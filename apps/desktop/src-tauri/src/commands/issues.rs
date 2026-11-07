@@ -44,11 +44,7 @@ fn connections(runtime: &TaskRuntime) -> Result<Vec<Connection>, String> {
     .unwrap_or_default())
 }
 fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
+    super::http::client(Duration::from_secs(20))
 }
 async fn response(request: reqwest::RequestBuilder) -> Result<Value, String> {
     let mut response = request
@@ -61,17 +57,14 @@ async fn response(request: reqwest::RequestBuilder) -> Result<Value, String> {
             response.status().as_u16()
         ));
     }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
+    let bytes = super::http::read_bounded(&mut response, 2_000_000)
         .await
-        .map_err(|_| "The issue response was interrupted. Retry.")?
-    {
-        if bytes.len() + chunk.len() > 2_000_000 {
-            return Err("The issue response is too large. Narrow your search.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
+        .map_err(|error| match error {
+            super::http::BodyError::Interrupted => "The issue response was interrupted. Retry.",
+            super::http::BodyError::TooLarge => {
+                "The issue response is too large. Narrow your search."
+            }
+        })?;
     let value: Value = serde_json::from_slice(&bytes)
         .map_err(|_| "The issue service returned an unreadable response.")?;
     if value.get("errors").is_some() {

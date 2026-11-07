@@ -1,12 +1,6 @@
 use super::*;
 use std::path::PathBuf;
 
-static RESOURCES: OnceLock<PathBuf> = OnceLock::new();
-
-pub fn set_resource_directory(path: PathBuf) {
-    let _ = RESOURCES.set(path);
-}
-
 pub fn supported() -> bool {
     #[cfg(target_os = "linux")]
     return !matches!(detected(false).selection, Selection::Unavailable(_));
@@ -83,20 +77,10 @@ fn wayland_session() -> bool {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn command(payload: Value) -> Result<std::process::Command, String> {
     use std::os::unix::process::CommandExt;
-    let relative = std::path::Path::new("resources/desktop-control/jackalope-desktop-control");
-    let bundled = RESOURCES.get().map(|root| root.join(relative));
-    let executable = bundled
-        .filter(|path| path.is_file())
-        .or_else(|| {
-            #[cfg(debug_assertions)]
-            {
-                let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative);
-                path.is_file().then_some(path)
-            }
-            #[cfg(not(debug_assertions))]
-            None
-        })
-        .ok_or("The bundled desktop helper is missing. Reinstall Jackalope.")?;
+    let executable =
+        crate::commands::resources::bundled("resources/desktop-control/jackalope-desktop-control")
+            .filter(|path| path.is_file())
+            .ok_or("The bundled desktop helper is missing. Reinstall Jackalope.")?;
     let mut command = std::process::Command::new(executable);
     command.env_clear().process_group(0);
     for key in [
@@ -304,7 +288,7 @@ fn install_gnome_extension() -> Result<(), String> {
     let data = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+        .or_else(|| crate::commands::platform::home_dir().map(|home| home.join(".local/share")))
         .filter(|path| path.is_absolute())
         .ok_or("The user data directory is unavailable.")?;
     let directory = data.join("gnome-shell/extensions/desktop-control@jackalope.dev");
@@ -410,7 +394,8 @@ fn open_lease(path: &std::path::Path) -> Result<super::super::file_lock::FileLoc
 /// one-window action set; element refs there fall back to coordinates.
 pub(crate) struct Capabilities {
     pub scopes: &'static [super::grant::Scope],
-    pub actions: &'static [&'static str],
+    /// Actions of [`super::actions::ACTIONS`] this desktop's helper lacks.
+    pub missing: &'static [&'static str],
     /// The helper performs accessibility actions on element refs itself.
     pub element_actions: bool,
     /// The helper accepts arbitrary validated key chords.
@@ -432,7 +417,7 @@ impl Capabilities {
     }
 
     pub fn action(&self, action: &str) -> Result<(), String> {
-        if self.actions.contains(&action) {
+        if super::actions::ACTIONS.contains(&action) && !self.missing.contains(&action) {
             Ok(())
         } else {
             Err(format!(
@@ -442,28 +427,8 @@ impl Capabilities {
     }
 }
 
-/// Actions the portal backend implements; clipboard access and opening apps
-/// are not offered through the portals.
-const PORTAL_ACTIONS: &[&str] = &[
-    "request_access",
-    "release",
-    "snapshot",
-    "screenshot",
-    "wait_for",
-    "focus",
-    "list_windows",
-    "switch_window",
-    "click",
-    "double_click",
-    "right_click",
-    "drag",
-    "type",
-    "set_value",
-    "press",
-    "scroll",
-    "invoke",
-    "select",
-];
+/// Clipboard access and opening apps are not offered through the portals.
+const PORTAL_MISSING: &[&str] = &["open_app", "clipboard_read", "clipboard_write"];
 
 /// Portal desktops never offer single-window grants: the portal cannot
 /// confine input to one window, and window positions stay private.
@@ -477,7 +442,7 @@ pub(crate) fn portal_capabilities(scopes: super::portal::PortalScopes) -> Capabi
             (false, true) => &[Scope::Desktop],
             (false, false) => &[],
         },
-        actions: PORTAL_ACTIONS,
+        missing: PORTAL_MISSING,
         element_actions: true,
         chords: true,
     }
@@ -492,31 +457,54 @@ pub(crate) fn capabilities() -> Capabilities {
     if cfg!(any(windows, target_os = "macos")) {
         Capabilities {
             scopes: &[Scope::Window, Scope::App, Scope::Desktop],
-            actions: super::actions::ACTIONS,
+            missing: &[],
             element_actions: true,
             chords: true,
         }
     } else {
         Capabilities {
             scopes: &[Scope::Window],
-            actions: &[
-                "request_access",
-                "release",
-                "snapshot",
-                "screenshot",
-                "wait_for",
-                "focus",
-                "list_windows",
-                "click",
-                "type",
-                "press",
-                "scroll",
-                "invoke",
+            missing: &[
+                "switch_window",
+                "open_app",
+                "clipboard_read",
+                "clipboard_write",
+                "double_click",
+                "right_click",
+                "drag",
+                "set_value",
+                "select",
             ],
             element_actions: false,
             chords: false,
         }
     }
+}
+
+/// A Windows PowerShell running `script` with a minimal environment; `payload`
+/// is the request for a one-shot helper.
+#[cfg(windows)]
+pub(super) fn native_command(
+    script: &str,
+    payload: Option<Value>,
+) -> Result<std::process::Command, String> {
+    let windows =
+        std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable.")?;
+    let mut command = std::process::Command::new(
+        std::path::PathBuf::from(&windows).join("System32/WindowsPowerShell/v1.0/powershell.exe"),
+    );
+    command
+        .env_clear()
+        .env("SystemRoot", &windows)
+        .env("WINDIR", &windows)
+        .env("TEMP", std::env::temp_dir())
+        .env("TMP", std::env::temp_dir())
+        .args(["-NoProfile", "-NonInteractive", "-Command", script]);
+    if let Some(payload) = payload {
+        command.env("JACKALOPE_DESKTOP_REQUEST", payload.to_string());
+    }
+    crate::commands::process_control::hidden(&mut command);
+    Ok(command)
 }
 
 /// Starts the resident helper for this platform, or None where each action
@@ -526,7 +514,7 @@ pub(crate) fn launcher() -> Option<super::helper::Launcher> {
     return Some(std::sync::Arc::new(|| {
         use base64::Engine as _;
         Ok(super::helper::Launch {
-            command: super::native_command(include_str!("windows.ps1"), None)?,
+            command: native_command(include_str!("windows.ps1"), None)?,
             preamble: vec![
                 base64::engine::general_purpose::STANDARD.encode(include_str!("windows.cs"))
             ],
@@ -563,9 +551,10 @@ pub(super) fn open_app(name: &str) -> Result<(), String> {
         }
         let windows =
             std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable.")?;
-        let status = std::process::Command::new(PathBuf::from(&windows).join("System32/cmd.exe"))
-            .raw_arg(format!("/d /c start \"\" {name}"))
-            .creation_flags(0x08000000)
+        let mut command =
+            std::process::Command::new(PathBuf::from(&windows).join("System32/cmd.exe"));
+        command.raw_arg(format!("/d /c start \"\" {name}"));
+        let status = crate::commands::process_control::hidden(&mut command)
             .status()
             .map_err(|e| e.to_string())?;
         return if status.success() {
@@ -591,14 +580,6 @@ pub(super) fn open_app(name: &str) -> Result<(), String> {
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     return Err("Opening apps is not available on this desktop.".into());
-}
-
-pub(super) fn key(key: &str) -> String {
-    if cfg!(target_os = "macos") {
-        key.into()
-    } else {
-        key.replacen("Primary+", "Control+", 1)
-    }
 }
 
 #[cfg(all(test, unix))]

@@ -100,6 +100,24 @@ class Harness(unittest.TestCase):
         self.fail("The run did not finish.")
 
 
+class SharedProtocol(Harness):
+    def test_named_keys_have_an_xdotool_name(self):
+        self.assertEqual(set(self.agent.KEYS), set(self.agent.SHARED["namedKeys"]))
+
+    def test_local_routes_name_served_tools(self):
+        served = set(self.agent.WORKSPACE_TOOLS) | set(self.agent.BROWSER_TOOLS)
+        self.assertTrue(set(self.agent.LOCAL_ROUTES.values()) <= served)
+        self.assertEqual(self.agent.LOCAL_ROUTES["/v1/browser/tabs"], "browser_tabs")
+
+    def test_failures_carry_a_shared_code(self):
+        codes = {self.agent.FAILED, self.agent.UNSUPPORTED, self.agent.PERMANENT}
+        self.assertEqual(codes, set(self.agent.SHARED["errorCodes"]))
+        missing = self.agent.respond({"id": 1, "action": "artifact_get", "sha256": "0" * 64})
+        self.assertEqual((missing["ok"], missing["code"]), (False, self.agent.PERMANENT))
+        invalid = self.agent.respond({"id": 2, "action": "artifact_get", "sha256": "x"})
+        self.assertEqual((invalid["ok"], invalid["code"]), (False, self.agent.FAILED))
+
+
 class RunProtocol(Harness):
     def test_round_trip_returns_patch_of_changes(self):
         base = self.upload("r1", archive({"a.txt": b"one\n", "dir/b.txt": b"keep\n"}))

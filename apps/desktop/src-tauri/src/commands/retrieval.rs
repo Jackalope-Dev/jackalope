@@ -1,15 +1,12 @@
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Words of a query that rank documents. A computer's runner ignores the same stop words.
 pub(super) fn terms(text: &str) -> Vec<String> {
-    const STOP: &[&str] = &[
-        "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "for", "from", "how", "i",
-        "in", "is", "it", "my", "of", "on", "or", "the", "this", "to", "was", "what", "when",
-        "where", "with", "you", "your",
-    ];
+    let stop = &super::computers::protocol::protocol().search.stop_words;
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
-        .filter(|s| s.len() > 1 && !STOP.contains(s))
+        .filter(|s| s.len() > 1 && !stop.iter().any(|word| word == s))
         .map(str::to_owned)
         .collect()
 }

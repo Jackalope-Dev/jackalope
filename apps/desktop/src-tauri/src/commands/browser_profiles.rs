@@ -13,7 +13,8 @@
 use super::{
     browser::{self, ProfileGuard, ProfileWindow, Verdict},
     desktop_control::grant,
-    harness::{PendingUserPrompt, QuestionPresentation},
+    harness::PendingUserPrompt,
+    site_gate::{self, Check, Loopback, Refused, SiteGate},
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
@@ -366,12 +367,11 @@ pub struct OpenProfileRequest {
     pub reason: Option<String>,
 }
 
-#[derive(Default)]
+/// Loopback pages were never asked about in a saved profile (local development).
+const SITE_LOOPBACK: Loopback = Loopback::Exempt;
+
 struct AgentState {
-    allowed: HashSet<String>,
-    denied: HashSet<String>,
-    /// Open site question: (prompt ID, host).
-    site_prompt: Option<(String, String)>,
+    sites: SiteGate,
     sign_in: Option<SignIn>,
     /// Hosts whose sign-in the person skipped this task.
     skipped: HashSet<String>,
@@ -389,32 +389,13 @@ struct AgentGuard {
     root: PathBuf,
     profile: BrowserProfile,
     directory: PathBuf,
-    /// Key for saved site decisions: the project ID or `bot:<id>`.
-    decisions: String,
-    /// Who the decisions belong to, as the person reads it.
+    /// Who the saved site decisions belong to, as the person reads it.
     owner: String,
     state: Mutex<AgentState>,
     _lease: Lease,
 }
 
-fn site_options(host: &str, owner: &str) -> Vec<(String, (bool, bool))> {
-    vec![
-        (format!("Allow {host} for this task"), (true, false)),
-        (format!("Always allow {host} in {owner}"), (true, true)),
-        (format!("Not {host}"), (false, false)),
-        (format!("Never allow {host} in {owner}"), (false, true)),
-    ]
-}
-
-fn loopback(host: &str) -> bool {
-    matches!(host, "localhost" | "127.0.0.1" | "::1" | "0.0.0.0")
-}
-
 impl AgentGuard {
-    fn store(&self) -> PathBuf {
-        grant::store_path(&self.runtime.preferences_directory())
-    }
-
     fn lock(&self) -> std::sync::MutexGuard<'_, AgentState> {
         self.state
             .lock()
@@ -426,85 +407,59 @@ impl AgentGuard {
             .update(&self.run_id, |run| run.activity.push(text));
     }
 
-    fn ask(&self, header: &str, question: String, options: Vec<String>) -> Result<String, String> {
-        let prompt = PendingUserPrompt {
-            id: uuid::Uuid::new_v4().to_string(),
-            run_id: self.run_id.clone(),
-            question,
-            input_type: "choice".into(),
-            options,
-            default_value: None,
-            status: "pending".into(),
-            answer: None,
-            created_at: chrono::Utc::now().to_rfc3339(),
-            answered_at: None,
-            presentation: QuestionPresentation {
-                header: Some(header.into()),
-                allow_other: Some(false),
-                ..Default::default()
-            },
-            autonomy: Default::default(),
-        };
-        let mut pushed = false;
-        self.runtime.update_checked(&self.run_id, |run| {
-            if run.status.is_running() {
-                run.prompts.push(prompt.clone());
-                pushed = true;
-            }
-        })?;
-        if !pushed {
-            return Err("This attempt has ended; its browser profile is closed.".into());
+    fn push(&self, prompt: &PendingUserPrompt) -> Result<(), String> {
+        if site_gate::push_if_running(&self.runtime, &self.run_id, prompt)? {
+            Ok(())
+        } else {
+            Err("This attempt has ended; its browser profile is closed.".into())
         }
-        Ok(prompt.id)
     }
 
-    /// The person's answer, `None` while the question is open.
-    fn answer(&self, prompt_id: &str) -> Result<Option<String>, String> {
+    fn prompt(&self, prompt_id: &str) -> Result<PendingUserPrompt, String> {
         let run = self
             .runtime
             .run_snapshot(&self.run_id)
             .filter(|run| run.status.is_running())
             .ok_or("This attempt has ended; its browser profile is closed.")?;
-        let prompt = run
-            .prompts
-            .iter()
+        run.prompts
+            .into_iter()
             .find(|prompt| prompt.id == prompt_id)
-            .ok_or("The browser question is no longer available.")?;
+            .ok_or_else(|| "The browser question is no longer available.".into())
+    }
+
+    /// The answer to a sign-in question, `None` while it is open.
+    fn answer(&self, prompt_id: &str) -> Result<Option<String>, String> {
+        let prompt = self.prompt(prompt_id)?;
         Ok(match prompt.status.as_str() {
             "pending" => None,
-            "answered" => Some(prompt.answer.clone().unwrap_or_default()),
+            "answered" => Some(prompt.answer.unwrap_or_default()),
             _ => Some(String::new()),
         })
     }
 
     fn settle_site(&self, state: &mut AgentState) -> Result<(), String> {
-        let Some((prompt_id, host)) = state.site_prompt.clone() else {
+        let Some((prompt_id, host)) = state
+            .sites
+            .pending()
+            .map(|(id, host)| (id.to_owned(), host.to_owned()))
+        else {
             return Ok(());
         };
-        let Some(answer) = self.answer(&prompt_id)? else {
+        let Some(decision) = state.sites.settle(&self.prompt(&prompt_id)?)? else {
             return Err(format!("Waiting for the person to decide whether you may use {host} in the {}. Call the browser tool again after they answer; page content is withheld until then.", self.profile.name));
         };
-        state.site_prompt = None;
-        let (allow, remember) = site_options(&host, &self.owner)
-            .into_iter()
-            .find(|(label, _)| *label == answer)
-            .map_or((false, false), |(_, choice)| choice);
-        if remember {
-            grant::decide_site(&self.store(), &self.decisions, &host, allow)?;
-        }
+        let (allow, remember) = (decision.allow, decision.remember);
         let scope = if remember {
             format!(" in {}", self.owner)
         } else {
             " for this task".into()
         };
         if allow {
-            state.allowed.insert(host.clone());
             self.activity(format!(
                 "You allowed the agent to use {host}{scope} in the {}.",
                 self.profile.name
             ));
         } else {
-            state.denied.insert(host.clone());
             self.activity(format!(
                 "You declined {host}{scope} in the {}.",
                 self.profile.name
@@ -558,35 +513,24 @@ impl ProfileGuard for AgentGuard {
         else {
             return Ok(Verdict::Proceed);
         };
-        if loopback(&host) {
-            return Ok(Verdict::Proceed);
-        }
         let mut state = self.lock();
-        if state.denied.contains(&host) {
-            return Err(format!("The person declined {host} for this task. Navigate elsewhere only if the person asks."));
-        }
-        if !state.allowed.contains(&host) {
-            match grant::site_decision(&grant::sites(&self.store(), &self.decisions), &host) {
-                Some(true) => {
-                    state.allowed.insert(host.clone());
-                }
-                Some(false) => {
-                    state.denied.insert(host.clone());
-                    return Err(format!(
-                        "{host} is blocked for {} in its settings.",
-                        self.owner
-                    ));
-                }
-                None => {
-                    let options = site_options(&host, &self.owner);
-                    let prompt = self.ask(
-                        "Website access",
-                        format!("An agent wants to use {host} in the {}, where your sign-ins are saved. Allow it to read and act on this site?", self.profile.name),
-                        options.into_iter().map(|(label, _)| label).collect(),
-                    )?;
-                    state.site_prompt = Some((prompt, host.clone()));
-                    return Err(format!("Asked the person whether you may use {host}. Wait, then call the browser tool again; page content is withheld until they allow it."));
-                }
+        match state.sites.check(&host) {
+            Ok(Check::Allowed) => {}
+            Err(Refused::Declined) => {
+                return Err(format!("The person declined {host} for this task. Navigate elsewhere only if the person asks."))
+            }
+            Err(Refused::Blocked) => {
+                return Err(format!(
+                    "{host} is blocked for {} in its settings.",
+                    self.owner
+                ))
+            }
+            Ok(Check::Ask) => {
+                let question = format!("An agent wants to use {host} in the {}, where your sign-ins are saved. Allow it to read and act on this site?", self.profile.name);
+                state
+                    .sites
+                    .ask(&self.run_id, &host, question, |prompt| self.push(prompt))?;
+                return Err(format!("Asked the person whether you may use {host}. Wait, then call the browser tool again; page content is withheld until they allow it."));
             }
         }
         if login && !state.skipped.contains(&host) && state.sign_in.is_none() {
@@ -606,14 +550,16 @@ impl ProfileGuard for AgentGuard {
             }
         };
         let question = format!("Sign in to {host} in the {}. Jackalope opened it in its own window; your password stays in that browser and neither the agent nor Jackalope sees it. Choose when you are done.", self.profile.name);
-        match self.ask(
+        let prompt = PendingUserPrompt::choice(
+            &self.run_id,
             "Sign in needed",
             question,
             vec![SIGNED_IN.into(), SKIP_SIGN_IN.into()],
-        ) {
-            Ok(prompt) => {
+        );
+        match self.push(&prompt) {
+            Ok(()) => {
                 state.sign_in = Some(SignIn {
-                    prompt,
+                    prompt: prompt.id,
                     host: host.clone(),
                     window: Some(window),
                 });
@@ -695,9 +641,12 @@ pub async fn open_for_run(
         root: root.clone(),
         profile: profile.clone(),
         directory,
-        decisions,
+        state: Mutex::new(AgentState {
+            sites: SiteGate::new(runtime, &decisions, format!("in {label}"), SITE_LOOPBACK),
+            sign_in: None,
+            skipped: HashSet::new(),
+        }),
         owner: label,
-        state: Mutex::default(),
         _lease: lease,
     });
     let id = run.id.clone();

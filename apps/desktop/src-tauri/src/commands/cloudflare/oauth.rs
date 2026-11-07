@@ -3,6 +3,11 @@
 //! loopback listener on 127.0.0.1; nothing is exposed beyond this computer.
 //! Tokens stay in memory until an account is chosen, then in protected storage.
 
+use super::{
+    api::API_ROOT,
+    scopes::{self, Scope},
+};
+use crate::commands::http;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
 use serde_json::Value;
@@ -20,15 +25,11 @@ const CLIENT_ID: &str = "0c24764a63057619e2f99d608b5a041b";
 const AUTHORIZE_URL: &str = "https://dash.cloudflare.com/oauth2/auth";
 const TOKEN_URL: &str = "https://dash.cloudflare.com/oauth2/token";
 const REVOKE_URL: &str = "https://dash.cloudflare.com/oauth2/revoke";
-const ACCOUNTS_URL: &str = "https://api.cloudflare.com/client/v4/accounts?per_page=50";
 /// Must match the client's registered redirect URIs exactly.
 const PORTS: [u16; 3] = [47851, 47852, 47853];
 const CALLBACK_PATH: &str = "/cloudflare/callback";
 const SCOPES: &str =
     "artifacts.write artifacts.read account-settings.read user-details.read offline_access";
-/// Requested only when the person sets up Jackalope Swarm, so Connect Cloudflare keeps
-/// working for clients whose registration does not allow Workers yet.
-pub const WORKERS_SCOPE: &str = "workers-scripts.write";
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(300);
 /// Refresh this long before expiry so a slow request never carries a stale token.
 const REFRESH_MARGIN_SECONDS: i64 = 300;
@@ -48,10 +49,10 @@ pub struct Grant {
 
 impl Grant {
     /// `Some(false)` only when Cloudflare reported the granted scopes and this one is missing.
-    pub fn allows(&self, scope: &str) -> Option<bool> {
+    pub fn allows(&self, scope: &Scope) -> Option<bool> {
         self.scopes
             .as_deref()
-            .map(|granted| granted.split_whitespace().any(|item| item == scope))
+            .map(|granted| scopes::granted(granted, scope))
     }
 }
 
@@ -109,11 +110,7 @@ fn form(pairs: &[(&str, &str)]) -> String {
 }
 
 fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
+    http::client(Duration::from_secs(30))
 }
 
 async fn token_request(pairs: &[(&str, &str)]) -> Result<Tokens, String> {
@@ -180,12 +177,8 @@ pub async fn refresh(grant: &Grant) -> Result<Tokens, String> {
     Ok(tokens)
 }
 
-fn requested_scopes(workers: bool, extra: &[String]) -> String {
+fn requested_scopes(extra: &[String]) -> String {
     let mut scopes = SCOPES.to_owned();
-    if workers {
-        scopes.push(' ');
-        scopes.push_str(WORKERS_SCOPE);
-    }
     for scope in extra {
         scopes.push(' ');
         scopes.push_str(scope);
@@ -199,7 +192,7 @@ fn authorize_error(error: &str, description: Option<&str>, invalid_scope: Option
         "access_denied" => "Cloudflare access was not approved.".into(),
         // The public client's registration does not allow a requested scope.
         "invalid_scope" if invalid_scope.is_some() => invalid_scope.unwrap_or_default().into(),
-        "invalid_scope" => "Cloudflare does not let Jackalope deploy Workers through Connect Cloudflare yet. Connect with an API token that has Workers Scripts: Edit and Artifacts: Edit instead.".into(),
+        "invalid_scope" => format!("Cloudflare does not let Jackalope deploy Workers through Connect Cloudflare yet. Connect with an API token that has {} and Artifacts: Edit instead.", scopes::WORKERS.permission),
         _ => format!(
             "Cloudflare sign-in failed: {}",
             description
@@ -227,14 +220,9 @@ pub async fn revoke(grant: &Grant) {
     }
 }
 
-/// Prepares a sign-in and returns the Cloudflare consent URL to open. `workers`
-/// also asks to deploy Workers, for Jackalope Swarm; `extra` adds product scopes, and
-/// `invalid_scope` is the message shown when Cloudflare refuses one of them.
-pub async fn begin(
-    workers: bool,
-    extra: &[String],
-    invalid_scope: Option<String>,
-) -> Result<String, String> {
+/// Prepares a sign-in and returns the Cloudflare consent URL to open. `extra` adds
+/// product scopes, and `invalid_scope` is the message shown when Cloudflare refuses one.
+pub async fn begin(extra: &[String], invalid_scope: Option<String>) -> Result<String, String> {
     let mut bound = None;
     for port in PORTS {
         if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)).await {
@@ -253,7 +241,7 @@ pub async fn begin(
         ("response_type", "code"),
         ("client_id", CLIENT_ID),
         ("redirect_uri", redirect_uri.as_str()),
-        ("scope", requested_scopes(workers, extra).as_str()),
+        ("scope", requested_scopes(extra).as_str()),
         ("state", state.as_str()),
         ("code_challenge", challenge(&verifier).as_str()),
         ("code_challenge_method", "S256"),
@@ -434,7 +422,7 @@ async fn accounts(access: &str) -> Result<Vec<Account>, String> {
 /// `GET /accounts` with `access`; any API token can list the accounts it covers.
 pub(super) async fn list_accounts(access: &str) -> Result<Value, String> {
     let response = client()?
-        .get(ACCOUNTS_URL)
+        .get(format!("{API_ROOT}?per_page=50"))
         .bearer_auth(access)
         .send()
         .await
@@ -525,18 +513,12 @@ mod tests {
     }
 
     #[test]
-    fn workers_scope_is_requested_only_for_swarm_setup() {
-        assert!(!requested_scopes(false, &[]).contains(WORKERS_SCOPE));
-        assert!(requested_scopes(true, &[]).ends_with(" workers-scripts.write"));
-        assert!(requested_scopes(true, &[]).contains("offline_access"));
-    }
-
-    #[test]
-    fn resource_scopes_are_added_after_the_base_scopes() {
-        let scopes = requested_scopes(false, &["d1.write".into(), "queues.write".into()]);
-        assert!(scopes.starts_with(SCOPES));
-        assert!(scopes.ends_with(" d1.write queues.write"));
-        assert!(!scopes.contains(WORKERS_SCOPE));
+    fn product_scopes_are_added_after_the_base_scopes() {
+        assert!(!requested_scopes(&[]).contains(scopes::WORKERS.name));
+        assert!(requested_scopes(&[]).contains("offline_access"));
+        let requested = requested_scopes(&["d1.write".into(), "queues.write".into()]);
+        assert!(requested.starts_with(SCOPES));
+        assert!(requested.ends_with(" d1.write queues.write"));
     }
 
     #[test]
@@ -546,13 +528,13 @@ mod tests {
             expires_at: 0,
             scopes: scopes.map(str::to_owned),
         };
-        assert_eq!(grant(None).allows(WORKERS_SCOPE), None);
+        assert_eq!(grant(None).allows(&scopes::WORKERS), None);
         assert_eq!(
-            grant(Some("artifacts.write workers-scripts.write")).allows(WORKERS_SCOPE),
+            grant(Some("artifacts.write workers-scripts.write")).allows(&scopes::WORKERS),
             Some(true)
         );
         assert_eq!(
-            grant(Some("artifacts.write workers-scripts.read")).allows(WORKERS_SCOPE),
+            grant(Some("artifacts.write workers-scripts.read")).allows(&scopes::WORKERS),
             Some(false)
         );
         // Saved grants from before scopes were recorded still load.
@@ -563,7 +545,7 @@ mod tests {
     #[test]
     fn unregistered_scopes_point_to_an_api_token() {
         let message = authorize_error("invalid_scope", None, None);
-        assert!(message.contains("Workers Scripts: Edit"));
+        assert!(message.contains(scopes::WORKERS.permission));
         assert_eq!(
             authorize_error("access_denied", None, None),
             "Cloudflare access was not approved."

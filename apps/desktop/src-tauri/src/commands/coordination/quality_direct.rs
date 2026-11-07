@@ -102,16 +102,7 @@ pub(super) fn run(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    crate::commands::process_control::isolated(&mut cmd);
     let run = Arc::new(Mutex::new(TaskRun {
         agent: agent.into(),
         model: Some(model.into()),

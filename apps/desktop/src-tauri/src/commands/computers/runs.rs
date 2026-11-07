@@ -9,7 +9,8 @@
 //! [`Transport`](super::Transport), so a long run never holds the connection
 //! desktop actions share. See `resources/computer/agent.py` for the protocol.
 
-use super::{credentials, Computer, Transport, AGENT37, LOCAL_DOCKER, PROJECT, REMOTE_MACHINE};
+use super::protocol::protocol;
+use super::{credentials, AgentError, Computer, Transport, PROJECT, UNSUPPORTED};
 use crate::commands::git_command;
 use base64::Engine;
 use serde_json::{json, Value};
@@ -23,17 +24,20 @@ use std::{
     time::Duration,
 };
 
-/// Raw bytes per upload chunk; base64 keeps each request under the agent's 1 MB body limit.
-pub(super) const CHUNK: usize = 512 * 1024;
-pub(super) const UPLOAD_LIMIT: u64 = 512 * 1024 * 1024;
-pub(super) const PATCH_LIMIT: usize = 256 * 1024 * 1024;
 pub(super) const CALL_TIMEOUT: Duration = Duration::from_secs(120);
 /// How long a run's agent waits for new output before answering a read.
 pub(crate) const READ_WAIT_MS: u64 = 1000;
 
-/// Providers whose machines run the computer image's agent and so accept runs.
+/// Whether the agent does not know an action. Agents in images published before
+/// error codes say so only in their message.
+fn unsupported(error: &AgentError) -> bool {
+    error.is(UNSUPPORTED) || (error.code.is_none() && error.message.contains("Unsupported action"))
+}
+
+/// Whether the computer's provider is one this build serves. Every provider runs
+/// the computer image's agent and so accepts runs.
 pub(crate) fn supports_runs(computer: &Computer) -> bool {
-    [LOCAL_DOCKER, REMOTE_MACHINE, AGENT37].contains(&computer.provider.as_str())
+    super::provider(&computer.provider).is_ok()
 }
 
 /// The computer a project's task agents run on, when it has one.
@@ -46,8 +50,7 @@ pub(crate) fn project_computer(root: &Path, project_id: &str) -> Option<Computer
 /// resume there.
 pub(crate) fn run_name(workspace: &str) -> String {
     let digest = Sha256::digest(workspace.as_bytes());
-    let hex: String = digest[..10].iter().map(|b| format!("{b:02x}")).collect();
-    format!("w{hex}")
+    format!("w{}", super::artifacts::hex(&digest[..10]))
 }
 
 /// A read-only (planning) attempt's run name. It never shares a folder with a
@@ -59,10 +62,16 @@ pub(crate) fn read_only_run_name(workspace: &str) -> String {
 /// Environment variables for a run, as name and value.
 pub(crate) type Environment = Vec<(String, String)>;
 
-/// Stand-ins the in-sandbox agent replaces with its bridge relay's address and
-/// secret when a run starts with `relay`.
-pub(crate) const RELAY_URL: &str = "@@JACKALOPE_RELAY_URL@@";
-pub(crate) const RELAY_TOKEN: &str = "@@JACKALOPE_RELAY_TOKEN@@";
+/// The stand-in the runner replaces with its bridge relay's address when a run
+/// starts with `relay`.
+pub(crate) fn relay_url() -> &'static str {
+    &protocol().relay.url
+}
+
+/// The stand-in the runner replaces with its bridge relay's secret.
+pub(crate) fn relay_token() -> &'static str {
+    &protocol().relay.token
+}
 
 /// The agent CLI command for a computer, translated from the local command:
 /// the program becomes the CLI on the computer's PATH, local paths are dropped,
@@ -91,7 +100,7 @@ pub(crate) fn translate(
         let relayed = value.and_then(|value| {
             bridge
                 .filter(|endpoint| value.contains(endpoint))
-                .map(|endpoint| value.replace(endpoint, RELAY_URL))
+                .map(|endpoint| value.replace(endpoint, relay_url()))
         });
         match (adapter, arg.as_str()) {
             ("claude", "--mcp-config") | ("codex", "-c") if relayed.is_some() => {
@@ -145,8 +154,8 @@ pub(crate) fn translate(
         })
         .collect();
     if bridge.is_some() {
-        env.push(("JACKALOPE_BRIDGE_URL".into(), RELAY_URL.into()));
-        env.push(("JACKALOPE_BRIDGE_TOKEN".into(), RELAY_TOKEN.into()));
+        env.push(("JACKALOPE_BRIDGE_URL".into(), relay_url().into()));
+        env.push(("JACKALOPE_BRIDGE_TOKEN".into(), relay_token().into()));
     }
     env.extend(credentials::environment(root, adapter)?);
     Ok((argv, env))
@@ -303,7 +312,11 @@ impl Session {
         }
     }
 
-    pub(super) fn call(&mut self, mut payload: Value, timeout: Duration) -> Result<Value, String> {
+    pub(super) fn call(
+        &mut self,
+        mut payload: Value,
+        timeout: Duration,
+    ) -> Result<Value, AgentError> {
         payload["run"] = json!(self.name);
         self.transport.call(&payload, timeout, &self.canceled)
     }
@@ -314,8 +327,8 @@ impl Session {
     pub fn status(&mut self) -> Result<Option<Value>, String> {
         let status = match self.call(json!({"action":"run_status"}), CALL_TIMEOUT) {
             Ok(status) => Some(status),
-            Err(error) if error.contains("Unsupported action") => None,
-            Err(error) => return Err(error),
+            Err(error) if unsupported(&error) => None,
+            Err(error) => return Err(error.into()),
         };
         self.capabilities = super::runner::RunnerCapabilities::from_status(status.as_ref());
         self.synced = status
@@ -341,11 +354,11 @@ impl Session {
         file.seek(std::io::SeekFrom::Start(0))
             .map_err(|e| e.to_string())?;
         let mut digest = Sha256::new();
-        let mut buffer = vec![0u8; CHUNK];
+        let mut buffer = vec![0u8; protocol().transfer.chunk];
         let mut offset = 0u64;
         loop {
             let mut filled = 0;
-            while filled < CHUNK {
+            while filled < protocol().transfer.chunk {
                 let read = file
                     .read(&mut buffer[filled..])
                     .map_err(|e| e.to_string())?;
@@ -363,13 +376,7 @@ impl Session {
                 "final": last,
             });
             if last {
-                let hex: String = digest
-                    .clone()
-                    .finalize()
-                    .iter()
-                    .map(|b| format!("{b:02x}"))
-                    .collect();
-                request["sha256"] = json!(hex);
+                request["sha256"] = json!(super::artifacts::hex(&digest.clone().finalize()));
             }
             self.call(request, CALL_TIMEOUT)?;
             offset += filled as u64;
@@ -469,19 +476,20 @@ impl Session {
         } else {
             request["body"] = json!(base64::engine::general_purpose::STANDARD.encode(&answer.body));
         }
-        self.call(request, CALL_TIMEOUT).map(|_| ())
+        self.call(request, CALL_TIMEOUT)?;
+        Ok(())
     }
 
     pub fn stop(&mut self) -> Result<(), String> {
-        self.call(json!({"action":"run_stop"}), CALL_TIMEOUT)
-            .map(|_| ())
+        self.call(json!({"action":"run_stop"}), CALL_TIMEOUT)?;
+        Ok(())
     }
 
     /// The run's changes since the upload, as a binary Git patch.
     pub fn collect(&mut self) -> Result<Vec<u8>, String> {
         let summary = self.call(json!({"action":"workspace_diff"}), Duration::from_secs(660))?;
         let size = summary["size"].as_u64().unwrap_or(0) as usize;
-        if size > PATCH_LIMIT {
+        if size > protocol().transfer.patch {
             return Err("The agent changed more than 256 MB of files.".into());
         }
         let mut patch = Vec::with_capacity(size);
@@ -498,10 +506,7 @@ impl Session {
             }
             patch.extend_from_slice(&data);
         }
-        let hex: String = Sha256::digest(&patch)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let hex = super::artifacts::hex(&Sha256::digest(&patch));
         if summary["sha256"].as_str() != Some(hex.as_str()) {
             return Err("The computer's change set was corrupted in transfer.".into());
         }
@@ -517,8 +522,8 @@ impl Session {
     /// [`Session::remove`], saying whether the computer removed the run: its
     /// folder, and for a Git-synced run its worktree, branch and refs.
     pub fn try_remove(&mut self) -> Result<(), String> {
-        self.call(json!({"action":"run_remove"}), CALL_TIMEOUT)
-            .map(|_| ())
+        self.call(json!({"action":"run_remove"}), CALL_TIMEOUT)?;
+        Ok(())
     }
 
     pub fn shutdown(&mut self) {
@@ -696,7 +701,7 @@ fn write_archive(workspace: &Path, files: Vec<(String, bool)>) -> Result<std::fs
                 .map_err(|e| e.to_string())?;
         } else if metadata.is_file() {
             total += metadata.len();
-            if total > UPLOAD_LIMIT {
+            if total > protocol().transfer.upload {
                 return Err("The workspace is larger than 512 MB, so it cannot run on a computer. Ignore build output in .gitignore.".into());
             }
             let mut header = tar::Header::new_gnu();
@@ -850,6 +855,17 @@ impl Lines {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_actions_are_recognized_by_code_or_old_agents_wording() {
+        let error = |code: Option<&str>, message: &str| AgentError {
+            code: code.map(str::to_owned),
+            message: message.into(),
+        };
+        assert!(unsupported(&error(Some(UNSUPPORTED), "")));
+        assert!(unsupported(&error(None, "Unsupported action.")));
+        assert!(!unsupported(&error(Some("failed"), "Unsupported action.")));
+    }
 
     #[test]
     fn lines_split_across_chunks_and_bound_length() {
@@ -1018,7 +1034,7 @@ mod tests {
             .env("JACKALOPE_BRIDGE_TOKEN", "real-secret");
         let (argv, env) = translate("claude", &command, root.path(), Some(endpoint)).unwrap();
         assert_eq!(argv[2], "--mcp-config");
-        assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
+        assert!(argv[3].contains(&format!("{}/mcp", relay_url())));
         assert!(!argv[3].contains(endpoint));
         let delivered: Value = serde_json::from_str(&argv[3]).unwrap();
         assert_eq!(
@@ -1033,8 +1049,8 @@ mod tests {
         assert!(!argv.iter().any(|arg| arg == "--permission-prompt-tool"));
         assert_eq!(argv[4..], ["--allowedTools", "mcp__jackalope__peers"]);
         let value = |name: &str| env.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str());
-        assert_eq!(value("JACKALOPE_BRIDGE_URL"), Some(RELAY_URL));
-        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(RELAY_TOKEN));
+        assert_eq!(value("JACKALOPE_BRIDGE_URL"), Some(relay_url()));
+        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(relay_token()));
         assert!(!env.iter().any(|(_, v)| v.contains("real-secret")));
 
         let mut command = Command::new("codex");
@@ -1047,7 +1063,7 @@ mod tests {
         ]);
         let (argv, _) = translate("codex", &command, root.path(), Some(endpoint)).unwrap();
         assert_eq!(argv.len(), 4);
-        assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
+        assert!(argv[3].contains(&format!("{}/mcp", relay_url())));
         assert!(!argv[3].contains("DOCS_TOKEN") && !argv[3].contains("docs.server"));
         let parsed: toml::Table = toml::from_str(&argv[3]).unwrap();
         assert_eq!(
@@ -1062,7 +1078,7 @@ mod tests {
             ("GIT_AUTHOR_NAME".into(), "Claude".into()),
             ("SHARED".into(), "from-command".into()),
             ("CLAUDE_CODE_OAUTH_TOKEN".into(), "sign-in".into()),
-            ("JACKALOPE_BRIDGE_TOKEN".into(), RELAY_TOKEN.into()),
+            ("JACKALOPE_BRIDGE_TOKEN".into(), relay_token().into()),
         ];
         add_secrets(
             &mut env,
@@ -1087,7 +1103,7 @@ mod tests {
         assert_eq!(value("KEY_FILE"), Some("C:\\keys\\service.json"));
         assert_eq!(value("SHARED"), Some("from-secret"));
         assert_eq!(value("CLAUDE_CODE_OAUTH_TOKEN"), Some("sign-in"));
-        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(RELAY_TOKEN));
+        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(relay_token()));
         assert_eq!(value("GIT_AUTHOR_NAME"), Some("Claude"));
     }
 
@@ -1189,14 +1205,19 @@ mod tests {
     }
 
     impl Transport for Fake {
-        fn call(&mut self, payload: &Value, _: Duration, _: &AtomicBool) -> Result<Value, String> {
+        fn call(
+            &mut self,
+            payload: &Value,
+            _: Duration,
+            _: &AtomicBool,
+        ) -> Result<Value, AgentError> {
             let engine = base64::engine::general_purpose::STANDARD;
             match payload["action"].as_str().unwrap() {
                 "workspace_put" => {
                     let mut upload = self.upload.lock().unwrap();
                     assert_eq!(payload["offset"].as_u64().unwrap() as usize, upload.len());
                     let data = engine.decode(payload["data"].as_str().unwrap()).unwrap();
-                    assert!(data.len() <= CHUNK);
+                    assert!(data.len() <= protocol().transfer.chunk);
                     upload.extend(data);
                     if payload["final"] == true {
                         let hex: String = Sha256::digest(&*upload)
@@ -1221,7 +1242,9 @@ mod tests {
     #[test]
     fn session_uploads_in_chunks_and_checks_the_returned_patch() {
         let dir = root();
-        let big: Vec<u8> = (0..CHUNK * 2 + 10).map(|n| (n % 251) as u8).collect();
+        let big: Vec<u8> = (0..protocol().transfer.chunk * 2 + 10)
+            .map(|n| (n % 251) as u8)
+            .collect();
         std::fs::write(dir.path().join("big.bin"), &big).unwrap();
         let upload = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let patch = b"diff --git a/x b/x\n".to_vec();

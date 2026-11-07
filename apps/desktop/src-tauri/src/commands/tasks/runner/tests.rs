@@ -30,7 +30,7 @@ impl computers::Transport for StandIn {
         payload: &serde_json::Value,
         _: Duration,
         _: &AtomicBool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, computers::AgentError> {
         let engine = base64::engine::general_purpose::STANDARD;
         Ok(match payload["action"].as_str().unwrap() {
             "run_status" => json!({"exists": false, "runs": 4, "capabilities": CAPABILITIES}),
@@ -56,7 +56,7 @@ impl computers::Transport for StandIn {
                 "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             }),
             "run_remove" => json!({}),
-            other => return Err(format!("Unsupported action {other}")),
+            other => return Err(format!("Unsupported action {other}").into()),
         })
     }
 }
@@ -299,7 +299,7 @@ impl computers::Transport for Unreachable {
         _: &serde_json::Value,
         _: Duration,
         _: &AtomicBool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, computers::AgentError> {
         Err("connection refused".into())
     }
 }
@@ -601,7 +601,7 @@ impl computers::Transport for Leftover {
         payload: &serde_json::Value,
         _: Duration,
         _: &AtomicBool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, computers::AgentError> {
         use sha2::Digest;
         let action = payload["action"].as_str().unwrap().to_string();
         self.calls.lock().unwrap().push(action.clone());
@@ -627,7 +627,7 @@ impl computers::Transport for Leftover {
                 json!({})
             }
             "workspace_put" => json!({}),
-            other => return Err(format!("Unsupported action {other}")),
+            other => return Err(format!("Unsupported action {other}").into()),
         })
     }
 }

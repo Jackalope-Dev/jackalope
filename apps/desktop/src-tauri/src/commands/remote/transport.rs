@@ -27,16 +27,7 @@ pub(super) fn close_tunnel(id: &str) {
 }
 fn command(program: &str) -> Command {
     let mut command = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
-    }
+    crate::commands::process_control::isolated(&mut command);
     command
 }
 pub(super) fn ssh_alias(value: &str) -> Result<(), String> {

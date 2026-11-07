@@ -1,5 +1,6 @@
 use super::{
     harness::PendingUserPrompt,
+    site_gate::{self, Check, Loopback, Refused, SiteGate},
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
@@ -17,7 +18,7 @@ use grant::{Choice, Grant, Scope};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex, OnceLock,
@@ -122,6 +123,32 @@ pub struct DesktopActionRecord {
 }
 
 const ACTION_LOG_LIMIT: usize = 200;
+/// The person's own browser: their local services are asked about like any site.
+const SITE_LOOPBACK: Loopback = Loopback::Asked;
+/// How long a snapshot's refs may be used for input.
+const SNAPSHOT_TTL: Duration = Duration::from_secs(60);
+/// The pause between a `wait_for`'s snapshots.
+const WAIT_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Lets the screen settle after input, before the "After …" capture.
+fn settle() {
+    std::thread::sleep(Duration::from_millis(120));
+}
+
+/// Adds an action to the run's activity and its bounded desktop action log.
+fn record_action(
+    runtime: &TaskRuntime,
+    run_id: &str,
+    line: String,
+    record: DesktopActionRecord,
+) -> Result<(), String> {
+    runtime.update_checked(run_id, |r| {
+        r.activity.push(line.clone());
+        r.desktop_actions.push(record.clone());
+        let excess = r.desktop_actions.len().saturating_sub(ACTION_LOG_LIMIT);
+        r.desktop_actions.drain(..excess);
+    })
+}
 
 struct Snapshot {
     id: String,
@@ -143,10 +170,37 @@ struct Access {
     target: Option<Window>,
     snapshot: Option<Snapshot>,
     indicator: Option<indicator::Indicator>,
-    site_prompt: Option<(String, String)>,
-    sites_allowed: HashSet<String>,
-    sites_denied: HashSet<String>,
+    /// Created with the grant, for the run's project.
+    sites: Option<SiteGate>,
     site: Option<String>,
+}
+
+/// A failed desktop call. `Ended` also closes the attempt's desktop session:
+/// the person declined access or stopped control.
+#[derive(Debug)]
+enum Failure {
+    Ended(String),
+    Other(String),
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Self {
+        Self::Other(message)
+    }
+}
+
+impl From<&str> for Failure {
+    fn from(message: &str) -> Self {
+        Self::Other(message.into())
+    }
+}
+
+impl From<Failure> for String {
+    fn from(failure: Failure) -> Self {
+        match failure {
+            Failure::Ended(message) | Failure::Other(message) => message,
+        }
+    }
 }
 
 enum Backend {
@@ -374,7 +428,7 @@ fn selected(
     run: &TaskRun,
     prompt_id: &str,
     choices: &[(String, Choice)],
-) -> Result<Option<Choice>, String> {
+) -> Result<Option<Choice>, Failure> {
     let prompt = run
         .prompts
         .iter()
@@ -388,7 +442,7 @@ fn selected_answer<T: Clone>(
     prompt: &PendingUserPrompt,
     prompt_id: &str,
     choices: &[(String, T)],
-) -> Result<Option<T>, String> {
+) -> Result<Option<T>, Failure> {
     if prompt.run_id != run_id || prompt.id != prompt_id {
         return Err("Desktop access question does not belong to this attempt.".into());
     }
@@ -399,7 +453,7 @@ fn selected_answer<T: Clone>(
         .iter()
         .find(|(label, _)| Some(label) == prompt.answer.as_ref())
         .map(|(_, choice)| Some(choice.clone()))
-        .ok_or_else(|| "Desktop access was declined. Nothing was granted.".into())
+        .ok_or_else(|| Failure::Ended("Desktop access was declined. Nothing was granted.".into()))
 }
 
 fn take_snapshot(access: &mut Access, id: Option<&str>) -> Result<Snapshot, String> {
@@ -407,32 +461,10 @@ fn take_snapshot(access: &mut Access, id: Option<&str>) -> Result<Snapshot, Stri
         .snapshot
         .take()
         .ok_or("Take a fresh snapshot or screenshot before input.")?;
-    if Some(snapshot.id.as_str()) != id || snapshot.taken.elapsed() > Duration::from_secs(60) {
+    if Some(snapshot.id.as_str()) != id || snapshot.taken.elapsed() > SNAPSHOT_TTL {
         return Err("The desktop snapshot is stale. Take a new snapshot before input.".into());
     }
     Ok(snapshot)
-}
-
-#[cfg(windows)]
-fn native_command(script: &str, payload: Option<Value>) -> Result<std::process::Command, String> {
-    use std::os::windows::process::CommandExt;
-    let windows =
-        std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable.")?;
-    let mut command = std::process::Command::new(
-        std::path::PathBuf::from(&windows).join("System32/WindowsPowerShell/v1.0/powershell.exe"),
-    );
-    command
-        .env_clear()
-        .env("SystemRoot", &windows)
-        .env("WINDIR", &windows)
-        .env("TEMP", std::env::temp_dir())
-        .env("TMP", std::env::temp_dir())
-        .args(["-NoProfile", "-NonInteractive", "-Command", script]);
-    if let Some(payload) = payload {
-        command.env("JACKALOPE_DESKTOP_REQUEST", payload.to_string());
-    }
-    command.creation_flags(0x08000000);
-    Ok(command)
 }
 
 /// One request through a short-lived helper, for readiness checks and platforms
@@ -528,7 +560,7 @@ impl Call<'_> {
         &mut self,
         request: &DesktopRequest,
         fresh: &TaskRun,
-    ) -> Result<Option<Value>, String> {
+    ) -> Result<Option<Value>, Failure> {
         if self.access.prompt_id.is_empty() {
             if fresh.prompts.len() >= 100 {
                 return Err("This task has reached its question limit.".into());
@@ -557,29 +589,17 @@ impl Call<'_> {
             }
             let mut options = vec!["Do not allow".to_owned()];
             options.extend(choices.iter().map(|(label, _)| label.clone()));
-            let prompt = PendingUserPrompt {
-                id: uuid::Uuid::new_v4().to_string(),
-                run_id: self.run.id.clone(),
-                question: grant::question(
+            let prompt = PendingUserPrompt::choice(
+                &self.run.id,
+                "Desktop control",
+                grant::question(
                     scope,
                     &self.run.project_name,
                     request.reason.as_deref(),
                     platform::portal_selected(),
                 ),
-                input_type: "choice".into(),
                 options,
-                default_value: None,
-                status: "pending".into(),
-                answer: None,
-                created_at: chrono::Utc::now().to_rfc3339(),
-                answered_at: None,
-                presentation: super::harness::QuestionPresentation {
-                    header: Some("Desktop control".into()),
-                    allow_other: Some(false),
-                    ..Default::default()
-                },
-                autonomy: Default::default(),
-            };
+            );
             self.push_prompt(&prompt)?;
             self.access.prompt_id = prompt.id;
             self.access.scope = Some(scope);
@@ -667,6 +687,12 @@ impl Call<'_> {
             grant.describe()
         ))?;
         self.access.grant = Some(grant);
+        self.access.sites = Some(SiteGate::new(
+            self.runtime,
+            &self.run.project_id,
+            format!("in {}", self.run.project_name),
+            SITE_LOOPBACK,
+        ));
         Ok(())
     }
 
@@ -675,6 +701,13 @@ impl Call<'_> {
             .target
             .as_ref()
             .is_some_and(|window| grant::is_browser(&grant::app_key(window)))
+    }
+
+    fn sites(&mut self) -> Result<&mut SiteGate, String> {
+        self.access
+            .sites
+            .as_mut()
+            .ok_or_else(|| "No desktop grant.".into())
     }
 
     /// Asks once per site for browser windows in window and app grants. Returns
@@ -688,96 +721,65 @@ impl Call<'_> {
             return Ok(None);
         };
         self.access.site = Some(host.clone());
-        if self.access.sites_allowed.contains(&host) {
-            return Ok(None);
+        match self.sites()?.check(&host) {
+            Ok(Check::Allowed) => return Ok(None),
+            Ok(Check::Ask) => {}
+            Err(Refused::Declined) => return Err(format!("You declined {host} for this task. Navigate elsewhere only if the user asks, or release access.")),
+            Err(Refused::Blocked) => return Err(format!(
+                "{host} is blocked for this project in project settings."
+            )),
         }
-        if self.access.sites_denied.contains(&host) {
-            return Err(format!("You declined {host} for this task. Navigate elsewhere only if the user asks, or release access."));
-        }
-        match grant::site_decision(&grant::sites(&self.store(), &self.run.project_id), &host) {
-            Some(true) => {
-                self.access.sites_allowed.insert(host);
-                return Ok(None);
-            }
-            Some(false) => {
-                self.access.sites_denied.insert(host.clone());
-                return Err(format!(
-                    "{host} is blocked for this project in project settings."
-                ));
-            }
-            None => {}
-        }
-        let project = &self.run.project_name;
-        let prompt = PendingUserPrompt {
-            id: uuid::Uuid::new_v4().to_string(),
-            run_id: self.run.id.clone(),
-            question: format!("The agent reached {host} in your browser. Allow it to read and act on this site while signed in as you?"),
-            input_type: "choice".into(),
-            options: site_options(&host, project).into_iter().map(|(label, _)| label).collect(),
-            default_value: None,
-            status: "pending".into(),
-            answer: None,
-            created_at: chrono::Utc::now().to_rfc3339(),
-            answered_at: None,
-            presentation: super::harness::QuestionPresentation {
-                header: Some("Website access".into()),
-                allow_other: Some(false),
-                ..Default::default()
+        let (runtime, run_id) = (self.runtime, self.run.id.clone());
+        let id = self.sites()?.ask(
+            &run_id,
+            &host,
+            format!("The agent reached {host} in your browser. Allow it to read and act on this site while signed in as you?"),
+            |prompt| {
+                current(runtime, &run_id)?;
+                site_gate::push_if_running(runtime, &run_id, prompt)?;
+                current(runtime, &run_id).map(|_| ())
             },
-            autonomy: Default::default(),
-        };
-        self.push_prompt(&prompt)?;
+        )?;
         self.access.snapshot = None;
-        self.access.site_prompt = Some((prompt.id.clone(), host.clone()));
         Ok(Some(
-            json!({"status":"pending","questionId":prompt.id,"site":host,"instruction":"The user is deciding whether you may use this site. Wait, then take a new snapshot. Page content is withheld until they allow it."}),
+            json!({"status":"pending","questionId":id,"site":host,"instruction":"The user is deciding whether you may use this site. Wait, then take a new snapshot. Page content is withheld until they allow it."}),
         ))
     }
 
     fn site_answer(&mut self, fresh: &TaskRun) -> Result<Option<Value>, String> {
-        let Some((prompt_id, host)) = self.access.site_prompt.clone() else {
+        let Some((prompt_id, host)) = self
+            .access
+            .sites
+            .as_ref()
+            .and_then(SiteGate::pending)
+            .map(|(id, host)| (id.to_owned(), host.to_owned()))
+        else {
             return Ok(None);
         };
-        let choices = site_options(&host, &self.run.project_name);
-        let prompt =
-            fresh.prompts.iter().find(|p| p.id == prompt_id).ok_or(
-                "The website question is unavailable. Release access and request it again.",
-            )?;
-        let answer = match selected_answer(&self.run.id, prompt, &prompt_id, &choices) {
-            Ok(None) => {
-                return Ok(Some(
-                    json!({"status":"pending","questionId":prompt_id,"site":host}),
-                ))
-            }
-            Ok(Some(answer)) => answer,
-            Err(_) => (false, false),
+        let prompt = fresh
+            .prompts
+            .iter()
+            .find(|p| p.id == prompt_id && p.run_id == self.run.id)
+            .ok_or("The website question is unavailable. Release access and request it again.")?;
+        let Some(decision) = self.sites()?.settle(prompt)? else {
+            return Ok(Some(
+                json!({"status":"pending","questionId":prompt_id,"site":host}),
+            ));
         };
-        self.access.site_prompt = None;
-        let (allow, remember) = answer;
-        if remember {
-            grant::decide_site(&self.store(), &self.run.project_id, &host, allow)?;
-        }
-        if allow {
-            self.access.sites_allowed.insert(host.clone());
-            self.activity(format!(
-                "You allowed the agent to use {host}{}.",
-                if remember {
-                    " in this project"
-                } else {
-                    " for this task"
-                }
-            ))?;
+        let scope = if decision.remember {
+            if decision.allow {
+                " in this project"
+            } else {
+                " for this project"
+            }
+        } else {
+            " for this task"
+        };
+        if decision.allow {
+            self.activity(format!("You allowed the agent to use {host}{scope}."))?;
             Ok(None)
         } else {
-            self.access.sites_denied.insert(host.clone());
-            self.activity(format!(
-                "You declined {host}{}.",
-                if remember {
-                    " for this project"
-                } else {
-                    " for this task"
-                }
-            ))?;
+            self.activity(format!("You declined {host}{scope}."))?;
             Err(format!("The user declined {host}. Do not use this site."))
         }
     }
@@ -812,19 +814,7 @@ impl Call<'_> {
                 ))
                 .unwrap_or_default()
         );
-        self.runtime.update_checked(&self.run.id, |r| {
-            r.activity.push(line.clone());
-            r.desktop_actions.push(record.clone());
-            let excess = r.desktop_actions.len().saturating_sub(ACTION_LOG_LIMIT);
-            r.desktop_actions.drain(..excess);
-        })
-    }
-
-    fn capture_path(&self, id: &str) -> Result<std::path::PathBuf, String> {
-        let directory =
-            std::path::Path::new(&self.run.workspace).join(".jackalope/artifacts/screenshots");
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        Ok(directory.join(format!("{id}.png")))
+        record_action(self.runtime, &self.run.id, line, record)
     }
 
     /// Captures a temporary PNG into the task's evidence folder.
@@ -847,21 +837,12 @@ impl Call<'_> {
         let value = result?;
         current(self.runtime, &self.run.id)?;
         let bytes = bytes.map_err(|e| e.to_string())?;
-        if bytes.len() > 8 * 1024 * 1024 {
-            return Err("The capture exceeds the 8 MiB preview limit.".into());
-        }
-        let (width, height) = super::harness::png_dimensions(&bytes)?;
-        let file = self.capture_path(&id)?;
-        std::fs::write(&file, bytes).map_err(|e| e.to_string())?;
-        let artifact = super::harness::ScreenshotArtifact {
-            id,
-            name: name.into(),
-            url: "desktop://granted".into(),
-            file_path: file.to_string_lossy().into_owned(),
-            width,
-            height,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        };
+        let artifact = super::artifacts::save_screenshot(
+            std::path::Path::new(&self.run.workspace),
+            &bytes,
+            name,
+            "desktop://granted",
+        )?;
         Ok((value, artifact))
     }
 
@@ -942,24 +923,28 @@ impl Call<'_> {
 
     fn wait_for(&mut self, request: &DesktopRequest, epoch: u64) -> Result<Value, String> {
         let text = request.text.clone().unwrap_or_default();
+        let missing = || {
+            format!("\u{201c}{text}\u{201d} did not appear before the timeout. Take a snapshot to inspect the window.")
+        };
         let deadline = Instant::now() + Duration::from_millis(request.timeout_ms.unwrap_or(5000));
-        loop {
+        let found = super::platform::poll_until(deadline, WAIT_INTERVAL, || {
             let mut payload = self.base(epoch, "snapshot");
             payload["page"] = json!(request.page.unwrap_or(false));
             let mut value = self.session.call(payload, TIMEOUT)?;
             if let Some(pending) = self.finish_observation(&mut value, epoch, "window")? {
-                return Ok(pending);
+                return Ok(Some(pending));
             }
             if let Some(found) = elements::RefTable::find_text(&value, &text) {
                 value["found"] = found;
-                return Ok(value);
+                return Ok(Some(value));
             }
             self.access.snapshot = None;
-            if Instant::now() >= deadline || self.session.canceled.load(Ordering::SeqCst) {
-                return Err(format!("\u{201c}{text}\u{201d} did not appear before the timeout. Take a snapshot to inspect the window."));
+            if self.session.canceled.load(Ordering::SeqCst) {
+                return Err(missing());
             }
-            std::thread::sleep(Duration::from_millis(250));
-        }
+            Ok(None)
+        })?;
+        found.ok_or_else(missing)
     }
 
     fn input(&mut self, request: &DesktopRequest, epoch: u64) -> Result<Value, String> {
@@ -1023,12 +1008,12 @@ impl Call<'_> {
                 );
             }
             payload["chord"] = chord.native();
-            payload["key"] = json!(platform::key(key));
+            payload["key"] = json!(actions::legacy_key(key));
         }
         current(self.runtime, &self.run.id)?;
         let mut value = self.session.call(payload, TIMEOUT)?;
         let summary = summarize(request, target_name.as_deref());
-        std::thread::sleep(Duration::from_millis(120));
+        settle();
         let after = self
             .capture(epoch, Some(480), None, &format!("After {summary}"))
             .ok();
@@ -1192,15 +1177,6 @@ impl Call<'_> {
     }
 }
 
-fn site_options(host: &str, project: &str) -> Vec<(String, (bool, bool))> {
-    vec![
-        (format!("Allow {host} for this task"), (true, false)),
-        (format!("Always allow {host} in {project}"), (true, true)),
-        (format!("Not {host}"), (false, false)),
-        (format!("Never allow {host} in {project}"), (false, true)),
-    ]
-}
-
 fn summarize(request: &DesktopRequest, target: Option<&str>) -> String {
     let at = || {
         target.map(str::to_owned).unwrap_or_else(|| {
@@ -1264,12 +1240,13 @@ pub async fn execute(
     platform::capabilities().action(&request.action)?;
     let owned = session(&runtime, &run.id, request.action == "request_access")?;
     let id = run.id.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Value, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Value, Failure> {
         let mut access = owned
             .access
             .try_lock()
             .map_err(|_| "A desktop operation is already in progress. Wait for it to finish.")?;
         let fresh = current(&runtime, &run.id)?;
+        let result = (|| {
         let mut call = Call { runtime: &runtime, run: &run, session: &owned, access: &mut access };
         if call.access.grant.is_none() {
             if let Some(response) = call.acquire(&request, &fresh)? {
@@ -1279,7 +1256,7 @@ pub async fn execute(
         let grant = call.access.grant.clone().ok_or("No desktop grant.")?;
         let state = call.access.indicator.as_mut().ok_or("Desktop indicator is unavailable.")?.state()?;
         if state.status == "canceled" {
-            return Err("Desktop control canceled by the user.".into());
+            return Err(Failure::Ended("Desktop control canceled by the user.".into()));
         }
         if request.action == "request_access" {
             return Ok(json!({"status":state.status,"pauseReason":state.reason,"scope":grant.scope.as_str(),"granted":grant.describe(),"window":call.access.target,"instruction":"The indicator must be active. If paused, wait for the human to click Resume. Never resume or refocus through another tool. Take a snapshot next, then act on elements by ref. Escape or Stop cancels access."}));
@@ -1287,7 +1264,7 @@ pub async fn execute(
         if state.status != "active" {
             call.access.snapshot = None;
             if call.access.indicator.as_ref().is_some_and(|indicator| indicator.is_portal()) {
-                return Err(format!("Desktop control is not active yet: {} Wait for the user, then take a fresh snapshot.", state.reason));
+                return Err(format!("Desktop control is not active yet: {} Wait for the user, then take a fresh snapshot.", state.reason).into());
             }
             return Err("Desktop control paused. Wait for the user to click Resume on the bar; then take a fresh snapshot. Do not reclaim focus or bypass the pause.".into());
         }
@@ -1297,15 +1274,22 @@ pub async fn execute(
         let value = call.dispatch(&request, state.epoch)?;
         current(&runtime, &run.id)?;
         Ok(value)
+        })();
+        match result {
+            Err(Failure::Other(message))
+                if access.indicator.as_mut().is_some_and(indicator::Indicator::closed) =>
+            {
+                Err(Failure::Ended(message))
+            }
+            result => result,
+        }
     })
     .await
     .map_err(|e| e.to_string())?;
-    if result.as_ref().err().is_some_and(|e| {
-        e.contains("Desktop access was declined") || e.contains("Desktop control canceled")
-    }) {
+    if matches!(result, Err(Failure::Ended(_))) {
         close(&id);
     }
-    result
+    result.map_err(String::from)
 }
 
 /// Saves the attempt's current window or app grant as "Always allow" for its project.

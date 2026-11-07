@@ -55,7 +55,8 @@ include `site`. The first time a grant reaches a host, Jackalope asks whether to
 it for this task, always allow it in the project, decline it, or never allow it in the
 project. Page content is withheld until the answer. Saved decisions apply to subdomains,
 the nearest saved parent wins, and Project settings lists and removes them. Unreadable
-addresses and internal pages are not gated. Full-desktop grants are not gated by site.
+addresses and internal pages are not gated; loopback pages are asked about like any other
+site. Full-desktop grants are not gated by site.
 
 Querying the document through UI Automation makes Chromium build its full web
 accessibility tree; on macOS the helper also sets `AXManualAccessibility` on browser
@@ -162,9 +163,11 @@ its coordinates; no automatic retries occur after uncertain or partial input.
 
 ## Implementation and acceptance
 
-`commands/desktop_control.rs` owns sessions, task checks, fresh snapshots, artifacts and
-the action log. `desktop_control/grant.rs` owns grant levels, the access and website
-questions and the remembered-permission store; `actions.rs` validates requests and key
+`commands/desktop_control.rs` owns sessions, task checks, fresh snapshots and the action
+log; `artifacts.rs` saves screenshot evidence. `site_gate.rs` asks the website question
+for every browser an agent drives (desktop windows, computers and browser profiles) and
+`desktop_control/grant.rs` owns grant levels, the access question and the
+remembered-permission store; `actions.rs` validates requests and key
 chords; `elements.rs` normalizes accessibility trees and resolves element refs.
 
 `desktop_control/portal.rs` selects the Linux backend and holds the portal session

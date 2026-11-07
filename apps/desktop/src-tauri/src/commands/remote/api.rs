@@ -13,10 +13,13 @@ use axum::{
     Json, Router,
 };
 
+pub(super) const PAIR_ROUTE: &str = "/api/pair";
+pub(super) const REQUEST_ROUTE: &str = "/api/request";
+
 pub(super) fn router(service: RemoteAccess) -> Router {
     Router::new()
-        .route("/api/pair", post(pair))
-        .route("/api/request", post(request))
+        .route(PAIR_ROUTE, post(pair))
+        .route(REQUEST_ROUTE, post(request))
         .fallback(get(asset))
         .layer(DefaultBodyLimit::max(32_000))
         .layer(middleware::from_fn_with_state(service.clone(), boundary))

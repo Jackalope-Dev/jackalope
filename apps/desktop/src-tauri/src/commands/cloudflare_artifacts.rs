@@ -6,29 +6,26 @@
 //! never enter argv, remote URLs, `.git/config` or saved history.
 
 use super::{
-    account_storage,
+    cloudflare::{
+        api::{Api, Body, Reply},
+        connection::{self, Connection, Status},
+        oauth,
+    },
     git_command::{command, Policy},
     process_control,
     tasks::{ProjectInfo, TaskRuntime},
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
-    sync::Mutex,
     time::Duration,
 };
 use tauri::{AppHandle, State};
 
-mod oauth;
-
-static CONNECTION_LOCK: Mutex<()> = Mutex::new(());
-/// Serializes OAuth refreshes; Cloudflare rotates refresh tokens on use.
-static REFRESH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-const STORAGE_FILE: &str = "cloudflare-artifacts.bin";
 const REMOTE_NAME: &str = "artifacts";
-const API_ROOT: &str = "https://api.cloudflare.com/client/v4/accounts";
+const API_TIMEOUT: Duration = Duration::from_secs(60);
 const PUSH_TOKEN_TTL_SECONDS: u64 = 900;
 const PUSH_TIMEOUT: Duration = Duration::from_secs(900);
 /// Local task branches are per-attempt scratch space; pushing them would flood
@@ -39,31 +36,6 @@ const PUSH_REFSPECS: [&str; 4] = [
     "refs/tags/*:refs/tags/*",
     "refs/notes/*:refs/notes/*",
 ];
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Connection {
-    pub account_id: String,
-    pub namespace: String,
-    #[serde(default)]
-    pub jurisdiction: Option<String>,
-    /// An API token, or the current OAuth access token when `oauth` is set.
-    token: String,
-    /// Present for Connect Cloudflare sign-ins; never accepted from the renderer.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    oauth: Option<oauth::Grant>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Status {
-    connected: bool,
-    account_id: Option<String>,
-    namespace: Option<String>,
-    jurisdiction: Option<String>,
-    /// `oauth` for Connect Cloudflare, `token` for a pasted API token.
-    method: Option<&'static str>,
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,70 +78,6 @@ pub struct ReviewShare {
     clone_command: String,
 }
 
-fn storage_path(runtime: &TaskRuntime) -> PathBuf {
-    runtime.integration_directory().join(STORAGE_FILE)
-}
-
-fn saved(runtime: &TaskRuntime) -> Result<Option<Connection>, String> {
-    account_storage::read(&storage_path(runtime))?
-        .map(|data| {
-            serde_json::from_slice(&data).map_err(|_| {
-                "The Cloudflare Artifacts connection could not be read. Your saved settings were preserved.".into()
-            })
-        })
-        .transpose()
-}
-
-fn connection(runtime: &TaskRuntime) -> Result<Connection, String> {
-    saved(runtime)?
-        .ok_or_else(|| "Connect Cloudflare Artifacts in Settings → Connected work.".to_string())
-}
-
-/// The saved connection with a usable access token, refreshing an OAuth sign-in
-/// that is about to expire. API tokens are returned unchanged.
-async fn current(runtime: &TaskRuntime) -> Result<Connection, String> {
-    let saved_connection = connection(runtime)?;
-    if !saved_connection
-        .oauth
-        .as_ref()
-        .is_some_and(oauth::needs_refresh)
-    {
-        return Ok(saved_connection);
-    }
-    let _refresh = REFRESH_LOCK.lock().await;
-    // Another request may have refreshed while this one waited.
-    let latest = connection(runtime)?;
-    let Some(grant) = latest.oauth.clone().filter(oauth::needs_refresh) else {
-        return Ok(latest);
-    };
-    let tokens = oauth::refresh(&grant).await?;
-    let next = Connection {
-        token: tokens.access,
-        oauth: Some(tokens.grant),
-        ..latest
-    };
-    let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
-    account_storage::write(
-        &storage_path(runtime),
-        &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-    )?;
-    Ok(next)
-}
-
-fn connected_status(connection: &Connection) -> Status {
-    Status {
-        connected: true,
-        account_id: Some(connection.account_id.clone()),
-        namespace: Some(connection.namespace.clone()),
-        jurisdiction: connection.jurisdiction.clone(),
-        method: Some(if connection.oauth.is_some() {
-            "oauth"
-        } else {
-            "token"
-        }),
-    }
-}
-
 fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|c| c.is_ascii_alphanumeric())
@@ -207,34 +115,10 @@ fn validate(connection: &Connection) -> Result<(), String> {
     {
         return Err("Choose EU, US or no data location restriction.".into());
     }
-    if !plausible_token(&connection.token) {
+    if !connection::plausible_token(&connection.token) {
         return Err("Enter a Cloudflare API token with Artifacts Edit permission.".into());
     }
     Ok(())
-}
-
-fn plausible_token(token: &str) -> bool {
-    !token.is_empty()
-        && token.len() <= 8192
-        && !token.chars().any(|c| c.is_whitespace() || c.is_control())
-}
-
-/// The accounts a pasted API token covers, from its `GET /accounts` response.
-fn token_accounts(body: &Value) -> Result<Vec<oauth::Account>, String> {
-    if body["success"] != true {
-        let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
-        return Err(if matches!(code, 1000 | 6003 | 9109 | 10000) {
-            "Cloudflare did not accept this API token. Check that you copied all of it."
-        } else {
-            "Cloudflare did not list the accounts for this token. Enter the account ID instead."
-        }
-        .into());
-    }
-    let accounts = oauth::parse_accounts(body);
-    if accounts.is_empty() {
-        return Err("This token is not scoped to an account. Give it Account → Artifacts → Edit, or enter the account ID.".into());
-    }
-    Ok(accounts)
 }
 
 /// Only an Artifacts Git host may receive a repo token.
@@ -266,24 +150,33 @@ fn remote_identity(remote: &str) -> Option<(String, String)> {
         .then_some((namespace, repo))
 }
 
-fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
+/// Cloudflare's codes for a repository that is not readable yet. Forks become
+/// readable asynchronously.
+const STILL_PREPARING: [u64; 2] = [10302, 10303];
+
+/// A failed Artifacts request: Cloudflare's error number (0 when there is none)
+/// and what to tell the person.
+#[derive(Debug)]
+struct Refusal {
+    code: u64,
+    message: String,
 }
 
-fn api_message(status: u16, body: &Value) -> String {
-    let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
-    let detail: String = body["errors"][0]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(200)
-        .collect();
-    match (status, code) {
+impl From<Refusal> for String {
+    fn from(refusal: Refusal) -> Self {
+        refusal.message
+    }
+}
+
+impl From<String> for Refusal {
+    fn from(message: String) -> Self {
+        Self { code: 0, message }
+    }
+}
+
+fn api_message(reply: &Reply) -> String {
+    let detail = reply.detail();
+    match (reply.status, reply.code()) {
         // The connect check only reads the namespace, so a read-only grant
         // passes it and is refused here on the first write.
         (401 | 403, _) => {
@@ -297,9 +190,9 @@ fn api_message(status: u16, body: &Value) -> String {
         (_, 10201) => "A repository with that name already exists in this namespace. Choose another name.".into(),
         (_, 10200) => "Cloudflare could not find that repository or namespace.".into(),
         (_, 10101) => "Cloudflare rejected the repository name. Use letters, digits, dots, underscores or hyphens.".into(),
-        (_, 10302 | 10303) => "The repository is still being prepared. Retry in a moment.".into(),
+        (_, code) if STILL_PREPARING.contains(&code) => "The repository is still being prepared. Retry in a moment.".into(),
         (429, _) => "Cloudflare is rate limiting Artifacts requests. Retry shortly.".into(),
-        _ => {
+        (status, _) => {
             if detail.is_empty() {
                 format!("Cloudflare Artifacts returned {status}. Retry, or check the Artifacts dashboard.")
             } else {
@@ -314,34 +207,14 @@ async fn call(
     method: reqwest::Method,
     route: &str,
     body: Option<Value>,
-) -> Result<(u16, Value), String> {
-    let mut request = client()?
-        .request(
+) -> Result<Reply, String> {
+    Api::new(&connection.account_id, &connection.token, API_TIMEOUT)?
+        .send(
             method,
-            format!("{API_ROOT}/{}/artifacts{route}", connection.account_id),
+            &format!("/artifacts{route}"),
+            body.as_ref().map_or(Body::Empty, Body::Json),
         )
-        .bearer_auth(&connection.token);
-    if let Some(body) = body {
-        request = request.json(&body);
-    }
-    let mut response = request
-        .send()
         .await
-        .map_err(|_| "Could not reach Cloudflare. Check your connection and retry.")?;
-    let status = response.status().as_u16();
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|_| "The Cloudflare response was interrupted. Retry.")?
-    {
-        if bytes.len() + chunk.len() > 1_000_000 {
-            return Err("Cloudflare returned an unexpectedly large response.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    let value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-    Ok((status, value))
 }
 
 async fn expect(
@@ -349,12 +222,15 @@ async fn expect(
     method: reqwest::Method,
     route: &str,
     body: Option<Value>,
-) -> Result<Value, String> {
-    let (status, value) = call(connection, method, route, body).await?;
-    if !(200..300).contains(&status) || value["success"] != true {
-        return Err(api_message(status, &value));
+) -> Result<Value, Refusal> {
+    let reply = call(connection, method, route, body).await?;
+    if !reply.ok() {
+        return Err(Refusal {
+            code: reply.code(),
+            message: api_message(&reply),
+        });
     }
-    Ok(value["result"].clone())
+    Ok(reply.body["result"].clone())
 }
 
 fn namespace_route(connection: &Connection, rest: &str) -> String {
@@ -410,7 +286,7 @@ async fn mint_token(
     repo: &str,
     scope: &str,
     ttl: u64,
-) -> Result<(String, String, String), String> {
+) -> Result<(String, String, String), Refusal> {
     let result = expect(
         connection,
         reqwest::Method::POST,
@@ -420,7 +296,7 @@ async fn mint_token(
     .await?;
     let token = result["plaintext"].as_str().unwrap_or_default().to_string();
     if token.is_empty() {
-        return Err("Cloudflare did not return a repository token.".into());
+        return Err(String::from("Cloudflare did not return a repository token.").into());
     }
     Ok((
         token,
@@ -429,6 +305,7 @@ async fn mint_token(
     ))
 }
 
+/// Best effort: a token left behind expires on its own after its short TTL.
 async fn revoke_token(connection: &Connection, id: &str) {
     if !id.is_empty() {
         let _ = call(
@@ -578,20 +455,6 @@ fn current_branch(path: &Path) -> String {
 }
 
 #[tauri::command]
-pub fn cloudflare_artifacts_status(state: State<'_, TaskRuntime>) -> Result<Status, String> {
-    Ok(match saved(&state)? {
-        Some(connection) => connected_status(&connection),
-        None => Status {
-            connected: false,
-            account_id: None,
-            namespace: None,
-            jurisdiction: None,
-            method: None,
-        },
-    })
-}
-
-#[tauri::command]
 pub async fn cloudflare_artifacts_connect(
     connection: Connection,
     state: State<'_, TaskRuntime>,
@@ -606,27 +469,17 @@ pub async fn cloudflare_artifacts_connect(
     establish(connection, &state).await
 }
 
-/// The accounts a pasted API token can use, so the person need not look up an account ID.
-#[tauri::command]
-pub async fn cloudflare_token_accounts(token: String) -> Result<Vec<oauth::Account>, String> {
-    let token = token.trim();
-    if !plausible_token(token) {
-        return Err("Enter a Cloudflare API token with Artifacts Edit permission.".into());
-    }
-    token_accounts(&oauth::list_accounts(token).await?)
-}
-
 /// Validates the connection against its namespace and saves it.
 async fn establish(connection: Connection, runtime: &TaskRuntime) -> Result<Status, String> {
     validate(&connection)?;
-    let (status, value) = call(
+    let reply = call(
         &connection,
         reqwest::Method::GET,
         &namespace_route(&connection, ""),
         None,
     )
     .await?;
-    if status == 404 || value["errors"][0]["code"] == 10200 {
+    if reply.status == 404 || reply.code() == 10200 {
         // Artifacts creates a namespace with its first repository, but a data
         // location can only be chosen when the namespace is created.
         if connection.jurisdiction.is_some() {
@@ -646,11 +499,11 @@ async fn establish(connection: Connection, runtime: &TaskRuntime) -> Result<Stat
             )
             .await?;
         }
-    } else if !(200..300).contains(&status) || value["success"] != true {
-        return Err(api_message(status, &value));
+    } else if !reply.ok() {
+        return Err(api_message(&reply));
     } else if let (Some(requested), Some(existing)) = (
         connection.jurisdiction.as_deref(),
-        value["result"]["jurisdiction"].as_str(),
+        reply.body["result"]["jurisdiction"].as_str(),
     ) {
         if requested != existing {
             return Err(format!(
@@ -660,71 +513,8 @@ async fn establish(connection: Connection, runtime: &TaskRuntime) -> Result<Stat
             ));
         }
     }
-    let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
-    account_storage::write(
-        &storage_path(runtime),
-        &serde_json::to_vec(&connection).map_err(|e| e.to_string())?,
-    )?;
-    Ok(connected_status(&connection))
-}
-
-/// Starts Connect Cloudflare and returns the consent URL for the browser. `workers`
-/// also asks to deploy Workers, which Jackalope Swarm setup needs. `scopes` asks for
-/// the extra product scopes cloud resource setup needs; only known scopes are accepted.
-/// Extra scopes the saved sign-in already has are requested again so a reauthorization
-/// never drops them.
-#[tauri::command]
-pub async fn cloudflare_oauth_begin(
-    workers: Option<bool>,
-    scopes: Option<Vec<String>>,
-    state: State<'_, TaskRuntime>,
-) -> Result<String, String> {
-    let requested = scopes.unwrap_or_default();
-    let mut permissions = Vec::new();
-    for scope in &requested {
-        permissions.push(
-            super::cloudflare_resources::permission_for_scope(scope)
-                .ok_or_else(|| format!("{scope} is not a scope Jackalope asks Cloudflare for."))?,
-        );
-    }
-    let granted = saved(&state)
-        .ok()
-        .flatten()
-        .and_then(|connection| connection.oauth)
-        .and_then(|grant| grant.scopes)
-        .unwrap_or_default();
-    let mut extra: Vec<String> = Vec::new();
-    let mut workers = workers.unwrap_or(false);
-    for scope in granted.split_whitespace() {
-        if scope == oauth::WORKERS_SCOPE {
-            workers = true;
-        } else if super::cloudflare_resources::permission_for_scope(scope).is_some() {
-            extra.push(scope.to_owned());
-        }
-    }
-    for scope in requested {
-        if !extra.contains(&scope) {
-            extra.push(scope);
-        }
-    }
-    let invalid_scope = (!permissions.is_empty()).then(|| {
-        format!(
-            "Cloudflare does not let Jackalope create these resources through Connect Cloudflare yet. Connect with an API token that has {} and Artifacts: Edit instead.",
-            permissions.join(", ")
-        )
-    });
-    oauth::begin(workers, &extra, invalid_scope).await
-}
-
-/// Waits for the browser sign-in and returns the accounts the person shared.
-#[tauri::command]
-pub async fn cloudflare_oauth_complete() -> Result<Vec<oauth::Account>, String> {
-    oauth::complete().await
-}
-
-#[tauri::command]
-pub fn cloudflare_oauth_cancel() {
-    oauth::cancel();
+    connection::save(runtime, &connection)?;
+    Ok(connection::connected_status(&connection))
 }
 
 /// Saves the signed-in connection for the chosen account and namespace.
@@ -752,121 +542,12 @@ pub async fn cloudflare_oauth_connect(
     Ok(result)
 }
 
-/// Replaces the saved sign-in with a newer one for the same account, keeping the
-/// namespace and data location. Used after Connect Cloudflare asks for Workers access.
-#[tauri::command]
-pub async fn cloudflare_oauth_reauthorize(state: State<'_, TaskRuntime>) -> Result<Status, String> {
-    let existing = connection(&state)?;
-    let previous = existing.oauth.clone().ok_or(
-        "This connection uses an API token. Replace it with one that has Workers Scripts: Edit.",
-    )?;
-    let tokens = oauth::signed_in(&existing.account_id).map_err(|_| {
-        "Share the same Cloudflare account you connected before, or disconnect and connect again."
-            .to_string()
-    })?;
-    let next = Connection {
-        token: tokens.access,
-        oauth: Some(tokens.grant),
-        ..existing
-    };
-    {
-        let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
-        account_storage::write(
-            &storage_path(&state),
-            &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-        )?;
-    }
-    oauth::finish();
-    oauth::revoke(&previous).await;
-    Ok(connected_status(&next))
-}
-
-/// What Workers deployment can use from the saved Cloudflare connection.
-pub(in crate::commands) struct WorkersAccess {
-    pub account_id: String,
-    pub namespace: String,
-    pub token: String,
-    pub oauth: bool,
-    /// `Some(false)` when Connect Cloudflare reported a grant without Workers access.
-    pub workers_allowed: Option<bool>,
-}
-
-fn workers_access_of(connection: Connection) -> WorkersAccess {
-    WorkersAccess {
-        workers_allowed: connection
-            .oauth
-            .as_ref()
-            .and_then(|grant| grant.allows(oauth::WORKERS_SCOPE)),
-        oauth: connection.oauth.is_some(),
-        account_id: connection.account_id,
-        namespace: connection.namespace,
-        token: connection.token,
-    }
-}
-
-/// The connected account and a fresh token for account-level product APIs.
-pub(in crate::commands) struct AccountAccess {
-    pub account_id: String,
-    pub token: String,
-    pub oauth: bool,
-    /// Scopes Cloudflare reported for an OAuth grant; `None` when unknown or an API token.
-    pub granted: Option<String>,
-}
-
-/// The saved connection with a fresh access token for account-level API calls.
-pub(in crate::commands) async fn account_access(
-    runtime: &TaskRuntime,
-) -> Result<AccountAccess, String> {
-    let connection = current(runtime).await?;
-    Ok(AccountAccess {
-        oauth: connection.oauth.is_some(),
-        granted: connection.oauth.and_then(|grant| grant.scopes),
-        account_id: connection.account_id,
-        token: connection.token,
-    })
-}
-
-/// Whether Cloudflare is connected, without refreshing.
-pub(in crate::commands) fn connected_account(runtime: &TaskRuntime) -> Option<String> {
-    saved(runtime)
-        .ok()
-        .flatten()
-        .map(|connection| connection.account_id)
-}
-
-/// The saved connection without refreshing, for status checks. The token may be stale.
-pub(in crate::commands) fn workers_access_saved(
-    runtime: &TaskRuntime,
-) -> Result<Option<WorkersAccess>, String> {
-    Ok(saved(runtime)?.map(workers_access_of))
-}
-
-/// The saved connection with a fresh access token for Workers API calls.
-pub(in crate::commands) async fn workers_access(
-    runtime: &TaskRuntime,
-) -> Result<WorkersAccess, String> {
-    Ok(workers_access_of(current(runtime).await?))
-}
-
-#[tauri::command]
-pub async fn cloudflare_artifacts_disconnect(state: State<'_, TaskRuntime>) -> Result<(), String> {
-    if let Some(grant) = saved(&state).ok().flatten().and_then(|saved| saved.oauth) {
-        oauth::revoke(&grant).await;
-    }
-    let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
-    match std::fs::remove_file(storage_path(&state)) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(format!("Could not remove the saved connection: {error}")),
-    }
-}
-
 #[tauri::command]
 pub async fn cloudflare_artifacts_project(
     project_path: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<ProjectLink, String> {
-    let connected = saved(&state)?;
+    let connected = connection::saved(&state)?;
     tauri::async_runtime::spawn_blocking(move || {
         let path = PathBuf::from(&project_path);
         let repository = repository_root(&project_path).is_ok();
@@ -900,7 +581,7 @@ pub async fn cloudflare_artifacts_create_project(
     repo_name: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<CreatedProject, String> {
-    let connection = current(&state).await?;
+    let connection = connection::current(&state).await?;
     validate_repo_name(&repo_name)?;
     let name = super::tasks::validate_project_name(&name)?.to_string();
     let (parent, create_parent) = match parent_path {
@@ -971,7 +652,7 @@ pub async fn cloudflare_artifacts_convert(
     description: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<PushResult, String> {
-    let connection = current(&state).await?;
+    let connection = connection::current(&state).await?;
     validate_repo_name(&repo_name)?;
     let checked = project_path.clone();
     let (path, branch) = tauri::async_runtime::spawn_blocking(move || {
@@ -1014,7 +695,7 @@ pub async fn cloudflare_artifacts_push(
     project_path: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<PushResult, String> {
-    let connection = current(&state).await?;
+    let connection = connection::current(&state).await?;
     let checked = project_path.clone();
     let (path, remote) = tauri::async_runtime::spawn_blocking(move || {
         let path = repository_root(&checked)?;
@@ -1067,7 +748,7 @@ pub(in crate::commands) async fn push_branch(
     {
         return Err(format!("{branch} is not a branch Jackalope can push."));
     }
-    if saved(runtime)?.is_none() {
+    if connection::saved(runtime)?.is_none() {
         return Ok(None);
     }
     let checked = project_path.to_string();
@@ -1080,7 +761,7 @@ pub(in crate::commands) async fn push_branch(
     let Some((path, remote)) = linked else {
         return Ok(None);
     };
-    let connection = current(runtime).await?;
+    let connection = connection::current(runtime).await?;
     let (namespace, repo) = remote_identity(&remote).ok_or("Invalid Artifacts remote.")?;
     if namespace != connection.namespace
         || !remote.contains(&format!("//{}.", connection.account_id))
@@ -1105,7 +786,7 @@ pub async fn cloudflare_artifacts_share(
     hours: u64,
     state: State<'_, TaskRuntime>,
 ) -> Result<ReviewShare, String> {
-    let connection = current(&state).await?;
+    let connection = connection::current(&state).await?;
     if ![1, 24, 168].contains(&hours) {
         return Err("Choose 1 hour, 1 day or 7 days.".into());
     }
@@ -1144,11 +825,11 @@ pub async fn cloudflare_artifacts_share(
         match mint_token(&connection, &fork_name, "read", hours * 3600).await {
             Ok(minted) => break minted,
             // Forks become readable asynchronously.
-            Err(error) if attempt < 5 && error.contains("still being prepared") => {
+            Err(refusal) if attempt < 5 && STILL_PREPARING.contains(&refusal.code) => {
                 attempt += 1;
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
-            Err(error) => return Err(error),
+            Err(refusal) => return Err(refusal.into()),
         }
     };
     let secret = token.split('?').next().unwrap_or(&token);
@@ -1173,30 +854,6 @@ mod tests {
             token: "fixture-token".into(),
             oauth: None,
         }
-    }
-
-    #[test]
-    fn saved_api_token_connections_still_load_and_report_their_method() {
-        let saved: Connection = serde_json::from_value(json!({
-            "accountId": "0123456789abcdef0123456789abcdef",
-            "namespace": "jackalope",
-            "token": "legacy-token"
-        }))
-        .unwrap();
-        assert!(saved.oauth.is_none());
-        assert_eq!(connected_status(&saved).method, Some("token"));
-        let signed_in = Connection {
-            oauth: Some(oauth::Grant {
-                refresh_token: "refresh".into(),
-                expires_at: 0,
-                scopes: None,
-            }),
-            ..fixture()
-        };
-        assert_eq!(connected_status(&signed_in).method, Some("oauth"));
-        let round_trip: Connection =
-            serde_json::from_slice(&serde_json::to_vec(&signed_in).unwrap()).unwrap();
-        assert_eq!(round_trip.oauth.unwrap().refresh_token, "refresh");
     }
 
     #[test]
@@ -1234,41 +891,6 @@ mod tests {
         ] {
             assert!(validate(&broken).is_err());
         }
-    }
-
-    #[test]
-    fn pasted_tokens_derive_their_accounts() {
-        let one = json!({"success": true, "result": [
-            {"id": "0123456789ABCDEF0123456789abcdef", "name": "Personal"},
-            {"id": "not-an-account", "name": "Broken"}
-        ]});
-        let accounts = token_accounts(&one).unwrap();
-        assert_eq!(accounts.len(), 1);
-        assert_eq!(accounts[0].id, "0123456789abcdef0123456789abcdef");
-        assert_eq!(accounts[0].name, "Personal");
-
-        let several = json!({"success": true, "result": [
-            {"id": "a".repeat(32), "name": "Team"},
-            {"id": "b".repeat(32)}
-        ]});
-        let accounts = token_accounts(&several).unwrap();
-        assert_eq!(accounts.len(), 2);
-        assert_eq!(accounts[1].name, "b".repeat(32));
-
-        assert!(token_accounts(&json!({"success": true, "result": []}))
-            .unwrap_err()
-            .contains("enter the account ID"));
-        assert!(
-            token_accounts(&json!({"success": false, "errors": [{"code": 1000}]}))
-                .unwrap_err()
-                .contains("did not accept this API token")
-        );
-        assert!(token_accounts(&Value::Null)
-            .unwrap_err()
-            .contains("Enter the account ID"));
-        assert!(!plausible_token("has space"));
-        assert!(!plausible_token(""));
-        assert!(plausible_token("abc_DEF-123"));
     }
 
     #[test]
@@ -1327,14 +949,16 @@ mod tests {
 
     #[test]
     fn auth_errors_explain_the_required_token_permission() {
-        assert!(api_message(403, &Value::Null).contains("Artifacts → Edit"));
-        let refused = api_message(
+        let reply = |status, body| api_message(&Reply { status, body });
+        assert!(reply(403, Value::Null).contains("Artifacts → Edit"));
+        let refused = reply(
             403,
-            &json!({"errors":[{"code":10000,"message":"Authentication error"}]}),
+            json!({"errors":[{"code":10000,"message":"Authentication error"}]}),
         );
         assert!(refused.contains("(Authentication error)"));
-        assert!(api_message(409, &json!({"errors":[{"code":10201}]})).contains("already exists"));
-        let message = api_message(500, &json!({"errors":[{"code":1,"message":"boom\u{7}"}]}));
+        assert!(reply(409, json!({"errors":[{"code":10201}]})).contains("already exists"));
+        assert!(reply(409, json!({"errors":[{"code":10302}]})).contains("still being prepared"));
+        let message = reply(500, json!({"errors":[{"code":1,"message":"boom\u{7}"}]}));
         assert!(message.ends_with("boom"));
     }
 

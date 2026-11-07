@@ -50,23 +50,6 @@ pub(crate) fn is_input(request: &DesktopRequest) -> bool {
         || (request.action == "focus" && request.element.is_some())
 }
 
-const NAMED: &[&str] = &[
-    "Tab",
-    "Enter",
-    "Escape",
-    "Space",
-    "Backspace",
-    "Delete",
-    "Insert",
-    "ArrowUp",
-    "ArrowDown",
-    "ArrowLeft",
-    "ArrowRight",
-    "Home",
-    "End",
-    "PageUp",
-    "PageDown",
-];
 const PUNCTUATION: &str = "-=,./;'[]\\`";
 
 /// Keys the original helpers understand; platforms without chord support accept only these.
@@ -103,14 +86,29 @@ pub(crate) struct Chord {
     pub key: String,
 }
 
+/// The modifier Primary stands for on this platform.
+fn primary() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command"
+    } else {
+        "Control"
+    }
+}
+
+/// A key as the original helpers read it: macOS's resolves Primary itself,
+/// the others take Primary as Control.
+pub(crate) fn legacy_key(key: &str) -> String {
+    if cfg!(target_os = "macos") {
+        key.into()
+    } else {
+        key.replacen("Primary+", &format!("{}+", primary()), 1)
+    }
+}
+
 impl Chord {
     /// Chord for the helper with Primary resolved for this platform.
     pub fn native(&self) -> Value {
-        let primary = if cfg!(target_os = "macos") {
-            "Command"
-        } else {
-            "Control"
-        };
+        let primary = primary();
         let mut modifiers: Vec<&str> = Vec::new();
         for modifier in &self.modifiers {
             let resolved = if modifier == "Primary" {
@@ -148,7 +146,10 @@ pub(crate) fn chord(text: &str) -> Result<Chord, String> {
     if ordered.len() != modifiers.len() {
         return Err(unsupported());
     }
-    let named = NAMED.contains(&key);
+    let named = crate::commands::computers::protocol::protocol()
+        .named_keys
+        .iter()
+        .any(|name| name == key);
     let function = key.len() >= 2
         && key.len() <= 3
         && key.starts_with('F')

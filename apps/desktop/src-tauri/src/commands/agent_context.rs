@@ -11,7 +11,7 @@
 //! project instructions, for the agent's launch input within a fixed budget.
 
 use super::git_command::{command, Policy};
-use std::{io::Read, path::Path, process::Stdio};
+use std::{path::Path, process::Stdio};
 
 /// Jackalope-owned files every task workspace receives when the project has them.
 pub(crate) const FILES: [&str; 1] = [super::cloudflare_resources::MANIFEST_PATH];
@@ -113,13 +113,7 @@ fn read_regular(path: &Path, limit: u64) -> Option<Vec<u8>> {
     if !metadata.is_file() || metadata.len() > limit {
         return None;
     }
-    let mut bytes = Vec::new();
-    std::fs::File::open(path)
-        .ok()?
-        .take(limit + 1)
-        .read_to_end(&mut bytes)
-        .ok()?;
-    (bytes.len() as u64 <= limit).then_some(bytes)
+    super::history::read_capped(path, limit).ok().flatten()
 }
 
 fn write_replacing(target: &Path, bytes: &[u8]) -> Result<(), String> {

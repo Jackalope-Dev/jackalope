@@ -192,15 +192,10 @@ fn a_paired_machine_belongs_to_one_bot() {
 }
 
 #[test]
-fn hosted_computers_refuse_every_operation() {
-    let root = root();
-    let mut computer = bot(&root, "b1");
-    computer.provider = HOSTED.into();
-    let hosted = provider(HOSTED).unwrap();
-    assert!(hosted.available(&root, &computer).is_err());
-    assert!(hosted.start(&root, &computer, &|_| {}).is_err());
-    assert!(hosted.transport(&root, &computer).is_err());
-    assert!(hosted.delete(&root, &computer).is_ok());
+fn hosted_computers_have_no_provider_yet() {
+    assert!(provider(HOSTED)
+        .err()
+        .is_some_and(|error| error.contains("not available yet")));
 }
 
 #[test]
@@ -296,7 +291,7 @@ fn the_image_tag_follows_the_bundled_definition() {
     assert!(tag.starts_with("jackalope-computer:"));
     assert_eq!(tag, docker::image_tag(&directory).unwrap());
     let copy = root();
-    for name in ["Dockerfile", "start.sh", "agent.py"] {
+    for name in docker::IMAGE_FILES {
         std::fs::copy(directory.join(name), copy.join(name)).unwrap();
     }
     assert_eq!(docker::image_tag(&copy).unwrap(), tag);
@@ -528,8 +523,8 @@ fn local_docker_computer_round_trip() {
                 &["bash".into(), "-c".into(), script.into()],
                 &[
                     ("EXAMPLE".into(), "1".into()),
-                    ("JACKALOPE_BRIDGE_URL".into(), runs::RELAY_URL.into()),
-                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::RELAY_TOKEN.into()),
+                    ("JACKALOPE_BRIDGE_URL".into(), runs::relay_url().into()),
+                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::relay_token().into()),
                 ],
                 "hello\n",
                 true,

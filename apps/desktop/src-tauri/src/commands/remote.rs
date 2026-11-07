@@ -162,18 +162,15 @@ impl RemoteAccess {
         sessions: LiveSessions,
         app: AppHandle,
     ) -> Self {
-        let loaded = account_storage::read(&path).and_then(|bytes| {
-            bytes
-                .map(|bytes| {
-                    serde_json::from_slice(&bytes).map_err(|_| {
-                        "Remote settings could not be read; the saved record is unchanged."
-                            .to_string()
-                    })
-                })
-                .unwrap_or(Ok(Config {
-                    port: default_port(),
-                    ..Default::default()
-                }))
+        let loaded = account_storage::read_json(
+            &path,
+            "Remote settings could not be read; the saved record is unchanged.",
+        )
+        .map(|saved| {
+            saved.unwrap_or(Config {
+                port: default_port(),
+                ..Default::default()
+            })
         });
         let (config, error) = match loaded {
             Ok(config) => (config, None),
@@ -206,10 +203,7 @@ impl RemoteAccess {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        account_storage::write(
-            &self.path,
-            &serde_json::to_vec(config).map_err(|e| e.to_string())?,
-        )
+        account_storage::write_json(&self.path, config)
     }
     pub fn launch(&self) {
         let service = self.clone();

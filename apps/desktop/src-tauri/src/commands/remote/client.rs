@@ -1,6 +1,7 @@
 use super::super::tasks::TaskRuntime;
 use super::*;
 static CLIENT_LOCK: Mutex<()> = Mutex::new(());
+const RESPONSE_LIMIT: usize = 4_000_000;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Host {
@@ -17,12 +18,11 @@ fn path(runtime: &TaskRuntime) -> PathBuf {
     runtime.integration_directory().join("remote-hosts.bin")
 }
 fn hosts(runtime: &TaskRuntime) -> Result<Vec<Host>, String> {
-    account_storage::read(&path(runtime))?
-        .map(|bytes| {
-            serde_json::from_slice(&bytes)
-                .map_err(|_| "Saved hosts could not be read. The record was preserved.".into())
-        })
-        .unwrap_or(Ok(Vec::new()))
+    Ok(account_storage::read_json(
+        &path(runtime),
+        "Saved hosts could not be read. The record was preserved.",
+    )?
+    .unwrap_or_default())
 }
 fn public(host: &Host) -> Value {
     json!({"id":host.id,"name":host.name,"address":host.address,"ssh":host.ssh,"port":host.port,"wsl":host.wsl})
@@ -54,12 +54,7 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
         .await;
     }
     let (base, authority) = endpoint(host).await?;
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(30))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = crate::commands::http::direct_client(Duration::from_secs(30))?;
     let mut request = client.post(format!("{base}{route}")).json(&value);
     if let Some(authority) = authority {
         request = request.header("Host", authority);
@@ -69,17 +64,14 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
     }
     let mut response = request.send().await.map_err(|_| "The host is unreachable. Work continues there; reconnect to check whether your last action completed.")?;
     let status = response.status();
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
+    let bytes = crate::commands::http::read_bounded(&mut response, RESPONSE_LIMIT)
         .await
-        .map_err(|_| "Connection interrupted. Refresh the host before retrying.")?
-    {
-        if bytes.len() + chunk.len() > 4_000_000 {
-            return Err("The host response is too large.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
+        .map_err(|error| match error {
+            crate::commands::http::BodyError::Interrupted => {
+                "Connection interrupted. Refresh the host before retrying."
+            }
+            crate::commands::http::BodyError::TooLarge => "The host response is too large.",
+        })?;
     let value: Value =
         serde_json::from_slice(&bytes).map_err(|_| "The host returned an unreadable response.")?;
     if !status.is_success() {
@@ -137,7 +129,13 @@ pub async fn remote_host_pair(
         .chars()
         .take(80)
         .collect::<String>();
-    let response = match request(&host, "/api/pair", json!({"code":code,"name":device})).await {
+    let response = match request(
+        &host,
+        super::api::PAIR_ROUTE,
+        json!({"code":code,"name":device}),
+    )
+    .await
+    {
         Ok(response) => response,
         Err(error) => {
             transport::close_tunnel(&host.id);
@@ -156,10 +154,7 @@ pub async fn remote_host_pair(
             return Err("Remove an unused host before adding another.".into());
         }
         saved.push(host.clone());
-        account_storage::write(
-            &path(&state),
-            &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
-        )?;
+        account_storage::write_json(&path(&state), &saved)?;
         Ok(public(&host))
     };
     let result = save();
@@ -182,7 +177,7 @@ pub async fn remote_host_request(
         .ok_or("Connect this host again.")?;
     request(
         &host,
-        "/api/request",
+        super::api::REQUEST_ROUTE,
         serde_json::to_value(action).map_err(|e| e.to_string())?,
     )
     .await
@@ -192,10 +187,7 @@ pub fn remote_host_remove(id: String, state: State<'_, TaskRuntime>) -> Result<(
     let _guard = CLIENT_LOCK.lock().map_err(|e| e.to_string())?;
     let mut saved = hosts(&state)?;
     saved.retain(|h| h.id != id);
-    account_storage::write(
-        &path(&state),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&path(&state), &saved)?;
     transport::close_tunnel(&id);
     Ok(())
 }

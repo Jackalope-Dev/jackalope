@@ -88,24 +88,6 @@ fn site_cleanup_accepts_only_site_names() {
 }
 
 #[test]
-fn site_choices_match_desktop_control() {
-    let options = site_options("example.com", "Demo");
-    let labels: Vec<_> = options.iter().map(|(label, _)| label.as_str()).collect();
-    assert_eq!(
-        labels,
-        [
-            "Allow example.com for this task",
-            "Always allow example.com in Demo",
-            "Not example.com",
-            "Never allow example.com in Demo"
-        ]
-    );
-    assert_eq!(options[1].1, (true, true));
-    assert_eq!(options[3].1, (false, true));
-    assert!(loopback("localhost") && loopback("127.0.0.1") && !loopback("example.com"));
-}
-
-#[test]
 #[ignore = "Launches a headless browser on a temporary persistent profile"]
 fn real_persistent_profile_keeps_cookies_and_clears_one_site() {
     let root = root();
@@ -124,4 +106,9 @@ fn real_persistent_profile_keeps_cookies_and_clears_one_site() {
         ["example.org"]
     );
     let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn saved_profiles_do_not_ask_about_loopback_pages() {
+    assert_eq!(SITE_LOOPBACK, crate::commands::site_gate::Loopback::Exempt);
 }

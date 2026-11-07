@@ -11,7 +11,11 @@
 
 use super::{
     account_storage,
-    cloudflare_artifacts::{self, AccountAccess},
+    cloudflare::{
+        api::Reply,
+        connection::{self, AccountAccess},
+        scopes::{self, Scope},
+    },
     tasks::TaskRuntime,
 };
 use serde::{Deserialize, Serialize};
@@ -31,7 +35,6 @@ mod tests;
 
 use api::Api;
 
-const API_ROOT: &str = "https://api.cloudflare.com/client/v4/accounts";
 const PROGRESS_EVENT: &str = "cloudflare-resources-progress";
 pub(super) const MANIFEST_PATH: &str = ".jackalope/cloudflare.json";
 const POSTGRES_FILE: &str = "cloudflare-postgres.bin";
@@ -127,43 +130,24 @@ impl Kind {
         !matches!(self, Kind::DurableObjects | Kind::Workers)
     }
 
-    /// The account API token permission that creates this kind, as the Cloudflare
-    /// dashboard names it.
-    fn permission(self) -> &'static str {
-        match self {
-            Kind::R2 => "Workers R2 Storage: Edit",
-            Kind::D1 => "D1: Edit",
-            Kind::Kv => "Workers KV Storage: Edit",
-            Kind::Queue => "Queues: Edit",
-            Kind::Hyperdrive => "Hyperdrive: Edit",
-            Kind::Turnstile => "Turnstile: Edit",
-            Kind::DurableObjects | Kind::Workers => "Workers Scripts: Edit",
-        }
-    }
-
-    /// The Connect Cloudflare scope for this kind, named like the existing
-    /// `workers-scripts.write` (the permission in kebab case, `.write` for Edit).
+    /// The Connect Cloudflare scope, and API token permission, that creates this kind.
     /// Cloudflare may not allow the public client to request these; a refusal comes
     /// back as `invalid_scope` and leads to an API token.
-    fn scope(self) -> Option<&'static str> {
+    fn scope(self) -> &'static Scope {
         match self {
-            Kind::R2 => Some("workers-r2-storage.write"),
-            Kind::D1 => Some("d1.write"),
-            Kind::Kv => Some("workers-kv-storage.write"),
-            Kind::Queue => Some("queues.write"),
-            Kind::Hyperdrive => Some("hyperdrive.write"),
-            Kind::Turnstile => Some("turnstile.write"),
-            Kind::DurableObjects | Kind::Workers => None,
+            Kind::R2 => &scopes::R2,
+            Kind::D1 => &scopes::D1,
+            Kind::Kv => &scopes::KV,
+            Kind::Queue => &scopes::QUEUES,
+            Kind::Hyperdrive => &scopes::HYPERDRIVE,
+            Kind::Turnstile => &scopes::TURNSTILE,
+            Kind::DurableObjects | Kind::Workers => &scopes::WORKERS,
         }
     }
-}
 
-/// The token permission behind a resource scope, for scopes Jackalope may request.
-pub(super) fn permission_for_scope(scope: &str) -> Option<&'static str> {
-    KINDS
-        .iter()
-        .find(|kind| kind.scope() == Some(scope))
-        .map(|kind| kind.permission())
+    fn permission(self) -> &'static str {
+        self.scope().permission
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -248,7 +232,7 @@ fn permission_failure(step: Step, kinds: &[Kind], oauth: bool) -> Failure {
     let labels: Vec<&str> = kinds.iter().map(|kind| kind.label()).collect();
     let scopes: Vec<String> = kinds
         .iter()
-        .filter_map(|kind| kind.scope().map(str::to_owned))
+        .map(|kind| kind.scope().name.to_owned())
         .collect();
     if oauth && !scopes.is_empty() {
         return Failure {
@@ -285,29 +269,15 @@ fn permission_failure(step: Step, kinds: &[Kind], oauth: bool) -> Failure {
     }
 }
 
-fn error_code(body: &Value) -> u64 {
-    body["errors"][0]["code"].as_u64().unwrap_or_default()
-}
-
-fn error_detail(body: &Value) -> String {
-    body["errors"][0]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(300)
-        .collect()
-}
-
 /// Maps a refusal for `kind` to a step failure. 401/403 or Cloudflare's 10000
 /// authentication error name the permission the step needs.
-fn api_failure(kind: Kind, account_id: &str, status: u16, body: &Value, oauth: bool) -> Failure {
+fn api_failure(kind: Kind, account_id: &str, reply: &Reply, oauth: bool) -> Failure {
     let step = Step::from(kind);
-    let code = error_code(body);
-    if matches!(status, 401 | 403) || code == 10000 {
+    let code = reply.code();
+    if reply.refused_access() {
         return permission_failure(step, &[kind], oauth);
     }
-    if status == 429 || code == 971 {
+    if reply.status == 429 || code == 971 {
         return Failure::new(step, "Cloudflare is rate limiting requests. Retry shortly.");
     }
     // R2 must be turned on (and its terms accepted) in the dashboard once per account.
@@ -321,7 +291,7 @@ fn api_failure(kind: Kind, account_id: &str, status: u16, body: &Value, oauth: b
             )
         };
     }
-    let detail = error_detail(body);
+    let (status, detail) = (reply.status, reply.detail());
     Failure::new(
         step,
         if detail.is_empty() {
@@ -693,10 +663,7 @@ fn save_postgres_url(
             Err(error) => Err(error),
         };
     }
-    account_storage::write(
-        &path,
-        &serde_json::to_vec(&urls).map_err(|e| e.to_string())?,
-    )
+    account_storage::write_json(&path, &urls)
 }
 
 struct RunGuard(String);
@@ -730,12 +697,7 @@ fn missing_scopes(kinds: &[Kind], granted: Option<&str>) -> Vec<Kind> {
     kinds
         .iter()
         .copied()
-        .filter(|kind| {
-            kind.provisioned()
-                && kind
-                    .scope()
-                    .is_some_and(|scope| !granted.split_whitespace().any(|item| item == scope))
-        })
+        .filter(|kind| kind.provisioned() && !scopes::granted(granted, kind.scope()))
         .collect()
 }
 
@@ -833,21 +795,15 @@ async fn provision(
     (done, None)
 }
 
-fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
-}
-
 fn api_for(access: &AccountAccess) -> Result<Api, String> {
     Ok(Api {
-        root: format!("{API_ROOT}/{}", access.account_id),
+        cloudflare: super::cloudflare::api::Api::new(
+            &access.account_id,
+            &access.token,
+            Duration::from_secs(60),
+        )?,
         account_id: access.account_id.clone(),
-        token: access.token.clone(),
         oauth: access.oauth,
-        client: client()?,
     })
 }
 
@@ -883,9 +839,7 @@ async fn run(
     if let Some(url) = new_url.filter(|_| plan.postgres.is_some()) {
         save_postgres_url(runtime, &project, Some(&url)).map_err(fail)?;
     }
-    let access = cloudflare_artifacts::account_access(runtime)
-        .await
-        .map_err(fail)?;
+    let access = connection::account_access(runtime).await.map_err(fail)?;
     let existing = read_manifest(&project).map_err(fail)?;
     let missing = missing_scopes(&plan.kinds, access.granted.as_deref());
     if access.oauth && !missing.is_empty() {
@@ -924,7 +878,7 @@ pub async fn cloudflare_resources_status(
     Ok(Status {
         manifest: read_manifest(&project)?,
         postgres_saved: postgres_urls(&state)?.contains_key(&project_key(&project)),
-        account_id: cloudflare_artifacts::connected_account(&state),
+        account_id: connection::connected_account(&state),
     })
 }
 
@@ -994,7 +948,7 @@ pub async fn cloudflare_resources_delete(
         .find(|resource| resource.kind == kind)
         .ok_or("That resource is not recorded for this project.")?;
     if kind.provisioned() {
-        let access = cloudflare_artifacts::account_access(state.inner()).await?;
+        let access = connection::account_access(state.inner()).await?;
         if access.account_id != manifest.account_id {
             return Err(format!(
                 "These resources are in another Cloudflare account. Delete them in the dashboard: {}",
@@ -1023,7 +977,7 @@ pub async fn cloudflare_resources_turnstile_secret(
         .find(|resource| resource.kind == Kind::Turnstile)
         .and_then(|resource| resource.id.clone())
         .ok_or("This project has no Turnstile widget recorded.")?;
-    let access = cloudflare_artifacts::account_access(state.inner()).await?;
+    let access = connection::account_access(state.inner()).await?;
     if access.account_id != manifest.account_id {
         return Err("The Turnstile widget is in another Cloudflare account.".into());
     }

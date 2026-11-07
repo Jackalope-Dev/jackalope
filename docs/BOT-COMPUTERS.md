@@ -99,7 +99,7 @@ The first start pulls this version's [published image](#the-image) and tags it
 definition, no network, or an arm64 host, since only amd64 is published) it builds the
 image from `apps/desktop/src-tauri/resources/computer` (bundled with the app) with
 `docker build`. The status shows the latest pull or build line. The tag follows the
-content of `Dockerfile`, `start.sh` and `agent.py`, so a changed definition builds a new
+content of `Dockerfile`, `start.sh`, `agent.py` and `protocol.json`, so a changed definition builds a new
 image. A local build is for the host's architecture, so Apple Silicon gets an arm64
 image.
 
@@ -549,7 +549,7 @@ version this app bundles) on the computer's own Chromium, so a server the agent 
 there is reachable at `localhost`. They take the same requests and give the same answers
 as here. Before opening a site, and on the page each command ends on, the runner asks
 this device through `POST /v1/policy` with kind `site`; the computer's own pages
-(`localhost`, `127.0.0.1`, `::1`) and non-web addresses are not asked about. This device
+(the protocol's loopback hosts) and non-web addresses are not asked about. This device
 answers with the computer's per-site questions and saved decisions (allow for this task,
 always allow, decline, never allow, saved under the project), and a page with a visible
 password field asks the person to sign in through **Watch / take over** instead; while a
@@ -739,6 +739,13 @@ runners behind `tasks/runner.rs` (see [the runner](#the-runner)).
 `browser::set_router`, gated by the same site questions, which also answer a runner's
 `site` callbacks.
 
+`protocol.json` holds the values both sides of the protocol read: protocol numbers,
+capability and run action names, transfer and relay limits, the runner-served tools and
+routes, the Git identity, repository search bounds, the browser page probe and limits,
+loopback hosts, the screenshot folder, named keys and the error codes a failed request
+carries beside its message (`failed`, `unsupported`, `permanent`). The desktop reads it
+from the bundled resources and `agent.py` from beside itself in the image.
+
 `agent.py` uses only Debian's Python with Pillow, pyatspi, `xdotool`, `wmctrl`, `xclip`,
 `scrot`, and agent-browser for the runner's browser tools. It answers the helper protocol's `hello` (`protocol: 1`) and `list`,
 `snapshot` (AT-SPI elements with screen bounds, at most 300, password text protected),
@@ -798,8 +805,9 @@ version (`UV_SHA256`, copied from that release's published `.sha256` assets and
 a new uv release means updating the version and both hashes together. The image has no
 Docker.
 
-The image's definition hash covers `Dockerfile`, `start.sh` and `agent.py`, so any
-change to the runner or the image definition, including the uv pin, gives a new
+The image's definition hash covers `Dockerfile`, `start.sh`, `agent.py` and
+`protocol.json`, so any change to the runner or the image definition, including the uv
+pin, gives a new
 `<version>-<hash>` tag. A local sandbox pulls or builds the new image and is recreated
 from it at its next start, Agent37 gets a new template (see each provider above), and a
 cloud machine keeps its old image until its owner runs the new tag.

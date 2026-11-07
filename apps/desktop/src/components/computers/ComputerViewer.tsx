@@ -56,10 +56,7 @@ export function ComputerViewer({ computer }: { computer: ComputerStatus }) {
       setBusy(false);
     }
   };
-  const startable =
-    computer.state === 'stopped' &&
-    (computer.provider !== 'local-docker' || computer.settings.network);
-  if (!computer.viewer && !startable && !view) return null;
+  if (!computer.viewer && !computer.startable && !view) return null;
   const loadingLabel = computer.state === 'running' ? 'Opening…' : 'Starting…';
   return (
     <div className="computer-viewer">

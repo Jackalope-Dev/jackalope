@@ -192,6 +192,31 @@ fn default_input_type() -> String {
     "text".into()
 }
 
+impl PendingUserPrompt {
+    /// A new question for the person to answer by choosing one of `options`,
+    /// without a free-text answer.
+    pub fn choice(run_id: &str, header: &str, question: String, options: Vec<String>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            run_id: run_id.into(),
+            question,
+            input_type: "choice".into(),
+            options,
+            default_value: None,
+            status: "pending".into(),
+            answer: None,
+            created_at: Utc::now().to_rfc3339(),
+            answered_at: None,
+            presentation: QuestionPresentation {
+                header: Some(header.into()),
+                allow_other: Some(false),
+                ..Default::default()
+            },
+            autonomy: Default::default(),
+        }
+    }
+}
+
 /// Optional structure for a question card. Every field is optional so prompts
 /// saved before it existed, and agents that never send it, behave as before.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]

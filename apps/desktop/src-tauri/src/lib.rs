@@ -135,9 +135,7 @@ pub fn run(launch: Launch) {
         .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
             commands::release::register_update_restart();
-            commands::browser::set_resource_directory(app.path().resource_dir()?);
-            commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
-            commands::computers::set_resource_directory(app.path().resource_dir()?);
+            commands::resources::set_directory(app.path().resource_dir()?);
             let paths = cli_protocol::ProfilePaths::new(
                 &profile.clone().unwrap_or(app.path().app_data_dir()?),
             );
@@ -475,15 +473,15 @@ pub fn run(launch: Launch) {
             commands::issues::issue_connection_remove,
             commands::coordination::peers::coordination_live_combination,
             commands::coordination::subtasks::task_request_split,
-            commands::cloudflare_artifacts::cloudflare_artifacts_status,
+            commands::cloudflare::connection::cloudflare_artifacts_status,
             commands::cloudflare_artifacts::cloudflare_artifacts_connect,
-            commands::cloudflare_artifacts::cloudflare_token_accounts,
-            commands::cloudflare_artifacts::cloudflare_artifacts_disconnect,
-            commands::cloudflare_artifacts::cloudflare_oauth_begin,
-            commands::cloudflare_artifacts::cloudflare_oauth_complete,
-            commands::cloudflare_artifacts::cloudflare_oauth_cancel,
+            commands::cloudflare::connection::cloudflare_token_accounts,
+            commands::cloudflare::connection::cloudflare_artifacts_disconnect,
+            commands::cloudflare::connection::cloudflare_oauth_begin,
+            commands::cloudflare::connection::cloudflare_oauth_complete,
+            commands::cloudflare::connection::cloudflare_oauth_cancel,
             commands::cloudflare_artifacts::cloudflare_oauth_connect,
-            commands::cloudflare_artifacts::cloudflare_oauth_reauthorize,
+            commands::cloudflare::connection::cloudflare_oauth_reauthorize,
             commands::coordination::cloud::swarm_connection_status,
             commands::coordination::cloud::swarm_connection_save,
             commands::coordination::cloud::swarm_connection_remove,

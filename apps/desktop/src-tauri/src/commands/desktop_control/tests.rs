@@ -63,9 +63,10 @@ fn desktop_permission_requires_an_explicit_answer_for_this_attempt() {
         Some(Choice::Window(window()))
     );
     question.answer = Some("Do not allow".into());
-    assert!(selected_answer("run", &question, "question", &choices)
-        .unwrap_err()
-        .contains("declined"));
+    assert!(matches!(
+        selected_answer("run", &question, "question", &choices),
+        Err(Failure::Ended(message)) if message.contains("declined")
+    ));
     question.answer = Some("123".into());
     assert!(selected_answer("run", &question, "question", &choices).is_err());
 }
@@ -140,7 +141,7 @@ fn grant_levels_scope_windows_apps_and_the_desktop() {
         .chain(&apps)
         .map(|(label, _)| label.clone())
         .collect();
-    let unique: HashSet<_> = labels.iter().collect();
+    let unique: std::collections::HashSet<_> = labels.iter().collect();
     assert_eq!(
         unique.len(),
         labels.len(),
@@ -318,10 +319,6 @@ fn browser_sites_are_recognized_and_decided_per_host() {
     let id = grant::sites(&path, "p")[0].id.clone();
     grant::forget(&path, "p", &id).unwrap();
     assert_eq!(grant::sites(&path, "p").len(), 1);
-    let options = site_options("github.com", "Site");
-    assert_eq!(options.len(), 4);
-    assert_eq!(options[1].1, (true, true));
-    assert_eq!(options[3].1, (false, true));
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
 
@@ -495,14 +492,14 @@ fn desktop_input_is_bounded_and_rejects_system_keys_and_extra_fields() {
         }
     );
     assert_eq!(
-        platform::key("Primary+a"),
+        actions::legacy_key("Primary+a"),
         if cfg!(target_os = "macos") {
             "Primary+a"
         } else {
             "Control+a"
         }
     );
-    assert_eq!(platform::key("Control+a"), "Control+a");
+    assert_eq!(actions::legacy_key("Control+a"), "Control+a");
 
     let mut input = request("type");
     input.text = Some("literal $() {ENTER} `characters`".into());
@@ -736,7 +733,6 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
 #[test]
 #[ignore = "Opens and controls a disposable Windows form; requires an interactive test desktop"]
 fn native_desktop_window_trial() {
-    use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
     let directory =
         std::env::temp_dir().join(format!("jackalope-desktop-trial-{}", uuid::Uuid::new_v4()));
@@ -747,14 +743,13 @@ fn native_desktop_window_trial() {
     let report = directory.join("result.txt");
     let powershell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
         .join("System32/WindowsPowerShell/v1.0/powershell.exe");
-    let mut child = Command::new(powershell)
+    let mut child = crate::commands::process_control::hidden(&mut Command::new(powershell))
         .args(["-NoProfile", "-File"])
         .arg(fixture)
         .env("JACKALOPE_DESKTOP_FIXTURE_TITLE", &title)
         .env("JACKALOPE_DESKTOP_FIXTURE_RESULT", &report)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .creation_flags(0x08000000)
         .spawn()
         .unwrap();
     // The job object closes the fixture even if an assertion unwinds past cleanup.
@@ -898,4 +893,9 @@ fn wait_for_fixture_text(path: &std::path::Path, expected: &str) {
         std::thread::sleep(Duration::from_millis(100));
     }
     assert_eq!(std::fs::read_to_string(path).unwrap(), expected);
+}
+
+#[test]
+fn the_persons_own_browser_asks_about_loopback_pages() {
+    assert_eq!(SITE_LOOPBACK, crate::commands::site_gate::Loopback::Asked);
 }

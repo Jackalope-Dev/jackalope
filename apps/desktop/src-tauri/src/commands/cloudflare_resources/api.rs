@@ -2,25 +2,18 @@
 //! by name first and creates it only when it is missing, returning the ID bindings
 //! use. Routes are relative to `/accounts/{account_id}`.
 
-use super::{api_failure, error_code, error_detail, Failure, Kind, PostgresOrigin, Step};
+use super::{api_failure, Failure, Kind, PostgresOrigin, Step};
+use crate::commands::cloudflare::api::{self, Body, Reply};
 use serde_json::{json, Value};
 
 /// Pages read when listing resources to find one by name.
 const MAX_PAGES: u32 = 20;
 const PAGE_SIZE: usize = 100;
-const MAX_RESPONSE: usize = 4_000_000;
 
 pub(super) struct Api {
-    /// `https://api.cloudflare.com/client/v4/accounts/{account_id}`, or a test server.
-    pub root: String,
+    pub cloudflare: api::Api,
     pub account_id: String,
-    pub token: String,
     pub oauth: bool,
-    pub client: reqwest::Client,
-}
-
-fn ok(status: u16, body: &Value) -> bool {
-    (200..300).contains(&status) && body["success"] == true
 }
 
 /// IDs and names go into request paths; anything else is refused.
@@ -43,39 +36,15 @@ fn text(value: &Value, fields: &[&str]) -> Option<String> {
 }
 
 impl Api {
-    pub async fn send(
+    async fn send(
         &self,
         method: reqwest::Method,
         route: &str,
         body: Option<&Value>,
-    ) -> Result<(u16, Value), String> {
-        let mut request = self
-            .client
-            .request(method, format!("{}{route}", self.root))
-            .bearer_auth(&self.token);
-        if let Some(body) = body {
-            request = request.json(body);
-        }
-        let mut response = request
-            .send()
+    ) -> Result<Reply, String> {
+        self.cloudflare
+            .send(method, route, body.map_or(Body::Empty, Body::Json))
             .await
-            .map_err(|_| "Could not reach Cloudflare. Check your connection and retry.")?;
-        let status = response.status().as_u16();
-        let mut bytes = Vec::new();
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| "The Cloudflare response was interrupted. Retry.")?
-        {
-            if bytes.len() + chunk.len() > MAX_RESPONSE {
-                return Err("Cloudflare returned an unexpectedly large response.".into());
-            }
-            bytes.extend_from_slice(&chunk);
-        }
-        Ok((
-            status,
-            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-        ))
     }
 
     async fn call(
@@ -84,14 +53,14 @@ impl Api {
         method: reqwest::Method,
         route: &str,
         body: Option<&Value>,
-    ) -> Result<(u16, Value), Failure> {
+    ) -> Result<Reply, Failure> {
         self.send(method, route, body)
             .await
             .map_err(|message| Failure::new(Step::from(kind), message))
     }
 
-    fn refused(&self, kind: Kind, status: u16, body: &Value) -> Failure {
-        api_failure(kind, &self.account_id, status, body, self.oauth)
+    fn refused(&self, kind: Kind, reply: &Reply) -> Failure {
+        api_failure(kind, &self.account_id, reply, self.oauth)
     }
 
     async fn expect(
@@ -101,11 +70,11 @@ impl Api {
         route: &str,
         body: Option<&Value>,
     ) -> Result<Value, Failure> {
-        let (status, value) = self.call(kind, method, route, body).await?;
-        if !ok(status, &value) {
-            return Err(self.refused(kind, status, &value));
+        let reply = self.call(kind, method, route, body).await?;
+        if !reply.ok() {
+            return Err(self.refused(kind, &reply));
         }
-        Ok(value)
+        Ok(reply.body)
     }
 
     /// The first item in a list response whose `name_field` is `name`. `paged`
@@ -168,7 +137,7 @@ impl Api {
     /// when it does not exist, and creating one that exists in this account is 10004.
     pub async fn ensure_r2(&self, name: &str) -> Result<Option<String>, Failure> {
         let kind = Kind::R2;
-        let (status, body) = self
+        let reply = self
             .call(
                 kind,
                 reqwest::Method::GET,
@@ -176,13 +145,13 @@ impl Api {
                 None,
             )
             .await?;
-        if ok(status, &body) {
+        if reply.ok() {
             return Ok(Some(name.into()));
         }
-        if status != 404 && error_code(&body) != 10006 {
-            return Err(self.refused(kind, status, &body));
+        if reply.status != 404 && reply.code() != 10006 {
+            return Err(self.refused(kind, &reply));
         }
-        let (status, body) = self
+        let reply = self
             .call(
                 kind,
                 reqwest::Method::POST,
@@ -190,10 +159,10 @@ impl Api {
                 Some(&json!({"name": name})),
             )
             .await?;
-        if ok(status, &body) || error_code(&body) == 10004 {
+        if reply.ok() || reply.code() == 10004 {
             return Ok(Some(name.into()));
         }
-        Err(self.refused(kind, status, &body))
+        Err(self.refused(kind, &reply))
     }
 
     pub async fn ensure_d1(&self, name: &str) -> Result<Option<String>, Failure> {
@@ -324,18 +293,18 @@ impl Api {
     pub async fn delete(&self, kind: Kind, id: &str) -> Result<(), String> {
         let route = Self::delete_route(kind, id)
             .ok_or_else(|| format!("Jackalope cannot delete {} here.", kind.label()))?;
-        let (status, body) = self.send(reqwest::Method::DELETE, &route, None).await?;
-        let code = error_code(&body);
-        if ok(status, &body) || status == 404 || matches!(code, 10006 | 10007) {
+        let reply = self.send(reqwest::Method::DELETE, &route, None).await?;
+        let code = reply.code();
+        if reply.ok() || reply.status == 404 || matches!(code, 10006 | 10007) {
             return Ok(());
         }
         if kind == Kind::R2 && code == 10008 {
             return Err(format!(
                 "R2 deletes only empty buckets. Empty {id} in the Cloudflare dashboard, then delete it again. Cloudflare said: {}",
-                error_detail(&body)
+                reply.detail()
             ));
         }
-        Err(self.refused(kind, status, &body).message)
+        Err(self.refused(kind, &reply).message)
     }
 
     pub async fn turnstile_secret(&self, sitekey: &str) -> Result<String, String> {

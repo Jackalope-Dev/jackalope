@@ -38,11 +38,7 @@ pub(super) fn command(path: &Path, args: &[&str], policy: Policy) -> Command {
     if matches!(policy, Policy::Inspection) {
         command.env("GIT_OPTIONAL_LOCKS", "0");
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    super::process_control::hidden(&mut command);
     #[cfg(unix)]
     if matches!(policy, Policy::Inherited) {
         use std::os::unix::process::CommandExt;

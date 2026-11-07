@@ -25,6 +25,7 @@ pub(crate) mod docker;
 pub(crate) mod image;
 pub(crate) mod policy;
 pub(crate) mod pool;
+pub(crate) mod protocol;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runner;
@@ -38,7 +39,7 @@ pub use usage::{launch as launch_idle_stop, shutdown, ComputerPreferences};
 
 use super::{
     account_storage,
-    harness::{PendingUserPrompt, QuestionPresentation},
+    harness::PendingUserPrompt,
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
@@ -54,34 +55,18 @@ use std::{
 pub(crate) const LOCAL_DOCKER: &str = "local-docker";
 pub(crate) const REMOTE_MACHINE: &str = "remote-machine";
 pub(crate) const AGENT37: &str = "agent37";
+/// Jackalope-hosted computers are planned. Saved records may name them; no
+/// provider serves them yet.
 pub(crate) const HOSTED: &str = "jackalope-hosted";
-/// Jackalope-hosted computers are planned; the provider exists so settings and
-/// saved records have a stable name, but it refuses every operation.
-const HOSTED_AVAILABLE: bool = false;
 const BOT: &str = "bot";
 const TASK: &str = "task";
 pub(crate) const PROJECT: &str = "project";
 
-static RESOURCES: OnceLock<PathBuf> = OnceLock::new();
-
-pub fn set_resource_directory(path: PathBuf) {
-    let _ = RESOURCES.set(path);
-}
-
 /// The Docker build context bundled with the app.
 pub(crate) fn image_directory() -> Result<PathBuf, String> {
-    let relative = Path::new("resources/computer");
-    if let Some(root) = RESOURCES.get() {
-        let path = root.join(relative);
-        if path.join("Dockerfile").is_file() {
-            return Ok(path);
-        }
-    }
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative);
-    if cfg!(any(debug_assertions, test)) && path.join("Dockerfile").is_file() {
-        return Ok(path);
-    }
-    Err("The bot computer image definition is missing. Reinstall Jackalope.".into())
+    super::resources::bundled("resources/computer/Dockerfile")
+        .and_then(|dockerfile| dockerfile.parent().map(Path::to_path_buf))
+        .ok_or_else(|| "The bot computer image definition is missing. Reinstall Jackalope.".into())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -313,8 +298,6 @@ fn hosted_unavailable() -> String {
         .into()
 }
 
-// ---- secrets ----
-
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ComputerSecret {
@@ -338,17 +321,17 @@ pub(crate) fn secret(root: &Path, id: &str) -> Result<ComputerSecret, String> {
         }
     }
     let secret = ComputerSecret {
-        vnc_password: uuid::Uuid::new_v4().simple().to_string()[..8].to_string(),
+        vnc_password: vnc_password(),
     };
     std::fs::create_dir_all(root.join("secrets")).map_err(|e| e.to_string())?;
-    account_storage::write(
-        &path,
-        &serde_json::to_vec(&secret).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&path, &secret)?;
     Ok(secret)
 }
 
-// ---- providers ----
+/// A new viewer password. VNC's password authentication uses only 8 characters.
+pub(crate) fn vnc_password() -> String {
+    uuid::Uuid::new_v4().simple().to_string()[..8].to_string()
+}
 
 /// What a provider reports about a computer's machine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -358,6 +341,53 @@ pub(crate) enum MachineState {
     Running,
 }
 
+/// A failed request to a computer's agent.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct AgentError {
+    /// The agent's reason (`errorCodes` in the computer protocol). `None` for a
+    /// failure on this side, or from an agent in an image published before codes.
+    pub code: Option<String>,
+    pub message: String,
+}
+
+/// The agent does not know the action.
+pub(crate) const UNSUPPORTED: &str = "unsupported";
+/// Retrying the same request cannot succeed.
+pub(crate) const PERMANENT: &str = "permanent";
+
+impl AgentError {
+    pub fn is(&self, code: &str) -> bool {
+        self.code.as_deref() == Some(code)
+    }
+}
+
+impl From<String> for AgentError {
+    fn from(message: String) -> Self {
+        Self {
+            code: None,
+            message,
+        }
+    }
+}
+
+impl From<&str> for AgentError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+impl From<AgentError> for String {
+    fn from(error: AgentError) -> Self {
+        error.message
+    }
+}
+
+impl std::fmt::Display for AgentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 /// One JSON-lines conversation with a computer's in-sandbox agent.
 pub(crate) trait Transport: Send {
     fn call(
@@ -365,7 +395,7 @@ pub(crate) trait Transport: Send {
         payload: &Value,
         timeout: Duration,
         canceled: &AtomicBool,
-    ) -> Result<Value, String>;
+    ) -> Result<Value, AgentError>;
     fn shutdown(&mut self) {}
 }
 
@@ -400,54 +430,18 @@ pub(crate) trait Provider: Send + Sync {
     fn devtools(&self, root: &Path, computer: &Computer) -> Option<String>;
 }
 
-struct Hosted;
-
-impl Provider for Hosted {
-    fn available(&self, _: &Path, _: &Computer) -> Result<(), String> {
-        if HOSTED_AVAILABLE {
-            Ok(())
-        } else {
-            Err(hosted_unavailable())
-        }
-    }
-    fn state(&self, _: &Path, _: &Computer) -> Result<MachineState, String> {
-        Err(hosted_unavailable())
-    }
-    fn start(&self, _: &Path, _: &Computer, _: &dyn Fn(&str)) -> Result<(), String> {
-        Err(hosted_unavailable())
-    }
-    fn stop(&self, _: &Path, _: &Computer) -> Result<(), String> {
-        Err(hosted_unavailable())
-    }
-    fn delete(&self, _: &Path, _: &Computer) -> Result<(), String> {
-        Ok(())
-    }
-    fn transport(&self, _: &Path, _: &Computer) -> Result<Box<dyn Transport>, String> {
-        Err(hosted_unavailable())
-    }
-    fn viewer(&self, _: &Path, _: &Computer, _: bool) -> Result<Option<String>, String> {
-        Ok(None)
-    }
-    fn devtools(&self, _: &Path, _: &Computer) -> Option<String> {
-        None
-    }
-}
-
 pub(crate) fn provider(name: &str) -> Result<&'static dyn Provider, String> {
     static DOCKER: docker::LocalDocker = docker::LocalDocker;
     static REMOTE: remote::RemoteMachine = remote::RemoteMachine;
     static AGENT37_PROVIDER: agent37::Agent37 = agent37::Agent37;
-    static HOSTED_PROVIDER: Hosted = Hosted;
     match name {
         LOCAL_DOCKER => Ok(&DOCKER),
         REMOTE_MACHINE => Ok(&REMOTE),
         AGENT37 => Ok(&AGENT37_PROVIDER),
-        HOSTED => Ok(&HOSTED_PROVIDER),
+        HOSTED => Err(hosted_unavailable()),
         _ => Err("This computer was made by a newer Jackalope. Update to use it.".into()),
     }
 }
-
-// ---- lifecycle and connections ----
 
 /// What a computer is doing right now, for computers starting or stopping in
 /// the background. Errors stay until the next lifecycle action.
@@ -555,7 +549,9 @@ pub(crate) fn call(
         }
     };
     let mut transport = connection.lock().map_err(|e| e.to_string())?;
-    transport.call(&payload, timeout, canceled)
+    transport
+        .call(&payload, timeout, canceled)
+        .map_err(String::from)
 }
 
 /// How long agent work waits for a stopped computer to start before it is
@@ -605,8 +601,6 @@ pub(crate) fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> 
         started = true;
     }
 }
-
-// ---- runs ----
 
 /// A run's computer: the one its agent runs on, its bot's, or the one the
 /// person approved for its task. An agent on a computer acts on that same
@@ -735,32 +729,13 @@ fn request_blocking(
                 )
             })
             .unwrap_or_default();
-        let prompt = PendingUserPrompt {
-            id: uuid::Uuid::new_v4().to_string(),
-            run_id: run.id.clone(),
-            question: format!("The agent asks for its own sandbox computer: a separate Linux desktop with a browser, running in Docker on this device. It cannot see your desktop or files unless you share this project read-only.{reason}"),
-            input_type: "choice".into(),
-            options: vec![DECLINE.into(), ALLOW.into(), ALLOW_PROJECT.into()],
-            default_value: None,
-            status: "pending".into(),
-            answer: None,
-            created_at: chrono::Utc::now().to_rfc3339(),
-            answered_at: None,
-            presentation: QuestionPresentation {
-                header: Some("Sandbox computer".into()),
-                allow_other: Some(false),
-                ..Default::default()
-            },
-            autonomy: Default::default(),
-        };
-        let mut pushed = false;
-        runtime.update_checked(&run.id, |r| {
-            if r.status.is_running() {
-                r.prompts.push(prompt.clone());
-                pushed = true;
-            }
-        })?;
-        if !pushed {
+        let prompt = PendingUserPrompt::choice(
+            &run.id,
+            "Sandbox computer",
+            format!("The agent asks for its own sandbox computer: a separate Linux desktop with a browser, running in Docker on this device. It cannot see your desktop or files unless you share this project read-only.{reason}"),
+            vec![DECLINE.into(), ALLOW.into(), ALLOW_PROJECT.into()],
+        );
+        if !super::site_gate::push_if_running(runtime, &run.id, &prompt)? {
             return Err("This attempt has ended.".into());
         }
         pending_requests()
@@ -872,8 +847,6 @@ pub fn release_run(run_id: &str) {
     super::desktop_control::computer::close(run_id);
 }
 
-// ---- views and app commands ----
-
 fn state_name(state: MachineState) -> &'static str {
     match state {
         MachineState::Missing => "not-created",
@@ -893,12 +866,19 @@ pub struct ComputerStatus {
     pub error: Option<String>,
     /// Whether a viewer can be opened now.
     pub viewer: bool,
+    /// Stopped, and starting it would give a viewer.
+    pub startable: bool,
     /// An active run or an open viewer holds it, so it is not stopped.
     pub in_use: bool,
     /// Stopped by the idle stop; it starts again when next used.
     pub stopped_idle: bool,
     /// Idle time and when it stops, or why it stopped, after the state.
     pub usage: Option<String>,
+}
+
+/// A local sandbox without network access publishes no viewer or browser port.
+fn screen_reachable(computer: &Computer) -> bool {
+    computer.provider != LOCAL_DOCKER || computer.settings.network
 }
 
 pub(crate) fn status(root: &Path, computer: Computer) -> ComputerStatus {
@@ -924,9 +904,8 @@ pub(crate) fn status(root: &Path, computer: Computer) -> ComputerStatus {
         in_use: usage.in_use,
         stopped_idle: usage.stopped_idle,
         usage: usage.line,
-        viewer: state == "running"
-            && computer.provider != AGENT37
-            && (computer.settings.network || computer.provider != LOCAL_DOCKER),
+        viewer: state == "running" && computer.provider != AGENT37 && screen_reachable(&computer),
+        startable: state == "stopped" && screen_reachable(&computer),
         computer,
         state,
         phase: busy.phase,
@@ -1203,7 +1182,7 @@ pub async fn computer_machines(
     blocking(move || {
         Ok(MachinesView {
             machines: remote::machines(&root)?,
-            hosted_available: HOSTED_AVAILABLE,
+            hosted_available: false,
             image: image_directory()
                 .and_then(|directory| image::published(&directory))
                 .unwrap_or_default(),

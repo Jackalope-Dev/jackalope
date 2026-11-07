@@ -61,6 +61,26 @@ pub(crate) struct Helper {
 pub(crate) struct CallError {
     pub message: String,
     pub uncertain: bool,
+    /// Why the helper refused, when it said (`errorCodes` in the computer protocol).
+    pub code: Option<String>,
+}
+
+/// The result in a `{ok, result}` or `{ok: false, error, code}` envelope, which a
+/// computer's agent answers in too.
+pub(crate) fn answer(response: &Value, fallback: &str) -> Result<Value, CallError> {
+    if response["ok"] == true {
+        return Ok(response["result"].clone());
+    }
+    Err(CallError {
+        message: response["error"]
+            .as_str()
+            .unwrap_or(fallback)
+            .chars()
+            .take(1200)
+            .collect(),
+        uncertain: false,
+        code: response["code"].as_str().map(str::to_owned),
+    })
 }
 
 impl From<CallError> for String {
@@ -105,6 +125,7 @@ impl Helper {
         let fail = |message: String| CallError {
             message,
             uncertain: false,
+            code: None,
         };
         let Launch {
             mut command,
@@ -185,6 +206,7 @@ impl Helper {
             return Err(CallError {
                 message: "Desktop access was revoked.".into(),
                 uncertain: false,
+                code: None,
             });
         }
         if !self.alive() {
@@ -210,6 +232,7 @@ impl Helper {
         let running = self.running.as_mut().ok_or(CallError {
             message: "The desktop helper is not running.".into(),
             uncertain: false,
+            code: None,
         })?;
         if writeln!(running.stdin, "{message}")
             .and_then(|_| running.stdin.flush())
@@ -220,6 +243,7 @@ impl Helper {
                 message: "The desktop helper stopped before receiving the action. Try again."
                     .into(),
                 uncertain: false,
+                code: None,
             });
         }
         let deadline = Instant::now() + timeout;
@@ -229,6 +253,7 @@ impl Helper {
                 return Err(CallError {
                     message: "Desktop access was revoked. An in-flight action may have occurred; do not replay it.".into(),
                     uncertain: true,
+                    code: None,
                 });
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -237,6 +262,7 @@ impl Helper {
                 return Err(CallError {
                     message: "The desktop operation timed out. Inspect the window before retrying; an action may have occurred.".into(),
                     uncertain: true,
+                    code: None,
                 });
             }
             let lines = &self.running.as_ref().unwrap().lines;
@@ -250,19 +276,7 @@ impl Helper {
                     if response["id"] != json!(id) {
                         continue;
                     }
-                    return if response["ok"] == true {
-                        Ok(response["result"].clone())
-                    } else {
-                        Err(CallError {
-                            message: response["error"]
-                                .as_str()
-                                .unwrap_or("The desktop helper failed.")
-                                .chars()
-                                .take(1200)
-                                .collect(),
-                            uncertain: false,
-                        })
-                    };
+                    return answer(&response, "The desktop helper failed.");
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -270,6 +284,7 @@ impl Helper {
                     return Err(CallError {
                         message: "The desktop helper stopped unexpectedly. Inspect the window before retrying; an action may have occurred.".into(),
                         uncertain: true,
+                        code: None,
                     });
                 }
             }
@@ -287,15 +302,13 @@ mod tests {
         Arc::new(|| {
             #[cfg(windows)]
             let command = {
-                use std::os::windows::process::CommandExt;
                 let script = "$ErrorActionPreference='Stop';while(($l=[Console]::In.ReadLine()) -ne $null){$r=$l|ConvertFrom-Json;switch($r.action){'hello'{'{\"id\":'+$r.id+',\"ok\":true,\"result\":{\"protocol\":1}}'}'crash'{exit 3}'hang'{Start-Sleep 30}'fail'{'{\"id\":'+$r.id+',\"ok\":false,\"error\":\"fixture failure\"}'}default{'noise';'{\"id\":'+$r.id+',\"ok\":true,\"result\":{\"value\":'+$r.value+',\"pid\":'+$PID+'}}'}};[Console]::Out.Flush()}";
                 let mut command = Command::new(
                     std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
                         .join("System32/WindowsPowerShell/v1.0/powershell.exe"),
                 );
-                command
-                    .args(["-NoProfile", "-NonInteractive", "-Command", script])
-                    .creation_flags(0x08000000);
+                command.args(["-NoProfile", "-NonInteractive", "-Command", script]);
+                crate::commands::process_control::hidden(&mut command);
                 command
             };
             #[cfg(unix)]

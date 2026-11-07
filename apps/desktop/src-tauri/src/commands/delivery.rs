@@ -87,11 +87,7 @@ fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
             ])
             .env("GH_PROMPT_DISABLED", "1")
             .env("GIT_TERMINAL_PROMPT", "0");
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
+        process_control::hidden(&mut command);
         match process_control::run(command, Duration::from_secs(15)) {
             Ok(result) if result.success => {
                 match serde_json::from_str::<Value>(&result.stdout) {
@@ -197,11 +193,7 @@ pub async fn task_pull_request_create(
         if draft {
             command.arg("--draft");
         }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
+        process_control::hidden(&mut command);
         let result = process_control::run_with_input(command, Duration::from_secs(60), body.into_bytes())?;
         if !result.success {
             let detail = result.stderr.trim();

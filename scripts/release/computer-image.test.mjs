@@ -7,8 +7,9 @@ test('the definition digest matches the app (image.rs uses the same fixture)', (
     ['Dockerfile', Buffer.from('FROM scratch\n')],
     ['start.sh', Buffer.from('#!/bin/sh\n')],
     ['agent.py', Buffer.from('print(1)\n')],
+    ['protocol.json', Buffer.from('{}\n')],
   ];
-  assert.equal(definitionDigest(files), 'a2510b669187');
+  assert.equal(definitionDigest(files), 'd8ea7fb8a163');
 });
 
 test('tags carry the version with the definition, the version and the commit', () => {
@@ -29,7 +30,7 @@ test('tags carry the version with the definition, the version and the commit', (
 
 test('the plan reads the repository, version and files from the desktop source', async () => {
   assert.equal(await repository(), 'ghcr.io/jackalope-dev/jackalope-computer');
-  assert.deepEqual(await imageFiles(), ['Dockerfile', 'start.sh', 'agent.py']);
+  assert.deepEqual(await imageFiles(), ['Dockerfile', 'start.sh', 'agent.py', 'protocol.json']);
   const result = await plan('0123456789abcdef0123456789abcdef01234567');
   assert.match(result.definition, /^[0-9a-f]{12}$/);
   assert.equal(result.tags[0], `${result.repository}:${result.version}-${result.definition}`);

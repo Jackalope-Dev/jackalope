@@ -407,10 +407,7 @@ pub async fn composio_authorize(
                 mcp_url,
                 ..saved.clone()
             };
-            account_storage::write(
-                &path(&state),
-                &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-            )?;
+            account_storage::write_json(&path(&state), &next)?;
             mcp::mcp_save_server(connection(&next)).await?;
             send(link(&next.session_id)?, &next.api_key).await?
         }

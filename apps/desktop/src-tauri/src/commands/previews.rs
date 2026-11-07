@@ -122,11 +122,7 @@ fn preview_status(id: String) -> Result<Option<PreviewView>, String> {
 }
 
 fn http_ready(port: u16) -> bool {
-    http_ready_with_timeout(port, Duration::from_millis(300))
-}
-
-fn http_ready_with_timeout(port: u16, timeout: Duration) -> bool {
-    http_ready_at(port, "/", timeout)
+    http_ready_at(port, "/", Duration::from_millis(300))
 }
 
 fn http_ready_at(port: u16, path: &str, timeout: Duration) -> bool {
@@ -600,7 +596,7 @@ mod tests {
                 assert_eq!(received, request.as_bytes());
                 client.write_all(response.as_bytes()).unwrap();
             });
-            let ready = http_ready_with_timeout(port, Duration::from_secs(5));
+            let ready = http_ready_at(port, "/", Duration::from_secs(5));
             server.join().unwrap();
             assert_eq!(ready, expected, "response {response:?}");
         }
