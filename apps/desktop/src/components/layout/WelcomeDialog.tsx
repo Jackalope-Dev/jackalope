@@ -1,3 +1,4 @@
+import { Button } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   GitCompareArrows,
@@ -10,7 +11,6 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
-import { Button } from '../ui/button';
 import './welcome.css';
 
 const SEEN_KEY = 'jackalope.welcome.seen';

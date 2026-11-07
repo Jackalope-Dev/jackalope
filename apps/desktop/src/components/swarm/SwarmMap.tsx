@@ -1,4 +1,4 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, Button } from '@jackalope/ui';
 import { ArrowUpRight, GitMerge } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import {
@@ -10,7 +10,6 @@ import {
 import { selectWork } from '../../lib/work-selection';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
 import './swarm-map.css';
 
 const WIDTH = 880;

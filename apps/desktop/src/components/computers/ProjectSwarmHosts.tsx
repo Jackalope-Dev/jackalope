@@ -1,9 +1,7 @@
-import { Badge, Checkbox, Choice } from '@jackalope/ui';
+import { Badge, Checkbox, Choice, InlineNotice, SettingBody, SettingGroup } from '@jackalope/ui';
 import { useState } from 'react';
 import { providerLabel, type SwarmHosts, setProjectHosts } from '../../lib/computers';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { SettingBody, SettingGroup } from '../settings/Setting';
-import { InlineNotice } from '../ui/InlineNotice';
 import { HostCapacity, useProjectHosts } from './HostCapacity';
 import './computers.css';
 

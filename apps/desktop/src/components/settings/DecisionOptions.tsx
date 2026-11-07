@@ -4,6 +4,7 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -16,7 +17,6 @@ import type {
   DecisionOptions as Options,
 } from '../../lib/decisions';
 import { invokeNative } from '../../lib/native/transport';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const helpers = [
   [

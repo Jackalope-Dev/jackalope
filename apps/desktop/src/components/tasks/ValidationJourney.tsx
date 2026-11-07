@@ -1,4 +1,4 @@
-import { IconButton } from '@jackalope/ui';
+import { Badge, IconButton, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlertCircle,
@@ -13,8 +13,6 @@ import {
 import { useState } from 'react';
 import type { ScreenshotArtifact, ValidationStep } from '../../lib/run-types';
 import { evidenceStrength } from '../../lib/task-outcomes';
-import { Badge } from '../ui/badge';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { ValidationEvidence } from './ValidationEvidence';
 

@@ -1,5 +1,5 @@
 import { graphlib, layout } from '@dagrejs/dagre';
-import { Badge, EmptyState } from '@jackalope/ui';
+import { Badge, Button, EmptyState, Select, SelectItem } from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -23,8 +23,6 @@ import type { QueueItem } from '../../lib/queue';
 import { isActive, isFinished, isUnfinished } from '../../lib/run-status';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
 import '@xyflow/react/dist/style.css';
 import './feature-graph.css';
 

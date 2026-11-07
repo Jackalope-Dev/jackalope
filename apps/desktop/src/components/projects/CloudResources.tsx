@@ -9,6 +9,7 @@ import {
   InlineNotice,
   Input,
   LinkButton,
+  LoadingState,
   Stepper,
   type StepperStep,
   Textarea,
@@ -50,7 +51,6 @@ import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CloudResourcesDraft, useCloudResourcesStore } from '../../stores/cloudResourcesStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings, openSettings } from '../layout/navigation';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';

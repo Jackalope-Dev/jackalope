@@ -1,7 +1,7 @@
+import { InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { InlineNotice } from '../ui/InlineNotice';
 
 interface LiveCombinationView {
   runs: { taskId: string; files: number; added: number; removed: number }[];

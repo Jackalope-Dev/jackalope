@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   FormField,
+  InlineNotice,
   DropdownMenu as Menu,
   Select,
   SelectItem,
@@ -17,7 +18,6 @@ import {
 } from '../../desktop/src/components/remote/useRemoteWorkspace';
 import { AgentQuestion } from '../../desktop/src/components/tasks/AgentQuestion';
 import { ChangedFiles } from '../../desktop/src/components/tasks/ChangedFiles';
-import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
 import { isActive } from '../../desktop/src/lib/run-status';
 import { Avatar, Bar } from './Bar';
 import { workspaceKey } from './drafts';

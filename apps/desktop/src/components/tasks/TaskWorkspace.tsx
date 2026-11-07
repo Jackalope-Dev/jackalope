@@ -1,11 +1,17 @@
 import { selectWork, workTarget } from '../../lib/work-selection';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import { DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  EmptyState,
+  InlineNotice,
+  LoadingState,
+  DropdownMenu as Menu,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -25,9 +31,6 @@ import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkCatchUp } from './WorkCatchUp';
 
 const ManagedTaskView = lazy(() =>

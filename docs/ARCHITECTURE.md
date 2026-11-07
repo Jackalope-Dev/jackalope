@@ -189,9 +189,9 @@ not change native task, update or recovery state. Keep action-local errors inlin
 
 components/tasks separates collection/composer, detail/result review, queue/add-work
 and integration review. Browser-safe controls live in packages/ui, consumed as
-@jackalope/ui by desktop, website and admin. Desktop components/ui retains
-compatibility exports and app-specific compositions such as workspace navigation
-and task state mapping. System information belongs to Settings; saved task editing
+@jackalope/ui by desktop, website and admin; desktop imports them from there directly.
+Desktop components/ui holds only app-specific compositions such as workspace navigation
+and error boundaries. System information belongs to Settings; saved task editing
 belongs to Tasks. TaskDetail composes TaskRunDetails, TaskFollowUpPanel and the
 useTaskFollowUps queue hook; OnboardingFlow composes one component per step.
 

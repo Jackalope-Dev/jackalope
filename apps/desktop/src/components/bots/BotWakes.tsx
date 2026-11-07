@@ -1,9 +1,13 @@
 import {
+  Button,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
+  Select,
+  SelectItem,
   Switch,
   Textarea,
 } from '@jackalope/ui';
@@ -23,9 +27,6 @@ import {
   validateWake,
   WAKE_PROMPT_MAX,
 } from '../../stores/botStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 
 const INTERVALS = [
   { value: 5, label: 'Every 5 minutes' },

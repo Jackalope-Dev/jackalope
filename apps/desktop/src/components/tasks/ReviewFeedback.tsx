@@ -1,4 +1,16 @@
-import { Button, FormField, Input, Select, SelectItem, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MessageSquarePlus } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useRef, useState } from 'react';
@@ -6,8 +18,6 @@ import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { type ReviewAnchor, type ReviewComment, reviewFeedback } from '../../lib/review-feedback';
 import { useReviewFeedbackStore } from '../../stores/reviewFeedbackStore';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 import './review-feedback.css';
 
 const FeedbackContext = createContext<{

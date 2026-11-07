@@ -1,4 +1,4 @@
-import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
+import { Badge, Button, InlineNotice, LoadingState, Panel, RefreshIcon } from '@jackalope/ui';
 import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
@@ -7,9 +7,6 @@ import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowName } from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 import { ProviderMark } from '../agents/ProviderMark';

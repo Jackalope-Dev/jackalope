@@ -1,4 +1,16 @@
-import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  EmptyState,
+  FormField,
+  InlineNotice,
+  SegmentedControl,
+  Select,
+  SelectItem,
+  Table,
+} from '@jackalope/ui';
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -19,15 +31,10 @@ import {
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
-import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { CapacityPanel } from './CapacityPanel';
 import { DecisionUsage, useTaskDecisionUsage } from './DecisionUsage';
 import { JevConnectionUsage } from './JevConnectionUsage';
@@ -466,7 +473,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                       Clear date
                     </Button>
                   )}
-                  <FilterGroup
+                  <SegmentedControl
                     label="Usage detail"
                     value={ledger}
                     onChange={(value) => {

@@ -1,3 +1,10 @@
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
@@ -5,9 +12,6 @@ import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function UnsavedTasksNotice() {
   const runs = useExecutionStore((state) => state.runs);

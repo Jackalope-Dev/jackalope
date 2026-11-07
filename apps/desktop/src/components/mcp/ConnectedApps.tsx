@@ -1,9 +1,12 @@
 import {
   Badge,
+  Button,
   ConfirmDialog,
   ExternalLinkIcon,
+  InlineNotice,
   Input,
   LinkButton,
+  LoadingState,
   DropdownMenu as Menu,
   SearchField,
   SegmentedControl,
@@ -27,9 +30,6 @@ import {
 } from '../../lib/composio';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { useMcpStore } from '../../stores/mcpStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './connected-apps.css';

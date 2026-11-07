@@ -1,4 +1,5 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import {
   helperPreferencePatch,
@@ -19,8 +20,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { type ActiveTab, navigateWorkspace, openHelperDraft } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const destinations: Record<string, ActiveTab> = {
   tasks: 'live-sessions',

@@ -1,4 +1,18 @@
-import { Badge, FormField, Input, SegmentedControl } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  FormField,
+  InlineNotice,
+  Input,
+  SegmentedControl,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CloudMachine,
@@ -19,12 +33,6 @@ import {
   stopComputer,
 } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { Agent37KeyForm, useAgent37 } from './Agent37Connect';
 import { ComputerViewer } from './ComputerViewer';
 import { IdleStopSelect } from './IdleStopSelect';
@@ -245,7 +253,7 @@ function OwnerComputerSettings({
       )}
       {status ? (
         <>
-          <Setting
+          <SettingRow
             title={
               <span className="inline-flex items-center gap-2">
                 {status.name}
@@ -290,19 +298,19 @@ function OwnerComputerSettings({
                 Start
               </Button>
             ) : null}
-          </Setting>
+          </SettingRow>
           {(status.state === 'running' || status.state === 'stopped') && (
             <SettingBody>
               <ComputerViewer computer={status} />
             </SettingBody>
           )}
           {status.provider === 'local-docker' && (
-            <Setting
+            <SettingRow
               title="Stop when idle"
               description="Stops the sandbox after this long with no agent work and no open viewer. Its files are kept, and it starts again when an agent or viewer needs it."
             >
               <IdleStopSelect computer={status} disabled={!!busy} onChanged={setStatus} />
-            </Setting>
+            </SettingRow>
           )}
           {status.provider === 'local-docker' && (
             <SettingBody>
@@ -332,7 +340,7 @@ function OwnerComputerSettings({
               </p>
             </SettingBody>
           )}
-          <Setting
+          <SettingRow
             title="Delete computer"
             description={
               status.provider === 'agent37'
@@ -342,7 +350,7 @@ function OwnerComputerSettings({
                   : 'Removes the computer and everything stored in it, including its browser sign-ins.'
             }
           >
-            <ConfirmAction
+            <ConfirmDialog
               trigger={
                 <Button variant="outline" disabled={!!busy || status.state === 'starting'}>
                   Delete computer…
@@ -367,7 +375,7 @@ function OwnerComputerSettings({
                 }
               }}
             />
-          </Setting>
+          </SettingRow>
         </>
       ) : (
         <SettingBody>

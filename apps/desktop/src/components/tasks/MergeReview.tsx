@@ -1,4 +1,13 @@
-import { Checkbox, Disclosure, DisclosureBody, DisclosureSummary, FormField } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Input,
+} from '@jackalope/ui';
 import { ArrowRight, Check, GitMerge, GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -9,9 +18,6 @@ import { taskTitle } from '../../lib/task-title';
 import { mergeDestination } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';

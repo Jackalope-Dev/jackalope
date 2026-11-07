@@ -1,3 +1,13 @@
+import {
+  Button,
+  InlineNotice,
+  Select,
+  SelectItem,
+  SettingActions,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
@@ -5,11 +15,6 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
-import { Setting, SettingActions, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 
 /**
  * Choices that apply across agents: which one starts new work, quota handoff and,
@@ -59,7 +64,7 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
   return (
     <div className="workspace-stack">
       <SettingGroup title="Defaults">
-        <Setting
+        <SettingRow
           title={project ? 'Default task agent' : 'Default orchestration agent'}
           description={
             project
@@ -104,9 +109,9 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
                 </SelectItem>
               ))}
           </Select>
-        </Setting>
+        </SettingRow>
         {!project && (
-          <Setting
+          <SettingRow
             title="Automatic quota handoff"
             description="Continue eligible tasks with another enabled agent when an account reaches its limit."
           >
@@ -118,7 +123,7 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
                 void save(() => useAgentConfigStore.setState({ automaticQuotaHandoff }))
               }
             />
-          </Setting>
+          </SettingRow>
         )}
         {project && customized && (
           <SettingActions>

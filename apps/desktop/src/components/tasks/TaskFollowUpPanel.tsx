@@ -1,4 +1,4 @@
-import { Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useRef } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
@@ -8,9 +8,7 @@ import type { TaskRun } from '../../lib/run-types';
 import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { TaskFollowUp } from '../../lib/task-followups';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 import { AttachButton } from './AttachButton';
 
 /** The task's single follow-up composer with its queued follow-ups. */

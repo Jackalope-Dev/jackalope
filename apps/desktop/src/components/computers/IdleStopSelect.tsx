@@ -1,7 +1,6 @@
+import { InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
 import { type ComputerStatus, IDLE_STOP_CHOICES, setComputerIdleStop } from '../../lib/computers';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import './computers.css';
 
 /** When an unused local sandbox stops. Applies at once. */

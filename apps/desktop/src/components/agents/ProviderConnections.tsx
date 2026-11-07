@@ -1,4 +1,16 @@
-import { Checkbox, Input } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { KeyRound } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -18,12 +30,6 @@ import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 function ConnectProvider({
@@ -85,7 +91,7 @@ function ConnectProvider({
         if (!open) void close();
       }}
     >
-      <DialogContent {...focus} className="confirm-action-dialog">
+      <DialogContent {...focus} layer="confirm">
         <DialogHeader
           title={`Connect ${provider.name}`}
           description={

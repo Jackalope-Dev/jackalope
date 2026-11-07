@@ -1,12 +1,9 @@
+import { Button, EmptyState, InlineNotice, LoadingState } from '@jackalope/ui';
 import { FileCheck2 } from 'lucide-react';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ValidationJourney } from '../tasks/ValidationJourney';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 

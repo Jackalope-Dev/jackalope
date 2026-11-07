@@ -1,4 +1,13 @@
-import { Disclosure, DisclosureSummary, FormField, Input } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -7,9 +16,6 @@ import { projectReadiness } from '../../lib/readiness';
 import type { ScreenshotArtifact, TaskRun } from '../../lib/run-types';
 import { stopPreview } from '../../lib/task-client';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { DesignPreview } from './DesignPreview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 

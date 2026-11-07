@@ -1,4 +1,14 @@
-import { Input } from '@jackalope/ui';
+import {
+  Button,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingActions,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -13,12 +23,7 @@ import {
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { CliCommandSetting } from './CliCommandSetting';
-import { Setting, SettingActions, SettingGroup } from './Setting';
 
 export interface DesktopActivity {
   mode: 'off' | 'working' | 'always';
@@ -95,7 +100,7 @@ export function DesktopPreferences() {
   return (
     <>
       <SettingGroup title="Display & editor">
-        <Setting title="Interface zoom">
+        <SettingRow title="Interface zoom">
           <Select
             aria-label="Interface zoom"
             value={String(settings.interfaceZoom)}
@@ -107,8 +112,8 @@ export function DesktopPreferences() {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting title="Preferred editor">
+        </SettingRow>
+        <SettingRow title="Preferred editor">
           <Select
             aria-label="Preferred editor"
             value={settings.preferredEditor}
@@ -119,10 +124,10 @@ export function DesktopPreferences() {
             <SelectItem value="vscode">VS Code</SelectItem>
             <SelectItem value="cursor">Cursor</SelectItem>
           </Select>
-        </Setting>
+        </SettingRow>
       </SettingGroup>
       <SettingGroup title="Terminal">
-        <Setting
+        <SettingRow
           title="Terminal shell"
           description="Applies when starting a terminal. WSL terminals do not change the environment used by agents or checks."
         >
@@ -151,8 +156,8 @@ export function DesktopPreferences() {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting title="Terminal font size">
+        </SettingRow>
+        <SettingRow title="Terminal font size">
           <Select
             aria-label="Terminal font size"
             value={String(settings.terminalFontSize)}
@@ -164,8 +169,8 @@ export function DesktopPreferences() {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Terminal links"
           description="Open clicked HTTP and HTTPS links in your default browser."
         >
@@ -174,9 +179,9 @@ export function DesktopPreferences() {
             checked={settings.terminalLinks}
             onCheckedChange={(terminalLinks) => settings.updateSettings({ terminalLinks })}
           />
-        </Setting>
+        </SettingRow>
         <CliCommandSetting />
-        <Setting
+        <SettingRow
           title="Restore terminal output"
           description="Save the last 256 KiB when a terminal stops or Jackalope quits. After restarting, output is read-only until you start a new shell. Applies to newly started terminals."
         >
@@ -187,10 +192,10 @@ export function DesktopPreferences() {
               settings.updateSettings({ retainTerminalOutput })
             }
           />
-        </Setting>
+        </SettingRow>
       </SettingGroup>
       <SettingGroup title="Power">
-        <Setting
+        <SettingRow
           title="Keep computer awake"
           description="Prevent idle sleep while Jackalope is open. While working covers agent runs and finishing checks; it releases when they finish. Your display can still sleep. Explicit sleep and closing the lid follow your system settings."
         >
@@ -204,9 +209,9 @@ export function DesktopPreferences() {
             <SelectItem value="working">While work runs</SelectItem>
             <SelectItem value="always">While Jackalope is open</SelectItem>
           </Select>
-        </Setting>
+        </SettingRow>
         {activity && (
-          <Setting
+          <SettingRow
             title="Running on this computer"
             description={`${activity.awake ? 'Keeping awake' : 'Idle sleep allowed'} · ${activity.activeWork} active ${
               activity.activeWork === 1 ? 'attempt' : 'attempts'
@@ -231,14 +236,14 @@ export function DesktopPreferences() {
                 Inspect worktrees and disk use
               </Button>
             </div>
-          </Setting>
+          </SettingRow>
         )}
       </SettingGroup>
       <SettingGroup
         title="Local dictation"
         description="Connect an OpenAI-compatible transcription server running on this computer. Dictate records only when clicked, then adds text to your draft for review. Jackalope does not save the audio."
       >
-        <Setting
+        <SettingRow
           title="Local transcription endpoint"
           description="Leave empty to disable dictation."
         >
@@ -248,27 +253,27 @@ export function DesktopPreferences() {
             value={settings.dictationEndpoint}
             onChange={(event) => settings.updateSettings({ dictationEndpoint: event.target.value })}
           />
-        </Setting>
-        <Setting title="Transcription model">
+        </SettingRow>
+        <SettingRow title="Transcription model">
           <Input
             aria-label="Transcription model"
             value={settings.dictationModel}
             onChange={(event) => settings.updateSettings({ dictationModel: event.target.value })}
           />
-        </Setting>
+        </SettingRow>
       </SettingGroup>
       <SettingGroup
         title="Keyboard shortcuts"
         description={`Use Mod for ${displayShortcut('Mod')}. Changes apply after saving.`}
       >
         {(Object.keys(defaultShortcuts) as ShortcutAction[]).map((action) => (
-          <Setting key={action} title={shortcutNames[action]}>
+          <SettingRow key={action} title={shortcutNames[action]}>
             <Input
               aria-label={`${shortcutNames[action]} shortcut`}
               value={drafts[action]}
               onChange={(event) => setDrafts({ ...drafts, [action]: event.target.value })}
             />
-          </Setting>
+          </SettingRow>
         ))}
         <SettingActions>
           <Button variant="outline" onClick={saveShortcuts}>

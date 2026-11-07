@@ -3,6 +3,7 @@ import {
   Disclosure,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -16,7 +17,6 @@ import {
   removeRemoteHost,
 } from '../../lib/remote-hosts';
 import { useHostContextStore } from '../../stores/hostContextStore';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { type RemoteAction, RemoteWorkspace } from './RemoteWorkspace';

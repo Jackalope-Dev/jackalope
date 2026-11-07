@@ -1,11 +1,15 @@
 import {
   Badge,
   type BadgeProps,
+  Button,
   Checkbox,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
+  Select,
+  SelectItem,
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
@@ -23,9 +27,6 @@ import {
   weakestEvidence,
 } from '../../lib/task-outcomes';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
 type OutcomeRun = Pick<

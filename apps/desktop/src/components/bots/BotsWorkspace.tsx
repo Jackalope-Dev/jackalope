@@ -1,5 +1,10 @@
 import {
+  Button,
   ConfirmDialog,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
   LinkButton,
   DropdownMenu as Menu,
   SearchField,
@@ -59,9 +64,6 @@ import {
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { LiveSessionView } from '../sessions/LiveSessionView';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';

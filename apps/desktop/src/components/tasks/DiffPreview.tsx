@@ -1,6 +1,5 @@
+import { InlineNotice, LoadingState } from '@jackalope/ui';
 import { Component, lazy, type ReactNode, Suspense } from 'react';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 
 const RichDiff = lazy(() => import('./RichDiff'));
 

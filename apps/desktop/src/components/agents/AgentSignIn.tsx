@@ -1,3 +1,11 @@
+import {
+  Button,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+  Input,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -15,11 +23,6 @@ import {
 } from '../../lib/agent-profiles';
 import { openInBrowser } from '../../lib/native/env';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
-import { Button } from '../ui/button';
-import { DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import '@xterm/xterm/css/xterm.css';
 export function AgentSignIn({
   agentId,

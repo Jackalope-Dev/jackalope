@@ -1,10 +1,9 @@
-import { Button, Checkbox, Input, Select, SelectItem } from '@jackalope/ui';
+import { Button, Checkbox, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type Issue, type IssuePage, issuePrompt, issueUrl } from '../../lib/issues';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { openSettings } from '../layout/navigation';
-import { InlineNotice } from '../ui/InlineNotice';
 import './issue-picker.css';
 
 export function IssuePicker({

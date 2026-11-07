@@ -1,4 +1,11 @@
-import { DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -6,9 +13,6 @@ import { sessionCommand } from '../../lib/live-session';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const TaskTerminal = lazy(() =>
   import('./TaskTerminal').then((m) => ({ default: m.TaskTerminal })),

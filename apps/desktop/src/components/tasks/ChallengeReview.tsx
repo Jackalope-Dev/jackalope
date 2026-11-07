@@ -1,4 +1,17 @@
-import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,11 +28,6 @@ import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { agentAdapter } from './CrossModelReviewPanel';
 import './challenge-review.css';
 

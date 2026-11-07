@@ -1,9 +1,8 @@
-import { Button, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { MousePointer2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { ScreenshotArtifact } from '../../lib/run-types';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
 interface Capture {

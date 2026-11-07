@@ -1,4 +1,22 @@
-import { Checkbox, DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  DropdownMenu as Menu,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -15,16 +33,7 @@ import {
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { type Project, useProjectStore } from '../../stores/projectStore';
-import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
 import { OptionsMenu } from '../ui/OptionsMenu';
-import { Textarea } from '../ui/Textarea';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import './feature-map.css';
 
 interface Draft {
@@ -303,7 +312,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
       {entries.map((entry, index) => {
         const problem = drift.find((item) => item.index === index);
         return (
-          <Setting
+          <SettingRow
             // biome-ignore lint/suspicious/noArrayIndexKey: entries have no identity; names and pages can repeat.
             key={index}
             className="feature-map-row"
@@ -343,7 +352,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
                 Remove…
               </Menu.Item>
             </OptionsMenu>
-          </Setting>
+          </SettingRow>
         );
       })}
       {native && (
@@ -386,7 +395,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
           }}
         />
       )}
-      <ConfirmAction
+      <ConfirmDialog
         open={removingEntry !== undefined}
         onOpenChange={(open) => !open && setRemoving(null)}
         title={`Remove ${removingEntry?.name || 'this feature'}?`}

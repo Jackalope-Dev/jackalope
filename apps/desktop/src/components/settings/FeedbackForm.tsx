@@ -1,15 +1,20 @@
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import { useEffect, useId, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
-import { Button } from '../ui/button';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { Textarea } from '../ui/Textarea';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 type Counts = { attempts: number; reviewed: number; failed: number; historySaveFailures: number };
 type Report = {
@@ -156,7 +161,7 @@ export function FeedbackForm({
               }
             />
           </FormField>
-          <Setting
+          <SettingRow
             title="Include task outcome counts"
             description="Preview before sending"
             controlId={`${id}-include`}
@@ -168,7 +173,7 @@ export function FeedbackForm({
               onCheckedChange={setInclude}
               disabled={busy}
             />
-          </Setting>
+          </SettingRow>
           <Button
             variant="outline"
             disabled={busy || !isTauriEnvironment() || !settings?.configured || !message.trim()}

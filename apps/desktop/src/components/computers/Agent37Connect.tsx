@@ -1,10 +1,16 @@
-import { Badge, FormField, Input } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { agent37Status, agent37Usage, setAgent37Key } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const KEYS_URL = 'https://www.agent37.com/';
 
@@ -105,7 +111,7 @@ export function Agent37Settings() {
       }
     >
       {connected ? (
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Agent37 <Badge variant="accent">Connected</Badge>
@@ -132,7 +138,7 @@ export function Agent37Settings() {
           >
             Disconnect
           </Button>
-        </Setting>
+        </SettingRow>
       ) : (
         <SettingBody>
           <Agent37KeyForm onConnected={() => setConnected(true)} />

@@ -1,14 +1,18 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Select,
+  SelectItem,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 
 export function CompanionSettings() {
   const helper = useHelperStore();

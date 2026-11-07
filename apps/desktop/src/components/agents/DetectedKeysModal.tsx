@@ -1,4 +1,4 @@
-import { Checkbox, RefreshIcon } from '@jackalope/ui';
+import { Button, Checkbox, RefreshIcon, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, CheckCircle2, Cpu, KeyRound, Server, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,8 +9,6 @@ import {
   importDetectedKey,
   type LocalLlmEndpoint,
 } from '../../lib/local-detection';
-import { Button } from '../ui/button';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import './detected-keys.css';
 
 export function DetectedKeysModal({

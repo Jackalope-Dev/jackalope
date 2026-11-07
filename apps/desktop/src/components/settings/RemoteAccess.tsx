@@ -6,14 +6,15 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
+  SettingGroup,
+  SettingRow,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunRequest } from '../../lib/run-types';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
 
@@ -250,7 +251,7 @@ export function RemoteAccess() {
   return (
     <SettingGroup title="Remote access">
       {status && !status.enabled && projects.length > 0 && (
-        <Setting
+        <SettingRow
           title="Pair a phone"
           description="Turns on remote access. Your phone can read work, start tasks and respond in the projects selected below."
         >
@@ -267,7 +268,7 @@ export function RemoteAccess() {
           >
             Pair a phone
           </Button>
-        </Setting>
+        </SettingRow>
       )}
       <form
         className="remote-setup px-5 py-4"
@@ -358,7 +359,7 @@ export function RemoteAccess() {
         />
       )}
       {status?.listening && (
-        <Setting
+        <SettingRow
           title="Pair a device"
           description={
             status.publicOrigin
@@ -373,7 +374,7 @@ export function RemoteAccess() {
           >
             {pair ? 'New code' : status.publicOrigin ? 'Pair a phone' : 'Create pairing code'}
           </Button>
-        </Setting>
+        </SettingRow>
       )}
       {pair && (
         <PairingView
@@ -386,7 +387,7 @@ export function RemoteAccess() {
       {!!status?.devices.length && (
         <div>
           {status.devices.map((device) => (
-            <Setting
+            <SettingRow
               key={device.id}
               title={device.name}
               description={`Paired ${new Date(device.pairedAt).toLocaleDateString()}`}
@@ -403,7 +404,7 @@ export function RemoteAccess() {
               >
                 Revoke access
               </Button>
-            </Setting>
+            </SettingRow>
           ))}
         </div>
       )}

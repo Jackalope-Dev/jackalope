@@ -1,4 +1,4 @@
-import { Input } from '@jackalope/ui';
+import { Button, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
@@ -12,9 +12,6 @@ import { saveWorkFeedback } from '../../lib/work-feedback';
 import { useSavedActionsStore } from '../../stores/savedActionsStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
 

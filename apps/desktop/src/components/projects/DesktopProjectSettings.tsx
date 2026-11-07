@@ -1,3 +1,4 @@
+import { Button, InlineNotice, SettingBody, SettingGroup, SettingRow } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import {
   type DesktopSiteDecision,
@@ -6,9 +7,6 @@ import {
   type RememberedDesktopGrant,
 } from '../../lib/agent-screen';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 /** Remembered desktop-control grants and website decisions for one project, each removable. */
 export function DesktopProjectSettings({ projectId }: { projectId: string }) {
@@ -78,7 +76,7 @@ export function DesktopProjectSettings({ projectId }: { projectId: string }) {
         </SettingBody>
       )}
       {grants.map((grant) => (
-        <Setting
+        <SettingRow
           key={grant.id}
           title={grant.label}
           description={
@@ -88,10 +86,10 @@ export function DesktopProjectSettings({ projectId }: { projectId: string }) {
           }
         >
           {removeButton(grant.id, grant.label)}
-        </Setting>
+        </SettingRow>
       ))}
       {sites.map((site) => (
-        <Setting
+        <SettingRow
           key={site.id}
           title={site.host}
           description={
@@ -101,7 +99,7 @@ export function DesktopProjectSettings({ projectId }: { projectId: string }) {
           }
         >
           {removeButton(site.id, site.host)}
-        </Setting>
+        </SettingRow>
       ))}
     </SettingGroup>
   );

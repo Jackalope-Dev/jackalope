@@ -218,6 +218,12 @@ select option {
   padding: 35px;
   z-index: 81;
 }
+.task-dialog-overlay[data-layer="confirm"] {
+  z-index: 90;
+}
+.task-dialog[data-layer="confirm"] {
+  z-index: 91;
+}
 .task-dialog.appearance-panel {
   max-width: calc(100vw - 48px);
   max-height: calc(100dvh - 48px);

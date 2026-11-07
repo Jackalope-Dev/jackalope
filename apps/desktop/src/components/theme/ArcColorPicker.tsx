@@ -1,10 +1,8 @@
 import { applyThemeTokens } from '@jackalope/brand/theme';
-import { Popover } from '@jackalope/ui';
+import { Button, Popover, Tooltip } from '@jackalope/ui';
 import { RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useThemeStore } from '../../stores/themeStore';
-import { Button } from '../ui/button';
-import { Tooltip } from '../ui/Tooltip';
 import { ThemeEditor } from './ThemeEditor';
 
 export function ArcColorPicker({

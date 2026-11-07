@@ -1,10 +1,17 @@
-import { Badge, Checkbox, CopyButton, Select, SelectItem, Table } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  CopyButton,
+  InlineNotice,
+  Select,
+  SelectItem,
+  Table,
+} from '@jackalope/ui';
 import { Scale } from 'lucide-react';
 import type { Verdict } from '../../lib/compare-judge';
 import { isActive, isFinished } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 /** An attempt as the verdict refers to it: its judge label and display name. */
 export interface LabelledAttempt {

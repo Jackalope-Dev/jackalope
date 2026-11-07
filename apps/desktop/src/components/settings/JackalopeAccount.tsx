@@ -1,4 +1,4 @@
-import { ExternalLinkIcon } from '@jackalope/ui';
+import { Button, ExternalLinkIcon, SettingActions, SettingBody, SettingGroup } from '@jackalope/ui';
 
 import { useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -6,9 +6,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { useReferralStore } from '../../stores/referralStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { WaitlistAccount, type WaitlistProgress } from '../account/WaitlistAccount';
-import { Button } from '../ui/button';
 import { FeedbackPreferences } from './FeedbackPreferences';
-import { SettingActions, SettingBody, SettingGroup } from './Setting';
 
 export interface AccountStatus {
   state:

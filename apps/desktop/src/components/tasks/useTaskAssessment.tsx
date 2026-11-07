@@ -1,4 +1,4 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { managedTaskCommand } from '../../lib/managed-task';
 import type { RunRequest } from '../../lib/run-types';
@@ -9,8 +9,6 @@ import {
   type TaskAssessment,
 } from '../../lib/task-strategy';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function useTaskAssessment() {
   const [assessment, setAssessment] = useState<{

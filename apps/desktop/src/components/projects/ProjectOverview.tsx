@@ -1,6 +1,9 @@
 import {
+  Button,
   Disclosure,
   DisclosureSummary,
+  EmptyState,
+  InlineNotice,
   DropdownMenu as Menu,
   SettingGroup,
   SettingRow,
@@ -31,10 +34,7 @@ import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';

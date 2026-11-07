@@ -1,4 +1,19 @@
-import { Badge, Checkbox, Disclosure, DisclosureSummary, Switch } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Select,
+  SelectItem,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, CircleCheck, Loader2, ScanSearch, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -18,11 +33,6 @@ import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Textarea } from '../ui/Textarea';
 import { agentAdapter } from './CrossModelReviewPanel';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';

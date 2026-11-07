@@ -1,4 +1,4 @@
-import { Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
@@ -11,9 +11,7 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { AttachButton } from '../tasks/AttachButton';
 import { DictationButton } from '../tasks/DictationButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function SessionComposer({
   session,

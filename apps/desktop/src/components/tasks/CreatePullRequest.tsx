@@ -1,10 +1,9 @@
-import { Checkbox, ConfirmDialog } from '@jackalope/ui';
+import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
-import { Button } from '../ui/button';
 import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
 
 /**

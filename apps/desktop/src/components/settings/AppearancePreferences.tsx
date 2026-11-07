@@ -1,10 +1,9 @@
+import { SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { ThemeEditor } from '../theme/ThemeEditor';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 export function AppearancePreferences({ projectId }: { projectId?: string }) {
   const { appTheme, setAppTheme } = useThemeStore(
     useShallow((s) => ({ appTheme: s.appTheme, setAppTheme: s.setAppTheme })),
@@ -44,7 +43,7 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
       </SettingGroup>
       {!projectId && (
         <SettingGroup title="Interface">
-          <Setting
+          <SettingRow
             title="Frosted window"
             description="Show your desktop softly through the window on Windows 11 and macOS."
           >
@@ -53,8 +52,8 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
               checked={frostedWindow}
               onCheckedChange={(next) => updateSettings({ frostedWindow: next })}
             />
-          </Setting>
-          <Setting
+          </SettingRow>
+          <SettingRow
             title="Companion animations"
             description="Let the jackalope react to your work. Reduced motion keeps it still."
           >
@@ -63,8 +62,8 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
               checked={mascotReactions}
               onCheckedChange={(next) => updateSettings({ mascotReactions: next })}
             />
-          </Setting>
-          <Setting title="Show theme picker in top bar">
+          </SettingRow>
+          <SettingRow title="Show theme picker in top bar">
             <Switch
               label="Show theme picker in top bar"
               checked={showThemePicker}
@@ -72,7 +71,7 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
                 updateSettings({ showThemePickerInToolbar })
               }
             />
-          </Setting>
+          </SettingRow>
         </SettingGroup>
       )}
     </>

@@ -1,4 +1,11 @@
-import { DefinitionList, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  DefinitionList,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
@@ -7,8 +14,6 @@ import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { mergeDestination } from '../../lib/task-workflow';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { CreatePullRequest } from './CreatePullRequest';
 import { LocalDelivery } from './LocalDelivery';
 

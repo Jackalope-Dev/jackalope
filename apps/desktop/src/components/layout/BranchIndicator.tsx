@@ -1,4 +1,4 @@
-import { CopyButton, Popover } from '@jackalope/ui';
+import { Button, CopyButton, Popover } from '@jackalope/ui';
 import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { sessionWork } from '../../lib/live-session';
@@ -10,7 +10,6 @@ import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
 import { navigateWorkspace } from './navigation';
 import { selectWorkItem, useWorkspaceWork } from './WorkSidebar';
 

@@ -1,9 +1,9 @@
+import { Button } from '@jackalope/ui';
 import { Split } from 'lucide-react';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
-import { Button } from '../ui/button';
 
 /** Lets the agent of a running isolated task spin off separable work as subtasks. */
 export function SplitTaskButton({

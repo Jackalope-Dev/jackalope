@@ -1,4 +1,13 @@
-import { FormField, Input } from '@jackalope/ui';
+import {
+  Button,
+  ConfirmDialog,
+  FormField,
+  InlineNotice,
+  Input,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   type DesktopSiteDecision,
@@ -17,10 +26,6 @@ import {
   profileSize,
 } from '../../lib/browser-profiles';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
 import '../settings/settings.css';
 
 function lastUsed(status: BrowserProfileStatus) {
@@ -122,7 +127,7 @@ export function BrowserProfileSettings({
           <InlineNotice tone="error">{error}</InlineNotice>
         </SettingBody>
       )}
-      <Setting
+      <SettingRow
         title={status?.name ?? (owner.kind === 'bot' ? `${owner.name} browser` : 'Project browser')}
         description={
           !loaded
@@ -159,7 +164,7 @@ export function BrowserProfileSettings({
             Open {label} to sign in
           </Button>
         )}
-      </Setting>
+      </SettingRow>
       {!status?.windowOpen && (
         <SettingBody>
           <FormField
@@ -181,7 +186,11 @@ export function BrowserProfileSettings({
         </SettingBody>
       )}
       {status?.signedInSites.map((site) => (
-        <Setting key={site} title={site} description="Has cookies or stored data in this profile.">
+        <SettingRow
+          key={site}
+          title={site}
+          description="Has cookies or stored data in this profile."
+        >
           <Button
             type="button"
             variant="outline"
@@ -193,10 +202,10 @@ export function BrowserProfileSettings({
           >
             Clear site data
           </Button>
-        </Setting>
+        </SettingRow>
       ))}
       {decisions.map((site) => (
-        <Setting
+        <SettingRow
           key={site.id}
           title={site.host}
           description={
@@ -214,14 +223,14 @@ export function BrowserProfileSettings({
           >
             Remove
           </Button>
-        </Setting>
+        </SettingRow>
       ))}
       {status && (
-        <Setting
+        <SettingRow
           title="Delete profile"
           description="Removes every sign-in, cookie and file this profile stored. Agents start signed out next time."
         >
-          <ConfirmAction
+          <ConfirmDialog
             trigger={
               <Button type="button" variant="outline" disabled={!!busy || !!status.inUse}>
                 Delete profile…
@@ -241,7 +250,7 @@ export function BrowserProfileSettings({
               }
             }}
           />
-        </Setting>
+        </SettingRow>
       )}
     </SettingGroup>
   );

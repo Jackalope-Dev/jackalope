@@ -1,9 +1,16 @@
-import { Button, FormField, Input, Select, SelectItem } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
 
 export function IssueConnections() {
   const [connections, setConnections] = useState<
@@ -25,9 +32,9 @@ export function IssueConnections() {
   }, [refresh]);
   return (
     <SettingGroup title="Connected work">
-      <Setting title="GitHub" description="Uses your GitHub CLI sign-in (gh auth login)." />
+      <SettingRow title="GitHub" description="Uses your GitHub CLI sign-in (gh auth login)." />
       {connections.map((connection) => (
-        <Setting
+        <SettingRow
           key={connection.provider}
           title={connection.provider === 'linear' ? 'Linear' : 'Jira'}
           description={connection.site || 'Connected'}
@@ -50,7 +57,7 @@ export function IssueConnections() {
           >
             Disconnect
           </Button>
-        </Setting>
+        </SettingRow>
       ))}
       <form
         className="space-y-3 px-5 py-4"

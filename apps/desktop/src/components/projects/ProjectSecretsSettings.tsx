@@ -1,4 +1,14 @@
-import { Badge, Choice, Input } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Choice,
+  FormField,
+  InlineNotice,
+  Input,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -11,10 +21,6 @@ import {
   type SecretAvailability,
   setProjectSecret,
 } from '../../lib/project-secrets';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
 import './project-secrets.css';
 
 const AVAILABILITY: { value: SecretAvailability; title: string; description: string }[] = [
@@ -176,7 +182,7 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
               {...ROW_MOTION}
               transition={{ duration, ease: [0.2, 0.8, 0.2, 1] }}
             >
-              <Setting
+              <SettingRow
                 title={
                   <span className="inline-flex items-center gap-2">
                     <code className="project-secret-name">{secret.name}</code>
@@ -214,7 +220,7 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
                     Remove
                   </Button>
                 </div>
-              </Setting>
+              </SettingRow>
               {editing === secret.name && (
                 <SettingBody>
                   <form

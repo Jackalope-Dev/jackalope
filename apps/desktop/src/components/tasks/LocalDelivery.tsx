@@ -1,10 +1,9 @@
-import { Checkbox, ConfirmDialog } from '@jackalope/ui';
+import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitCommitHorizontal, GitMerge } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
-import { Button } from '../ui/button';
 import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
 
 const files = (count: number) => `${count} changed ${count === 1 ? 'file' : 'files'}`;

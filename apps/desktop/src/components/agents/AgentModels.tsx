@@ -1,15 +1,19 @@
-import { Input, RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  InlineNotice,
+  Input,
+  LoadingState,
+  RefreshIcon,
+  Select,
+  SelectItem,
+  Switch,
+} from '@jackalope/ui';
 import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { completeProviderProfile } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 
 export function AgentModels({
   agentId,

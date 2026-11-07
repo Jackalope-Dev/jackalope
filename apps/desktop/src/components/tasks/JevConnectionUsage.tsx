@@ -1,8 +1,8 @@
+import { InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunUsage } from '../../lib/run-types';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export interface JevConnectionTotals {
   calls: number;

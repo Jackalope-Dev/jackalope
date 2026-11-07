@@ -1,4 +1,4 @@
-import { ContextMenu, DropdownMenu as Menu } from '@jackalope/ui';
+import { ContextMenu, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
 import { ChevronRight, Copy, Ellipsis, Plus, Smile, Trash2, X } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -24,7 +24,6 @@ import {
   useWorkSignals,
   WorkSignals,
 } from '../tasks/WorkSignals';
-import { Tooltip } from '../ui/Tooltip';
 import { type ActiveTab, viewLabel, WORKSPACE_VIEWS } from './navigation';
 
 /** Finished rows shown per project before the rest are left to the Work page. */

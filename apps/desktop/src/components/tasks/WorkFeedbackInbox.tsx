@@ -1,8 +1,6 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { pendingWorkFeedback, type WorkFeedback } from '../../lib/work-feedback';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function WorkFeedbackInbox({
   taskId,

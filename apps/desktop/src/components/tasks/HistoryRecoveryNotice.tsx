@@ -1,12 +1,16 @@
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 import './history-recovery.css';
 
 interface HistoryRecovery {

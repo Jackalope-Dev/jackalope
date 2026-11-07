@@ -1,4 +1,13 @@
-import { FormField, IconButton, Panel, Select, SelectItem, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  IconButton,
+  InlineNotice,
+  Panel,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import { Activity, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -22,8 +31,6 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';

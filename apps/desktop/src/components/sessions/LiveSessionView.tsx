@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { CopyButton, SegmentedControl } from '@jackalope/ui';
+import { Button, CopyButton, InlineNotice, SegmentedControl, Tooltip } from '@jackalope/ui';
 import {
   AlarmClock,
   ArrowLeft,
@@ -52,9 +52,6 @@ import { useWorkSeen, WorkContextDetails } from '../tasks/WorkContext';
 import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
 import { useWorkspaceActions } from '../tasks/WorkTools';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Tooltip } from '../ui/Tooltip';
 import { ChatOptions } from './ChatOptions';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';

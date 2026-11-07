@@ -1,12 +1,8 @@
-import { Input } from '@jackalope/ui';
+import { Button, DialogFooter, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
 import { useCallback, useId, useRef, useState } from 'react';
 import { type BuiltinAgentId, builtinAgents } from '../../lib/agent-catalog';
 import { type AgentProbeResult, probeExecutable } from '../../lib/agent-profiles';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
-import { Button } from '../ui/button';
-import { DialogFooter } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import './agent-manager.css';
 
 type AdapterChoice = BuiltinAgentId | 'acp';

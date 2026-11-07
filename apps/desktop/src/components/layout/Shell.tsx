@@ -1,4 +1,4 @@
-import { SearchIcon } from '@jackalope/ui';
+import { LoadingState, SearchIcon, Tooltip } from '@jackalope/ui';
 import { PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import {
   type CSSProperties,
@@ -61,10 +61,8 @@ import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
-import { LoadingState } from '../ui/LoadingState';
 import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { ResizeHandle } from '../ui/ResizeHandle';
-import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';

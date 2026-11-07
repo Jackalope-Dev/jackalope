@@ -1,4 +1,12 @@
-import { FormField, Input, DropdownMenu as Menu, SegmentedControl } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  DropdownMenu as Menu,
+  SegmentedControl,
+  Switch,
+} from '@jackalope/ui';
 import { ArrowLeft, MoreHorizontal, Star } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,9 +17,6 @@ import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
 import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';

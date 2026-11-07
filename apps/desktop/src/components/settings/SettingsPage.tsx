@@ -1,4 +1,17 @@
-import { FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  Input,
+  SearchField,
+  SegmentedControl,
+  Select,
+  SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import {
   Cloud,
   Cpu,
@@ -30,9 +43,6 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -44,7 +54,6 @@ import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { RoutingPreferences } from './RoutingSetup';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
@@ -344,7 +353,7 @@ export function SettingsPage({
                   <WindowBehaviorSettings />
                   <NotificationSettings />
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Guided setup"
                       description="Walk through project and agent setup again. Your saved work stays."
                     >
@@ -357,7 +366,7 @@ export function SettingsPage({
                       >
                         Open guided setup
                       </Button>
-                    </Setting>
+                    </SettingRow>
                   </SettingGroup>
                 </>
               )}
@@ -368,7 +377,7 @@ export function SettingsPage({
                 <>
                   <PrivacySettings />
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Use MCP marketplace"
                       description="Allow searches and server details from allmcps.com."
                     >
@@ -377,7 +386,7 @@ export function SettingsPage({
                         checked={settings.useMcpMarketplace}
                         onCheckedChange={settings.setUseMcpMarketplace}
                       />
-                    </Setting>
+                    </SettingRow>
                     <SettingBody>
                       <p className="settings-row-description">
                         Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
@@ -397,14 +406,14 @@ export function SettingsPage({
               {c === 'Data & reset' && (
                 <>
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Preferences"
                       description="Copy this profile's preferences as JSON, for support or to compare settings."
                     >
                       <Button variant="outline" onClick={() => void exportConfig()}>
                         Copy preferences
                       </Button>
-                    </Setting>
+                    </SettingRow>
                   </SettingGroup>
                   <ArchivedHistory />
                   <SettingGroup

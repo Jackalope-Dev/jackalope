@@ -1,4 +1,18 @@
-import { Checkbox, FormField, Input, Switch, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,10 +30,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { BotComputerSettings } from '../computers/BotComputerSettings';
 import { BrowserProfileSettings } from '../projects/BrowserProfileSettings';
 import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { BotAppearancePicker } from './BotAppearancePicker';
 import { BotWakes } from './BotWakes';
 

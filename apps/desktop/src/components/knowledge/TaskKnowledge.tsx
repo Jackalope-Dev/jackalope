@@ -1,13 +1,19 @@
-import { Checkbox, Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { useKnowledge } from '../../lib/knowledge';
 import type { ContextReceipt, ContextSelection } from '../../lib/knowledge-types';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import './task-knowledge.css';
 
 export function TaskKnowledge({

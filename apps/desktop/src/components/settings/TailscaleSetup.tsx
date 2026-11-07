@@ -1,10 +1,9 @@
-import { Button } from '@jackalope/ui';
+import { Button, InlineNotice } from '@jackalope/ui';
 import { Check } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { type TailscaleStatus, tailscaleEnableLink } from '../../lib/tailscale-setup';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const DOWNLOAD = 'https://tailscale.com/download';
 const DNS_SETTINGS = 'https://login.tailscale.com/admin/dns';

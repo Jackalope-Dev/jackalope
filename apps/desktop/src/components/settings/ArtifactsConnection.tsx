@@ -5,10 +5,13 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   LinkButton,
   Select,
   SelectItem,
+  SettingGroup,
+  SettingRow,
 } from '@jackalope/ui';
 import { Cloud as CloudIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -28,8 +31,6 @@ import {
   disconnectArtifacts,
 } from '../../lib/cloudflare-artifacts';
 import { openExternalUrl } from '../../lib/native/env';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
 import { SwarmConnection } from './SwarmConnection';
 import './artifacts-connection.css';
 
@@ -403,12 +404,12 @@ export function ArtifactsConnection() {
   return (
     <>
       <SettingGroup>
-        <Setting
+        <SettingRow
           title={<ArtifactsTitle />}
           description="Create projects on Artifacts, or move an existing repository there from Project settings."
         />
         {status?.connected ? (
-          <Setting
+          <SettingRow
             title="Your Cloudflare account"
             description={`${status.method === 'oauth' ? 'Signed in with Cloudflare' : 'API token'} · Namespace ${status.namespace}${
               status.jurisdiction ? ` · ${status.jurisdiction.toUpperCase()} data location` : ''
@@ -434,7 +435,7 @@ export function ArtifactsConnection() {
             >
               Disconnect
             </Button>
-          </Setting>
+          </SettingRow>
         ) : (
           status && <ArtifactsConnectForm onConnected={setStatus} />
         )}
@@ -446,7 +447,7 @@ export function ArtifactsConnection() {
       </SettingGroup>
       {status && <SwarmConnection artifactsConnected={status.connected} />}
       <SettingGroup aria-disabled="true">
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Jackalope Cloud <Badge>Coming soon</Badge>

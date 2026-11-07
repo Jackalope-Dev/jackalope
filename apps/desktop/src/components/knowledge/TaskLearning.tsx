@@ -1,12 +1,10 @@
-import { DropdownMenu as Menu } from '@jackalope/ui';
+import { Button, InlineNotice, DropdownMenu as Menu } from '@jackalope/ui';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
 export function TaskLearning({ run, allowSave = false }: { run: TaskRun; allowSave?: boolean }) {

@@ -1,9 +1,17 @@
 import {
   Badge,
   type BadgeProps,
+  Button,
+  ConfirmDialog,
+  EmptyState,
   IconButton,
+  InlineNotice,
+  Input,
+  LoadingState,
   DropdownMenu as Menu,
   RefreshIcon,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import {
   Archive,
@@ -36,13 +44,6 @@ import { openChanges } from '../../stores/commitReviewStore';
 import { useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorktreeRemovalPlan as RemovalPlan } from './WorktreeRemovalPlan';
@@ -410,7 +411,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         </div>
         <div className="workspace-actions">
           {(wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason && (
-            <ConfirmAction
+            <ConfirmDialog
               title={`Clean up ${wt.branch || 'worktree'}?`}
               description={`Removes this worktree folder and local branch. Changes are already merged into ${wt.cleanup.target_branch}.`}
               label="Remove worktree & branch"
@@ -437,10 +438,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   busyNote={`Removing ${wt.branch || wt.path}. This may take a moment…`}
                 />
               )}
-            </ConfirmAction>
+            </ConfirmDialog>
           )}
           {wt.cleanup?.recoverable && (
-            <ConfirmAction
+            <ConfirmDialog
               title={`Archive and remove ${wt.branch || 'worktree'}?`}
               description="Saves uncommitted work to .worktrees/.archive, then removes the folder and branch."
               label="Archive & remove"
@@ -466,7 +467,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   busyNote="Archiving uncommitted work and removing folder. This may take a moment…"
                 />
               )}
-            </ConfirmAction>
+            </ConfirmDialog>
           )}
           <Button
             variant="ghost"
@@ -672,7 +673,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     Merged with no uncommitted changes. Removing them keeps task history.
                   </p>
                 </div>
-                <ConfirmAction
+                <ConfirmDialog
                   title={`Clean up ${ready.length} ready worktrees?`}
                   description="Removes merged worktrees and local branches. Task history is kept."
                   label="Clean up ready"
@@ -693,7 +694,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                       progress={progress}
                     />
                   )}
-                </ConfirmAction>
+                </ConfirmDialog>
               </header>
               {ready.map(renderWorktree)}
             </section>
@@ -713,7 +714,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   <p className="task-muted">Folders in .worktrees/ that Git no longer tracks.</p>
                 </div>
                 {leftover.length > 0 && (
-                  <ConfirmAction
+                  <ConfirmDialog
                     title={`Delete ${leftover.length} leftover ${leftover.length === 1 ? 'folder' : 'folders'}?`}
                     description="These folders in .worktrees/ are no longer tracked by Git. Deleting them cannot be undone."
                     label="Delete leftover folders"
@@ -735,7 +736,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         isFolder
                       />
                     )}
-                  </ConfirmAction>
+                  </ConfirmDialog>
                 )}
               </header>
               {orphans.map((folder) => (
@@ -761,7 +762,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   </div>
                   <div className="workspace-actions">
                     {!folder.blocked_reason && (
-                      <ConfirmAction
+                      <ConfirmDialog
                         title={`Delete ${folder.name}?`}
                         description="This folder in .worktrees/ is not tracked by Git. Deleting it cannot be undone."
                         label="Delete folder"
@@ -786,7 +787,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                             isFolder
                           />
                         )}
-                      </ConfirmAction>
+                      </ConfirmDialog>
                     )}
                     <IconButton
                       variant="ghost"

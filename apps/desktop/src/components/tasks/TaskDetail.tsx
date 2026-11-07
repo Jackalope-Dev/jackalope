@@ -1,9 +1,16 @@
 import {
   Badge,
+  Button,
   Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
   Disclosure,
   DisclosureSummary,
+  InlineNotice,
   DropdownMenu as Menu,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
@@ -35,10 +42,6 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';

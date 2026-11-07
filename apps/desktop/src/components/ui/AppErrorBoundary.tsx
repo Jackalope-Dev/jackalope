@@ -1,7 +1,6 @@
-import { ErrorState } from '@jackalope/ui';
+import { Button, ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
 import { telemetry } from '../../lib/telemetry-client';
-import { Button } from './button';
 import { errorMessage } from './PageErrorBoundary';
 
 /**

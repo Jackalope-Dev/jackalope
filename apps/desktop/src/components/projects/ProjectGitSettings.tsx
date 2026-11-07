@@ -1,11 +1,16 @@
+import {
+  Button,
+  InlineNotice,
+  Input,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { Bot, Check, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { Switch } from '../ui/Switch';
 
 const choices = [
   {
@@ -138,20 +143,20 @@ export function ProjectGitSettings({
               </label>
             </div>
           </SettingBody>
-          <Setting title="Save checkpoints after successful tasks">
+          <SettingRow title="Save checkpoints after successful tasks">
             <Switch
               label="Save checkpoints after successful tasks"
               checked={policy.autoCheckpoint !== false}
               onCheckedChange={(autoCheckpoint) => setPolicy({ ...policy, autoCheckpoint })}
             />
-          </Setting>
-          <Setting title="Remove worktree and branch after approval">
+          </SettingRow>
+          <SettingRow title="Remove worktree and branch after approval">
             <Switch
               label="Remove worktree and branch after approval"
               checked={policy.cleanupAfterMerge}
               onCheckedChange={(cleanupAfterMerge) => setPolicy({ ...policy, cleanupAfterMerge })}
             />
-          </Setting>
+          </SettingRow>
         </fieldset>
       )}
       {(!policy || notice || error) && (

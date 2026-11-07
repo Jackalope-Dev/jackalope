@@ -1,4 +1,11 @@
-import { Badge, SearchField } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  InlineNotice,
+  LoadingState,
+  SearchField,
+} from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { openKnowledgeTask, prepareLessonCheck, useKnowledge } from '../../lib/knowledge';
@@ -15,11 +22,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
 
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 import { LearnedHistory } from './LearnedHistory';
@@ -283,7 +286,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                         {status === 'archived' ? 'Restore' : 'Archive'}
                       </Button>
                     )}
-                    <ConfirmAction
+                    <ConfirmDialog
                       title="Remove saved knowledge?"
                       description="Future tasks will stop using it. Existing task context and source history are kept."
                       onConfirm={async () => {

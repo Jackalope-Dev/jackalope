@@ -1,4 +1,12 @@
-import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import {
@@ -8,9 +16,6 @@ import {
   workflowRecipes,
 } from '../../lib/workflow-recipes';
 import { IssuePicker } from '../tasks/IssuePicker';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 
 export function WorkflowStarter({
   projectPath,

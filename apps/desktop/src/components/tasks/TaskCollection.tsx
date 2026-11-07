@@ -1,10 +1,15 @@
 import {
+  Button,
   Checkbox,
   Disclosure,
   DisclosureSummary,
+  EmptyState,
+  InlineNotice,
   DropdownMenu as Menu,
   SearchField,
   SegmentedControl,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import {
   Archive,
@@ -30,10 +35,6 @@ import {
 } from '../../lib/task-collection';
 import { useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './task-collection.css';
 import type { ChangeStats } from '../../lib/run-types';

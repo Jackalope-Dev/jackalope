@@ -1,4 +1,4 @@
-import { Input, SegmentedControl } from '@jackalope/ui';
+import { Button, InlineNotice, Input, SegmentedControl } from '@jackalope/ui';
 import { ArrowRight, Cloud, FolderOpen, FolderPlus } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import {
@@ -12,8 +12,6 @@ import { invokeNative } from '../../lib/native/transport';
 import { createProject, openProject } from '../../lib/project-setup';
 import type { Project } from '../../stores/projectStore';
 import { ArtifactsConnectForm } from '../settings/ArtifactsConnection';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ProjectPreview } from './ProjectPreview';
 
 /** Open an existing repository, or create a new project folder locally or backed by Cloudflare Artifacts. */

@@ -1,4 +1,4 @@
-import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
+import { Disclosure, DisclosureBody, DisclosureSummary, InlineNotice, Table } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import {
   countedTaskDecisions,
@@ -8,7 +8,6 @@ import {
 } from '../../lib/decision-usage';
 import { decisionLabels } from '../../lib/decisions';
 import { summarizeUsage } from '../../lib/usage-insights';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 export function useTaskDecisionUsage(enabled = true) {

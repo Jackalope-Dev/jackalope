@@ -1,12 +1,17 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 import { SettingsSync } from './SettingsSync';
 
 export function PrivacySettings() {
@@ -49,7 +54,7 @@ export function PrivacySettings() {
         title="Usage sharing"
         description="Optional daily counts to improve Jackalope. No prompts, code or account IDs. Kept for 30 days."
       >
-        <Setting title="Share anonymous usage counts">
+        <SettingRow title="Share anonymous usage counts">
           <Switch
             label="Share anonymous usage counts"
             checked={usage}
@@ -59,8 +64,8 @@ export function PrivacySettings() {
             }}
             disabled={community.busy || !community.settings}
           />
-        </Setting>
-        <Setting title="Include known error categories">
+        </SettingRow>
+        <SettingRow title="Include known error categories">
           <Switch
             label="Include known error categories"
             checked={errors}
@@ -70,7 +75,7 @@ export function PrivacySettings() {
             }}
             disabled={community.busy || !community.settings || !usage}
           />
-        </Setting>
+        </SettingRow>
         <SettingBody>
           <Disclosure className="space-y-2">
             <DisclosureSummary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">

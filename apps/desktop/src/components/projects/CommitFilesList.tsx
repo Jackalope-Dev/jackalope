@@ -1,7 +1,6 @@
-import { Checkbox, IconButton } from '@jackalope/ui';
+import { Checkbox, ConfirmDialog, IconButton } from '@jackalope/ui';
 import { Undo2 } from 'lucide-react';
 import type { ChangedFile } from '../../lib/project-git';
-import { ConfirmAction } from '../ui/ConfirmAction';
 
 export const STATUS = {
   modified: { letter: 'M', label: 'Modified' },
@@ -96,7 +95,7 @@ export function CommitFilesList({
                   </span>
                 )}
               </button>
-              <ConfirmAction
+              <ConfirmDialog
                 title={`Discard changes to ${name}?`}
                 description={
                   file.status === 'untracked' || file.status === 'added'

@@ -1,9 +1,14 @@
 import {
   Badge,
+  Button,
   Disclosure,
   DisclosureSummary,
+  InlineNotice,
+  LoadingState,
   DropdownMenu as Menu,
   SegmentedNav,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import {
   ArrowLeft,
@@ -36,10 +41,6 @@ import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { AddWork } from './AddWork';
 import { CoordinationAutomation } from './CoordinationAutomation';
 import { CoordinationDecisions } from './CoordinationDecisions';

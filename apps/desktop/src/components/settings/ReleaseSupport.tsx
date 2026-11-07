@@ -1,12 +1,19 @@
-import { DiscordIcon, FormField, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DiscordIcon,
+  FormField,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Textarea,
+} from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { Button } from '../ui/button';
 import { FeedbackForm } from './FeedbackForm';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { UpdateSettings } from './UpdateSettings';
 
 export function ReleaseSupport() {
@@ -39,7 +46,7 @@ export function ReleaseSupport() {
       <UpdateSettings />
       <FeedbackForm />
       <SettingGroup aria-label="Help and community">
-        <Setting
+        <SettingRow
           title="Documentation & guides"
           description="Architecture guides, agent configuration, worktree workflows and troubleshooting recipes in the online Knowledgebase."
         >
@@ -50,8 +57,8 @@ export function ReleaseSupport() {
             <LifeBuoy className="size-4 mr-2" />
             Browse Knowledgebase
           </Button>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Community"
           description="Ask questions, share workflows and hear about new releases first in the Jackalope Discord."
         >
@@ -59,7 +66,7 @@ export function ReleaseSupport() {
             <DiscordIcon className="size-4 mr-2" />
             Join the Discord
           </Button>
-        </Setting>
+        </SettingRow>
       </SettingGroup>
       <SettingGroup
         aria-label="Support report"

@@ -1,5 +1,5 @@
 import { applyThemeTokens } from '@jackalope/brand/theme';
-import { RefreshIcon, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, RefreshIcon, Switch, Textarea } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -21,9 +21,6 @@ import { ProviderMark } from '../agents/ProviderMark';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
 import { AgentInstallCatalog, CommandCopy } from './AgentInstallCatalog';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';

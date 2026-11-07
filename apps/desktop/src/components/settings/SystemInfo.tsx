@@ -1,4 +1,11 @@
-import { RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  InlineNotice,
+  RefreshIcon,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -10,9 +17,6 @@ import {
   restartForDesktopPermissions,
   type SystemInfo,
 } from '../../lib/system-info';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 const PERMISSION_LABELS: Record<DesktopPermission, string> = {
   accessibility: 'Accessibility',
@@ -111,7 +115,7 @@ export function SystemInfoView() {
       )}
       {host ? (
         <>
-          <Setting
+          <SettingRow
             title="Git"
             description={
               host.git_available
@@ -120,7 +124,7 @@ export function SystemInfoView() {
             }
           />
           {host.desktop_control && (
-            <Setting title="Native window control" description={host.desktop_control.message}>
+            <SettingRow title="Native window control" description={host.desktop_control.message}>
               {host.desktop_control.can_request_permissions &&
                 (!host.desktop_control.available || host.os === 'linux') && (
                   <Button
@@ -135,7 +139,7 @@ export function SystemInfoView() {
                       : 'Set up macOS permissions'}
                   </Button>
                 )}
-            </Setting>
+            </SettingRow>
           )}
           {host.desktop_control &&
             !host.desktop_control.available &&

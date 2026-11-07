@@ -1,8 +1,6 @@
-import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice, Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 interface Rating {
   useful: boolean;

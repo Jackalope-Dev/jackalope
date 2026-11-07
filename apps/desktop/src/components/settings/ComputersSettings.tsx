@@ -1,4 +1,13 @@
-import { Badge } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  InlineNotice,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
   type CloudMachine,
@@ -23,11 +32,6 @@ import { Agent37Settings } from '../computers/Agent37Connect';
 import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
 import { PairMachineForm } from '../computers/PairMachineForm';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 function dockerSummary(status: DockerStatus) {
   const engine =
@@ -115,7 +119,7 @@ export function ComputersSettings() {
         title="Local sandboxes"
         description="Bots and tasks get their own Linux desktop and browser in Docker on this device."
       >
-        <Setting
+        <SettingRow
           title={
             docker
               ? docker.available
@@ -146,8 +150,8 @@ export function ComputersSettings() {
               Check again
             </Button>
           </div>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Keep computers running when Jackalope quits"
           description="When off, local sandboxes stop when Jackalope quits. Their files are kept."
         >
@@ -161,7 +165,7 @@ export function ComputersSettings() {
               )
             }
           />
-        </Setting>
+        </SettingRow>
       </SettingGroup>
 
       <SettingGroup
@@ -169,7 +173,7 @@ export function ComputersSettings() {
         description="Run the Jackalope computer on any machine you own behind HTTPS. Jackalope never stops it; your provider’s schedule applies."
       >
         {machines.map((machine) => (
-          <Setting
+          <SettingRow
             key={machine.id}
             title={machine.name}
             description={health[machine.id] ?? machine.url}
@@ -184,7 +188,7 @@ export function ComputersSettings() {
               >
                 Test connection
               </Button>
-              <ConfirmAction
+              <ConfirmDialog
                 trigger={
                   <Button variant="outline" disabled={!!busy}>
                     Remove…
@@ -197,7 +201,7 @@ export function ComputersSettings() {
                 onConfirm={() => run(`remove:${machine.id}`, () => removeCloudMachine(machine.id))}
               />
             </div>
-          </Setting>
+          </SettingRow>
         ))}
         {pairing ? (
           <SettingBody>
@@ -211,13 +215,13 @@ export function ComputersSettings() {
             />
           </SettingBody>
         ) : (
-          <Setting title="Pair a cloud machine">
+          <SettingRow title="Pair a cloud machine">
             <Button variant="outline" disabled={!!busy} onClick={() => setPairing(true)}>
               Pair machine
             </Button>
-          </Setting>
+          </SettingRow>
         )}
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Jackalope-hosted computers {!hosted && <Badge>Coming soon</Badge>}
@@ -244,7 +248,7 @@ export function ComputersSettings() {
           </SettingBody>
         )}
         {computers.map((computer) => (
-          <Setting
+          <SettingRow
             key={computer.id}
             title={
               <span className="inline-flex items-center gap-2">
@@ -285,7 +289,7 @@ export function ComputersSettings() {
                   Stop
                 </Button>
               )}
-              <ConfirmAction
+              <ConfirmDialog
                 trigger={
                   <Button variant="outline" disabled={!!busy || computer.state === 'starting'}>
                     Delete…
@@ -302,7 +306,7 @@ export function ComputersSettings() {
                 onConfirm={() => run(`delete:${computer.id}`, () => deleteComputer(computer.id))}
               />
             </div>
-          </Setting>
+          </SettingRow>
         ))}
       </SettingGroup>
     </>

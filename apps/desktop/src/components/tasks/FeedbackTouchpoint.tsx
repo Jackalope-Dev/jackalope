@@ -1,3 +1,4 @@
+import { Button } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isActive } from '../../lib/run-status';
@@ -6,7 +7,6 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 import { openSettings } from '../layout/navigation';
 import { FeedbackForm } from '../settings/FeedbackForm';
-import { Button } from '../ui/button';
 
 export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: boolean }) {
   const { view, request } = useFeedbackStore(

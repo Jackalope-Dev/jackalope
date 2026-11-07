@@ -1,8 +1,6 @@
-import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Checkbox, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function CoordinationAutomation({
   project,

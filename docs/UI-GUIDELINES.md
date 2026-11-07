@@ -111,7 +111,7 @@ Derive colors, typography, surfaces and motion from packages/brand and shared
 controls from `@jackalope/ui`. Its Button, Input, Textarea, Select, FormField,
 InlineNotice and Dialog components are browser-safe and include their CSS without
 requiring Tailwind. Keep native bridges, API clients and app state out of this package.
-Desktop compatibility exports can retain existing import paths. Use the local font stacks and established size tokens. Favor clear
+Desktop imports these controls from `@jackalope/ui` directly. Use the local font stacks and established size tokens. Favor clear
 hierarchy, generous space and restrained surfaces over repeated metric cards.
 
 Use semantic action and accent tokens with their matching text colors, and
@@ -238,8 +238,8 @@ WorkspaceSubnavigation and RunStatus for their app-specific context. Component
 ownership and runtime boundaries are documented in the architecture guide.
 
 Standard dialogs compose DialogContent, DialogHeader, DialogCloseButton and
-DialogFooter. ConfirmDialog owns pending guards, failure feedback and focus return
-for a single confirmation; its children can collect feature-specific acknowledgments.
+DialogFooter. ConfirmDialog owns pending guards, failure feedback, focus return and stacking above
+other dialogs and the command palette (`layer="confirm"` on DialogContent) for a single confirmation; its children can collect feature-specific acknowledgments.
 The feature supplies the actual operation and eligibility. Custom dialogs retain
 their own dismissal and focus-return policies. Use contained layout for editors with a scrolling body
 and fixed actions. Specialized canvases and command palettes may retain their
@@ -252,7 +252,7 @@ title, description and action for a card heading, SettingBody for forms, pickers
 inside a card, SettingActions for a card's buttons and `tone="danger"` for destructive
 settings. Do not place loose headings, rows or buttons between cards. Use InlineNotice for inline feedback, choosing
 the tone from the actual outcome; use its action slot for recovery controls.
-WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
+WorkspaceToolbar owns filter/action wrapping and spacing. SegmentedControl represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
 Every row of peer choices uses the shared segmented track: SegmentedControl for
 filters, SegmentedNav for views (it marks the open view with aria-current) and

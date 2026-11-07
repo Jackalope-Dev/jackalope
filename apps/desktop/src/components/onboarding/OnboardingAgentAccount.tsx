@@ -1,3 +1,4 @@
+import { Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import {
   type AccountStatus,
@@ -7,9 +8,6 @@ import {
 import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 
 const AgentSignIn = lazy(() =>
   import('../agents/AgentSignIn').then((module) => ({ default: module.AgentSignIn })),

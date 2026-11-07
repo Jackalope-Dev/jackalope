@@ -1,9 +1,7 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import { isLive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function CoordinationDecisions({
   queue,

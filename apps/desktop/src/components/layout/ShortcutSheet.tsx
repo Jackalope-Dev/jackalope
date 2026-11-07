@@ -1,3 +1,4 @@
+import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 import { primaryModifier } from '../../lib/platform-shortcuts';
@@ -8,7 +9,6 @@ import {
   shortcutNames,
 } from '../../lib/shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 
 /** Window event that opens the keyboard shortcut sheet. */
 const OPEN_SHORTCUTS = 'jackalope:open-shortcuts';

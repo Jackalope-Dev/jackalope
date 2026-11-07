@@ -1,10 +1,8 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { CloudUpload, Rocket } from 'lucide-react';
 import { useState } from 'react';
 import { DEPLOY_OUTCOME, type DeployStatus, deployAgain } from '../../lib/deploy';
 import { ago } from '../../lib/swarm';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const short = (head?: string | null) => head?.slice(0, 7) ?? '';
 

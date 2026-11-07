@@ -1,3 +1,4 @@
+import { Button } from '@jackalope/ui';
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { TaskRun } from '../../lib/run-types';
@@ -11,7 +12,6 @@ import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
 
 export function NextWorkAction({ run }: { run: TaskRun }) {
   const runs = useExecutionStore((state) => state.runs);

@@ -1,8 +1,7 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { ScreenshotArtifact } from '../../lib/run-types';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function ScreenshotPreview({
   runId,

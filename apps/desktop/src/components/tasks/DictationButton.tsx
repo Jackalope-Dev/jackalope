@@ -1,11 +1,10 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { Mic, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { recordingWave } from '../../lib/dictation';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function DictationButton({
   onText,

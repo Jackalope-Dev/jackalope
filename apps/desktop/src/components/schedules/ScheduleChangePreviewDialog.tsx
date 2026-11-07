@@ -1,7 +1,11 @@
+import {
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { Textarea } from '../ui/Textarea';
-import { useDialogFocus } from '../ui/useDialogFocus';
 
 export interface ChangePreviewData {
   title: string;

@@ -1,4 +1,4 @@
-import { RefreshIcon } from '@jackalope/ui';
+import { Button, EmptyState, InlineNotice, LoadingState, RefreshIcon } from '@jackalope/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -15,10 +15,6 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../projects/project-context.css';
 

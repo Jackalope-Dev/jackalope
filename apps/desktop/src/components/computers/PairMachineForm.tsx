@@ -1,8 +1,6 @@
-import { CopyButton, FormField, Input } from '@jackalope/ui';
+import { Button, CopyButton, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { addCloudMachine, type CloudMachine, cloudMachines } from '../../lib/computers';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import './computers.css';
 
 /** The tag of an image built from resources/computer on the machine itself. */

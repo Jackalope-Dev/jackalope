@@ -1,8 +1,7 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
-import { Button } from '@jackalope/ui';
+import { Button, InlineNotice } from '@jackalope/ui';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
 import { moveNewWorkDraft } from './drafts';
 import { Hosts } from './Hosts';
 import { HostWork, type Opening } from './HostWork';

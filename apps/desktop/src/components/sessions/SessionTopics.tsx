@@ -1,4 +1,16 @@
-import { Checkbox, Disclosure, DisclosureSummary, Input, SearchField } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Input,
+  SearchField,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
 import { type LiveSession, type SessionTopic, sessionCommand } from '../../lib/live-session';
@@ -7,9 +19,6 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { openHelperDraft } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function SessionTopics({
   session,

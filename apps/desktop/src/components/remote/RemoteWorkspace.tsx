@@ -3,6 +3,7 @@ import {
   Disclosure,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Select,
   SelectItem,
   Textarea,
@@ -12,7 +13,6 @@ import remarkGfm from 'remark-gfm';
 import { isActive as active } from '../../lib/run-status';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { ChangedFiles } from '../tasks/ChangedFiles';
-import { InlineNotice } from '../ui/InlineNotice';
 import { type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
 import './remote.css';
 

@@ -1,3 +1,4 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { Eye, MousePointer2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -7,8 +8,6 @@ import {
   holdComputerViewer,
 } from '../../lib/computers';
 import { openExternalUrl } from '../../lib/native/env';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import './computers.css';
 
 /** An open embedded viewer renews its hold well inside the 90 second lease. */

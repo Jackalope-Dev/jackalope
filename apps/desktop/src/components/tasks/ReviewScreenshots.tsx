@@ -1,12 +1,9 @@
-import { SegmentedControl } from '@jackalope/ui';
+import { Button, InlineNotice, SegmentedControl, Select, SelectItem } from '@jackalope/ui';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import { capturedPages, capturePageName, type ReviewCaptures } from '../../lib/review-captures';
 import type { ScreenshotArtifact } from '../../lib/run-types';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import './review-screenshots.css';
 
 type Mode = 'slider' | 'side';

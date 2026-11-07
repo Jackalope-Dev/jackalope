@@ -1,5 +1,5 @@
+import { Button } from '@jackalope/ui';
 import { downloadPercent, formatSize, type LocalProgress } from '../../lib/local-ai';
-import { Button } from '../ui/button';
 import './managed-runtime-progress.css';
 
 export function ManagedRuntimeProgress({

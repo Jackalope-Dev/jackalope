@@ -1,11 +1,20 @@
 import {
+  Button,
   Checkbox,
   Disclosure,
   DisclosureSummary,
+  EmptyState,
   IconButton,
+  Input,
+  LoadingState,
   RefreshIcon,
   SearchField,
+  SegmentedControl,
+  Select,
+  SelectItem,
   Textarea,
+  Tooltip,
+  useDialogFocus,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, FileText, ListTodo, Pencil, Play, Plus, X } from 'lucide-react';
@@ -27,16 +36,9 @@ import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { todoDraftKey, useRepoTodoStore } from '../../stores/repoTodoStore';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Tooltip } from '../ui/Tooltip';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
-import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import './repo-todos.css';
 
 export function RepoTodos({
@@ -361,7 +363,7 @@ export function RepoTodos({
                     ) : (
                       <>
                         <WorkspaceToolbar className="repo-todo-toolbar">
-                          <FilterGroup
+                          <SegmentedControl
                             label="Filter TODOs"
                             value={filter}
                             onChange={setFilter}

@@ -1,3 +1,4 @@
+import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Atom,
@@ -34,7 +35,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { type Project, useProjectStore } from '../../stores/projectStore';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 
 /** Saved by key, so renaming a Lucide export never breaks a saved project icon. */
 const PROJECT_ICONS: Record<string, LucideIcon> = {

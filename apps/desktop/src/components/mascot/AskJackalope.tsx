@@ -1,4 +1,4 @@
-import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice, Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
@@ -6,8 +6,6 @@ import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { HelperAction } from './HelperAction';
 import './helper.css';
 

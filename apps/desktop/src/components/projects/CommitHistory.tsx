@@ -1,7 +1,7 @@
+import { InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './commit-history.css';
 

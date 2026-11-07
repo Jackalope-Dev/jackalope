@@ -6,9 +6,13 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   Select,
   SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
 } from '@jackalope/ui';
 import { Check, ExternalLink, KeyRound, Route, SlidersHorizontal, Zap } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -19,8 +23,6 @@ import {
   type RoutingSettings,
   routingSettings,
 } from '../../lib/routing-settings';
-import { InlineNotice } from '../ui/InlineNotice';
-import { SettingActions, SettingBody, SettingGroup } from './Setting';
 import './routing.css';
 import { DecisionOptions } from './DecisionOptions';
 

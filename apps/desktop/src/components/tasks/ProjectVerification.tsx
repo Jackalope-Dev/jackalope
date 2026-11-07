@@ -1,10 +1,8 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun, Verification } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function ProjectVerification({
   run,

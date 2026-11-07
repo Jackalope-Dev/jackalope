@@ -1,5 +1,5 @@
+import { Select, SelectItem } from '@jackalope/ui';
 import { useSavedActionsStore } from '../../stores/savedActionsStore';
-import { Select, SelectItem } from '../ui/Select';
 
 export function PromptPresets({
   projectId,

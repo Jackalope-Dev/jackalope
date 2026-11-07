@@ -1,4 +1,4 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, Button, InlineNotice } from '@jackalope/ui';
 import { AppWindow, ExternalLink, Globe, Lock, Monitor, Server } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,8 +15,6 @@ import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { ComputerViewer } from '../computers/ComputerViewer';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import './agent-screen.css';
 

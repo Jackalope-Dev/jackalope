@@ -1,9 +1,8 @@
-import { CopyButton, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { CopyButton, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import type { builtinAgents } from '../../lib/agent-catalog';
 import { ProviderMark } from '../agents/ProviderMark';
-import { InlineNotice } from '../ui/InlineNotice';
 import { AgentInstall } from './AgentInstall';
 
 /** A shell command with a copy action that reports clipboard failures. */

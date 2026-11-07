@@ -1,4 +1,4 @@
-import { Popover, RefreshIcon } from '@jackalope/ui';
+import { Button, Popover, RefreshIcon } from '@jackalope/ui';
 import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,7 +9,6 @@ import { useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
-import { Button } from '../ui/button';
 import { navigateWorkspace } from './navigation';
 import './statusbar-usage.css';
 

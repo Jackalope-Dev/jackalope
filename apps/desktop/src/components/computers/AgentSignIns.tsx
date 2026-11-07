@@ -1,10 +1,15 @@
-import { Badge, Input } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  InlineNotice,
+  Input,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type AgentCredential, agentCredentials, setAgentCredential } from '../../lib/computers';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const HINTS: Record<string, string> = {
   'claude-token':
@@ -58,7 +63,7 @@ export function AgentSignIns() {
         const inputId = `agent-credential-${credential.id}`;
         const draft = drafts[credential.id] ?? '';
         return (
-          <Setting
+          <SettingRow
             key={credential.id}
             title={
               <span className="inline-flex items-center gap-2">
@@ -109,7 +114,7 @@ export function AgentSignIns() {
                 </Button>
               </form>
             )}
-          </Setting>
+          </SettingRow>
         );
       })}
     </SettingGroup>

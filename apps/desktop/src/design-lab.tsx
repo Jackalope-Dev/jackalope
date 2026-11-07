@@ -1,5 +1,5 @@
 import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/brand/theme';
-import { Checkbox } from '@jackalope/ui';
+import { Button, Checkbox, Input, Select, SelectItem } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,9 +8,6 @@ import { LocalAiSetup } from './components/agents/LocalAiSetup';
 import { WelcomeDialog } from './components/layout/WelcomeDialog';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
-import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
-import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
 import { localAiFixture } from './design-lab/local-ai-fixture';
 import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';

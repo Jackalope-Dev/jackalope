@@ -1,4 +1,4 @@
-import { FormField, RefreshIcon, Select, SelectItem } from '@jackalope/ui';
+import { Button, FormField, RefreshIcon, Select, SelectItem } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -35,7 +35,6 @@ import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
 
 const stages = ['Your computer', 'Choose a model', 'Install & download', 'Check & connect'];
 type SetupActivity = 'inspect' | 'ollama' | 'opencode' | 'model' | 'verify' | 'connect';

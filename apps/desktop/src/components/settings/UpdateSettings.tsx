@@ -1,16 +1,21 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { isLive } from '../../lib/run-status';
 import { useExecutionStore } from '../../stores/executionStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { BetaProgram } from './BetaProgram';
 import { ReleaseNotes } from './ReleaseNotes';
-import { SettingBody, SettingGroup } from './Setting';
 
 export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }) {
   const update = useUpdateStore();

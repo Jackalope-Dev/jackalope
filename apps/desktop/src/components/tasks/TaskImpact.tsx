@@ -1,9 +1,8 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { scanCodebase } from '../../lib/codebase';
 import { affectedFiles } from '../../lib/codebase-impact';
 import type { TaskRun } from '../../lib/run-types';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
   const [affected, setAffected] = useState<string[] | null>(null);

@@ -1,9 +1,7 @@
+import { InlineNotice, SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 interface DesktopSettings {
   closeToTray: boolean;
@@ -63,7 +61,7 @@ export function WindowBehaviorSettings() {
 
   return (
     <SettingGroup title="Window & startup">
-      <Setting
+      <SettingRow
         title="Close to system tray"
         controlId="close-to-tray"
         descriptionId="close-to-tray-description"
@@ -77,8 +75,8 @@ export function WindowBehaviorSettings() {
           disabled={!settings?.trayAvailable || saving}
           onCheckedChange={update}
         />
-      </Setting>
-      <Setting
+      </SettingRow>
+      <SettingRow
         title="Launch at login"
         controlId="launch-at-login"
         descriptionId="launch-at-login-description"
@@ -92,7 +90,7 @@ export function WindowBehaviorSettings() {
           disabled={!settings || saving}
           onCheckedChange={updateLaunchAtLogin}
         />
-      </Setting>
+      </SettingRow>
       {((settings && !settings.trayAvailable) || error) && (
         <SettingBody>
           {settings && !settings.trayAvailable && (

@@ -1,8 +1,6 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 import { ChangedFiles } from './ChangedFiles';
 

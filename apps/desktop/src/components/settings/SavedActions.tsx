@@ -1,12 +1,20 @@
-import { FormField, Input, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Textarea,
+} from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../stores/projectStore';
 import { type SavedAction, useSavedActionsStore } from '../../stores/savedActionsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 
 const empty = (): SavedAction => ({
   id: crypto.randomUUID(),
@@ -31,7 +39,7 @@ export function SavedActions() {
           description="Prompts fill a conversation draft. Commands are offered in an idle task terminal and run only when you choose Run command. Saved on this device."
         >
           {actions.map((action) => (
-            <Setting
+            <SettingRow
               key={action.id}
               title={action.name}
               description={`${action.kind === 'command' ? 'Terminal command' : 'Prompt preset'} · ${
@@ -55,7 +63,7 @@ export function SavedActions() {
                   Delete
                 </Button>
               </div>
-            </Setting>
+            </SettingRow>
           ))}
         </SettingGroup>
       )}

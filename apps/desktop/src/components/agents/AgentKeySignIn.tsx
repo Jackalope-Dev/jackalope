@@ -1,13 +1,17 @@
-import { Checkbox, Input } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
 import { apiProviders } from '../../lib/api-providers';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 export function AgentKeySignIn({
@@ -56,7 +60,8 @@ export function AgentKeySignIn({
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content
           {...focus}
-          className="task-dialog appearance-panel confirm-action-dialog"
+          data-layer="confirm"
+          className="task-dialog appearance-panel"
           onCloseAutoFocus={(event) => {
             if (returnFocus?.isConnected) {
               event.preventDefault();

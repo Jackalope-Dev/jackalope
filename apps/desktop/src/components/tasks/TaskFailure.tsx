@@ -1,8 +1,6 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { RotateCw } from 'lucide-react';
 import type { PreparationRecord } from '../../lib/run-types';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 /** The setup command's own output, which is usually where the real cause is. */
 function SetupOutput({ preparation }: { preparation: PreparationRecord }) {

@@ -1,8 +1,7 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type DetectedKey, detectEnvKeys, importDetectedKey } from '../../lib/local-detection';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 /**
  * Offers API keys found in the environment for installed agents that have no working

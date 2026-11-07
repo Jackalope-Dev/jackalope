@@ -1,9 +1,8 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 interface RuntimeStatus {

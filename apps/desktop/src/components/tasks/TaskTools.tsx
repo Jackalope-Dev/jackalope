@@ -1,11 +1,10 @@
+import { DialogCloseButton, DialogContent, DialogHeader, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentManager } from '../agents/AgentManager';
 import { McpWorkspace } from '../mcp/McpWorkspace';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 
 export function TaskTools({ onClose }: { onClose: () => void }) {

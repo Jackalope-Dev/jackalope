@@ -1,8 +1,6 @@
-import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice, Input } from '@jackalope/ui';
 import { useState } from 'react';
 import type { SessionLimits as Limits } from '../../lib/live-session';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function SessionLimits({
   initial,

@@ -1,8 +1,7 @@
-import { ErrorState } from '@jackalope/ui';
+import { Button, ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../lib/telemetry-client';
-import { Button } from './button';
 import { WorkspacePage } from './WorkspacePage';
 
 /** The thrown error in words, so a crash can be reported and diagnosed. */

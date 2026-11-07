@@ -1,4 +1,15 @@
-import { Badge, LoadingIcon, DropdownMenu as Menu, SearchField, SegmentedNav } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  InlineNotice,
+  LoadingIcon,
+  DropdownMenu as Menu,
+  SearchField,
+  SegmentedControl,
+  SegmentedNav,
+} from '@jackalope/ui';
 import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,13 +20,9 @@ import { invokeNative } from '../../lib/native/transport';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
-import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import {
   recommendationFor,
   recommendationGroups,
@@ -347,7 +354,7 @@ export function McpWorkspace({
               )}
 
               <WorkspaceToolbar className="mb-4">
-                <FilterGroup
+                <SegmentedControl
                   label="Connection scope"
                   value={scopeFilter}
                   onChange={setScopeFilter}
@@ -614,7 +621,7 @@ export function McpWorkspace({
                   </div>
 
                   <div className="mcp-browse-controls">
-                    <FilterGroup
+                    <SegmentedControl
                       label="Marketplace collection"
                       value={directory ? 'directory' : 'recommended'}
                       onChange={(value) => {
@@ -648,7 +655,7 @@ export function McpWorkspace({
                   ) : (
                     <>
                       {directory && (
-                        <FilterGroup
+                        <SegmentedControl
                           className="mcp-category-filter"
                           label="Category"
                           value={selectedCategory}
@@ -703,7 +710,7 @@ export function McpWorkspace({
             </section>
           )}
 
-          <ConfirmAction
+          <ConfirmDialog
             open={!!removing}
             onOpenChange={(open) => {
               if (!open) setRemoving(null);

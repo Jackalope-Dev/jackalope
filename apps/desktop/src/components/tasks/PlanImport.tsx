@@ -1,4 +1,14 @@
-import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -6,10 +16,6 @@ import { builtinAgents } from '../../lib/agent-catalog';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { useDialogFocus } from '../ui/useDialogFocus';
 
 interface PlanEntry {
   contextSelection?: import('../../lib/knowledge-types').ContextSelection;

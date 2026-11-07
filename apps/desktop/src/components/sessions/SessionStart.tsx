@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Select, SelectItem, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
@@ -27,9 +27,7 @@ import { DictationButton } from '../tasks/DictationButton';
 import { PromptPresets } from '../tasks/PromptPresets';
 import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ChatOptions } from './ChatOptions';
 import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './ComposerAgentPicker';
 import { SessionLimits } from './SessionLimits';

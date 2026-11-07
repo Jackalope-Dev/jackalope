@@ -1,3 +1,4 @@
+import { Button, InlineNotice, Tooltip } from '@jackalope/ui';
 import { Sparkles, Square, Undo2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -10,10 +11,7 @@ import {
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Tooltip } from '../ui/Tooltip';
 
 type Sharpen = ReturnType<typeof useSharpen>;
 

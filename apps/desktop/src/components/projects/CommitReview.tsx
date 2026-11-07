@@ -1,10 +1,18 @@
 import {
   Badge,
+  Button,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
+  EmptyState,
   IconButton,
+  InlineNotice,
+  Input,
+  LoadingState,
   RefreshIcon,
+  Select,
+  SelectItem,
+  Textarea,
 } from '@jackalope/ui';
 import {
   ArrowUpFromLine,
@@ -34,13 +42,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { navigateWorkspace, openHelperDraft } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { CommitHistory } from './CommitHistory';

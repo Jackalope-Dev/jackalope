@@ -1,4 +1,4 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, Button, InlineNotice, LoadingState } from '@jackalope/ui';
 import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { runHostName } from '../../lib/computers';
@@ -13,9 +13,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openCloudResources, openSettings } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';

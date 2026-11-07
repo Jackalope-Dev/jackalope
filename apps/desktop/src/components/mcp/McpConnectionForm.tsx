@@ -1,4 +1,15 @@
-import { Checkbox } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogFooter,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,14 +20,6 @@ import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-
 import { mcpEndpointError } from '../../lib/mcp-endpoint';
 import { useMcpStore } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogFooter } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { Textarea } from '../ui/Textarea';
 import type { SavedMcpConnection } from './McpConnectionResult';
 
 export function McpConnectionForm({

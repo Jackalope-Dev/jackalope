@@ -1,8 +1,7 @@
+import { DialogCloseButton, DialogContent, DialogHeader, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import type { McpServerConfig } from '../../lib/mcp-client';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { McpConnectionForm } from './McpConnectionForm';
 import { McpConnectionResult, type SavedMcpConnection } from './McpConnectionResult';
 export function McpAddCustomModal({

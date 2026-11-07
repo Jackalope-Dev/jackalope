@@ -1,3 +1,4 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { MotionConfig } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
@@ -5,8 +6,6 @@ import { invokeNative } from '../../lib/native/transport';
 import { saveWorkFeedback } from '../../lib/work-feedback';
 import { observeExecution, useExecutionStore } from '../../stores/executionStore';
 import { bootstrapWindow, useWindowTheme } from '../../window-bootstrap';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ResultReview } from './ResultReview';
 import { TaskPreview } from './TaskPreview';
 import { TaskTerminal } from './TaskTerminal';

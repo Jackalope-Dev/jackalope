@@ -1,4 +1,4 @@
-import { Badge, IconButton, Panel } from '@jackalope/ui';
+import { Badge, Button, IconButton, Panel } from '@jackalope/ui';
 import { ArrowRight, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -17,7 +17,6 @@ import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { usePresenceStore } from '../../stores/presenceStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { selectWorkItem, useWorkspaceWork } from '../layout/WorkSidebar';
-import { Button } from '../ui/button';
 import './work-catch-up.css';
 
 const PICTURE_LIMIT = 3;

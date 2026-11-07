@@ -1,4 +1,13 @@
-import { Disclosure, DisclosureSummary, DropdownMenu as Menu, Switch } from '@jackalope/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  LoadingState,
+  DropdownMenu as Menu,
+  Switch,
+} from '@jackalope/ui';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -24,10 +33,6 @@ import {
 } from '../../stores/projectStore';
 import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -397,7 +402,7 @@ export function ScheduleManager(props: {
         )}
       </div>
       {deleting && (
-        <ConfirmAction
+        <ConfirmDialog
           open
           onOpenChange={(value) => !value && setDeleting(null)}
           title={`Delete ${deleting.name}?`}
@@ -428,7 +433,7 @@ export function ScheduleManager(props: {
                   <Button disabled={!desktop || busy || !ledger} onClick={() => reviewPlan(plan)}>
                     Review plan
                   </Button>
-                  <ConfirmAction
+                  <ConfirmDialog
                     title="Delete saved plan?"
                     description="This removes the saved instructions and timing. Existing tasks and native schedules are kept."
                     onConfirm={() => useScheduleStore.getState().deleteSchedule(plan.id)}

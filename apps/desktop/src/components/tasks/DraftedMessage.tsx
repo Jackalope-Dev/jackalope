@@ -1,7 +1,6 @@
-import { FormField, Input, Textarea } from '@jackalope/ui';
+import { Button, FormField, Input, Textarea } from '@jackalope/ui';
 import { Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { Button } from '../ui/button';
 import './drafted-message.css';
 
 interface Message {

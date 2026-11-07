@@ -1,4 +1,17 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  FormField,
+  Input,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
 import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
 import { syncsLessons } from '../../lib/lesson-sync';
@@ -9,13 +22,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { ProjectComputerSettings } from '../computers/BotComputerSettings';
 import { ProjectSwarmHosts } from '../computers/ProjectSwarmHosts';
 import { openProjectSettings } from '../layout/navigation';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { FormField } from '../ui/FormField';
-import { Input } from '../ui/input';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
@@ -83,17 +89,17 @@ export function ProjectPreferences({
       ) : (
         <>
           <SettingGroup>
-            <Setting title="Project name" controlId="project-name">
+            <SettingRow title="Project name" controlId="project-name">
               <Input
                 id="project-name"
                 className="project-setting-input"
                 value={project.name}
                 onChange={(e) => updateProject(project.id, { name: e.target.value })}
               />
-            </Setting>
+            </SettingRow>
             {!embedded && (
               <>
-                <Setting
+                <SettingRow
                   title="Appearance"
                   description={
                     project.preferences?.theme
@@ -107,15 +113,15 @@ export function ProjectPreferences({
                   >
                     Edit appearance
                   </Button>
-                </Setting>
-                <Setting title="Agents and accounts">
+                </SettingRow>
+                <SettingRow title="Agents and accounts">
                   <Button
                     variant="outline"
                     onClick={() => openProjectSettings(project.id, 'Agents')}
                   >
                     Configure agents
                   </Button>
-                </Setting>
+                </SettingRow>
               </>
             )}
           </SettingGroup>
@@ -137,7 +143,7 @@ export function ProjectPreferences({
                 />
               </FormField>
             </SettingBody>
-            <Setting
+            <SettingRow
               title="Split work into subtasks"
               description="Plan substantial requests as parallel subtasks that start without a review step. Requires a verification command."
             >
@@ -148,8 +154,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { automaticSubtasks })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Choose guidelines automatically"
               description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Options → Saved project context in the Work composer."
             >
@@ -160,8 +166,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { automaticTaskContext })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Auto-approve agent requests"
               description="Approve routine tool use without asking; each approval is listed in the task's activity. Deleting files, force pushes, deploys, credentials, elevated commands and changes outside the workspace still ask. Codex, Gemini CLI, Grok and Antigravity follow their own CLI rules."
             >
@@ -172,8 +178,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { autoApprove })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Use my Claude Code setup"
               description="Claude Code tasks load your own Claude Code settings, plugins, hooks and MCP servers. Turn off to use only this project's settings and the connections chosen here."
             >
@@ -184,8 +190,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { personalClaudeSetup })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Learn automatically"
               description="Save lessons from what you tell agents and from checks that pass, while work runs and when it finishes. New lessons stay on probation until tasks use them; unused ones are archived. Review them under Context."
             >
@@ -196,9 +202,9 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { learnAutomatically })
                 }
               />
-            </Setting>
+            </SettingRow>
             {learningSettings(project).automatic && (
-              <Setting
+              <SettingRow
                 title="Learn during long tasks"
                 description="How often a running task is reviewed for new lessons."
                 descriptionId="project-learning-cadence-description"
@@ -217,9 +223,9 @@ export function ProjectPreferences({
                     </SelectItem>
                   ))}
                 </Select>
-              </Setting>
+              </SettingRow>
             )}
-            <Setting
+            <SettingRow
               title="Reflect with an agent"
               description="When work ends, also ask this project's default agent to suggest lessons from what you wrote. Uses that agent account's quota; each reflection is short and capped. Suggestions pass the same checks as other lessons."
             >
@@ -230,8 +236,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { agentReflection })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Sync learned lessons"
               description="Include this project's learned lessons when lesson sync is on under Settings → Privacy. Turn off to keep them on this computer."
             >
@@ -242,8 +248,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { syncLessons })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Write lessons to AGENTS.md"
               description="Keep active learned lessons in a marked section of this project's AGENTS.md and in a Claude Code skill, so agents outside Jackalope see them. Nothing is committed for you; turning this off removes them."
             >
@@ -254,11 +260,11 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { exportLessons })
                 }
               />
-            </Setting>
+            </SettingRow>
             <Disclosure className="project-guidelines">
               <DisclosureSummary>Always include guidelines</DisclosureSummary>
               {VETTED_SKILLS.map((skill) => (
-                <Setting key={skill.id} title={skill.shortLabel} description={skill.description}>
+                <SettingRow key={skill.id} title={skill.shortLabel} description={skill.description}>
                   <Switch
                     label={`Always include ${skill.shortLabel}`}
                     checked={project.preferences?.taskGuidelines?.includes(skill.id) ?? false}
@@ -270,7 +276,7 @@ export function ProjectPreferences({
                       })
                     }
                   />
-                </Setting>
+                </SettingRow>
               ))}
             </Disclosure>
           </SettingGroup>
@@ -301,7 +307,7 @@ export function ProjectPreferences({
           <ProjectSecretsSettings key={`secrets-${project.id}`} projectId={project.id} />
           <SettingGroup title="Workspace">
             {!project.plainFolder && (
-              <Setting
+              <SettingRow
                 title="Where tasks work"
                 description={WORKSPACE_MODES[workspaceModeFor(project)].description}
                 descriptionId="project-workspace-mode-description"
@@ -322,9 +328,9 @@ export function ProjectPreferences({
                     </SelectItem>
                   ))}
                 </Select>
-              </Setting>
+              </SettingRow>
             )}
-            <Setting
+            <SettingRow
               title="Target branch"
               description="Starting branch for new tasks and their review."
               controlId="project-base-branch"
@@ -340,8 +346,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { baseBranch: e.target.value })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Workspace preparation"
               description="Runs before new tasks, with your OS permissions. Five-minute limit; skipped for continuations."
               controlId="preparation-command"
@@ -357,7 +363,7 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { prepareCommand: event.target.value })
                 }
               />
-            </Setting>
+            </SettingRow>
             <SettingBody>
               <FormField
                 label="Copy ignored setup files"
@@ -377,7 +383,7 @@ export function ProjectPreferences({
             </SettingBody>
           </SettingGroup>
           <SettingGroup title="Checks and preview">
-            <Setting
+            <SettingRow
               title="Verification command"
               description="Runs with your OS permissions. Five-minute limit."
               controlId="verification-command"
@@ -395,8 +401,8 @@ export function ProjectPreferences({
                   })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Check after each edit"
               description="A fast check Claude Code runs after it edits a file, so it fixes problems straight away. {file} is the edited file. One-minute limit."
               controlId="edit-check"
@@ -414,8 +420,8 @@ export function ProjectPreferences({
                   })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Check results automatically"
               description="Run this command after new tasks and scheduled runs finish successfully."
             >
@@ -426,8 +432,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { autoVerify })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Preview command"
               description={
                 <>
@@ -449,8 +455,8 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { previewCommand: event.target.value })
                 }
               />
-            </Setting>
-            <Setting
+            </SettingRow>
+            <SettingRow
               title="Capture review screenshots"
               description={
                 project.preferences?.previewCommand?.trim()
@@ -466,10 +472,10 @@ export function ProjectPreferences({
                   updateProjectPreferences(project.id, { reviewCaptures })
                 }
               />
-            </Setting>
+            </SettingRow>
             {reviewCapturesOn(project.preferences) && (
               <>
-                <Setting
+                <SettingRow
                   title="Screenshot sizes"
                   description="Narrow adds a phone-width capture of each page."
                   descriptionId="project-review-viewports-description"
@@ -489,7 +495,7 @@ export function ProjectPreferences({
                     <SelectItem value="desktop">Desktop</SelectItem>
                     <SelectItem value="both">Desktop and narrow</SelectItem>
                   </Select>
-                </Setting>
+                </SettingRow>
                 <SettingBody>
                   <FormField
                     label="Pages to capture"
@@ -512,7 +518,7 @@ export function ProjectPreferences({
           </SettingGroup>
           {reviewCapturesOn(project.preferences) && <FeatureMapSettings project={project} />}
           <SettingGroup tone="danger">
-            <Setting
+            <SettingRow
               title="Remove project"
               description="Remove this project from Jackalope. Your files and task history stay intact."
             >
@@ -520,7 +526,7 @@ export function ProjectPreferences({
                 project={project}
                 trigger={<Button variant="outline">Remove from Jackalope…</Button>}
               />
-            </Setting>
+            </SettingRow>
           </SettingGroup>
         </>
       )}

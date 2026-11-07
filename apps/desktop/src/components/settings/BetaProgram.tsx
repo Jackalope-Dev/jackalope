@@ -1,9 +1,6 @@
+import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
-import { Button } from '../ui/button';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
 
 interface BetaRequest {
   kind: 'join' | 'leave';

@@ -1,4 +1,15 @@
-import { Disclosure, DisclosureSummary, RefreshIcon, SearchField } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  EmptyState,
+  InlineNotice,
+  LoadingState,
+  RefreshIcon,
+  SearchField,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -19,12 +30,7 @@ import {
 import { dependencyCycles, directoryOf, GRAPH_LIMIT, mapGraph } from '../../lib/codebase-graph';
 import { isTauriEnvironment } from '../../lib/native/env';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
 
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '@xyflow/react/dist/style.css';
 import { CodebaseChecks } from './CodebaseChecks';

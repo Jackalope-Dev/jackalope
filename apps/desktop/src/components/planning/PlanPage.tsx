@@ -1,4 +1,14 @@
-import { Badge, Input, Textarea } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  InlineNotice,
+  Input,
+  LoadingState,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -36,11 +46,6 @@ import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { EscalationNote } from '../tasks/AgentDecision';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { agentAdapter } from '../tasks/CrossModelReviewPanel';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';

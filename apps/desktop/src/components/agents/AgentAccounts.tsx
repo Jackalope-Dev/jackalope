@@ -1,4 +1,19 @@
-import { RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  ConfirmDialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  LoadingState,
+  RefreshIcon,
+  Select,
+  SelectItem,
+  Switch,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -24,16 +39,6 @@ import {
 } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { AgentKeySignIn } from './AgentKeySignIn';
 import { DetectedKeysModal } from './DetectedKeysModal';
 
@@ -94,7 +99,7 @@ function EditAccount({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent {...dialogFocus} className="confirm-action-dialog agent-account-edit">
+      <DialogContent {...dialogFocus} layer="confirm" className="agent-account-edit">
         <DialogHeader
           title="Edit account"
           description={<>Choose a name, label and group to keep your accounts organized.</>}
@@ -573,7 +578,7 @@ export function AgentAccounts({
                   <Pencil size={16} />
                 </Button>
                 {!existing && (
-                  <ConfirmAction
+                  <ConfirmDialog
                     title="Remove account?"
                     description={`Remove ${profile.name} and its sign-in data? Projects and existing tasks using it will need attention. The normal CLI sign-in is kept.`}
                     label="Remove account"

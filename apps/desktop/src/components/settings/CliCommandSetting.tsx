@@ -1,10 +1,7 @@
-import { CopyButton } from '@jackalope/ui';
+import { Button, CopyButton, InlineNotice, SettingRow } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting } from './Setting';
 
 interface CommandStatus {
   command: string | null;
@@ -51,7 +48,7 @@ export function CliCommandSetting() {
           ? 'The command is installed, but its folder is not on your terminal’s PATH yet.'
           : (status.skipped ?? 'The jackalope command is not installed.');
   return (
-    <Setting title="Command line tool" description={description}>
+    <SettingRow title="Command line tool" description={description}>
       <div className="flex flex-col items-end gap-2">
         {ready ? (
           <span className="flex items-center gap-2">
@@ -79,6 +76,6 @@ export function CliCommandSetting() {
           <InlineNotice tone="error">{error || status?.error}</InlineNotice>
         )}
       </div>
-    </Setting>
+    </SettingRow>
   );
 }

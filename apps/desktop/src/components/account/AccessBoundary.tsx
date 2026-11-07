@@ -1,5 +1,5 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Disclosure, DisclosureSummary, DiscordIcon } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, DiscordIcon, Switch } from '@jackalope/ui';
 import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
@@ -17,8 +17,6 @@ import { TitleBar } from '../layout/TitleBar';
 import { JackalopeAccount } from '../settings/JackalopeAccount';
 import { PrivacySettings } from '../settings/PrivacySettings';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { Button } from '../ui/button';
-import { Switch } from '../ui/Switch';
 import './access.css';
 
 const AccessNoticeContext = createContext<ReactNode>(null);

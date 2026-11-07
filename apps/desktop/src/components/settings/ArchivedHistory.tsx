@@ -1,4 +1,12 @@
-import { RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  InlineNotice,
+  RefreshIcon,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { Archive, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -7,9 +15,6 @@ import { statusLabel } from '../../lib/run-status';
 import type { ArchivedRun } from '../../lib/run-types';
 import { restoreArchivedTask } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 const PAGE = 20;
 
@@ -133,7 +138,7 @@ export function ArchivedHistory() {
         </SettingBody>
       )}
       {runs.slice(0, shown).map((run) => (
-        <Setting
+        <SettingRow
           key={run.id}
           title={<span className="block truncate">{run.prompt || 'Untitled task'}</span>}
           description={`${run.projectName} · ${run.agent} · ${statusLabel[run.status] ?? run.status} · ${new Date(
@@ -149,7 +154,7 @@ export function ArchivedHistory() {
           >
             Restore
           </Button>
-        </Setting>
+        </SettingRow>
       ))}
       {shown < runs.length && (
         <SettingActions>

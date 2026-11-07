@@ -450,12 +450,6 @@ button:disabled {
 .evidence-dialog {
   width: 880px;
 }
-.confirm-action-overlay {
-  z-index: 90;
-}
-.confirm-action-dialog {
-  z-index: 91;
-}
 .cleanup-plan {
   display: flex;
   flex-direction: column;
