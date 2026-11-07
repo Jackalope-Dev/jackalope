@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
 import { isMain } from '../lib/cli.mjs';
+import { parseJsonc } from '../lib/jsonc.mjs';
 import { channel, origin, readNotes, releasePlan, root, sha256, version } from './catalog.mjs';
 
 export async function publish({ receipt, notes, base, store, publicRead }) {
@@ -48,7 +49,7 @@ if (isMain(import.meta)) {
   const environment = process.env.DEPLOY_ENV;
   if (!['staging', 'production'].includes(environment))
     throw new Error('Invalid deployment environment');
-  const config = JSON.parse(await readFile(resolve(root, 'apps/server/wrangler.jsonc'), 'utf8'));
+  const config = parseJsonc(await readFile(resolve(root, 'apps/server/wrangler.jsonc'), 'utf8'));
   const bucket = config.env[environment].r2_buckets[0].bucket_name;
   const dir = resolve(root, 'output/release');
   const receipt = JSON.parse(await readFile(resolve(dir, 'receipt.json'), 'utf8'));
