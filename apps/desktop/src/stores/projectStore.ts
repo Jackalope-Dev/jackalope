@@ -362,7 +362,7 @@ interface ProjectRecord {
  */
 let appAccent: string | undefined;
 
-export function selectActiveProject(state: Pick<ProjectState, 'projects' | 'activeProjectId'>) {
+function selectActiveProject(state: Pick<ProjectState, 'projects' | 'activeProjectId'>) {
   return state.projects.find((project) => project.id === state.activeProjectId);
 }
 
