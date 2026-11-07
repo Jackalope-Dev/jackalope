@@ -21,7 +21,10 @@ fn stdout_stream() -> String {
 pub(super) fn response(check: &Verification) -> Value {
     response_with_reports(
         check,
-        crate::commands::experiments::is("JACKALOPE_VERIFICATION_OUTPUT", "test-report"),
+        crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::VerificationOutput,
+            "test-report",
+        ),
     )
 }
 

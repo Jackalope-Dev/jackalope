@@ -19,7 +19,7 @@ fn warm_opencode_protocol() {
 #[ignore = "Real private API helper protocol with fake loopback provider; set JACKALOPE_OPENCODE_EXE and JACKALOPE_WARM_API_HELPERS=on"]
 fn warm_opencode_api_protocol() {
     assert!(crate::commands::experiments::is(
-        "JACKALOPE_WARM_API_HELPERS",
+        crate::commands::experiments::Experiment::WarmApiHelpers,
         "on"
     ));
     protocol(true);

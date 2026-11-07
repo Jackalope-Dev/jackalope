@@ -10,7 +10,10 @@ pub(super) fn configure_tools(
     directory: &Path,
     id: &str,
 ) -> Result<(), String> {
-    if !crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "output") {
+    if !crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::NativeTools,
+        "output",
+    ) {
         return Ok(());
     }
     configure_tool_plugin(command, directory, id)
@@ -181,15 +184,19 @@ impl Connection {
                         .ok_or("OpenCode model IDs must use provider/model.")?;
                     body["model"] = json!({"providerID":provider,"modelID":name});
                     if let Some(effort) = effort.filter(|_| {
-                        !crate::commands::experiments::is("JACKALOPE_PROVIDER_EFFORT", "off")
+                        !crate::commands::experiments::is(
+                            crate::commands::experiments::Experiment::ProviderEffort,
+                            "off",
+                        )
                     }) {
-                        let effort =
-                            if crate::commands::experiments::is("JACKALOPE_PROVIDER_EFFORT", "low")
-                            {
-                                effort::TaskEffort::Quick
-                            } else {
-                                effort
-                            };
+                        let effort = if crate::commands::experiments::is(
+                            crate::commands::experiments::Experiment::ProviderEffort,
+                            "low",
+                        ) {
+                            effort::TaskEffort::Quick
+                        } else {
+                            effort
+                        };
                         let providers = api.json(Method::GET, "/config/providers", None).await?;
                         if let Some(variant) = select_variant(&providers, provider, name, effort) {
                             body["variant"] = json!(variant);

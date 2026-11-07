@@ -930,7 +930,10 @@ fn connection_plan(
 /// Leaves tools whose experiment is off out of the runner's `local` request,
 /// as this device leaves them out of the tool list.
 fn without_disabled_tools(mut local: serde_json::Value) -> serde_json::Value {
-    if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
+    if !crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ContextRead,
+        "on",
+    ) {
         if let Some(tools) = local["tools"].as_array_mut() {
             tools.retain(|tool| tool != "read_context");
         }

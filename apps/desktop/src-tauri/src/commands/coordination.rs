@@ -154,7 +154,10 @@ async fn bridge_help(
         .is_ok_and(|run| run.efficiency.execution_profile.as_deref() == Some("lean"));
     let mut help = help_response(
         lean && !query.full,
-        crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on"),
+        crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ResultQueries,
+            "on",
+        ),
     );
     if let Ok(run) = service.authorized_run(&headers) {
         if super::decisions::agent_questions::available(&service.runtime, &run.project_id) {

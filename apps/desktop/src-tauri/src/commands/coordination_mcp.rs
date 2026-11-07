@@ -380,7 +380,10 @@ impl CoordinationTools {
         context: RequestContext<RoleServer>,
         Parameters(input): Parameters<super::codebase::context_read::Input>,
     ) -> Result<CallToolResult, ErrorData> {
-        if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
+        if !crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ContextRead,
+            "on",
+        ) {
             return Err(ErrorData::invalid_request(
                 "Source context reads are not enabled.",
                 None,
@@ -1478,7 +1481,10 @@ impl ServerHandler for CoordinationTools {
     fn supported_protocol_versions(
         &self,
     ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
-        if crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred") {
+        if crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ToolSurface,
+            "deferred",
+        ) {
             // Deferred discovery uses legacy in-stream notifications, not subscriptions/listen.
             return std::borrow::Cow::Owned(
                 rmcp::model::ProtocolVersion::KNOWN_VERSIONS
@@ -1495,7 +1501,10 @@ impl ServerHandler for CoordinationTools {
         let mut capabilities = rmcp::model::ServerCapabilities::builder()
             .enable_tools()
             .build();
-        if crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred") {
+        if crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ToolSurface,
+            "deferred",
+        ) {
             capabilities.tools.as_mut().unwrap().list_changed = Some(true);
         }
         rmcp::model::ServerConfig::new(capabilities)
@@ -1531,10 +1540,16 @@ impl ServerHandler for CoordinationTools {
         if !super::decisions::agent_questions::available(&self.service.runtime, &run.project_id) {
             tools.retain(|tool| tool.name != "ask_jev");
         }
-        if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
+        if !crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ContextRead,
+            "on",
+        ) {
             tools.retain(|tool| tool.name != "read_context");
         }
-        let queries = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
+        let queries = crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ResultQueries,
+            "on",
+        );
         for tool in &mut tools {
             if !queries {
                 if matches!(tool.name.as_ref(), "read_tool" | "execute_tool") {
@@ -1565,7 +1580,12 @@ impl ServerHandler for CoordinationTools {
         if !catalog::deferred(&run) {
             tools.retain(|tool| tool.name != "discover_harness_tools");
         }
-        if lean || crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "available") {
+        if lean
+            || crate::commands::experiments::is(
+                crate::commands::experiments::Experiment::ToolSurface,
+                "available",
+            )
+        {
             let discovery = self.service.runtime.mcp_broker.has_attempt(&run.id);
             tools.retain(|tool| {
                 available_tool(tool.name.as_ref(), discovery, run.verify_command.as_deref())
@@ -1656,7 +1676,10 @@ pub(super) fn router(service: Coordinator) -> Router {
     let worker_service = service.clone();
     let mut config = StreamableHttpServerConfig::default();
     config.legacy_session_mode = false;
-    config.json_response = !crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred");
+    config.json_response = !crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ToolSurface,
+        "deferred",
+    );
     config.max_request_body_bytes = 65_536;
     let transport: StreamableHttpService<CoordinationTools, LocalSessionManager> =
         StreamableHttpService::new(

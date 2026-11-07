@@ -99,12 +99,18 @@ pub(super) fn select_measured(
     snapshots: &mut VecDeque<Snapshot>,
 ) -> (CallToolResult, SelectionStats) {
     let mut stats = SelectionStats::default();
-    let structured = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
+    let structured = crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ResultQueries,
+        "on",
+    );
     let preview = automatic_preview(
         &result,
         selection.is_none()
             && structured
-            && crate::commands::experiments::is("JACKALOPE_RESULT_PREVIEW", "on"),
+            && crate::commands::experiments::is(
+                crate::commands::experiments::Experiment::ResultPreview,
+                "on",
+            ),
     );
     let result = select_inner(
         result,
@@ -129,7 +135,10 @@ pub(super) fn bounded(
         json_pointers: vec![],
         max_chars: Some(2000),
     };
-    let structured = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
+    let structured = crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ResultQueries,
+        "on",
+    );
     let preview = select_inner(
         result,
         Some(&selection),

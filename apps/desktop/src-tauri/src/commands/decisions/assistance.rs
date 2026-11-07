@@ -7,7 +7,10 @@ use crate::commands::{
 use serde_json::{json, Value};
 
 fn shadow_mode() -> bool {
-    crate::commands::experiments::is("JACKALOPE_JEV_ASSISTANCE", "shadow")
+    crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::JevAssistance,
+        "shadow",
+    )
 }
 
 fn local_failure(run: &TaskRun) -> Option<String> {

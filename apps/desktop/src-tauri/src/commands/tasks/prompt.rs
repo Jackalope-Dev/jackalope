@@ -11,7 +11,7 @@ const WORKFLOW_GUIDANCE: &str = "Use supplied context, batch independent reads, 
 
 /// `JACKALOPE_SCOPE_GUARD=on` restores the workflow and scope guidance for comparison runs.
 pub(super) fn workflow_guidance() -> bool {
-    crate::commands::experiments::is("JACKALOPE_SCOPE_GUARD", "on")
+    crate::commands::experiments::is(crate::commands::experiments::Experiment::ScopeGuard, "on")
 }
 
 pub(super) const SCOPE_GUIDANCE: &str = "\nSeparate required outcomes from suggested implementation options. Choose the smallest complete change that meets the requirements and preserves existing contracts. Add persistence, new abstractions, dependency changes or unrelated defaults only when the task requires them. Inspect existing regression coverage; do not weaken tests to fit a patch. Read relevant symbols/ranges first, expanding to callers and full files when needed. Select checks that cover the changed behavior and its dependents, plus every user/repository-required check. A necessary early reproduction is useful; repeated unchanged full builds are not. Before finishing, inspect the final diff for scope and compatibility regressions and state any unverified requirements.\n";

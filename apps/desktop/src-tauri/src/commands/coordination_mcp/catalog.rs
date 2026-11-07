@@ -29,7 +29,10 @@ pub(super) fn deferred(run: &TaskRun) -> bool {
         .map_or(run.agent.as_str(), |binding| binding.adapter.as_str())
         == "opencode"
         && run.efficiency.execution_profile.as_deref() == Some("lean")
-        && crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred")
+        && crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::ToolSurface,
+            "deferred",
+        )
 }
 
 pub(super) fn visible(name: &str, discovered: &BTreeSet<String>) -> bool {

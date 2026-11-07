@@ -160,7 +160,10 @@ impl Pool {
                 || self.account_revision(&binding.directory) != revision
         };
         if binding.profile_id.is_some()
-            && crate::commands::experiments::is("JACKALOPE_WARM_API_HELPERS", "on")
+            && crate::commands::experiments::is(
+                crate::commands::experiments::Experiment::WarmApiHelpers,
+                "on",
+            )
         {
             agent_profiles::apply_binding(cmd, binding)?;
         }
@@ -187,7 +190,10 @@ impl Pool {
         let configuration = binding.directory.join("helper-config");
         std::fs::create_dir_all(&configuration).ok()?;
         cmd.env("XDG_CONFIG_HOME", configuration).args(["--pure"]);
-        if crate::commands::experiments::is("JACKALOPE_WARM_OPENCODE", "off") {
+        if crate::commands::experiments::is(
+            crate::commands::experiments::Experiment::WarmOpencode,
+            "off",
+        ) {
             return None;
         }
         self.reaper.get_or_init(|| {
@@ -304,7 +310,10 @@ impl Pool {
 }
 
 fn configure_api_helper(cmd: &mut Command, binding: &agent_profiles::AccountBinding) -> bool {
-    if !crate::commands::experiments::is("JACKALOPE_WARM_API_HELPERS", "on") {
+    if !crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::WarmApiHelpers,
+        "on",
+    ) {
         return false;
     }
     let Some(provider) = agent_profiles::api_provider(binding).ok().flatten() else {

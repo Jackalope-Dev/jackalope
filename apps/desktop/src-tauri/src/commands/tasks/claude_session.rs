@@ -50,22 +50,22 @@ pub(super) struct Settings {
 
 impl Settings {
     fn from_experiments(personal_setup: Option<bool>) -> Self {
-        use crate::commands::experiments::is;
-        let persistent = is("JACKALOPE_CLAUDE_SESSION", "persistent");
-        let hook = |name: &str| persistent && is(name, "on");
+        use crate::commands::experiments::{is, Experiment};
+        // Each hook requires a persistent session in the registry.
+        let hook = |experiment| is(experiment, "on");
         Self {
-            persistent,
+            persistent: is(Experiment::ClaudeSession, "persistent"),
             isolated: personal_setup
-                .map_or_else(|| is("JACKALOPE_CLAUDE_ISOLATION", "on"), |own| !own),
-            partials: is("JACKALOPE_CLAUDE_PARTIALS", "on"),
-            fallback: is("JACKALOPE_CLAUDE_FALLBACK", "auto"),
-            shared_cache: is("JACKALOPE_CLAUDE_PROMPT_CACHE", "shared"),
+                .map_or_else(|| is(Experiment::ClaudeIsolation, "on"), |own| !own),
+            partials: is(Experiment::ClaudePartials, "on"),
+            fallback: is(Experiment::ClaudeFallback, "auto"),
+            shared_cache: is(Experiment::ClaudePromptCache, "shared"),
             hooks: Hooks {
-                edit_check: hook("JACKALOPE_CLAUDE_EDIT_CHECK"),
-                stop_check: hook("JACKALOPE_CLAUDE_STOP_CHECK"),
-                context: hook("JACKALOPE_CLAUDE_CONTEXT_HOOK"),
-                permission: hook("JACKALOPE_CLAUDE_PERMISSION_HOOK"),
-                timing: hook("JACKALOPE_CLAUDE_TOOL_TIMING"),
+                edit_check: hook(Experiment::ClaudeEditCheck),
+                stop_check: hook(Experiment::ClaudeStopCheck),
+                context: hook(Experiment::ClaudeContextHook),
+                permission: hook(Experiment::ClaudePermissionHook),
+                timing: hook(Experiment::ClaudeToolTiming),
             },
         }
     }
