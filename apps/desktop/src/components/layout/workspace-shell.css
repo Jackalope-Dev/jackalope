@@ -1,6 +1,154 @@
 /* Shell: the title bar carries search, the sidebar navigates projects and their work,
    the status bar holds the focused project's context. Dense navigation rows are 32px;
    coarse pointers get 44px targets back at the end of this file. */
+.workspace-shell {
+  height: calc(100dvh / var(--interface-zoom, 1));
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-shell-gradient);
+}
+.skip-link {
+  position: fixed;
+  left: 24px;
+  top: -100px;
+  padding: 12px 20px;
+  z-index: 100;
+  background: var(--color-surface-elevated);
+  border-radius: var(--radius-md);
+}
+.skip-link:focus {
+  top: 12px;
+}
+
+.command-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--control-height, 36px);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-header-search, var(--color-surface-sunken));
+  cursor: pointer;
+}
+.command-trigger:hover {
+  background: var(--color-surface-hover);
+}
+.command-trigger kbd {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-left: 18px;
+}
+.command-trigger.command-jump {
+  border: 1px solid var(--color-header-search-border);
+  background: color-mix(
+    in srgb,
+    var(--color-header-search, var(--color-surface-sunken)) 55%,
+    transparent
+  );
+  backdrop-filter: blur(16px);
+}
+.command-trigger.command-jump kbd {
+  margin-left: auto;
+  display: block;
+}
+.command-trigger.command-jump:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-header-search, var(--color-surface-sunken)) 75%,
+    transparent
+  );
+}
+
+.workspace-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 12px;
+  gap: 20px;
+  flex-shrink: 0;
+}
+.workspace-nav-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background 140ms,
+    color 140ms;
+}
+.workspace-nav-item > svg {
+  width: 18px;
+  height: 18px;
+}
+.workspace-nav-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.workspace-nav-item[aria-current],
+.workspace-nav-item[data-active] {
+  color: var(--color-accent-ink);
+  background: var(--color-accent-subtle);
+  font-weight: 600;
+}
+
+.workspace-canvas {
+  --workspace-gutter: clamp(24px, 4vw, 48px);
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-surface);
+}
+.workspace-canvas > * {
+  min-width: 0;
+}
+.workspace-shell .workspace-canvas > .task-page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: var(--workspace-gutter, 32px);
+  scrollbar-gutter: stable;
+  overflow-y: auto;
+}
+/* Opening a workspace view settles it into place; switching views remounts the page. */
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-canvas > :is(.workspace-page-layout, .task-page),
+  .workspace-canvas > * > :is(.workspace-page-layout, .task-page) {
+    animation: ui-rise-in var(--motion-slow) var(--ease-out);
+  }
+}
+@media (max-width: 700px) {
+  .command-trigger kbd,
+  .command-trigger.command-jump kbd {
+    display: none;
+  }
+  .command-trigger.command-jump {
+    width: auto;
+    min-width: var(--control-height, 36px);
+  }
+  .workspace-navigation {
+    overflow-x: auto;
+  }
+  .workspace-navigation nav {
+    flex-shrink: 0;
+  }
+}
+
 .workspace-shell .workspace-body {
   display: flex;
   flex: 1;

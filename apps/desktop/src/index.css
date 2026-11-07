@@ -113,17 +113,32 @@ body {
   overflow: hidden;
 }
 
+:where(button, [role="button"], [role="menuitem"], select, summary) {
+  touch-action: manipulation;
+}
+/* Shared segments, menu rows and links size themselves. */
+:where(button, [role="button"], [role="menuitem"]):where(
+  :not(.ui-segment, .ui-tabs-trigger, .ui-menu-item, .workspace-menu-item, .ui-link)
+) {
+  min-height: var(--control-height, 36px);
+  min-width: var(--control-height, 36px);
+}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) {
+  min-height: var(--control-height, 36px);
+}
+:where(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--color-accent-ink);
+}
+:where(a, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 3px;
+}
 :where(button, input, select, [tabindex]):focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 4px;
 }
-
-.workspace-shell {
-  height: calc(100dvh / var(--interface-zoom, 1));
-  padding: 0 8px;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-shell-gradient);
+button:disabled {
+  cursor: not-allowed;
 }
 
 /* Custom window chrome — replaces the OS titlebar on Windows/Linux
@@ -214,6 +229,7 @@ body {
   justify-content: center;
   width: 46px;
   height: 100%;
+  min-height: 32px;
   color: var(--color-text-secondary);
   cursor: pointer;
   transition:
@@ -226,6 +242,11 @@ body {
 }
 .app-titlebar-button[aria-current] {
   color: var(--color-accent-ink);
+}
+@media (pointer: coarse) {
+  .app-titlebar-button {
+    min-height: 44px;
+  }
 }
 .app-titlebar-help {
   position: relative;
@@ -313,27 +334,11 @@ body {
   cursor: nesw-resize;
 }
 
-.command-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  background: var(--color-header-search, var(--color-surface-sunken));
-  cursor: pointer;
-}
 .command-search {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
-}
-.command-trigger kbd {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  margin-left: 18px;
 }
 .quiet-icon,
 .appearance-trigger {
@@ -346,60 +351,12 @@ body {
   cursor: pointer;
   color: var(--color-text-secondary);
 }
-.quiet-icon:hover,
-.command-trigger:hover {
-  background: var(--color-surface-hover);
-}
 .appearance-trigger {
   background: transparent;
-  border-radius: var(--radius-md);
 }
+.quiet-icon:hover,
 .appearance-trigger:hover {
   background: var(--color-surface-hover);
-}
-.workspace-navigation {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px 12px;
-  gap: 20px;
-  flex-shrink: 0;
-}
-.workspace-nav-item {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 14px;
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  cursor: pointer;
-  transition:
-    background 140ms,
-    color 140ms;
-}
-.workspace-nav-item:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-.workspace-nav-item[aria-current],
-.workspace-nav-item[data-active] {
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-  font-weight: 600;
-}
-.workspace-canvas {
-  min-height: 0;
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--radius-2xl);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg);
-  box-shadow: var(--shadow-surface);
 }
 .workspace-menu,
 .appearance-panel {
@@ -409,7 +366,11 @@ body {
   color: var(--color-text-primary);
 }
 .workspace-menu {
+  max-height: var(--radix-dropdown-menu-content-available-height);
+  max-width: calc(100vw - 48px);
   padding: 8px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   z-index: 70;
 }
 .workspace-menu-item {
@@ -423,7 +384,8 @@ body {
   font-size: var(--text-xs);
   cursor: pointer;
 }
-.workspace-menu-item[data-highlighted] {
+.workspace-menu-item[data-highlighted],
+.workspace-menu-item:focus-visible {
   background: var(--color-surface-hover);
 }
 .workspace-menu-sub {
@@ -483,6 +445,7 @@ body {
   gap: 8px;
   padding: 8px;
   border-radius: var(--radius-md);
+  min-height: var(--control-height, 36px);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
   transition:
@@ -528,6 +491,33 @@ body {
 .appearance-panel .color-field {
   height: clamp(7rem, calc(100dvh - 520px), 11rem);
 }
+.workspace-appearance {
+  display: flex;
+  flex-direction: column;
+}
+.workspace-appearance > div:first-child,
+.workspace-appearance > div:last-of-type {
+  flex-shrink: 0;
+}
+.workspace-appearance > .theme-editor {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px;
+}
+.workspace-appearance [aria-label="Theme presets"] {
+  gap: 4px;
+}
+/* Shared empty states tighten on narrow windows. */
+@media (max-width: 700px) {
+  .empty-state {
+    gap: 16px;
+  }
+  .empty-state-icon {
+    flex-basis: 48px;
+    height: 48px;
+    border-radius: var(--radius-2xl);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -538,6 +528,9 @@ body {
     transition-duration: 0s;
     scroll-behavior: auto;
   }
+  .animate-spin {
+    animation: none;
+  }
 }
 
 code,
@@ -546,14 +539,12 @@ pre,
   font-family: var(--font-mono);
 }
 
-/* Subtle flat gradients */
-
-.accent-glow {
-  box-shadow: 0 0 15px -2px var(--color-accent-glow);
-}
-
 img[src="/mascot.svg"] {
   filter: brightness(var(--brand-brightness));
+}
+.command-dialog {
+  top: 12vh;
+  max-height: 76vh;
 }
 .command-file-row {
   display: flex;

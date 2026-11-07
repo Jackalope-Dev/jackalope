@@ -171,6 +171,17 @@
   }
 }
 
+.schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--color-border);
+}
+.schedule-row > div:first-child {
+  flex-basis: 100%;
+}
 .schedule-row-summary {
   display: flex;
   flex-basis: 100%;
@@ -189,6 +200,9 @@
   white-space: nowrap;
 }
 
+.schedule-row > div > p {
+  overflow-wrap: anywhere;
+}
 .schedule-row .ui-disclosure {
   flex-basis: 100%;
   min-width: 0;

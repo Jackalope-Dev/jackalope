@@ -13,7 +13,8 @@ import { localAiFixture } from './design-lab/local-ai-fixture';
 import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
-import './components/ui/experience.css';
+import '@jackalope/ui/styles.css';
+import './components/layout/workspace-shell.css';
 import './components/agents/agents-workspace.css';
 
 function DesignLab() {

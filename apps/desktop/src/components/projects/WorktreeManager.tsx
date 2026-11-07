@@ -49,6 +49,7 @@ import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorktreeRemovalPlan as RemovalPlan } from './WorktreeRemovalPlan';
+import './worktrees.css';
 
 /** Ignored paths cleanup deletes, so a confirm never hides them. */
 

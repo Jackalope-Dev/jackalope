@@ -4,7 +4,7 @@ import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { type RemoteAction, RemoteWorkspace } from './components/remote/RemoteWorkspace';
 import './index.css';
-import './components/ui/experience.css';
+import '@jackalope/ui/styles.css';
 import './components/tasks/task-workspace.css';
 
 const code = new URLSearchParams(location.hash.slice(1)).get('pair') ?? '';

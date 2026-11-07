@@ -1,4 +1,5 @@
 import { SegmentedNav, type SegmentItem } from '@jackalope/ui';
+import './workspace-layout.css';
 
 /** Peer views of one workspace area, as a segmented control aligned with the page gutter. */
 export function WorkspaceSubnavigation<T extends string>({

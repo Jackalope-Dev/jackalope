@@ -17,7 +17,6 @@ import { useExecutionStore } from '/src/stores/executionStore.ts';
 import { useThemeStore } from '/src/stores/themeStore.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 const f = window.projectFixture = { calls: [], failSave: false,
  state: () => ({ projects: useProjectStore.getState().projects, config: useAgentConfigStore.getState(), drafts: useExecutionStore.getState().drafts }),
  theme: dark => useThemeStore.getState().setAppTheme({ ...useThemeStore.getState().appTheme, isDark: dark, appearance: 'manual' }),

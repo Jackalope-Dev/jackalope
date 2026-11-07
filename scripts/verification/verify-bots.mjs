@@ -15,7 +15,6 @@ import { useProjectStore } from '/src/stores/projectStore.ts';
 import { useThemeStore } from '/src/stores/themeStore.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 const bot = '6f1f9a52-3c1e-4c6b-9a55-2c36c0b6a001';
 const at = (hours) => new Date(Date.now() - hours * 3600000).toISOString();
 const persona = { botId: bot, name: 'Scout', instructions: 'Keep dependencies healthy.' };

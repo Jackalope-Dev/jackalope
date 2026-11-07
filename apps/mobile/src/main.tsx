@@ -11,7 +11,7 @@ import { Splash } from './Splash';
 import { useComputers } from './useComputers';
 import { Work } from './Work';
 import '../../desktop/src/index.css';
-import '../../desktop/src/components/ui/experience.css';
+import '@jackalope/ui/styles.css';
 import '../../desktop/src/components/tasks/task-workspace.css';
 import './mobile.css';
 

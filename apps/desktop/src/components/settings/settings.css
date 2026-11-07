@@ -461,6 +461,9 @@
 .project-guidelines[open] > .ui-disclosure-summary {
   border-bottom: 1px solid var(--color-border-subtle);
 }
+.activity-log .p-6 {
+  padding-inline: 0;
+}
 .settings-content .activity-log {
   padding: 0;
   max-width: none;

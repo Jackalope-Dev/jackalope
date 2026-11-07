@@ -31,7 +31,7 @@ try {
           body: `<!doctype html><html><head><meta charset="utf-8"><title>Coordination fixture</title></head><body><div id="root"></div><script type="module">
 import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>type=>type; window.__vite_plugin_react_preamble_installed__=true;
 const source=await fetch('/src/main.tsx').then(r=>r.text()); const reactUrl=source.split('"').find(url=>url.includes('/react.js?')); const {default:React}=await import(reactUrl); const {default:ReactDOM}=await import(source.split('"').find(url=>url.includes('/react-dom_client.js?')));
-await import('/src/index.css'); await import('/src/components/ui/experience.css'); await import('/src/components/tasks/task-workspace.css'); await import('/src/components/tasks/project-queue.css');
+await import('/src/index.css'); await import('/src/components/tasks/task-workspace.css'); await import('/src/components/tasks/project-queue.css');
 const {useThemeStore}=await import('/src/stores/themeStore.ts'); const theme=useThemeStore.getState(); theme.setAppTheme({...theme.appTheme,appearance:'manual',isDark:window.fixture.dark});
 const {CoordinationDecisions}=await import('/src/components/tasks/CoordinationDecisions.tsx'); const {CoordinationAutomation}=await import('/src/components/tasks/CoordinationAutomation.tsx');
 const project={id:'p',name:'Fixture',path:'C:/fixture',preferences:{verifyCommand:'node check.mjs'}};

@@ -12,7 +12,6 @@ import { AgentAccounts } from '/src/components/agents/AgentAccounts.tsx';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 import '/src/components/agents/agent-manager.css';
 const f = window.accountFixture = {
   agent: new URLSearchParams(location.search).get('agent') ?? 'codex',

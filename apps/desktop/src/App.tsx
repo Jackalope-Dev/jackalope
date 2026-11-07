@@ -25,7 +25,7 @@ import { useProjectStore } from './stores/projectStore';
 import { observeSettingsSync } from './stores/settingsSyncStore';
 import { bootstrapWindow } from './window-bootstrap';
 import './components/tasks/task-workspace.css';
-import './components/ui/experience.css';
+import '@jackalope/ui/styles.css';
 
 export default function App() {
   useEffect(observeDesktopControlTheme, []);

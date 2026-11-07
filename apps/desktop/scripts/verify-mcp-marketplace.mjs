@@ -16,7 +16,6 @@ import { useThemeStore } from '/src/stores/themeStore.ts';
 import { useSettingsStore } from '/src/stores/settingsStore.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 useProjectStore.setState({projects:[{id:'fixture',name:'Sample project',path:'C:/fixture',agentProvider:'codex'}],activeProjectId:'fixture'});
 useSettingsStore.setState({useMcpMarketplace:true});
 window.storeModule = name => import('/src/stores/'+name+'.ts');

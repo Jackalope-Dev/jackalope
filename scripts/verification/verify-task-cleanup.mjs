@@ -15,7 +15,6 @@ import { useProjectStore } from '/src/stores/projectStore.ts';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 const base = {projectId:'atlas',projectName:'Atlas',projectPath:'C:/Projects/atlas',workspace:'C:/Projects/atlas-task',branch:'task',baseHead:'base',agent:'codex',account:'Personal',prompt:'',status:'reviewed',startedAt:'2026-09-01T12:00:00Z',endedAt:'2026-09-01T13:00:00Z',sessionId:null,result:'Saved result',activity:[],diagnostics:[],error:null,persistenceError:null,exitCode:0,usage:{input:10,output:20,cacheRead:0,cacheWrite:0,reported:true}};
 const tasks = [['finished','Polish search','reviewed'],['failed','Retry indexing','failed'],['active','Live indexing','running'],['interrupted','Recover indexing','interrupted'],['review','Review navigation','review'],['other','Other project work','reviewed']].map(([id,prompt,status])=>({...base,id,taskId:id,prompt,status,projectId:id==='other'?'other':'atlas',projectName:id==='other'?'Other':'Atlas'}));
 const f = window.cleanupFixture = {calls:[],fail:null,hold:false,release:null,theme: mode=>applyThemeTokens({...DEFAULT_THEME,isDark:mode==='dark'})};

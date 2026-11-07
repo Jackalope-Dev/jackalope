@@ -7,7 +7,6 @@ import { bootstrapWindow, useWindowTheme } from '../../window-bootstrap';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
-import '../ui/experience.css';
 
 export default function LiveSessionWindow({ id }: { id: string }) {
   useSettingsStore();

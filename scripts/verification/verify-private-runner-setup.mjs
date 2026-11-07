@@ -11,7 +11,6 @@ import { LocalAiSetup } from '/src/components/agents/LocalAiSetup.tsx';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 const f = window.runnerFixture = { calls: [], theme: dark => applyThemeTokens({...DEFAULT_THEME,isDark:dark}) };
 const inspection = {hardware:{os:'macos',arch:'aarch64',memoryBytes:32*1024**3,availableMemoryBytes:24*1024**3,freeDiskBytes:100e9,gpu:'Fixture',diskLocation:null},models:[{id:'qwen3.5:4b',name:'Fixture model',downloadBytes:3.4e9,recommendedMemoryGb:16,description:'Fixture only'}],installedModels:['qwen3.5:4b'],ollamaOnline:true,opencodeInstalled:false,canInstall:false,canPrepareRunner:true,runtimeDiskBytes:4e9,catalogCheckedAt:'fixture'};
 window.__TAURI_INTERNALS__ = {transformCallback:()=>0,unregisterCallback:()=>{},invoke:async(command,args={})=>{

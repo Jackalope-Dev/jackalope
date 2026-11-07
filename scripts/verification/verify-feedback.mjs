@@ -28,7 +28,6 @@ import {useThemeStore} from './src/stores/themeStore';
 import './src/index.css';
 import './src/components/settings/settings.css';
 import './src/components/tasks/task-workspace.css';
-import './src/components/ui/experience.css';
 let sample={enabled:false,promptsEnabled:true,completed:false,nextPromptAt:0,promptCount:0,eligible:false,claimed:false};
 window.calls=[];
 window.__TAURI_INTERNALS__={invoke:async(command,args)=>{

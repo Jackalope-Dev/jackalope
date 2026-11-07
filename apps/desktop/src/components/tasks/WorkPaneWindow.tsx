@@ -10,7 +10,6 @@ import { ResultReview } from './ResultReview';
 import { TaskPreview } from './TaskPreview';
 import { TaskTerminal } from './TaskTerminal';
 import './workbench.css';
-import '../ui/experience.css';
 import { describeError } from '../../lib/errors';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
