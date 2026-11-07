@@ -179,16 +179,13 @@ fn platform_machine_id() -> Option<String> {
 
 #[cfg(windows)]
 fn platform_machine_id() -> Option<String> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let output = std::process::Command::new("reg")
+    let output = super::process_control::hidden(&mut std::process::Command::new("reg"))
         .args([
             "query",
             r"HKLM\SOFTWARE\Microsoft\Cryptography",
             "/v",
             "MachineGuid",
         ])
-        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok()?;
     String::from_utf8_lossy(&output.stdout)

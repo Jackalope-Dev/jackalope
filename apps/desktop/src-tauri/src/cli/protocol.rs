@@ -15,6 +15,10 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
 
+#[path = "profile.rs"]
+pub mod profile;
+pub use profile::ProfilePaths;
+
 /// Bumped when a request or response shape changes incompatibly. A client that
 /// finds a different version refuses to attach rather than guessing.
 pub const VERSION: u32 = 1;
@@ -934,30 +938,9 @@ pub fn present(error: Option<&str>) -> Option<&str> {
     error.filter(|error| !error.trim().is_empty() && *error != "null")
 }
 
-/// The profile root: the explicit override when set, else the platform's
-/// per-user application data directory. Mirrors the resolution in `lib.rs`.
-pub fn profile_root() -> Option<PathBuf> {
-    if let Some(explicit) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
-        let path = PathBuf::from(explicit);
-        return path.is_absolute().then_some(path);
-    }
-    let home = PathBuf::from(std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?);
-    #[cfg(target_os = "macos")]
-    let root = home.join("Library/Application Support");
-    #[cfg(target_os = "linux")]
-    let root = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".local/share"));
-    #[cfg(windows)]
-    let root = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join("AppData/Roaming"));
-    Some(root.join(IDENTIFIER))
-}
-
 /// Where the host advertises itself.
 pub fn handshake_path() -> Option<PathBuf> {
-    Some(profile_root()?.join("task-runs-v1/preferences/host.json"))
+    Some(ProfilePaths::active()?.handshake())
 }
 
 /// Reads the advertisement without contacting anyone. A handshake can outlive

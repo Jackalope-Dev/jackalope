@@ -61,9 +61,7 @@ pub struct McpProbeResult {
 }
 
 fn config_path(scope: &str) -> Result<PathBuf, String> {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .map(PathBuf::from)
-        .ok_or("Home directory unavailable")?;
+    let home = super::platform::home_dir().ok_or("Home directory unavailable")?;
     if let Some(path) = super::agents::find(scope).and_then(|agent| agent.mcp_config(&home)) {
         return Ok(path);
     }
@@ -615,16 +613,7 @@ pub(super) async fn connect(
         let program = server.command.as_ref().unwrap();
         let mut executable = PathBuf::from(program);
         if cfg!(windows) && executable.extension().is_none() && !executable.is_absolute() {
-            if let Some(found) =
-                std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-                    .flat_map(|dir| {
-                        [
-                            dir.join(format!("{program}.exe")),
-                            dir.join(format!("{program}.cmd")),
-                        ]
-                    })
-                    .find(|path| path.is_file())
-            {
+            if let Some(found) = super::platform::find_executable(program, &[]) {
                 executable = found;
             }
         }
@@ -633,10 +622,7 @@ pub(super) async fn connect(
             .args(&server.args)
             .envs(&server.env)
             .kill_on_drop(true);
-        #[cfg(windows)]
-        command.creation_flags(0x08000000);
-        #[cfg(unix)]
-        command.process_group(0);
+        super::process_control::isolated(command.as_std_mut());
         if let Some(workspace) = workspace {
             command.current_dir(workspace);
         }

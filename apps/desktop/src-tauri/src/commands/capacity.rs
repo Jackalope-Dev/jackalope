@@ -176,8 +176,7 @@ async fn read_codex_bound(
         .stderr(Stdio::null())
         .kill_on_drop(true);
     super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-    #[cfg(windows)]
-    command.creation_flags(0x08000000);
+    super::process_control::hidden(command.as_std_mut());
     let mut child = command
         .spawn()
         .map_err(|_| "Could not start Codex to read its quota".to_string())?;

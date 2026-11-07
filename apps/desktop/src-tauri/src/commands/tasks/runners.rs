@@ -117,20 +117,8 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
             return Ok(path);
         }
     }
-    let candidates: Vec<String> = if cfg!(windows) {
-        vec![
-            format!("{binary}.exe"),
-            format!("{binary}.cmd"),
-            format!("{binary}.bat"),
-            binary.to_string(),
-        ]
-    } else {
-        vec![binary.to_string()]
-    };
-    let mut dirs: Vec<PathBuf> =
-        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect();
-    if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
-        let home_path = PathBuf::from(&home);
+    let mut dirs = Vec::new();
+    if let Some(home_path) = crate::commands::platform::home_dir() {
         dirs.push(home_path.join(".local/bin"));
         dirs.push(home_path.join(".grok/bin"));
         dirs.push(home_path.join(".opencode/bin"));
@@ -175,13 +163,8 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
         dirs.push(PathBuf::from("/usr/local/bin"));
         dirs.push(PathBuf::from("/opt/homebrew/bin"));
     }
-    for dir in &dirs {
-        for candidate in &candidates {
-            let target = dir.join(candidate);
-            if dir.is_absolute() && crate::commands::platform::is_executable(&target) {
-                return Ok(target);
-            }
-        }
+    if let Some(found) = crate::commands::platform::find_executable(binary, &dirs) {
+        return Ok(found);
     }
     Err(format!(
         "Install {agent} and make its executable available on PATH, then refresh."

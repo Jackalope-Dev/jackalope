@@ -104,9 +104,8 @@ fn secret_value(word: &str) -> bool {
 }
 
 fn home() -> Option<String> {
-    std::env::var("USERPROFILE")
-        .or_else(|_| std::env::var("HOME"))
-        .ok()
+    crate::commands::platform::home_dir()
+        .map(|home| home.to_string_lossy().into_owned())
         .filter(|home| home.len() > 3)
 }
 

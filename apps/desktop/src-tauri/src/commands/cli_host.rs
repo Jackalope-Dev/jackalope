@@ -86,8 +86,12 @@ fn remove_stale_endpoint(handshake_path: &Path) {
 
 /// Starts the listener and advertises it. Failing to serve the CLI must never
 /// stop the app from running, so callers report the error and continue.
-pub fn launch(app: AppHandle, preferences: &Path, windowed: bool) -> Result<CliHost, String> {
-    let handshake_path = preferences.join("host.json");
+pub fn launch(
+    app: AppHandle,
+    paths: &crate::cli_protocol::ProfilePaths,
+    windowed: bool,
+) -> Result<CliHost, String> {
+    let handshake_path = paths.handshake();
     remove_stale_endpoint(&handshake_path);
 
     #[cfg(unix)]

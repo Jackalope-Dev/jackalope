@@ -102,7 +102,7 @@ fn install(preferences: &Path) -> Outcome {
     let Some(command) = bundled_command() else {
         return failed("This installation does not include the jackalope command.".into());
     };
-    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+    let Some(home) = super::platform::home_dir() else {
         return failed("Could not find your home folder.".into());
     };
     let source = match std::env::var_os("APPIMAGE") {
@@ -304,8 +304,8 @@ fn inspect() -> CommandStatus {
         if cfg!(target_os = "macos") {
             candidates.push(PathBuf::from("/usr/local/bin"));
         }
-        if let Some(home) = std::env::var_os("HOME") {
-            candidates.push(PathBuf::from(home).join(".local/bin"));
+        if let Some(home) = super::platform::home_dir() {
+            candidates.push(home.join(".local/bin"));
         }
         for directory in candidates {
             let candidate = directory.join(NAME);

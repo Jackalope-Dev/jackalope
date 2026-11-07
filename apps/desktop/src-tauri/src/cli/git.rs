@@ -9,6 +9,8 @@ use std::io::{BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
+use crate::protocol::profile::home_dir;
+
 /// Written when a new repository has files and no ignore file of its own, so
 /// the initial commit does not absorb dependency trees or common secret files.
 const STARTER_IGNORE: &str = "\
@@ -279,12 +281,6 @@ fn notice(wrote_ignore: bool, staged: bool, placeholder: bool) -> String {
         );
     }
     lines.join("\n")
-}
-
-fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
 }
 
 /// A file a conversation's checkout changed, with its line counts. Counts are

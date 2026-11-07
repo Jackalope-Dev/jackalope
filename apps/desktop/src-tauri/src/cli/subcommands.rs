@@ -4,9 +4,7 @@
 use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
 use crate::host::{self, ColdStart};
-use crate::protocol::{
-    self, profile_root, AgentStatus, Project, Request, Response, SessionSummary,
-};
+use crate::protocol::{self, profile, AgentStatus, Project, Request, Response, SessionSummary};
 use serde_json::json;
 
 /// The project for this directory. A terminal tool should work where the user
@@ -444,7 +442,7 @@ fn usable(agent: &AgentStatus) -> bool {
 }
 
 pub fn status(as_json: bool) -> Result<(), String> {
-    let profile = profile_root()
+    let profile = profile::root()
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "unknown".into());
     let Some(mut connection) = host::attach_or_wait() else {

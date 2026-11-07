@@ -548,11 +548,11 @@ fn shell_block(run: &shell::Run, tick: usize) -> Vec<Line<'static>> {
 
 /// `~` for the home directory, so paths fit beside the command.
 fn short_path(path: &str) -> String {
-    std::env::var("HOME")
-        .ok()
-        .or_else(|| std::env::var("USERPROFILE").ok())
-        .filter(|home| !home.is_empty())
-        .and_then(|home| path.strip_prefix(&home).map(|rest| format!("~{rest}")))
+    crate::protocol::profile::home_dir()
+        .and_then(|home| {
+            path.strip_prefix(home.to_str()?)
+                .map(|rest| format!("~{rest}"))
+        })
         .unwrap_or_else(|| path.to_string())
 }
 

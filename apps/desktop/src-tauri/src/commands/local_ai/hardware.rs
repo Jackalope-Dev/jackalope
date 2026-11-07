@@ -60,9 +60,8 @@ pub(super) fn inspect() -> Value {
     #[cfg(unix)]
     {
         let path = std::env::var("OLLAMA_MODELS").ok().or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .map(|p| format!("{p}/.ollama/models"))
+            crate::commands::platform::home_dir()
+                .map(|home| format!("{}/.ollama/models", home.to_string_lossy()))
         });
         if let Some(path) = path {
             let mut existing = std::path::Path::new(&path);

@@ -27,14 +27,6 @@ fn display_command(agent: &str) -> Option<String> {
     package(agent).map(|package| format!("npm {}", install_args(package).join(" ")))
 }
 
-fn npm_names() -> &'static [&'static str] {
-    if cfg!(windows) {
-        &["npm.cmd", "npm.exe", "npm"]
-    } else {
-        &["npm"]
-    }
-}
-
 /// Where npm usually lives when the app was started without it on PATH.
 fn npm_directories() -> Vec<PathBuf> {
     let mut directories: Vec<PathBuf> =
@@ -56,16 +48,8 @@ fn npm_directories() -> Vec<PathBuf> {
     directories
 }
 
-fn find_npm_in(directories: &[PathBuf]) -> Option<PathBuf> {
-    directories
-        .iter()
-        .filter(|directory| directory.is_absolute())
-        .flat_map(|directory| npm_names().iter().map(move |name| directory.join(name)))
-        .find(|candidate| super::platform::is_executable(candidate))
-}
-
 fn find_npm() -> Option<PathBuf> {
-    find_npm_in(&npm_directories())
+    super::platform::find_in(npm_directories(), "npm")
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -92,7 +76,7 @@ fn install_command(agent: &str, npm: &Path) -> Result<CommandBuilder, String> {
         .ok_or("Jackalope cannot install this agent. Follow its install guide instead.")?;
     let mut command = CommandBuilder::new(npm);
     command.args(install_args(package));
-    if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
+    if let Some(home) = super::platform::home_dir() {
         command.cwd(home);
     }
     command.env("TERM", "xterm-256color");
@@ -190,24 +174,5 @@ mod tests {
                 managed: false,
             }
         );
-    }
-
-    #[test]
-    fn npm_is_found_only_in_absolute_directories() {
-        let directory =
-            std::env::temp_dir().join(format!("jackalope-npm-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&directory).unwrap();
-        assert_eq!(find_npm_in(std::slice::from_ref(&directory)), None);
-        let name = npm_names()[0];
-        let npm = directory.join(name);
-        std::fs::write(&npm, "#!/bin/sh\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&npm, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
-        assert_eq!(find_npm_in(std::slice::from_ref(&directory)), Some(npm));
-        assert_eq!(find_npm_in(&[PathBuf::from("relative")]), None);
-        let _ = std::fs::remove_dir_all(&directory);
     }
 }

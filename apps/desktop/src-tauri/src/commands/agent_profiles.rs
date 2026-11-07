@@ -279,8 +279,7 @@ fn bind_account_selection(
             .and_then(|entry| entry.active.as_deref())
     });
     if adapter == "acp" && selected.is_none() {
-        let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .map(PathBuf::from)
+        let directory = super::platform::home_dir()
             .filter(|path| path.is_absolute())
             .ok_or("Cannot locate the home directory for this CLI's own sign-in.")?;
         return Ok(AccountBinding {
@@ -292,9 +291,9 @@ fn bind_account_selection(
     }
     let spec = super::agents::find(adapter);
     if adapter == "antigravity" && selected.is_none() {
-        let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        let directory = super::platform::home_dir()
             .zip(spec)
-            .map(|(home, spec)| spec.default_directory(Path::new(&home)))
+            .map(|(home, spec)| spec.default_directory(&home))
             .filter(|path| path.is_absolute())
             .ok_or("Cannot locate Antigravity's CLI data directory.")?;
         return Ok(AccountBinding {
@@ -332,10 +331,7 @@ fn bind_account_selection(
     } else {
         let directory = std::env::var_os(env_name)
             .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-                    .map(|home| spec.default_directory(Path::new(&home)))
-            })
+            .or_else(|| super::platform::home_dir().map(|home| spec.default_directory(&home)))
             .ok_or("Cannot locate the agent's default account directory.")?;
         (
             None,
@@ -617,8 +613,7 @@ pub(in crate::commands) fn create_local(
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
     super::agent_sign_in::ensure_idle(binding)?;
     if binding.adapter == "antigravity" && binding.profile_id.is_none() {
-        let current = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .map(|home| PathBuf::from(home).join(".gemini"));
+        let current = super::platform::home_dir().map(|home| home.join(".gemini"));
         if current.as_ref() != Some(&binding.directory) {
             return Err("Antigravity's CLI data location changed. Start a new task.".into());
         }

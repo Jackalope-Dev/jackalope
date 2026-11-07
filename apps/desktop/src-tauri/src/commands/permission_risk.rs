@@ -293,11 +293,8 @@ impl Context {
         let raw = workspace.to_string_lossy().into_owned();
         let windows = is_windows_path(&raw);
         let normal = |path: String| normalize(&path, windows);
-        let home = std::env::var("HOME")
-            .ok()
-            .or_else(|| std::env::var("USERPROFILE").ok())
-            .filter(|home| !home.is_empty())
-            .map(normal);
+        let home =
+            super::platform::home_dir().map(|home| normal(home.to_string_lossy().into_owned()));
         let mut temp = vec![normal(std::env::temp_dir().to_string_lossy().into_owned())];
         if !windows {
             temp.extend(["/tmp".to_string(), "/var/tmp".to_string()]);

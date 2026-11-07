@@ -303,12 +303,9 @@ mod tests {
                 vec!["commit", "-m", "Evaluation fixture"],
             ] {
                 let mut command = std::process::Command::new("git");
-                command.args(args).current_dir(&workspace);
-                #[cfg(windows)]
-                {
-                    use std::os::windows::process::CommandExt;
-                    command.creation_flags(0x08000000);
-                }
+                crate::commands::process_control::hidden(&mut command)
+                    .args(args)
+                    .current_dir(&workspace);
                 assert!(command.output().unwrap().status.success());
             }
             let req: RunRequest = serde_json::from_value(json!({

@@ -531,8 +531,8 @@ pub fn find_browser_executable() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         let mut roots = vec![PathBuf::from("/Applications")];
-        if let Some(home) = std::env::var_os("HOME") {
-            roots.push(PathBuf::from(home).join("Applications"));
+        if let Some(home) = super::platform::home_dir() {
+            roots.push(home.join("Applications"));
         }
         for root in roots {
             for (app, binary) in [
