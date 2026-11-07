@@ -19,8 +19,9 @@ import {
   Settings2,
   Share2,
 } from 'lucide-react';
-import { openExternalUrl } from '../../lib/native/env';
+import { openExternalUrl } from '../../lib/native/env.ts';
 import type { Feature } from '../../lib/telemetry';
+import type { SettingsCategory } from '../settings/categories';
 export type ViewGroup = 'tasks' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
 
 /**
@@ -41,9 +42,11 @@ interface ViewEntry {
   feature: Feature;
   keywords?: string;
   /** A search entry for a Settings category rather than a page of its own. */
-  settings?: 'Diagnostics' | 'System';
+  settings?: SettingsCategory;
   /** A page reached from another view, whose subnavigation item stays highlighted. */
   within?: string;
+  /** The name the in-app helper opens this view by; Rust checks it against helper-destinations.json. */
+  helper?: string;
   /** Left out of subnavigation and the project menu unless open (or Swarm is connected). */
   listed?: 'when-open' | 'when-swarm';
 }
@@ -51,6 +54,7 @@ interface ViewEntry {
 export const WORKSPACE_VIEWS = [
   {
     id: 'kanban',
+    helper: 'tasks',
     label: 'Work',
     shortLabel: 'Tasks',
     description: 'Tasks: plan, review and archive work.',
@@ -70,6 +74,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'schedules',
+    helper: 'schedules',
     label: 'Schedules',
     description: 'Bots: recurring tasks and their run history.',
     icon: CalendarClock,
@@ -103,6 +108,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'worktrees',
+    helper: 'worktrees',
     label: 'Worktrees',
     description: 'Project: inspect and clean up branches.',
     icon: GitBranch,
@@ -111,6 +117,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'topology',
+    helper: 'project',
     label: 'Codebase',
     description: 'Explore codebase dependencies and project worktrees.',
     icon: Network,
@@ -119,6 +126,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'project-knowledge',
+    helper: 'knowledge',
     label: 'Context',
     description: 'Project: repository context, saved lessons and workflows.',
     icon: BookOpen,
@@ -171,6 +179,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'agents',
+    helper: 'agents',
     label: 'Agents',
     description: 'Agents, accounts, tools and usage.',
     icon: Bot,
@@ -180,6 +189,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'mcps',
+    helper: 'mcp',
     label: 'Tools',
     description: 'Install and configure MCP tools.',
     icon: Plug,
@@ -206,6 +216,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'usage',
+    helper: 'usage',
     label: 'Usage & quota',
     shortLabel: 'Usage',
     description: 'Agents: account limits and recorded token usage.',
@@ -223,6 +234,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'agent-settings',
+    helper: 'agent-settings',
     label: 'Agent configuration',
     description: 'Agents: accounts, models, paths and defaults.',
     icon: Settings2,
@@ -250,6 +262,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'preferences',
+    helper: 'settings',
     label: 'Settings',
     description: 'App preferences, appearance, privacy and support.',
     icon: Settings2,
@@ -267,6 +280,11 @@ export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'kanban';
 
 export function workspaceView(id: ActiveTab): ViewEntry {
   return WORKSPACE_VIEWS.find((item) => item.id === id) ?? WORKSPACE_VIEWS[0];
+}
+
+/** The view the in-app helper's `navigate` destination names, if any. */
+export function helperView(destination: string): ActiveTab | undefined {
+  return WORKSPACE_VIEWS.find((item: ViewEntry) => item.helper === destination)?.id;
 }
 
 /** The label a view shows in its group's subnavigation. */
@@ -290,59 +308,6 @@ export function groupViews(group: ViewGroup, open?: ActiveTab, swarmConnected = 
     if (item.listed === 'when-swarm') return swarmConnected || item.id === open;
     return true;
   });
-}
-
-export function navigateWorkspace(tab: ActiveTab) {
-  window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
-}
-export function openSettings(
-  category:
-    | 'Agents'
-    | 'General'
-    | 'System'
-    | 'Diagnostics'
-    | 'Invitations'
-    | 'Updates & support'
-    | 'Connected work'
-    | 'Cloudflare',
-) {
-  window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
-}
-
-export interface ProjectSettingsDestination {
-  projectId: string;
-  category: 'Project' | 'Appearance' | 'Agents';
-}
-
-export function openProjectSettings(
-  projectId: string,
-  category: ProjectSettingsDestination['category'] = 'Project',
-) {
-  window.dispatchEvent(
-    new CustomEvent<ProjectSettingsDestination>('jackalope:open-settings', {
-      detail: { projectId, category },
-    }),
-  );
-}
-
-/** Opens a project's Cloud resources screen. */
-export function openCloudResources(projectId: string) {
-  window.dispatchEvent(new CustomEvent('jackalope:open-cloud-resources', { detail: projectId }));
-}
-
-/** Opens the composer on a draft another surface prepared under `key`. */
-export function openHelperDraft(key: string) {
-  window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
-}
-
-export function openAgentConfiguration(agentId: string) {
-  window.dispatchEvent(new CustomEvent('jackalope:configure-agent', { detail: agentId }));
-}
-
-export const OPEN_SHORTCUTS_EVENT = 'jackalope:open-shortcuts';
-
-export function openShortcuts() {
-  window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_EVENT));
 }
 
 const HELP_URL = 'https://jackalope.dev/knowledge/';

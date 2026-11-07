@@ -1,3 +1,5 @@
+import { emitAppEvent } from './app-events.ts';
+
 const prefix = 'jackalope-work-feedback:';
 export interface WorkFeedback {
   key: string;
@@ -36,5 +38,5 @@ export function saveWorkFeedback(taskId: string, runId: string, text: string) {
     key,
     JSON.stringify({ taskId, runId, text, createdAt: new Date().toISOString() }),
   );
-  window.dispatchEvent(new Event('jackalope:work-feedback'));
+  emitAppEvent('work-feedback');
 }

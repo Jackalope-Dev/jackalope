@@ -2,7 +2,7 @@ import { lazy, type ReactNode } from 'react';
 import { openRun, selectWork } from '../../lib/work-selection';
 import type { Project } from '../../stores/projectStore';
 import type { ComposerSeed } from '../sessions/SessionStart';
-import type { SettingsCategory } from '../settings/SettingsPage';
+import type { SettingsCategory } from '../settings/categories';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import type { ActiveTab, PageTab } from './navigation';

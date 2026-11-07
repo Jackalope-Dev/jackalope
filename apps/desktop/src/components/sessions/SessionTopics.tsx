@@ -12,13 +12,13 @@ import {
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
+import { openHelperDraft } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import { type LiveSession, type SessionTopic, sessionCommand } from '../../lib/live-session';
 import { suggestTopics, topicDraft } from '../../lib/session-topics';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { openHelperDraft } from '../layout/navigation';
 import { ActionError } from '../ui/ActionError';
 
 export function SessionTopics({

@@ -47,7 +47,6 @@ export function UserPromptCard({
       throw new Error(
         'This request is no longer waiting for a response. Refresh the task to see its current state.',
       );
-    useMascotStore.getState().setMood('working');
     useMascotStore.getState().say('Your response is saved for the agent.', 3000);
     await useExecutionStore.getState().refresh();
   };

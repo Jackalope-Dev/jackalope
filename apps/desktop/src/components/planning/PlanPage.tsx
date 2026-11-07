@@ -12,6 +12,7 @@ import {
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { agentAdapter } from '../../lib/agents';
+import { navigateWorkspace, openProjectSettings } from '../../lib/app-events';
 import { runHostName } from '../../lib/computers';
 import {
   type AutonomyEntry,
@@ -42,7 +43,6 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { HostCapacity } from '../computers/HostCapacity';
-import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { EscalationNote } from '../tasks/AgentDecision';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';

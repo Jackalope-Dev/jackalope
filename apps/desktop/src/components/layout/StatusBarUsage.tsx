@@ -3,6 +3,7 @@ import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { navigateWorkspace } from '../../lib/app-events';
 import { capacityWindowDisplay, capacityWindowName } from '../../lib/capacity-display';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCapacityStore } from '../../stores/capacityStore';
@@ -13,7 +14,6 @@ import {
   useProjectStore,
 } from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
-import { navigateWorkspace } from './navigation';
 import './statusbar-usage.css';
 
 const agentName = (id: string) =>

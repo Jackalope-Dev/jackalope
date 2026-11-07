@@ -26,6 +26,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { openAgentConfiguration } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { isActive } from '../../lib/run-status';
@@ -42,7 +43,6 @@ import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
 import { ProviderMark } from '../agents/ProviderMark';
-import { openAgentConfiguration } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import '../agents/agents-workspace.css';

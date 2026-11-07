@@ -1,6 +1,7 @@
 import { Button, CopyButton, Popover } from '@jackalope/ui';
 import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
 import { openWork, selectWork, useWorkspaceWork } from '../../lib/work-selection';
@@ -10,7 +11,6 @@ import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useActiveProject } from '../../stores/projectStore';
-import { navigateWorkspace } from './navigation';
 
 /**
  * The project, remote host and the work in focus: the selected task, plan or

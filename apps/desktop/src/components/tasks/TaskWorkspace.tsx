@@ -15,6 +15,7 @@ import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'luc
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
 import { invokeNative } from '../../lib/native/transport';
 import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -24,7 +25,6 @@ import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { ActionError } from '../ui/ActionError';
 import { WorkCatchUp } from './WorkCatchUp';

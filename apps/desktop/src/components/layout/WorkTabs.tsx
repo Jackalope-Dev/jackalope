@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workPresence } from '../../lib/task-collection';
 import { openWork, useWorkspaceWork } from '../../lib/work-selection';
@@ -8,7 +9,6 @@ import { useOpenWorkStore } from '../../stores/openWorkStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { isUnread, signalKey, useOpenSignalKey, useWorkSignals } from '../tasks/WorkSignals';
-import { navigateWorkspace } from './navigation';
 import './work-tabs.css';
 
 const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);

@@ -4,12 +4,13 @@ import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { startComparison } from '../../lib/compare-launch';
 import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
-import { ATTACH_TO_COMPOSER, appendAttachments } from '../../lib/prompt-attachments';
+import { appendAttachments } from '../../lib/prompt-attachments';
 import { isQuestionOnly } from '../../lib/question-intent';
 import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
@@ -20,7 +21,6 @@ import { usePlanStore } from '../../stores/planStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
-import { navigateWorkspace } from '../layout/navigation';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
@@ -144,17 +144,12 @@ export function SessionStart({
   });
   const clearAssessment = useRef(assessment.clear);
   clearAssessment.current = assessment.clear;
-  useEffect(() => {
-    const receive = (event: Event) => {
-      const references = (event as CustomEvent<string[]>).detail;
-      if (!Array.isArray(references)) return;
-      clearAssessment.current();
-      setText((current) => appendAttachments(current, references));
-      input.current?.focus();
-    };
-    window.addEventListener(ATTACH_TO_COMPOSER, receive);
-    return () => window.removeEventListener(ATTACH_TO_COMPOSER, receive);
-  }, []);
+  useAppEvent('attach-to-composer', (references) => {
+    if (!Array.isArray(references)) return;
+    clearAssessment.current();
+    setText((current) => appendAttachments(current, references));
+    input.current?.focus();
+  });
   const latest = useRef(text);
   const sharpen = useSharpen({
     draft: text,

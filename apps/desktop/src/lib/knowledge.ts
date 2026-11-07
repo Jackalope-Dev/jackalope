@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { navigateWorkspace, openHelperDraft } from '../components/layout/navigation';
 import { useExecutionStore } from '../stores/executionStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
+import { navigateWorkspace, openHelperDraft } from './app-events';
 import type { KnowledgeEntry } from './knowledge-types';
 import { lessonCheckDraftKey } from './learning';
 import { isTauriEnvironment } from './native/env';

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { listSchedules, type SavedSchedule } from '../../lib/schedules';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { useCompanionNotices } from '../mascot/useCompanionNotices';
 
 export function ScheduleNotice() {

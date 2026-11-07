@@ -1,10 +1,10 @@
 import { Button } from '@jackalope/ui';
 import { useMemo } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import type { TaskRun } from '../../lib/run-types';
 import { taskDecision } from '../../lib/task-workflow';
 import { showWork, useWorkspaceWork } from '../../lib/work-selection';
 import { attentionQueue } from '../../lib/workbench';
-import { navigateWorkspace } from '../layout/navigation';
 
 export function NextWorkAction({ run }: { run: TaskRun }) {
   const work = useWorkspaceWork({ withoutDrafts: true });

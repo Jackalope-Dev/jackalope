@@ -1,13 +1,14 @@
-import { PRESET_THEMES } from '@jackalope/brand/theme';
+import { PRESET_THEMES, withPreset } from '@jackalope/brand/theme';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { emitAppEvent } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import { searchFiles } from '../../lib/file-search';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { ATTACH_TO_COMPOSER, attachmentReference } from '../../lib/prompt-attachments';
+import { attachmentReference } from '../../lib/prompt-attachments';
 import { isSettled } from '../../lib/run-status';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workShape } from '../../lib/task-collection';
@@ -290,11 +291,7 @@ export function CommandPalette({
                         `${activeProject.path}/${file}`,
                         activeProject.path,
                       );
-                      requestAnimationFrame(() =>
-                        window.dispatchEvent(
-                          new CustomEvent(ATTACH_TO_COMPOSER, { detail: [reference] }),
-                        ),
-                      );
+                      requestAnimationFrame(() => emitAppEvent('attach-to-composer', [reference]));
                     }}
                   >
                     <Paperclip size={16} />
@@ -347,14 +344,7 @@ export function CommandPalette({
                 key={theme.id}
                 className="workspace-menu-item w-full hover:bg-[var(--color-surface-hover)]"
                 onClick={() => {
-                  const current = useThemeStore.getState().currentTheme;
-                  setTheme({
-                    ...theme,
-                    isDark: current.isDark,
-                    appearance: current.appearance,
-                    atmosphere: current.atmosphere,
-                    harmony: current.harmony,
-                  });
+                  setTheme(withPreset(theme, useThemeStore.getState().currentTheme));
                   onClose();
                 }}
               >

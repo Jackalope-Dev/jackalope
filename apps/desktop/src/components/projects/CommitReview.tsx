@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { authorEvidence } from '../../lib/agent-review';
+import { emitAppEvent, navigateWorkspace, openHelperDraft } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import {
@@ -40,7 +41,6 @@ import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { navigateWorkspace, openHelperDraft } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -180,7 +180,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       if (target === projectPath && next.branch && active && next.branch !== active.gitBranch) {
         useProjectStore.getState().updateProject(active.id, { gitBranch: next.branch });
       }
-      window.dispatchEvent(new Event('jackalope:changes-updated'));
+      emitAppEvent('changes-updated');
       const paths = new Set(next.files.map((file) => file.path));
       // Forget exclusions for files that no longer have changes.
       const { excluded, setExcluded } = useCommitReviewStore.getState();

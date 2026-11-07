@@ -13,6 +13,7 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
+import { openAgents, openProjectSettings } from '../../lib/app-events';
 import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
 import { syncsLessons } from '../../lib/lesson-sync';
 import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
@@ -21,7 +22,6 @@ import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectComputerSettings } from '../computers/BotComputerSettings';
 import { ProjectSwarmHosts } from '../computers/ProjectSwarmHosts';
-import { openProjectSettings } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
@@ -115,10 +115,7 @@ export function ProjectPreferences({
                   </Button>
                 </SettingRow>
                 <SettingRow title="Agents and accounts">
-                  <Button
-                    variant="outline"
-                    onClick={() => openProjectSettings(project.id, 'Agents')}
-                  >
+                  <Button variant="outline" onClick={() => openAgents('project')}>
                     Configure agents
                   </Button>
                 </SettingRow>

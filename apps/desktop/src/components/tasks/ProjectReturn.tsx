@@ -1,5 +1,6 @@
 import { Badge, Button, Panel } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { projectTaskPresence } from '../../lib/project-return';
 import type { QueueView } from '../../lib/queue';
 import type { TaskRun } from '../../lib/run-types';
@@ -7,7 +8,6 @@ import type { WorkItem } from '../../lib/task-collection';
 import { selectWork } from '../../lib/work-selection';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
-import { navigateWorkspace } from '../layout/navigation';
 
 export function ProjectReturn({
   items,

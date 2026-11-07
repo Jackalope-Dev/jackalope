@@ -1,6 +1,7 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
 import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { navigateWorkspace, openHelperDraft } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import {
   helperPreferencePatch,
@@ -21,21 +22,9 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { type ActiveTab, navigateWorkspace, openHelperDraft } from '../layout/navigation';
+import { helperView } from '../layout/navigation';
 import { ActionError } from '../ui/ActionError';
 
-const destinations: Record<string, ActiveTab> = {
-  tasks: 'kanban',
-  agents: 'agents',
-  'agent-settings': 'agent-settings',
-  mcp: 'mcps',
-  usage: 'usage',
-  settings: 'preferences',
-  schedules: 'schedules',
-  project: 'topology',
-  worktrees: 'worktrees',
-  knowledge: 'project-knowledge',
-};
 const labels: Record<string, string> = {
   open_task: 'Open task',
   stop_task: 'Stop task',
@@ -199,7 +188,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           result = { openedRunId: run.id };
         }
       } else if (action.operation === 'navigate') {
-        const destination = destinations[String(input.destination)];
+        const destination = helperView(String(input.destination));
         if (!destination) throw new Error('Unknown destination.');
         onNavigate();
         requestAnimationFrame(() => navigateWorkspace(destination));

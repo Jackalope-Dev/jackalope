@@ -205,9 +205,15 @@ and error boundaries. System information belongs to Settings; saved task editing
 belongs to Tasks. TaskDetail composes TaskRunDetails, TaskFollowUpPanel and the
 useTaskFollowUps queue hook; OnboardingFlow composes one component per step.
 
-Subscribe to native events with hooks/useTauriEvent and to app `jackalope:*` window
-events with hooks/useWindowEvent; both handle late-resolving cleanup and stale
-handlers. Open links through openInBrowser in lib/native/env, which reports
+Subscribe to native events with hooks/useTauriEvent. Requests between parts of a
+window (navigate, open settings or the Agents page, open a helper draft, attach to the
+composer, changes or feedback saved) are typed events in lib/app-events: send them with
+its helpers or emitAppEvent and listen with useAppEvent. Settings categories, their
+groups, icons and search words are one registry in components/settings/categories.ts;
+the in-app helper's page names are lib/helper-destinations.json, which the native
+helper validates against and workspace views name with `helper`. The mascot's mood is
+derived in stores/mascotStore from activity sources (running work, a requested
+repository scan) rather than set by callers. Open links through openInBrowser in lib/native/env, which reports
 failures to the caller. Select store fields with useShallow rather than
 subscribing to a whole store. PROMPT_MAX_CHARS bounds task, follow-up and
 schedule instructions in the composer; the native side accepts longer ones.

@@ -1,11 +1,11 @@
 import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
+import { useAppEvent } from '../../lib/app-events';
 import { primaryModifier } from '../../lib/platform-shortcuts';
 import { displayShortcut, resolveShortcuts, shortcutNames } from '../../lib/shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { COMMANDS } from './commands';
-import { OPEN_SHORTCUTS_EVENT } from './navigation';
 
 function typing(target: EventTarget | null) {
   return (
@@ -18,18 +18,16 @@ function typing(target: EventTarget | null) {
 export function ShortcutSheet() {
   const [open, setOpen] = useState(false);
   const saved = useSettingsStore((state) => state.shortcuts);
+  useAppEvent('open-shortcuts', () => setOpen(true));
   useEffect(() => {
-    const show = () => setOpen(true);
     const key = (event: KeyboardEvent) => {
       if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey) return;
       if (typing(event.target) || document.querySelector('[role="dialog"]')) return;
       event.preventDefault();
       setOpen(true);
     };
-    window.addEventListener(OPEN_SHORTCUTS_EVENT, show);
     window.addEventListener('keydown', key);
     return () => {
-      window.removeEventListener(OPEN_SHORTCUTS_EVENT, show);
       window.removeEventListener('keydown', key);
     };
   }, []);

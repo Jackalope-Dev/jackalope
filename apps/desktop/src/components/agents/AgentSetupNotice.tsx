@@ -1,5 +1,5 @@
 import { Button, InlineNotice } from '@jackalope/ui';
-import { navigateWorkspace } from '../layout/navigation';
+import { navigateWorkspace } from '../../lib/app-events';
 
 /** Whether an error means no agent could answer, as opposed to a problem with the request. */
 export function isAgentSetupError(message: string) {

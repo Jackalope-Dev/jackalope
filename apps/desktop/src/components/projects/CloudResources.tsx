@@ -16,6 +16,7 @@ import {
 } from '@jackalope/ui';
 import { Cloud, MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { openProjectSettings, openSettings } from '../../lib/app-events';
 import {
   CLOUD_RESOURCES,
   type CloudResourceKind,
@@ -48,7 +49,6 @@ import {
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CloudResourcesDraft, useCloudResourcesStore } from '../../stores/cloudResourcesStore';
 import { useActiveProject } from '../../stores/projectStore';
-import { openProjectSettings, openSettings } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';

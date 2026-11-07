@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
-import { useWindowEvent } from '../../hooks/useWindowEvent';
+import { navigateWorkspace, openSettings, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
@@ -59,7 +59,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { ComposerSeed } from '../sessions/SessionStart';
-import type { SettingsCategory } from '../settings/SettingsPage';
+import type { SettingsCategory } from '../settings/categories';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 
@@ -76,11 +76,8 @@ import {
   DEFAULT_WORKSPACE_TAB,
   groupViews,
   highlightedView,
-  navigateWorkspace,
-  openSettings,
   type PageTab,
   PRIMARY_VIEWS,
-  type ProjectSettingsDestination,
   viewLabel,
   workspaceView,
 } from './navigation';
@@ -197,7 +194,7 @@ export function Shell({
     if (activeTab !== 'preferences') previousView.current = activeTab;
   }, [activeTab]);
   const [configuredAgent, setConfiguredAgent] = useState<string>();
-  useWindowEvent<string>('jackalope:configure-agent', (agent) => {
+  useAppEvent('configure-agent', (agent) => {
     setConfiguredAgent(agent);
     setActiveTab('agent-settings');
   });
@@ -266,7 +263,7 @@ export function Shell({
     else if (entry.initialCapture) focusComposer();
   }, [openInComposer, focusComposer]);
   // Helpers, conversation topics and lesson checks prepare a draft, then open it here.
-  useWindowEvent<string>('jackalope:helper-draft', (key) => {
+  useAppEvent('helper-draft', (key) => {
     if (useExecutionStore.getState().drafts[key]) openInComposer({ draftKey: key });
   });
   const { projects, activeProjectId, selectProject } = useProjectStore(
@@ -361,23 +358,17 @@ export function Shell({
       setActiveTab('preferences');
     } else setActiveTab(tab);
   }, []);
-  useWindowEvent<ActiveTab>('jackalope:navigate', navigate);
-  useWindowEvent<SettingsCategory | 'Agents' | ProjectSettingsDestination>(
-    'jackalope:open-settings',
-    (destination) => {
-      const category = typeof destination === 'string' ? destination : destination.category;
-      // Agent choices moved to the Agents page; older links open it at the same scope.
-      if (category === 'Agents') {
-        useAgentScopeStore.getState().setScope(typeof destination === 'string' ? 'app' : 'project');
-        setActiveTab('agents');
-        return;
-      }
-      setSettingsCategory(category);
-      setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
-      setActiveTab('preferences');
-    },
-  );
-  useWindowEvent<string>('jackalope:open-cloud-resources', (projectId) => {
+  useAppEvent('navigate', navigate);
+  useAppEvent('open-settings', (destination) => {
+    setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
+    setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
+    setActiveTab('preferences');
+  });
+  useAppEvent('open-agents', (scope) => {
+    useAgentScopeStore.getState().setScope(scope);
+    setActiveTab('agents');
+  });
+  useAppEvent('open-cloud-resources', (projectId) => {
     selectProject(projectId);
     setActiveTab('cloud-resources');
   });
@@ -469,6 +460,14 @@ export function Shell({
     onNewWork: (id: string) => {
       switchProject(id);
       focusComposer();
+    },
+    onCopyPath: (item: Project) => {
+      setCommandError('');
+      void Promise.resolve()
+        .then(() => navigator.clipboard.writeText(item.path))
+        .catch((cause) =>
+          setCommandError(`Could not copy the path of ${item.name}: ${describeError(cause)}`),
+        );
     },
     onRemoveProject: (item: Project) => {
       removeReturnFocus.current = document.activeElement as HTMLElement | null;

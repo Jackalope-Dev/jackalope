@@ -1,5 +1,6 @@
 import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAppEvent } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import { pendingWorkFeedback, type WorkFeedback } from '../../lib/work-feedback';
 import { ActionError } from '../ui/ActionError';
@@ -14,6 +15,8 @@ export function WorkFeedbackInbox({
   const [items, setItems] = useState<WorkFeedback[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const reread = useRef<() => void>(undefined);
+  useAppEvent('work-feedback', () => reread.current?.());
   useEffect(() => {
     const refresh = () => {
       try {
@@ -23,11 +26,10 @@ export function WorkFeedbackInbox({
       }
     };
     refresh();
+    reread.current = refresh;
     window.addEventListener('storage', refresh);
-    window.addEventListener('jackalope:work-feedback', refresh);
     return () => {
       window.removeEventListener('storage', refresh);
-      window.removeEventListener('jackalope:work-feedback', refresh);
     };
   }, [taskId]);
   if (!items.length && !error) return null;

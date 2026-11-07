@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { navigateWorkspace, openSettings } from '../../lib/app-events';
 import { taskNotices } from '../../lib/companion-tasks';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -12,7 +13,6 @@ import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
 export function openCompanionTask(run: TaskRun) {

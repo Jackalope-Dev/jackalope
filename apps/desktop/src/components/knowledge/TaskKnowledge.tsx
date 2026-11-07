@@ -9,11 +9,11 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { useKnowledge } from '../../lib/knowledge';
 import type { ContextReceipt, ContextSelection } from '../../lib/knowledge-types';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { navigateWorkspace } from '../layout/navigation';
 import './task-knowledge.css';
 import { describeError } from '../../lib/errors';
 

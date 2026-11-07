@@ -1,6 +1,7 @@
 import { Badge, Button, InlineNotice, LoadingState } from '@jackalope/ui';
 import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { navigateWorkspace, openCloudResources, openSettings } from '../../lib/app-events';
 import { runHostName } from '../../lib/computers';
 import { type DeployStatus, deliveryPhase, deployStatus } from '../../lib/deploy';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -12,7 +13,6 @@ import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { HostCapacity } from '../computers/HostCapacity';
-import { navigateWorkspace, openCloudResources, openSettings } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ActiveTab } from '../components/layout/navigation';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { observeRefresh } from '../lib/observe-refresh';
@@ -39,7 +40,8 @@ export interface HelperView {
 interface HelperState {
   view: HelperView;
   draft: string;
-  screen: string;
+  /** The open workspace view, shared with the helper as app context. */
+  screen: ActiveTab;
   sharePreferences: boolean;
   shareProjects: boolean;
   error: string | null;
@@ -75,7 +77,7 @@ export const useHelperStore = create<HelperState>()(
     (set, get) => ({
       view: { turns: [], actions: [], connected: false, error: null },
       draft: '',
-      screen: 'tasks',
+      screen: 'kanban',
       sharePreferences: true,
       shareProjects: true,
       error: null,

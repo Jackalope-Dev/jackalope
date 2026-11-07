@@ -25,8 +25,8 @@ function DesignLab() {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [period, setPeriod] = useState('30');
   const [agentState, setAgentState] = useState('idle');
-  const { mood, setMood } = useMascotStore(
-    useShallow((s) => ({ mood: s.mood, setMood: s.setMood })),
+  const { mood, previewMood } = useMascotStore(
+    useShallow((s) => ({ mood: s.mood, previewMood: s.previewMood })),
   );
   useEffect(() => applyThemeTokens(theme), [theme]);
 
@@ -81,7 +81,7 @@ function DesignLab() {
                     type="button"
                     aria-pressed={mood === state}
                     onClick={() => {
-                      setMood(state);
+                      previewMood(state);
                       setReplay((value) => value + 1);
                     }}
                     className="workspace-nav-item"

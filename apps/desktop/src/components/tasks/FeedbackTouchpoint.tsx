@@ -1,11 +1,11 @@
 import { Button } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { openSettings } from '../../lib/app-events';
 import { isActive } from '../../lib/run-status';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
-import { openSettings } from '../layout/navigation';
 import { FeedbackForm } from '../settings/FeedbackForm';
 
 export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: boolean }) {

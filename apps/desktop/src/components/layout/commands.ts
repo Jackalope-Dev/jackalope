@@ -8,10 +8,11 @@ import {
   Settings2,
   SquareTerminal,
 } from 'lucide-react';
+import { openShortcuts } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import type { ShortcutAction } from '../../lib/shortcuts';
 import type { Project } from '../../stores/projectStore';
-import { openHelp, openShortcuts } from './navigation';
+import { openHelp } from './navigation';
 
 /** What commands act on; Shell provides it. */
 export interface CommandContext {

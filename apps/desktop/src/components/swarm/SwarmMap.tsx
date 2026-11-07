@@ -1,6 +1,7 @@
 import { Badge, Button } from '@jackalope/ui';
 import { ArrowUpRight, GitMerge } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import {
   SWARM_PHASES,
   type SwarmAgent,
@@ -9,7 +10,6 @@ import {
 } from '../../lib/swarm-map';
 import { selectWork } from '../../lib/work-selection';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { navigateWorkspace } from '../layout/navigation';
 import './swarm-map.css';
 
 const WIDTH = 880;

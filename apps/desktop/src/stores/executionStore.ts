@@ -113,12 +113,9 @@ export const useExecutionStore = create<ExecutionState>()(
               revision = changes.revision;
               previousDetailId = detailId;
             }
-            const working = runs.some(isActive);
-            const wasWorking = get().runs.some(isActive);
             if (runs !== get().runs || get().loading || get().error || get().historyError)
               set({ runs, loading: false, error: null, historyError: null });
-            if (working !== wasWorking)
-              useMascotStore.getState().setMood(working ? 'working' : 'idle');
+            useMascotStore.getState().setActivity('runs', runs.some(isActive));
           } catch (error) {
             set({ error: String(error), historyError: String(error), loading: false });
           } finally {

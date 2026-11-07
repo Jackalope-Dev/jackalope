@@ -77,6 +77,7 @@ type ProjectActions = {
   onOpenProject: (projectId: string, view: ActiveTab) => void;
   onNewWork: (projectId: string) => void;
   onRemoveProject: (project: Project) => void;
+  onCopyPath: (project: Project) => void;
 };
 
 const projectViews = groupViews('project');
@@ -92,6 +93,7 @@ function ProjectMenuItems({
   onOpenProject,
   onNewWork,
   onRemoveProject,
+  onCopyPath,
 }: ProjectActions & {
   menu: typeof Menu | typeof ContextMenu;
   project: Project;
@@ -119,10 +121,7 @@ function ProjectMenuItems({
         <Smile size={16} aria-hidden="true" />
         Set icon…
       </M.Item>
-      <M.Item
-        className="workspace-menu-item"
-        onSelect={() => void navigator.clipboard?.writeText(project.path).catch(() => {})}
-      >
+      <M.Item className="workspace-menu-item" onSelect={() => onCopyPath(project)}>
         <Copy size={16} aria-hidden="true" />
         Copy path
       </M.Item>
@@ -149,7 +148,16 @@ const ProjectContextMenu = forwardRef<
     }
 >(
   (
-    { children, project, onSetIcon, onOpenProject, onNewWork, onRemoveProject, ...trigger },
+    {
+      children,
+      project,
+      onSetIcon,
+      onOpenProject,
+      onNewWork,
+      onRemoveProject,
+      onCopyPath,
+      ...trigger
+    },
     ref,
   ) => (
     <ContextMenu.Root>
@@ -165,6 +173,7 @@ const ProjectContextMenu = forwardRef<
             onOpenProject={onOpenProject}
             onNewWork={onNewWork}
             onRemoveProject={onRemoveProject}
+            onCopyPath={onCopyPath}
           />
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -176,19 +185,13 @@ ProjectContextMenu.displayName = 'ProjectContextMenu';
 export function WorkSidebar({
   activeTab,
   onOpen,
-  onOpenProject,
-  onNewWork,
-  onRemoveProject,
   onAddProject,
-}: {
+  ...actions
+}: ProjectActions & {
   activeTab: ActiveTab;
   onOpen: () => void;
-  onOpenProject: (projectId: string, view: ActiveTab) => void;
-  onNewWork: (projectId: string) => void;
-  onRemoveProject: (project: Project) => void;
   onAddProject: () => void;
 }) {
-  const actions = { onOpenProject, onNewWork, onRemoveProject };
   const [iconFor, setIconFor] = useState<Project | null>(null);
   const projects = useProjectStore((state) => state.projects);
   const activeProject = useProjectStore((state) => state.activeProjectId);
@@ -264,7 +267,7 @@ export function WorkSidebar({
                   type="button"
                   className="project-tree-name"
                   aria-current={current ? 'page' : undefined}
-                  onClick={() => onOpenProject(project.id, 'kanban')}
+                  onClick={() => actions.onOpenProject(project.id, 'kanban')}
                   title={project.path}
                 >
                   <ProjectMark project={project} />
@@ -292,7 +295,7 @@ export function WorkSidebar({
                       type="button"
                       className="project-tree-action"
                       aria-label={`New work in ${project.name}`}
-                      onClick={() => onNewWork(project.id)}
+                      onClick={() => actions.onNewWork(project.id)}
                     >
                       <Plus size={14} aria-hidden="true" />
                     </button>

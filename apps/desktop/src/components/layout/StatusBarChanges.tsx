@@ -1,5 +1,6 @@
 import { GitCommitHorizontal } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAppEvent } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { workingChanges } from '../../lib/project-git';
 import { openChanges } from '../../stores/commitReviewStore';
@@ -16,6 +17,9 @@ export function StatusBarChanges({
   checkout: string;
 }) {
   const [count, setCount] = useState<number | null>(null);
+  // The Changes page announces commits and discards so this updates at once.
+  const reread = useRef<() => void>(undefined);
+  useAppEvent('changes-updated', () => reread.current?.());
   useEffect(() => {
     if (!isTauriEnvironment() || !projectPath || !checkout) return;
     let live = true;
@@ -34,16 +38,14 @@ export function StatusBarChanges({
         });
     };
     read();
+    reread.current = read;
     const timer = setInterval(read, 15_000);
     window.addEventListener('focus', read);
-    // The Changes page announces commits and discards so this updates at once.
-    window.addEventListener('jackalope:changes-updated', read);
     document.addEventListener('visibilitychange', read);
     return () => {
       live = false;
       clearInterval(timer);
       window.removeEventListener('focus', read);
-      window.removeEventListener('jackalope:changes-updated', read);
       document.removeEventListener('visibilitychange', read);
     };
   }, [projectPath, checkout]);

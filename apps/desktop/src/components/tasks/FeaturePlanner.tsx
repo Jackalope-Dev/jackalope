@@ -14,6 +14,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import { featureDraftKey } from '../../lib/feature-draft';
 import { manualPlan, planCommands } from '../../lib/plan-mode';
@@ -26,7 +27,6 @@ import {
   type Project,
   useProjectStore,
 } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { OutcomeEditor } from './OutcomeEditor';
 
 /** The most tasks a plan holds. */

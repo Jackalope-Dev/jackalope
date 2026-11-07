@@ -10,6 +10,7 @@ import {
   Switch,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -23,7 +24,6 @@ import {
 } from '../../lib/shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { CliCommandSetting } from './CliCommandSetting';
 
 export interface DesktopActivity {
