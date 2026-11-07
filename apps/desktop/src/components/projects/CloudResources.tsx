@@ -15,7 +15,7 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { Cloud, MoreHorizontal } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   CLOUD_RESOURCES,
   type CloudResourceKind,
@@ -30,9 +30,7 @@ import {
 } from '../../lib/cloud-resources-plan';
 import {
   ARTIFACTS_TOKEN_URL,
-  beginCloudflareSignIn,
   cancelCloudflareSignIn,
-  completeCloudflareSignIn,
   reauthorizeCloudflare,
 } from '../../lib/cloudflare-artifacts';
 import {
@@ -55,6 +53,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';
 import { describeError } from '../../lib/errors';
+import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
 
 interface Run {
   kinds: CloudResourceKind[];
@@ -108,7 +107,7 @@ export function CloudResources() {
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const signingIn = useRef(false);
+  const cloudflareSignIn = useCloudflareSignIn();
   const projectPath = project?.path;
 
   const draft: CloudResourcesDraft = savedDraft ?? {
@@ -136,12 +135,6 @@ export function CloudResources() {
       })
       .catch((cause) => setError(describeError(cause)));
   }, [refresh, project?.id]);
-  useEffect(
-    () => () => {
-      if (signingIn.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
 
   if (!project) {
     return (
@@ -173,14 +166,8 @@ export function CloudResources() {
 
   /** Connect Cloudflare again for the same account, asking for `scopes` as well. */
   const allow = async (scopes: string[]) => {
-    signingIn.current = true;
-    try {
-      await openExternalUrl(await beginCloudflareSignIn({ scopes }));
-      await completeCloudflareSignIn();
-      await reauthorizeCloudflare();
-    } finally {
-      signingIn.current = false;
-    }
+    await cloudflareSignIn({ scopes });
+    await reauthorizeCloudflare();
   };
 
   const start = async (allowFirst?: string[]) => {

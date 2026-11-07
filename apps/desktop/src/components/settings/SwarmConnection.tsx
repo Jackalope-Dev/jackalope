@@ -11,13 +11,8 @@ import {
   SettingRow,
   Stepper,
 } from '@jackalope/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  beginCloudflareSignIn,
-  cancelCloudflareSignIn,
-  completeCloudflareSignIn,
-  reauthorizeCloudflare,
-} from '../../lib/cloudflare-artifacts';
+import { useCallback, useEffect, useState } from 'react';
+import { cancelCloudflareSignIn, reauthorizeCloudflare } from '../../lib/cloudflare-artifacts';
 import { openExternalUrl } from '../../lib/native/env';
 import {
   type SwarmConnection as Connection,
@@ -31,6 +26,7 @@ import {
 } from '../../lib/swarm';
 import './swarm-connection.css';
 import { describeError } from '../../lib/errors';
+import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
 
 type Phase = 'allow' | SwarmSetupStep;
 
@@ -80,17 +76,11 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
   const [error, setError] = useState('');
   const [deleteWorker, setDeleteWorker] = useState(true);
   const [warning, setWarning] = useState('');
-  const signingIn = useRef(false);
+  const cloudflareSignIn = useCloudflareSignIn();
   const refresh = useCallback(async () => setStatus(await swarmConnection()), []);
   useEffect(() => {
     void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
-  useEffect(
-    () => () => {
-      if (signingIn.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
   const open = (link: string) =>
     void openExternalUrl(link).catch((cause) => setError(describeError(cause)));
 
@@ -109,15 +99,8 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
 
   /** Connect Cloudflare again, asking for Workers access, for the same account. */
   const allowWorkers = async () => {
-    signingIn.current = true;
-    try {
-      const consent = await beginCloudflareSignIn({ workers: true });
-      await openExternalUrl(consent);
-      await completeCloudflareSignIn();
-      await reauthorizeCloudflare();
-    } finally {
-      signingIn.current = false;
-    }
+    await cloudflareSignIn({ workers: true });
+    await reauthorizeCloudflare();
   };
 
   const setUp = async (allowFirst = false) => {

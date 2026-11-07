@@ -14,18 +14,16 @@ import {
   SettingRow,
 } from '@jackalope/ui';
 import { Cloud as CloudIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ARTIFACTS_DOCS_URL,
   ARTIFACTS_TOKEN_URL,
   type ArtifactsJurisdiction,
   type ArtifactsStatus,
   artifactsStatus,
-  beginCloudflareSignIn,
   type CloudflareAccount,
   cancelCloudflareSignIn,
   cloudflareTokenAccounts,
-  completeCloudflareSignIn,
   connectArtifacts,
   connectCloudflareAccount,
   disconnectArtifacts,
@@ -34,6 +32,7 @@ import { openExternalUrl } from '../../lib/native/env';
 import { SwarmConnection } from './SwarmConnection';
 import './artifacts-connection.css';
 import { describeError } from '../../lib/errors';
+import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
 import { ActionError } from '../ui/ActionError';
 
 export function ArtifactsTitle() {
@@ -74,16 +73,9 @@ export function ArtifactsConnectForm({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const waiting = useRef(false);
+  const cloudflareSignIn = useCloudflareSignIn();
   const open = (url: string) =>
     void openExternalUrl(url).catch((cause) => setError(describeError(cause)));
-  // Leaving the form abandons an unfinished browser sign-in and its listener.
-  useEffect(
-    () => () => {
-      if (waiting.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
   const finish = async (accountId: string) =>
     onConnected(
       await connectCloudflareAccount({
@@ -96,12 +88,7 @@ export function ArtifactsConnectForm({
     setError('');
     setBusy(true);
     try {
-      const url = await beginCloudflareSignIn();
-      setStage({ kind: 'waiting', url });
-      waiting.current = true;
-      await openExternalUrl(url);
-      const accounts = await completeCloudflareSignIn();
-      waiting.current = false;
+      const accounts = await cloudflareSignIn({}, (url) => setStage({ kind: 'waiting', url }));
       const only = accounts.length === 1 ? accounts[0] : undefined;
       if (only) {
         try {
@@ -113,7 +100,6 @@ export function ArtifactsConnectForm({
       }
       setStage({ kind: 'choose', accounts, accountId: accounts[0]?.id ?? '' });
     } catch (cause) {
-      waiting.current = false;
       const message = String(cause);
       if (!message.includes('canceled')) setError(message);
       setStage({ kind: 'start' });
@@ -167,10 +153,7 @@ export function ArtifactsConnectForm({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  waiting.current = false;
-                  void cancelCloudflareSignIn().catch(() => {});
-                }}
+                onClick={() => void cancelCloudflareSignIn().catch(() => {})}
               >
                 Cancel
               </Button>
