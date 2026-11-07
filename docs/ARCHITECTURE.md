@@ -83,7 +83,7 @@ names; changes must preserve both sides and old saved records.
 | computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
 | computers/pool.rs, coordination/hosts.rs | The capacity pool of execution hosts (this device and the person's computers): per-project host choices, limits, health, the deterministic placer for planned and swarm forks, and the one retry of a fork whose host was lost |
 | computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
-| tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), and one record of what workspace tools did |
+| tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), one record of what workspace tools did, and the recovery of changes a lost attempt left on a computer, saved as a patch and never applied |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
@@ -141,7 +141,11 @@ execution guard; the choice reaches the attempt when it is created and is saved 
 Attempts the queue does not dispatch, continuations included, keep the project's computer
 rule or their earlier host. A fork whose host was lost is retried once on another host
 through the same dispatch path, so reservations, quota handoff and the lock order are
-unchanged. See [swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
+unchanged. Recovering the changes a lost attempt left on its computer
+(`tasks/runner/recovery.rs`) takes neither the coordinator lock nor the execution guard:
+it writes only beside the attempt's history and on the computer, never to a workspace,
+and its own lock keeps it apart from a run preparing on that computer. See
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
 
 `desktop_control.rs` separately owns explicit window, app and desktop grants, the
 session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot

@@ -207,7 +207,12 @@ assignments deduplicated and sequenced where scopes overlap). A round runs at le
 assignments, sized to the slots of the project's capacity pool. Every planned or swarm
 fork is placed on one host of that pool (this device or one of the person's computers) by
 what it needs, the project's **Swarms run on** choice and which host has room; the reason
-is recorded in its activity and a fork whose host is lost is retried once elsewhere (see
+is recorded in its activity. Under **Computers only** a fork on a computer never falls
+back to this device: automatic routing offers it only agents that run there, and it
+fails with the reason when none can. A fork whose host is lost is retried once elsewhere
+as a fresh attempt; the changes it left there are saved as a patch on the lost attempt,
+never applied, once that computer answers again. Lost computers stay skipped across a
+restart for the rest of their ten minutes (see
 [swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts)). Rounds stop at the
 plan's round limit (default 5), pause and stop with the plan, start paused after a
 restart, and never assign `.jackalope/**`. A swarm Worker is optional. See

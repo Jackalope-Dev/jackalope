@@ -1,5 +1,17 @@
 [
   {
+    "id": "swarm-tasks-keep-their-work-when-a-computer-drops-out",
+    "date": "2026-11-07",
+    "title": "Swarm tasks keep their work when a computer drops out",
+    "description": "Swarms that run on computers now hold to that choice and keep what a task did on a computer that stopped answering.",
+    "items": [
+      "Under Computers only, a swarm task with an automatic agent is given only an agent that runs on computers, and stops with the reason when none can, instead of running on this device.",
+      "When a computer that stopped answering comes back, the changes a retried task left there are saved as a patch on the lost attempt, shown in its task details with the path to copy, and never applied over the retry.",
+      "A computer that stopped answering stays skipped for ten minutes even if Jackalope restarts."
+    ],
+    "note": "Beta. Not yet tested across real computers in the installed app."
+  },
+  {
     "id": "swarms-spread-across-your-computers",
     "date": "2026-11-06",
     "title": "Swarms spread across your computers",

@@ -433,7 +433,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   use the workspace. Directly delivered connections are withheld; the attempt's activity
   names where each connection runs or why it is withheld. Plan-mode planners and swarm orchestrators run there
   read-only and bring nothing back. Lost contact is retried for 30 minutes, and changes
-  left on the computer come back when the task continues. Such agents have their own
+  left on the computer come back when that attempt continues; once another attempt
+  replaces it, they are saved as a patch on the lost attempt when the computer answers
+  again, never applied, and removed from the computer. Such agents have their own
   concurrency limit (8 by default, up to 32, set in the project's queue); other agents
   stay local. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 - Planned and swarm work spreads across a capacity pool (beta): this device, the project's
@@ -444,9 +446,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   computer, browser-checked criteria), the project's choice and free capacity, preferring
   the project's computer, and records why in its activity. Each host has a concurrency
   limit (computers take two runs unless their runner reports more) and health from its
-  runs; a fork whose host was lost is retried once on another host. Without added
+  runs, saved so a computer lost just before a restart stays skipped for the rest of its
+  ten minutes; a fork whose host was lost is retried once on another host. Under
+  computers only, a fork on a computer never runs on this device: automatic routing
+  offers only Claude Code and Codex, and the fork fails with the reason when neither can
+  run. Without added
   computers, forks run where they did before. The swarm board, map, round view and task
-  details show each fork's host and each host's load; the phone companion shows the host.
+  details show each fork's host and each host's load, and task details show changes
+  recovered from a lost computer with their patch path; the phone companion shows the host.
   See [swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
 - Project secrets (Project settings → Secrets) give a project's task agents environment
   variables such as service API keys, on this device, on its computer or both. Values

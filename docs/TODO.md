@@ -55,6 +55,16 @@ release dates.
   choice, a computer stopped mid-round (the fork retried once elsewhere and the lost host
   skipped until it answers again), a restart mid-round, and the phone companion showing
   the host. Decide whether runners should report `slots` from their machine size.
+- [ ] Accept the lost-host follow-ups in the installed app on Windows and macOS: under
+  **Computers only**, an `auto` fork with only Claude Code or Codex signed in for computers
+  routed to one of them, and one with neither failing with the reason and nothing started
+  on this device; a computer stopped mid-run and started again after its fork was retried,
+  with the lost attempt showing **Changes recovered from** it, the patch opening from the
+  copied path and the workspace untouched, on a tar-synced and a Git-synced computer; a
+  later attempt of the same workspace placed back on that computer starting from its own
+  upload; a continuation of a lost attempt that was not retried bringing its changes back;
+  and Jackalope restarted within ten minutes of losing a computer still skipping it, then
+  using it once the ten minutes pass.
 - [ ] Publish the first computer image from `beta`, make its package public, and accept
   a local pull, a cloud machine started from it and an Agent37 registry import.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default

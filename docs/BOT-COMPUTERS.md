@@ -183,7 +183,8 @@ Running a project's agents on a computer, Agent37 computers and agent sign-ins f
 computers are beta and marked **Beta** wherever the app shows them. A project whose
 **Agents run on** names a computer runs its Claude Code and Codex task agents there,
 including read-only planning attempts (plan mode's planner and a swarm round's
-orchestrator). Other agents run on this device and say so in the attempt's activity.
+orchestrator). Other agents run on this device and say so in the attempt's activity,
+except for swarm forks of a project whose swarms run only on computers.
 Planned and swarm work can also spread to other computers and this device (see
 [swarms across hosts](#swarms-across-hosts)). Workspace preparation, checks, the checkpoint, review and integration stay on
 this device and are unchanged, so the coordinator, execution guard and runtime lock
@@ -192,7 +193,11 @@ order, reservations and Git safeguards apply as for a local attempt:
 1. The local workspace is prepared as usual. If an earlier run of the same workspace
    left changes on the computer (contact was lost, or Jackalope restarted), they are
    brought back and applied first; a patch that does not apply is saved as
-   `<attempt>.recovered.patch` beside the attempt's history. The workspace's tracked
+   `<attempt>.recovered.patch` beside the attempt's history. Changes an attempt left
+   after losing contact are applied only by a continuation of that attempt; any other
+   attempt of the workspace saves them for the lost attempt instead and removes them
+   from the computer before its upload (see
+   [changes left on a lost computer](#changes-left-on-a-lost-computer)). The workspace's tracked
    files and untracked files Git does not ignore (or, for a folder that is not a
    repository, the files its ignore files allow) are sent with the project's copied
    setup files such as `.env.local` (regular files of at most 1 MiB each, 8 MB in all)
@@ -210,8 +215,8 @@ order, reservations and Git safeguards apply as for a local attempt:
    reads fail, the attempt keeps trying for 30 minutes, reconnecting every five failed
    reads and starting the computer again if it stopped, then carries on where it left
    off. A stopped attempt gives up after 30 seconds without contact. Past the window the
-   attempt ends as lost contact and its changes stay on the computer until the task is
-   continued.
+   attempt ends as lost contact and its changes stay on the computer until the attempt
+   is continued, or until they are recovered once another attempt has replaced it.
 4. When it ends, its changes since the upload come back as a binary Git patch, checked
    by SHA-256 (from a bundle, the patch is rebuilt on this device from the result
    bundle), and are applied to the local workspace with `git apply`, which changes
@@ -232,7 +237,8 @@ Claude Code runs with `--permission-mode bypassPermissions` and Codex with
 remotely. The agent CLI does not need to be installed on this device: for a project with
 a computer, launch checks only the agent's adapter and model settings, and this device's
 account profiles are neither required nor checked. Automatic routing still chooses among
-agents installed here. The copy lives at `~/.jackalope-runs/w<hash>/workspace`, named
+agents installed here; for a fork that must stay on a computer (see
+[swarms across hosts](#swarms-across-hosts)) it offers only Claude Code and Codex. The copy lives at `~/.jackalope-runs/w<hash>/workspace`, named
 from the local workspace path, so a continuation reuses the path and the agent's own
 session resumes; the run's folder is removed after its changes come back (for a bundle,
 with its worktree, branch and refs; the project's repository keeps the commits).
@@ -283,8 +289,13 @@ project's computer may take up to that limit, and an added computer takes two ru
 time unless its runner reports `slots` (1 to 32) in `hello` or `run_status`. Health comes
 from runs: a computer is last seen when a run's status or output read succeeds, and lost
 when it cannot be started or reached or contact is lost. A lost computer gets no new work
-for ten minutes unless it is reached again first. Health is kept in memory, so it starts
-empty after a restart.
+for ten minutes unless it is reached again first. When each computer was last reached
+and when and why contact was lost are saved, atomically, in `computers/host-health.json`
+beside `pool.json` (at most 64 computers; reaching a computer is written at most every
+five minutes, losing or regaining contact at once). It is loaded at startup, so a
+computer lost less than ten minutes before a restart stays skipped for the rest of that
+time; an unreadable file, or an entry whose time cannot be read, counts as never lost.
+What runners reported (`browser`, `slots`) is not saved and is learned again from runs.
 
 When the queue reserves a fork, the placer (`computers::pool::place`) decides, the same
 way every time for the same hosts, loads and needs:
@@ -313,18 +324,55 @@ project's agents run, except that **This device only** keeps them here too. A co
 returns to its earlier attempt's host, where its agent session and anything left behind
 are.
 
+Under **Computers only**, a fork placed on a computer (and a continuation of an attempt
+that ran on one) never runs on this device. With the `auto` agent, routing offers only
+agents that run on a computer (Claude Code and Codex); if none of them has an enabled
+account with quota, the attempt fails with that reason instead of choosing another
+agent. An attempt whose agent cannot run there fails the same way at launch. Under
+**Anywhere** and **This device only**, such an agent still runs on this device and the
+placement says why.
+
 A fork whose attempt failed because its host was lost (the computer could not be started
 or reached before the agent ran, contact was lost for the whole 30-minute window, or the
 computer no longer exists) is retried once while its plan's dispatch runs, as a new
 attempt on another host it may use, this device included. The failed attempt's activity
 says where the retry went, or why there was none; a retry that loses its host too is not
-retried again. Changes the lost run left on that computer are not brought back by the
-retry. An agent that fails on a host that answered is an agent failure and is not
-retried.
+retried again. The retry starts fresh; it does not bring back changes the lost run left
+on that computer. An agent that fails on a host that answered is an agent failure and is
+not retried.
 
 The swarm board, its map and a plan's round view name each fork's host and show a line
 per host with its running attempts against its limit, or lost contact. Task details show
 the host and why it was chosen, and the phone companion shows the host in task details.
+
+#### Changes left on a lost computer
+
+An attempt that loses contact mid-run records that its changes stayed on the computer
+(`host.left` on the attempt). The run's folder there, its Git-sync worktree, its
+`jackalope/<run>` branch and its `refs/jackalope/incoming/<run>/` and
+`refs/jackalope/result/<run>` refs are all keyed by the run name, which follows the local
+workspace path; only `refs/jackalope/base/<commit>` is shared by the project's runs.
+
+Once another attempt has replaced the lost one (a host retry, or any retry of it) and
+the computer answers again, a background sweep (`tasks/runner/recovery.rs`, every 30
+seconds, asking each computer at most once a minute) recovers them. It asks a computer
+once the pool no longer skips it (a run has reached it since, or its ten minutes have
+passed) and its provider reports it running, and recovers when it answers; a stopped
+computer is never started for this. The changes
+are collected the way a finished run's are and saved beside the lost attempt's history as
+`<attempt>.remote.patch`, with saved output in `<attempt>.remote.artifacts`, as a patch
+that does not apply is saved. They are never applied to the workspace, because the retry
+may have moved on. The run is then removed from the computer, folder, worktree, branch and
+refs together, so no later run of the workspace there can bring them back. The lost
+attempt's activity records the recovery, and its task details show **Changes recovered
+from** the computer with a button to copy the patch path (and the output path).
+
+Until then, a continuation of the lost attempt still brings its changes back. Any other
+attempt of that workspace placed on the computer saves them for the lost attempt first,
+with a line in its own activity; if they cannot be fetched then, they are discarded so
+they cannot mix into its run. The sweep gives up after three failed fetches and leaves
+the changes on the computer, saying so in the activity. Changes on a computer that was
+removed are reported as lost.
 
 ### How workspaces travel
 
@@ -781,10 +829,14 @@ separate concurrency for computer projects and planned work spread across the po
 other queued work keeps its host; `computers::pool` covers placement by requirements,
 secrets and connection boundaries, the project's choice, load balancing with a pinned
 computer, per-host and shared limits, lost hosts and retries, the default matching the
-placement from before the pool, saved choices and health; `coordination::hosts` covers
+placement from before the pool, saved choices and health, and saved health across a
+restart (including unreadable files); `coordination::hosts` covers
 which failed forks are retried after a lost host and where the retry goes; `tasks::runner`
-also covers recording the chosen host once, continuations returning to their host and a
-computer that does not answer becoming a lost host; `computers::agent37` covers keys, instance
+also covers recording the chosen host once, continuations returning to their host, a
+computer that does not answer becoming a lost host, **Computers only** keeping placed
+forks off this device (at launch and in routing), and changes left on a lost computer
+being saved, never applied, by the sweep or by a later attempt of the workspace, while a
+continuation still brings them back; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
 `computers::image` covers the published reference and the definition hash shared with
 `node --test scripts/release/computer-image.test.mjs`; `computers::agent37` also covers
