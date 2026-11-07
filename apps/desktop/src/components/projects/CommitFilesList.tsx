@@ -1,15 +1,7 @@
 import { Checkbox, IconButton } from '@jackalope/ui';
 import { Undo2 } from 'lucide-react';
+import type { ChangedFile } from '../../lib/project-git';
 import { ConfirmAction } from '../ui/ConfirmAction';
-
-export interface ChangedFile {
-  path: string;
-  oldPath: string | null;
-  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted';
-  staged: boolean;
-  additions: number | null;
-  deletions: number | null;
-}
 
 export const STATUS = {
   modified: { letter: 'M', label: 'Modified' },

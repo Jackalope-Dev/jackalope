@@ -72,13 +72,7 @@ import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
-
-interface ScheduleLedger {
-  schedules: {
-    definition: { id: string; name: string; enabled: boolean; expression: string };
-    nextAt: string;
-  }[];
-}
+import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
 
 function randomStyle() {
   return BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id;
@@ -1233,7 +1227,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
   const read = useCallback(async () => {
     if (!isTauriEnvironment()) return;
     try {
-      setLedger(await invokeNative<ScheduleLedger>('schedule_list'));
+      setLedger(await listSchedules());
     } catch (cause) {
       setError(String(cause));
     }

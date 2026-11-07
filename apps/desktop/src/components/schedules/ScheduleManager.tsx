@@ -8,8 +8,13 @@ import { invokeNative } from '../../lib/native/transport';
 import { isWorking } from '../../lib/run-status';
 import type { RunRequest } from '../../lib/run-types';
 import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
-import { type ScheduleDefinition as Definition, savedPlanDraft } from '../../lib/schedules';
-import { stopTask } from '../../lib/task-actions';
+import {
+  type ScheduleDefinition as Definition,
+  listSchedules,
+  type ScheduleLedger,
+  savedPlanDraft,
+} from '../../lib/schedules';
+import { stopTask } from '../../lib/task-client';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
@@ -31,24 +36,6 @@ import { ScheduleChangePreviewDialog } from './ScheduleChangePreviewDialog';
 import { ScheduleEditDialog } from './ScheduleEditDialog';
 import { ScheduleTemplateLibrary } from './ScheduleTemplateLibrary';
 import { ScheduleWebhookDialog } from './ScheduleWebhookDialog';
-
-interface SavedSchedule {
-  localChecks?: number;
-  quietChecks?: number;
-  webhook?: { createdAt: string } | null;
-  definition: Definition;
-  nextAt: string;
-  history: {
-    dueAt: string;
-    runId: string | null;
-    outcome: string;
-    change?: { before: string; after: string; path: string; branch: string } | null;
-  }[];
-}
-interface Ledger {
-  schedules: SavedSchedule[];
-  error: string | null;
-}
 
 /** Plain-language timing, falling back to the expression for custom schedules. */
 function describeTiming(definition: Definition) {
@@ -76,7 +63,7 @@ export function ScheduleManager(props: {
   const runners = useExecutionStore((s) => s.runners);
   const runs = useExecutionStore((s) => s.runs);
   const legacy = useScheduleStore((s) => s.schedules);
-  const [ledger, setLedger] = useState<Ledger | null>(null);
+  const [ledger, setLedger] = useState<ScheduleLedger | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Definition | null>(null);
@@ -112,12 +99,12 @@ export function ScheduleManager(props: {
     }
   }, [busy, editing]);
   const desktop = isTauriEnvironment();
-  const refresh = async () => setLedger(await invokeNative<Ledger>('schedule_list'));
+  const refresh = async () => setLedger(await listSchedules());
   useEffect(() => {
     if (!desktop) return;
     let alive = true;
     const read = () =>
-      invokeNative<Ledger>('schedule_list')
+      listSchedules()
         .then((data) => {
           if (alive) setLedger(data);
         })
@@ -477,7 +464,7 @@ export function ScheduleManager(props: {
               url: revealed.url,
               token: revealed.token,
             });
-            setLedger(await invokeNative<Ledger>('schedule_list'));
+            setLedger(await listSchedules());
           });
         }}
         onDisable={async () => {
@@ -485,7 +472,7 @@ export function ScheduleManager(props: {
           await act(async () => {
             await invokeNative('schedule_webhook_disable', { id: webhook.id });
             setWebhook(null);
-            setLedger(await invokeNative<Ledger>('schedule_list'));
+            setLedger(await listSchedules());
           });
         }}
       />

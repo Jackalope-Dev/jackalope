@@ -2,6 +2,7 @@ import { Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitCommitHorizontal, GitMerge } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
+import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
@@ -42,7 +43,7 @@ export function LocalDelivery({
     message.reset();
     setPush(false);
     setUncommitted(null);
-    void invokeNative<{ files: { path: string }[] }>('git_working_changes', checkout)
+    void workingChanges(checkout)
       .then((changes) => {
         paths.current = changes.files.map((file) => file.path);
         setUncommitted(paths.current);

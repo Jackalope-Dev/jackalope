@@ -5,7 +5,7 @@ import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/l
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
-import { stopAndSettle, stopPreview } from '../../lib/task-actions';
+import { stopAndSettle, stopPreview } from '../../lib/task-client';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { AttachButton } from '../tasks/AttachButton';
 import { DictationButton } from '../tasks/DictationButton';

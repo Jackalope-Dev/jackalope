@@ -8,7 +8,6 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOpenWorkStore } from '../../stores/openWorkStore';
 import {
-  type ChangeStats,
   compactElapsed,
   isUnread,
   openSignalKey,
@@ -17,6 +16,7 @@ import {
   useWorkSignalsStore,
 } from '../../stores/workSignalsStore';
 import './work-signals.css';
+import type { ChangeStats } from '../../lib/run-types';
 
 /** Key of the work open in the main view. */
 export function useOpenSignalKey() {

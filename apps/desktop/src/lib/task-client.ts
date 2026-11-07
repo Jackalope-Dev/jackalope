@@ -1,11 +1,18 @@
 import { invokeNative } from './native/transport.ts';
 import { isActive } from './run-status.ts';
-import type { TaskRun } from './run-types.ts';
+import type { ChangeStats, Review, TaskRun } from './run-types.ts';
 
 export const stopTask = (id: string) => invokeNative<void>('task_stop', { id });
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });
 /** Start a fresh attempt at a task whose last attempt did not finish. */
 export const retryTask = (id: string) => invokeNative<string>('task_retry', { id });
+export const taskReview = (id: string) => invokeNative<Review>('task_review', { id });
+/** Diff size per attempt, keyed by id; attempts whose diff cannot be read are left out. */
+export const taskChangeStats = (ids: string[]) =>
+  invokeNative<Record<string, ChangeStats>>('task_change_stats', { ids });
+/** Loads an archived attempt back into history. */
+export const restoreArchivedTask = (id: string) =>
+  invokeNative<void>('task_restore_archived', { id });
 export const respondToPrompt = (runId: string, promptId: string, answer: string) =>
   invokeNative<boolean>('task_respond_prompt', { runId, promptId, answer });
 

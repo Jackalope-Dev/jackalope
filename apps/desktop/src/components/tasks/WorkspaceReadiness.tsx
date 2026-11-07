@@ -1,23 +1,10 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
+import { projectReadiness, type Readiness } from '../../lib/readiness';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
-
-export interface Readiness {
-  head: string;
-  branch: string;
-  changes: string;
-  recentChanges: string;
-  prepareCommand: string | null;
-  verifyCommand: string | null;
-  previewCommand: string | null;
-  dependenciesMissing: boolean;
-  missingConfiguration: string[];
-  notes: string[];
-}
 
 export function WorkspaceReadiness({
   project,
@@ -45,7 +32,7 @@ export function WorkspaceReadiness({
     setBusy(true);
     setError('');
     try {
-      const value = await invokeNative<Readiness>('project_readiness', { path });
+      const value = await projectReadiness(path);
       if (version === request.current) setResult(value);
     } catch (cause) {
       if (version === request.current) setError(String(cause));

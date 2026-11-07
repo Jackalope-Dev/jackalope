@@ -17,7 +17,7 @@ import { queueCommand } from '../../lib/queue';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { isActive, isFinished } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
-import { stopPreview } from '../../lib/task-actions';
+import { stopPreview } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';

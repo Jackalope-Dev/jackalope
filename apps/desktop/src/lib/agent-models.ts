@@ -11,6 +11,11 @@ export interface ModelCatalog {
   detail: string;
 }
 
+export const agentModels = (
+  agent: string,
+  options: { agentProfileId?: string; refresh: boolean },
+) => invokeNative<ModelCatalog>('agent_models', { agent, ...options });
+
 export function useAgentModels(agentId: string, revision = 0, agentProfileId?: string) {
   const [catalog, setCatalog] = useState<ModelCatalog>();
   const [loading, setLoading] = useState(false);
@@ -30,11 +35,7 @@ export function useAgentModels(agentId: string, revision = 0, agentProfileId?: s
       }
       setLoading(true);
       try {
-        const result = await invokeNative<ModelCatalog>('agent_models', {
-          agent: agentId,
-          agentProfileId,
-          refresh: force,
-        });
+        const result = await agentModels(agentId, { agentProfileId, refresh: force });
         if (version === request.current) {
           setCatalog(result);
           setLoadedKey(key);

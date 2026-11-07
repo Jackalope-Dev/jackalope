@@ -2,7 +2,7 @@ import { Checkbox, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { KeyRound } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { ModelCatalog } from '../../lib/agent-models';
+import { agentModels, type ModelCatalog } from '../../lib/agent-models';
 import {
   type AgentProfile,
   completeProviderProfile,
@@ -70,8 +70,7 @@ function ConnectProvider({
   };
   const readModels = async () => {
     if (!profile.current) return;
-    const result = await invokeNative<ModelCatalog>('agent_models', {
-      agent: 'opencode',
+    const result = await agentModels('opencode', {
       agentProfileId: profile.current.id,
       refresh: true,
     });

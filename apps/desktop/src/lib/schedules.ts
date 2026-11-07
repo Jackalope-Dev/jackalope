@@ -1,4 +1,5 @@
 import type { ScheduledTask } from '../stores/scheduleStore.ts';
+import { invokeNative } from './native/transport.ts';
 import type { Runner, RunRequest } from './run-types.ts';
 
 export const scheduleHourIntervals = ['1', '2', '3', '4', '6', '8', '12'];
@@ -49,6 +50,30 @@ export interface ScheduleDefinition {
   enabled: boolean;
   request: RunRequest;
 }
+
+interface ScheduleOccurrence {
+  dueAt: string;
+  runId: string | null;
+  outcome: string;
+  change?: { before: string; after: string; path: string; branch: string } | null;
+}
+
+export interface SavedSchedule {
+  localChecks?: number;
+  quietChecks?: number;
+  webhook?: { createdAt: string } | null;
+  lastNotice?: ScheduleOccurrence | null;
+  definition: ScheduleDefinition;
+  nextAt: string;
+  history: ScheduleOccurrence[];
+}
+
+export interface ScheduleLedger {
+  schedules: SavedSchedule[];
+  error: string | null;
+}
+
+export const listSchedules = () => invokeNative<ScheduleLedger>('schedule_list');
 
 export function savedPlanDraft(
   plan: ScheduledTask,

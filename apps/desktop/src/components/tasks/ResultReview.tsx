@@ -3,7 +3,6 @@ import { ArrowRight, Check, FileDiff, GitMerge, Images, ListChecks, RefreshCw } 
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { invokeNative } from '../../lib/native/transport';
 import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
 import type { Review, TaskRun } from '../../lib/run-types';
@@ -21,6 +20,7 @@ import { ReviewActions } from './ReviewActions';
 import { ReviewFeedback } from './ReviewFeedback';
 import { ReviewScreenshots } from './ReviewScreenshots';
 import './result-review.css';
+import { taskReview } from '../../lib/task-client';
 
 export type ReviewSection = 'changes' | 'screenshots' | 'checks' | 'delivery';
 
@@ -96,7 +96,7 @@ export function ResultReview({
     setError('');
     try {
       if (suppliedReview) await onRefresh?.();
-      else setReview(await invokeNative<Review>('task_review', { id: run.id }));
+      else setReview(await taskReview(run.id));
     } catch (error) {
       setError(String(error));
     } finally {

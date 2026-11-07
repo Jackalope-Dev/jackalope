@@ -4,9 +4,8 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
-import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
+import { missingProjectDefaults } from '../../lib/context/project-defaults';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { WindowGlass } from '../../lib/window-glass';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
@@ -30,6 +29,7 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
 import './onboarding.css';
+import { projectReadiness } from '../../lib/readiness';
 
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
@@ -108,7 +108,7 @@ export function OnboardingFlow({
   useEffect(() => {
     if (!desktop || !previewProjectId || !projectPath) return;
     let canceled = false;
-    void invokeNative<ProjectDefaults>('project_readiness', { path: projectPath })
+    void projectReadiness(projectPath)
       .then((defaults) => {
         if (canceled) return;
         const current = useOnboardingStore.getState();

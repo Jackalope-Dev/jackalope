@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
+import { listSchedules, type SavedSchedule } from '../../lib/schedules';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { useCompanionNotices } from '../mascot/useCompanionNotices';
 
-interface ScheduleStatus {
-  lastNotice?: { dueAt: string; runId: string | null; outcome: string } | null;
-  definition: { id: string; name: string; request: { projectId: string } };
-  history: { dueAt: string; runId: string | null; outcome: string }[];
-}
 export function ScheduleNotice() {
-  const [schedules, setSchedules] = useState<ScheduleStatus[]>([]);
+  const [schedules, setSchedules] = useState<SavedSchedule[]>([]);
   const [error, setError] = useState('');
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {
@@ -29,7 +24,7 @@ export function ScheduleNotice() {
     if (!isTauriEnvironment()) return;
     let active = true;
     const refresh = () =>
-      invokeNative<{ schedules: ScheduleStatus[] }>('schedule_list')
+      listSchedules()
         .then((data) => {
           if (active) {
             setSchedules(data.schedules);

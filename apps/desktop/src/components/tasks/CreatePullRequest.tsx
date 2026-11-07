@@ -2,6 +2,7 @@ import { Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
+import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
@@ -38,7 +39,7 @@ export function CreatePullRequest({
     setDraft(true);
     message.write(false);
     setUncommitted(null);
-    void invokeNative<{ files: { path: string }[] }>('git_working_changes', checkout)
+    void workingChanges(checkout)
       .then((changes) => setUncommitted(changes.files.map((file) => file.path)))
       .catch(() => setUncommitted([]));
   };

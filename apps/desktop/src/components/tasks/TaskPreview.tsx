@@ -3,15 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { previewUrl } from '../../lib/preview-url';
+import { projectReadiness } from '../../lib/readiness';
 import type { ScreenshotArtifact, TaskRun } from '../../lib/run-types';
-import { stopPreview } from '../../lib/task-actions';
+import { stopPreview } from '../../lib/task-client';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { DesignPreview } from './DesignPreview';
 import { ScreenshotPreview } from './ScreenshotPreview';
-import type { Readiness } from './WorkspaceReadiness';
 
 export interface Preview {
   port: number;
@@ -65,7 +65,7 @@ export function TaskPreview({
   useEffect(() => {
     if (project?.preferences?.previewCommand !== undefined || !run.workspace) return;
     let alive = true;
-    void invokeNative<Readiness>('project_readiness', { path: run.workspace })
+    void projectReadiness(run.workspace)
       .then((result) => {
         if (alive && result.previewCommand)
           setCommand((value) => value || result.previewCommand || '');
@@ -230,9 +230,7 @@ export function TaskPreview({
             disabled={busy || preview?.running}
             onClick={() =>
               void act(async () => {
-                const result = await invokeNative<Readiness>('project_readiness', {
-                  path: run.workspace,
-                });
+                const result = await projectReadiness(run.workspace);
                 if (result.previewCommand) {
                   setCommand(result.previewCommand);
                   setNotice('Suggested command ready to review. Choose Start preview to run it.');

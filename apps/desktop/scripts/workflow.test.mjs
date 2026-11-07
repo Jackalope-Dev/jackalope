@@ -4,7 +4,7 @@ import { agentProvider, taskAgents } from '../src/lib/agent-provider.ts';
 import { taskNotices } from '../src/lib/companion-tasks.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { returnToProject } from '../src/lib/project-return.ts';
-import { waitForStoppedAttempt } from '../src/lib/task-actions.ts';
+import { waitForStoppedAttempt } from '../src/lib/task-client.ts';
 import {
   collectWork,
   collectWorkspaceWork,

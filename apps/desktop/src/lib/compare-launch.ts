@@ -4,8 +4,8 @@ import { agentAccountFor, type Project } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
 import { attemptLabel, buildJudgePrompt } from './compare-judge';
 import type { ContextSelection } from './knowledge-types';
-import { invokeNative } from './native/transport';
-import type { Review, RunRequest, TaskRun } from './run-types';
+import type { RunRequest, TaskRun } from './run-types';
+import { taskReview } from './task-client';
 import { taskTitle } from './task-title';
 
 /**
@@ -107,9 +107,7 @@ export async function startComparisonJudge({
   if (attempts.length < 2 || !first)
     throw new Error('Judging needs at least two finished attempts.');
   const reviews = await Promise.all(
-    attempts.map((attempt) =>
-      invokeNative<Review>('task_review', { id: attempt.id }).catch(() => undefined),
-    ),
+    attempts.map((attempt) => taskReview(attempt.id).catch(() => undefined)),
   );
   const prompt = buildJudgePrompt(
     comparison.prompt,

@@ -2,17 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isTauriEnvironment } from '../lib/native/env';
-import { invokeNative } from '../lib/native/transport';
 import { isActive } from '../lib/run-status';
-import type { TaskRun } from '../lib/run-types';
+import type { ChangeStats, TaskRun } from '../lib/run-types';
+import { taskChangeStats } from '../lib/task-client';
 
 export { compactElapsed, isUnread, openSignalKey, signalKey } from '../lib/work-signals';
-
-export interface ChangeStats {
-  files: number;
-  added: number;
-  removed: number;
-}
 
 interface WorkSignalsState {
   /** Work finished before this time is never reported as unread (first run of this feature). */
@@ -116,9 +110,7 @@ export function useChangeStats(runs: (TaskRun | undefined)[]) {
         );
       });
       if (!due.length) return;
-      pending = invokeNative<Record<string, ChangeStats>>('task_change_stats', {
-        ids: due.map((run) => run.id),
-      })
+      pending = taskChangeStats(due.map((run) => run.id))
         .then((result) => {
           const checkedAt = Date.now();
           useWorkSignalsStore.setState((state) => {

@@ -29,7 +29,7 @@ import {
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
-import { respondToPrompt, stopTask } from '../../lib/task-actions';
+import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
 import { selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';

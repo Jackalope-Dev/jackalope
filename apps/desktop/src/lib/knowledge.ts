@@ -6,6 +6,7 @@ import { lessonCheckDraftKey } from './learning';
 import { isTauriEnvironment } from './native/env';
 import { invokeNative } from './native/transport';
 import { createReadCache } from './read-cache';
+import { restoreArchivedTask } from './task-client';
 import { workspaceModeFor } from './workspace-mode';
 
 const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);
@@ -68,7 +69,7 @@ export function useKnowledge(projectId: string, projectPath: string) {
 
 export async function openKnowledgeTask(projectId: string, runId: string) {
   if (!useExecutionStore.getState().runs.some((run) => run.id === runId)) {
-    await invokeNative('task_restore_archived', { id: runId });
+    await restoreArchivedTask(runId);
     await useExecutionStore.getState().refresh();
     if (!useExecutionStore.getState().runs.some((run) => run.id === runId))
       throw new Error('The source task could not be loaded. Retry from archived history.');

@@ -7,7 +7,7 @@ import {
   type ThemeChange,
 } from '../../lib/helper-actions';
 import { invokeNative } from '../../lib/native/transport';
-import { stopTask } from '../../lib/task-actions';
+import { stopTask } from '../../lib/task-client';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {

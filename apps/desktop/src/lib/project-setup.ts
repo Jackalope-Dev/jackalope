@@ -4,19 +4,23 @@ import { type Project, projectPathKey, useProjectStore } from '../stores/project
 import { missingProjectDefaults } from './context/project-defaults';
 import { invokeNative } from './native/transport';
 
-interface ProjectInfo {
+/** A folder the native side checked: its resolved path, name and Git state. */
+export interface ProjectInfo {
   path: string;
   name: string;
   branch: string;
   repository: boolean;
 }
 
+export const validateProject = (path: string) =>
+  invokeNative<ProjectInfo>('task_validate_project', { path });
+
 export async function openProject(
   path: string,
   options: { provisional?: boolean; pending?: Project | null } = {},
 ) {
   await syncAgentConfig();
-  const info = await invokeNative<ProjectInfo>('task_validate_project', { path: path.trim() });
+  const info = await validateProject(path.trim());
   const project = projectFromInfo(info, options.pending);
   return options.provisional ? project : commitProjectSetup(project);
 }

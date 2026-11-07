@@ -19,7 +19,13 @@ import { useShallow } from 'zustand/react/shallow';
 import { authorEvidence } from '../../lib/agent-review';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
+import {
+  type ChangedFile,
+  type CommitPolicy,
+  projectGitPolicy,
+  type WorkingChanges,
+  workingChanges,
+} from '../../lib/project-git';
 import { isActive } from '../../lib/run-status';
 import type { RunRequest } from '../../lib/run-types';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
@@ -39,15 +45,9 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
-import { stopTask } from '../../lib/task-actions';
-import { type ChangedFile, CommitFilesList, STATUS } from './CommitFilesList';
+import { stopTask } from '../../lib/task-client';
+import { CommitFilesList, STATUS } from './CommitFilesList';
 import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
-
-interface WorkingChanges {
-  branch: string | null;
-  head: string | null;
-  files: ChangedFile[];
-}
 
 const TITLE_LIMIT = 72;
 
@@ -171,10 +171,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setLoading(true);
     setError('');
     try {
-      const next = await invokeNative<WorkingChanges>('git_working_changes', {
-        repoPath: projectPath,
-        worktreePath: target,
-      });
+      const next = await workingChanges({ repoPath: projectPath, worktreePath: target });
       if (current.current !== target) return;
       setChanges(next);
       setHistoryVersion((value) => value + 1);

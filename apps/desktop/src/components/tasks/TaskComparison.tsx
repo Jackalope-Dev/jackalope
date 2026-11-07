@@ -20,7 +20,7 @@ import {
   isFinished,
   statusLabel,
 } from '../../lib/run-status';
-import type { TaskRun } from '../../lib/run-types';
+import type { ChangeStats, TaskRun } from '../../lib/run-types';
 import { latestAttempt } from '../../lib/task-workflow';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { type Comparison, comparisonForTask, useCompareStore } from '../../stores/compareStore';
@@ -33,12 +33,7 @@ import { DismissButton } from '../ui/DismissButton';
 import { InlineNotice } from '../ui/InlineNotice';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
-
-interface Stats {
-  files: number;
-  added: number;
-  removed: number;
-}
+import { taskChangeStats } from '../../lib/task-client';
 
 function duration(run: TaskRun) {
   if (run.durationMs != null) return durationLabel(run.durationMs / 1000);
@@ -165,7 +160,7 @@ function ComparisonDialog({
   onClose: () => void;
 }) {
   const { id: comparisonId, prompt, chosenTaskId, judge } = comparison;
-  const [stats, setStats] = useState<Record<string, Stats | 'error'>>({});
+  const [stats, setStats] = useState<Record<string, ChangeStats | 'error'>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const runners = useExecutionStore(useShallow((state) => state.runners));
@@ -280,7 +275,7 @@ function ComparisonDialog({
     let canceled = false;
     const ids = finishedIds.split(',').filter(Boolean);
     if (ids.length)
-      invokeNative<Record<string, Stats>>('task_change_stats', { ids })
+      taskChangeStats(ids)
         .then((result) => {
           if (!canceled) setStats(Object.fromEntries(ids.map((id) => [id, result[id] ?? 'error'])));
         })

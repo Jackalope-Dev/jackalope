@@ -27,7 +27,7 @@ import { Textarea } from '../ui/Textarea';
 import { agentAdapter } from './CrossModelReviewPanel';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';
-import { stopTask } from '../../lib/task-actions';
+import { stopTask } from '../../lib/task-client';
 
 const SEVERITY = {
   high: { label: 'High', variant: 'danger' },

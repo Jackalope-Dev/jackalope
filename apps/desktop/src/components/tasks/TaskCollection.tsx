@@ -28,7 +28,7 @@ import {
   workPresence,
   workShape,
 } from '../../lib/task-collection';
-import { type ChangeStats, useChangeStats } from '../../stores/workSignalsStore';
+import { useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
@@ -36,6 +36,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './task-collection.css';
+import type { ChangeStats } from '../../lib/run-types';
 
 export interface TaskCollectionView {
   filter: string;

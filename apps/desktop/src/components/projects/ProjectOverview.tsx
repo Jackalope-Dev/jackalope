@@ -18,7 +18,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
 import { taskTitle } from '../../lib/task-title';
@@ -32,7 +31,6 @@ import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
-import type { Readiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
 import { EmptyState } from '../ui/EmptyState';
@@ -41,6 +39,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './project-overview.css';
+import { projectReadiness, type Readiness } from '../../lib/readiness';
 
 export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }) {
   const project = useProjectStore((state) =>
@@ -79,7 +78,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     setReadiness(null);
     setReadinessError('');
     try {
-      const data = await invokeNative<Readiness>('project_readiness', { path });
+      const data = await projectReadiness(path);
       if (request === readinessRequest.current) setReadiness({ path, value: data });
     } catch (cause) {
       if (request === readinessRequest.current) setReadinessError(String(cause));

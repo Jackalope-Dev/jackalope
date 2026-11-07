@@ -9,22 +9,20 @@ import {
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
+import {
+  pairRemoteHost,
+  type RemoteHost,
+  remoteHosts,
+  removeRemoteHost,
+} from '../../lib/remote-hosts';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { type RemoteAction, RemoteWorkspace } from './RemoteWorkspace';
 
-interface Host {
-  id: string;
-  name: string;
-  address: string;
-  ssh: boolean;
-  port: number;
-  wsl?: boolean;
-}
 export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
-  const [hosts, setHosts] = useState<Host[]>([]);
+  const [hosts, setHosts] = useState<RemoteHost[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
@@ -62,7 +60,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   }, [method]);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const next = await invokeNative<Host[]>('remote_hosts');
+      const next = await remoteHosts();
       if (!signal?.aborted) {
         setHosts(next);
         setLoaded(true);
@@ -126,8 +124,8 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   setBusy(true);
                   setError('');
                   try {
-                    await invokeNative('remote_host_remove', { id: host.id });
-                    setHosts(await invokeNative<Host[]>('remote_hosts'));
+                    await removeRemoteHost(host.id);
+                    setHosts(await remoteHosts());
                   } catch (cause) {
                     setError(String(cause));
                   } finally {
@@ -164,7 +162,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
               setBusy(true);
               setError('');
               try {
-                const paired = await invokeNative<Host>('remote_host_pair', {
+                const paired = await pairRemoteHost({
                   name,
                   address,
                   ssh: method === 'ssh',
@@ -172,7 +170,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   port,
                   code: code.trim(),
                 });
-                setHosts(await invokeNative<Host[]>('remote_hosts'));
+                setHosts(await remoteHosts());
                 setSelected(paired.id);
                 setAdding(false);
                 setCode('');

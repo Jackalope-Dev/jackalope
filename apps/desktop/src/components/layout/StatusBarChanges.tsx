@@ -1,7 +1,7 @@
 import { GitCommitHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
+import { workingChanges } from '../../lib/project-git';
 import { openChanges } from '../../stores/commitReviewStore';
 
 /**
@@ -25,10 +25,7 @@ export function StatusBarChanges({
       // stack Git processes that each walk the whole checkout.
       if (document.hidden || reading) return;
       reading = true;
-      invokeNative<{ files: unknown[] }>('git_working_changes', {
-        repoPath: projectPath,
-        worktreePath: checkout,
-      })
+      workingChanges({ repoPath: projectPath, worktreePath: checkout })
         .then((changes) => live && setCount(changes.files.length))
         // A worktree still being prepared, or removed, simply shows nothing.
         .catch(() => live && setCount(null))

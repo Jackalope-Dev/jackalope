@@ -5,6 +5,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { statusLabel } from '../../lib/run-status';
 import type { ArchivedRun } from '../../lib/run-types';
+import { restoreArchivedTask } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
@@ -54,7 +55,7 @@ export function ArchivedHistory() {
     setError('');
     setNotice('');
     try {
-      await invokeNative('task_restore_archived', { id: run.id });
+      await restoreArchivedTask(run.id);
       setRuns((current) => current.filter((item) => item.id !== run.id));
       setNotice('Task restored to your loaded history.');
       await useExecutionStore.getState().refresh();

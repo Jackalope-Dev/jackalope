@@ -412,6 +412,11 @@ export interface Verification {
     durationMs: number;
   };
 }
+export interface ChangeStats {
+  files: number;
+  added: number;
+  removed: number;
+}
 export interface Review {
   files: string[];
   diff: string;
