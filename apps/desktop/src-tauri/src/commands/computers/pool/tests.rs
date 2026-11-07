@@ -288,7 +288,12 @@ fn the_pool_lists_hosts_for_each_kind_of_work() {
                 id: "box".into(),
                 name: "Box".into(),
                 pinned_by: Some("p".into()),
-                health: Default::default(),
+                // The project's own computer keeps the shared limit whatever
+                // its runner reports.
+                health: PoolHealth {
+                    slots: Some(1),
+                    ..Default::default()
+                },
             },
             PoolComputer {
                 id: "lab".into(),

@@ -278,15 +278,15 @@ computer when it has one, otherwise on this device. The choice is offered once t
 a computer to run on.
 
 Each host has a concurrency limit. This device keeps the queue's limit of one to six;
-computers together keep the queue's limit on agents on computers (8 by default). A
-computer whose runner reports `slots` (1 to 32) in `hello` or `run_status` takes that many
-runs at a time; otherwise the project's computer may take up to the shared limit and an
-added computer takes two. The image's runner reports one run per two CPUs and per 4 GiB of
+computers together keep the queue's limit on agents on computers (8 by default). The
+project's computer may take up to that shared limit whatever its runner reports. An
+added computer takes the `slots` (1 to 32) its runner reports in `hello` or
+`run_status`, or two when it reports none. The image's runner reports one run per two CPUs and per 4 GiB of
 memory (rounded to whole GiB), whichever allows fewer, from 1 to 8, counting the
 container's cgroup CPU and memory limits. A run is an agent CLI plus the builds, tests,
-dev servers and Chromium it starts, so a 4-CPU, 8 GB machine takes two and a local
-sandbox at its default 2 CPUs and 4 GB takes one; give the sandbox more CPUs and memory
-in its settings for more. A whole number from 1 to 32 in `JACKALOPE_RUNNER_SLOTS` in the
+dev servers and Chromium it starts, so an added 4-CPU, 8 GB machine takes two and an
+added local sandbox at its default 2 CPUs and 4 GB takes one; give the sandbox more CPUs
+and memory in its settings for more. A whole number from 1 to 32 in `JACKALOPE_RUNNER_SLOTS` in the
 agent's environment replaces the derived value, for example `-e JACKALOPE_RUNNER_SLOTS=4`
 on a cloud machine's `docker run`; any other value is ignored. Jackalope sets no such
 variable on the computers it creates. Runners from earlier images report no `slots`.

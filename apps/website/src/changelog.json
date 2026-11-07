@@ -3,9 +3,9 @@
     "id": "computers-take-as-many-agents-as-they-have-room-for",
     "date": "2026-11-07",
     "title": "Computers take as many agents as they have room for",
-    "description": "A computer now tells Jackalope how many agents it can run at once from its processors and memory, so swarms put more work on larger computers and less on small ones.",
+    "description": "A computer now tells Jackalope how many agents it can run at once from its processors and memory, so swarms put more work on larger added computers and less on small ones.",
     "items": [
-      "A computer takes one agent for every two processors and 4 GB of memory, up to eight. Set JACKALOPE_RUNNER_SLOTS on the computer to choose a different number.",
+      "A computer added to a project's swarms takes one agent for every two processors and 4 GB of memory, up to eight. Set JACKALOPE_RUNNER_SLOTS on the computer to choose a different number. A project's own computer keeps the shared limit on agents on computers.",
       "uv, installed on a computer when a connection needs it, now comes from a fixed release and is checked against its known fingerprint before it runs.",
       "Repository search by agents on a computer now ranks files by the names they declare, like searches on this device."
     ],

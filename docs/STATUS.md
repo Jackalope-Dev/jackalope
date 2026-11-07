@@ -447,9 +447,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   computer, secrets available to only one place, selected connections that cannot reach a
   computer, browser-checked criteria), the project's choice and free capacity, preferring
   the project's computer, and records why in its activity. Each host has a concurrency
-  limit (a computer takes the `slots` its runner derives from its CPUs and memory, 1 to 8,
-  or sets through `JACKALOPE_RUNNER_SLOTS`; one on an earlier image takes two, or the
-  shared limit for the project's computer) and health from its
+  limit (the project's computer takes up to the shared limit on agents on computers; an
+  added computer takes the `slots` its runner derives from its CPUs and memory, 1 to 8,
+  or sets through `JACKALOPE_RUNNER_SLOTS`, and two on an earlier image) and health from its
   runs; a fork whose host was lost is retried once on another host. Without added
   computers, forks run where they did before. The swarm board, map, round view and task
   details show each fork's host and each host's load; the phone companion shows the host.
