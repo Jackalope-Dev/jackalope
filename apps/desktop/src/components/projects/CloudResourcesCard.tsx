@@ -1,8 +1,8 @@
 import { Button, SettingGroup } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
 import { resourceOption } from '../../lib/cloud-resources-plan';
-import { type CloudResourcesStatus, cloudResourcesStatus } from '../../lib/cloudflare-resources';
+import { cloudResourcesStatus } from '../../lib/cloudflare-resources';
 import { isTauriEnvironment } from '../../lib/native/env';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { openCloudResources, openSettings } from '../layout/navigation';
 
 /** Project settings entry to the Cloud resources screen, or to connecting Cloudflare first. */
@@ -13,17 +13,11 @@ export function CloudResourcesCard({
   projectId: string;
   projectPath: string;
 }) {
-  const [status, setStatus] = useState<CloudResourcesStatus>();
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let alive = true;
-    cloudResourcesStatus(projectPath)
-      .then((next) => alive && setStatus(next))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [projectPath]);
+  const { data: status } = useNativeResource(
+    () => cloudResourcesStatus(projectPath),
+    [projectPath],
+    { enabled: isTauriEnvironment() },
+  );
   if (!status) return null;
   const resources = status.manifest?.resources ?? [];
   if (!status.accountId && resources.length === 0) {

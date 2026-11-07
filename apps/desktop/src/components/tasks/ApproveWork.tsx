@@ -9,41 +9,30 @@ import {
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
 import { ActionError } from '../ui/ActionError';
 
 export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () => void }) {
   const [open, setOpen] = useState(false);
-  const [tree, setTree] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const requirements = run.contract?.requirements ?? [];
   const step = run.contract?.step ?? 0;
   const currentRequirements = requirements.filter(
     (item, index) => !item.checkpoint || index === step,
   );
-  useEffect(() => {
-    if (!open) return;
-    let alive = true;
-    setTree(null);
-    setError('');
-    void invokeNative<string>('task_outcome_snapshot', { id: run.id }).then(
-      (value) => {
-        if (alive) setTree(value);
-      },
-      (cause) => {
-        if (alive) setError(describeError(cause));
-      },
-    );
-    return () => {
-      alive = false;
-    };
-  }, [open, run.id]);
+  const snapshot = useNativeResource(
+    () => invokeNative<string>('task_outcome_snapshot', { id: run.id }),
+    [run.id],
+    { enabled: open },
+  );
+  const tree = snapshot.data ?? null;
+  const { error, setError } = snapshot;
   const approve = async () => {
     if (busy || !tree) return;
     setBusy(true);

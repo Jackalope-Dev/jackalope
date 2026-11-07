@@ -1,5 +1,4 @@
 import { Disclosure, DisclosureBody, DisclosureSummary, InlineNotice, Table } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
 import {
   countedTaskDecisions,
   decisionUsageEntries,
@@ -7,40 +6,15 @@ import {
   type TaskDecisionUsage,
 } from '../../lib/decision-usage';
 import { decisionLabels } from '../../lib/decisions';
-import { describeError } from '../../lib/errors';
 import { summarizeUsage } from '../../lib/usage-insights';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
-export function useTaskDecisionUsage(enabled = true) {
-  const [records, setRecords] = useState<TaskDecisionUsage[]>([]);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (!enabled) return;
-    let alive = true;
-    const read = () =>
-      void readTaskDecisionUsage()
-        .then((values) => {
-          if (alive) {
-            setRecords(values);
-            setLoading(false);
-            setError('');
-          }
-        })
-        .catch((cause) => {
-          if (alive) {
-            setError(describeError(cause));
-            setLoading(false);
-          }
-        });
-    read();
-    const timer = setInterval(read, 15000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [enabled]);
-  return { records, error, loading };
+const NO_RECORDS: TaskDecisionUsage[] = [];
+
+export function useTaskDecisionUsage() {
+  const { data, error, loading } = useNativeResource(readTaskDecisionUsage, [], { pollMs: 15000 });
+  return { records: data ?? NO_RECORDS, error, loading };
 }
 
 export function DecisionUsage({

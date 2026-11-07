@@ -1,8 +1,9 @@
 import { InlineNotice, SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { useNativeResource } from '../../lib/useNativeResource';
 
 interface DesktopSettings {
   closeToTray: boolean;
@@ -11,26 +12,16 @@ interface DesktopSettings {
 }
 
 export function WindowBehaviorSettings() {
-  const [settings, setSettings] = useState<DesktopSettings>();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const native = isTauriEnvironment();
-
-  useEffect(() => {
-    if (!native) return;
-    let active = true;
-    invokeNative<DesktopSettings>('desktop_settings').then(
-      (value) => {
-        if (active) setSettings(value);
-      },
-      (reason) => {
-        if (active) setError(describeError(reason));
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [native]);
+  const {
+    data: settings,
+    setData: setSettings,
+    error,
+    setError,
+  } = useNativeResource(() => invokeNative<DesktopSettings>('desktop_settings'), [], {
+    enabled: native,
+  });
 
   const update = async (enabled: boolean) => {
     if (!settings || saving) return;

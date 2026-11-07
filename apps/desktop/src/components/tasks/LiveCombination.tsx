@@ -1,7 +1,7 @@
 import { InlineNotice } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { useNativeResource } from '../../lib/useNativeResource';
 
 interface LiveCombinationView {
   runs: { taskId: string; files: number; added: number; removed: number }[];
@@ -23,26 +23,20 @@ export function LiveCombination({
   titles: Record<string, string>;
   live: boolean;
 }) {
-  const [view, setView] = useState<LiveCombinationView>();
   const key = taskIds.join(',');
-  useEffect(() => {
-    const ids = key ? key.split(',') : [];
-    if (!isTauriEnvironment() || ids.length < 2) return;
-    let current = true;
-    const load = () =>
-      void invokeNative<LiveCombinationView>('coordination_live_combination', {
+  const combination = useNativeResource(
+    () =>
+      invokeNative<LiveCombinationView>('coordination_live_combination', {
         projectId,
-        taskIds: ids,
-      })
-        .then((next) => current && setView(next))
-        .catch(() => current && setView(undefined));
-    load();
-    const timer = live ? window.setInterval(load, REFRESH_MS) : undefined;
-    return () => {
-      current = false;
-      window.clearInterval(timer);
-    };
-  }, [projectId, key, live]);
+        taskIds: key.split(','),
+      }),
+    [projectId, key],
+    {
+      enabled: isTauriEnvironment() && taskIds.length >= 2,
+      pollMs: live ? REFRESH_MS : undefined,
+    },
+  );
+  const view = combination.error ? undefined : combination.data;
   if (!view || view.runs.length < 2) return null;
   if (view.conflicts.length) {
     return (

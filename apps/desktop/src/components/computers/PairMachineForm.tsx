@@ -1,8 +1,9 @@
 import { Button, CopyButton, FormField, Input } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { addCloudMachine, type CloudMachine, cloudMachines } from '../../lib/computers';
 import './computers.css';
 import { describeError } from '../../lib/errors';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { ActionError } from '../ui/ActionError';
 
 /** The tag of an image built from resources/computer on the machine itself. */
@@ -41,18 +42,7 @@ export function PairMachineForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // This version's published image; a locally built one when it is unknown.
-  const [image, setImage] = useState(LOCAL_IMAGE);
-  useEffect(() => {
-    let current = true;
-    void cloudMachines()
-      .then((view) => {
-        if (current && view.image) setImage(view.image);
-      })
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, []);
+  const image = useNativeResource(cloudMachines, []).data?.image || LOCAL_IMAGE;
   const command = runCommand(secret.trim(), image);
   return (
     <form
