@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
 import { channel, origin, readNotes, releasePlan, root, sha256, version } from './catalog.mjs';
 
 export async function publish({ receipt, notes, base, store, publicRead }) {
@@ -11,13 +12,11 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   const current = await publicRead(`${c}/latest.json`, true);
   const previous = current?.catalog ? await publicRead(current.catalog, true) : [];
   const plan = releasePlan({ receipt, notes, base, current, previous });
-  const expected = [
-    `Jackalope_${v}_x64-setup.exe`,
-    `Jackalope_${v}_x64-setup.exe.sig`,
-    `Jackalope_${v}_x64_en-US.msi`,
-    `Jackalope_${v}_x64_en-US.msi.sig`,
-    'checksums.json',
-  ];
+  const expected = [windowsInstallerName(v), windowsMsiName(v)].flatMap((name) => [
+    name,
+    `${name}.sig`,
+  ]);
+  expected.push('checksums.json');
   if (JSON.stringify(Object.keys(receipt.files).sort()) !== JSON.stringify(expected.sort()))
     throw new Error('Unexpected release files');
   for (const [name, hash] of Object.entries(receipt.files)) {
@@ -30,7 +29,7 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   }
   for (const installer of ['nsis', 'msi']) {
     const item = plan.manifest.platforms?.[`windows-x86_64-${installer}`];
-    const name = `Jackalope_${v}_x64${installer === 'nsis' ? '-setup.exe' : '_en-US.msi'}`;
+    const name = installer === 'nsis' ? windowsInstallerName(v) : windowsMsiName(v);
     if (
       item?.url !== `${base}/updates/${plan.directory}/${name}` ||
       item.signature !== (await store.read(`${name}.sig`)).toString('utf8').trim()

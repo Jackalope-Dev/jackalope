@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { windowsInstallerName } from '../../packages/contracts/src/release.ts';
 import { assertVersions, channel, readNotes, root, sha256, version } from './catalog.mjs';
 import { cloudAssets, cloudFiles, targets } from './cloud-targets.mjs';
 import { application, cloudConfig } from './crabnebula-config.mjs';
@@ -106,7 +107,7 @@ async function main() {
   if (command !== 'receipt')
     throw new Error('Usage: cloud-artifacts.mjs config|receipt|check [directory]');
   const name = mode === 'candidate' ? 'Jackalope' : 'Jackalope Rehearsal';
-  const installer = `${name}_${v}_x64-setup.exe`;
+  const installer = windowsInstallerName(v, name);
   const files = {};
   for (const name of [installer, `${installer}.sig`, 'tauri.cloud.json', 'notes.md'])
     files[name] = sha256(await readFile(resolve(directory, name)));

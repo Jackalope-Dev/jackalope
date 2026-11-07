@@ -30,10 +30,12 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-settings-sync.mjs | Desktop 5179 | Sync consent, conflicts and theme rollback |
 | verify-connected-desktops.mjs | Starts its own website server on 5189 | Device metadata, legacy records and scoped revocation |
 | verify-feedback.mjs | Desktop 5297 and website 5296, VITE_ACCESS_API=https://feedback-fixture.invalid | Feedback forms, delivery states and opt-out |
-| verify-waitlist.mjs | Website 5198, VITE_ACCESS_API=https://api.jackalope.test | Waitlist, referrals, passes and admin fixtures |
+| verify-waitlist.mjs | Website 5198, VITE_ACCESS_API=https://api.jackalope.test | Waitlist, referrals, passes and email fixtures |
 | verify-passes-desktop.mjs | Desktop 5199 | Pass view, clipboard and keyboard |
 | verify-task-detail.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Task states, live step progress, preparation failure detail and retry dispatch |
 | verify-core-flows.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Project scope, unified work, keyboard search, preview readiness and delivery drafts |
+| verify-decisions.mjs | Desktop 5198; JACKALOPE_PREVIEW_URL override | Decision settings, project inheritance, key retry and removal |
+| verify-task-cleanup.mjs | Desktop 5199; JACKALOPE_PREVIEW_URL override | Bulk archive and restore, undo, saved ideas and focus |
 | performance.mjs --production | Builds and starts its own fixture | History lists, output, rich rendering and production CSP |
 
 Some scripts create temporary entry files and remove them on completion. If one

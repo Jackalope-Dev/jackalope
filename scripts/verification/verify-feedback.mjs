@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { accessEmail } from '../../apps/server/src/access/mail-templates.ts';
 
@@ -203,9 +203,6 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
     });
     await page.close();
   }
-  const admin = readFileSync('apps/server/src/access/admin-page.ts', 'utf8');
-  const script = admin.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
-  if (script) new Function(script);
   console.log(
     'Feedback fixtures passed: desktop 1280/960, website 1280/960/390, light/dark, reduced motion, keyboard/focus, safe preview, retry idempotency, explicit unsubscribe, and overflow. No native execution or email delivery claimed.',
   );

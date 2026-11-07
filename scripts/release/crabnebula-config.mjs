@@ -1,4 +1,11 @@
-export const application = 'jackalope-digital/jackalope';
+import {
+  CLOUD_APPLICATION,
+  cloudUpdateEndpoint,
+  isCloudTarget,
+} from '../../packages/contracts/src/release.ts';
+import { ACCOUNT_SERVICE_URL, releaseChannelConfig } from './channels.mjs';
+
+export const application = CLOUD_APPLICATION;
 
 export function clearAppleSigning(environment) {
   for (const name of [
@@ -18,19 +25,12 @@ export function clearAppleSigning(environment) {
 
 export function cloudEndpoint(channel) {
   if (!['beta', 'stable'].includes(channel)) throw new Error('Unknown release channel');
-  return `https://cdn.crabnebula.app/update/${application}/{{target}}-{{arch}}/{{current_version}}?channel=${channel}`;
-}
-
-export function isCloudEndpoint(value, channel) {
-  if (!['beta', 'stable'].includes(channel)) return false;
-  return new URL(value).href === new URL(cloudEndpoint(channel)).href;
+  return cloudUpdateEndpoint(channel);
 }
 
 export function cloudConfig({ mode, channel, publicKey, signScript, target = 'windows-x86_64' }) {
-  if (!['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64'].includes(target))
-    throw new Error('Unsupported Cloud target');
+  if (!isCloudTarget(target)) throw new Error('Unsupported Cloud target');
   if (!['rehearsal', 'candidate'].includes(mode)) throw new Error('Unknown build mode');
-  const endpoint = cloudEndpoint(channel);
   if (!publicKey || !/^[A-Za-z0-9+/]+={0,2}$/.test(publicKey))
     throw new Error('A valid updater public key is required');
   const preview = mode === 'rehearsal';
@@ -46,20 +46,17 @@ export function cloudConfig({ mode, channel, publicKey, signScript, target = 'wi
     plugins: {
       updater: {
         pubkey: publicKey,
-        endpoints: preview ? [] : [endpoint],
+        endpoints: preview ? [] : [cloudEndpoint(channel)],
         windows: { installMode: 'passive' },
       },
-      jackalope: {
-        channel,
-        accountServiceUrl: 'https://api.jackalope.dev',
-        accountWebUrl: 'https://jackalope.dev',
-        // Feedback and opt-in usage reports go to the same service; without it
-        // the app shows feedback as unavailable.
-        serviceUrl: 'https://api.jackalope.dev',
+      // Feedback and opt-in usage reports go to the account service; without
+      // it the app shows feedback as unavailable.
+      jackalope: releaseChannelConfig(channel, {
+        serviceUrl: ACCOUNT_SERVICE_URL,
         ...(!preview
           ? { stableEndpoint: cloudEndpoint('stable'), betaEndpoint: cloudEndpoint('beta') }
           : {}),
-      },
+      }),
     },
   };
   if (!preview && target === 'windows-x86_64') {

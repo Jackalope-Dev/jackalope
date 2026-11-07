@@ -32,9 +32,7 @@
   ],
   "ignoreUnresolved": [
     // Browser-side imports evaluated by Playwright inside the Vite dev server.
-    "^/src/",
-    // TODO: verify-waitlist.mjs still imports the pre-SPA admin page, which was removed.
-    "admin-page\\.ts$"
+    "^/src/"
   ],
   // Platform tools invoked by release, evaluation and verification scripts, not
   // npm packages. sccache is optional and used only when installed.

@@ -1,11 +1,20 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { httpsUrl, SEMVER } from '../../packages/contracts/src/platform.ts';
+import { releasePrefix } from '../../packages/contracts/src/release.ts';
+import { isMain } from '../lib/cli.mjs';
+import { root } from '../lib/paths.mjs';
 
-export const root = fileURLToPath(new URL('../../', import.meta.url));
+export { root };
+
+const versionFiles = [
+  'package.json',
+  'apps/desktop/package.json',
+  'apps/desktop/src-tauri/tauri.conf.json',
+];
 export function version(value) {
-  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value) || value.length > 32)
+  if (!SEMVER.test(value) || value.length > 32)
     throw new Error('Version must be major.minor.patch');
   return value;
 }
@@ -14,16 +23,8 @@ export function channel(value) {
   return value;
 }
 export function origin(value) {
-  const url = new URL(value);
-  if (
-    url.protocol !== 'https:' ||
-    url.username ||
-    url.password ||
-    url.pathname !== '/' ||
-    url.search ||
-    url.hash
-  )
-    throw new Error('Use an HTTPS origin without credentials or a path');
+  const url = httpsUrl(value, { path: false });
+  if (!url) throw new Error('Use an HTTPS origin without credentials or a path');
   return url.origin;
 }
 export function compare(a, b) {
@@ -35,7 +36,7 @@ export function compare(a, b) {
   return 0;
 }
 export function prefix(v, c) {
-  return `releases/${channel(c) === 'beta' ? 'beta/' : ''}v${version(v)}`;
+  return releasePrefix(version(v), channel(c));
 }
 export function parseNotes(text, expectedVersion, publish = false) {
   if (Buffer.byteLength(text) > 24000) throw new Error('Release notes exceed 24 KB');
@@ -57,11 +58,7 @@ export async function readNotes(v, publish = false) {
 }
 export async function assertVersions(v, directory = root) {
   version(v);
-  for (const path of [
-    'package.json',
-    'apps/desktop/package.json',
-    'apps/desktop/src-tauri/tauri.conf.json',
-  ]) {
+  for (const path of versionFiles) {
     if (JSON.parse(await readFile(resolve(directory, path), 'utf8')).version !== v)
       throw new Error(`Version mismatch in ${path}`);
   }
@@ -84,11 +81,7 @@ export async function prepare(v, directory = root) {
     `# Jackalope ${v}\n\nStatus: draft\nDate: ${new Date().toISOString().slice(0, 10)}\n\n## Highlights\n\n- TODO: describe the improvement for users.\n\n## Improvements\n\n- TODO\n\n## Fixes\n\n- TODO\n\n## Known issues\n\n- TODO\n`,
     { flag: 'wx' },
   );
-  for (const path of [
-    'package.json',
-    'apps/desktop/package.json',
-    'apps/desktop/src-tauri/tauri.conf.json',
-  ]) {
+  for (const path of versionFiles) {
     const full = resolve(directory, path);
     const text = await readFile(full, 'utf8');
     // Edit the value in place: re-serializing would expand short arrays and
@@ -154,7 +147,7 @@ export function releasePlan({ receipt, notes, previous = [], base, current }) {
   if (manifest.version !== v) throw new Error('Manifest version mismatch');
   return { releases, manifest, feed: feed(releases, base, c), directory: prefix(v, c) };
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const [command, v] = process.argv.slice(2);
   if (command === 'prepare') await prepare(v);
   else if (command === 'check') {

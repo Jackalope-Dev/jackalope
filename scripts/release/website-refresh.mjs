@@ -1,5 +1,5 @@
 import { setTimeout } from 'node:timers/promises';
-import { readPublicRelease } from './website.mjs';
+import { readPublicRelease } from '../../apps/website/scripts/public-release.mjs';
 
 let hook;
 try {

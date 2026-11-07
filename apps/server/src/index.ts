@@ -1,3 +1,4 @@
+import { CATALOG_KEY, RELEASE_KEY } from '@jackalope/contracts/release';
 import { deviceRoutes } from './access/devices';
 import { pruneFeedbackInvitations } from './access/feedback';
 import { deliverAccessMail } from './access/mail';
@@ -117,9 +118,7 @@ async function release(request: Request, env: Env, path: string): Promise<Respon
       throw new ApiError(503, 'invalid_release');
     }
     const metadata = await pointer.json<{ catalog?: string }>();
-    const match = /^releases\/(beta\/)?v(\d+\.\d+\.\d+)\/catalog\.json$/.exec(
-      metadata.catalog ?? '',
-    );
+    const match = CATALOG_KEY.exec(metadata.catalog ?? '');
     if (!match || Boolean(match[1]) !== (alias[1] === 'beta'))
       throw new ApiError(503, 'invalid_release');
     key =
@@ -127,12 +126,7 @@ async function release(request: Request, env: Env, path: string): Promise<Respon
         ? (metadata.catalog as string)
         : (metadata.catalog as string).replace('catalog.json', 'feed.xml');
   }
-  if (
-    !/^(?:(?:stable|beta)\/latest\.json|releases\/(?:beta\/)?v(\d+\.\d+\.\d+)\/(?:Jackalope_\1_x64(?:-setup\.exe|_en-US\.msi)(?:\.sig)?|checksums\.json|latest\.json|catalog\.json|feed\.xml))$/.test(
-      key,
-    )
-  )
-    throw new ApiError(404, 'not_found');
+  if (!RELEASE_KEY.test(key)) throw new ApiError(404, 'not_found');
   const object = await env.RELEASES.get(key);
   if (!object) throw new ApiError(404, 'not_found');
   const headers = new Headers({

@@ -1,18 +1,19 @@
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { httpsUrl, SEMVER } from '../packages/contracts/src/platform.ts';
+import { windowsInstallerName, windowsMsiName } from '../packages/contracts/src/release.ts';
 
 export async function makeManifest({ version, baseUrl, notes, nsis, msi }) {
-  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
-    throw new Error('Use a stable major.minor.patch release version.');
-  const base = new URL(baseUrl);
-  if (base.protocol !== 'https:' || base.username || base.password || base.hash || base.search)
+  if (!SEMVER.test(version)) throw new Error('Use a stable major.minor.patch release version.');
+  const base = httpsUrl(baseUrl);
+  if (!base)
     throw new Error('Artifact base URL must use HTTPS without credentials, query or fragment.');
   base.pathname = `${base.pathname.replace(/\/$/, '')}/`;
   const platforms = {};
   for (const [installer, path, expected] of [
-    ['nsis', nsis, `Jackalope_${version}_x64-setup.exe`],
-    ['msi', msi, `Jackalope_${version}_x64_en-US.msi`],
+    ['nsis', nsis, windowsInstallerName(version)],
+    ['msi', msi, windowsMsiName(version)],
   ]) {
     if (basename(path) !== expected || !(await stat(path)).isFile() || !(await stat(path)).size)
       throw new Error(`Missing or mismatched ${installer} installer for ${version}.`);

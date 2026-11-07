@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "types": "wrangler types --strict-vars=false",
-    "typecheck": "pnpm admin:build && tsc --noEmit && tsc -p admin/tsconfig.json",
-    "test": "vitest run",
+    "typecheck": "wrangler types --strict-vars=false && pnpm admin:build && tsc --noEmit && tsc -p admin/tsconfig.json",
+    "test": "node --test \"scripts/*.test.mjs\" && vitest run",
     "build": "wrangler deploy --dry-run --outdir dist",
     "db:local": "wrangler d1 migrations apply DB --local",
     "admin:build": "node scripts/build-admin.mjs"

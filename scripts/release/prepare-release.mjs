@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gitEnvironment } from '../git-environment.mjs';
+import { gitEnvironment } from '../lib/git-environment.mjs';
 import { assertVersions, compare, prepare, root, version } from './catalog.mjs';
 
 export function nextVersion(current, bump) {

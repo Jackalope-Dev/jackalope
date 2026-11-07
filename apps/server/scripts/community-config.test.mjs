@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyCommunityConfig } from '../../apps/server/scripts/community-config.mjs';
+import { applyCommunityConfig } from './community-config.mjs';
 
 const defaults = () => ({
   vars: {
@@ -101,4 +101,45 @@ test('audience list survives deployment with scoped overrides and can be explici
     PRODUCTION_COMMUNITY_CONFIG: JSON.stringify({ ACCESS_AUDIENCE_LIST: '' }),
   });
   assert.equal(settings.vars.ACCESS_AUDIENCE_LIST, '');
+});
+
+test('private deployment settings stay scoped to their environment and require complete admin/mail configuration', () => {
+  const settings = () => ({
+    vars: {
+      ADMIN_EMAIL: '',
+      ACCESS_ISSUER: '',
+      ACCESS_AUD: '',
+      INGESTION_ENABLED: 'false',
+      FEEDBACK_EMAIL_ENABLED: 'false',
+      FEEDBACK_EMAIL_FROM: '',
+      FEEDBACK_EMAIL_TO: 'inbox@example.com',
+    },
+  });
+  const source = {
+    STAGING_ADMIN_EMAIL: 'owner@example.com',
+    STAGING_ACCESS_ISSUER: 'https://test.cloudflareaccess.com',
+    STAGING_ACCESS_AUD: 'staging-app',
+    STAGING_INGESTION_ENABLED: 'true',
+    PRODUCTION_INGESTION_ENABLED: 'false',
+  };
+  const staging = settings(),
+    production = settings();
+  applyCommunityConfig(staging, 'staging', source);
+  applyCommunityConfig(production, 'production', source);
+  assert.equal(staging.vars.ADMIN_EMAIL, 'owner@example.com');
+  assert.equal(production.vars.ADMIN_EMAIL, '');
+  assert.equal(staging.vars.INGESTION_ENABLED, 'true');
+  assert.equal(production.vars.INGESTION_ENABLED, 'false');
+  applyCommunityConfig(staging, 'staging', {
+    STAGING_FEEDBACK_EMAIL_ENABLED: 'true',
+    STAGING_FEEDBACK_EMAIL_FROM: 'feedback@example.com',
+  });
+  assert.equal(staging.send_email, undefined);
+  assert.ok(staging.secrets.required.includes('SEQUENZY_API_KEY'));
+  assert.throws(() =>
+    applyCommunityConfig(settings(), 'staging', { STAGING_ADMIN_EMAIL: 'owner@example.com' }),
+  );
+  assert.throws(() =>
+    applyCommunityConfig(settings(), 'staging', { STAGING_FEEDBACK_EMAIL_ENABLED: 'true' }),
+  );
 });

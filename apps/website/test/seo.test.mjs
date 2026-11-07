@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { discoveryFiles, pageHtml } from '../../apps/website/src/seo.ts';
+import { discoveryFiles, pageHtml } from '../src/seo.ts';
 
 const origin = 'https://site.example.test';
 const metadata = (path) => {
