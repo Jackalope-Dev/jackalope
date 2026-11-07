@@ -11,19 +11,17 @@ const CHOICES: { value: SwarmHosts; title: string; description: string }[] = [
   {
     value: 'anywhere',
     title: 'Anywhere',
-    description:
-      'This device and the computers below. Work goes to the project’s computer when it has one, and to the least busy host when that is full.',
+    description: 'The project’s computer first, then the least busy host.',
   },
   {
     value: 'computers',
     title: 'Computers only',
-    description:
-      'Work that only this device can run, such as an agent that cannot run on a computer, stops with the reason.',
+    description: 'Work only this device can run stops with the reason.',
   },
   {
     value: 'device',
     title: 'This device only',
-    description: 'Planned and swarm work, planners and orchestrators included, stay here.',
+    description: 'Planners and orchestrators stay here too.',
   },
 ];
 
@@ -101,7 +99,9 @@ export function ProjectSwarmHosts({ projectId }: { projectId: string }) {
                       }
                     />
                     <span className="ui-choice-body">
-                      <span className="ui-choice-title">{computer.name}</span>
+                      <span className="ui-choice-title">
+                        <span className="swarm-hosts-name">{computer.name}</span>
+                      </span>
                       <span className="ui-choice-description">
                         {providerLabel(computer.provider)}
                         {computer.ownerKind === 'bot' ? ' · a bot’s computer' : ''} · two runs at a
