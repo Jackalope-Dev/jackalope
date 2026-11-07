@@ -1,3 +1,4 @@
+import { agentFamily } from './agent-catalog.ts';
 import type { Runner, TaskRun } from './task-runtime';
 
 const MODEL_FAMILIES: [RegExp, string][] = [
@@ -12,14 +13,6 @@ const MODEL_FAMILIES: [RegExp, string][] = [
   [/mistral|codestral|devstral/, 'mistral'],
   [/glm|zhipu/, 'zhipu'],
 ];
-const AGENT_FAMILIES: Record<string, string> = {
-  claude: 'anthropic',
-  codex: 'openai',
-  gemini: 'google',
-  antigravity: 'google',
-  grok: 'xai',
-  kimi: 'moonshot',
-};
 
 /**
  * The model family an agent runs, from its model when that names one, otherwise from the
@@ -28,9 +21,7 @@ const AGENT_FAMILIES: Record<string, string> = {
 export function modelFamily(agent: string, model?: string | null): string | null {
   const name = model?.toLowerCase() ?? '';
   return (
-    MODEL_FAMILIES.find(([pattern]) => pattern.test(name))?.[1] ??
-    AGENT_FAMILIES[agent.toLowerCase()] ??
-    null
+    MODEL_FAMILIES.find(([pattern]) => pattern.test(name))?.[1] ?? agentFamily(agent.toLowerCase())
   );
 }
 
