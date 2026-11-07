@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 import { root } from './catalog.mjs';
 
 const tauri = resolve(root, 'apps/desktop/src-tauri');
@@ -68,7 +68,7 @@ export async function plan(sha) {
   return { ...values, tags: tags(values) };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta)) {
   const sha = process.env.GITHUB_SHA;
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) throw new Error('GITHUB_SHA must be a commit SHA');
   const result = await plan(sha);

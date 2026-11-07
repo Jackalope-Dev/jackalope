@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 import { impactReport } from './impact-report.mjs';
 
 export function publicImpact(comparison, options) {
@@ -133,7 +133,7 @@ export function publicImpact(comparison, options) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   const [input, output, options] = process.argv.slice(2);
   if (!input || !output || !options)
     throw new Error('Usage: impact-export.mjs comparison.json public-experiment.json options.json');

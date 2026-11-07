@@ -57,10 +57,12 @@ development is independent and requires no Cloudflare login; see its
 
 ## Checks
 
-Use `pnpm test` for the release, desktop JavaScript and server suites. Desktop
-tests are discovered from `apps/desktop/scripts/*.test.mjs`; new suites do not
-need a package script entry. Desktop tests also retain the shared release-config
-and update-manifest checks used by release builds.
+Use `pnpm test` for every suite: `pnpm test:scripts` runs the repository script
+tests (`scripts/*.test.mjs` and `scripts/release/*.test.mjs`), then each package
+runs its own `test`. Package suites are discovered from their folders (for
+example `apps/desktop/scripts/*.test.mjs` and `apps/website/test/*.test.mjs`);
+new suites do not need a package script entry. `pnpm typecheck` checks every
+package, including the server and the swarm Worker.
 
 For a single suite or test name, pass Node test-runner arguments to `test:file`:
 

@@ -1,100 +1,18 @@
-export type Feature =
-  | 'tasks'
-  | 'chat'
-  | 'project'
-  | 'knowledge'
-  | 'worktrees'
-  | 'agents'
-  | 'usage'
-  | 'codebase'
-  | 'settings'
-  | 'connections'
-  | 'schedules'
-  | 'browser'
-  | 'queue';
-type ErrorCode =
-  | 'history_save_failed'
-  | 'verification_failed'
-  | 'update_failed'
-  | 'ui_error'
-  | 'ui_rejection'
-  | 'ui_render_error'
-  | 'history_load_failed'
-  | 'agent_discovery_failed'
-  | 'checkpoint_failed'
-  | 'verification_error'
-  | 'operation_failed'
-  | 'task_failed';
-export const operations = [
-  'task_start',
-  'task_retry',
-  'task_stop',
-  'task_verify',
-  'task_respond_prompt',
-  'task_outcome_review',
-  'task_preview_start',
-  'task_preview_inspect',
-  'task_retry_save',
-  'task_export_recovery',
-  'task_import_recovery',
-  'live_session_create',
-  'live_session_send',
-  'live_session_review',
-  'live_session_pause',
-  'live_session_resume',
-  'live_session_retry',
-  'live_session_finish',
-  'live_session_limits',
-  'live_session_window',
-  'queue_add',
-  'queue_import',
-  'queue_dispatch',
-  'integration_prepare',
-  'integration_apply',
-  'schedule_save',
-  'schedule_set_enabled',
-  'knowledge_save',
-  'knowledge_search',
-  'mcp_save_server',
-  'mcp_probe_server',
-  'mcp_authenticate',
-  'git_create_worktree',
-  'git_cleanup_worktree',
-  'git_archive_worktree',
-  'agent_profile_create',
-  'agent_profile_sign_in',
-  'local_ai_connect',
-  'helper_send',
-  'helper_action',
-] as const;
-export type Operation = (typeof operations)[number];
-export type OperationOutcome = 'accepted' | 'failed' | 'blocked' | 'partial' | 'canceled';
-export const agents = [
-  'codex',
-  'claude',
-  'grok',
-  'opencode',
-  'kimi',
-  'antigravity',
-  'gemini',
-  'other',
-] as const;
-export type TelemetryAgent = (typeof agents)[number];
-type Workflow = 'task' | 'chat';
-export type TaskState =
-  | 'starting'
-  | 'running'
-  | 'review'
-  | 'reviewed'
-  | 'failed'
-  | 'stopped'
-  | 'interrupted';
-export type Metric =
-  | { name: 'app_opened' }
-  | { name: 'feature_used'; feature: Feature }
-  | { name: 'app_error'; code: ErrorCode; operation?: Operation; feature?: Feature }
-  | { name: 'operation_result'; operation: Operation; outcome: OperationOutcome }
-  | { name: 'task_state'; state: TaskState; agent?: TelemetryAgent; workflow?: Workflow };
+import type { Metric } from '@jackalope/contracts/telemetry';
+
+export type {
+  Feature,
+  Metric,
+  Operation,
+  OperationOutcome,
+  TaskState,
+  TelemetryAgent,
+} from '@jackalope/contracts/telemetry';
+export {
+  OPERATIONS as operations,
+  TELEMETRY_AGENTS as agents,
+} from '@jackalope/contracts/telemetry';
+
 type Event = Metric & { id: string };
 export function createTelemetry(send: (events: Event[]) => Promise<unknown>, delay = 15_000) {
   let enabled = false,

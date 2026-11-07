@@ -5,14 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../../scripts/release/website.mjs build",
+    "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.mjs\"",
     "preview": "vite preview",
     "deploy": "pnpm build && wrangler deploy",
     "deploy:check": "wrangler deploy --dry-run"
   },
   "dependencies": {
     "@jackalope/brand": "workspace:*",
+    "@jackalope/contracts": "workspace:*",
     "@jackalope/knowledge": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.6",
     "lucide-react": "^1.46.0",

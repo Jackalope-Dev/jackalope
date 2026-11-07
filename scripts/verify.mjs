@@ -2,10 +2,10 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { constants, setPriority } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { affected, changedFiles } from './change-scope.mjs';
+import { gitEnvironment } from './lib/git-environment.mjs';
+import { root } from './lib/paths.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
 const pnpm = process.env.npm_execpath;
 if (!pnpm || !/\.[cm]?js$/i.test(pnpm)) throw new Error('Run this check with pnpm verify.');
 
@@ -79,19 +79,16 @@ const sharedChecks = [
   [process.execPath, [pnpm, 'check']],
   [process.execPath, [pnpm, 'knip']],
   [process.execPath, [pnpm, 'typecheck']],
-  [process.execPath, [pnpm, 'test:hooks']],
-  [process.execPath, ['--test', 'scripts/docs-policy.test.mjs']],
-  [process.execPath, ['--test', 'scripts/change-scope.test.mjs']],
+  [process.execPath, [pnpm, 'test:scripts']],
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:tokens']],
   [process.execPath, [pnpm, 'check:swarm-bundle']],
   [process.execPath, [pnpm, 'check:changelog']],
-  [process.execPath, [pnpm, 'test:release']],
   ...(pushing ? [] : [[process.execPath, [pnpm, 'ui:build']]]),
-  [process.execPath, [pnpm, '--filter', '@jackalope/server', 'types']],
-  [process.execPath, [pnpm, '--filter', '@jackalope/server', 'typecheck']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test', ...serverTests]],
-  [process.execPath, [pnpm, '--filter', '@jackalope/mobile', 'test']],
+  ...['@jackalope/mobile', '@jackalope/swarm', '@jackalope/website', '@jackalope/contracts'].map(
+    (name) => [process.execPath, [pnpm, '--filter', name, 'test']],
+  ),
 ];
 const sharedBuilds = [
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'build']],
@@ -112,8 +109,8 @@ const sharedBuilds = [
     ],
   ],
 ];
+const desktopScripts = [process.execPath, [pnpm, '--filter', '@jackalope/desktop', 'test']];
 const nativeChecks = [
-  [process.execPath, [pnpm, '--filter', '@jackalope/desktop', 'test']],
   [cargo, ['fmt', '--manifest-path', 'apps/desktop/src-tauri/Cargo.toml', '--check']],
   // The terminal command is a separate binary; without `--bin` a change that
   // breaks only it would still pass. One invocation compiles both in parallel.
@@ -135,7 +132,6 @@ const nativeChecks = [
     ],
   ],
 ];
-const desktopScripts = nativeChecks.shift();
 const checks = [
   [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],
   ...(!nativeOnly && scope.shared ? sharedChecks : []),
@@ -143,13 +139,9 @@ const checks = [
   ...(scope.shared || nativeOnly ? [desktopScripts] : []),
   ...(scope.native ? nativeChecks : []),
 ];
-// A Git hook exports the repository it runs for, and in a linked worktree that
-// includes GIT_DIR. Checks that build fixture repositories would otherwise commit
-// into this repository instead of their own, so they resolve Git from `cwd`.
-const environment = { ...process.env };
-for (const key of Object.keys(environment))
-  if (/^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|PREFIX)$/.test(key))
-    delete environment[key];
+// Checks that build fixture repositories must act on their own, not on the
+// repository whose pre-push hook started this run.
+const environment = gitEnvironment();
 for (const [command, args] of checks) {
   const started = performance.now();
   console.log(`\n> ${command} ${args.join(' ')}`);

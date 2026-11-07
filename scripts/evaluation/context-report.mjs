@@ -1,36 +1,19 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
-
-const measured = (value) => Number.isFinite(value) && value >= 0;
-const sum = (rows, key) =>
-  rows.length && rows.every((row) => measured(row[key]))
-    ? rows.reduce((total, row) => total + row[key], 0)
-    : null;
-const reduction = (before, after) =>
-  before > 0 && measured(after) ? 100 * (1 - after / before) : null;
+import { isMain } from '../lib/cli.mjs';
+import { measured, reduction, seededRandom, sum } from '../lib/stats.mjs';
 
 function interval(groups, baseline, candidate, metric) {
   if (groups.length < 3) return null;
-  let seed = 17092026;
-  const random = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
+  const random = seededRandom(17092026);
   const samples = [];
   for (let i = 0; i < 2000; i++) {
     let before = 0,
       after = 0;
     for (let j = 0; j < groups.length; j++) {
       const group = groups[Math.floor(random() * groups.length)];
-      const a = sum(
-        group.filter((row) => row.variant === baseline),
-        metric,
-      );
-      const b = sum(
-        group.filter((row) => row.variant === candidate),
-        metric,
-      );
+      const a = sum(group.filter((row) => row.variant === baseline).map((row) => row[metric]));
+      const b = sum(group.filter((row) => row.variant === candidate).map((row) => row[metric]));
       if (a === null || b === null) return null;
       before += a;
       after += b;
@@ -139,29 +122,20 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
         {
           trials: selected.length,
           oraclePassed: selected.filter((row) => row.oraclePassed).length,
-          totalTokens: sum(selected, 'totalTokens'),
-          inputTokens: sum(selected, 'input'),
-          outputTokens: sum(selected, 'output'),
-          cachedInputTokens: sum(selected, 'cacheRead'),
-          elapsedMs: sum(selected, 'elapsedMs'),
-          promptBytes: sum(selected, 'promptBytes'),
+          totalTokens: sum(selected.map((row) => row.totalTokens)),
+          inputTokens: sum(selected.map((row) => row.input)),
+          outputTokens: sum(selected.map((row) => row.output)),
+          cachedInputTokens: sum(selected.map((row) => row.cacheRead)),
+          elapsedMs: sum(selected.map((row) => row.elapsedMs)),
+          promptBytes: sum(selected.map((row) => row.promptBytes)),
           medianElapsedMs:
             elapsed.length === selected.length && elapsed.length
               ? elapsed[Math.floor(elapsed.length / 2)]
               : null,
           measuredTokenTrials: selected.filter((row) => measured(row.totalTokens)).length,
-          mcpReceivedBytes: sum(
-            selected.map((row) => ({ value: row.mcpUsage?.resultBytesReceived })),
-            'value',
-          ),
-          mcpDeliveredBytes: sum(
-            selected.map((row) => ({ value: row.mcpUsage?.resultBytesReturned })),
-            'value',
-          ),
-          expansionReads: sum(
-            selected.map((row) => ({ value: row.mcpUsage?.resultReads })),
-            'value',
-          ),
+          mcpReceivedBytes: sum(selected.map((row) => row.mcpUsage?.resultBytesReceived)),
+          mcpDeliveredBytes: sum(selected.map((row) => row.mcpUsage?.resultBytesReturned)),
+          expansionReads: sum(selected.map((row) => row.mcpUsage?.resultReads)),
         },
       ];
     }),
@@ -269,7 +243,7 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   const [input, output, baseline = 'direct', candidate = 'after'] = process.argv.slice(2);
   if (!input || !output)
     throw new Error(

@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { ServiceError } from '../errors';
 import { feedbackStatements } from '../storage';
 import { randomToken, seal, tokenHash } from './crypto';
-import { AccessError, tokenSchema } from './service';
+import { tokenSchema } from './service';
 
 const day = 86400000;
 type Campaign = {
@@ -235,7 +236,7 @@ export async function feedbackResponse(env: Env, input: unknown, now = Date.now(
   )
     .bind(await tokenHash(action.token), now)
     .first<Campaign>();
-  if (!row) throw new AccessError(410, 'feedback_link_expired');
+  if (!row) throw new ServiceError(410, 'feedback_link_expired');
   if (action.action === 'unsubscribe') {
     await memberFeedback(
       env,
@@ -246,7 +247,7 @@ export async function feedbackResponse(env: Env, input: unknown, now = Date.now(
     return { completed: row.completed_at !== null, unsubscribed: true };
   }
   if (action.action === 'submit' && row.completed_at === null) {
-    if (env.INGESTION_ENABLED !== 'true') throw new AccessError(503, 'feedback_unavailable');
+    if (env.INGESTION_ENABLED !== 'true') throw new ServiceError(503, 'feedback_unavailable');
     await env.DB.batch([
       ...(await feedbackStatements(
         env,

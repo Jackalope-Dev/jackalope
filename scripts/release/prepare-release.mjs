@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { gitEnvironment } from '../git-environment.mjs';
+import { isMain } from '../lib/cli.mjs';
+import { gitEnvironment } from '../lib/git-environment.mjs';
 import { assertVersions, compare, prepare, root, version } from './catalog.mjs';
 
 export function nextVersion(current, bump) {
@@ -46,7 +46,7 @@ export function versionFloor(git, current) {
   return highest;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const [bump, merged, ...extra] = process.argv.slice(2);
   if (!bump || (merged && merged !== '--merged') || extra.length)
     throw new Error('Usage: pnpm release:prepare patch|minor|major|VERSION [--merged]');

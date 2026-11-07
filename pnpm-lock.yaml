@@ -51,6 +51,9 @@ importers:
       '@jackalope/brand':
         specifier: workspace:*
         version: link:../../packages/brand
+      '@jackalope/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@jackalope/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -200,6 +203,9 @@ importers:
       '@jackalope/brand':
         specifier: workspace:*
         version: link:../../packages/brand
+      '@jackalope/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@jackalope/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -267,6 +273,9 @@ importers:
       '@jackalope/brand':
         specifier: workspace:*
         version: link:../../packages/brand
+      '@jackalope/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@jackalope/knowledge':
         specifier: workspace:*
         version: link:../../packages/knowledge
@@ -341,6 +350,12 @@ importers:
       '@types/react':
         specifier: ^19.0.4
         version: 19.3.0
+
+  packages/contracts:
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   packages/knowledge: {}
 

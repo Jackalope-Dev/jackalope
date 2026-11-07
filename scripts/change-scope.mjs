@@ -1,21 +1,20 @@
-import { spawnSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { posix, resolve } from 'node:path';
+import { isMain } from './lib/cli.mjs';
+import { root } from './lib/paths.mjs';
+import { git } from './lib/proc.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
+const NATIVE = 'apps/desktop/src-tauri/';
 
 /**
- * Files the native build or its tests read, including the files it embeds with
- * include_str!/include_bytes!. Anything else cannot change a Rust result.
+ * Files the native build or its tests read besides the Rust crate itself. Files
+ * the crate embeds with include_str!/include_bytes! are found by
+ * `embeddedInputs`; anything else cannot change a Rust result.
  */
 const NATIVE_INPUTS = [
   /^apps\/desktop\/src-tauri\//,
   /^apps\/desktop\/icons\//,
-  /^apps\/desktop\/src\/lib\/agents\.json$/,
   /^apps\/desktop\/scripts\/fixtures\//,
-  /^packages\/knowledge\/catalog\.json$/,
-  /^scripts\/evaluation\/cases\.json$/,
   /^patches\/glib\//,
   /^\.cargo\//,
   /^rust-toolchain/,
@@ -23,13 +22,35 @@ const NATIVE_INPUTS = [
   /^pnpm-(lock|workspace)\.yaml$/,
   /^scripts\/verify\.mjs$/,
   /^scripts\/change-scope\.mjs$/,
+  /^scripts\/lib\//,
 ];
+
+/** The repository files outside the crate that `sources` (path → Rust text) embed. */
+export function embeddedInputs(sources) {
+  const inputs = new Set();
+  for (const [file, text] of sources)
+    for (const [, target] of text.matchAll(/include_(?:str|bytes)!\(\s*"([^"]+)"\s*\)/g)) {
+      const path = posix.normalize(posix.join(posix.dirname(file), target));
+      if (!path.startsWith(NATIVE)) inputs.add(path);
+    }
+  return inputs;
+}
+
+let embedded;
+function nativeEmbeds() {
+  embedded ??= embeddedInputs(
+    git(['ls-files', '--', `${NATIVE}*.rs`], { cwd: root })
+      .split('\n')
+      .filter(Boolean)
+      .map((file) => [file, readFileSync(resolve(root, file), 'utf8')]),
+  );
+  return embedded;
+}
 
 /**
  * Paths that nothing in the desktop app, its native build, its tests or the
  * platform trials reads. CI skips the desktop suites only when every changed
- * file matches one of these, so an unlisted path always runs them. Desktop
- * tests import apps/server/admin, so that folder is not listed.
+ * file matches one of these, so an unlisted path always runs them.
  */
 const DESKTOP_INDEPENDENT = [
   /^docs\//,
@@ -37,18 +58,18 @@ const DESKTOP_INDEPENDENT = [
   /^apps\/website\//,
   /^apps\/swarm\//,
   /^apps\/mobile\//,
-  /^apps\/server\/(?!admin\/)/,
+  /^apps\/server\//,
 ];
 
 /** Files changed between `base` and HEAD, or null when Git cannot tell. */
 export function changedFiles(base) {
-  const diff = spawnSync('git', ['diff', '--name-only', '--no-renames', base, 'HEAD'], {
-    cwd: root,
-    encoding: 'utf8',
-    windowsHide: true,
-  });
-  if (diff.status !== 0) return null;
-  const files = diff.stdout.split('\n').filter(Boolean);
+  let diff;
+  try {
+    diff = git(['diff', '--name-only', '--no-renames', base, 'HEAD'], { cwd: root });
+  } catch {
+    return null;
+  }
+  const files = diff.split('\n').filter(Boolean);
   return files.length ? files : null;
 }
 
@@ -61,15 +82,17 @@ export function changedFiles(base) {
 export function affected(files) {
   if (!files) return { shared: true, native: true, desktop: true };
   return {
-    shared: files.some((file) => !file.startsWith('apps/desktop/src-tauri/')),
-    native: files.some((file) => NATIVE_INPUTS.some((input) => input.test(file))),
+    shared: files.some((file) => !file.startsWith(NATIVE)),
+    native: files.some(
+      (file) => NATIVE_INPUTS.some((input) => input.test(file)) || nativeEmbeds().has(file),
+    ),
     desktop: files.some((file) => !DESKTOP_INDEPENDENT.some((path) => path.test(file))),
   };
 }
 
 // CI: `node scripts/change-scope.mjs <base>` writes desktop=true|false to the step
 // outputs. Without a base, or when the diff is unavailable, it reports true.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const base = process.argv[2];
   const files = base ? changedFiles(base) : null;
   const { desktop } = affected(files);

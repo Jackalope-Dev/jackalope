@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { accessAdminPage } from '../../apps/server/src/access/admin-page.ts';
 import { accessEmail } from '../../apps/server/src/access/mail-templates.ts';
 
 const output = 'output/waitlist-referrals';
@@ -186,59 +185,6 @@ try {
     assert(posts.some((x) => x.path.endsWith('/waitlist/link')));
     await context.close();
   }
-  const context = await browser.newContext({ viewport: sizes[0], reducedMotion: 'reduce' });
-  const page = await context.newPage();
-  page.on('pageerror', (e) => failures.push(e.message));
-  const admin = accessAdminPage('fixture');
-  writeFileSync(`${output}/admin.html`, admin);
-  await page.route('http://admin.fixture/**', async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname === '/admin/access')
-      return route.fulfill({ contentType: 'text/html', body: admin });
-    const result = url.pathname.endsWith('/readiness')
-      ? { enabled: true, mailConfigured: true, download: 'unconfigured' }
-      : url.pathname.endsWith('/insights')
-        ? {
-            totals: { requested: 28, responded: 16, approved: 5, connected: 3 },
-            platforms: [],
-            agents: [],
-            priorities: [],
-            sources: [],
-          }
-        : {
-            members: [
-              {
-                id: 'fixture',
-                email: 'builder@example.invalid',
-                status: 'waiting',
-                position: 3,
-                referral_count: 12,
-                pending_referrals: 2,
-                accepted: 0,
-                created_at: Date.now(),
-                invite_limit: 5,
-              },
-            ],
-            counts: [{ status: 'waiting', count: 28 }],
-            hasMore: false,
-          };
-    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(result) });
-  });
-  await page.goto('http://admin.fixture/admin/access');
-  await page.getByText(/12 verified referrals/).waitFor();
-  await page.getByLabel('Order', { exact: true }).selectOption('referrals');
-  for (const size of sizes.slice(0, 2)) {
-    await page.setViewportSize(size);
-    for (const colorScheme of ['light', 'dark']) {
-      await page.emulateMedia({ colorScheme });
-      await noOverflow(page, 'Admin');
-      await page.screenshot({
-        path: `${output}/admin-${size.width}-${colorScheme}.png`,
-        fullPage: true,
-      });
-    }
-  }
-  await context.close();
   const emailContext = await browser.newContext();
   const emailPage = await emailContext.newPage();
   for (const kind of [
@@ -272,7 +218,7 @@ try {
   await emailContext.close();
   assert.deepEqual(failures, []);
   console.log(
-    'Waitlist, pass, admin, and eight email fixtures passed: 1280/960/390px, both themes, reduced motion, keyboard copy, verification, recovery, and overflow.',
+    'Waitlist, pass and eight email fixtures passed: 1280/960/390px, both themes, reduced motion, keyboard copy, verification, recovery, and overflow.',
   );
 } finally {
   await browser.close();

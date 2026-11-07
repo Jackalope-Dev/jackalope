@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 import { assertVersions, channel, prepare, root } from './catalog.mjs';
 import { gitAt, nextVersion, versionFloor } from './prepare-release.mjs';
 
@@ -50,7 +50,7 @@ export async function cutRelease(directory, target, bump, source) {
   return { path, branch, version: next, source: revision, destination };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const [target, bump = 'patch', source, ...extra] = process.argv.slice(2);
   if (!target || extra.length)
     throw new Error('Usage: pnpm release:cut beta|stable [patch|minor|major|VERSION] [SOURCE]');

@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { type ChangedFile, changedFiles } from './changes';
 import { allConflicts, type Conflict } from './conflicts';
-import { forkName, SwarmError, text } from './names';
+import { forkName, REPO_NAME, SwarmError, settle, text } from './names';
 import { CachedReader, objectReader, repoInfo } from './objects';
 
 /** One agent attempt working in its own fork of the shared repository. */
@@ -28,7 +28,6 @@ export interface SwarmState {
 }
 
 const HASH = /^[0-9a-f]{40}$/;
-const REPO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 const TOKEN_TTL = 86_400;
 
 /**
@@ -50,7 +49,11 @@ export class Swarm extends DurableObject<Env> {
     return [...stored.values()].sort((a, b) => a.registeredAt.localeCompare(b.registeredAt));
   }
 
-  async state(repo: string): Promise<SwarmState> {
+  state(repo: string) {
+    return settle(() => this.snapshot(repo));
+  }
+
+  private async snapshot(repo: string): Promise<SwarmState> {
     return {
       repo,
       forks: await this.records(),
@@ -60,8 +63,12 @@ export class Swarm extends DurableObject<Env> {
   }
 
   /** Creates the attempt's fork and returns a write token for pushing to it. */
-  async register(repo: string, input: Record<string, unknown>) {
-    if (!REPO.test(repo)) throw new SwarmError('Unknown repository name.');
+  register(repo: string, input: Record<string, unknown>) {
+    return settle(() => this.createFork(repo, input));
+  }
+
+  private async createFork(repo: string, input: Record<string, unknown>) {
+    if (!REPO_NAME.test(repo)) throw new SwarmError('Unknown repository name.');
     const attemptId = text(input.attemptId, 80);
     const baseCommit = text(input.baseCommit, 40).toLowerCase();
     if (!HASH.test(baseCommit))
@@ -118,7 +125,11 @@ export class Swarm extends DurableObject<Env> {
   }
 
   /** A new write token for an existing fork; tokens expire after a day. */
-  async token(fork: string) {
+  token(fork: string) {
+    return settle(() => this.writeToken(fork));
+  }
+
+  private async writeToken(fork: string) {
     if (!(await this.ctx.storage.get(`fork:${fork}`))) throw new SwarmError('Unknown fork.', 404);
     const handle = await this.env.ARTIFACTS.get(fork);
     const token = await handle.createToken('write', TOKEN_TTL);
@@ -127,7 +138,11 @@ export class Swarm extends DurableObject<Env> {
   }
 
   /** Re-reads one fork after a push and recomputes conflicts across all forks. */
-  async analyze(repo: string, fork: string): Promise<SwarmState> {
+  analyze(repo: string, fork: string) {
+    return settle(() => this.reanalyze(repo, fork));
+  }
+
+  private reanalyze(repo: string, fork: string): Promise<SwarmState> {
     return this.serial(async () => {
       const record = await this.ctx.storage.get<ForkRecord>(`fork:${fork}`);
       if (!record) throw new SwarmError('Unknown fork.', 404);
@@ -176,7 +191,11 @@ export class Swarm extends DurableObject<Env> {
   }
 
   /** Stops tracking a fork, optionally deleting its repository. */
-  async release(repo: string, fork: string, remove: boolean) {
+  release(repo: string, fork: string, remove: boolean) {
+    return settle(() => this.untrack(repo, fork, remove));
+  }
+
+  private untrack(repo: string, fork: string, remove: boolean): Promise<SwarmState> {
     return this.serial(async () => {
       await this.ctx.storage.delete(`fork:${fork}`);
       if (remove) await this.env.ARTIFACTS.delete(fork).catch(() => false);
@@ -195,7 +214,7 @@ export class Swarm extends DurableObject<Env> {
   }
 
   private async broadcast(repo: string) {
-    const state = await this.state(repo);
+    const state = await this.snapshot(repo);
     const message = JSON.stringify({ type: 'state', state });
     for (const socket of this.ctx.getWebSockets()) {
       try {

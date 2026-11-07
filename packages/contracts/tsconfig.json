@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/contracts.tsbuildinfo",
+    "lib": ["ES2022", "DOM"],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src"]
+}

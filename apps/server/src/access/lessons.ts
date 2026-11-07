@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AccessError } from './service';
+import { ServiceError } from '../errors';
 
 const MAX = Number.MAX_SAFE_INTEGER - 1;
 /** Synced lesson rows per member, tombstones included. */
@@ -109,10 +109,10 @@ export async function lessonsRoute(
   )
     .bind(deviceId, memberId)
     .first<{ epoch: number }>();
-  if (!consent) throw new AccessError(403, 'settings_sync_disabled');
+  if (!consent) throw new ServiceError(403, 'settings_sync_disabled');
   if (action === 'pull') {
     const { epoch, cursor } = pullSchema.parse(body);
-    if (epoch !== 0 && epoch !== consent.epoch) throw new AccessError(409, 'lessons_reset');
+    if (epoch !== 0 && epoch !== consent.epoch) throw new ServiceError(409, 'lessons_reset');
     const [lessons, records] = await Promise.all([
       env.DB.prepare(
         'SELECT id,project,revision,updated_at,deleted,body,seq FROM access_lessons WHERE member_id=? AND seq>? ORDER BY seq LIMIT ?',
@@ -155,7 +155,7 @@ export async function lessonsRoute(
     };
   }
   const push = pushSchema.parse(body);
-  if (push.epoch !== consent.epoch) throw new AccessError(409, 'lessons_reset');
+  if (push.epoch !== consent.epoch) throw new ServiceError(409, 'lessons_reset');
   const ids = push.lessons.map((item) => item.id);
   if (ids.length) {
     const marks = ids.map(() => '?').join(',');
@@ -165,7 +165,7 @@ export async function lessonsRoute(
       .bind(memberId, memberId, ...ids)
       .first<{ known: number; total: number }>();
     if ((known?.total ?? 0) + ids.length - (known?.known ?? 0) > LESSON_ROWS)
-      throw new AccessError(413, 'lessons_full');
+      throw new ServiceError(413, 'lessons_full');
   }
   const count = push.lessons.length + push.records.length;
   if (count) {
@@ -210,7 +210,7 @@ export async function lessonsRoute(
       ).bind(memberId, memberId),
     ];
     const [counter] = await env.DB.batch(statements);
-    if (counter.meta.changes !== 1) throw new AccessError(409, 'lessons_reset');
+    if (counter.meta.changes !== 1) throw new ServiceError(409, 'lessons_reset');
   }
   if (!ids.length) return { lessons: [] };
   const stored = await env.DB.prepare(

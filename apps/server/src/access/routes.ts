@@ -1,14 +1,23 @@
+import type { AccessMember } from '@jackalope/contracts/access';
+import type { ReleaseChannel } from '@jackalope/contracts/platform';
+import {
+  cloudDownloadUrl,
+  RELEASE_DOWNLOADS,
+  type ReleaseDownload,
+} from '@jackalope/contracts/release';
 import { z } from 'zod';
+import { ServiceError } from '../errors';
 import { deliverFeedback } from '../feedback-mail';
+import type { RateGroup } from '../rate-limit';
+import { ACCESS_HEADERS, errorResponse, json as respondJson } from '../respond';
 import { randomToken } from './crypto';
 import { browserDeviceAction, connectedDevices } from './devices';
+import { downloadChannels, installerKey, memberBuilds, storeUrl } from './downloads';
 import { feedbackResponse } from './feedback';
 import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
-import type { EmailDownload } from './mail-templates';
 import { syncNewsletter } from './newsletter';
 import {
-  AccessError,
   acceptToken,
   changeInvite,
   emailSchema,
@@ -34,94 +43,11 @@ import {
   waitlistStatus,
 } from './waitlist';
 
-const headers = {
-  'cache-control': 'no-store',
-  'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
-};
-export function installerKey(env: Env) {
-  const key = env.ACCESS_INSTALLER_KEY;
-  return /^early-access\/v\d+\.\d+\.\d+\/[a-zA-Z0-9_.-]+\.exe$/.test(key) ? key : null;
-}
-const macDownloads = {
-  'macos-aarch64': { platform: 'dmg-aarch64', label: 'Apple silicon' },
-  'macos-x86_64': { platform: 'dmg-x86_64', label: 'Intel' },
-} as const;
-const linuxDownloads = {
-  'linux-x86_64': { platform: 'appimage-x86_64', label: 'x64 AppImage' },
-} as const;
-const releaseDownloads = { ...macDownloads, ...linuxDownloads };
-
-function releaseChannels(value: string | undefined) {
-  return [
-    ...new Set(
-      (value ?? '')
-        .split(',')
-        .map((channel) => channel.trim())
-        .filter((channel) => channel === 'stable' || channel === 'beta'),
-    ),
-  ];
-}
-/**
- * The CrabNebula release channels macOS members may download, in the order the
- * website offers them; the first is the default.
- */
-export function macChannels(env: Env) {
-  return releaseChannels(env.ACCESS_MAC_CHANNELS);
-}
-/** The CrabNebula release channels Linux members may download, ordered like macOS. */
-export function linuxChannels(env: Env) {
-  return releaseChannels(env.ACCESS_LINUX_CHANNELS);
-}
-function releaseDownloadUrl(channel: string, id: keyof typeof releaseDownloads) {
-  return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${releaseDownloads[id].platform}?channel=${channel}`;
-}
-
-/**
- * Direct stable-channel downloads for approval emails. Installers are public on the
- * release CDN; the desktop account gate, not the link, controls who can run tasks.
- */
-export function stableDownloads(env: Env): EmailDownload[] {
-  const store = storeUrl(env);
-  return [
-    ...(store ? [{ label: 'Windows (Microsoft Store)', url: store }] : []),
-    ...(macChannels(env).includes('stable')
-      ? (['macos-aarch64', 'macos-x86_64'] as const).map((id) => ({
-          label: `macOS (${releaseDownloads[id].label})`,
-          url: releaseDownloadUrl('stable', id),
-        }))
-      : []),
-    ...(linuxChannels(env).includes('stable')
-      ? [{ label: 'Linux (AppImage)', url: releaseDownloadUrl('stable', 'linux-x86_64') }]
-      : []),
-  ];
-}
-
-export function storeUrl(env: Env) {
-  try {
-    const url = new URL(env.ACCESS_STORE_URL);
-    const path =
-      url.hostname === 'apps.microsoft.com'
-        ? /^\/detail\/[a-z0-9]{12}\/?$/i
-        : /^\/store\/apps\/[a-z0-9]{12}\/?$/i;
-    return url.protocol === 'https:' &&
-      !url.username &&
-      !url.password &&
-      !url.port &&
-      !url.hash &&
-      ['apps.microsoft.com', 'www.microsoft.com'].includes(url.hostname) &&
-      path.test(url.pathname)
-      ? url.href
-      : null;
-  } catch {
-    return null;
-  }
-}
 export async function accessRoutes(
   request: Request,
   env: Env,
   readJson: (request: Request) => Promise<unknown>,
-  limit: (mail: boolean) => Promise<void>,
+  limit: (group: RateGroup) => Promise<void>,
   ctx?: ExecutionContext,
 ) {
   const origin = request.headers.get('origin');
@@ -133,29 +59,29 @@ export async function accessRoutes(
         vary: 'Origin',
       }
     : {};
+  const headers = { ...ACCESS_HEADERS, ...cors };
   const json = (data: unknown, status = 200, extra: Record<string, string> = {}) =>
-    Response.json(data, { status, headers: { ...headers, ...cors, ...extra } });
+    respondJson(data, status, { ...headers, ...extra });
   try {
     const site = new URL(env.ACCESS_WEB_ORIGIN);
     if (
       site.origin !== env.ACCESS_WEB_ORIGIN ||
       (site.protocol !== 'https:' && env.ENVIRONMENT !== 'local')
     )
-      throw new AccessError(503, 'access_not_configured');
-    if (origin && !allowed) throw new AccessError(403, 'origin_not_allowed');
+      throw new ServiceError(503, 'access_not_configured');
+    if (origin && !allowed) throw new ServiceError(403, 'origin_not_allowed');
     if (request.method === 'OPTIONS')
       return new Response(null, {
         status: 204,
         headers: {
           ...headers,
-          ...cors,
           'access-control-allow-methods': 'GET, HEAD, POST, OPTIONS',
           'access-control-allow-headers': 'content-type',
           'access-control-max-age': '600',
         },
       });
     const url = new URL(request.url);
-    if (url.search) throw new AccessError(400, 'query_not_allowed');
+    if (url.search) throw new ServiceError(400, 'query_not_allowed');
     if (request.method === 'GET' && url.pathname === '/v1/access/status')
       return json({ enabled: env.EARLY_ACCESS_ENABLED === 'true', openSignup: openSignup(env) });
     if (
@@ -165,9 +91,9 @@ export async function accessRoutes(
       !env.SEQUENZY_API_KEY ||
       !env.ACCESS_EMAIL_FROM
     )
-      throw new AccessError(503, 'access_not_available');
+      throw new ServiceError(503, 'access_not_available');
     const path = url.pathname;
-    if (request.method === 'POST' && !allowed) throw new AccessError(403, 'origin_required');
+    if (request.method === 'POST' && !allowed) throw new ServiceError(403, 'origin_required');
     await limit(
       request.method === 'POST' &&
         [
@@ -175,7 +101,9 @@ export async function accessRoutes(
           '/v1/access/link',
           '/v1/access/waitlist/link',
           '/v1/access/feedback',
-        ].includes(path),
+        ].includes(path)
+        ? 'access-mail'
+        : 'access-session',
     );
     if (request.method === 'POST' && path === '/v1/access/feedback') {
       const result = await feedbackResponse(env, await readJson(request));
@@ -286,7 +214,7 @@ export async function accessRoutes(
     }
     if (request.method === 'POST' && path.startsWith('/v1/access/waitlist/desktop/')) {
       const waiting = await waitingMember(request, env);
-      if (!waiting) throw new AccessError(401, 'access_sign_in_required');
+      if (!waiting) throw new ServiceError(401, 'access_sign_in_required');
       return json(
         await browserDeviceAction(
           env,
@@ -299,11 +227,11 @@ export async function accessRoutes(
     }
     if (request.method === 'GET' && path === '/v1/access/waitlist/devices') {
       const waiting = await waitingMember(request, env);
-      if (!waiting) throw new AccessError(401, 'access_sign_in_required');
+      if (!waiting) throw new ServiceError(401, 'access_sign_in_required');
       return json(await connectedDevices(env, waiting.id));
     }
     const member = await sessionMember(request, env);
-    if (!member) throw new AccessError(401, 'access_sign_in_required');
+    if (!member) throw new ServiceError(401, 'access_sign_in_required');
     if (request.method === 'POST' && path.startsWith('/v1/access/desktop/'))
       return json(
         await browserDeviceAction(
@@ -319,36 +247,29 @@ export async function accessRoutes(
       const store = storeUrl(env);
       const key = installerKey(env);
       const installer = !store && key ? await env.RELEASES.head(key) : null;
-      const builds = (channels: string[], downloads: Record<string, { label: string }>) =>
-        channels.flatMap((channel) =>
-          Object.entries(downloads).map(([id, { label }]) => ({
-            id,
-            label,
-            channel,
-            url: `${url.origin}/v1/access/download/${id}/${channel}`,
-          })),
-        );
       return json({
         email: member.email,
         ...(await invitations(env, member)),
         openSignup: openSignup(env),
-        macos: builds(macChannels(env), macDownloads),
-        linux: builds(linuxChannels(env), linuxDownloads),
+        macos: memberBuilds(env, url.origin, 'macos'),
+        linux: memberBuilds(env, url.origin, 'linux'),
         download: store
           ? { url: `${url.origin}/v1/access/download`, kind: 'store' }
           : installer
             ? { url: `${url.origin}/v1/access/download`, bytes: installer.size }
             : null,
-      });
+      } satisfies AccessMember);
     }
-    const releasePath = path.match(
-      /^\/v1\/access\/download\/(macos-(?:aarch64|x86_64)|linux-x86_64)\/([a-z]+)$/,
-    );
-    if (['GET', 'HEAD'].includes(request.method) && releasePath) {
-      const id = releasePath[1] as keyof typeof releaseDownloads;
-      const channel = releasePath[2] as 'stable' | 'beta';
-      const channels = id.startsWith('linux-') ? linuxChannels(env) : macChannels(env);
-      if (!channels.includes(channel)) throw new AccessError(404, 'download_not_ready');
+    const releasePath = /^\/v1\/access\/download\/([a-z0-9_-]+)\/([a-z]+)$/.exec(path);
+    if (
+      ['GET', 'HEAD'].includes(request.method) &&
+      releasePath &&
+      Object.hasOwn(RELEASE_DOWNLOADS, releasePath[1])
+    ) {
+      const id = releasePath[1] as ReleaseDownload;
+      const channel = releasePath[2] as ReleaseChannel;
+      const channels = downloadChannels(env, id);
+      if (!channels.includes(channel)) throw new ServiceError(404, 'download_not_ready');
       if (request.method === 'GET')
         await env.DB.prepare(
           'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
@@ -357,7 +278,7 @@ export async function accessRoutes(
           .run();
       return new Response(null, {
         status: 302,
-        headers: { ...headers, ...cors, location: releaseDownloadUrl(channel, id) },
+        headers: { ...headers, location: cloudDownloadUrl(id, channel) },
       });
     }
     if (['GET', 'HEAD'].includes(request.method) && path === '/v1/access/download') {
@@ -371,13 +292,13 @@ export async function accessRoutes(
             .run();
         return new Response(null, {
           status: 302,
-          headers: { ...headers, ...cors, location: store },
+          headers: { ...headers, location: store },
         });
       }
       const key = installerKey(env);
-      if (!key) throw new AccessError(404, 'download_not_ready');
+      if (!key) throw new ServiceError(404, 'download_not_ready');
       const object = await env.RELEASES.get(key);
-      if (!object) throw new AccessError(404, 'download_not_ready');
+      if (!object) throw new ServiceError(404, 'download_not_ready');
       if (request.method === 'GET')
         await env.DB.prepare(
           'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
@@ -388,7 +309,6 @@ export async function accessRoutes(
       return new Response(request.method === 'HEAD' ? null : object.body, {
         headers: {
           ...headers,
-          ...cors,
           'content-type': 'application/octet-stream',
           'content-length': String(object.size),
           'content-disposition': `attachment; filename="${key.split('/').at(-1)}"`,
@@ -411,16 +331,12 @@ export async function accessRoutes(
       if (ctx && body.action === 'resend') ctx.waitUntil(deliverAccessMail(env));
       return json({ success: true, ...(await invitations(env, member)) });
     }
-    throw new AccessError(404, 'not_found');
+    throw new ServiceError(404, 'not_found');
   } catch (error) {
-    const code =
-      error instanceof AccessError
-        ? error.code
-        : error instanceof z.ZodError
-          ? 'invalid_request'
-          : 'access_unavailable';
-    const status =
-      error instanceof AccessError ? error.status : error instanceof z.ZodError ? 400 : 503;
-    return json({ error: code }, status, status === 429 ? { 'retry-after': '60' } : {});
+    return errorResponse(error, {
+      headers,
+      fallback: 'access_unavailable',
+      retryAfter: { 429: '60' },
+    });
   }
 }

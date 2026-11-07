@@ -1,4 +1,6 @@
 import { EchoMark } from '@jackalope/brand/echo';
+import type { ConnectedDevice } from '@jackalope/contracts/access';
+import { isAccessToken } from '@jackalope/contracts/links';
 import {
   Button,
   Checkbox,
@@ -52,7 +54,7 @@ export function DesktopConnection({
           url.pathname + url.search + (fragment.size ? `#${fragment}` : ''),
         );
         setExpiresAt(Date.now() + 10 * 60000);
-        if (!/^[a-f0-9]{64}$/.test(token)) {
+        if (!isAccessToken(token)) {
           setVerification('');
           setDone('This connection request is invalid. Return to Jackalope to start again.');
           try {
@@ -62,7 +64,7 @@ export function DesktopConnection({
         }
       }
       try {
-        if (token && /^[a-f0-9]{64}$/.test(token))
+        if (token && isAccessToken(token))
           sessionStorage.setItem(
             storageKey,
             JSON.stringify({ token, expires: Date.now() + 10 * 60000 }),
@@ -71,14 +73,14 @@ export function DesktopConnection({
         if (
           saved &&
           typeof saved.token === 'string' &&
-          /^[a-f0-9]{64}$/.test(saved.token) &&
+          isAccessToken(saved.token) &&
           saved.expires > Date.now()
         ) {
           setVerification(saved.token);
           setExpiresAt(Math.min(saved.expires, Date.now() + 10 * 60000));
         } else sessionStorage.removeItem(storageKey);
       } catch {
-        if (token && /^[a-f0-9]{64}$/.test(token)) setVerification(token);
+        if (token && isAccessToken(token)) setVerification(token);
       }
     }
     readRequest();
@@ -271,22 +273,8 @@ export function DesktopConnection({
   );
 }
 
-interface Device {
-  id: string;
-  name?: string | null;
-  createdAt: number;
-  expiresAt: number;
-  appVersion?: string | null;
-  platform?: 'windows' | 'macos' | 'linux' | null;
-  buildKind?: 'development' | 'release' | null;
-  profileKind?: 'default' | 'isolated' | null;
-  lastSeenAt?: number | null;
-  settingsCheckedAt?: number | null;
-  settingsSync?: number;
-}
-
-function groupDevices(devices: Device[]) {
-  const groups = new Map<string, Device[]>();
+function groupDevices(devices: ConnectedDevice[]) {
+  const groups = new Map<string, ConnectedDevice[]>();
   for (const device of devices) {
     const name = device.name?.trim().toLowerCase();
     const key = name ? JSON.stringify([name, device.platform || null]) : device.id;
@@ -297,7 +285,7 @@ function groupDevices(devices: Device[]) {
   return [...groups.entries()];
 }
 
-function DesktopGroup({ devices, children }: { devices: Device[]; children: ReactNode }) {
+function DesktopGroup({ devices, children }: { devices: ConnectedDevice[]; children: ReactNode }) {
   if (devices.length === 1) return children;
   return (
     <Disclosure className="desktop-device-group">
@@ -323,7 +311,7 @@ function DesktopGroup({ devices, children }: { devices: Device[]; children: Reac
 }
 
 export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
-  const [devices, setDevices] = useState<Device[] | null>(null);
+  const [devices, setDevices] = useState<ConnectedDevice[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -333,7 +321,7 @@ export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
     const controller = new AbortController();
     request.current = controller;
     try {
-      const next = await accessRequest<Device[]>(
+      const next = await accessRequest<ConnectedDevice[]>(
         `${waiting ? 'waitlist/' : ''}devices`,
         undefined,
         controller.signal,
