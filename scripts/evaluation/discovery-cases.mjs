@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 
 const tools = [
   ['audit_log', 'Read immutable security and access events.'],
@@ -83,7 +83,7 @@ export const discoveryCases = [
   ),
 }));
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   if (!process.argv[2]) throw new Error('Supply a discovery suite output JSON path.');
   await writeFile(
     process.argv[2],

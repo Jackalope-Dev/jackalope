@@ -1,10 +1,9 @@
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { root } from '../lib/paths.mjs';
 import { requireEvaluationPass } from './readiness.mjs';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
 const suite = JSON.parse(await readFile(new URL('./cases.json', import.meta.url), 'utf8'));
 const args = process.argv.slice(2);
 const value = (name, fallback) =>
