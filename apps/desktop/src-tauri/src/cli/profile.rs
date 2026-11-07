@@ -40,6 +40,11 @@ pub fn root() -> Option<PathBuf> {
 
 /// The lock the host holds on its task history for as long as it runs.
 pub const RUNTIME_LOCK: &str = "runtime.lock";
+/// The coordinator's folder in the data directory, and the lock it holds there.
+pub const COORDINATION: &str = "coordination";
+pub const COORDINATOR_LOCK: &str = "owner.lock";
+/// Schedules live beside task history, which skips them when it loads.
+pub const SCHEDULES: &str = "schedules.json";
 
 /// The layout of a profile's data directory.
 #[derive(Clone, Debug, PartialEq)]
@@ -60,6 +65,11 @@ impl ProfilePaths {
         Self { data }
     }
 
+    /// The layout of an existing data directory.
+    pub fn at(data: PathBuf) -> Self {
+        Self { data }
+    }
+
     /// The layout of the active profile, when its root can be found.
     pub fn active() -> Option<Self> {
         root().map(|root| Self::new(&root))
@@ -76,6 +86,18 @@ impl ProfilePaths {
 
     pub fn runtime_lock(&self) -> PathBuf {
         self.data.join(RUNTIME_LOCK)
+    }
+
+    pub fn coordination(&self) -> PathBuf {
+        self.data.join(COORDINATION)
+    }
+
+    pub fn coordinator_lock(&self) -> PathBuf {
+        self.coordination().join(COORDINATOR_LOCK)
+    }
+
+    pub fn schedules(&self) -> PathBuf {
+        self.data.join(SCHEDULES)
     }
 
     /// Where the host advertises itself to the command.

@@ -1,4 +1,5 @@
 use super::{coordination::Coordinator, tasks::TaskRuntime};
+use crate::cli_protocol::{profile, ProfilePaths};
 use crate::state::AppState;
 use std::path::Path;
 use tauri::{Manager, State};
@@ -30,18 +31,19 @@ pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
         return Ok(false);
     }
     reject_links(directory)?;
+    let paths = ProfilePaths::at(directory.to_path_buf());
     let lock = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(directory.join("runtime.lock"))
+        .open(paths.runtime_lock())
         .map_err(|e| e.to_string())?;
     let _lock = super::file_lock::FileLock::try_new(lock)
         .map_err(|_| "Close the other Jackalope instance before resetting.".to_string())?;
-    let coordinator_lock = if directory.join("coordination/owner.lock").exists() {
+    let coordinator_lock = if paths.coordinator_lock().exists() {
         let owner = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
-            .open(directory.join("coordination/owner.lock"))
+            .open(paths.coordinator_lock())
             .map_err(|e| e.to_string())?;
         let owner = super::file_lock::FileLock::try_new(owner)
             .map_err(|_| "The task coordinator is still running.".to_string())?;
@@ -51,18 +53,18 @@ pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
     };
     for child in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
         let child = child.map_err(|e| e.to_string())?;
-        if ["runtime.lock", RESET_MARKER, "coordination"]
+        if [profile::RUNTIME_LOCK, RESET_MARKER, profile::COORDINATION]
             .contains(&child.file_name().to_string_lossy().as_ref())
         {
             continue;
         }
         remove_entry(&child.path())?;
     }
-    let coordination = directory.join("coordination");
+    let coordination = paths.coordination();
     if coordination.exists() {
         for child in std::fs::read_dir(&coordination).map_err(|e| e.to_string())? {
             let child = child.map_err(|e| e.to_string())?;
-            if child.file_name() != "owner.lock" {
+            if child.file_name() != profile::COORDINATOR_LOCK {
                 remove_entry(&child.path())?;
             }
         }
@@ -78,17 +80,7 @@ fn remove_entry(path: &Path) -> Result<(), String> {
         }
         std::fs::remove_dir(path)
     } else {
-        if path.file_name().is_some_and(|name| {
-            [
-                "account.bin",
-                "api-key.bin",
-                "issue-connections.bin",
-                "remote-access.bin",
-                "remote-hosts.bin",
-            ]
-            .iter()
-            .any(|candidate| name == *candidate)
-        }) {
+        if super::account_storage::is_record(path) {
             return super::account_storage::remove(path);
         }
         std::fs::remove_file(path)
@@ -127,13 +119,10 @@ pub async fn app_reset(
 
 #[tauri::command]
 pub fn app_finish_reset(app: tauri::AppHandle) -> Result<(), String> {
-    let directory = app
+    let marker = app
         .state::<TaskRuntime>()
-        .integration_directory()
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    let marker = directory.join(RESET_MARKER);
+        .data_directory()
+        .join(RESET_MARKER);
     if marker.exists() {
         std::fs::remove_file(marker).map_err(|e| e.to_string())?;
     }

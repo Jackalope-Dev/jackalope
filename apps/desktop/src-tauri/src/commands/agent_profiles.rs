@@ -10,7 +10,7 @@ use super::tasks::TaskRuntime;
 
 mod credentials;
 pub use credentials::agent_profile_save_key;
-pub(in crate::commands) use credentials::save_key;
+pub(in crate::commands) use credentials::save_imported_key;
 
 pub(super) fn has_api_key(binding: &AccountBinding) -> Result<bool, String> {
     credentials::read(binding).map(|key| key.is_some())
@@ -150,15 +150,16 @@ pub struct AccountBinding {
     pub label: String,
 }
 
-pub(super) fn preferred_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+/// The model saved for `binding`'s account in the manifest under `root`.
+/// The binding's directory cannot locate that manifest: an account may keep
+/// its sign-in in a folder of its own choosing.
+pub(super) fn preferred_model(
+    root: &Path,
+    binding: &AccountBinding,
+) -> Result<Option<String>, String> {
     let Some(id) = binding.profile_id.as_deref() else {
         return Ok(None);
     };
-    let root = binding
-        .directory
-        .parent()
-        .and_then(Path::parent)
-        .ok_or("Invalid account directory.")?;
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let manifest = load_checked(root)?;
     Ok(manifest
@@ -980,14 +981,14 @@ mod tests {
             .default_model = "other/default".into();
         assert_eq!(
             policy
-                .model_for_account("opencode", None, &binding)
+                .model_for_account(&root, "opencode", None, &binding)
                 .unwrap()
                 .as_deref(),
             Some("deepseek/flash")
         );
         assert_eq!(
             policy
-                .model_for_account("opencode", Some("deepseek/pro"), &binding)
+                .model_for_account(&root, "opencode", Some("deepseek/pro"), &binding)
                 .unwrap()
                 .as_deref(),
             Some("deepseek/pro")
@@ -998,7 +999,7 @@ mod tests {
             .unwrap()
             .restrict_models = true;
         assert!(policy
-            .model_for_account("opencode", None, &binding)
+            .model_for_account(&root, "opencode", None, &binding)
             .is_err());
         let _ = fs::remove_dir_all(root);
     }
@@ -1028,9 +1029,40 @@ mod tests {
         assert_eq!(saved.agents["opencode"].active.as_deref(), Some("old"));
         assert!(saved.agents["opencode"].pending.is_empty());
         assert_eq!(
-            preferred_model(&binding).unwrap().as_deref(),
+            preferred_model(&root, &binding).unwrap().as_deref(),
             Some("deepseek/flash")
         );
+        // An account signed in from a folder of its own still finds its model.
+        let mut manifest = load_checked(&root).unwrap();
+        let custom =
+            std::env::temp_dir().join(format!("jackalope-custom-{}", uuid::Uuid::new_v4()));
+        manifest
+            .agents
+            .get_mut("opencode")
+            .unwrap()
+            .profiles
+            .iter_mut()
+            .find(|p| p.id == "paid")
+            .unwrap()
+            .config_dir = Some(custom.to_string_lossy().into_owned());
+        save(&root, &manifest).unwrap();
+        let moved = bind_account(&root, "opencode", Some("paid")).unwrap();
+        assert_eq!(moved.directory, custom);
+        assert_eq!(
+            preferred_model(&root, &moved).unwrap().as_deref(),
+            Some("deepseek/flash")
+        );
+        let mut manifest = load_checked(&root).unwrap();
+        manifest
+            .agents
+            .get_mut("opencode")
+            .unwrap()
+            .profiles
+            .iter_mut()
+            .find(|p| p.id == "paid")
+            .unwrap()
+            .config_dir = None;
+        save(&root, &manifest).unwrap();
         complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
         complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
         assert_eq!(
@@ -1088,20 +1120,20 @@ mod tests {
             .default_model = "paid/model".into();
         assert_eq!(
             policy
-                .model_for_account("opencode", None, &paid)
+                .model_for_account(&root, "opencode", None, &paid)
                 .unwrap()
                 .as_deref(),
             Some("paid/model")
         );
         assert_eq!(
             policy
-                .model_for_account("opencode", None, &binding)
+                .model_for_account(&root, "opencode", None, &binding)
                 .unwrap()
                 .as_deref(),
             Some("jackalope-local/qwen3.5:4b")
         );
         assert!(policy
-            .model_for_account("opencode", Some("paid/model"), &binding)
+            .model_for_account(&root, "opencode", Some("paid/model"), &binding)
             .is_err());
         policy
             .runner_options
@@ -1109,7 +1141,7 @@ mod tests {
             .unwrap()
             .restrict_models = true;
         assert!(policy
-            .model_for_account("opencode", None, &binding)
+            .model_for_account(&root, "opencode", None, &binding)
             .is_err());
         let mut command = std::process::Command::new("opencode");
         command.env(

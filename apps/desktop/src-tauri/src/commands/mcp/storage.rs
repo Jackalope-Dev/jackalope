@@ -30,21 +30,13 @@ pub(super) fn read(path: &Path) -> Result<String, String> {
 }
 
 fn read_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    match fs::File::open(path) {
-        Ok(file) => {
-            use std::io::Read;
-            let mut bytes = Vec::new();
-            file.take(1024 * 1024 + 4097)
-                .read_to_end(&mut bytes)
-                .map_err(|_| "Could not read MCP configuration.")?;
-            if bytes.len() > 1024 * 1024 + 4096 {
-                return Err("MCP configuration exceeds its size limit.".into());
-            }
-            Ok(Some(bytes))
+    crate::commands::history::read_capped(path, 1024 * 1024 + 4096).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::InvalidData {
+            "MCP configuration exceeds its size limit.".to_string()
+        } else {
+            "Could not read MCP configuration.".to_string()
         }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(_) => Err("Could not read MCP configuration.".into()),
-    }
+    })
 }
 
 pub(super) fn write(path: &Path, text: &str) -> Result<(), String> {

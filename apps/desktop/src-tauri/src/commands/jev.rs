@@ -51,11 +51,13 @@ fn valid_key(key: &str) -> bool {
 }
 
 fn connection(path: &Path) -> Result<Option<Connection>, String> {
-    let Some(bytes) = account_storage::read(&path.join("api-key.bin"))? else {
+    let Some(value) = account_storage::read_json::<Connection>(
+        &path.join("api-key.bin"),
+        "Reconnect Jev: its saved API key could not be read.",
+    )?
+    else {
         return Ok(None);
     };
-    let value: Connection = serde_json::from_slice(&bytes)
-        .map_err(|_| "Reconnect Jev: its saved API key could not be read.".to_string())?;
     if !valid_key(&value.key) {
         return Err("Reconnect Jev: its saved API key is invalid.".into());
     }
@@ -200,10 +202,7 @@ pub async fn routing_connect(
         checked_at: chrono::Utc::now().to_rfc3339(),
     };
     std::fs::create_dir_all(&path).map_err(|_| "Could not create secure Jev storage.")?;
-    account_storage::write(
-        &path.join("api-key.bin"),
-        &serde_json::to_vec(&value).map_err(|_| "Could not prepare the Jev connection.")?,
-    )?;
+    account_storage::write_json(&path.join("api-key.bin"), &value)?;
     save(&path, &mut current)?;
     status(&path, project_id.as_deref())
 }

@@ -37,13 +37,11 @@ fn connections(runtime: &TaskRuntime) -> Result<Vec<Connection>, String> {
     let path = runtime
         .integration_directory()
         .join("issue-connections.bin");
-    account_storage::read(&path)?
-        .map(|data| {
-            serde_json::from_slice(&data).map_err(|_| {
-                "Issue connections could not be read. Your saved settings were preserved.".into()
-            })
-        })
-        .unwrap_or(Ok(Vec::new()))
+    Ok(account_storage::read_json(
+        &path,
+        "Issue connections could not be read. Your saved settings were preserved.",
+    )?
+    .unwrap_or_default())
 }
 fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
@@ -150,9 +148,9 @@ pub async fn issue_connection_save(
     let mut saved = connections(&state)?;
     saved.retain(|item| item.provider != connection.provider);
     saved.push(connection);
-    account_storage::write(
+    account_storage::write_json(
         &state.integration_directory().join("issue-connections.bin"),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
+        &saved,
     )
 }
 #[tauri::command]
@@ -163,9 +161,9 @@ pub fn issue_connection_remove(
     let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
     let mut saved = connections(&state)?;
     saved.retain(|item| item.provider != provider);
-    account_storage::write(
+    account_storage::write_json(
         &state.integration_directory().join("issue-connections.bin"),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
+        &saved,
     )
 }
 fn text(value: &Value, field: &str) -> String {

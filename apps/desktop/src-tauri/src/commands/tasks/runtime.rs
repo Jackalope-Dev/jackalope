@@ -1587,6 +1587,11 @@ impl TaskRuntime {
             })
             .unwrap_or(0)
     }
+    /// The profile's data directory, which holds task history and every
+    /// other store.
+    pub fn data_directory(&self) -> &Path {
+        &self.directory
+    }
     pub fn integration_directory(&self) -> PathBuf {
         self.directory.join("integrations")
     }
@@ -1884,7 +1889,12 @@ impl TaskRuntime {
                     .model
                     .as_deref()
                     .or_else(|| previous.as_ref().and_then(|old| old.model.as_deref()));
-                request.model = policy.model_for_account(&request.agent, requested, &binding)?;
+                request.model = policy.model_for_account(
+                    &self.profiles_root(),
+                    &request.agent,
+                    requested,
+                    &binding,
+                )?;
             }
             if request.agent != "auto"
                 && !self

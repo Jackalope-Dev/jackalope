@@ -248,7 +248,6 @@ fn import_detected_key(
     let default_name = format!("{} (Imported Key)", key_name);
     let name = profile_name.unwrap_or(default_name).trim().to_string();
 
-    let root = runtime.profiles_root();
     let profile = agent_profiles::agent_profile_create(
         runtime.clone(),
         target_agent.to_string(),
@@ -265,30 +264,21 @@ fn import_detected_key(
         Some("Imported Key".to_string()),
     );
 
-    if target_agent == "opencode" {
-        if let Err(error) = agent_profiles::save_key(
-            runtime.clone(),
+    if let Err(error) = agent_profiles::save_imported_key(
+        runtime.clone(),
+        target_agent.into(),
+        profile.id.clone(),
+        key_name,
+        val.into(),
+    ) {
+        let _ = agent_profiles::delete_profile(
+            runtime,
+            helper,
             target_agent.into(),
             profile.id.clone(),
-            key_name,
-            val.into(),
-        ) {
-            let _ = agent_profiles::delete_profile(
-                runtime,
-                helper,
-                target_agent.into(),
-                profile.id.clone(),
-            );
-            return Err(error);
-        }
-        return Ok(profile);
+        );
+        return Err(error);
     }
-
-    let profile_dir = root.join(target_agent).join(&profile.id);
-    let env_path = profile_dir.join(".env");
-    let env_content = format!("{key_name}={val}\n");
-    std::fs::write(env_path, env_content).map_err(|e| e.to_string())?;
-
     Ok(profile)
 }
 

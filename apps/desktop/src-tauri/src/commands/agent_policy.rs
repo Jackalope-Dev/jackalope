@@ -100,6 +100,7 @@ impl AgentPolicy {
 
     pub(super) fn model_for_account(
         &self,
+        profiles_root: &std::path::Path,
         agent: &str,
         requested: Option<&str>,
         binding: &super::agent_profiles::AccountBinding,
@@ -111,7 +112,7 @@ impl AgentPolicy {
             }
             self.model(agent, Some(&id))
         } else {
-            let preferred = super::agent_profiles::preferred_model(binding)?;
+            let preferred = super::agent_profiles::preferred_model(profiles_root, binding)?;
             let model = self.model(
                 agent,
                 requested

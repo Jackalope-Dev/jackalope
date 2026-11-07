@@ -2,16 +2,35 @@ use serde::Serialize;
 use std::path::Path;
 
 pub(super) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
-    use std::io::Read;
-    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    let mut bytes = Vec::new();
-    file.take(limit + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > limit {
-        return Err(format!("History exceeds the {limit}-byte load limit; the original remains available for recovery."));
+    match read_capped(path, limit) {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) => Err(std::io::Error::from(std::io::ErrorKind::NotFound).to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => Err(format!("History exceeds the {limit}-byte load limit; the original remains available for recovery.")),
+        Err(error) => Err(error.to_string()),
     }
-    Ok(bytes)
+}
+
+/// Reads `path` when it holds at most `limit` bytes, without reading further.
+/// `None` when it does not exist; an `InvalidData` error when it is larger.
+pub(in crate::commands) fn read_capped(
+    path: &Path,
+    limit: u64,
+) -> std::io::Result<Option<Vec<u8>>> {
+    use std::io::Read;
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("The file exceeds its {limit}-byte limit."),
+        ));
+    }
+    Ok(Some(bytes))
 }
 
 pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {

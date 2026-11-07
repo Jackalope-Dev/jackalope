@@ -571,7 +571,9 @@ impl TaskRuntime {
                 if let Some(id) = &local_id {
                     account_models = vec![Some(id.clone())];
                 } else {
-                    if let Some(preferred) = agent_profiles::preferred_model(&binding)? {
+                    if let Some(preferred) =
+                        agent_profiles::preferred_model(&self.profiles_root(), &binding)?
+                    {
                         account_models.retain(Option::is_some);
                         account_models.insert(0, Some(preferred));
                     }

@@ -26,7 +26,7 @@ pub(in crate::commands) fn run(
     runtime.access.ensure()?;
     let policy = runtime.policy()?;
     let (adapter, executable) = policy.resolve(agent)?;
-    let model = policy.model_for_account(agent, model, binding)?;
+    let model = policy.model_for_account(&runtime.profiles_root(), agent, model, binding)?;
     if !policy.account_allowed("", agent, binding) {
         return Err("This account is disabled. Choose an enabled account in Agents.".into());
     }

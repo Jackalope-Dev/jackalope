@@ -170,7 +170,7 @@ pub fn run(launch: Launch) {
             app.manage(commands::community::Community::load(
                 preferences.join("community.json"),
             ));
-            let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
+            let coordinator = Coordinator::new(paths.coordination(), runtime.clone())?;
             coordinator.launch();
             commands::coordination::cloud::launch(coordinator.clone());
             commands::coordination::deploy::launch(coordinator.clone());
@@ -198,7 +198,7 @@ pub fn run(launch: Launch) {
             bot_hub.launch(app.handle().clone());
             app.manage(bot_hub);
             app.manage(sessions);
-            let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator.clone());
+            let scheduler = Scheduler::new(paths.schedules(), coordinator.clone());
             scheduler.launch();
             app.manage(scheduler);
             app.manage(runtime);

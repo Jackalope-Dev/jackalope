@@ -1,18 +1,16 @@
 use super::*;
 use crate::commands::agent_profiles::AccountBinding;
-use std::io::Read;
 use std::path::Path;
 
 fn read_private(path: &Path) -> Result<String, String> {
-    let file =
-        std::fs::File::open(path).map_err(|_| "Kimi account configuration is unavailable.")?;
-    let mut bytes = Vec::new();
-    file.take(1_048_577)
-        .read_to_end(&mut bytes)
-        .map_err(|_| "Could not read Kimi account configuration.")?;
-    if bytes.len() > 1_048_576 {
-        return Err("Kimi account configuration exceeded the size limit.".into());
-    }
+    let bytes = match crate::commands::history::read_capped(path, 1_048_576) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Err("Kimi account configuration is unavailable.".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+            return Err("Kimi account configuration exceeded the size limit.".into())
+        }
+        Err(_) => return Err("Could not read Kimi account configuration.".into()),
+    };
     String::from_utf8(bytes).map_err(|_| "Kimi account configuration is invalid.".into())
 }
 

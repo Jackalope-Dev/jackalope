@@ -142,11 +142,11 @@ fn path(root: &Path, project_id: &str) -> Result<PathBuf, String> {
 }
 
 fn load(root: &Path, project_id: &str) -> Result<Saved, String> {
-    match account_storage::read(&path(root, project_id)?)? {
-        Some(bytes) => serde_json::from_slice(&bytes)
-            .map_err(|_| "This project's saved secrets could not be read.".into()),
-        None => Ok(Saved::default()),
-    }
+    Ok(account_storage::read_json(
+        &path(root, project_id)?,
+        "This project's saved secrets could not be read.",
+    )?
+    .unwrap_or_default())
 }
 
 fn store(root: &Path, project_id: &str, saved: &Saved) -> Result<(), String> {
@@ -155,8 +155,7 @@ fn store(root: &Path, project_id: &str, saved: &Saved) -> Result<(), String> {
         return account_storage::remove(&path);
     }
     std::fs::create_dir_all(root).map_err(|_| "Project secrets could not be saved.")?;
-    let bytes = serde_json::to_vec(saved).map_err(|_| "Project secrets could not be saved.")?;
-    account_storage::write(&path, &bytes)
+    account_storage::write_json(&path, saved)
 }
 
 fn statuses(saved: &Saved) -> Vec<SecretStatus> {

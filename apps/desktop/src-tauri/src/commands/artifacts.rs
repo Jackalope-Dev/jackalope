@@ -1,4 +1,4 @@
-use std::{io::Read, path::Path};
+use std::path::Path;
 
 pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, String> {
     let root = workspace
@@ -11,15 +11,14 @@ pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, 
     if !path.starts_with(root) {
         return Err("This screenshot is outside the task's evidence folder".into());
     }
-    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    let mut bytes = Vec::new();
-    const LIMIT: u64 = 8 * 1024 * 1024;
-    file.take(LIMIT + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > LIMIT {
-        return Err("This screenshot is too large to preview (8 MB maximum)".into());
-    }
+    let bytes = match super::history::read_capped(&path, 8 * 1024 * 1024) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Err("This screenshot is no longer available on disk".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+            return Err("This screenshot is too large to preview (8 MB maximum)".into())
+        }
+        Err(error) => return Err(error.to_string()),
+    };
     if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[12..16] != b"IHDR" {
         return Err("This file is not a readable PNG screenshot".into());
     }

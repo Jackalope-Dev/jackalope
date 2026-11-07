@@ -18,21 +18,7 @@ fn unavailable(_: keyring::Error) -> String {
 
 #[cfg(unix)]
 fn record(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    match std::fs::File::open(path) {
-        Ok(file) => {
-            use std::io::Read;
-            let mut bytes = Vec::new();
-            file.take((super::MAX_SECRET_BYTES + 4097) as u64)
-                .read_to_end(&mut bytes)
-                .map_err(|_| "The secure account record could not be read.")?;
-            if bytes.len() > super::MAX_SECRET_BYTES + 4096 {
-                return Err("The secure account record is invalid.".into());
-            }
-            Ok(Some(bytes))
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(_) => Err("The secure account record could not be read.".into()),
-    }
+    super::read_file(path)
 }
 
 fn identifier(bytes: &[u8]) -> Result<&str, String> {

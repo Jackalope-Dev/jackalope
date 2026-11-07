@@ -36,18 +36,10 @@ impl AccountService {
         }
     }
     fn read(&self) -> Result<Option<SavedAccount>, String> {
-        account_storage::read(&self.path)?
-            .map(|bytes| {
-                serde_json::from_slice(&bytes)
-                    .map_err(|_| "The saved account record is invalid.".into())
-            })
-            .transpose()
+        account_storage::read_json(&self.path, "The saved account record is invalid.")
     }
     fn save(&self, record: &SavedAccount) -> Result<(), String> {
-        account_storage::write(
-            &self.path,
-            &serde_json::to_vec(record).map_err(|_| "Could not encode the account record.")?,
-        )
+        account_storage::write_json(&self.path, record)
     }
 }
 #[derive(Serialize, Deserialize)]

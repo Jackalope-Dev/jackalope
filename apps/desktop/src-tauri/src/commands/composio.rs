@@ -67,14 +67,10 @@ fn path(runtime: &TaskRuntime) -> PathBuf {
 }
 
 fn saved(runtime: &TaskRuntime) -> Result<Option<Saved>, String> {
-    account_storage::read(&path(runtime))?
-        .map(|bytes| {
-            serde_json::from_slice(&bytes).map_err(|_| {
-                "The saved Composio connection could not be read. Remove it and add the key again."
-                    .into()
-            })
-        })
-        .transpose()
+    account_storage::read_json(
+        &path(runtime),
+        "The saved Composio connection could not be read. Remove it and add the key again.",
+    )
 }
 
 fn require(runtime: &TaskRuntime) -> Result<Saved, String> {
@@ -255,10 +251,7 @@ pub async fn composio_save_key(
         session_id,
         mcp_url,
     };
-    account_storage::write(
-        &path(&state),
-        &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&path(&state), &next)?;
     mcp::mcp_save_server(connection(&next)).await?;
     *CATALOG.lock().map_err(|e| e.to_string())? = None;
     composio_status(state).await

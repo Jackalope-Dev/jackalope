@@ -22,7 +22,7 @@ impl TaskRuntime {
             .truncate(false)
             .read(true)
             .write(true)
-            .open(directory.join("runtime.lock"))
+            .open(directory.join(crate::cli_protocol::profile::RUNTIME_LOCK))
             .map_err(|e| e.to_string())?;
         // The `jackalope` command briefly takes a shared lock to ask whether
         // the app is starting, and a relaunch can overlap the previous exit;
@@ -61,7 +61,9 @@ impl TaskRuntime {
             .iter()
             .filter(|path| {
                 path.extension().is_some_and(|ext| ext == "json")
-                    && path.file_name().is_none_or(|name| name != "schedules.json")
+                    && path
+                        .file_name()
+                        .is_none_or(|name| name != crate::cli_protocol::profile::SCHEDULES)
             })
             .collect();
         let mut loaded: HashMap<_, _> = std::thread::scope(|scope| {
@@ -84,7 +86,7 @@ impl TaskRuntime {
         for path in paths {
             if path
                 .file_name()
-                .is_some_and(|name| name == "schedules.json")
+                .is_some_and(|name| name == crate::cli_protocol::profile::SCHEDULES)
             {
                 continue;
             }

@@ -460,7 +460,7 @@ impl Helper {
                 {
                     continue;
                 }
-                let Ok(model) = policy.model_for_account(&agent, None, &binding) else {
+                let Ok(model) = policy.model_for_account(&root, &agent, None, &binding) else {
                     continue;
                 };
                 candidates.push(Candidate {
