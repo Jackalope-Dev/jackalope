@@ -25,10 +25,6 @@ pub fn store_for(runtime: &crate::commands::tasks::TaskRuntime) -> Store {
     Store::new(runtime.integration_directory().with_file_name("plans"))
 }
 
-fn active(status: &str) -> bool {
-    ["starting", "running", "stopping", "routing", "queued"].contains(&status)
-}
-
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskProgress {
@@ -537,7 +533,7 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
         })
         .collect();
     for run in &pending {
-        if active(&run.status) || run.finishing {
+        if run.status.is_active() || run.finishing {
             super::register_run(
                 &run.id,
                 &record.id,
@@ -548,7 +544,7 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
     }
     let finished: Vec<&TaskRun> = pending
         .into_iter()
-        .filter(|run| !active(&run.status) && !run.finishing)
+        .filter(|run| !run.status.is_active() && !run.finishing)
         .collect();
     if finished.is_empty() {
         return Ok(record.clone());
@@ -556,10 +552,10 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
     let (record, _) = store.update(&record.id, |saved| {
         for run in finished {
             saved.session.ingested.push(run.id.clone());
-            if !matches!(run.status.as_str(), "review" | "reviewed") || run.error.is_some() {
+            if !run.status.is_done() || run.error.is_some() {
                 saved.error = Some(format!(
                     "Planning ended without a plan ({}). Keep planning to try again.",
-                    run.error.as_deref().unwrap_or(&run.status)
+                    run.error.as_deref().unwrap_or(run.status.as_str())
                 ));
                 continue;
             }
@@ -610,9 +606,9 @@ fn task_state(run: Option<&TaskRun>, merged: bool, error: bool) -> &'static str 
         _ if merged => "merged",
         _ if error => "needs-attention",
         None => "waiting",
-        Some(run) if active(&run.status) || run.finishing => "running",
+        Some(run) if run.status.is_active() || run.finishing => "running",
         Some(run)
-            if matches!(run.status.as_str(), "review" | "reviewed")
+            if run.status.is_done()
                 && run.error.is_none()
                 && run
                     .verification
@@ -739,7 +735,7 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
         crate::commands::agent_decider::reconcile(&store, ingest(&store, &store.load(id)?, &runs)?);
     let doc = record.document();
     let planner = planning_run(&record, &runs);
-    let planning = planner.is_some_and(|run| active(&run.status) || run.finishing);
+    let planning = planner.is_some_and(|run| run.status.is_active() || run.finishing);
     let mut progress_view = None;
     let mut criteria = vec![];
     if let Some(doc) = &doc {
@@ -902,7 +898,7 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
 }
 
 fn guard_idle(record: &PlanRecord, runs: &[TaskRun]) -> Result<(), String> {
-    if planning_run(record, runs).is_some_and(|run| active(&run.status) || run.finishing) {
+    if planning_run(record, runs).is_some_and(|run| run.status.is_active() || run.finishing) {
         return Err(
             "The planner is still working. Answer its question or wait for the draft.".into(),
         );
@@ -1091,7 +1087,7 @@ pub fn approve(
             item.run_id
                 .as_ref()
                 .and_then(|id| runs.iter().find(|run| &run.id == id))
-                .is_some_and(|run| active(&run.status) || run.finishing)
+                .is_some_and(|run| run.status.is_active() || run.finishing)
         }) {
             return Err("Earlier tasks of this plan are still running. Let them finish or stop them before approving the new revision.".into());
         }
@@ -1405,7 +1401,7 @@ pub fn resolve_deviation(
                 if let Some(run) = runs
                     .iter()
                     .find(|run| &run.id == run_id)
-                    .filter(|run| !active(&run.status) && !run.finishing)
+                    .filter(|run| !run.status.is_active() && !run.finishing)
                 {
                     let mut request = record.request.clone();
                     request.id = Uuid::new_v4().to_string();

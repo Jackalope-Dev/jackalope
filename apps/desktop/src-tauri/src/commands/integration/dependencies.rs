@@ -60,7 +60,7 @@ pub(in crate::commands) fn verified(run: &TaskRun, tree: &str) -> Result<(), Str
         // No check gate: the snapshot comparison in `validate_dependencies`
         // still pins consumers to these exact files, and the plan review
         // gates integration.
-        if !matches!(run.status.as_str(), "review" | "reviewed") || run.error.is_some() {
+        if !run.status.is_done() || run.error.is_some() {
             return Err("The predecessor has not finished cleanly.".into());
         }
         return Ok(());

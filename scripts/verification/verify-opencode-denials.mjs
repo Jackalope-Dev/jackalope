@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { startProviderMeter } from '../evaluation/provider-meter.mjs';
-import { gitEnvironment } from '../git-environment.mjs';
+import { gitEnvironment } from '../lib/git-environment.mjs';
 
 const executable = process.argv[2];
 if (!executable || !path.isAbsolute(executable))

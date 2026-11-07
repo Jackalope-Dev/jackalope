@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
-import { createServer } from '../../apps/desktop/node_modules/vite/dist/node/index.js';
+import { createServer } from 'vite';
 
 const directory = path.resolve('apps/desktop/scratch/workflow-ui');
 const output = path.resolve('output/playwright/workflow-velocity');

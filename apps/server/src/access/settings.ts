@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { ServiceError } from '../errors';
 import { deleteLessonStatements } from './lessons';
-import { AccessError } from './service';
 
 const syncedSettingsSchema = z.strictObject({
   version: z.literal(1),
@@ -35,7 +35,7 @@ export async function settingsRoute(
   )
     .bind(deviceId, memberId)
     .first();
-  if (!consent) throw new AccessError(403, 'settings_sync_disabled');
+  if (!consent) throw new ServiceError(403, 'settings_sync_disabled');
   if (method === 'PUT') {
     const { revision, settings } = z
       .strictObject({
@@ -61,12 +61,12 @@ export async function settingsRoute(
       )
         .bind(JSON.stringify(settings), Date.now(), memberId, revision, deviceId, memberId)
         .first<{ revision: number; settings: string }>();
-      if (!updated) throw new AccessError(409, 'settings_conflict');
+      if (!updated) throw new ServiceError(409, 'settings_conflict');
       return { revision: updated.revision, settings: JSON.parse(updated.settings) };
     }
     return { revision: changed.revision, settings: JSON.parse(changed.settings) };
   } else if (method !== 'GET') {
-    throw new AccessError(405, 'method_not_allowed');
+    throw new ServiceError(405, 'method_not_allowed');
   }
   const row = await env.DB.prepare(
     'SELECT revision,settings FROM access_settings WHERE member_id=?',

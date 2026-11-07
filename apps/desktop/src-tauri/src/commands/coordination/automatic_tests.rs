@@ -1,5 +1,6 @@
 use super::automatic::*;
 use super::*;
+use crate::commands::tasks::RunStatus;
 use serde_json::{json, Value};
 
 mod claude;
@@ -33,7 +34,8 @@ impl Fixture {
     }
 
     fn running(&self, id: &str) {
-        self.runtime.update(id, |run| run.status = "running".into());
+        self.runtime
+            .update(id, |run| run.status = RunStatus::Running);
         let mut inner = self.service.inner.lock().unwrap();
         inner.grants.insert(id.into(), (id.into(), id.into()));
         inner.ledger.lifecycle.as_mut().unwrap().remove(id);
@@ -150,7 +152,7 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
         .await
         .is_err());
     f.runtime
-        .update("reader-run", |run| run.status = "review".into());
+        .update("reader-run", |run| run.status = RunStatus::Review);
     assert!(
         bridge_verification_output(state(), headers("reader-run"), input())
             .await
@@ -219,7 +221,7 @@ async fn project_exposes_only_the_authorized_attempts_verification_command() {
             .is_err()
     );
     f.runtime
-        .update("reader-run", |run| run.status = "review".into());
+        .update("reader-run", |run| run.status = RunStatus::Review);
     assert!(
         bridge_project(WebState(f.service.clone()), headers("reader-run"))
             .await
@@ -243,7 +245,7 @@ fn lifecycle_baselines_history_and_persists_one_start_and_outcome() {
     assert!(messages[0].text.contains("unknown scope"));
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "review".into());
+        .update("writer-run", |run| run.status = RunStatus::Review);
     fixture.service.reconcile().unwrap();
     fixture.service.reconcile().unwrap();
     let saved: Ledger = serde_json::from_slice(
@@ -256,7 +258,7 @@ fn lifecycle_baselines_history_and_persists_one_start_and_outcome() {
     assert!(saved.messages.iter().all(|m| m.acknowledged_by.is_empty()));
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "reviewed".into());
+        .update("writer-run", |run| run.status = RunStatus::Reviewed);
     fixture.service.reconcile().unwrap();
     assert_eq!(fixture.service.view().unwrap().messages.len(), 2);
 }
@@ -301,7 +303,7 @@ fn failed_lifecycle_save_does_not_consume_event_and_retry_is_idempotent() {
     std::fs::create_dir(&path).unwrap();
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "stopped".into());
+        .update("writer-run", |run| run.status = RunStatus::Stopped);
     assert!(fixture.service.reconcile().is_err());
     assert_eq!(fixture.service.view().unwrap().messages.len(), 1);
     std::fs::remove_dir(&path).unwrap();
@@ -429,7 +431,7 @@ fn quick_failure_emits_start_and_failure_and_restart_emits_recovery_once() {
     }
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "failed".into());
+        .update("writer-run", |run| run.status = RunStatus::Failed);
     fixture.service.reconcile().unwrap();
     let messages = fixture.service.view().unwrap().messages;
     assert_eq!(messages.len(), 2);
@@ -535,7 +537,7 @@ async fn checkpoint_deduplicates_delivery_without_acknowledging_and_respects_sco
     assert!(fixture.service.checkpoint(&origin).is_err());
     fixture
         .runtime
-        .update("reader-run", |run| run.status = "review".into());
+        .update("reader-run", |run| run.status = RunStatus::Review);
     assert!(fixture.service.checkpoint(&headers("reader-run")).is_err());
 }
 

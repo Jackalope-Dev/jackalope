@@ -1,17 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
+import { measured, quantile, reduction, seededRandom, sum } from '../lib/stats.mjs';
 import { studyPlan, wilson } from './study-plan.mjs';
 
-const measured = (n) => Number.isFinite(n) && n >= 0;
-const sum = (values) =>
-  values.length && values.every(measured) ? values.reduce((a, b) => a + b, 0) : null;
-const reduction = (a, b) => (a > 0 && measured(b) ? 100 * (1 - b / a) : null);
 const familyOf = (row) => row.source?.family ?? row.category ?? row.case;
-const quantile = (values, p) =>
-  values.length
-    ? [...values].sort((a, b) => a - b)[Math.max(0, Math.ceil(p * values.length) - 1)]
-    : null;
 
 export function pricedBounds(row, pricing) {
   if (!pricing) return null;
@@ -237,7 +230,7 @@ export function impactReport(
       ? wilson(familyPass(candidate), families.length)[0] -
         wilson(familyPass(baseline), families.length)[1]
       : null;
-  let seed = 73191;
+  const random = seededRandom(73191);
   const intervals = {};
   for (const key of [
     'totalTokens',
@@ -259,8 +252,7 @@ export function impactReport(
     ) {
       const selected = [];
       for (let n = 0; n < families.length; n++) {
-        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-        const family = families[Math.floor((seed / 4294967296) * families.length)];
+        const family = families[Math.floor(random() * families.length)];
         selected.push(...rows.filter((row) => familyOf(row) === family));
       }
       const values = [baseline, candidate].map((variant) => {
@@ -447,7 +439,7 @@ export function impactReport(
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   const [input, output, options] = process.argv.slice(2);
   if (!input || !output)
     throw new Error('Usage: impact-report.mjs comparison.json report.json [options.json]');

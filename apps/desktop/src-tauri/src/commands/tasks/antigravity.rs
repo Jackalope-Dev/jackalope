@@ -1,7 +1,5 @@
 use super::*;
 
-pub(super) const TIMEOUT: Duration = Duration::from_secs(30 * 60);
-
 pub(in crate::commands) fn configure(cmd: &mut Command, workspace: &str, session: Option<&str>) {
     cmd.args([
         "--input-format",

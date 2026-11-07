@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright-core';
+import { cloudDownloadUrl, releaseDownloads } from '../../../packages/contracts/src/release.ts';
 
 const origin = process.env.JACKALOPE_TEST_URL || 'http://127.0.0.1:5194';
 const output = resolve('output/download-page');
@@ -117,10 +118,7 @@ try {
       await page
         .locator('.download-platform-action a')
         .evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort()),
-      ['appimage-x86_64', 'dmg-aarch64', 'dmg-x86_64'].map(
-        (platform) =>
-          `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${platform}?channel=stable`,
-      ),
+      releaseDownloads.map((id) => cloudDownloadUrl(id, 'stable')).sort(),
       'Public macOS and Linux builds default to Stable',
     );
     assert.equal(attempts(), 0);

@@ -65,7 +65,7 @@ pub async fn ask(runtime: &TaskRuntime, run: &TaskRun, input: Input) -> Result<V
 }
 
 fn reserve(run: &mut TaskRun, questions: u64) -> bool {
-    if !["starting", "running"].contains(&run.status.as_str()) || !(1..=32).contains(&questions) {
+    if !run.status.is_running() || !(1..=32).contains(&questions) {
         return false;
     }
     let calls = run.efficiency.jev_question_calls.get_or_insert(0);

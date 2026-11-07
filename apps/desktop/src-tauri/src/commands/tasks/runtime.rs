@@ -5,22 +5,6 @@ use super::*;
 const RECENT_TOUCHED_ATTEMPTS: usize = 3;
 const RECENT_TOUCHED_PATHS: usize = 60;
 
-/// Adapters with a native task protocol. Others fail explicitly at launch.
-pub(super) const EXECUTABLE_ADAPTERS: &[&str] = &[
-    "codex",
-    "claude",
-    "kimi",
-    "antigravity",
-    "opencode",
-    "grok",
-    "gemini",
-    "acp",
-];
-
-pub(super) fn unimplemented_adapter(adapter: &str) -> String {
-    format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code, Antigravity, Gemini CLI or an ACP agent to run this task.")
-}
-
 /// Launch the agent, retrying a transient failure (an antivirus or indexer lock
 /// on the executable, `ETXTBSY` just after a write) a bounded number of times.
 /// A missing executable is not retried. Returns the child and the attempt count.
@@ -80,7 +64,7 @@ impl TaskRuntime {
     pub(super) fn reusable_workspace(&self, retried: &str) -> Option<(String, String, String)> {
         let runs = self.inner.lock().ok()?;
         let old = runs.runs.get(retried)?;
-        if ["starting", "running", "stopping"].contains(&old.status.as_str())
+        if old.status.is_active()
             || old.workspace.is_empty()
             || old.branch.is_empty()
             || Path::new(&old.workspace) == Path::new(&old.project_path)
@@ -89,10 +73,7 @@ impl TaskRuntime {
             return None;
         }
         if runs.runs.values().any(|other| {
-            other.id != retried
-                && other.workspace == old.workspace
-                && ["starting", "running", "stopping", "interrupted"]
-                    .contains(&other.status.as_str())
+            other.id != retried && other.workspace == old.workspace && other.status.is_live()
         }) {
             return None;
         }
@@ -107,21 +88,12 @@ impl TaskRuntime {
     }
 
     pub(super) fn fail(&self, id: &str, error: String) {
-        self.update(id, |run| {
-            run.status = "failed".into();
-            run.error = Some(error);
-            run.ended_at = Some(Utc::now().to_rfc3339());
-            run.progress = None;
-        });
+        self.update(id, |run| run.mark_failed(error));
     }
 
     pub(in crate::commands) fn request_reset(&self) -> Result<(), String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
-        if inner
-            .runs
-            .values()
-            .any(|run| ["starting", "running", "stopping"].contains(&run.status.as_str()))
-        {
+        if inner.runs.values().any(|run| run.status.is_active()) {
             return Err("Stop active tasks before resetting Jackalope.".into());
         }
         crate::commands::reset::reject_links(&self.directory)?;
@@ -138,7 +110,7 @@ impl TaskRuntime {
             .unwrap()
             .runs
             .get(id)
-            .is_some_and(|run| ["starting", "running"].contains(&run.status.as_str()))
+            .is_some_and(|run| run.status.is_running())
     }
 
     pub fn stop_all(&self) {
@@ -150,7 +122,7 @@ impl TaskRuntime {
             .unwrap()
             .runs
             .values()
-            .filter(|r| ["starting", "running", "stopping"].contains(&r.status.as_str()))
+            .filter(|r| r.status.is_active())
             .map(|r| r.id.clone())
             .collect();
         for id in ids {
@@ -162,10 +134,10 @@ impl TaskRuntime {
         let process = {
             let mut inner = self.inner.lock().unwrap();
             let run = inner.runs.get_mut(id).ok_or("Attempt not found")?;
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 return Ok(());
             }
-            run.status = "stopping".into();
+            run.status = RunStatus::Stopping;
             run.progress = None;
             run.persistence_error = self
                 .save(run)
@@ -255,10 +227,7 @@ impl TaskRuntime {
         let early = early.join();
         if !self.is_running(id) {
             // A stop during preparation reports as stopped, not as the selection it interrupted.
-            self.update(id, |run| {
-                run.status = "stopped".into();
-                run.ended_at = Some(Utc::now().to_rfc3339());
-            });
+            self.mark_stopped(id);
             return Ok(());
         }
         let mut request =
@@ -267,10 +236,7 @@ impl TaskRuntime {
         let mut routed = true;
         loop {
             if !self.is_running(id) {
-                self.update(id, |run| {
-                    run.status = "stopped".into();
-                    run.ended_at = Some(Utc::now().to_rfc3339());
-                });
+                self.mark_stopped(id);
                 return Ok(());
             }
             if !std::mem::replace(&mut routed, false) && request.agent == "auto" {
@@ -301,7 +267,10 @@ impl TaskRuntime {
                 .get(id)
                 .cloned()
                 .ok_or("Attempt not found")?;
-            if run.status != "starting" || run.routing.is_none() || run.quota_failure.is_none() {
+            if run.status != RunStatus::Starting
+                || run.routing.is_none()
+                || run.quota_failure.is_none()
+            {
                 return Ok(());
             }
             request = self.handoff(req, &run)?;
@@ -520,10 +489,7 @@ impl TaskRuntime {
             {
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
-                    self.update(id, |r| {
-                        r.status = "stopped".into();
-                        r.ended_at = Some(Utc::now().to_rfc3339());
-                    });
+                    self.mark_stopped(id);
                     return Ok(());
                 }
                 if !record.success {
@@ -544,7 +510,7 @@ impl TaskRuntime {
         if inner.runs.values().any(|other| {
             other.id != id
                 && !other.workspace.is_empty()
-                && ["starting", "running", "stopping"].contains(&other.status.as_str())
+                && other.status.is_active()
                 && (Path::new(&other.workspace) == Path::new(root)
                     || target.is_some() && canonical(&other.workspace) == target)
         }) {
@@ -658,10 +624,7 @@ impl TaskRuntime {
             };
             let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
             if !self.is_running(id) {
-                self.update(id, |run| {
-                    run.status = "stopped".into();
-                    run.ended_at = Some(Utc::now().to_rfc3339());
-                });
+                self.mark_stopped(id);
                 return Ok(());
             }
             if !record.success {
@@ -689,11 +652,9 @@ impl TaskRuntime {
         let policy = self.policy()?;
         // An agent on the project's computer uses the CLI installed there.
         let adapter = policy.adapter(&req.agent)?;
-        let remote = if EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
-            self.placed_target(id, req, &adapter, previous.as_ref())?
-        } else {
-            None
-        };
+        let spec = crate::commands::agents::find(&adapter)
+            .ok_or("Choose a supported CLI adapter for this agent.")?;
+        let remote = self.placed_target(id, req, &adapter, previous.as_ref())?;
         let executable = match remote {
             Some(_) => PathBuf::from(&adapter),
             None => policy.resolve(&req.agent)?.1,
@@ -746,9 +707,6 @@ impl TaskRuntime {
         {
             return Err("This agent was disabled for the project before launch.".into());
         }
-        if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
-            return Err(unimplemented_adapter(&adapter));
-        }
         let runner_lease = match remote {
             Some(_) => None,
             None => crate::commands::managed_runtime::acquire(&executable)?,
@@ -772,7 +730,7 @@ impl TaskRuntime {
             }
         }
         // Agents on a computer use the sign-ins saved for computers instead.
-        if remote.is_none() && crate::commands::agent_profiles::env_var_for(&adapter).is_some() {
+        if remote.is_none() && spec.account_env().is_some() {
             let binding = req
                 .account_binding
                 .as_ref()
@@ -894,7 +852,7 @@ impl TaskRuntime {
                 previous.as_ref().and_then(|old| old.session_id.as_deref()),
             );
         } else {
-            return Err(unimplemented_adapter(&adapter));
+            return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
         let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
@@ -903,7 +861,7 @@ impl TaskRuntime {
             run.requested_service_tier = tier;
         })?;
         if let Some(model) = &selected_model {
-            if adapter != "kimi" && adapter != "acp" && opencode_connection.is_none() {
+            if spec.protocol != Protocol::Acp && opencode_connection.is_none() {
                 cmd.args(["--model", model]);
             }
             self.update_checked(id, |run| run.model = Some(model.clone()))?;
@@ -1166,8 +1124,7 @@ impl TaskRuntime {
             .map(|run| super::efficiency::launch_context(run, host_parallelism))
             .unwrap_or_default();
         input.push_str(&launch_context);
-        let native_mcp = req.coordination.is_some()
-            && matches!(adapter.as_str(), "codex" | "claude" | "opencode" | "kimi");
+        let native_mcp = req.coordination.is_some() && spec.bridge() == Bridge::Mcp;
         if native_mcp && crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             input.push_str("\nread_context provides bounded source ranges and repository symbol locations. Reuse returned blockHash only while its original text remains in your context; unchanged ranges omit text, changed ranges refresh it. Use the agent's own file tools whenever they are simpler.\n");
         }
@@ -1187,7 +1144,7 @@ impl TaskRuntime {
                     &adapter,
                 ));
             }
-            if matches!(adapter.as_str(), "grok" | "antigravity" | "gemini") {
+            if spec.bridge() == Bridge::Http {
                 input.push_str(crate::commands::coordination::http_bootstrap());
             }
             if has_discovery {
@@ -1241,7 +1198,7 @@ impl TaskRuntime {
                 Path::new(&req.project_path)
             )
         ));
-        if adapter == "grok" {
+        if spec.prompt == Prompt::File {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
         }
@@ -1259,7 +1216,7 @@ impl TaskRuntime {
                 );
             }
         }
-        let acp_servers = if adapter == "kimi" || adapter == "acp" {
+        let acp_servers = if spec.protocol == Protocol::Acp {
             crate::commands::mcp::acp_servers(&project_mcp, &cmd)?
         } else {
             Vec::new()
@@ -1378,9 +1335,7 @@ impl TaskRuntime {
             let result = {
                 let inner = self.inner.lock().unwrap();
                 let current = inner.runs.get(id).ok_or("Attempt not found")?;
-                if !inner.canceled.contains(id)
-                    && ["starting", "running"].contains(&current.status.as_str())
-                {
+                if !inner.canceled.contains(id) && current.status.is_running() {
                     Some(crate::commands::checkpoint::create(
                         current,
                         &self.integration_directory(),
@@ -1421,9 +1376,9 @@ impl TaskRuntime {
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
             r.finishing = false; r.exit_code = exit_code; r.ended_at = Some(Utc::now().to_rfc3339());
-            r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if success && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
-            r.review_capturing = capture_review && r.status == "review";
-            if r.status == "failed" {
+            r.status = if canceled || r.status == RunStatus::Stopping { RunStatus::Stopped } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; RunStatus::Starting } else if success && r.error.is_none() && !r.result.is_empty() { RunStatus::Review } else { RunStatus::Failed };
+            r.review_capturing = capture_review && r.status == RunStatus::Review;
+            if r.status == RunStatus::Failed {
                 if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
                     if let Some(failure) = &r.quota_failure {
                         r.error = Some(failure.message.clone());
@@ -1470,7 +1425,7 @@ impl TaskRuntime {
         {
             let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
             let run = inner.runs.get_mut(run_id).ok_or("Attempt not found")?;
-            if !["starting", "running"].contains(&run.status.as_str()) {
+            if !run.status.is_running() {
                 return Err(
                     "This attempt has ended. Continue the task to provide more input.".into(),
                 );
@@ -1511,7 +1466,7 @@ impl TaskRuntime {
             let Some(run) = inner.runs.get_mut(run_id) else {
                 return Ok(false);
             };
-            if !["starting", "running"].contains(&run.status.as_str()) {
+            if !run.status.is_running() {
                 return Ok(false);
             }
             let mut updated = run.clone();
@@ -1656,10 +1611,7 @@ impl TaskRuntime {
                 inner
                     .runs
                     .values()
-                    .filter(|run| {
-                        ["starting", "running", "stopping"].contains(&run.status.as_str())
-                            || run.finishing
-                    })
+                    .filter(|run| run.status.is_active() || run.finishing)
                     .cloned()
                     .collect()
             })
@@ -1672,10 +1624,7 @@ impl TaskRuntime {
                 inner
                     .runs
                     .values()
-                    .filter(|run| {
-                        ["starting", "running", "stopping"].contains(&run.status.as_str())
-                            || run.finishing
-                    })
+                    .filter(|run| run.status.is_active() || run.finishing)
                     .count()
             })
             .unwrap_or(0)
@@ -1726,7 +1675,7 @@ impl TaskRuntime {
             .get(id)
             .cloned()
             .ok_or("Attempt not found")?;
-        if !["failed", "stopped", "interrupted"].contains(&run.status.as_str()) {
+        if !run.status.is_retryable() {
             return Err(
                 "Only an attempt that failed, stopped or was interrupted can be retried.".into(),
             );
@@ -1902,13 +1851,14 @@ impl TaskRuntime {
                 })
                 .transpose()?;
             if let Some(ref old) = retried {
-                if ["starting", "running", "stopping"].contains(&old.status.as_str()) {
+                if old.status.is_active() {
                     return Err("This attempt is still running. Stop it before retrying.".into());
                 }
-                if inner.runs.values().any(|r| {
-                    r.task_id == old.task_id
-                        && ["starting", "running", "stopping"].contains(&r.status.as_str())
-                }) {
+                if inner
+                    .runs
+                    .values()
+                    .any(|r| r.task_id == old.task_id && r.status.is_active())
+                {
                     return Err("This task already has an active attempt.".into());
                 }
                 if inner
@@ -1929,16 +1879,17 @@ impl TaskRuntime {
                 {
                     return Err("Open the latest attempt before continuing this task.".into());
                 }
-                if old.status == "interrupted" {
+                if old.status == RunStatus::Interrupted {
                     return Err("This attempt was interrupted. Inspect the agent's CLI session and workspace before starting new work; automatic resume is unavailable because process ownership is unknown.".into());
                 }
                 if old.live_session_id != request.live_session_id {
                     return Err("Continue this work from its live session.".into());
                 }
-                if inner.runs.values().any(|r| {
-                    r.task_id == old.task_id
-                        && ["starting", "running", "stopping"].contains(&r.status.as_str())
-                }) {
+                if inner
+                    .runs
+                    .values()
+                    .any(|r| r.task_id == old.task_id && r.status.is_active())
+                {
                     return Err("This task already has an active attempt.".into());
                 }
                 if old.agent != request.agent
@@ -1947,7 +1898,7 @@ impl TaskRuntime {
                 {
                     return Err("A continuation must use its original project and agent.".into());
                 }
-                if ["starting", "running", "stopping"].contains(&old.status.as_str()) {
+                if old.status.is_active() {
                     return Err("Stop or finish this attempt before continuing.".into());
                 }
             }
@@ -2119,7 +2070,7 @@ impl TaskRuntime {
                 verification: None,
                 model: request.model.clone(),
                 prompt: request.prompt.clone(),
-                status: "starting".into(),
+                status: RunStatus::Starting,
                 started_at: Utc::now().to_rfc3339(),
                 ended_at: None,
                 session_id: None,
@@ -2163,12 +2114,9 @@ impl TaskRuntime {
                     .unwrap()
                     .runs
                     .get(&request.id)
-                    .is_some_and(|run| run.status == "stopping")
+                    .is_some_and(|run| run.status == RunStatus::Stopping)
                 {
-                    runtime.update(&request.id, |run| {
-                        run.status = "stopped".into();
-                        run.ended_at = Some(Utc::now().to_rfc3339());
-                    });
+                    runtime.mark_stopped(&request.id);
                 } else {
                     runtime.fail(&request.id, error);
                 }

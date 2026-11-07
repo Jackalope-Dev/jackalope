@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readPublicRelease } from './website.mjs';
+import { readPublicRelease } from '../scripts/public-release.mjs';
 
 const manifest = {
   version: '0.2.0',

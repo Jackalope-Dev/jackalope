@@ -1,4 +1,4 @@
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 
 export const qualityMethod = 'Independent source-family Wilson endpoint difference, z=1.96';
 export const qualityMargin = 0.02;
@@ -48,7 +48,7 @@ export function studyPlan({ margin = qualityMargin, expectedPassRate = 1, famili
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   const args = process.argv.slice(2);
   const value = (name, fallback) =>
     Number(args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);

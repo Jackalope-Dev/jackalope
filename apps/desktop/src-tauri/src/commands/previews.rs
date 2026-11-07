@@ -211,10 +211,10 @@ fn start_preview(
     }
     let runs = runtime.integration_runs()?;
     let run = runs.iter().find(|r| r.id == id).ok_or("Task not found")?;
-    if runs.iter().any(|r| {
-        r.workspace == run.workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|r| r.workspace == run.workspace && r.status.is_live())
+    {
         return Err("Finish active work and resolve interrupted ownership before starting a managed preview.".into());
     }
     ensure_idle(&run.workspace)?;
@@ -295,19 +295,17 @@ fn start_preview(
 fn preview_process(expanded: &str, workspace: &str, port: u16) -> Command {
     #[cfg(windows)]
     let mut cmd = {
-        use std::os::windows::process::CommandExt;
         let mut c = Command::new("cmd.exe");
-        c.args(["/D", "/S", "/C", expanded])
-            .creation_flags(0x08000000);
+        c.args(["/D", "/S", "/C", expanded]);
         c
     };
     #[cfg(not(windows))]
     let mut cmd = {
-        use std::os::unix::process::CommandExt;
         let mut c = Command::new("/bin/sh");
-        c.args(["-c", expanded]).process_group(0);
+        c.args(["-c", expanded]);
         c
     };
+    super::process_control::isolated(&mut cmd);
     cmd.current_dir(workspace)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

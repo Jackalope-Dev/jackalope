@@ -23,8 +23,9 @@ const MAX_SECRETS: usize = 64;
 const MAX_VALUE_CHARS: usize = 16_000;
 const MAX_NAME_CHARS: usize = 128;
 
-/// Names Jackalope, agent sign-ins and the operating system own. A secret with
-/// one of these would change how the agent signs in or starts.
+/// Names Jackalope, agent sign-ins and the operating system own, besides each
+/// agent's account variable. A secret with one of these would change how the
+/// agent signs in or starts.
 const RESERVED: &[&str] = &[
     "CLAUDE_CODE_OAUTH_TOKEN",
     "ANTHROPIC_API_KEY",
@@ -33,13 +34,12 @@ const RESERVED: &[&str] = &[
     "OPENAI_API_KEY",
     "OPENAI_BASE_URL",
     "CODEX_API_KEY",
-    "CLAUDE_CONFIG_DIR",
-    "CODEX_HOME",
-    "GROK_HOME",
-    "KIMI_CODE_HOME",
-    "GEMINI_CLI_HOME",
+    "KIMI_SHARE_DIR",
+    "GEMINI_FORCE_FILE_STORAGE",
     "OPENCODE_CONFIG",
     "OPENCODE_CONFIG_CONTENT",
+    "OPENCODE_CONFIG_DIR",
+    "OPENCODE_DISABLE_PROJECT_CONFIG",
     "PATH",
     "PATHEXT",
     "HOME",
@@ -183,6 +183,9 @@ pub(crate) fn validate_name(name: &str) -> Result<(), String> {
         return Err("Use capital letters, digits and underscores, starting with a letter or underscore, up to 128 characters.".into());
     }
     let owned = RESERVED.contains(&name)
+        || super::agents::all()
+            .iter()
+            .any(|agent| agent.account_env() == Some(name))
         || RESERVED_PREFIXES
             .iter()
             .any(|prefix| name.starts_with(prefix))
@@ -409,6 +412,32 @@ mod tests {
         assert!(validate_value("a\0b").is_err());
         assert!(validate_value(&"é".repeat(16_000)).is_ok());
         assert!(validate_value(&"é".repeat(16_001)).is_err());
+    }
+
+    #[test]
+    fn variables_an_account_binding_sets_are_reserved() {
+        let root = scratch();
+        for agent in super::super::agents::all() {
+            let binding = super::super::agent_profiles::AccountBinding {
+                adapter: agent.id.clone(),
+                profile_id: Some("work".into()),
+                directory: root.0.join(&agent.id),
+                label: "Work".into(),
+            };
+            let mut command = std::process::Command::new("fixture");
+            // Antigravity accounts need saved settings and a key; its home variables are reserved.
+            if super::super::agent_profiles::apply_binding(&mut command, &binding).is_err() {
+                continue;
+            }
+            for (name, value) in command.get_envs() {
+                let name = name.to_string_lossy();
+                assert!(
+                    value.is_none() || validate_name(&name).is_err(),
+                    "{}: {name}",
+                    agent.id
+                );
+            }
+        }
     }
 
     #[test]

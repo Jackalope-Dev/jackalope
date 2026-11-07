@@ -1,5 +1,6 @@
 import { setTimeout } from 'node:timers/promises';
-import { readPublicRelease } from './website.mjs';
+import { readPublicRelease } from '../../apps/website/scripts/public-release.mjs';
+import { httpsUrl } from '../../packages/contracts/src/platform.ts';
 
 let hook;
 try {
@@ -8,12 +9,9 @@ try {
   throw new Error('Configure the website Deploy Hook secret before stable publication');
 }
 if (
+  !httpsUrl(hook.href) ||
   hook.origin !== 'https://api.cloudflare.com' ||
-  !/^\/client\/v4\/workers\/builds\/deploy_hooks\/[a-zA-Z0-9_-]+$/.test(hook.pathname) ||
-  hook.username ||
-  hook.password ||
-  hook.search ||
-  hook.hash
+  !/^\/client\/v4\/workers\/builds\/deploy_hooks\/[a-zA-Z0-9_-]+$/.test(hook.pathname)
 )
   throw new Error('Invalid website Deploy Hook configuration');
 if (process.argv[2] !== 'check') {

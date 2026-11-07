@@ -100,10 +100,6 @@ fn open(record: &PlanRecord) -> bool {
             .is_some_and(|round| round.verdict.is_empty())
 }
 
-fn active(status: &str) -> bool {
-    ["starting", "running", "stopping", "routing", "queued"].contains(&status)
-}
-
 /// The current round's proposed assignments wait for a decision.
 fn proposed(record: &PlanRecord) -> bool {
     open(record)
@@ -286,10 +282,10 @@ pub enum Outcome {
 /// A done verdict stands only when the plan's check passed on the integrated
 /// tree in the orchestrator's own attempt.
 pub fn decide(doc: &PlanDocument, round: u32, run: &TaskRun, check: Option<&str>) -> Outcome {
-    if !matches!(run.status.as_str(), "review" | "reviewed") || run.error.is_some() {
+    if !run.status.is_done() || run.error.is_some() {
         return Outcome::Retry(format!(
             "The orchestrator attempt ended without a verdict ({}).",
-            run.error.as_deref().unwrap_or(&run.status)
+            run.error.as_deref().unwrap_or(run.status.as_str())
         ));
     }
     match parse_verdict(&run.result) {
@@ -386,7 +382,7 @@ fn attempt_step(last: Option<&String>, handled: &[String], runs: &[TaskRun]) -> 
             "The orchestrator attempt is missing from task history. Resume to review the round again."
                 .into(),
         ),
-        Some(run) if active(&run.status) || run.finishing => Step::Wait,
+        Some(run) if run.status.is_active() || run.finishing => Step::Wait,
         Some(_) => Step::Read(id.clone()),
     }
 }
@@ -700,7 +696,7 @@ pub struct RoundsView {
 fn live(run_id: Option<&String>, runs: &[TaskRun]) -> bool {
     run_id
         .and_then(|id| runs.iter().find(|run| &run.id == id))
-        .is_some_and(|run| active(&run.status) || run.finishing)
+        .is_some_and(|run| run.status.is_active() || run.finishing)
 }
 
 pub fn view(
@@ -1485,7 +1481,7 @@ pub fn action(
         let runs = coordinator.runtime.integration_runs()?;
         for run in runs
             .iter()
-            .filter(|run| round.review_run_ids.contains(&run.id) && active(&run.status))
+            .filter(|run| round.review_run_ids.contains(&run.id) && run.status.is_active())
         {
             coordinator.runtime.stop(&run.id)?;
         }

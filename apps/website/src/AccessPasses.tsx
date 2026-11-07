@@ -1,4 +1,5 @@
 import { PassTickets } from '@jackalope/brand/passes';
+import type { InvitationSummary } from '@jackalope/contracts/access';
 import { Button, CopyButton, IconButton, Input, MailIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, Check, X } from 'lucide-react';
@@ -6,11 +7,7 @@ import { type FormEvent, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
 
-interface Allowance {
-  limit: number;
-  remaining: number;
-  accepted: number;
-}
+type Allowance = Pick<InvitationSummary, 'limit' | 'remaining' | 'accepted'>;
 
 export function AccessPasses({
   member,

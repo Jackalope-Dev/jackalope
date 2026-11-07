@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-
+import { httpsUrl } from '../../packages/contracts/src/platform.ts';
+import { isMain } from '../lib/cli.mjs';
 import { assertVersions, readNotes } from './catalog.mjs';
 import { waitForSourceChecks } from './source-checks.mjs';
 import { storePlan } from './store-plan.mjs';
@@ -131,13 +131,8 @@ export async function submit(
     submissionId: draft.id,
     status: 'DraftCreated',
   });
-  const url = new URL(draft.fileUploadUrl);
-  if (
-    url.protocol !== 'https:' ||
-    !url.hostname.endsWith('.blob.core.windows.net') ||
-    url.username ||
-    url.password
-  )
+  const url = httpsUrl(draft.fileUploadUrl, { query: true, fragment: true });
+  if (!url?.hostname.endsWith('.blob.core.windows.net'))
     throw new Error('Unexpected Store upload destination');
   await request(path, 'PUT', updateSubmission(draft, channel, fileName, receipt.version));
   await upload(url, fetcher);
@@ -283,7 +278,7 @@ async function main() {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

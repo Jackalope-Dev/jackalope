@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { createServer } from '../../packages/ui/node_modules/vite/dist/node/index.js';
+import { createServer } from 'vite';
 import { verifyPatternLayout, verifyPatterns } from './ui-patterns.mjs';
 
 const output = 'output/ui-library';

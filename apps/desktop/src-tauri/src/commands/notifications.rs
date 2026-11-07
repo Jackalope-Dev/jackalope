@@ -1,4 +1,5 @@
 use super::tasks::TaskRuntime;
+use crate::commands::tasks::RunStatus;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -48,7 +49,7 @@ pub struct Snapshot {
     pub task_id: String,
     pub project_id: String,
     pub started_at: String,
-    pub status: String,
+    pub status: RunStatus,
     pub questions: Vec<String>,
     /// The attempt an agent reviewer reviewed; its notice opens that attempt.
     pub review_of: Option<String>,
@@ -67,7 +68,7 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
     let mut reviews = Vec::new();
     for run in runs {
         if let Some(author) = &run.review_of {
-            if run.status == "review" {
+            if run.status == RunStatus::Review {
                 reviews.push(Notice {
                     key: format!("{}:review", run.id),
                     run_id: author.clone(),
@@ -85,7 +86,7 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
     latest
         .values()
         .flat_map(|run| {
-            if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if run.status.is_active() {
                 return run
                     .questions
                     .iter()
@@ -97,17 +98,17 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
                     })
                     .collect::<Vec<_>>();
             }
-            let title = match run.status.as_str() {
-                "failed" => "A task needs attention",
-                "interrupted" => "A task was interrupted",
-                "review" => "A task is ready for review",
+            let title = match run.status {
+                RunStatus::Failed => "A task needs attention",
+                RunStatus::Interrupted => "A task was interrupted",
+                RunStatus::Review => "A task is ready for review",
                 _ => return vec![],
             };
             vec![Notice {
                 key: format!("{}:{}", run.id, run.status),
                 run_id: run.id.clone(),
                 title,
-                attention: run.status != "review",
+                attention: run.status != RunStatus::Review,
             }]
         })
         .chain(reviews)

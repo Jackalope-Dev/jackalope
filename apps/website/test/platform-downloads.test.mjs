@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  detectDesktopPlatform,
-  platformDownloads,
-} from '../../apps/website/src/platform-downloads.ts';
+import { detectDesktopPlatform, platformDownloads } from '../src/platform-downloads.ts';
 
 test('desktop platform detection handles browser hints and avoids mobile and ChromeOS lookalikes', () => {
   for (const [browser, expected] of [

@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+pub use crate::cli_protocol::profile::home_dir;
+
 pub fn is_executable(path: &Path) -> bool {
     let Ok(metadata) = path.metadata() else {
         return false;
@@ -19,9 +21,39 @@ pub fn is_executable(path: &Path) -> bool {
 }
 
 pub fn find_on_path(name: &str) -> Option<PathBuf> {
-    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+    find_executable(name, &[])
+}
+
+/// The first executable named `name` in a PATH directory, then in `extra`.
+/// On Windows a name without an extension matches `name.exe`, `name.cmd` or
+/// `name.bat`; a file without one cannot be started there.
+pub fn find_executable(name: &str, extra: &[PathBuf]) -> Option<PathBuf> {
+    find_in(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .chain(extra.iter().cloned()),
+        name,
+    )
+}
+
+/// The first executable named `name` (see [`find_executable`]) in `directories`.
+pub fn find_in(directories: impl IntoIterator<Item = PathBuf>, name: &str) -> Option<PathBuf> {
+    let names: Vec<String> = if cfg!(windows) && Path::new(name).extension().is_none() {
+        [".exe", ".cmd", ".bat"]
+            .iter()
+            .map(|suffix| format!("{name}{suffix}"))
+            .collect()
+    } else {
+        vec![name.to_string()]
+    };
+    directories
+        .into_iter()
         .filter(|directory| directory.is_absolute())
-        .map(|directory| directory.join(name))
+        .flat_map(|directory| {
+            names
+                .iter()
+                .map(move |name| directory.join(name))
+                .collect::<Vec<_>>()
+        })
         .find(|path| is_executable(path))
 }
 
@@ -51,7 +83,7 @@ fn path_from_shell(output: &str) -> Option<&str> {
 pub fn initialize_environment() {
     use std::{process::Command, time::Duration};
     let inherited = std::env::var_os("PATH").unwrap_or_default();
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = home_dir();
     let shell = std::env::var_os("SHELL")
         .map(PathBuf::from)
         .or_else(|| {
@@ -122,6 +154,29 @@ pub fn initialize_environment() {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn executables_are_found_only_in_absolute_directories() {
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-npm-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        assert_eq!(find_in([directory.clone()], "npm"), None);
+        let npm = directory.join(if cfg!(windows) { "npm.cmd" } else { "npm" });
+        std::fs::write(
+            &npm,
+            "#!/bin/sh
+",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&npm, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        assert_eq!(find_in([directory.clone()], "npm"), Some(npm));
+        assert_eq!(find_in([PathBuf::from("relative")], "npm"), None);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
 
     #[test]
     fn directories_are_not_executables() {

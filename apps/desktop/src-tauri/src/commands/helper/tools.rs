@@ -150,7 +150,10 @@ impl Helper {
                     .and_then(|tasks| tasks.iter().find(|t| t["id"] == input.run_id))
                     .ok_or("Choose a task ID from the shared task list.")?;
                 if name == "stop_task"
-                    && !["starting", "running"].contains(&task["status"].as_str().unwrap_or(""))
+                    && !crate::commands::tasks::RunStatus::from(
+                        task["status"].as_str().unwrap_or(""),
+                    )
+                    .is_running()
                 {
                     return Err("This task is not running.".into());
                 }

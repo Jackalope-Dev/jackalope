@@ -2,6 +2,7 @@ use super::{
     integration,
     tasks::{TaskRun, TaskRuntime},
 };
+use crate::commands::tasks::RunStatus;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -312,16 +313,16 @@ impl TaskContract {
 fn idle_run(runtime: &TaskRuntime, id: &str) -> Result<TaskRun, String> {
     let runs = runtime.integration_runs()?;
     let run = runs.iter().find(|r| r.id == id).ok_or("Task not found")?;
-    if runs.iter().any(|other| {
-        other.workspace == run.workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|other| other.workspace == run.workspace && other.status.is_live())
+    {
         return Err(
             "Stop active work and resolve interrupted ownership before reviewing this workspace."
                 .into(),
         );
     }
-    if !["review", "reviewed"].contains(&run.status.as_str()) {
+    if !run.status.is_done() {
         return Err("Review acceptance after the agent has produced a finished result.".into());
     }
     if runs
@@ -439,7 +440,7 @@ pub fn record(runtime: &TaskRuntime, review: OutcomeReview) -> Result<(), String
             tree,
             recorded_at: chrono::Utc::now().to_rfc3339(),
         });
-        r.status = "review".into();
+        r.status = RunStatus::Review;
     })?;
     runtime
         .refresh_knowledge(&run.project_id, &run.project_path, true)

@@ -51,7 +51,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         connection_ids: None,
         model: None,
         prompt: "Example".into(),
-        status: "running".into(),
+        status: RunStatus::Running,
         started_at: Utc::now().to_rfc3339(),
         ended_at: None,
         session_id: None,
@@ -190,7 +190,7 @@ fn active_summaries_keep_only_three_short_activity_previews() {
     assert_eq!(summary.activity[0], "Reading src/a.rs");
     assert_eq!(summary.activity[2].len(), 240);
     assert_eq!(run.activity.len(), 4);
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     assert!(run.summary().activity.is_empty());
 }
 
@@ -332,16 +332,6 @@ fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
 }
 
 #[test]
-fn every_builtin_agent_is_executable() {
-    for adapter in BUILTIN_AGENTS {
-        assert!(runtime::EXECUTABLE_ADAPTERS.contains(adapter), "{adapter}");
-    }
-    let message = runtime::unimplemented_adapter("other");
-    assert!(message.starts_with("The other task adapter is not implemented yet"));
-    assert!(message.contains("Gemini CLI"));
-}
-
-#[test]
 #[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
 fn installed_agent_lifecycle_trial() {
     let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");
@@ -359,7 +349,7 @@ fn installed_agent_lifecycle_trial() {
 }
 
 pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
-    assert!(BUILTIN_AGENTS.contains(&agent));
+    assert!(crate::commands::agents::is_builtin(agent));
     let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
@@ -476,7 +466,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         let deadline = std::time::Instant::now() + Duration::from_secs(180);
         loop {
             let run = runtime.inner.lock().unwrap().runs[id].clone();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 return run;
             }
             if std::time::Instant::now() > deadline {
@@ -493,7 +483,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     let first = settled(&runtime, &request.id);
     assert_eq!(
         first.status,
-        "review",
+        RunStatus::Review,
         "{:?}; fixture {}",
         first.error,
         root.display()
@@ -543,7 +533,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     }
     runtime.start(next.clone()).unwrap();
     let second = settled(&runtime, &next.id);
-    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert_eq!(second.status, RunStatus::Review, "{:?}", second.error);
     assert!(
         second.result.contains("copper-rabbit-731"),
         "Continuation did not retain context"
@@ -603,7 +593,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         std::thread::sleep(Duration::from_millis(50));
     }
     runtime.stop(&stop.id).unwrap();
-    assert_eq!(settled(&runtime, &stop.id).status, "stopped");
+    assert_eq!(settled(&runtime, &stop.id).status, RunStatus::Stopped);
     std::thread::sleep(Duration::from_millis(300));
     drop(runtime);
     let restored = TaskRuntime::with_test_access(history).unwrap();
@@ -646,7 +636,7 @@ fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
 
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut failed = sample("codex");
-    failed.status = "failed".into();
+    failed.status = RunStatus::Failed;
     failed.project_path = repo_path.clone();
     failed.workspace = worktree_path.clone();
     failed.branch = "attempt".into();
@@ -698,16 +688,16 @@ fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
     assert!(runtime.reusable_workspace(&failed_id).is_some());
 
     // A running attempt is neither retryable nor a source of a reusable workspace.
-    runtime.update(&failed_id, |run| run.status = "running".into());
+    runtime.update(&failed_id, |run| run.status = RunStatus::Running);
     assert!(runtime.retry_request(&failed_id).is_err());
     assert!(runtime.reusable_workspace(&failed_id).is_none());
-    runtime.update(&failed_id, |run| run.status = "failed".into());
+    runtime.update(&failed_id, |run| run.status = RunStatus::Failed);
 
     // Nor is a workspace a later attempt already owns.
     let mut newer = sample("codex");
     newer.id = uuid::Uuid::new_v4().to_string();
     newer.task_id = failed.task_id.clone();
-    newer.status = "running".into();
+    newer.status = RunStatus::Running;
     newer.workspace = worktree_path.clone();
     runtime
         .inner
@@ -963,8 +953,8 @@ process.stdin.on('end', () => {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let run = runtime.integration_runs().unwrap().pop().unwrap();
-        if !["starting", "running"].contains(&run.status.as_str()) {
-            assert_eq!(run.status, "review", "{:?}", run.error);
+        if !run.status.is_running() {
+            assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
             assert_eq!(run.agent, "custom-fixture");
             assert_eq!(run.model.as_deref(), Some("test-model"));
             assert_eq!(run.result, "Fixture complete");
@@ -1090,8 +1080,8 @@ process.stdin.on('end', () => {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let run = runtime.integration_runs().unwrap().pop().unwrap();
-        if !["starting", "running"].contains(&run.status.as_str()) {
-            assert_eq!(run.status, "review", "{:?}", run.error);
+        if !run.status.is_running() {
+            assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
             assert_eq!(run.result, "Fixture complete");
             break;
         }
@@ -1149,7 +1139,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
     let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let inner = loaded.inner.lock().unwrap();
     let restored = &inner.runs[&run.id];
-    assert_eq!(restored.status, "interrupted");
+    assert_eq!(restored.status, RunStatus::Interrupted);
     assert_eq!(restored.result, "🐇 café");
     assert_eq!(restored.session_id.as_deref(), Some("session-1"));
     assert!(inner.processes.is_empty());
@@ -1172,7 +1162,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let directory = folder.join("history");
     let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     run.result = "last saved output".into();
     runtime.save(&run).unwrap();
     runtime
@@ -1212,7 +1202,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let saved = restarted.integration_runs().unwrap().pop().unwrap();
     assert_eq!(saved.result, "latest unsaved output");
     assert!(saved.persistence_error.is_none());
-    assert_eq!(saved.status, "review");
+    assert_eq!(saved.status, RunStatus::Review);
     drop(restarted);
     std::fs::remove_dir_all(folder).unwrap();
 }
@@ -1235,12 +1225,13 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
     let runtime = TaskRuntime::with_test_access(folder.clone())
         .expect("a failed checkpoint must not prevent reading other history");
     let recovered = runtime.integration_runs().unwrap().pop().unwrap();
-    assert_eq!(recovered.status, "stopped");
+    assert_eq!(recovered.status, RunStatus::Stopped);
     assert!(recovered.persistence_error.is_some());
     assert!(runtime.inner.lock().unwrap().processes.is_empty());
     let saved: TaskRun = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
     assert_eq!(
-        saved.status, "running",
+        saved.status,
+        RunStatus::Running,
         "failed replacement must keep the checkpoint intact"
     );
     std::fs::set_permissions(&path, original).unwrap();
@@ -1258,7 +1249,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
         std::env::temp_dir().join(format!("jackalope-history-id-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut good = sample("codex");
-    good.status = "review".into();
+    good.status = RunStatus::Review;
     good.result = "keep this result".into();
     runtime.save(&good).unwrap();
     let mut mismatch = good.clone();
@@ -1528,7 +1519,7 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
         std::env::temp_dir().join(format!("jackalope-manual-archive-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "reviewed".into();
+    run.status = RunStatus::Reviewed;
     run.result = "Keep this result".into();
     runtime.save(&run).unwrap();
     runtime
@@ -1544,7 +1535,7 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
     let saved = runtime.snapshot(Some(&run.id));
     assert!(saved[0].archived_at.is_some());
     assert_eq!(saved[0].result, run.result);
-    assert_eq!(saved[0].status, "reviewed");
+    assert_eq!(saved[0].status, RunStatus::Reviewed);
     runtime.set_archived(&run.id, false).unwrap();
     drop(runtime);
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
@@ -1569,7 +1560,7 @@ fn manual_archive_rejects_unfinished_unsaved_session_and_stale_attempts() {
             .insert(run.id.clone(), run.clone());
         assert!(runtime.set_archived(&run.id, true).is_err());
     }
-    run.status = "reviewed".into();
+    run.status = RunStatus::Reviewed;
     for blocked in [
         TaskRun {
             persistence_error: Some("disk full".into()),
@@ -1618,7 +1609,7 @@ fn manual_archive_failed_save_keeps_task_visible() {
     ));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "failed".into();
+    run.status = RunStatus::Failed;
     runtime
         .inner
         .lock()
@@ -1645,7 +1636,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let mut session_run = sample("codex");
     session_run.id = "keep-live-session".into();
     session_run.live_session_id = Some("live-session".into());
-    session_run.status = "reviewed".into();
+    session_run.status = RunStatus::Reviewed;
     session_run.started_at = "2025-01-01T00:00:00Z".into();
     runtime.save(&session_run).unwrap();
     for status in ["review", "failed", "interrupted"] {
@@ -1657,7 +1648,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     for i in 0..205 {
         let mut run = sample("codex");
         run.id = format!("reviewed-{i:04}");
-        run.status = "reviewed".into();
+        run.status = RunStatus::Reviewed;
         run.started_at = format!("2026-01-01T00:{:02}:{:02}Z", i / 60, i % 60);
         run.ended_at = Some(run.started_at.clone());
         runtime.save(&run).unwrap();
@@ -1667,13 +1658,16 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let loaded = restarted.integration_runs().unwrap();
     assert_eq!(
-        loaded.iter().filter(|r| r.status == "reviewed").count(),
+        loaded
+            .iter()
+            .filter(|r| r.status == RunStatus::Reviewed)
+            .count(),
         201
     );
     assert!(loaded.iter().any(|r| r.id == "keep-live-session"));
     assert!(loaded.iter().any(|r| r.id == "reviewed-0204"));
     assert!(!loaded.iter().any(|r| r.id == "reviewed-0000"));
-    for status in ["review", "failed", "interrupted"] {
+    for status in [RunStatus::Review, RunStatus::Failed, RunStatus::Interrupted] {
         assert!(
             loaded.iter().any(|r| r.status == status),
             "{status} retained"
@@ -1710,7 +1704,7 @@ fn recovery_exports_import_once_and_never_shadow_a_present_task() {
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.id = "imported-attempt-01".into();
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     run.result = "recovered output".into();
     let envelope = serde_json::json!({
         "format": "jackalope-task-recovery", "version": 1,

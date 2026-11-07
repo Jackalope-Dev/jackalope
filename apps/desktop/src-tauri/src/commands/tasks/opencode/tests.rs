@@ -309,7 +309,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                 .into_iter()
                 .find(|r| r.id == request.id)
                 .unwrap();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 break run;
             }
             for prompt in run.prompts.iter().filter(|p| p.status == "pending") {
@@ -342,9 +342,9 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
         assert_eq!(
             completed.status,
             match attempt {
-                0 | 1 | 2 | 5 => "review",
-                4 => "stopped",
-                _ => "failed",
+                0 | 1 | 2 | 5 => RunStatus::Review,
+                4 => RunStatus::Stopped,
+                _ => RunStatus::Failed,
             },
             "{:?}",
             completed.error

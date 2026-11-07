@@ -445,8 +445,8 @@ defaults and validation. Neither reaches Cloudflare.
 Agent Configuration shows the selected adapter's support and limitations. Task
 options describe tool delivery, and incompatible selected connections show an
 explanation before launch. Custom agents inherit their configured adapter.
-The shared agent-capabilities.json drives frontend checks and native direct
-connection validation.
+The shared agent catalog (`src/lib/agents.json`) drives frontend checks and
+native direct connection validation.
 
 | Capability | Codex | Claude | Grok | OpenCode | Kimi | Antigravity | Gemini CLI |
 | --- | --- | --- | --- | --- | --- | --- | --- |

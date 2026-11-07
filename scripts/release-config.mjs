@@ -1,13 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { channelConfig } from './release/channels.mjs';
+import { httpsUrl } from '../packages/contracts/src/platform.ts';
+import { environmentChannelConfig } from './release/channels.mjs';
 
 const [endpoint, publicKey, certificateThumbprint, timestampUrl] = process.argv.slice(2);
 for (const value of [endpoint, timestampUrl]) {
-  const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
+  if (!httpsUrl(value, { query: true }))
     throw new Error('Release and timestamp URLs must use HTTPS without credentials or fragments.');
-  }
 }
 if (!publicKey || !/^[A-Za-z0-9+/=]+$/.test(publicKey))
   throw new Error('Supply the Tauri updater public key.');
@@ -23,11 +22,7 @@ const config = {
     windows: { certificateThumbprint, digestAlgorithm: 'sha256', timestampUrl, tsp: true },
   },
   plugins: {
-    jackalope: channelConfig(process.env.RELEASE_CHANNEL ?? 'stable', {
-      stableEndpoint: process.env.STABLE_UPDATE_ENDPOINT,
-      betaEndpoint: process.env.BETA_UPDATE_ENDPOINT,
-      serviceUrl: process.env.COMMUNITY_SERVICE_URL,
-    }),
+    jackalope: environmentChannelConfig(),
     updater: { pubkey: publicKey, endpoints: [endpoint], windows: { installMode: 'passive' } },
   },
 };

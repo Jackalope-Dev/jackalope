@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 
 fn run(workspace: &std::path::Path) -> TaskRun {
     serde_json::from_value(json!({"id":"jev-test-run","taskId":"task","projectId":"project",
@@ -93,7 +94,7 @@ fn failed_calls_and_parallel_reservations_share_an_attempt_limit() {
     let mut run = run.into_inner().unwrap();
     assert_eq!(run.efficiency.jev_questions, Some(24));
     run.efficiency.jev_question_calls = Some(0);
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     assert!(!reserve(&mut run, 1));
     assert_eq!(run.efficiency.jev_question_calls, Some(0));
 }
@@ -185,7 +186,7 @@ async fn installed_agent_questions_trial() {
     .unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     runtime
-        .update_checked(&initial.id, |run| run.status = "running".into())
+        .update_checked(&initial.id, |run| run.status = RunStatus::Running)
         .unwrap();
     assert!(runtime.is_running(&initial.id));
     let directory = super::super::settings::directory(&runtime);

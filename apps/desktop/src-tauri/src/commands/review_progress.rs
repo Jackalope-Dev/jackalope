@@ -52,10 +52,7 @@ pub(super) fn progress(
     }
     if run.workspace.is_empty()
         || runs.iter().any(|other| {
-            other.workspace == run.workspace
-                && (["starting", "running", "stopping", "interrupted"]
-                    .contains(&other.status.as_str())
-                    || other.finishing)
+            other.workspace == run.workspace && (other.status.is_live() || other.finishing)
         })
     {
         return Err(

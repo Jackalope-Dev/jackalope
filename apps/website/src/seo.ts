@@ -1,4 +1,4 @@
-import { guideMarkdown, knowledgeFiles } from '@jackalope/knowledge';
+import { guideMarkdown, guidePath, knowledgeFiles, knowledgeGuides } from '@jackalope/knowledge';
 import { type Author, authorPath, authors, findAuthor } from './authors.ts';
 import benchmarks from './benchmark-summary.json' with { type: 'json' };
 import { serializeBlogPost } from './blog-types.ts';
@@ -13,7 +13,6 @@ import {
   updates,
   updatesWith,
 } from './content.ts';
-import { knowledgeGuides } from './knowledge-content.ts';
 import { type MarketingPage, marketingPages } from './marketing-content.ts';
 import { platformDownloads } from './platform-downloads.ts';
 
@@ -78,7 +77,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
   const marketingPage = marketingPages.find((item) => item.path === normalized);
   const comparison = marketingPage?.comparison;
-  const guide = knowledgeGuides.find((item) => normalized === `/knowledge/${item.slug}/`);
+  const guide = knowledgeGuides.find((item) => normalized === guidePath(item.slug));
   const postAuthor = findAuthor(post?.author);
   const profile = authors.find((item) => normalized === authorPath(item));
   const title = page?.title || 'Page not found | Jackalope';
@@ -278,7 +277,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         '@type': 'ListItem',
         position: index + 1,
         name: entry.title,
-        url: `${origin}/knowledge/${entry.slug}/`,
+        url: `${origin}${guidePath(entry.slug)}`,
       })),
     };
   }

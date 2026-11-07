@@ -1088,7 +1088,7 @@ impl App {
                 sessions.sort_by_key(|session| {
                     if super::conversation::needs_you(session) {
                         0
-                    } else if protocol::working(session.status.as_deref()) {
+                    } else if protocol::working(session.status.as_ref()) {
                         1
                     } else {
                         2

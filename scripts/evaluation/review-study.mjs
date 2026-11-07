@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { gitEnvironment } from '../git-environment.mjs';
+import { gitEnvironment } from '../lib/git-environment.mjs';
 
 const [comparisonPath, output, seed = 'review-1'] = process.argv.slice(2);
 if (!comparisonPath || !output)

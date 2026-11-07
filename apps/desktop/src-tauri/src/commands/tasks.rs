@@ -38,9 +38,9 @@ pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
-pub(super) use runners::BUILTIN_AGENTS;
 pub use snapshots::{task_changes, TaskHighlight};
 
+use super::agents::{Bridge, Prompt, Protocol};
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
 use serde::Serialize;
@@ -108,9 +108,7 @@ impl TaskRuntime {
                 id: run.id.clone(),
                 project_id: run.project_id.clone(),
                 tool_calls: run.efficiency.tool_calls.values().sum(),
-                finished: !run.finishing
-                    && !["starting", "running", "stopping", "routing", "queued"]
-                        .contains(&run.status.as_str()),
+                finished: !run.finishing && !run.status.is_active(),
             })
             .collect()
     }
@@ -118,16 +116,7 @@ impl TaskRuntime {
 
 fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut cmd = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    super::process_control::isolated(&mut cmd);
     cmd
 }
 
@@ -264,7 +253,9 @@ pub(super) fn probe_auth(
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;
     let profiles_root = runtime.profiles_root();
-    let mut ids: Vec<String> = BUILTIN_AGENTS.iter().map(|id| (*id).into()).collect();
+    let mut ids: Vec<String> = crate::commands::agents::builtin_ids()
+        .map(String::from)
+        .collect();
     ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
     // Each agent's discovery/sign-in probe can take up to probe_auth's own
     // 10-second timeout. Running them in one sequential closure (the
@@ -583,11 +574,10 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
             .find(|r| r.id == id)
             .ok_or("Attempt not found")?;
         if !current.contract.requirements.is_empty() {
-            if runs.iter().any(|r| {
-                r.workspace == current.workspace
-                    && ["starting", "running", "stopping", "interrupted"]
-                        .contains(&r.status.as_str())
-            }) {
+            if runs
+                .iter()
+                .any(|r| r.workspace == current.workspace && r.status.is_live())
+            {
                 return Err("Resolve active workspace ownership before completing review.".into());
             }
             let directory = state.integration_directory();
@@ -597,11 +587,11 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
         }
         let mut inner = state.inner.lock().unwrap();
         let run = inner.runs.get_mut(&id).ok_or("Attempt not found")?;
-        if run.status != "review" {
+        if run.status != RunStatus::Review {
             return Err("Only a finished result can be marked reviewed.".into());
         }
         let mut updated = run.clone();
-        updated.status = "reviewed".into();
+        updated.status = RunStatus::Reviewed;
         state.save(&updated)?;
         updated.persistence_error = None;
         *run = updated.clone();

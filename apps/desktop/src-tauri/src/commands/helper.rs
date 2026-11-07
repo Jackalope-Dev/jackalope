@@ -369,7 +369,6 @@ impl Helper {
     }
 }
 
-const HELPER_ADAPTERS: [&str; 5] = ["claude", "codex", "opencode", "grok", "kimi"];
 const ARCHIVE_LIMIT: usize = 100;
 
 fn account_key_for(binding: &agent_profiles::AccountBinding) -> String {
@@ -435,7 +434,12 @@ impl Helper {
         let policy = self.runtime.policy()?;
         let root = self.runtime.profiles_root();
         let mut agents = vec![policy.default_meta_agent.clone()];
-        agents.extend(HELPER_ADAPTERS.iter().map(|a| a.to_string()));
+        agents.extend(
+            super::agents::all()
+                .iter()
+                .filter(|agent| agent.orchestrates)
+                .map(|agent| agent.id.clone()),
+        );
         agents.retain(|agent| !agent.is_empty());
         let mut seen = std::collections::HashSet::new();
         agents.retain(|agent| seen.insert(agent.clone()));
@@ -444,7 +448,7 @@ impl Helper {
             let Ok((adapter, _)) = policy.resolve(&agent) else {
                 continue; // Not installed or disabled.
             };
-            if !HELPER_ADAPTERS.contains(&adapter.as_str()) {
+            if !super::agents::orchestrates(&adapter) {
                 continue;
             }
             let Ok(bindings) = agent_profiles::routing_accounts(&root, &adapter, None) else {

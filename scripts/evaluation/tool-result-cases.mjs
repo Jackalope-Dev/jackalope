@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 import { sanitizeForCode } from './repository-cases.mjs';
 
 export const toolResultCases = ['deliveries', 'builds', 'packages'].map((category, index) => {
@@ -35,7 +35,7 @@ export const toolResultCases = ['deliveries', 'builds', 'packages'].map((categor
   };
 });
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   if (!process.argv[2]) throw new Error('Supply an output suite JSON path.');
   await writeFile(process.argv[2], `${JSON.stringify({ cases: toolResultCases }, null, 2)}\n`);
 }

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
 import { makeManifest } from '../update-manifest.mjs';
 import { assertVersions, channel, origin, prefix, readNotes, root, sha256 } from './catalog.mjs';
 
@@ -11,8 +12,8 @@ const version = JSON.parse(
 await assertVersions(version);
 const selectedChannel = channel(process.env.RELEASE_CHANNEL);
 const notes = await readNotes(version, process.env.RELEASE_MODE === 'publish');
-const exe = `Jackalope_${version}_x64-setup.exe`;
-const msi = `Jackalope_${version}_x64_en-US.msi`;
+const exe = windowsInstallerName(version);
+const msi = windowsMsiName(version);
 const manifest = await makeManifest({
   version,
   baseUrl: `${origin(process.env.UPDATE_BASE_URL)}/updates/${prefix(version, selectedChannel)}`,

@@ -4,9 +4,7 @@
 use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
 use crate::host::{self, ColdStart};
-use crate::protocol::{
-    self, profile_root, AgentStatus, Project, Request, Response, SessionSummary,
-};
+use crate::protocol::{self, profile, AgentStatus, Project, Request, Response, SessionSummary};
 use serde_json::json;
 
 /// The project for this directory. A terminal tool should work where the user
@@ -164,7 +162,7 @@ pub fn stop(preference: Option<ColdStart>, prefix: &str) -> Result<(), String> {
     let view = connection.session(&id)?;
     match view
         .run_id
-        .filter(|_| protocol::working(view.status.as_deref()))
+        .filter(|_| protocol::working(view.status.as_ref()))
     {
         Some(run_id) => {
             connection.call(&Request::Stop { run_id })?;
@@ -259,7 +257,7 @@ pub fn merge(
     let mut connection = host::ensure(preference)?;
     let id = resolve(&connection.sessions()?, prefix)?;
     let view = connection.session(&id)?;
-    if protocol::working(view.status.as_deref()) {
+    if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Merge once it finishes.".into());
     }
     if !view.paused {
@@ -361,7 +359,7 @@ pub fn pull_request(
     let mut connection = host::ensure(preference)?;
     let id = resolve(&connection.sessions()?, prefix)?;
     let view = connection.session(&id)?;
-    if protocol::working(view.status.as_deref()) {
+    if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Open a pull request once it finishes.".into());
     }
     let title = title
@@ -444,7 +442,7 @@ fn usable(agent: &AgentStatus) -> bool {
 }
 
 pub fn status(as_json: bool) -> Result<(), String> {
-    let profile = profile_root()
+    let profile = profile::root()
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "unknown".into());
     let Some(mut connection) = host::attach_or_wait() else {

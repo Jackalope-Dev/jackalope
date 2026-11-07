@@ -258,7 +258,7 @@ pub(super) fn validate_review(ledger: &Ledger, ids: &[String]) -> Result<(), Str
 
 fn passed(run: &TaskRun) -> bool {
     !run.finishing
-        && matches!(run.status.as_str(), "review" | "reviewed")
+        && run.status.is_done()
         && run.error.is_none()
         && run.persistence_error.is_none()
         && !run.dependency_invalidated
@@ -437,7 +437,7 @@ fn repair_candidate<'a>(
                 .iter()
                 .find(|run| Some(&run.id) == item.run_id.as_ref())?;
             if !run.finishing
-                && matches!(run.status.as_str(), "review" | "reviewed")
+                && run.status.is_done()
                 && run.error.is_none()
                 && run.persistence_error.is_none()
                 && !run.dependency_invalidated
@@ -506,7 +506,7 @@ impl Coordinator {
                 && workers.iter().all(|item| {
                     item.run_id.as_ref().is_some_and(|id| {
                         runs.iter()
-                            .any(|run| &run.id == id && !active(&run.status) && !run.finishing)
+                            .any(|run| &run.id == id && !run.status.is_active() && !run.finishing)
                     })
                 })
                 && delivery.workers_finished_at.is_none()
@@ -620,7 +620,7 @@ impl Coordinator {
         }
         if runs
             .iter()
-            .filter(|run| active(&run.status) && !run.finishing)
+            .filter(|run| run.status.is_active() && !run.finishing)
             .count()
             >= inner.concurrency
         {
@@ -906,6 +906,7 @@ The plan review left these gaps open. Fix them, then record a new Plan review:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
 
     fn fixture() -> (Ledger, Vec<TaskRun>) {
         let task: managed::ManagedTask = serde_json::from_value(serde_json::json!({
@@ -1023,10 +1024,10 @@ mod tests {
     #[test]
     fn single_finished_assignment_waits_without_launching_an_extra_agent() {
         let (mut ledger, mut runs) = fixture();
-        runs[1].status = "running".into();
+        runs[1].status = RunStatus::Running;
         assert!(!enqueue_checkpoint(&mut ledger, "parent", &runs));
-        runs[1].status = "review".into();
-        runs[2].status = "review".into();
+        runs[1].status = RunStatus::Review;
+        runs[2].status = RunStatus::Review;
         assert!(!enqueue_checkpoint(&mut ledger, "parent", &runs));
     }
 
@@ -1045,7 +1046,7 @@ mod tests {
             runs[0].status = status.into();
             assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
         }
-        runs[0].status = "review".into();
+        runs[0].status = RunStatus::Review;
         ledger.items[2].dependencies.push("a".into());
         assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
         let saved: Ledger = serde_json::from_value(serde_json::to_value(&ledger).unwrap()).unwrap();
@@ -1099,7 +1100,7 @@ mod tests {
         runs[1].error = Some("crashed".into());
         assert!(!passed(&runs[1]));
         // A run that has a check still needs it to pass.
-        runs[2].status = "review".into();
+        runs[2].status = RunStatus::Review;
         runs[2].verify_command = Some("check".into());
         assert!(!passed(&runs[2]));
         ledger.managed_tasks[0].plan = Some(managed::PlanLink {
@@ -1132,7 +1133,7 @@ mod tests {
         final_run.id = "final".into();
         runs.push(final_run);
         for run in &mut runs {
-            run.status = "review".into();
+            run.status = RunStatus::Review;
             run.project_path = repo.root.to_string_lossy().into();
             run.target_branch = Some("main".into());
         }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +30,10 @@ fn latest<'a>(runs: &'a [TaskRun], task_id: &str) -> Result<&'a TaskRun, String>
 }
 
 fn resumable(run: &TaskRun) -> Result<(), String> {
-    if run.status == "interrupted" || run.session_id.is_none() || run.live_session_id.is_some() {
+    if run.status == RunStatus::Interrupted
+        || run.session_id.is_none()
+        || run.live_session_id.is_some()
+    {
         return Err(
             "This attempt cannot queue a continuation. Review its recovery or live session.".into(),
         );
@@ -260,11 +264,11 @@ impl Coordinator {
                     continue;
                 }
             };
-            if run.finishing || ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if run.finishing || run.status.is_active() {
                 continue;
             }
             if item.allow_failure.as_ref() != Some(&run.id)
-                && (!matches!(run.status.as_str(), "review" | "reviewed")
+                && (!run.status.is_done()
                     || run.verification_error.is_some()
                     || run
                         .verification
@@ -286,18 +290,14 @@ impl Coordinator {
                 )?;
                 continue;
             }
-            if runs
-                .iter()
-                .filter(|run| matches!(run.status.as_str(), "starting" | "running" | "stopping"))
-                .count()
-                >= inner.concurrency
+            if runs.iter().filter(|run| run.status.is_active()).count() >= inner.concurrency
                 || crate::commands::previews::ensure_idle(&run.workspace).is_err()
                 || crate::commands::verification::ensure_idle(&run.workspace).is_err()
             {
                 continue;
             }
             let attempt = Uuid::new_v4().to_string();
-            let prompt = if run.status == "stopped" && run.result.is_empty() {
+            let prompt = if run.status == RunStatus::Stopped && run.result.is_empty() {
                 format!("The previous attempt was stopped before completion. Its request is context only; follow the new instruction below instead of restarting that work.\n\nPrevious request:\n{}\n\nCurrent follow-up:\n{}", run.prompt, item.prompt)
             } else {
                 item.prompt.clone()

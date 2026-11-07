@@ -61,12 +61,12 @@ pub struct McpProbeResult {
 }
 
 fn config_path(scope: &str) -> Result<PathBuf, String> {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .map(PathBuf::from)
-        .ok_or("Home directory unavailable")?;
+    let home = super::platform::home_dir().ok_or("Home directory unavailable")?;
+    if let Some(path) = super::agents::find(scope).and_then(|agent| agent.mcp_config(&home)) {
+        return Ok(path);
+    }
     match scope {
         "global" => Ok(home.join(".jackalope/mcp_servers.json")),
-        "claude" => Ok(home.join(".claude.json")),
         "claude-desktop" => {
             if cfg!(windows) {
                 Ok(
@@ -79,11 +79,6 @@ fn config_path(scope: &str) -> Result<PathBuf, String> {
                 Ok(home.join(".config/Claude/claude_desktop_config.json"))
             }
         }
-        "codex" => Ok(std::env::var_os("CODEX_HOME")
-            .map(PathBuf::from)
-            .unwrap_or(home.join(".codex"))
-            .join("config.toml")),
-        "grok" => Ok(home.join(".grok/config.toml")),
         scope if scope.starts_with("project:") => {
             let id = &scope[8..];
             if id.is_empty()
@@ -101,6 +96,19 @@ fn config_path(scope: &str) -> Result<PathBuf, String> {
         }
         _ => Err("Unsupported MCP configuration scope.".into()),
     }
+}
+
+/// Where an unmanaged global connection is written: Jackalope's own file and
+/// every agent configuration Jackalope edits.
+fn mirror_scopes() -> Vec<&'static str> {
+    std::iter::once("global")
+        .chain(
+            super::agents::all()
+                .iter()
+                .filter(|agent| agent.has_mcp_config())
+                .map(|agent| agent.id.as_str()),
+        )
+        .collect()
 }
 
 fn read_config(path: &Path) -> Result<(String, Value), String> {
@@ -326,10 +334,7 @@ fn validate_endpoint(value: &str) -> Result<(), String> {
 
 fn validate(server: &McpServerConfig) -> Result<(), String> {
     if server.agents.as_ref().is_some_and(|agents| {
-        agents.is_empty()
-            || agents
-                .iter()
-                .any(|agent| !super::tasks::BUILTIN_AGENTS.contains(&agent.as_str()))
+        agents.is_empty() || agents.iter().any(|agent| !super::agents::is_builtin(agent))
     }) {
         return Err("Select at least one supported agent.".into());
     }
@@ -423,7 +428,7 @@ pub async fn mcp_save_server(server: McpServerConfig) -> Result<(), String> {
     validate(&server)?;
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
     let scopes = if server.scope == "global" && !server.managed {
-        vec!["global", "codex", "claude", "grok"]
+        mirror_scopes()
     } else {
         vec![server.scope.as_str()]
     };
@@ -476,7 +481,7 @@ pub async fn mcp_delete_server(id: String, scope: String) -> Result<(), String> 
     let (_, root) = read_config(&path)?;
     let original_spec = root[servers_key(&path)][&id].clone();
     let scopes = if scope == "global" && original_spec["jackalopeManaged"] != true {
-        vec!["global", "codex", "claude", "grok"]
+        mirror_scopes()
     } else {
         vec![scope.as_str()]
     };
@@ -608,16 +613,7 @@ pub(super) async fn connect(
         let program = server.command.as_ref().unwrap();
         let mut executable = PathBuf::from(program);
         if cfg!(windows) && executable.extension().is_none() && !executable.is_absolute() {
-            if let Some(found) =
-                std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-                    .flat_map(|dir| {
-                        [
-                            dir.join(format!("{program}.exe")),
-                            dir.join(format!("{program}.cmd")),
-                        ]
-                    })
-                    .find(|path| path.is_file())
-            {
+            if let Some(found) = super::platform::find_executable(program, &[]) {
                 executable = found;
             }
         }
@@ -626,10 +622,7 @@ pub(super) async fn connect(
             .args(&server.args)
             .envs(&server.env)
             .kill_on_drop(true);
-        #[cfg(windows)]
-        command.creation_flags(0x08000000);
-        #[cfg(unix)]
-        command.process_group(0);
+        super::process_control::isolated(command.as_std_mut());
         if let Some(workspace) = workspace {
             command.current_dir(workspace);
         }
@@ -1138,12 +1131,8 @@ fn delivery_from_configs(
                 optimized.push(server);
                 continue;
             }
-            let capabilities: Value =
-                serde_json::from_str(include_str!("../../../src/lib/agent-capabilities.json"))
-                    .map_err(|e| e.to_string())?;
-            if !capabilities[adapter]["direct"]
-                .as_array()
-                .is_some_and(|transports| transports.contains(&json!(server.transport)))
+            if !super::agents::find(adapter)
+                .is_some_and(|agent| agent.capabilities.direct.contains(&server.transport))
             {
                 return Err("This agent requires on-demand discovery for this project connection. Enable on-demand tools, or choose an agent supporting its direct transport.".into());
             }
@@ -1613,8 +1602,16 @@ pub async fn mcp_authenticate(
     profile_id: Option<String>,
     runtime: tauri::State<'_, super::tasks::TaskRuntime>,
 ) -> Result<(), String> {
-    if !["codex", "claude"].contains(&agent.as_str()) {
-        return Err("Choose Codex or Claude for connection sign-in.".into());
+    if !super::agents::find(&agent).is_some_and(|agent| agent.mcp_sign_in) {
+        return Err(format!(
+            "Choose {} for connection sign-in.",
+            super::agents::names(
+                super::agents::all()
+                    .iter()
+                    .filter(|agent| agent.mcp_sign_in),
+                "or"
+            )
+        ));
     }
     let server = {
         let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;

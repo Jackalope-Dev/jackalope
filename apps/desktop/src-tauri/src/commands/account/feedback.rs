@@ -171,13 +171,7 @@ pub async fn app_account_feedback(
             runtime
                 .notification_snapshot()
                 .into_iter()
-                .find(|run| {
-                    run.id == *id
-                        && matches!(
-                            run.status.as_str(),
-                            "review" | "reviewed" | "failed" | "stopped"
-                        )
-                })
+                .find(|run| run.id == *id && run.status.is_terminal())
                 .ok_or("Open a finished task result first.")?
                 .task_id,
         )

@@ -70,7 +70,7 @@ pub(in crate::commands::tasks) fn configure(
             file.write_all(format!("---\nname: jackalope-helper\ndescription: Answer the supplied Jackalope request without tools.\ntools: []\nsubagents: []\n---\n{prompt}\n").as_bytes()).map_err(|_| "Could not write the Kimi helper configuration.")?;
             cmd.args(["--agent-file"]).arg(path).args(["--output-format", "stream-json", "--prompt", "Answer the supplied Jackalope request. Follow its output format."]);
         }
-        _ => return Err("This default agent has no supported routing-only interface. Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator. Antigravity remains available as a worker.".into()),
+        _ => return Err(format!("This default agent has no supported routing-only interface. Choose {} as the default orchestrator. Other agents remain available as workers.", crate::commands::agents::orchestrator_names())),
     }
     Ok(configuration)
 }

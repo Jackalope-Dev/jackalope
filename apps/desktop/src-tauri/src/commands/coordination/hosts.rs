@@ -3,11 +3,9 @@
 //! retrying once on another host a fork whose host was lost.
 
 use super::*;
-use crate::commands::computers::{
-    credentials,
-    pool::{self, Decision, Needs},
-};
+use crate::commands::computers::pool::{self, Decision, Needs};
 use crate::commands::project_secrets::{self, Availability, Place};
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 
 impl Coordinator {
@@ -61,7 +59,7 @@ impl Coordinator {
             .ok()
             .and_then(|policy| policy.adapter(&item.agent).ok());
         if let Some(adapter) = adapter.as_deref() {
-            if item.agent != "auto" && !credentials::REMOTE_ADAPTERS.contains(&adapter) {
+            if item.agent != "auto" && !crate::commands::agents::runs_on_computers(adapter) {
                 needs.device_only = Some(format!("{} cannot run on a computer", item.agent));
             }
         }
@@ -267,7 +265,7 @@ pub(super) fn host_retries(
                 .iter()
                 .find(|run| Some(&run.id) == item.run_id.as_ref())?;
             let host = run.host.as_ref()?;
-            let eligible = run.status == "failed"
+            let eligible = run.status == RunStatus::Failed
                 && host.lost.is_some()
                 && host.retried_from.is_none()
                 && host.retry.is_none()
@@ -485,7 +483,7 @@ mod tests {
             id: id.into(),
             task_id: task.into(),
             project_id: "p".into(),
-            status: "failed".into(),
+            status: RunStatus::Failed,
             started_at: "2026-11-01T00:00:00Z".into(),
             host,
             ..Default::default()

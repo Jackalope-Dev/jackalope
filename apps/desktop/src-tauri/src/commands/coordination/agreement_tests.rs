@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use agreements::{Action, AgreementInput};
 
@@ -109,7 +110,7 @@ fn interface_requires_every_invited_owner_and_blocks_descendants() {
 fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
     let repo = Repo::new();
     let mut run = repo.run("api");
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     let history = repo.root.join("history");
     std::fs::create_dir(&history).unwrap();
     std::fs::write(
@@ -211,7 +212,7 @@ impl Repo {
             project_path: self.root.to_string_lossy().into(),
             workspace: workspace.to_string_lossy().into(),
             base_head: self.git(&["rev-parse", "HEAD"]),
-            status: "review".into(),
+            status: RunStatus::Review,
             started_at: "now".into(),
             ..Default::default()
         }
@@ -296,7 +297,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
             id: id.into(),
             task_id: id.into(),
             project_id: "p".into(),
-            status: "review".into(),
+            status: RunStatus::Review,
             started_at: "now".into(),
             ..Default::default()
         };
@@ -309,7 +310,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
     let runtime = TaskRuntime::with_test_access(history).unwrap();
     let service = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
     for id in ["grok-run", "claude-run"] {
-        runtime.update(id, |r| r.status = "running".into());
+        runtime.update(id, |r| r.status = RunStatus::Running);
         service
             .inner
             .lock()
@@ -351,7 +352,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
     .await
     .is_err());
     assert_eq!(service.inner.lock().unwrap().ledger.agreements.len(), 1);
-    runtime.update("grok-run", |r| r.status = "review".into());
+    runtime.update("grok-run", |r| r.status = RunStatus::Review);
     assert!(agreements::bridge_agreement(
         WebState(service.clone()),
         headers("grok-run"),

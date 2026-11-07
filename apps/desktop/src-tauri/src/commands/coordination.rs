@@ -802,7 +802,7 @@ pub async fn queue_release(
     }
     if let Some(original) = runs.iter().find(|r| Some(&r.id) == item.run_id.as_ref()) {
         if runs.iter().any(|r| {
-            r.task_id == original.task_id && (active(&r.status) || r.status == "interrupted")
+            r.task_id == original.task_id && (r.status.is_live())
         }) {
             return Err("Stop all attempts first. Interrupted attempts require checking process ownership outside Jackalope before their scope can be released.".into());
         }

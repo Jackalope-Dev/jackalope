@@ -18,6 +18,7 @@ pub struct AssistPolicy {
 mod tests {
     use super::super::agreement_tests::Repo;
     use super::*;
+    use crate::commands::tasks::RunStatus;
 
     /// Commits `policy` to the target branch, verifies one task that writes
     /// `file`, and runs automatic merging once.
@@ -146,7 +147,7 @@ mod tests {
         .unwrap();
         let mut run = repo.run("source");
         let mut other = repo.run("other");
-        other.status = "stopped".into();
+        other.status = RunStatus::Stopped;
         run.target_branch = Some("main".into());
         std::fs::write(
             PathBuf::from(&run.workspace).join("feature.txt"),
@@ -289,9 +290,10 @@ pub async fn queue_retry_reconciliation(
             return Err("Only failed or interrupted reconciliation can be retried.".into());
         }
         let runs = service.runtime.integration_runs()?;
-        if runs.iter().any(|r| {
-            job.run_id.as_ref() == Some(&r.id) && (active(&r.status) || r.status == "interrupted")
-        }) {
+        if runs
+            .iter()
+            .any(|r| job.run_id.as_ref() == Some(&r.id) && (r.status.is_live()))
+        {
             return Err("Resolve the previous worker's process ownership before retrying.".into());
         }
         job.status = "superseded".into();
@@ -326,10 +328,10 @@ impl Coordinator {
             .cloned()
             .collect::<Vec<_>>()
         {
-            if runs.iter().any(|r| {
-                r.project_id == policy.project_id
-                    && (active(&r.status) || r.status == "interrupted")
-            }) {
+            if runs
+                .iter()
+                .any(|r| r.project_id == policy.project_id && (r.status.is_live()))
+            {
                 continue;
             }
             if let Some(job) = inner
@@ -361,7 +363,7 @@ impl Coordinator {
                 .filter(|r| {
                     r.project_id == policy.project_id
                         && !super::managed::owns_run(&inner.ledger, runs, r)
-                        && ["review", "reviewed"].contains(&r.status.as_str())
+                        && r.status.is_done()
                         && !merged.contains(&r.id)
                         && !runs
                             .iter()
@@ -391,7 +393,7 @@ impl Coordinator {
             }
             if runs
                 .iter()
-                .filter(|r| active(&r.status) && !r.finishing)
+                .filter(|r| r.status.is_active() && !r.finishing)
                 .count()
                 >= inner.concurrency
             {
@@ -597,7 +599,7 @@ impl Coordinator {
             let run = runs.iter().find(|r| &r.id == id).ok_or(
                 "The reserved reconciliation never started. Inspect and explicitly retry it.",
             )?;
-            if !["review", "reviewed"].contains(&run.status.as_str()) {
+            if !run.status.is_done() {
                 return Err("Reconciliation did not complete successfully. Inspect its task and retry explicitly.".into());
             }
             if run.verify_command.as_deref() != Some(&policy.verify_command) {

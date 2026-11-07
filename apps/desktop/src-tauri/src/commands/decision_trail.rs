@@ -164,7 +164,7 @@ pub(in crate::commands) fn record(
     let mut outcome = Err("Attempt not found".to_owned());
     let mut recorded = None;
     runtime.update_checked(&run.id, |current| {
-        outcome = if !["starting", "running"].contains(&current.status.as_str()) {
+        outcome = if !current.status.is_running() {
             Err("This attempt has ended; its decision trail is closed.".into())
         } else if current.decisions.len() >= MAX_ENTRIES {
             Err(format!(

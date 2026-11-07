@@ -1,124 +1,37 @@
+import catalog from './agents.json' with { type: 'json' };
+
+export type BuiltinAgentId = keyof typeof catalog;
+
 export interface AgentMetadata {
-  id: string;
+  id: BuiltinAgentId;
   name: string;
   vendor: string;
   description: string;
-  strengths: readonly string[];
-  installCommand?: string;
+  installCommand: string;
   installUrl: string;
   defaultBinary: string;
-  accountEnvVar?: string;
-  loginCommand?: string;
+  loginCommand: string;
 }
 
-export const builtinAgents = [
-  {
-    id: 'codex',
-    name: 'Codex',
-    vendor: 'OpenAI',
-    description:
-      'Specialized in fast, precise code generation, Python, systems, and deep codebase changes.',
-    strengths: ['backend', 'systems', 'python', 'refactoring', 'fast-edits'],
-    installCommand: 'npm install -g @openai/codex',
-    installUrl: 'https://learn.chatgpt.com/docs/app-server',
-    defaultBinary: 'codex',
-    accountEnvVar: 'CODEX_HOME',
-    loginCommand: 'codex login',
-  },
-  {
-    id: 'claude',
-    name: 'Claude Code',
-    vendor: 'Anthropic',
-    description:
-      'Exceptional for complex architecture, deep reasoning, frontend/UI, documentation, and multi-file refactoring.',
-    strengths: ['frontend', 'architecture', 'react', 'css', 'documentation', 'reasoning'],
-    installCommand: 'npm install -g @anthropic-ai/claude-code',
-    installUrl: 'https://code.claude.com/docs/en/overview',
-    defaultBinary: 'claude',
-    accountEnvVar: 'CLAUDE_CONFIG_DIR',
-    loginCommand: 'claude auth login',
-  },
-  {
-    id: 'grok',
-    name: 'Grok',
-    vendor: 'xAI',
-    description:
-      'High-speed reasoning, fast multi-step iteration, web-augmented research, and code verification.',
-    strengths: ['reasoning', 'verification', 'testing', 'search', 'algorithms'],
-    installCommand: 'npm install -g @xai/grok-cli',
-    installUrl: 'https://docs.x.ai',
-    defaultBinary: 'grok',
-    accountEnvVar: 'GROK_HOME',
-    loginCommand: 'grok login',
-  },
-  {
-    id: 'kimi',
-    name: 'Kimi Code',
-    vendor: 'Moonshot AI',
-    description: 'Coding agent with project tools, model selection, and resumable task sessions.',
-    strengths: ['coding', 'reasoning', 'multi-file'],
-    installCommand: 'npm install -g @moonshot-ai/kimi-code',
-    installUrl: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
-    defaultBinary: 'kimi',
-    accountEnvVar: 'KIMI_CODE_HOME',
-    loginCommand: 'kimi login',
-  },
-  {
-    id: 'opencode',
-    name: 'OpenCode',
-    vendor: 'OpenCode AI',
-    description:
-      'Open-source agent supporting local, offline, and customizable multi-provider models.',
-    strengths: ['local-models', 'offline', 'custom-providers', 'budget-conscious'],
-    installCommand: 'npm install -g opencode-ai',
-    installUrl: 'https://opencode.ai/docs/',
-    defaultBinary: 'opencode',
-    accountEnvVar: 'XDG_DATA_HOME',
-    loginCommand: 'opencode auth login',
-  },
-  {
-    id: 'antigravity',
-    name: 'Antigravity',
-    vendor: 'Google DeepMind',
-    description:
-      'Advanced agentic coding with high-level planning, subagent orchestration, and native tools.',
-    strengths: ['planning', 'orchestration', 'subagents', 'complex-workflows'],
-    installCommand: '',
-    installUrl: 'https://antigravity.google/docs/cli/install/',
-    defaultBinary: 'agy',
-    accountEnvVar: 'HOME',
-    loginCommand: 'agy',
-  },
-  {
-    id: 'gemini',
-    name: 'Gemini CLI',
-    vendor: 'Google',
-    description:
-      'Powered by Gemini models for rapid code generation, large context inspection, and multimodal tasks.',
-    strengths: ['large-context', 'multimodal', 'documentation', 'fast-prototyping'],
-    installCommand: 'npm install -g @google/gemini-cli',
-    installUrl: 'https://github.com/google-gemini/gemini-cli',
-    defaultBinary: 'gemini',
-    accountEnvVar: 'GEMINI_CLI_HOME',
-    loginCommand: 'gemini',
-  },
-  {
-    id: 'acp',
-    name: 'ACP (Generic)',
-    vendor: 'Agent Client Protocol',
-    description:
-      'Connect any agent that speaks the Agent Client Protocol (ACP) over stdio JSON-RPC.',
-    strengths: ['interop', 'custom-agents', 'protocol-standard'],
-    installCommand: '',
-    installUrl: 'https://github.com/anthropics/agent-client-protocol',
-    defaultBinary: '',
-    accountEnvVar: '',
-    loginCommand: '',
-  },
-] as const;
-
-export type BuiltinAgentId = (typeof builtinAgents)[number]['id'];
+/** Every catalog agent in display order, as the native side reads them from agents.json. */
+export const builtinAgents: readonly AgentMetadata[] = (
+  Object.entries(catalog) as [BuiltinAgentId, (typeof catalog)[BuiltinAgentId]][]
+).map(([id, agent]) => ({
+  id,
+  name: agent.name,
+  vendor: agent.vendor,
+  description: agent.description,
+  installCommand: agent.npmPackage ? `npm install -g ${agent.npmPackage}` : '',
+  installUrl: agent.installUrl,
+  defaultBinary: agent.binary ?? '',
+  loginCommand: agent.binary ? [agent.binary, ...agent.loginArgs].join(' ') : '',
+}));
 
 export function getAgentMetadata(id: string): AgentMetadata | undefined {
-  return (builtinAgents as readonly AgentMetadata[]).find((agent) => agent.id === id);
+  return builtinAgents.find((agent) => agent.id === id);
+}
+
+/** The model family an agent runs by default, or null for multi-provider agents. */
+export function agentFamily(id: string): string | null {
+  return catalog[id as BuiltinAgentId]?.family ?? null;
 }

@@ -12,24 +12,10 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
-/// Agent ID → npm package. Keep in step with `installCommand` in
-/// src/lib/agent-catalog.ts; a test checks that they match.
-const PACKAGES: [(&str, &str); 6] = [
-    ("codex", "@openai/codex"),
-    ("claude", "@anthropic-ai/claude-code"),
-    ("grok", "@xai/grok-cli"),
-    ("kimi", "@moonshot-ai/kimi-code"),
-    ("opencode", "opencode-ai"),
-    ("gemini", "@google/gemini-cli"),
-];
-
 const NODE_MISSING: &str = "Installing this agent needs Node.js with npm. Install the Node.js LTS release from nodejs.org, restart Jackalope, then try again.";
 
 fn package(agent: &str) -> Option<&'static str> {
-    PACKAGES
-        .iter()
-        .find(|(id, _)| *id == agent)
-        .map(|(_, package)| *package)
+    super::agents::find(agent)?.npm_package.as_deref()
 }
 
 fn install_args(package: &str) -> [&str; 3] {
@@ -39,14 +25,6 @@ fn install_args(package: &str) -> [&str; 3] {
 /// The command shown to the person, exactly as it runs apart from npm's path.
 fn display_command(agent: &str) -> Option<String> {
     package(agent).map(|package| format!("npm {}", install_args(package).join(" ")))
-}
-
-fn npm_names() -> &'static [&'static str] {
-    if cfg!(windows) {
-        &["npm.cmd", "npm.exe", "npm"]
-    } else {
-        &["npm"]
-    }
 }
 
 /// Where npm usually lives when the app was started without it on PATH.
@@ -70,16 +48,8 @@ fn npm_directories() -> Vec<PathBuf> {
     directories
 }
 
-fn find_npm_in(directories: &[PathBuf]) -> Option<PathBuf> {
-    directories
-        .iter()
-        .filter(|directory| directory.is_absolute())
-        .flat_map(|directory| npm_names().iter().map(move |name| directory.join(name)))
-        .find(|candidate| super::platform::is_executable(candidate))
-}
-
 fn find_npm() -> Option<PathBuf> {
-    find_npm_in(&npm_directories())
+    super::platform::find_in(npm_directories(), "npm")
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -106,7 +76,7 @@ fn install_command(agent: &str, npm: &Path) -> Result<CommandBuilder, String> {
         .ok_or("Jackalope cannot install this agent. Follow its install guide instead.")?;
     let mut command = CommandBuilder::new(npm);
     command.args(install_args(package));
-    if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
+    if let Some(home) = super::platform::home_dir() {
         command.cwd(home);
     }
     command.env("TERM", "xterm-256color");
@@ -158,13 +128,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn install_commands_match_the_catalog() {
-        let catalog = include_str!("../../../src/lib/agent-catalog.ts");
-        for (agent, _) in PACKAGES {
-            let command = display_command(agent).unwrap();
-            assert!(
-                catalog.contains(&format!("installCommand: '{command}'")),
-                "{agent}: {command} is not the catalog's install command"
+    fn install_commands_come_from_the_catalog_package() {
+        for agent in super::super::agents::all() {
+            assert_eq!(
+                display_command(&agent.id),
+                agent
+                    .npm_package
+                    .as_ref()
+                    .map(|package| format!("npm install -g {package}")),
+                "{}",
+                agent.id
             );
         }
         assert_eq!(
@@ -201,24 +174,5 @@ mod tests {
                 managed: false,
             }
         );
-    }
-
-    #[test]
-    fn npm_is_found_only_in_absolute_directories() {
-        let directory =
-            std::env::temp_dir().join(format!("jackalope-npm-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&directory).unwrap();
-        assert_eq!(find_npm_in(std::slice::from_ref(&directory)), None);
-        let name = npm_names()[0];
-        let npm = directory.join(name);
-        std::fs::write(&npm, "#!/bin/sh\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&npm, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
-        assert_eq!(find_npm_in(std::slice::from_ref(&directory)), Some(npm));
-        assert_eq!(find_npm_in(&[PathBuf::from("relative")]), None);
-        let _ = std::fs::remove_dir_all(&directory);
     }
 }

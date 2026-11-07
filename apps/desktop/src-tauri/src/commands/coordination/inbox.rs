@@ -98,6 +98,7 @@ pub(in crate::commands) async fn bridge_ack(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
     fn item() -> QueueItem {
         serde_json::from_value(serde_json::json!({"id":"reader","projectId":"p","projectName":"P","projectPath":"/fixture","title":"Reader","prompt":"Read","agent":"codex","scopes":[],"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
     }
@@ -188,7 +189,7 @@ mod tests {
         let runtime = TaskRuntime::with_test_access(history).unwrap();
         let service = Coordinator::new(directory.join("coordination"), runtime.clone()).unwrap();
         for id in ["sender-run", "reader-run", "foreign-run"] {
-            runtime.update(id, |run| run.status = "running".into());
+            runtime.update(id, |run| run.status = RunStatus::Running);
             service
                 .inner
                 .lock()
@@ -323,7 +324,7 @@ mod tests {
             .err(),
             Some(StatusCode::FORBIDDEN)
         );
-        runtime.update("reader-run", |run| run.status = "review".into());
+        runtime.update("reader-run", |run| run.status = RunStatus::Review);
         assert_eq!(
             bridge_inbox(
                 WebState(service.clone()),

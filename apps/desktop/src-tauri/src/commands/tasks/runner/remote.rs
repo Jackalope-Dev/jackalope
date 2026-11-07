@@ -336,8 +336,8 @@ impl AttemptRunner for RemoteRunner {
         let browser = !self.access.tool_unavailable("browser_navigate");
         let read_only = self.read_only;
         runtime.update_checked(id, |r| {
-            if r.status == "starting" {
-                r.status = "running".into();
+            if r.status == RunStatus::Starting {
+                r.status = RunStatus::Running;
             }
             r.progress = None;
             activity(

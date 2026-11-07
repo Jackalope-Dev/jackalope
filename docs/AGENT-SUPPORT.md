@@ -2,9 +2,11 @@
 
 Jackalope has native Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity and
 Gemini CLI adapters.
-The native registry is `tasks/runners.rs`; the desktop selection catalog is
+The agent catalog `src/lib/agents.json` holds each agent's names, executable,
+install package, sign-in directory and variables, protocol and capabilities;
+native code reads it through `commands/agents.rs` and the desktop through
 `src/lib/agent-catalog.ts`. New agents need a real CLI protocol adapter, not just
-an entry in either list. Manually configured executables must implement their
+a catalog entry. Manually configured executables must implement their
 selected adapter's CLI contract.
 
 Antigravity uses `agy` with streamed events, exact-session continuation and the

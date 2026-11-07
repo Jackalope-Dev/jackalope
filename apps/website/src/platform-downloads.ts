@@ -1,42 +1,32 @@
-export type DesktopPlatform = 'windows' | 'macos' | 'linux';
+import type { ReleaseBuild } from '@jackalope/contracts/access';
+import { httpsUrl, type Platform, RELEASE_CHANNELS } from '@jackalope/contracts/platform';
+import {
+  cloudDownloadUrl,
+  microsoftStoreUrl,
+  RELEASE_DOWNLOADS,
+  releaseDownloadsFor,
+} from '@jackalope/contracts/release';
 
 export interface PlatformDownload {
-  id: DesktopPlatform;
+  id: Platform;
   name: string;
   detail: string;
   url: string | null;
   store: boolean;
 }
 
-export interface ReleaseBuild {
-  id: string;
-  label: string;
-  channel: 'stable' | 'beta';
-  url: string;
-}
-
-const releaseCdn =
-  'https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform';
-const releasePlatforms = {
-  macos: [
-    { id: 'macos-aarch64', label: 'Apple silicon', platform: 'dmg-aarch64' },
-    { id: 'macos-x86_64', label: 'Intel', platform: 'dmg-x86_64' },
-  ],
-  linux: [{ id: 'linux-x86_64', label: 'x64 AppImage', platform: 'appimage-x86_64' }],
-} as const;
-
 /**
  * Public release CDN builds. Anyone can download them; the desktop account gate, not
  * the link, controls who can use the app. Signed-in members get equivalent links from
  * the access service so first downloads are recorded.
  */
-export function publicReleaseBuilds(os: keyof typeof releasePlatforms): ReleaseBuild[] {
-  return (['stable', 'beta'] as const).flatMap((channel) =>
-    releasePlatforms[os].map(({ id, label, platform }) => ({
+export function publicReleaseBuilds(os: 'macos' | 'linux'): ReleaseBuild[] {
+  return RELEASE_CHANNELS.flatMap((channel) =>
+    releaseDownloadsFor(os).map((id) => ({
       id,
-      label,
+      label: RELEASE_DOWNLOADS[id].label,
       channel,
-      url: `${releaseCdn}/${platform}?channel=${channel}`,
+      url: cloudDownloadUrl(id, channel),
     })),
   );
 }
@@ -49,7 +39,7 @@ export function detectDesktopPlatform({
   platform?: string;
   userAgent?: string;
   maxTouchPoints?: number;
-}): DesktopPlatform | null {
+}): Platform | null {
   if (/Android|iPhone|iPad|iPod|CrOS/i.test(userAgent + platform)) return null;
   if (/Mac/i.test(platform + userAgent) && maxTouchPoints > 1) return null;
   if (/Win/i.test(platform + userAgent)) return 'windows';
@@ -69,20 +59,9 @@ export function platformDownloads(env: Record<string, string | undefined>): Plat
     const key = `VITE_${platform.id.toUpperCase()}_DOWNLOAD_URL`;
     const value = storeUrl || env[key]?.trim();
     if (value) {
-      const url = new URL(value);
-      if (url.protocol !== 'https:' || url.username || url.password)
+      if (!httpsUrl(value, { query: true, fragment: true }))
         throw new Error(`${key} must be a public HTTPS URL without credentials.`);
-      if (
-        storeUrl &&
-        !(
-          (url.hostname === 'apps.microsoft.com' &&
-            /^\/detail\/[A-Z0-9]{12}$/i.test(url.pathname)) ||
-          (url.hostname === 'www.microsoft.com' &&
-            /^\/store\/apps\/[A-Z0-9]{12}$/i.test(url.pathname))
-        )
-      )
-        throw new Error('VITE_WINDOWS_STORE_URL must be a Microsoft Store product link.');
-      if (storeUrl && (url.port || url.search || url.hash))
+      if (storeUrl && !microsoftStoreUrl(storeUrl))
         throw new Error('VITE_WINDOWS_STORE_URL must be a plain Microsoft Store product link.');
       if (!storeUrl && !env.VITE_RELEASE_VERSION?.trim())
         throw new Error('Set VITE_RELEASE_VERSION when configuring a download.');

@@ -1,9 +1,14 @@
+import { BUILD_KINDS, type ConnectedDevice, PROFILE_KINDS } from '@jackalope/contracts/access';
+import { PLATFORMS } from '@jackalope/contracts/platform';
 import { z } from 'zod';
+import { ServiceError } from '../errors';
+import type { RateGroup } from '../rate-limit';
+import { errorResponse, json } from '../respond';
 import { latestBetaRequest, requestBeta, withdrawBeta } from './beta';
 import { randomToken, tokenHash } from './crypto';
 import { memberFeedback } from './feedback';
 import { lessonsRoute } from './lessons';
-import { AccessError, invitations, type Member, tokenSchema } from './service';
+import { invitations, type Member, tokenSchema } from './service';
 import { settingsRoute } from './settings';
 import { openSignup, waitlistProgress } from './waitlist';
 
@@ -14,7 +19,7 @@ export async function connectedDevices(env: Env, memberId: string) {
       'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt,app_version AS appVersion,platform,build_kind AS buildKind,profile_kind AS profileKind,last_seen_at AS lastSeenAt,settings_checked_at AS settingsCheckedAt,settings_sync AS settingsSync FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 10',
     )
       .bind(memberId, Date.now())
-      .all()
+      .all<ConnectedDevice>()
   ).results;
 }
 async function deviceMember(env: Env, hash: string, now = Date.now()) {
@@ -79,24 +84,15 @@ export async function deviceRoutes(
   request: Request,
   env: Env,
   readJson: (request: Request) => Promise<unknown>,
-  limit: (creating: boolean) => Promise<void>,
+  limit: (group: RateGroup) => Promise<void>,
 ) {
-  const json = (data: unknown, status = 200) =>
-    Response.json(data, {
-      status,
-      headers: {
-        'cache-control': 'no-store',
-        'x-content-type-options': 'nosniff',
-        ...(status === 429 ? { 'retry-after': '5' } : {}),
-      },
-    });
   try {
-    if (env.EARLY_ACCESS_ENABLED !== 'true') throw new AccessError(503, 'access_not_available');
-    if (request.headers.has('origin')) throw new AccessError(403, 'browser_origin_not_allowed');
+    if (env.EARLY_ACCESS_ENABLED !== 'true') throw new ServiceError(503, 'access_not_available');
+    if (request.headers.has('origin')) throw new ServiceError(403, 'browser_origin_not_allowed');
     const url = new URL(request.url);
-    if (url.search) throw new AccessError(400, 'query_not_allowed');
+    if (url.search) throw new ServiceError(400, 'query_not_allowed');
     const start = request.method === 'POST' && url.pathname === '/v1/desktop/start';
-    await limit(start);
+    await limit(start ? 'desktop-link' : 'desktop-session');
     const now = Date.now();
     if (start) {
       // `deviceKey` is an opaque hash the client derives from its machine, so
@@ -115,11 +111,11 @@ export async function deviceRoutes(
       return json({ verification, userCode, expiresAt }, 201);
     }
     const token = request.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
-    if (!token) throw new AccessError(401, 'device_sign_in_required');
+    if (!token) throw new ServiceError(401, 'device_sign_in_required');
     const hash = await tokenHash(token);
     if (url.pathname === '/v1/desktop/metadata' && request.method === 'POST') {
       const member = await accountDevice(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       const metadata = z
         .strictObject({
           appVersion: z
@@ -127,9 +123,9 @@ export async function deviceRoutes(
             .min(1)
             .max(64)
             .regex(/^[0-9A-Za-z.+-]+$/),
-          platform: z.enum(['windows', 'macos', 'linux']),
-          buildKind: z.enum(['development', 'release']),
-          profileKind: z.enum(['default', 'isolated']),
+          platform: z.enum(PLATFORMS),
+          buildKind: z.enum(BUILD_KINDS),
+          profileKind: z.enum(PROFILE_KINDS),
         })
         .parse(await readJson(request));
       await env.DB.prepare(
@@ -148,7 +144,7 @@ export async function deviceRoutes(
     }
     if (url.pathname === '/v1/desktop/name' && request.method === 'POST') {
       const member = await accountDevice(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       const { name } = z
         .strictObject({
           name: z
@@ -166,7 +162,7 @@ export async function deviceRoutes(
     }
     if (url.pathname === '/v1/desktop/settings/consent' && request.method === 'POST') {
       const member = await deviceMember(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       const { enabled, automatic } = z
         .strictObject({ enabled: z.boolean(), automatic: z.boolean().default(false) })
         .parse(await readJson(request));
@@ -179,7 +175,7 @@ export async function deviceRoutes(
     }
     if (url.pathname === '/v1/desktop/settings') {
       const member = await deviceMember(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       const result = await settingsRoute(
         env,
         member.memberId,
@@ -198,7 +194,7 @@ export async function deviceRoutes(
     }
     if (url.pathname === '/v1/desktop/lessons' || url.pathname.startsWith('/v1/desktop/lessons/')) {
       const member = await deviceMember(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       const action =
         url.pathname === '/v1/desktop/lessons' && request.method === 'DELETE'
           ? 'delete'
@@ -207,7 +203,7 @@ export async function deviceRoutes(
             : url.pathname === '/v1/desktop/lessons/push' && request.method === 'POST'
               ? 'push'
               : undefined;
-      if (!action) throw new AccessError(404, 'not_found');
+      if (!action) throw new ServiceError(404, 'not_found');
       return json(
         await lessonsRoute(
           env,
@@ -220,18 +216,18 @@ export async function deviceRoutes(
     }
     if (request.method === 'POST' && url.pathname === '/v1/desktop/feedback') {
       const member = await deviceMember(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       return json(await memberFeedback(env, member.memberId, await readJson(request), now));
     }
     if (url.pathname === '/v1/desktop/beta') {
       const member = await deviceMember(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       if (request.method === 'GET')
         return json({ request: await latestBetaRequest(env, member.memberId) });
       if (request.method === 'POST')
         return json(await requestBeta(env, member.memberId, await readJson(request), now));
       if (request.method === 'DELETE') return json(await withdrawBeta(env, member.memberId, now));
-      throw new AccessError(404, 'not_found');
+      throw new ServiceError(404, 'not_found');
     }
     if (request.method === 'DELETE' && url.pathname === '/v1/desktop/session') {
       await env.DB.batch([
@@ -242,7 +238,7 @@ export async function deviceRoutes(
     }
     if (request.method === 'GET' && url.pathname === '/v1/desktop/me') {
       const member = await accountDevice(env, hash, now);
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       await env.DB.prepare('UPDATE access_devices SET last_seen_at=? WHERE id=? AND member_id=?')
         .bind(now, member.id, member.memberId)
         .run();
@@ -250,16 +246,16 @@ export async function deviceRoutes(
     }
     if (request.method === 'GET' && url.pathname === '/v1/desktop/referrals') {
       const device = await deviceMember(env, hash, now);
-      if (!device) throw new AccessError(401, 'device_sign_in_required');
+      if (!device) throw new ServiceError(401, 'device_sign_in_required');
       const member = await env.DB.prepare('SELECT * FROM access_members WHERE id=?')
         .bind(device.memberId)
         .first<Member>();
-      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
       // With open signup, passes no longer admit anyone, so the desktop can hide them.
       return json({ ...(await invitations(env, member, now)), openSignup: openSignup(env) });
     }
     if (request.method !== 'POST' || url.pathname !== '/v1/desktop/exchange')
-      throw new AccessError(404, 'not_found');
+      throw new ServiceError(404, 'not_found');
     // The native client keeps this secret, so a lost exchange response can be retried safely.
     const existing = await accountDevice(env, hash, now);
     if (existing) return json(await accountView(env, existing));
@@ -268,14 +264,14 @@ export async function deviceRoutes(
     )
       .bind(hash, now)
       .first<{ member_id: string | null; polled_at: number }>();
-    if (!link) throw new AccessError(410, 'device_link_expired');
-    if (link.polled_at > now - 5000) throw new AccessError(429, 'slow_down');
+    if (!link) throw new ServiceError(410, 'device_link_expired');
+    if (link.polled_at > now - 5000) throw new ServiceError(429, 'slow_down');
     const claimed = await env.DB.prepare(
       'UPDATE access_device_links SET polled_at=? WHERE hash=? AND polled_at<=? AND expires_at>? AND used_at IS NULL',
     )
       .bind(now, hash, now - 5000, now)
       .run();
-    if (claimed.meta.changes !== 1) throw new AccessError(429, 'slow_down');
+    if (claimed.meta.changes !== 1) throw new ServiceError(429, 'slow_down');
     if (!link.member_id) return json({ status: 'pending' }, 202);
     if (request.headers.get('x-jackalope-waitlist') !== '1') {
       const waiting = await env.DB.prepare(
@@ -294,14 +290,10 @@ export async function deviceRoutes(
       ).bind(now, hash, hash),
     ]);
     const connected = await accountDevice(env, hash, now);
-    if (!connected) throw new AccessError(410, 'device_link_expired');
+    if (!connected) throw new ServiceError(410, 'device_link_expired');
     return json(await accountView(env, connected));
   } catch (error) {
-    if (error instanceof AccessError) return json({ error: error.code }, error.status);
-    if (error instanceof z.ZodError) return json({ error: 'invalid_request' }, 400);
-    if (error instanceof Error && error.message.includes('device_capacity'))
-      return json({ error: 'device_limit' }, 409);
-    return json({ error: 'access_unavailable' }, 503);
+    return errorResponse(error, { fallback: 'access_unavailable', retryAfter: { 429: '5' } });
   }
 }
 
@@ -331,10 +323,10 @@ export async function browserDeviceAction(
     )
       .bind(hash, now)
       .first();
-    if (!link) throw new AccessError(410, 'device_link_expired');
+    if (!link) throw new ServiceError(410, 'device_link_expired');
     return link;
   }
-  if (action !== 'approve' && action !== 'deny') throw new AccessError(404, 'not_found');
+  if (action !== 'approve' && action !== 'deny') throw new ServiceError(404, 'not_found');
   const result =
     action === 'deny'
       ? await env.DB.prepare(
@@ -347,6 +339,6 @@ export async function browserDeviceAction(
         )
           .bind(member.id, hash, now, member.id)
           .run();
-  if (result.meta.changes !== 1) throw new AccessError(410, 'device_link_expired');
+  if (result.meta.changes !== 1) throw new ServiceError(410, 'device_link_expired');
   return { success: true };
 }

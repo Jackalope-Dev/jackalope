@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
-import { createServer } from '../../apps/desktop/node_modules/vite/dist/node/index.js';
+import { createServer } from 'vite';
 
 const server = process.env.JACKALOPE_PREVIEW_URL
   ? null

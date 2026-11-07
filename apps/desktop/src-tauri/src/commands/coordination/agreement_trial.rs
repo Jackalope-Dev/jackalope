@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use serde_json::json;
 use std::time::Instant;
 
@@ -54,7 +55,7 @@ async fn installed_grok_and_claude_negotiate_ownership_and_interfaces() {
             && runs
                 .iter()
                 .filter(|r| r.id == grok || r.id == claude)
-                .all(|r| !active(&r.status))
+                .all(|r| !r.status.is_active())
         {
             break;
         }
@@ -69,7 +70,7 @@ async fn installed_grok_and_claude_negotiate_ownership_and_interfaces() {
             .integration_runs()
             .unwrap()
             .iter()
-            .all(|r| !active(&r.status))
+            .all(|r| !r.status.is_active())
         {
             break;
         }
@@ -105,7 +106,7 @@ async fn installed_grok_and_claude_negotiate_ownership_and_interfaces() {
     ] {
         match runs.iter().find(|r| &r.id == id) {
             Some(run)
-                if run.status == "review"
+                if run.status == RunStatus::Review
                     && std::fs::read_to_string(PathBuf::from(&run.workspace).join(file))
                         .is_ok_and(|s| s.trim() == expected) => {}
             Some(run) => failures.push(format!("{file} oracle failed; status {}", run.status)),

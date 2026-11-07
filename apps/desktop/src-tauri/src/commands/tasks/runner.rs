@@ -29,7 +29,7 @@
 
 use super::*;
 use crate::commands::computers::{
-    self, credentials,
+    self,
     pool::{self, RunHost},
     runs, Computer,
 };
@@ -141,12 +141,8 @@ impl TaskRuntime {
             .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some())
     }
 
-    /// Marks an attempt stopped before its agent ran.
     pub(super) fn mark_stopped(&self, id: &str) {
-        self.update(id, |r| {
-            r.status = "stopped".into();
-            r.ended_at = Some(Utc::now().to_rfc3339());
-        });
+        self.update(id, TaskRun::mark_stopped);
     }
 
     /// Whether attempt `id` of this project, with `adapter`, runs on a
@@ -157,7 +153,7 @@ impl TaskRuntime {
         project_id: &str,
         adapter: &str,
     ) -> bool {
-        credentials::REMOTE_ADAPTERS.contains(&adapter)
+        crate::commands::agents::runs_on_computers(adapter)
             && match pool::peek(id) {
                 Some(host) => !host.is_device(),
                 None => self.project_target(id, project_id).is_some(),
@@ -264,7 +260,7 @@ impl TaskRuntime {
         };
         let computer = match computer {
             Some(computer)
-                if !credentials::REMOTE_ADAPTERS.contains(&adapter)
+                if !crate::commands::agents::runs_on_computers(adapter)
                     && placed
                     && self.computers_only_project(&req.project_id) =>
             {
@@ -272,7 +268,7 @@ impl TaskRuntime {
                     "{} cannot run on {}, and this project's swarms run only on computers, so it did not run on this device. {}",
                     req.agent,
                     computer.name,
-                    COMPUTERS_ONLY_FIX
+                    computers_only_fix()
                 );
                 if current.as_ref().map(|old| &old.id) != Some(&host.id) {
                     self.record_host(id, host);
@@ -280,7 +276,7 @@ impl TaskRuntime {
                 self.update(id, |run| activity(run, &format!("Placement: {reason}")));
                 return Err(reason);
             }
-            Some(computer) if !credentials::REMOTE_ADAPTERS.contains(&adapter) => {
+            Some(computer) if !crate::commands::agents::runs_on_computers(adapter) => {
                 host = RunHost::device(format!(
                     "{} cannot run on {} yet, so it runs on this device.",
                     req.agent, computer.name
@@ -322,14 +318,23 @@ impl TaskRuntime {
 
 /// What the person can change when work that must run on a computer has no
 /// agent that runs there.
-pub(super) const COMPUTERS_ONLY_FIX: &str = "Only Claude Code and Codex run on computers: allow one of them for this project, or change Swarms run on in Project settings.";
+pub(super) fn computers_only_fix() -> String {
+    format!(
+        "Only {} run on computers: allow one of them for this project, or change Swarms run on in Project settings.",
+        crate::commands::agents::names(
+            crate::commands::agents::all().iter().filter(|agent| agent.remote),
+            "and"
+        )
+    )
+}
 
 /// Why automatic routing found no agent for an attempt that must run on
 /// `host`.
 pub(super) fn no_computer_agent(host: &RunHost) -> String {
     format!(
-        "No enabled agent that can run on {} has an account with available quota, and this project's swarms run only on computers, so it did not run on this device. {COMPUTERS_ONLY_FIX}",
-        host.name
+        "No enabled agent that can run on {} has an account with available quota, and this project's swarms run only on computers, so it did not run on this device. {}",
+        host.name,
+        computers_only_fix()
     )
 }
 
@@ -341,11 +346,10 @@ pub(super) fn host_activity(host: &RunHost) -> String {
 /// Whether another active attempt is using `workspace`. Only one writer
 /// owns a workspace at a time.
 pub(super) fn workspace_in_use(inner: &Inner, id: &str, workspace: &str) -> bool {
-    inner.runs.values().any(|r| {
-        r.id != id
-            && r.workspace == workspace
-            && ["starting", "running", "stopping"].contains(&r.status.as_str())
-    })
+    inner
+        .runs
+        .values()
+        .any(|r| r.id != id && r.workspace == workspace && r.status.is_active())
 }
 
 pub(super) const WORKSPACE_IN_USE: &str =

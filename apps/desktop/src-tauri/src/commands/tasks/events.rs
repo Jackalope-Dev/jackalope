@@ -31,11 +31,12 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
     if let Some(failure) = super::routing::quota_failure(&event) {
         run.quota_failure = Some(failure);
     }
-    if adapter == "opencode" {
+    let protocol = crate::commands::agents::find(adapter).map(|agent| agent.protocol);
+    if protocol == Some(Protocol::Opencode) {
         consume_opencode_event(run, &event, kind);
         return;
     }
-    if adapter == "kimi" || adapter == "acp" {
+    if protocol == Some(Protocol::Acp) {
         if event["role"] == "tool"
             || event["tool_calls"]
                 .as_array()
@@ -51,7 +52,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         return;
     }
     let child = event["parent_tool_use_id"].as_str();
-    if ["claude", "grok"].contains(&adapter) && event["type"] == "assistant" {
+    if protocol == Some(Protocol::ClaudeStream) && event["type"] == "assistant" {
         let message = &event["message"];
         let usage = &message["usage"];
         if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {
@@ -91,8 +92,8 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
     {
         run.model = Some(model.into());
     }
-    match (adapter, kind) {
-        ("codex", "item.started") => {
+    match (protocol, kind) {
+        (Some(Protocol::Codex), "item.started") => {
             let item = &event["item"];
             let name = match item["type"].as_str() {
                 Some("command_execution") => "command_execution",
@@ -103,7 +104,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
             let label = super::tool_activity::label(name, item, &run.workspace);
             activity(run, &label);
         }
-        ("codex", "item.completed") => {
+        (Some(Protocol::Codex), "item.completed") => {
             let item = &event["item"];
             if item["type"] == "agent_message" {
                 run.result = item["text"]
@@ -159,7 +160,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 );
             }
         }
-        ("codex", "turn.completed") => {
+        (Some(Protocol::Codex), "turn.completed") => {
             let u = &event["usage"];
             if u["input_tokens"].is_u64() && u["output_tokens"].is_u64() {
                 run.usage = Usage {
@@ -180,7 +181,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     .into(),
             );
         }
-        ("claude" | "grok", "assistant") => {
+        (Some(Protocol::ClaudeStream), "assistant") => {
             if let Some(content) = event["message"]["content"].as_array() {
                 for block in content {
                     if let Some(text) = block["text"].as_str() {
@@ -196,14 +197,14 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 }
             }
         }
-        ("claude" | "grok", "user") => {
+        (Some(Protocol::ClaudeStream), "user") => {
             for block in event["message"]["content"].as_array().into_iter().flatten() {
                 if block["type"] == "tool_result" && block["is_error"] == true {
                     activity(run, "Tool request failed");
                 }
             }
         }
-        ("claude" | "grok", "result") => {
+        (Some(Protocol::ClaudeStream), "result") => {
             run.result = event["result"]
                 .as_str()
                 .unwrap_or("")
@@ -236,7 +237,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     .take(8)
                     .collect();
                 activity(run, &format!("{} tool request(s) were denied by the agent's permission policy: {}. Review the result before continuing.", denials.len(), tools.join(", ")));
-                run.error.get_or_insert("Claude Code was denied a required permission. Allow the operation and continue the task, or review what was blocked.".into());
+                run.error.get_or_insert(format!("{} was denied a required permission. Allow the operation and continue the task, or review what was blocked.", crate::commands::agents::name(adapter)));
             }
         }
         _ => {}
@@ -315,6 +316,10 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
     }
 }
 
+fn short_name(adapter: &str) -> &str {
+    crate::commands::agents::find(adapter).map_or(adapter, |agent| agent.short_name.as_str())
+}
+
 fn extract_error_message(event: &Value, adapter: &str) -> String {
     if let Some(errors) = event["errors"].as_array() {
         let messages: Vec<_> = errors
@@ -360,21 +365,7 @@ fn extract_error_message(event: &Value, adapter: &str) -> String {
         .as_str()
         .filter(|s| !s.trim().is_empty() && *s != "null")
     {
-        return format!(
-            "{} error: {subtype}",
-            if adapter == "claude" {
-                "Claude"
-            } else {
-                "Grok"
-            }
-        );
+        return format!("{} error: {subtype}", short_name(adapter));
     }
-    format!(
-        "{} reported an error.",
-        if adapter == "claude" {
-            "Claude"
-        } else {
-            "Grok"
-        }
-    )
+    format!("{} reported an error.", short_name(adapter))
 }

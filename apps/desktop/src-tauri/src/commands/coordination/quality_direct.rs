@@ -1,3 +1,4 @@
+use crate::commands::tasks::RunStatus;
 use crate::commands::{
     agent_profiles,
     process_control::ProcessTree,
@@ -121,7 +122,7 @@ pub(super) fn run(
         account: binding.label.clone(),
         account_binding: Some(binding),
         workspace: repo.to_string_lossy().into(),
-        status: "running".into(),
+        status: RunStatus::Running,
         started_at: chrono::Utc::now().to_rfc3339(),
         ..Default::default()
     }));

@@ -209,8 +209,8 @@ fn main() {
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
     policy.automatic_quota_handoff = Some(enabled);
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for (id, adapter) in [("fixture-a", "codex"), ("fixture-b", "claude")] {
@@ -239,7 +239,7 @@ fn main() {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         assert!(
@@ -250,7 +250,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(50));
     };
     if !enabled {
-        assert_eq!(settled.status, "failed");
+        assert_eq!(settled.status, RunStatus::Failed);
         assert!(settled
             .error
             .as_deref()
@@ -266,7 +266,7 @@ fn main() {
     }
     assert_eq!(
         settled.status,
-        "review",
+        RunStatus::Review,
         "{:?} / {:?} at {}",
         settled.error,
         settled.activity,
@@ -300,7 +300,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(20));
     }
     restored.stop(&cancel_id).unwrap();
-    while restored.inner.lock().unwrap().runs[&cancel_id].status != "stopped" {
+    while restored.inner.lock().unwrap().runs[&cancel_id].status != RunStatus::Stopped {
         assert!(std::time::Instant::now() < deadline, "Router did not stop");
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -366,7 +366,7 @@ fn routing_reserves_active_account_headroom_and_releases_finished_work() {
     run.account_binding = Some(option.binding.clone());
     reserve_active_headroom(&mut option, &[run.clone(), run.clone()], "new-task");
     assert_eq!(option.remaining_percent, Some(30.0));
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     reserve_active_headroom(&mut option, &[run], "new-task");
     assert_eq!(option.remaining_percent, Some(30.0));
 }
@@ -400,8 +400,8 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "codex".into();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), *id == "codex");
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), id == "codex");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -412,7 +412,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let deadline = std::time::Instant::now() + Duration::from_secs(180);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         if std::time::Instant::now() >= deadline {
@@ -423,7 +423,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     };
     assert_eq!(
         settled.status,
-        "review",
+        RunStatus::Review,
         "{:?} / {:?} at {}",
         settled.error,
         settled.activity,
@@ -558,8 +558,8 @@ fn main() {
     .unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for id in ["fixture-a", "fixture-b"] {
@@ -587,7 +587,7 @@ fn main() {
     let deadline = started + Duration::from_secs(25);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         assert!(
@@ -598,9 +598,11 @@ fn main() {
         std::thread::sleep(Duration::from_millis(50));
     };
     assert_eq!(
-        settled.status, "review",
+        settled.status,
+        RunStatus::Review,
         "{:?} / {:?}",
-        settled.error, settled.activity
+        settled.error,
+        settled.activity
     );
     let routing = settled.routing.as_ref().unwrap();
     let decision = routing.decisions.last().unwrap();

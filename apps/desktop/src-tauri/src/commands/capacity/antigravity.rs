@@ -19,13 +19,7 @@ pub(in crate::commands) async fn output(
         .stderr(Stdio::null())
         .kill_on_drop(true);
     agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-    #[cfg(windows)]
-    command.creation_flags(0x08000000);
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.as_std_mut().process_group(0);
-    }
+    crate::commands::process_control::isolated(command.as_std_mut());
     let mut child = command
         .spawn()
         .map_err(|_| "Could not start the Antigravity metadata reader.")?;

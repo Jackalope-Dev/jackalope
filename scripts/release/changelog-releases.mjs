@@ -1,11 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
+import { root } from '../lib/paths.mjs';
 
 export const changelogPath = 'apps/website/src/changelog.json';
 const publicRemote = 'https://github.com/Jackalope-Dev/jackalope.git';
 const releaseTag = /^(beta|stable)-v(\d+)\.(\d+)\.(\d+)$/;
-const root = fileURLToPath(new URL('../..', import.meta.url));
 
 export function gitRunner(cwd = root) {
   return (args) => {
@@ -133,7 +132,7 @@ export function changelogReleases({
   return result.releases;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const releases = changelogReleases({
     fetch: process.argv.includes('--fetch'),
     required: process.argv.includes('--require'),

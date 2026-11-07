@@ -86,7 +86,9 @@ pub(super) fn audit(ledger: &Ledger, runs: &[TaskRun], merged: &[String]) -> Vec
         }
         let owner = agreements::owner_id(ledger, runs, run);
         let item = ledger.items.iter().find(|i| i.id == owner);
-        if item.is_none() && !active(&run.status) && !std::path::Path::new(&run.workspace).is_dir()
+        if item.is_none()
+            && !run.status.is_active()
+            && !std::path::Path::new(&run.workspace).is_dir()
         {
             continue;
         }
@@ -321,7 +323,7 @@ pub async fn queue_reconcile_scope(
         let _guard = crate::commands::integration::execution_guard()?;
         service.refresh_scopes_locked(&mut inner)?;
         let runs = service.runtime.integration_runs()?;
-        if runs.iter().any(|r| r.id == run_id && (active(&r.status) || r.status == "interrupted")) { return Err("Stop the task and resolve interrupted process ownership before accepting its scope.".into()); }
+        if runs.iter().any(|r| r.id == run_id && (r.status.is_live())) { return Err("Stop the task and resolve interrupted process ownership before accepting its scope.".into()); }
         let mut ledger = inner.ledger.clone();
         let a = ledger.scope_audits.iter_mut().find(|a| a.run_id == run_id).ok_or("Scope check not found.")?;
         if a.error.is_some() || !a.overlaps.is_empty() || a.tree.as_deref() != Some(&tree) { return Err("Files changed or overlap another task. Resolve the overlap and review the current scope check.".into()); }
@@ -349,7 +351,7 @@ pub async fn queue_cancel_agreement(
         }
         if a.kind == "ownership" {
             let runs = service.runtime.integration_runs()?;
-            if runs.iter().any(|r| agreements::owner_id(&ledger, &runs, r) == a.task_id && (active(&r.status) || r.status == "interrupted")) {
+            if runs.iter().any(|r| agreements::owner_id(&ledger, &runs, r) == a.task_id && (r.status.is_live())) {
                 return Err("Stop the owner and resolve interrupted process ownership before releasing this claim.".into());
             }
             let merged = crate::commands::integration::applied_run_ids(&service.runtime)?;

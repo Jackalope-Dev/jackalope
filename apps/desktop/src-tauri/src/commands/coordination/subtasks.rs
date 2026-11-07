@@ -385,7 +385,7 @@ pub async fn task_request_split(
             .iter()
             .find(|run| run.id == run_id)
             .ok_or("Task not found.")?;
-        if !active(&run.status) || run.workspace == run.project_path || run.base_head.is_empty() {
+        if !run.status.is_active() || run.workspace == run.project_path || run.base_head.is_empty() {
             return Err("Only a running task in its own worktree can be split.".into());
         }
         let mut inner = service.inner.lock().unwrap();
@@ -426,6 +426,7 @@ pub async fn task_request_split(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
 
     fn repo() -> std::path::PathBuf {
         let root = std::env::temp_dir().join(format!("jackalope-subtasks-{}", Uuid::new_v4()));
@@ -478,7 +479,7 @@ mod tests {
         TaskRun {
             id: format!("run-{task_id}"),
             task_id: task_id.into(),
-            status: "running".into(),
+            status: RunStatus::Running,
             prompt: "Standalone request".into(),
             agent: "codex".into(),
             ..Default::default()

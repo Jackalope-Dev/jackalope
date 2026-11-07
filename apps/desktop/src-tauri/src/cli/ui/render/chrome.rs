@@ -207,7 +207,7 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
     let working = if current {
         app.working()
     } else {
-        protocol::working(session.status.as_deref())
+        protocol::working(session.status.as_ref())
     };
     let dot = if brand::unicode() { "●" } else { "*" };
     if needs_you {

@@ -1,10 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { root } from '../../../scripts/lib/paths.mjs';
 import { pages, siteOrigin } from '../src/content.ts';
 
-const root = fileURLToPath(new URL('../../../', import.meta.url));
 const directory = resolve(root, 'apps/website/dist');
 const reportPath = resolve(root, 'scratch/website-link-audit.json');
 const { values } = parseArgs({ options: { origin: { type: 'string', default: siteOrigin } } });

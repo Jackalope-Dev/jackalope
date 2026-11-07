@@ -147,7 +147,7 @@ fn review_lessons_require_later_acceptance_and_a_matching_successful_check() {
     let mut resolved = rejected.clone();
     resolved.id = "resolution".into();
     resolved.started_at = "2026-09-09T12:02:00Z".into();
-    resolved.status = "reviewed".into();
+    resolved.status = RunStatus::Reviewed;
     let accepted = resolved.contract.requirements[0].receipt.as_mut().unwrap();
     accepted.accepted = true;
     accepted.tree = "checked".into();
@@ -181,7 +181,7 @@ fn review_lessons_require_later_acceptance_and_a_matching_successful_check() {
             "other-task" => next.task_id = "unrelated".into(),
             "other-project" => next.project_id = "other".into(),
             "quota" => next.error = Some("quota exhausted".into()),
-            "not-reviewed" => next.status = "review".into(),
+            "not-reviewed" => next.status = RunStatus::Review,
             _ => {}
         }
         store
@@ -272,7 +272,7 @@ fn test_conventions_require_repeated_files_and_ignore_dependency_folders() {
 fn verification_patterns_count_distinct_reviewed_tasks_and_freeze_context() {
     let (root, store) = fixture();
     let mut first = run(&root, "a");
-    first.status = "reviewed".into();
+    first.status = RunStatus::Reviewed;
     first.prompt = "Run project checks".into();
     first.verification = Some(serde_json::from_value(serde_json::json!({
         "command":"pnpm verify", "checkedAt":"2026-09-09", "tree":"abc", "result":{
@@ -337,7 +337,7 @@ fn reviewed_follow_up_adjustments_require_specific_matches_and_are_not_standing_
         )
         .unwrap();
     assert!(store.list("p", root.to_str().unwrap()).unwrap().is_empty());
-    task.status = "reviewed".into();
+    task.status = RunStatus::Reviewed;
     store
         .learn("p", root.to_str().unwrap(), &[original, task])
         .unwrap();

@@ -948,7 +948,7 @@ setInterval(()=>{},1000);
                     .into_iter()
                     .find(|run| run.id == request.id)
                     .unwrap();
-                if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                if !run.status.is_active() {
                     break run;
                 }
                 for prompt in &run.prompts {
@@ -958,7 +958,7 @@ setInterval(()=>{},1000);
                             .unwrap();
                     }
                 }
-                if attempt == 2 && run.session_id.is_some() && run.status == "running" {
+                if attempt == 2 && run.session_id.is_some() && run.status == RunStatus::Running {
                     runtime.stop(&run.id).unwrap();
                 }
                 if std::time::Instant::now() > deadline {
@@ -969,7 +969,11 @@ setInterval(()=>{},1000);
             };
             assert_eq!(
                 completed.status,
-                if attempt == 2 { "stopped" } else { "review" },
+                if attempt == 2 {
+                    RunStatus::Stopped
+                } else {
+                    RunStatus::Review
+                },
                 "{:?}",
                 completed.error
             );

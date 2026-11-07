@@ -1,5 +1,5 @@
 import { authorized } from './auth';
-import { SwarmError } from './names';
+import { forkPrefix, REPO_NAME, type SwarmResult } from './names';
 import { Swarm } from './swarm';
 
 export { Swarm };
@@ -34,7 +34,8 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   }
 }
 
-const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const reply = <T>(result: SwarmResult<T>, status = 200) =>
+  result.ok ? json(result.value, status) : json({ error: result.error }, result.status);
 
 export default {
   async fetch(request, env): Promise<Response> {
@@ -48,9 +49,9 @@ export default {
       );
     if (!match) return json({ error: 'Not found.' }, 404);
     const [, repo, section, fork, action] = match;
-    if (!NAME.test(repo) || (fork && !NAME.test(fork)))
+    if (!REPO_NAME.test(repo) || (fork && !REPO_NAME.test(fork)))
       return json({ error: 'Invalid name.' }, 400);
-    if (fork && !fork.startsWith(`${repo.slice(0, 80)}--`))
+    if (fork && !fork.startsWith(forkPrefix(repo)))
       return json({ error: 'That fork does not belong to this repository.' }, 400);
     const namespace = env.SWARM as DurableObjectNamespace<Swarm>;
     const swarm = namespace.get(namespace.idFromName(repo));
@@ -62,23 +63,18 @@ export default {
           new Request(`https://swarm/live?repo=${encodeURIComponent(repo)}`, request),
         );
       }
-      if (!section && request.method === 'GET') return json(await swarm.state(repo));
+      if (!section && request.method === 'GET') return reply(await swarm.state(repo));
       if (section === 'forks' && !fork && request.method === 'POST')
-        return json(await swarm.register(repo, await body(request)), 201);
+        return reply(await swarm.register(repo, await body(request)), 201);
       if (fork && action === 'analyze' && request.method === 'POST')
-        return json(await swarm.analyze(repo, fork));
+        return reply(await swarm.analyze(repo, fork));
       if (fork && action === 'token' && request.method === 'POST')
-        return json(await swarm.token(fork));
+        return reply(await swarm.token(fork));
       if (fork && !action && request.method === 'DELETE')
-        return json(await swarm.release(repo, fork, url.searchParams.get('delete') === '1'));
+        return reply(await swarm.release(repo, fork, url.searchParams.get('delete') === '1'));
       return json({ error: 'Not found.' }, 404);
     } catch (cause) {
-      // Durable Object RPC keeps the message but not custom fields.
-      const message = cause instanceof Error ? cause.message : String(cause);
-      const known =
-        cause instanceof SwarmError || /^(Unknown|Send|Use|That|The fork)/.test(message);
-      if (/^Unknown fork|not found/i.test(message)) return json({ error: message }, 404);
-      return json({ error: message }, known ? 400 : 502);
+      return json({ error: cause instanceof Error ? cause.message : String(cause) }, 502);
     }
   },
 } satisfies ExportedHandler<Env>;

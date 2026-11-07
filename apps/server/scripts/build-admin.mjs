@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { isMain } from '../../../scripts/lib/cli.mjs';
 
 export async function buildAdmin() {
   const root = fileURLToPath(new URL('../', import.meta.url));
@@ -29,4 +30,4 @@ export async function buildAdmin() {
   );
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await buildAdmin();
+if (isMain(import.meta)) await buildAdmin();

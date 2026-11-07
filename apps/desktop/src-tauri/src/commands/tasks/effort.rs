@@ -64,7 +64,10 @@ mod tests {
     }
     #[test]
     fn effort_is_scoped_to_supported_adapters_and_missing_values_preserve_defaults() {
-        for adapter in ["codex", "claude", "kimi", "opencode", "grok", "antigravity"] {
+        for adapter in crate::commands::agents::all()
+            .iter()
+            .map(|agent| agent.id.as_str())
+        {
             let mut command = Command::new("fixture");
             assert_eq!(configure(&mut command, adapter, None), None);
             assert_eq!(command.get_args().count(), 0);

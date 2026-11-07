@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
+import { isMain } from '../lib/cli.mjs';
+import { parseJsonc } from '../lib/jsonc.mjs';
 import { channel, origin, readNotes, releasePlan, root, sha256, version } from './catalog.mjs';
 
 export async function publish({ receipt, notes, base, store, publicRead }) {
@@ -11,13 +13,11 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   const current = await publicRead(`${c}/latest.json`, true);
   const previous = current?.catalog ? await publicRead(current.catalog, true) : [];
   const plan = releasePlan({ receipt, notes, base, current, previous });
-  const expected = [
-    `Jackalope_${v}_x64-setup.exe`,
-    `Jackalope_${v}_x64-setup.exe.sig`,
-    `Jackalope_${v}_x64_en-US.msi`,
-    `Jackalope_${v}_x64_en-US.msi.sig`,
-    'checksums.json',
-  ];
+  const expected = [windowsInstallerName(v), windowsMsiName(v)].flatMap((name) => [
+    name,
+    `${name}.sig`,
+  ]);
+  expected.push('checksums.json');
   if (JSON.stringify(Object.keys(receipt.files).sort()) !== JSON.stringify(expected.sort()))
     throw new Error('Unexpected release files');
   for (const [name, hash] of Object.entries(receipt.files)) {
@@ -30,7 +30,7 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   }
   for (const installer of ['nsis', 'msi']) {
     const item = plan.manifest.platforms?.[`windows-x86_64-${installer}`];
-    const name = `Jackalope_${v}_x64${installer === 'nsis' ? '-setup.exe' : '_en-US.msi'}`;
+    const name = installer === 'nsis' ? windowsInstallerName(v) : windowsMsiName(v);
     if (
       item?.url !== `${base}/updates/${plan.directory}/${name}` ||
       item.signature !== (await store.read(`${name}.sig`)).toString('utf8').trim()
@@ -44,12 +44,12 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   await store.put(`${c}/latest.json`, encode(plan.manifest));
   return plan;
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const base = origin(process.env.UPDATE_BASE_URL);
   const environment = process.env.DEPLOY_ENV;
   if (!['staging', 'production'].includes(environment))
     throw new Error('Invalid deployment environment');
-  const config = JSON.parse(await readFile(resolve(root, 'apps/server/wrangler.jsonc'), 'utf8'));
+  const config = parseJsonc(await readFile(resolve(root, 'apps/server/wrangler.jsonc'), 'utf8'));
   const bucket = config.env[environment].r2_buckets[0].bucket_name;
   const dir = resolve(root, 'output/release');
   const receipt = JSON.parse(await readFile(resolve(dir, 'receipt.json'), 'utf8'));
@@ -80,7 +80,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     execFileSync(
       process.execPath,
       [
-        resolve(root, 'apps/server/node_modules/wrangler/bin/wrangler.js'),
+        resolve(root, 'scripts/run-bin.mjs'),
+        'wrangler',
         'r2',
         'object',
         'put',

@@ -88,16 +88,14 @@ impl AgentPolicy {
                 .find(|custom| custom.id == agent)
                 .and_then(|custom| custom.adapter.as_deref())
                 .unwrap_or(agent);
-            if self.agent_allowed(project, agent)
-                && matches!(
-                    adapter,
-                    "codex" | "claude" | "grok" | "opencode" | "kimi" | "acp"
-                )
-            {
+            if self.agent_allowed(project, agent) && super::agents::orchestrates(adapter) {
                 return Ok(agent);
             }
         }
-        Err("Choose an enabled Codex, Claude, Grok, OpenCode, Kimi Code or ACP agent for this project in Settings → Agents.".into())
+        Err(format!(
+            "Choose an enabled {} agent for this project in Settings → Agents.",
+            super::agents::orchestrator_names()
+        ))
     }
 
     pub(super) fn model_for_account(
@@ -170,7 +168,7 @@ impl AgentPolicy {
         }
         let custom = self.custom_agents.iter().find(|a| a.id == agent);
         let adapter = custom.and_then(|a| a.adapter.as_deref()).unwrap_or(agent);
-        if !super::tasks::BUILTIN_AGENTS.contains(&adapter) && adapter != "acp" {
+        if !super::agents::is_executable(adapter) {
             return Err("Choose a supported CLI adapter for this manually added agent.".into());
         }
         Ok(adapter.to_string())
@@ -261,11 +259,8 @@ impl TaskRuntime {
             }
             let agent = policy.routing_agent(&request.project_id)?;
             let (adapter, _) = policy.resolve(agent)?;
-            if !matches!(
-                adapter.as_str(),
-                "codex" | "claude" | "grok" | "opencode" | "kimi"
-            ) {
-                return Err("Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator in Settings → Agents. Antigravity is available as a worker.".into());
+            if !super::agents::orchestrates(&adapter) {
+                return Err(format!("Choose {} as the default orchestrator in Settings → Agents. Other agents are available as workers.", super::agents::orchestrator_names()));
             }
             if adapter != "opencode" {
                 policy.model(agent, None)?;
@@ -322,7 +317,7 @@ pub async fn agent_save_policy(
     let mut ids = std::collections::HashSet::new();
     for agent in &policy.custom_agents {
         if agent.id.is_empty()
-            || super::tasks::BUILTIN_AGENTS.contains(&agent.id.as_str())
+            || super::agents::is_builtin(&agent.id)
             || agent.id == "default"
             || agent.id == "auto"
             || !ids.insert(&agent.id)

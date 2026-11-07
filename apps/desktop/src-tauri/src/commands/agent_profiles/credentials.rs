@@ -124,7 +124,7 @@ pub(in crate::commands) fn save_key(
     let binding = super::bind_account(&runtime.profiles_root(), &agent, Some(&id))?;
     crate::commands::agent_sign_in::ensure_idle(&binding)?;
     if runtime.integration_runs()?.iter().any(|run| {
-        ["starting", "running", "stopping"].contains(&run.status.as_str())
+        run.status.is_active()
             && run
                 .account_binding
                 .as_ref()

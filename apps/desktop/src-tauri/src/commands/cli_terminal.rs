@@ -142,8 +142,6 @@ fn open_system_terminal(
     command: &Path,
     arguments: &[String],
 ) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let started = if super::platform::find_on_path("wt.exe").is_some() {
         std::process::Command::new("wt.exe")
             .arg("-d")
@@ -152,12 +150,11 @@ fn open_system_terminal(
             .args(arguments)
             .spawn()
     } else {
-        std::process::Command::new("cmd.exe")
+        super::process_control::hidden(&mut std::process::Command::new("cmd.exe"))
             .args(["/C", "start", "Jackalope", "/D"])
             .arg(directory)
             .arg(command)
             .args(arguments)
-            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
     };
     started

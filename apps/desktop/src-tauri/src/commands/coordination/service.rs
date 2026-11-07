@@ -586,13 +586,7 @@ impl Coordinator {
         {
             let runs = self.runtime.integration_runs()?;
             if !runs.iter().any(|run| run.id == request.id)
-                && runs
-                    .iter()
-                    .filter(|run| {
-                        ["starting", "running", "stopping"].contains(&run.status.as_str())
-                    })
-                    .count()
-                    >= inner.concurrency
+                && runs.iter().filter(|run| run.status.is_active()).count() >= inner.concurrency
             {
                 return Err("Session is waiting for execution capacity.".into());
             }
@@ -771,7 +765,7 @@ impl Coordinator {
             .integration_runs()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .iter()
-            .any(|r| r.id == run_id && active(&r.status))
+            .any(|r| r.id == run_id && r.status.is_active())
         {
             return Err(StatusCode::UNAUTHORIZED);
         }
@@ -847,7 +841,7 @@ impl Coordinator {
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         let run = runs
             .into_iter()
-            .find(|r| r.id == run_id && active(&r.status))
+            .find(|r| r.id == run_id && r.status.is_active())
             .ok_or(StatusCode::UNAUTHORIZED)?;
         Ok(run)
     }

@@ -177,7 +177,7 @@ pub async fn task_pull_request_create(
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if run.status.is_active() {
             return Err("Wait for the agent to finish before opening a pull request.".into());
         }
         let path = Path::new(&run.workspace);
@@ -282,10 +282,10 @@ pub async fn task_merge_locally(
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        if runs.iter().any(|other| {
-            other.workspace == run.workspace
-                && ["starting", "running", "stopping"].contains(&other.status.as_str())
-        }) {
+        if runs
+            .iter()
+            .any(|other| other.workspace == run.workspace && other.status.is_active())
+        {
             return Err("Wait for work in this checkout to finish before merging.".into());
         }
         if run.workspace.is_empty() || run.branch.is_empty() || run.branch == target {

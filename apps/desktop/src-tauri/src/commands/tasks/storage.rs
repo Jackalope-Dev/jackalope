@@ -155,13 +155,12 @@ impl TaskRuntime {
                         if crate::commands::previews::review::recover(&mut run) {
                             let _ = runtime.save(&run);
                         }
-                        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                        if run.status.is_active() {
                             run.status = if cfg!(windows) && run.process_contained {
-                                "stopped"
+                                RunStatus::Stopped
                             } else {
-                                "interrupted"
-                            }
-                            .into();
+                                RunStatus::Interrupted
+                            };
                             run.error = Some("Jackalope closed before this attempt finished. Review its workspace before continuing; work was not automatically rerun.".into());
                             run.ended_at = Some(Utc::now().to_rfc3339());
                             if let Err(error) = runtime.save(&run) {
@@ -209,7 +208,7 @@ impl TaskRuntime {
                 .runs
                 .values()
                 .filter(|run| {
-                    run.status == "reviewed"
+                    run.status == RunStatus::Reviewed
                         && run.persistence_error.is_none()
                         && run.live_session_id.is_none()
                         && run.archived_at.is_none()
@@ -247,10 +246,7 @@ impl TaskRuntime {
                 .values()
                 .filter(|run| run.task_id == current.task_id)
             {
-                if !["review", "reviewed", "failed", "stopped"].contains(&run.status.as_str())
-                    || run.finishing
-                    || run.live_session_id.is_some()
-                {
+                if !run.status.is_terminal() || run.finishing || run.live_session_id.is_some() {
                     return Err("Finish or resolve all attempts before archiving this task. Live session tasks stay with their session.".into());
                 }
                 if run.persistence_error.is_some() || self.writer.error(&run.id).is_some() {
@@ -363,21 +359,19 @@ impl TaskRuntime {
             return Err("The task record has an invalid identifier.".into());
         }
         if let Some(existing) = self.inner.lock().unwrap().runs.get(&run.id) {
-            return Err(
-                if ["starting", "running", "stopping"].contains(&existing.status.as_str()) {
-                    "A running task already uses this identifier."
-                } else {
-                    "This task is already in your history."
-                }
-                .into(),
-            );
+            return Err(if existing.status.is_active() {
+                "A running task already uses this identifier."
+            } else {
+                "This task is already in your history."
+            }
+            .into());
         }
         if self.directory.join(format!("{}.json", run.id)).exists() {
             return Err("A history file with this identifier already exists.".into());
         }
         run.persistence_error = None;
-        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
-            run.status = "interrupted".into();
+        if run.status.is_active() {
+            run.status = RunStatus::Interrupted;
             run.error.get_or_insert_with(|| {
                 "Restored from a recovery copy of an unfinished attempt; it was not rerun.".into()
             });
@@ -418,7 +412,7 @@ impl TaskRuntime {
     }
 
     fn bound_output(run: &mut TaskRun) {
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             run.progress = None;
         }
         if run.result.len() > 128_000 {

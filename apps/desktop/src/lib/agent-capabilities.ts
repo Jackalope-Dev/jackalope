@@ -1,5 +1,5 @@
-import capabilities from './agent-capabilities.json' with { type: 'json' };
 import type { BuiltinAgentId } from './agent-catalog';
+import capabilities from './agents.json' with { type: 'json' };
 
 export function agentCapabilities(adapter: string) {
   return capabilities[adapter as BuiltinAgentId];

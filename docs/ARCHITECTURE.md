@@ -1,6 +1,6 @@
 # Architecture
 
-Jackalope has three applications and shared UI, branding and knowledge packages. Desktop execution
+Jackalope has three applications and shared UI, branding, knowledge and contract packages. Desktop execution
 is local; verified account access is required to start new work in every build.
 Saved history and running tasks remain accessible when access expires.
 
@@ -16,12 +16,14 @@ Saved history and running tasks remain accessible when access expires.
 | `packages/ui` | Browser-safe React controls shared by desktop, website and admin |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
+| `packages/contracts` | Cross-application shapes: telemetry, account and download responses, platforms, and release distribution (targets, CDN URLs, installer names, R2 layout, Store links) |
 | `scripts/release` | Cross-application build, signing, release receipts and publication orchestration |
 | `scripts/verification` | Browser regression fixtures and local acceptance helpers |
 | `docs` | Public architecture, feature contracts, verification and release guidance |
 
-Application runtime imports share code through `packages/ui`, `packages/brand` and `packages/knowledge`; applications do
-not import each other's runtime modules. Release tooling intentionally spans
+Application runtime imports share code through `packages/ui`, `packages/brand`, `packages/knowledge` and
+`packages/contracts`; applications do not import each other's runtime modules. Release scripts import
+`packages/contracts` for release names and URLs. Release tooling intentionally spans
 applications. The website generates its monochrome SVG and PNG icons directly
 from shared character geometry during development and builds. The server bundles
 its React admin frontend from `apps/server/admin` using `pnpm admin:build`; Wrangler
@@ -88,6 +90,7 @@ changes must preserve both sides and old saved records.
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
 | process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
 | notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
+| agents.rs | The agent catalog read from src/lib/agents.json: names, executables, sign-in directories and variables, protocols and capabilities |
 | agent_policy.rs, agent_profiles.rs, capacity/ | Allowlists, profile binding/sign-in and capacity |
 | mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
 | agent_decider.rs, question_risk.rs | Autonomy policy, question classification and read-only decider attempts that answer plan questions, rounds and deviations for the person |

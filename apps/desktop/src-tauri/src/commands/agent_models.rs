@@ -174,8 +174,7 @@ async fn read_catalog(
             .stderr(Stdio::null())
             .kill_on_drop(true);
         agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-        #[cfg(windows)]
-        command.creation_flags(0x08000000);
+        super::process_control::hidden(command.as_std_mut());
         let mut child = command
             .spawn()
             .map_err(|_| "Could not start the model reader")?;
@@ -268,7 +267,7 @@ pub async fn agent_models(
     if adapter == "gemini" {
         return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "Gemini CLI does not expose a model catalog command. Tasks use the CLI's configured model unless a saved model override is passed with --model; the model in use is reported when a task starts.".into()});
     }
-    if !["codex", "claude", "grok", "opencode", "kimi", "antigravity"].contains(&adapter.as_str()) {
+    if !super::agents::find(&adapter).is_some_and(|agent| agent.model_catalog) {
         return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "This agent does not expose a supported model catalog. Model selection is unavailable; the agent manages its model unless a saved override exists.".into()});
     }
     let binding = agent_profiles::bind_account(

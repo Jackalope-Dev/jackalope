@@ -14,6 +14,7 @@ use super::super::{
     project_registry,
     tasks::{events::activity, TaskRun, TaskRuntime},
 };
+use crate::commands::tasks::RunStatus;
 use serde::{Deserialize, Serialize};
 use std::{
     path::PathBuf,
@@ -450,7 +451,7 @@ fn before_source(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String>
     let busy = runtime.integration_runs()?.iter().any(|other| {
         other.id != run.id
             && dunce::canonicalize(&other.workspace).ok().as_ref() == Some(&checkout)
-            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
+            && other.status.is_live()
     });
     if busy {
         return Err(
@@ -702,7 +703,7 @@ pub(in crate::commands) fn wanted(runtime: &TaskRuntime, run: &TaskRun) -> bool 
 fn wanted_now(runtime: &TaskRuntime, id: &str) -> bool {
     runtime
         .run_snapshot(id)
-        .is_some_and(|run| run.review_capturing && run.status == "review")
+        .is_some_and(|run| run.review_capturing && run.status == RunStatus::Review)
 }
 
 /// Captures review screenshots in the background for an attempt whose result is

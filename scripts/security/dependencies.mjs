@@ -2,9 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { root } from '../lib/paths.mjs';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
 const read = (file) => readFileSync(path.join(root, file), 'utf8');
 const provenance = JSON.parse(read('patches/glib/provenance.json'));
 const files = (directory) =>

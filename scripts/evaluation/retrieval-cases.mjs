@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 
 const families = {
   incidents: {
@@ -119,7 +119,7 @@ export function retrievalSuite(split = 'held-out') {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   if (!process.argv[2])
     throw new Error('Usage: node retrieval-cases.mjs suite.json [pilot|held-out]');
   await writeFile(process.argv[2], `${JSON.stringify(retrievalSuite(process.argv[3]), null, 2)}\n`);

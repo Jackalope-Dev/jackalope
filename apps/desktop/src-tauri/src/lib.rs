@@ -112,7 +112,7 @@ pub fn run(launch: Launch) {
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows[0].user_agent =
         Some(format!("Jackalope/{}", env!("CARGO_PKG_VERSION")));
-    let profile = std::env::var_os("JACKALOPE_PROFILE_DIR").map(std::path::PathBuf::from);
+    let profile = cli_protocol::profile::explicit_root();
     context.config_mut().app.windows[0].create = false;
     if let Some(path) = &profile {
         assert!(path.is_absolute(), "JACKALOPE_PROFILE_DIR must be absolute");
@@ -138,14 +138,10 @@ pub fn run(launch: Launch) {
             commands::browser::set_resource_directory(app.path().resource_dir()?);
             commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
             commands::computers::set_resource_directory(app.path().resource_dir()?);
-            let directory = profile
-                .clone()
-                .unwrap_or(app.path().app_data_dir()?)
-                .join("task-runs-v1");
-            #[cfg(debug_assertions)]
-            let directory = std::env::var_os("JACKALOPE_TEST_DATA_DIR")
-                .map(std::path::PathBuf::from)
-                .unwrap_or(directory);
+            let paths = cli_protocol::ProfilePaths::new(
+                &profile.clone().unwrap_or(app.path().app_data_dir()?),
+            );
+            let directory = paths.data().to_path_buf();
             let resetting = reset_on_startup(&directory)?;
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
@@ -157,7 +153,7 @@ pub fn run(launch: Launch) {
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
             helper.launch();
             app.manage(helper);
-            let preferences = directory.join("preferences");
+            let preferences = paths.preferences();
             std::fs::create_dir_all(&preferences)?;
             app.manage(commands::account::AccountService::new(
                 preferences.join("account.bin"),
@@ -223,7 +219,7 @@ pub fn run(launch: Launch) {
             app.manage(main_window);
             commands::cli_install::launch(preferences.clone());
             // The CLI is a convenience; losing it must not stop the app.
-            match commands::cli_host::launch(app.handle().clone(), &preferences, !launch.headless) {
+            match commands::cli_host::launch(app.handle().clone(), &paths, !launch.headless) {
                 Ok(host) => {
                     app.manage(host);
                 }

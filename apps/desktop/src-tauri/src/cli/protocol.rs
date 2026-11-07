@@ -15,6 +15,10 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
 
+#[path = "profile.rs"]
+pub mod profile;
+pub use profile::ProfilePaths;
+
 /// Bumped when a request or response shape changes incompatibly. A client that
 /// finds a different version refuses to attach rather than guessing.
 pub const VERSION: u32 = 1;
@@ -408,7 +412,7 @@ pub struct SessionSummary {
     /// The latest run's status, so a list can show which conversations are
     /// working. Absent from older hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<RunStatus>,
     /// Whether an agent is waiting on an answer. Absent from older hosts.
     #[serde(default)]
     pub asking: bool,
@@ -566,7 +570,7 @@ pub struct SessionView {
     pub error: Option<String>,
     pub messages: Vec<Message>,
     pub run_id: Option<String>,
-    pub status: Option<String>,
+    pub status: Option<RunStatus>,
     pub agent: Option<String>,
     pub account: Option<String>,
     pub model: Option<String>,
@@ -816,15 +820,116 @@ impl Response {
     }
 }
 
-/// Run statuses that mean an agent is still going.
-pub const WORKING: &[&str] = &["starting", "running", "routing", "queued", "stopping"];
-/// Run statuses for work someone stopped before it finished.
-pub const STOPPED: &[&str] = &["stopped", "cancelled", "canceled", "interrupted"];
-/// Run statuses for work that ended in failure.
-pub const FAILED: &[&str] = &["failed", "error"];
+/// A task run's status, saved and sent as its lowercase name. A name this
+/// build does not know is kept as `Unknown` and written back unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RunStatus {
+    Starting,
+    Running,
+    Stopping,
+    Stopped,
+    Interrupted,
+    Failed,
+    /// The agent finished; its result waits for review.
+    Review,
+    Reviewed,
+    Unknown(String),
+}
 
-pub fn working(status: Option<&str>) -> bool {
-    status.is_some_and(|status| WORKING.contains(&status))
+impl RunStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Starting => "starting",
+            Self::Running => "running",
+            Self::Stopping => "stopping",
+            Self::Stopped => "stopped",
+            Self::Interrupted => "interrupted",
+            Self::Failed => "failed",
+            Self::Review => "review",
+            Self::Reviewed => "reviewed",
+            Self::Unknown(name) => name,
+        }
+    }
+
+    /// The agent process exists or is being started or stopped.
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Starting | Self::Running | Self::Stopping)
+    }
+
+    /// Active and not being stopped, so the agent can still act.
+    pub fn is_running(&self) -> bool {
+        matches!(self, Self::Starting | Self::Running)
+    }
+
+    /// Active, or interrupted with its process ownership unresolved, so it
+    /// still holds its workspace.
+    pub fn is_live(&self) -> bool {
+        self.is_active() || *self == Self::Interrupted
+    }
+
+    /// The agent finished with a result.
+    pub fn is_done(&self) -> bool {
+        matches!(self, Self::Review | Self::Reviewed)
+    }
+
+    /// Ended for good: a result, a failure or a stop.
+    pub fn is_terminal(&self) -> bool {
+        self.is_done() || matches!(self, Self::Failed | Self::Stopped)
+    }
+
+    /// Ended without a result, so a retry makes sense.
+    pub fn is_retryable(&self) -> bool {
+        matches!(self, Self::Failed | Self::Stopped | Self::Interrupted)
+    }
+
+    /// Someone or something stopped the work before it finished.
+    pub fn is_stopped(&self) -> bool {
+        matches!(self, Self::Stopped | Self::Interrupted)
+    }
+}
+
+impl Default for RunStatus {
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+
+impl From<&str> for RunStatus {
+    fn from(name: &str) -> Self {
+        match name {
+            "starting" => Self::Starting,
+            "running" => Self::Running,
+            "stopping" => Self::Stopping,
+            "stopped" => Self::Stopped,
+            "interrupted" => Self::Interrupted,
+            "failed" => Self::Failed,
+            "review" => Self::Review,
+            "reviewed" => Self::Reviewed,
+            other => Self::Unknown(other.to_string()),
+        }
+    }
+}
+
+impl std::fmt::Display for RunStatus {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl Serialize for RunStatus {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for RunStatus {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self::from(String::deserialize(deserializer)?.as_str()))
+    }
+}
+
+pub fn working(status: Option<&RunStatus>) -> bool {
+    status.is_some_and(RunStatus::is_active)
 }
 
 /// An error worth showing. Stored errors can be blank, and older records hold
@@ -833,30 +938,9 @@ pub fn present(error: Option<&str>) -> Option<&str> {
     error.filter(|error| !error.trim().is_empty() && *error != "null")
 }
 
-/// The profile root: the explicit override when set, else the platform's
-/// per-user application data directory. Mirrors the resolution in `lib.rs`.
-pub fn profile_root() -> Option<PathBuf> {
-    if let Some(explicit) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
-        let path = PathBuf::from(explicit);
-        return path.is_absolute().then_some(path);
-    }
-    let home = PathBuf::from(std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?);
-    #[cfg(target_os = "macos")]
-    let root = home.join("Library/Application Support");
-    #[cfg(target_os = "linux")]
-    let root = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".local/share"));
-    #[cfg(windows)]
-    let root = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join("AppData/Roaming"));
-    Some(root.join(IDENTIFIER))
-}
-
 /// Where the host advertises itself.
 pub fn handshake_path() -> Option<PathBuf> {
-    Some(profile_root()?.join("task-runs-v1/preferences/host.json"))
+    Some(ProfilePaths::active()?.handshake())
 }
 
 /// Reads the advertisement without contacting anyone. A handshake can outlive
@@ -1040,6 +1124,33 @@ pub fn attach() -> Option<(Handshake, Client)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn run_status_keeps_every_saved_name_including_unknown_ones() {
+        for name in [
+            "starting",
+            "running",
+            "stopping",
+            "stopped",
+            "interrupted",
+            "failed",
+            "review",
+            "reviewed",
+            "queued",
+            "",
+        ] {
+            let status: RunStatus = serde_json::from_str(&format!("\"{name}\"")).unwrap();
+            assert_eq!(
+                serde_json::to_string(&status).unwrap(),
+                format!("\"{name}\"")
+            );
+        }
+        assert_eq!(
+            RunStatus::from("queued"),
+            RunStatus::Unknown("queued".into())
+        );
+        assert!(!RunStatus::from("queued").is_active());
+    }
 
     #[test]
     fn lesson_settings_stay_optional_for_older_hosts_and_terminals() {

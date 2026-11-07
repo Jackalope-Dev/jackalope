@@ -101,7 +101,7 @@ fn output_journal_recovers_unicode_and_compacts_at_a_checkpoint() {
         runtime.inner.lock().unwrap().runs[&id].result
     );
     runtime
-        .update_checked(&id, |run| run.status = "review".into())
+        .update_checked(&id, |run| run.status = RunStatus::Review)
         .unwrap();
     assert!(!path.with_extension("journal").exists());
     drop(runtime);

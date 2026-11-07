@@ -6,6 +6,31 @@ use std::{
 
 pub const OUTPUT_LIMIT: usize = 128_000;
 
+/// Windows `CREATE_NO_WINDOW`: a console child gets no console window.
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Keeps a console child from opening a window on Windows. No effect elsewhere.
+pub fn hidden(command: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
+/// [`hidden`], and on Unix the leader of its own process group, so a
+/// [`ProcessTree`] can contain it and everything it starts.
+pub fn isolated(command: &mut Command) -> &mut Command {
+    hidden(command);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    command
+}
+
 pub fn read_bounded(mut reader: impl Read, limit: usize) -> std::io::Result<(String, bool)> {
     read_observed(&mut reader, limit, |_| {})
 }
@@ -325,16 +350,7 @@ fn run_supervised_input(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
-    }
+    isolated(&mut command);
     let start = Instant::now();
     let mut child = command
         .spawn()

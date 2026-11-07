@@ -1,3 +1,5 @@
+import { isReleaseChannel } from '@jackalope/contracts/platform';
+import { microsoftStoreUrl } from '@jackalope/contracts/release';
 export function applyCommunityConfig(settings, environment, source = process.env) {
   const prefix = environment === 'production' ? 'PRODUCTION_' : 'STAGING_';
   const names = [
@@ -36,31 +38,13 @@ export function applyCommunityConfig(settings, environment, source = process.env
     if (value !== undefined) settings.vars[name] = value;
   }
   const vars = settings.vars;
-  if (vars.ACCESS_STORE_URL) {
-    const url = new URL(vars.ACCESS_STORE_URL);
-    const path =
-      url.hostname === 'apps.microsoft.com'
-        ? /^\/detail\/[a-z0-9]{12}\/?$/i
-        : /^\/store\/apps\/[a-z0-9]{12}\/?$/i;
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.port ||
-      url.hash ||
-      !['apps.microsoft.com', 'www.microsoft.com'].includes(url.hostname) ||
-      !path.test(url.pathname)
-    )
-      throw new Error('Store link must be an official Microsoft product URL');
-  }
+  if (vars.ACCESS_STORE_URL && !microsoftStoreUrl(vars.ACCESS_STORE_URL))
+    throw new Error('Store link must be an official Microsoft product URL');
   for (const [name, platform] of [
     ['ACCESS_MAC_CHANNELS', 'macOS'],
     ['ACCESS_LINUX_CHANNELS', 'Linux'],
   ])
-    if (
-      vars[name] &&
-      !vars[name].split(',').every((channel) => ['stable', 'beta'].includes(channel.trim()))
-    )
+    if (vars[name] && !vars[name].split(',').every((channel) => isReleaseChannel(channel.trim())))
       throw new Error(`${platform} download channels must be stable and/or beta`);
   vars.EARLY_ACCESS_ENABLED ??= 'false';
   if (!['true', 'false'].includes(vars.EARLY_ACCESS_ENABLED))
