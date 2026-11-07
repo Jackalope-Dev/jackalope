@@ -42,6 +42,7 @@ if(mode) window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
  if(command==='task_screenshot')return Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='),c=>c.charCodeAt(0));
  if(command==='task_preview_inspect_cancel')return;
  if(command==='git_working_changes')return {branch:'task/search',head:'local-head',files:[{path:'src/search.ts',status:'modified'}]};
+ if(command==='git_generate_pull_request')return {title:'Search with the keyboard',body:'Search supports arrow keys.'};
  if(command==='git_commit_changes')return 'abc1234';
  if(command==='git_push_changes')return 'Pushed task/search to origin/task/search.';
  if(command==='task_pull_request_create')return 'https://github.com/example/example/pull/2';
@@ -88,19 +89,17 @@ try {
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
-  const passes = page.getByRole('button', { name: 'Trial passes', exact: true });
-  await passes.waitFor();
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll('button[aria-label="Trial passes"]')].some((button) =>
-      button.textContent.includes('3/5'),
-    ),
-  );
-  const searchBox = await page
-    .getByRole('button', { name: 'Search commands', exact: true })
-    .boundingBox();
-  const passesBox = await passes.boundingBox();
-  assert.ok(passesBox.y >= searchBox.y + searchBox.height, 'Trial passes belong below search');
-  await passes.click();
+  // Trial passes sit in the status bar's More menu while signup is invitation-based.
+  const statusMenu = page.getByRole('button', { name: 'More', exact: true }).last();
+  const trialPasses = page.getByRole('menuitem').filter({ hasText: 'Trial passes' });
+  const passesShown = async (remaining) => {
+    await statusMenu.click();
+    await page.getByRole('menuitem', { name: 'Send feedback', exact: true }).waitFor();
+    if (remaining === null) assert.equal(await trialPasses.count(), 0);
+    else await trialPasses.filter({ hasText: `${remaining}/5` }).waitFor();
+  };
+  await passesShown(3);
+  await trialPasses.click();
   await page.getByRole('heading', { name: 'Invitations', exact: true }).waitFor();
   // The fixture has no native account, which clears passes; restore them to check the page.
   await page.evaluate(() => window.coreFixture.passes(3));
@@ -112,15 +111,8 @@ try {
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
   for (const remaining of [0, null, 5, 3]) {
     await page.evaluate((value) => window.coreFixture.passes(value), remaining);
-    await page.waitForFunction(
-      (expected) =>
-        [...document.querySelectorAll('button[aria-label="Trial passes"]')].some((button) =>
-          expected === null
-            ? !/\d/.test(button.textContent)
-            : button.textContent.includes(`${expected}/5`),
-        ),
-      remaining,
-    );
+    await passesShown(remaining);
+    await page.keyboard.press('Escape');
   }
   for (const count of [1, 10, 100]) {
     await page.evaluate((value) => window.coreFixture.notices(value), count);
@@ -159,7 +151,8 @@ try {
     }
   }
   await page.setViewportSize({ width: 1280, height: 840 });
-  assert.equal(await page.locator('.work-item').filter({ hasText: 'Improve billing' }).count(), 0);
+  // Work opened from the sidebar lists every project.
+  await page.locator('.work-item').filter({ hasText: 'Improve billing' }).waitFor();
   await page.locator('.work-item').filter({ hasText: 'Live keyboard exploration' }).waitFor();
   const rows = page.locator('.work-item');
   await rows.first().focus();
@@ -182,6 +175,8 @@ try {
     }
   }
   await page.setViewportSize({ width: 1280, height: 840 });
+  await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
+  await page.getByRole('option', { name: 'Atlas', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('Export');
   await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
   await page.getByRole('option', { name: 'All projects', exact: true }).click();
@@ -264,7 +259,8 @@ try {
   await page.getByRole('button', { name: 'Stop preview', exact: true }).click();
   await page.getByRole('button', { name: 'Start preview', exact: true }).waitFor();
   await page.goto(`${url}/?mode=delivery`);
-  await page.getByRole('button', { name: 'Check PR and CI' }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Check pull request and CI', exact: true }).click();
   await page
     .getByText('The PR head differs from the inspected local revision.', { exact: false })
     .waitFor();
@@ -273,8 +269,8 @@ try {
   const repair = await page.evaluate(() => window.coreFixture.handoff);
   assert.match(repair, /- Build: FAILURE/);
   assert.match(repair, /Do not commit, push/);
-  await page.getByRole('button', { name: 'More delivery actions' }).click();
-  await page.getByRole('menuitem', { name: 'Prepare a deployment' }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Ask the agent to prepare a deployment' }).click();
   assert.match(await page.evaluate(() => window.coreFixture.handoff), /Do not commit, push/);
   assert.equal(
     await page.evaluate(() =>
@@ -289,7 +285,9 @@ try {
   await dialog.getByText('Commits 1 changed file', { exact: false }).waitFor();
   assert.equal(
     await page.evaluate(() =>
-      window.coreFixture.calls.some((call) => /commit|push|pull_request/.test(call.command)),
+      window.coreFixture.calls.some((call) =>
+        /commit_changes|push|pull_request_create/.test(call.command),
+      ),
     ),
     false,
     'Opening the dialog must not publish anything',
@@ -298,7 +296,7 @@ try {
   await page.getByText('Pull request opened.', { exact: true }).waitFor();
   const published = await page.evaluate(() =>
     window.coreFixture.calls
-      .filter((call) => /commit|push|pull_request/.test(call.command))
+      .filter((call) => /commit_changes|push|pull_request_create/.test(call.command))
       .map((call) => ({ command: call.command, draft: call.draft, paths: call.paths })),
   );
   assert.deepEqual(published, [
