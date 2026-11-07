@@ -380,6 +380,105 @@ fn settings_round_trip_and_default_to_no_choice() {
 }
 
 #[test]
+fn health_survives_a_restart_and_unreadable_files_lose_nothing() {
+    let root = std::env::temp_dir().join(format!("jackalope-health-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join(HEALTH_FILE);
+    let now = chrono::Utc::now();
+    let ago = |minutes: i64| (now - chrono::Duration::minutes(minutes)).to_rfc3339();
+
+    // What one session knew, written down and read back by the next.
+    let mut map = HashMap::new();
+    map.insert(
+        "Recent".to_string(),
+        Health {
+            last_seen: Some(ago(20)),
+            lost: Some("connection refused".into()),
+            lost_at: Some(Instant::now()),
+            lost_since: Some(now - chrono::Duration::minutes(2)),
+            browser: Some(true),
+            slots: Some(4),
+        },
+    );
+    map.insert(
+        "Answering".to_string(),
+        Health {
+            last_seen: Some(ago(1)),
+            ..Default::default()
+        },
+    );
+    map.insert("Unknown".to_string(), Health::default());
+    let saved = saved_health(&map);
+    assert_eq!(saved.hosts.len(), 2, "{saved:?}");
+    crate::commands::history::write_atomic(&path, &serde_json::to_vec(&saved).unwrap()).unwrap();
+    let loaded = load_health(&path, now);
+    let recent = &loaded["Recent"];
+    assert!(recent.unavailable(), "lost two minutes ago stays skipped");
+    assert_eq!(recent.lost.as_deref(), Some("connection refused"));
+    assert_eq!(recent.last_seen.as_deref(), Some(ago(20).as_str()));
+    // Only contact is saved, not what a runner reported.
+    assert_eq!((recent.browser, recent.slots), (None, None));
+    assert!(!loaded["Answering"].unavailable());
+    assert!(loaded["Answering"].lost.is_none());
+
+    // Past the cooldown it may take work again; the reason stays until it
+    // is reached. A time ahead of this clock counts as just lost, and one
+    // that cannot be read as never lost.
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&serde_json::json!({"hosts": {
+            "Old": {"lost": "timed out", "lostAt": ago(30)},
+            "Ahead": {"lost": "timed out", "lostAt": (now + chrono::Duration::minutes(5)).to_rfc3339()},
+            "Garbled": {"lost": "timed out", "lostAt": "yesterday", "lastSeen": "soon"},
+            "Reasonless": {"lostAt": ago(1)},
+        }}))
+        .unwrap(),
+    )
+    .unwrap();
+    let loaded = load_health(&path, now);
+    assert!(!loaded["Old"].unavailable());
+    assert_eq!(loaded["Old"].lost.as_deref(), Some("timed out"));
+    assert!(loaded["Ahead"].unavailable());
+    for id in ["Garbled", "Reasonless"] {
+        assert!(
+            !loaded[id].unavailable() && loaded[id].lost.is_none(),
+            "{id}"
+        );
+    }
+    assert!(loaded["Garbled"].last_seen.is_none());
+
+    for bytes in [
+        &b"{not json"[..],
+        &b"[1, 2]"[..],
+        &vec![b' '; HEALTH_LIMIT as usize + 1],
+    ] {
+        std::fs::write(&path, bytes).unwrap();
+        assert!(load_health(&path, now).is_empty());
+    }
+    assert!(load_health(&root.join("missing.json"), now).is_empty());
+
+    // The file stays small however many computers there were.
+    let many: HashMap<String, Health> = (0..SAVED_HOSTS + 10)
+        .map(|n| {
+            (
+                format!("c{n}"),
+                Health {
+                    last_seen: Some(ago(n as i64)),
+                    ..Default::default()
+                },
+            )
+        })
+        .collect();
+    let saved = saved_health(&many);
+    assert_eq!(saved.hosts.len(), SAVED_HOSTS);
+    assert!(
+        saved.hosts.contains_key("c0")
+            && !saved.hosts.contains_key(&format!("c{}", SAVED_HOSTS + 9))
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn health_follows_contact() {
     let id = format!("health-{}", uuid::Uuid::new_v4().simple());
     lost(&id, "timed out");

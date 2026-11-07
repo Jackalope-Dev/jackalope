@@ -140,6 +140,8 @@ pub(crate) struct Health {
     /// Why contact was lost, until the computer is reached again.
     pub lost: Option<String>,
     lost_at: Option<Instant>,
+    /// When contact was lost, as saved across restarts.
+    lost_since: Option<chrono::DateTime<chrono::Utc>>,
     /// Whether its runner has the browser tools, once a run has asked.
     pub browser: Option<bool>,
     /// Runs its runner reports it takes at once.
@@ -151,6 +153,11 @@ impl Health {
     pub fn unavailable(&self) -> bool {
         self.lost_at.is_some_and(|at| at.elapsed() < LOST_COOLDOWN)
     }
+
+    /// When contact was lost, while it has not been reached since.
+    pub fn lost_since(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.lost.as_ref().and(self.lost_since)
+    }
 }
 
 fn health_map() -> &'static Mutex<HashMap<String, Health>> {
@@ -161,23 +168,179 @@ fn health_map() -> &'static Mutex<HashMap<String, Health>> {
 /// Records that a computer answered, with what its runner reported when a
 /// run asked.
 pub(crate) fn seen(id: &str, capabilities: Option<&RunnerCapabilities>) {
-    let mut map = health_map().lock().unwrap();
-    let health = map.entry(id.into()).or_default();
-    health.last_seen = Some(chrono::Utc::now().to_rfc3339());
-    health.lost = None;
-    health.lost_at = None;
-    if let Some(capabilities) = capabilities {
-        health.browser = Some(capabilities.has(super::runner::BROWSER));
-        health.slots = capabilities.slots;
-    }
+    let reached_again = {
+        let mut map = health_map().lock().unwrap();
+        let health = map.entry(id.into()).or_default();
+        let reached_again = health.lost.is_some();
+        health.last_seen = Some(chrono::Utc::now().to_rfc3339());
+        health.lost = None;
+        health.lost_at = None;
+        health.lost_since = None;
+        if let Some(capabilities) = capabilities {
+            health.browser = Some(capabilities.has(super::runner::BROWSER));
+            health.slots = capabilities.slots;
+        }
+        reached_again
+    };
+    save_health(reached_again);
 }
 
 /// Records that contact with a computer was lost.
 pub(crate) fn lost(id: &str, reason: &str) {
-    let mut map = health_map().lock().unwrap();
-    let health = map.entry(id.into()).or_default();
-    health.lost = Some(reason.chars().take(300).collect());
-    health.lost_at = Some(Instant::now());
+    {
+        let mut map = health_map().lock().unwrap();
+        let health = map.entry(id.into()).or_default();
+        health.lost = Some(reason.chars().take(300).collect());
+        health.lost_at = Some(Instant::now());
+        health.lost_since = Some(chrono::Utc::now());
+    }
+    save_health(true);
+}
+
+// Health is saved in `host-health.json` beside `pool.json`, so a computer
+// lost shortly before a restart stays skipped for the rest of its cooldown.
+// It holds only when each computer was last reached and when and why contact
+// was lost; an unreadable file starts with nothing lost.
+
+const HEALTH_FILE: &str = "host-health.json";
+const HEALTH_LIMIT: u64 = 64 * 1024;
+const SAVED_HOSTS: usize = 64;
+/// How often a computer being reached is written down on its own; losing or
+/// regaining contact is written at once.
+const SEEN_SAVE_EVERY: Duration = Duration::from_secs(5 * 60);
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct SavedHealth {
+    #[serde(default)]
+    hosts: BTreeMap<String, SavedHost>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedHost {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_seen: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lost: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lost_at: Option<String>,
+}
+
+struct HealthStore {
+    path: std::path::PathBuf,
+    saved: Option<Instant>,
+}
+
+fn health_store() -> &'static Mutex<Option<HealthStore>> {
+    static STORE: OnceLock<Mutex<Option<HealthStore>>> = OnceLock::new();
+    STORE.get_or_init(Default::default)
+}
+
+/// Loads the saved health of computers and saves changes from now on. Called
+/// once at startup.
+pub(crate) fn restore_health(root: &Path) {
+    let path = root.join(HEALTH_FILE);
+    let loaded = load_health(&path, chrono::Utc::now());
+    {
+        let mut map = health_map().lock().unwrap();
+        for (id, health) in loaded {
+            map.entry(id).or_insert(health);
+        }
+    }
+    *health_store().lock().unwrap() = Some(HealthStore { path, saved: None });
+}
+
+/// The saved health in `path` as of `now`. A computer lost less than
+/// [`LOST_COOLDOWN`] ago stays unavailable for the rest of it; anything
+/// unreadable counts as never lost.
+fn load_health(path: &Path, now: chrono::DateTime<chrono::Utc>) -> HashMap<String, Health> {
+    let saved: SavedHealth = crate::commands::history::read_bounded(path, HEALTH_LIMIT)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    saved
+        .hosts
+        .into_iter()
+        .filter(|(id, _)| !id.is_empty() && id.len() <= 200)
+        .map(|(id, host)| {
+            let since = host
+                .lost_at
+                .as_deref()
+                .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+                .map(|at| at.with_timezone(&chrono::Utc))
+                .filter(|_| host.lost.is_some());
+            let lost_at = since.and_then(|since| {
+                // A time ahead of this clock counts as just now.
+                let ago = (now - since).to_std().unwrap_or_default();
+                (ago < LOST_COOLDOWN)
+                    .then(|| Instant::now().checked_sub(ago).unwrap_or_else(Instant::now))
+            });
+            let health = Health {
+                last_seen: host
+                    .last_seen
+                    .filter(|seen| chrono::DateTime::parse_from_rfc3339(seen).is_ok()),
+                lost: since.and(host.lost.map(|why| why.chars().take(300).collect())),
+                lost_at,
+                lost_since: since,
+                ..Default::default()
+            };
+            (id, health)
+        })
+        .collect()
+}
+
+/// What is saved of the computers' health: the most recently active ones.
+fn saved_health(map: &HashMap<String, Health>) -> SavedHealth {
+    let mut hosts: Vec<(&String, SavedHost, String)> = map
+        .iter()
+        .filter_map(|(id, health)| {
+            let lost_at = health.lost_since().map(|at| at.to_rfc3339());
+            let host = SavedHost {
+                last_seen: health.last_seen.clone(),
+                lost: lost_at.as_ref().and(health.lost.clone()),
+                lost_at,
+            };
+            let latest = host
+                .last_seen
+                .clone()
+                .max(host.lost_at.clone())
+                .unwrap_or_default();
+            (host != SavedHost::default()).then_some((id, host, latest))
+        })
+        .collect();
+    hosts.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.cmp(b.0)));
+    SavedHealth {
+        hosts: hosts
+            .into_iter()
+            .take(SAVED_HOSTS)
+            .map(|(id, host, _)| (id.clone(), host))
+            .collect(),
+    }
+}
+
+/// Writes the health down, atomically, once [`restore_health`] has run.
+/// Contact alone is written at most every [`SEEN_SAVE_EVERY`].
+fn save_health(changed: bool) {
+    let mut store = health_store().lock().unwrap();
+    let Some(store) = store.as_mut() else {
+        return;
+    };
+    if !changed && store.saved.is_some_and(|at| at.elapsed() < SEEN_SAVE_EVERY) {
+        return;
+    }
+    let saved = saved_health(&health_map().lock().unwrap());
+    let written = serde_json::to_vec_pretty(&saved)
+        .map_err(|error| error.to_string())
+        .and_then(|bytes| {
+            if let Some(parent) = store.path.parent() {
+                std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            }
+            crate::commands::history::write_atomic(&store.path, &bytes)
+        });
+    match written {
+        Ok(()) => store.saved = Some(Instant::now()),
+        Err(error) => eprintln!("Computer health could not be saved: {error}"),
+    }
 }
 
 pub(crate) fn health(id: &str) -> Health {

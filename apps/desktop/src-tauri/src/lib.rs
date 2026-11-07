@@ -150,6 +150,7 @@ pub fn run(launch: Launch) {
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
             runtime.observe_changes(app.handle().clone());
+            commands::computers::pool::restore_health(&runtime.computers_root());
             commands::computers::install_browser_routing(runtime.clone());
             commands::computers::launch_idle_stop(runtime.clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
