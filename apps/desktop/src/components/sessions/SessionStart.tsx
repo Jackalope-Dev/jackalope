@@ -33,6 +33,7 @@ import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './Co
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
+import { selectWork } from '../../lib/work-selection';
 
 /** Saved work handed to the composer: a draft, an idea or an agent choice. */
 export interface ComposerSeed {
@@ -258,7 +259,7 @@ ${incoming}`
         const first = useExecutionStore
           .getState()
           .runs.find((run) => run.taskId === comparison.taskIds[0]);
-        if (first) useExecutionStore.getState().select(first.id);
+        if (first) selectWork({ task: first.id });
         return;
       }
       const lead = chosen[0];

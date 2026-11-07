@@ -12,7 +12,7 @@ import {
   Settings2,
   SquareTerminal,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { describeError } from '../../lib/errors';
 import { searchFiles } from '../../lib/file-search';
@@ -21,11 +21,11 @@ import { invokeNative } from '../../lib/native/transport';
 import { ATTACH_TO_COMPOSER, attachmentReference } from '../../lib/prompt-attachments';
 import { isSettled } from '../../lib/run-status';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
-import { taskTitle } from '../../lib/task-title';
+import { workShape } from '../../lib/task-collection';
 import { taskDecision } from '../../lib/task-workflow';
+import { showWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -83,43 +83,19 @@ export function CommandPalette({
   const search = query.trim().toLowerCase();
   const projects = useProjectStore((state) => state.projects);
   const runs = useExecutionStore((state) => state.runs);
-  const sessions = useLiveSessionStore((state) => state.sessions);
   const selected = useExecutionStore((state) => state.selectedId);
   const current = runs.find((run) => run.id === selected);
-  const latest = useMemo(() => {
-    const tasks = new Map<
-      string,
-      { run: (typeof runs)[number]; original: (typeof runs)[number] }
-    >();
-    for (const run of runs) {
-      if (run.liveSessionId) continue;
-      const task = tasks.get(run.taskId);
-      if (!task) tasks.set(run.taskId, { run, original: run });
-      else {
-        if (Date.parse(run.startedAt) > Date.parse(task.run.startedAt)) task.run = run;
-        if (Date.parse(run.startedAt) < Date.parse(task.original.startedAt)) task.original = run;
-      }
-    }
-    return [...tasks.values()];
-  }, [runs]);
-  const work = [
-    ...latest.map(({ run, original }) => ({
-      id: run.id,
-      title: taskTitle(original.prompt),
-      project: run.projectName,
-      date: run.startedAt,
-      state: taskDecision(run).label,
-    })),
-    ...sessions.map((session) => ({
-      id: `session:${session.id}`,
-      title: session.title,
-      project: session.request.projectName,
-      date: session.updatedAt,
-      state: session.persona ? `Bot · ${session.persona.name}` : 'Conversation',
-    })),
-  ]
-    .filter((item) => `${item.title} ${item.project} ${item.state}`.toLowerCase().includes(search))
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+  const workspaceWork = useWorkspaceWork({ withoutDrafts: true });
+  const work = workspaceWork
+    .map((item) => ({
+      item,
+      project: projects.find((project) => project.id === workProjectId(item))?.name ?? '',
+      state: item.statusLabel ?? workShape(item),
+    }))
+    .filter(({ item, project, state }) =>
+      `${item.title} ${project} ${state}`.toLowerCase().includes(search),
+    )
+    .sort((a, b) => Date.parse(b.item.date) - Date.parse(a.item.date))
     .slice(0, 8);
   const matchingProjects = projects
     .filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(search))
@@ -245,14 +221,15 @@ export function CommandPalette({
             {work.length > 0 && (
               <p className="menu-label">{search ? 'Matching work' : 'Recent work'}</p>
             )}
-            {work.map((item) => (
+            {work.map(({ item, project, state }) => (
               <button
                 key={item.id}
                 data-command
                 type="button"
                 className="workspace-menu-item w-full text-left"
                 onClick={() => {
-                  useWorkViewStore.getState().open(item.id);
+                  showWork(item);
+                  onNavigate('kanban');
                   onClose();
                 }}
               >
@@ -260,7 +237,7 @@ export function CommandPalette({
                 <span className="min-w-0">
                   <span className="block truncate">{item.title}</span>
                   <small className="block text-[var(--color-text-secondary)]">
-                    {item.project} · {item.state}
+                    {[project, state].filter(Boolean).join(' · ')}
                   </small>
                 </span>
               </button>

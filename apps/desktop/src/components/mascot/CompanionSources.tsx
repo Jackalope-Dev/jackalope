@@ -4,6 +4,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { type PlanSummary, planCommands } from '../../lib/plan-mode';
 import type { TaskRun } from '../../lib/run-types';
+import { openRun, selectWork } from '../../lib/work-selection';
 import { useBotStore } from '../../stores/botStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
@@ -15,8 +16,7 @@ import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
 export function openCompanionTask(run: TaskRun) {
-  useProjectStore.getState().selectProject(run.projectId);
-  useExecutionStore.getState().select(run.id);
+  openRun(run.id);
   navigateWorkspace('kanban');
   requestAnimationFrame(() => document.getElementById('workspace-content')?.focus());
 }
@@ -156,7 +156,10 @@ The work departed from the approved plan.`,
             detail: error,
             kind: 'attention',
             actionLabel: 'Open tasks',
-            onOpen: () => navigateWorkspace('live-sessions'),
+            onOpen: () => {
+              selectWork();
+              navigateWorkspace('kanban');
+            },
           },
         ]
       : [],

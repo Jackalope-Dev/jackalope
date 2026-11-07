@@ -48,6 +48,7 @@ import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
 import { describeError } from '../../lib/errors';
 import { stopTask } from '../../lib/task-client';
+import { openRun } from '../../lib/work-selection';
 import { CommitFilesList, STATUS } from './CommitFilesList';
 import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
 
@@ -401,7 +402,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
 
   const openFixTask = () => {
     if (!fixRun) return;
-    useExecutionStore.getState().select(fixRun.id);
+    openRun(fixRun.id);
     navigateWorkspace('kanban');
   };
 

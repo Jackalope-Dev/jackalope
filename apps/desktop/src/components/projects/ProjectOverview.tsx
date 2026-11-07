@@ -24,7 +24,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
 import { taskTitle } from '../../lib/task-title';
-import { selectWork, workTarget } from '../../lib/work-selection';
+import { selectWork, useAllRuns, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -46,22 +46,15 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
   const project = useActiveProject();
   const runs = useExecutionStore((state) => state.runs);
   const historyError = useExecutionStore((state) => state.historyError);
-  const {
-    sessions,
-    runs: sessionRuns,
-    error: sessionError,
-  } = useLiveSessionStore(
-    useShallow((s) => ({ sessions: s.sessions, runs: s.runs, error: s.error })),
+  const { sessions, error: sessionError } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, error: s.error })),
   );
   const { queue, error: queueError } = useManagedTaskStore(
     useShallow((s) => ({ queue: s.queue, error: s.error })),
   );
   const ideas = useTaskStore((state) => state.tasks);
   const integrated = queue.mergedRunIds;
-  const allRuns = useMemo(
-    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-    [runs, sessionRuns],
-  );
+  const allRuns = useAllRuns();
   const [readinessResult, setReadiness] = useState<{ path: string; value: Readiness } | null>(null);
   const readiness = readinessResult?.path === project?.path ? readinessResult?.value : null;
   const readinessRequest = useRef(0);
@@ -106,10 +99,8 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
   const openTask = (item: WorkItem) => {
     // A task opens through its list row rather than straight to its page.
     selectWork(item.run && !item.managed && !item.session ? {} : workTarget(item));
-    if (item.managed) {
+    if (item.managed || item.session) {
       navigateWorkspace('kanban');
-    } else if (item.session) {
-      navigateWorkspace('live-sessions');
     } else if (item.run) {
       useWorkViewStore.getState().open(item.run.id);
     } else {
@@ -158,7 +149,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   onClick={() => {
                     selectWork();
                     useProjectStore.getState().selectProject(project.id);
-                    navigateWorkspace('live-sessions');
+                    navigateWorkspace('kanban');
                   }}
                 >
                   <Plus size={14} />
@@ -221,7 +212,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   );
                 localStorage.setItem(key, combined);
                 selectWork();
-                navigateWorkspace('live-sessions');
+                navigateWorkspace('kanban');
               }}
             />
           </Disclosure>

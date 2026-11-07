@@ -26,6 +26,7 @@ import {
 import { stopTask } from '../../lib/task-client';
 import { useAction } from '../../lib/useAction';
 import { useNativeResource } from '../../lib/useNativeResource';
+import { openRun } from '../../lib/work-selection';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
@@ -61,11 +62,10 @@ export function ScheduleManager(props: {
   sourceRunId?: string;
   onSourceHandled?: () => void;
 }) {
-  const { projects, activeProjectId, selectProject } = useProjectStore(
+  const { projects, activeProjectId } = useProjectStore(
     useShallow((s) => ({
       projects: s.projects,
       activeProjectId: s.activeProjectId,
-      selectProject: s.selectProject,
     })),
   );
   const runners = useExecutionStore((s) => s.runners);
@@ -346,9 +346,8 @@ export function ScheduleManager(props: {
                         <Button
                           variant="ghost"
                           onClick={() => {
-                            selectProject(run.projectId);
                             props.onPlanning();
-                            useExecutionStore.getState().select(run.id);
+                            openRun(run.id);
                           }}
                         >
                           View run

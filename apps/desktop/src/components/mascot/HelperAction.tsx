@@ -10,6 +10,7 @@ import {
 } from '../../lib/helper-actions';
 import { invokeNative } from '../../lib/native/transport';
 import { stopTask } from '../../lib/task-client';
+import { openRun } from '../../lib/work-selection';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
@@ -192,8 +193,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           await stopTask(run.id);
           result = { stopRequested: true, runId: run.id };
         } else {
-          useProjectStore.getState().selectProject(run.projectId);
-          useExecutionStore.getState().select(run.id);
+          openRun(run.id);
           onNavigate();
           requestAnimationFrame(() => navigateWorkspace('kanban'));
           result = { openedRunId: run.id };

@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isActive } from '../../lib/run-status';
-import { selectWork } from '../../lib/work-selection';
+import { selectWork, useWorkspaceWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -16,7 +16,6 @@ import { InvitationsMenuItem } from './InvitationsMenuItem';
 import { navigateWorkspace } from './navigation';
 import { StatusBarChanges } from './StatusBarChanges';
 import { StatusBarUsage } from './StatusBarUsage';
-import { useWorkspaceWork } from './WorkSidebar';
 
 export function WorkspaceStatusBar({
   onSearch,

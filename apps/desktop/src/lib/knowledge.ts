@@ -8,6 +8,7 @@ import { isTauriEnvironment } from './native/env';
 import { invokeNative } from './native/transport';
 import { createReadCache } from './read-cache';
 import { restoreArchivedTask } from './task-client';
+import { selectWork } from './work-selection';
 import { workspaceModeFor } from './workspace-mode';
 
 const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);
@@ -76,7 +77,7 @@ export async function openKnowledgeTask(projectId: string, runId: string) {
       throw new Error('The source task could not be loaded. Retry from archived history.');
   }
   useProjectStore.getState().selectProject(projectId);
-  useExecutionStore.getState().select(runId);
+  selectWork({ task: runId });
   navigateWorkspace('kanban');
 }
 
