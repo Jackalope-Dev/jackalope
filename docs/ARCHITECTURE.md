@@ -39,7 +39,14 @@ Project readiness uses isolated gix metadata reads with Git fallback. Review ren
 uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integration
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
 Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
-and MCP connections and marketplace. Zustand stores keep
+and MCP connections and marketplace. Workspace views are registered once in
+layout/navigation.ts (label, group, icon, telemetry feature, search keywords) with
+their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
+read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
+command search and the shortcut sheet live in layout/commands.ts. Work is read through
+lib/work-selection.ts (`useWorkspaceWork`, `useAllRuns`) and opened with `openWork`,
+`openRun` or `openConversation`, which clear the other selections and focus the
+project. Zustand stores keep
 selection, drafts and preferences; they do not establish that native work ran.
 
 ~~~text
