@@ -6,6 +6,7 @@ import { suggestTopics, topicDraft } from '../../lib/session-topics';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { openHelperDraft } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -91,7 +92,7 @@ export function SessionTopics({
         });
       useProjectStore.getState().selectProject(session.request.projectId);
       setOpen(false);
-      window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
+      openHelperDraft(key);
     } catch (cause) {
       setError(String(cause));
     }

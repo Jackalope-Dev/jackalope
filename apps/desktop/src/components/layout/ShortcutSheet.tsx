@@ -13,6 +13,10 @@ import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 /** Window event that opens the keyboard shortcut sheet. */
 const OPEN_SHORTCUTS = 'jackalope:open-shortcuts';
 
+export function openShortcuts() {
+  window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS));
+}
+
 function typing(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&

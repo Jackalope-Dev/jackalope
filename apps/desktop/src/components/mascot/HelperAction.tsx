@@ -18,7 +18,7 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import type { ActiveTab } from '../layout/navigation';
+import { type ActiveTab, navigateWorkspace, openHelperDraft } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -194,18 +194,14 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           useProjectStore.getState().selectProject(run.projectId);
           useExecutionStore.getState().select(run.id);
           onNavigate();
-          requestAnimationFrame(() =>
-            window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: 'kanban' })),
-          );
+          requestAnimationFrame(() => navigateWorkspace('kanban'));
           result = { openedRunId: run.id };
         }
       } else if (action.operation === 'navigate') {
         const destination = destinations[String(input.destination)];
         if (!destination) throw new Error('Unknown destination.');
         onNavigate();
-        requestAnimationFrame(() =>
-          window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: destination })),
-        );
+        requestAnimationFrame(() => navigateWorkspace(destination));
       } else if (action.operation === 'prepare_task') {
         const key = `helper-${action.id}`;
         if (useExecutionStore.getState().drafts[key]?.prompt)
@@ -217,9 +213,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           agent: '',
         });
         onNavigate();
-        requestAnimationFrame(() =>
-          window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key })),
-        );
+        requestAnimationFrame(() => openHelperDraft(key));
         result = { draftPrepared: true, started: false };
       } else throw new Error('Unsupported action.');
       await invokeNative('helper_action', { id: action.id, decision: 'complete', result });

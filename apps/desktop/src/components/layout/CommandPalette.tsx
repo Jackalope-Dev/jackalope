@@ -30,6 +30,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
+import { openShortcuts } from './ShortcutSheet';
 
 const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
 
@@ -397,9 +398,7 @@ export function CommandPalette({
                 className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
                 onClick={() => {
                   onClose();
-                  requestAnimationFrame(() =>
-                    window.dispatchEvent(new CustomEvent('jackalope:open-shortcuts')),
-                  );
+                  requestAnimationFrame(openShortcuts);
                 }}
               >
                 <Keyboard className="size-4 text-[var(--color-accent-ink)]" />

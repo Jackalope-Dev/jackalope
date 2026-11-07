@@ -32,7 +32,7 @@ import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { navigateWorkspace } from '../layout/navigation';
+import { navigateWorkspace, openHelperDraft } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
@@ -433,7 +433,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       readOnly: true,
       agent: '',
     });
-    window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
+    openHelperDraft(key);
   };
 
   if (!project)

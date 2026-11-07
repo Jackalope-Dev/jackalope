@@ -73,6 +73,7 @@ import {
   AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
   navigateWorkspace,
+  openSettings,
   type ProjectSettingsDestination,
   viewLabel,
   WORKSPACE_VIEWS,
@@ -354,9 +355,7 @@ export function Shell({
     })),
   );
   useTauriEvent('jackalope-tray-new-task', () => focusComposer());
-  useTauriEvent('jackalope-tray-settings', () =>
-    window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: 'General' })),
-  );
+  useTauriEvent('jackalope-tray-settings', () => openSettings('General'));
   // `/diff` in the terminal: open Changes on that checkout, in its project.
   useTauriEvent<string>('jackalope:open-changes', (path) => {
     const owner = useProjectStore

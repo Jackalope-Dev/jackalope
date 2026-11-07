@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { navigateWorkspace, openHelperDraft } from '../components/layout/navigation';
 import { useExecutionStore } from '../stores/executionStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
 import type { KnowledgeEntry } from './knowledge-types';
@@ -76,7 +77,7 @@ export async function openKnowledgeTask(projectId: string, runId: string) {
   }
   useProjectStore.getState().selectProject(projectId);
   useExecutionStore.getState().select(runId);
-  window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: 'kanban' }));
+  navigateWorkspace('kanban');
 }
 
 /**
@@ -102,5 +103,5 @@ export async function prepareLessonCheck(project: Project, entry: KnowledgeEntry
       contextSelection: { enforcesLessonId: entry.id },
     });
   }
-  window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
+  openHelperDraft(key);
 }

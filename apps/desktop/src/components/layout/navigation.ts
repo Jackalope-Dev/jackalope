@@ -282,6 +282,11 @@ export function openCloudResources(projectId: string) {
   window.dispatchEvent(new CustomEvent('jackalope:open-cloud-resources', { detail: projectId }));
 }
 
+/** Opens the composer on a draft another surface prepared under `key`. */
+export function openHelperDraft(key: string) {
+  window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
+}
+
 export function openAgentConfiguration(agentId: string) {
   window.dispatchEvent(new CustomEvent('jackalope:configure-agent', { detail: agentId }));
 }
