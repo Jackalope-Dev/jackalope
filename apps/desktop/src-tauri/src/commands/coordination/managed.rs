@@ -312,7 +312,7 @@ pub(super) fn parse_plan_entries(
                     .get(&prior.key)
                     .is_some_and(|set| set.contains(&item.key))
                 && ancestors.contains_key(&prior.key)
-                && overlaps(&prior.scopes, &item.scopes)
+                && any_overlap(&prior.scopes, &item.scopes)
             {
                 return Err("Independent assignments overlap. Ask the planner to give shared files one owner and make dependent work sequential.".into());
             }
@@ -403,11 +403,11 @@ impl Coordinator {
             started: false,
             error: None,
             auto_start,
-            max_assignments: assignment_limit(self.inner.lock().unwrap().concurrency),
+            max_assignments: assignment_limit(self.state().concurrency),
             plan: None,
         };
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.state();
             if let Some(saved) = inner
                 .ledger
                 .managed_tasks
@@ -423,10 +423,10 @@ impl Coordinator {
             if inner.ledger.managed_tasks.len() >= 500 {
                 return Err("The managed task history limit has been reached.".into());
             }
-            let mut ledger = inner.ledger.clone();
-            ledger.managed_tasks.push(task.clone());
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(&mut inner, |ledger| {
+                ledger.managed_tasks.push(task.clone());
+                Ok::<_, String>(())
+            })?;
         }
         self.launch_planner(&task)?;
         Ok(task.id)
@@ -441,16 +441,16 @@ impl Coordinator {
         planning.verify_command = None;
         planning.context_selection.outcomes.clear();
         if let Err(error) = self.start_manual(planning) {
-            let mut inner = self.inner.lock().unwrap();
-            let mut ledger = inner.ledger.clone();
-            ledger
-                .managed_tasks
-                .iter_mut()
-                .find(|item| item.id == task.id)
-                .unwrap()
-                .error = Some(error);
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            let mut inner = self.state();
+            self.commit(&mut inner, |ledger| {
+                ledger
+                    .managed_tasks
+                    .iter_mut()
+                    .find(|item| item.id == task.id)
+                    .unwrap()
+                    .error = Some(error);
+                Ok::<_, String>(())
+            })?;
         }
         Ok(())
     }
@@ -546,32 +546,32 @@ impl Coordinator {
             review_only,
             items,
         })?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         if inner.url.is_none() {
             return Err("The coordination bridge is unavailable. Retry when it is ready.".into());
         }
-        let mut ledger = inner.ledger.clone();
-        let task = ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|task| task.id == id)
-            .unwrap();
-        task.started = true;
-        task.error = None;
-        let planned_at = latest_planner(task, &runs).and_then(|run| run.ended_at.clone());
-        let auto_started = task.auto_start;
-        if let Some(delivery) = &mut task.delivery {
-            delivery.planned_at = planned_at;
-            delivery.started_at = Some(Utc::now().to_rfc3339());
-            delivery.assignment_count = count.saturating_sub(usize::from(count > 1));
-            delivery.auto_started = auto_started;
-            delivery.final_item = created.last().cloned();
-            if count > 1 {
-                delivery.integration_items = created.last().cloned().into_iter().collect();
+        self.commit(&mut inner, |ledger| {
+            let task = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| task.id == id)
+                .unwrap();
+            task.started = true;
+            task.error = None;
+            let planned_at = latest_planner(task, &runs).and_then(|run| run.ended_at.clone());
+            let auto_started = task.auto_start;
+            if let Some(delivery) = &mut task.delivery {
+                delivery.planned_at = planned_at;
+                delivery.started_at = Some(Utc::now().to_rfc3339());
+                delivery.assignment_count = count.saturating_sub(usize::from(count > 1));
+                delivery.auto_started = auto_started;
+                delivery.final_item = created.last().cloned();
+                if count > 1 {
+                    delivery.integration_items = created.last().cloned().into_iter().collect();
+                }
             }
-        }
-        self.save(&ledger)?;
-        inner.ledger = ledger;
+            Ok::<_, String>(())
+        })?;
         inner.enabled.insert(dispatch_key(id));
         Ok(())
     }
@@ -582,7 +582,7 @@ impl Coordinator {
     pub(super) fn auto_start_managed(&self) -> Result<(), String> {
         let runs = self.runtime.integration_runs()?;
         let ready = {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.state();
             if inner.url.is_none() {
                 return Ok(());
             }
@@ -593,18 +593,23 @@ impl Coordinator {
         }
         for (id, planner_run_id) in ready {
             if let Err(error) = self.start_managed(&id, &planner_run_id) {
-                let mut inner = self.inner.lock().unwrap();
-                let mut ledger = inner.ledger.clone();
-                if let Some(task) = ledger.managed_tasks.iter_mut().find(|task| task.id == id) {
-                    if task.started {
-                        continue;
-                    }
-                    task.error = Some(format!(
-                        "Subtasks did not start automatically: {error} Review the plan to continue."
-                    ));
+                let mut inner = self.state();
+                if inner
+                    .ledger
+                    .managed_tasks
+                    .iter()
+                    .any(|task| task.id == id && task.started)
+                {
+                    continue;
                 }
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                self.commit(&mut inner, |ledger| {
+                    if let Some(task) = ledger.managed_tasks.iter_mut().find(|task| task.id == id) {
+                        task.error = Some(format!(
+                            "Subtasks did not start automatically: {error} Review the plan to continue."
+                        ));
+                    }
+                    Ok::<_, String>(())
+                })?;
             }
         }
         Ok(())
@@ -612,7 +617,7 @@ impl Coordinator {
 
     pub(super) fn managed_action(&self, id: &str, action: &str) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         let task = inner
             .ledger
             .managed_tasks
@@ -624,21 +629,21 @@ impl Coordinator {
             "retry-repair" => {
                 self.runtime.access.ensure()?;
                 task_strategy::validate_source(&task.request, &task.assessment.source_head)?;
-                let mut ledger = inner.ledger.clone();
-                let saved = ledger
-                    .managed_tasks
-                    .iter_mut()
-                    .find(|saved| saved.id == id)
-                    .unwrap();
-                let delivery = saved
-                    .delivery
-                    .as_mut()
-                    .ok_or("This task uses the earlier review flow.")?;
-                delivery.repair_limit = delivery.repairs.len() + 1;
-                delivery.interventions += 1;
-                saved.error = None;
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                self.commit(&mut inner, |ledger| {
+                    let saved = ledger
+                        .managed_tasks
+                        .iter_mut()
+                        .find(|saved| saved.id == id)
+                        .unwrap();
+                    let delivery = saved
+                        .delivery
+                        .as_mut()
+                        .ok_or("This task uses the earlier review flow.")?;
+                    delivery.repair_limit = delivery.repairs.len() + 1;
+                    delivery.interventions += 1;
+                    saved.error = None;
+                    Ok::<_, String>(())
+                })?;
                 inner.enabled.insert(dispatch_key(id));
             }
             "retry-plan" => {
@@ -655,18 +660,17 @@ impl Coordinator {
                         "Resolve active or interrupted planning attempts before retrying.".into(),
                     );
                 }
-                let mut ledger = inner.ledger.clone();
-                let saved = ledger
-                    .managed_tasks
-                    .iter_mut()
-                    .find(|task| task.id == id)
-                    .unwrap();
-                saved.run_ids.push(saved.planner_run_id.clone());
-                saved.planner_run_id = Uuid::new_v4().to_string();
-                saved.error = None;
-                let next = saved.clone();
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                let next = self.commit(&mut inner, |ledger| {
+                    let saved = ledger
+                        .managed_tasks
+                        .iter_mut()
+                        .find(|task| task.id == id)
+                        .unwrap();
+                    saved.run_ids.push(saved.planner_run_id.clone());
+                    saved.planner_run_id = Uuid::new_v4().to_string();
+                    saved.error = None;
+                    Ok::<_, String>(saved.clone())
+                })?;
                 drop(inner);
                 return self.launch_planner(&next);
             }
@@ -685,12 +689,14 @@ impl Coordinator {
                 if task.started {
                     return Err("Subtasks have already started.".into());
                 }
-                let mut ledger = inner.ledger.clone();
-                if let Some(saved) = ledger.managed_tasks.iter_mut().find(|saved| saved.id == id) {
-                    saved.auto_start = false;
-                }
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                self.commit(&mut inner, |ledger| {
+                    if let Some(saved) =
+                        ledger.managed_tasks.iter_mut().find(|saved| saved.id == id)
+                    {
+                        saved.auto_start = false;
+                    }
+                    Ok::<_, String>(())
+                })?;
             }
             "pause" | "stop" => {
                 inner.enabled.remove(&dispatch_key(id));
@@ -739,28 +745,27 @@ pub async fn task_plan_review_time(
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         service.ensure_storage_loaded()?;
-        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
-        let mut ledger = inner.ledger.clone();
-        let task = ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|task| task.id == id)
-            .ok_or("Task not found.")?;
-        let delivery = task
-            .delivery
-            .as_mut()
-            .ok_or("This task has no review measurements.")?;
-        if delivery.review_samples.contains(&sample_id) {
-            return Ok(());
-        }
-        delivery.review_seconds =
-            Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
-        delivery.review_samples.push(sample_id);
-        let excess = delivery.review_samples.len().saturating_sub(1000);
-        delivery.review_samples.drain(..excess);
-        service.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+        let mut inner = service.state();
+        service.commit(&mut inner, |ledger| {
+            let task = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| task.id == id)
+                .ok_or("Task not found.")?;
+            let delivery = task
+                .delivery
+                .as_mut()
+                .ok_or("This task has no review measurements.")?;
+            if delivery.review_samples.contains(&sample_id) {
+                return Ok(());
+            }
+            delivery.review_seconds =
+                Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
+            delivery.review_samples.push(sample_id);
+            let excess = delivery.review_samples.len().saturating_sub(1000);
+            delivery.review_samples.drain(..excess);
+            Ok(())
+        })
     })
     .await
     .map_err(|error| error.to_string())?
@@ -961,7 +966,7 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("managed-restart-{}", Uuid::new_v4()));
         let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
         let service = Coordinator::new(folder.join("queue"), runtime.clone()).unwrap();
-        service.save(&inner.ledger).unwrap();
+        service.commit(&mut inner, |_| Ok::<_, String>(())).unwrap();
         drop(service);
         let restarted = Coordinator::new(folder.join("queue"), runtime.clone()).unwrap();
         assert!(restarted.view().unwrap().enabled_projects.is_empty());

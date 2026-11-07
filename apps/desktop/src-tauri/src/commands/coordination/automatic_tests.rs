@@ -36,7 +36,7 @@ impl Fixture {
     fn running(&self, id: &str) {
         self.runtime
             .update(id, |run| run.status = RunStatus::Running);
-        let mut inner = self.service.inner.lock().unwrap();
+        let mut inner = self.service.state();
         inner.grants.insert(id.into(), (id.into(), id.into()));
         inner.ledger.lifecycle.as_mut().unwrap().remove(id);
         self.service.register_launch(&mut inner, id).unwrap();
@@ -267,7 +267,7 @@ fn lifecycle_baselines_history_and_persists_one_start_and_outcome() {
 fn queue_snapshot_prioritizes_active_work_and_bounds_large_scopes() {
     let fixture = Fixture::new();
     fixture.running("writer-run");
-    let mut inner = fixture.service.inner.lock().unwrap();
+    let mut inner = fixture.service.state();
     for index in 0..100 {
         let item: QueueItem = serde_json::from_value(json!({"id":format!("queued-{index}"),"projectId":"p","projectName":"Fixture","projectPath":"","title":format!("Queued work {index}"),"prompt":"Work","agent":"codex","scopes":vec!["x".repeat(500); 30],"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap();
         inner.ledger.items.push(item);
@@ -319,13 +319,13 @@ fn failed_lifecycle_save_does_not_consume_event_and_retry_is_idempotent() {
 #[test]
 fn rejected_launch_does_not_announce_work_or_leave_a_reservation() {
     let fixture = Fixture::new();
-    fixture.service.inner.lock().unwrap().url = Some("http://127.0.0.1:1".into());
+    fixture.service.state().url = Some("http://127.0.0.1:1".into());
     let mut input = request(None);
     input.id = Uuid::new_v4().to_string();
     input.prompt.clear();
     let id = input.id.clone();
     assert!(fixture.service.start_manual(input).is_err());
-    let inner = fixture.service.inner.lock().unwrap();
+    let inner = fixture.service.state();
     assert!(inner.ledger.messages.is_empty());
     assert!(!inner.ledger.lifecycle.as_ref().unwrap().contains_key(&id));
     assert!(!inner.delivered.contains_key(&id));
@@ -343,7 +343,7 @@ async fn checkpoints_skip_historical_broadcasts_but_keep_unread_direct_messages(
         .message("historical direct", Some("reader-run-task"))
         .await;
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         for message in inner
             .ledger
             .messages
@@ -377,7 +377,7 @@ async fn duplicate_launch_snapshot_does_not_consume_updates_for_the_running_atte
     let mut input = request(None);
     input.id = "reader-run".into();
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         fixture.service.startup(&mut inner, &input, None).unwrap();
     }
     let update = fixture
@@ -398,7 +398,7 @@ async fn busy_coordinator_defers_updates_without_blocking_or_consuming_them() {
         .message("deliver after launch", Some("reader-run-task"))
         .await;
     {
-        let _launch_guard = fixture.service.inner.lock().unwrap();
+        let _launch_guard = fixture.service.state();
         assert!(fixture
             .service
             .checkpoint(&headers("reader-run"))
@@ -417,7 +417,7 @@ async fn busy_coordinator_defers_updates_without_blocking_or_consuming_them() {
 fn quick_failure_emits_start_and_failure_and_restart_emits_recovery_once() {
     let fixture = Fixture::new();
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         inner
             .ledger
             .lifecycle
@@ -471,7 +471,7 @@ async fn startup_uses_stable_continuation_identity_and_filters_private_messages(
     fixture
         .message("private-to-writer", Some("writer-run-task"))
         .await;
-    let mut inner = fixture.service.inner.lock().unwrap();
+    let mut inner = fixture.service.state();
     let text = fixture
         .service
         .startup(&mut inner, &request(Some("reader-run")), None)
@@ -677,7 +677,7 @@ async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
     input.project_id = "empty-project".into();
     input.isolated = true;
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         assert!(fixture
             .service
             .startup(&mut inner, &input, None)
@@ -700,7 +700,7 @@ async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
     fixture.running("writer-run");
     let message = fixture.message("pending coordination", None).await;
     input.project_id = "empty-project".into();
-    let mut inner = fixture.service.inner.lock().unwrap();
+    let mut inner = fixture.service.state();
     inner
         .ledger
         .messages

@@ -1723,14 +1723,16 @@ impl TaskRuntime {
         })
     }
 
+    #[cfg(test)]
     pub(in crate::commands) fn start(&self, request: RunRequest) -> Result<String, String> {
-        let _integration_guard = crate::commands::integration::execution_guard()?;
-        self.start_locked(request)
+        let guard = crate::commands::integration::execution_guard()?;
+        self.start_locked(&guard, request)
     }
-    /// Caller holds the execution guard; acquire runtime state only after it.
-    /// Coordinator callers must acquire coordinator state before that guard.
+
+    /// Starts an attempt under an execution guard the caller already holds.
     pub(in crate::commands) fn start_locked(
         &self,
+        _guard: &crate::commands::integration::ExecutionGuard,
         mut request: RunRequest,
     ) -> Result<String, String> {
         self.access.ensure()?;

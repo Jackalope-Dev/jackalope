@@ -92,24 +92,12 @@ pub(super) fn list_worktrees(repo_path: &str) -> Result<Vec<WorktreeEntry>, Stri
     Ok(worktrees)
 }
 
-/// Rejects anything but a plain relative path under the repository: no `..`
-/// segment, no absolute path (leading `/` or `\`, or a drive letter), no
-/// empty segment. `worktree_path` comes straight from user-typed input (the
-/// "Folder name" field in the worktree creation form) with no other check
-/// between it and `git worktree add` — without this, a crafted value like
-/// `../../../../Windows/System32/evil` would make Git check out a worktree
-/// outside the project entirely, since `git worktree add` otherwise accepts
-/// any path relative to `current_dir` unchanged.
+/// The worktree folder comes from user input and `git worktree add` accepts
+/// any path relative to the repository, so anything that could leave it is refused.
 fn relative_and_contained(path: &str) -> Result<(), String> {
-    let invalid = path.is_empty()
-        || path.len() > 300
-        || path.starts_with('/')
-        || path.starts_with('\\')
-        || path.contains(':')
-        || path
-            .split(['/', '\\'])
-            .any(|segment| segment == ".." || segment.is_empty());
-    if invalid {
+    let contained = !path.starts_with(['/', '\\'])
+        && super::scope_path::ScopePath::parse(path).is_some_and(|path| !path.is_root());
+    if !contained {
         return Err(
             "Worktree path must be a relative path inside the repository, without parent-directory references."
                 .into(),

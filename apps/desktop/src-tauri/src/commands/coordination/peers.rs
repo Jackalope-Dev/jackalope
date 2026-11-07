@@ -611,19 +611,10 @@ pub(super) fn peers(view: &QueueView, runs: &[TaskRun], caller: &TaskRun) -> Vec
 }
 
 fn valid_path(path: &str) -> Result<String, String> {
-    let path = path.trim().replace('\\', "/");
-    if path.is_empty()
-        || path.len() > 500
-        || path.starts_with('/')
-        || path.contains(':')
-        || path.chars().any(char::is_control)
-        || path
-            .split('/')
-            .any(|part| part.is_empty() || part == "." || part == "..")
-    {
-        return Err("Use a repository-relative file path without parent traversal.".into());
-    }
-    Ok(path)
+    crate::commands::scope_path::ScopePath::parse(path)
+        .filter(|path| !path.is_root())
+        .map(|path| path.as_str().to_string())
+        .ok_or_else(|| "Use a repository-relative file path without parent traversal.".into())
 }
 
 fn window(text: &str, offset: usize, limit: Option<usize>) -> serde_json::Value {
@@ -824,8 +815,7 @@ pub(in crate::commands) async fn bridge_peer_adopt(
         .map_err(|status| (status, "Unauthorized".into()))?;
     let worker = service.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = worker.inner.lock().unwrap();
-        let _guard = crate::commands::integration::execution_guard()?;
+        worker.transact(|inner, _guard| {
         crate::commands::verification::ensure_idle(&caller.workspace)?;
         crate::commands::previews::ensure_idle(&caller.workspace)?;
         let directory = worker.runtime.integration_directory();
@@ -841,16 +831,17 @@ pub(in crate::commands) async fn bridge_peer_adopt(
             ..Default::default()
         };
         let adoption = adopt(&view, &runs, &caller, &caller_tree, &input)?;
-        let mut ledger = inner.ledger.clone();
-        record_adoption(&mut ledger, adoption.clone());
-        worker.save(&ledger)?;
-        inner.ledger = ledger;
+        worker.commit(inner, |ledger| {
+            record_adoption(ledger, adoption.clone());
+            Ok::<_, String>(())
+        })?;
         Ok::<_, String>(serde_json::json!({
             "adopted": adoption.paths,
             "fromTaskId": adoption.source_task_id,
             "sourceTree": adoption.source_tree,
             "note": "These files now match the peer's snapshot. Keep them unchanged so they stay the peer's work; if the peer changes them again you will receive a live conflict and can adopt again.",
         }))
+        })
     })
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?

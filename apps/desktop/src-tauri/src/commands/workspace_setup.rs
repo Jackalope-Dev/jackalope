@@ -1,27 +1,22 @@
 use std::{
     io::Write,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
 fn relative(value: &str) -> Result<PathBuf, String> {
-    let normalized = value.replace('\\', "/");
-    let path = PathBuf::from(&normalized);
-    if normalized.is_empty()
-        || normalized.len() > 500
-        || normalized.contains(':')
-        || normalized
-            .split('/')
-            .any(|part| part.is_empty() || part.eq_ignore_ascii_case(".git") || part == "..")
-        || path
-            .components()
-            .any(|part| !matches!(part, Component::Normal(_)))
-    {
-        return Err(
+    super::scope_path::ScopePath::parse(value)
+        .filter(|path| {
+            !path.is_root()
+                && !path
+                    .as_str()
+                    .split('/')
+                    .any(|part| part.eq_ignore_ascii_case(".git"))
+        })
+        .map(|path| PathBuf::from(path.as_str()))
+        .ok_or_else(|| {
             "Setup files must be relative files inside the project, without parent paths or .git."
-                .into(),
-        );
-    }
-    Ok(path)
+                .into()
+        })
 }
 
 pub(super) fn no_links(root: &Path, relative: &Path) -> Result<PathBuf, String> {

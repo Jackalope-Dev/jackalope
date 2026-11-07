@@ -100,6 +100,7 @@ pub mod first_commit;
 mod git_command;
 pub mod notifications;
 mod repo;
+mod scope_path;
 
 pub mod commit_review;
 pub mod project_git;

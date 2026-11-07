@@ -362,13 +362,15 @@ async fn pass(service: &Coordinator) -> Result<(), String> {
         let directory = directory.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let record = run(&directory, &project, &head, &deploy);
-            let _ = update(&directory, &project, |state| {
+            if let Err(error) = update(&directory, &project, |state| {
                 state.deploying = None;
                 state.deployed_head = Some(record.head.clone());
                 state.halted = halt_reason(&record);
                 state.history.insert(0, record);
                 state.history.truncate(HISTORY);
-            });
+            }) {
+                eprintln!("The deploy of {head} finished but its result was not saved: {error}");
+            }
             if let Ok(mut running) = RUNNING.lock() {
                 running.get_or_insert_with(HashSet::new).remove(&key);
             }

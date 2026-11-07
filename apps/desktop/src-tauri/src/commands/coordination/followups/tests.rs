@@ -25,7 +25,7 @@ fn fixture() -> (PathBuf, Coordinator) {
     .unwrap();
     let runtime = TaskRuntime::with_test_access(history).unwrap();
     let service = Coordinator::new(root.join("coordination"), runtime).unwrap();
-    service.inner.lock().unwrap().url = Some("http://127.0.0.1:1".into());
+    service.state().url = Some("http://127.0.0.1:1".into());
     (root, service)
 }
 
@@ -122,7 +122,7 @@ fn restart_pauses_saved_intent_and_interrupted_claims_never_replay() {
     assert!(restored.followups("task").unwrap()[0].paused);
     restored.followup_action(&first, "resume").unwrap();
     {
-        let mut inner = restored.inner.lock().unwrap();
+        let mut inner = restored.state();
         inner.url = Some("http://127.0.0.1:1".into());
         restored
             .update_followup(&mut inner, &first, |item| {
@@ -149,7 +149,7 @@ fn queued_intent_blocks_merge_and_competing_manual_continuations() {
     }))
     .unwrap();
     {
-        let inner = service.inner.lock().unwrap();
+        let inner = service.state();
         assert!(service
             .validate_followup_launch(&inner.ledger, &request)
             .is_err());
@@ -160,7 +160,7 @@ fn queued_intent_blocks_merge_and_competing_manual_continuations() {
     }
     service.followup_action(&id, "cancel").unwrap();
     assert!(service
-        .validate_followup_launch(&service.inner.lock().unwrap().ledger, &request)
+        .validate_followup_launch(&service.state().ledger, &request)
         .is_ok());
 }
 
@@ -310,7 +310,7 @@ async fn installed_agent_queues_and_interrupts_followups_once_in_the_bound_sessi
         );
         tokio::time::sleep(Duration::from_millis(100)).await;
     };
-    let ledger = service.inner.lock().unwrap().ledger.clone();
+    let ledger = service.state().ledger.clone();
     let followup_run = |queued: &str| {
         let entry = ledger
             .followups

@@ -29,11 +29,9 @@ pub struct MonitorChange {
 
 impl ChangeMonitor {
     pub fn validate(&self) -> Result<(), String> {
-        if self.path.len() > 500
-            || self.path.contains(['\\', ':', '\0', '\n', '\r'])
-            || self.path.starts_with('/')
-            || self.path.split('/').any(|p| p == ".." || p == ".")
-        {
+        let normalized = super::scope_path::ScopePath::parse(&self.path)
+            .filter(|path| !path.is_root() && path.as_str() == self.path);
+        if !self.path.is_empty() && normalized.is_none() {
             return Err(
                 "Choose a tracked path relative to the project, using forward slashes.".into(),
             );

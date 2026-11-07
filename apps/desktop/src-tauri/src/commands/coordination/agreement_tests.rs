@@ -127,12 +127,12 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
     let service = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
     let id = Uuid::new_v4().to_string();
     {
-        let mut inner = service.inner.lock().unwrap();
+        let mut inner = service.state();
         inner.ledger.items = vec![a.clone(), b.clone(), child];
         let mut proposal = request(Action::Propose, &id);
         proposal.participants = vec![b.id.clone()];
         change(&mut inner.ledger, &[run.clone()], &a, proposal).unwrap();
-        service.save(&inner.ledger).unwrap();
+        service.commit(&mut inner, |_| Ok::<_, String>(())).unwrap();
         inner.enabled.insert("p".into());
         assert!(!ready_items(&inner, &[run.clone()], &[run.id.clone()])
             .iter()
@@ -144,10 +144,10 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
         .contains("Interface"));
     drop(service);
     let restored = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
-    assert!(restored.inner.lock().unwrap().enabled.is_empty());
+    assert!(restored.state().enabled.is_empty());
     assert_eq!(restored.view().unwrap().agreements[0].status, "pending");
     {
-        let mut inner = restored.inner.lock().unwrap();
+        let mut inner = restored.state();
         change(
             &mut inner.ledger,
             &[run.clone()],
@@ -155,7 +155,9 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
             request(Action::Accept, &id),
         )
         .unwrap();
-        restored.save(&inner.ledger).unwrap();
+        restored
+            .commit(&mut inner, |_| Ok::<_, String>(()))
+            .unwrap();
         inner.enabled.insert("p".into());
         assert!(ready_items(&inner, &[run.clone()], &[run.id.clone()])
             .iter()
@@ -351,7 +353,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
     )
     .await
     .is_err());
-    assert_eq!(service.inner.lock().unwrap().ledger.agreements.len(), 1);
+    assert_eq!(service.state().ledger.agreements.len(), 1);
     runtime.update("grok-run", |r| r.status = RunStatus::Review);
     assert!(agreements::bridge_agreement(
         WebState(service.clone()),

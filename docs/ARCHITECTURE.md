@@ -71,6 +71,7 @@ names; changes must preserve both sides and old saved records.
 | coordination.rs, coordination/ | Queue contracts, eligibility, storage, guarded dispatch and loopback bridge |
 | integration.rs | Captured source snapshots, review receipts and guarded fast-forward application |
 | cli_host.rs, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint, PATH links, opening the command in the system terminal and the shared project mirror |
+| scope_path.rs | Repository-relative paths tasks own or name, with one case-folding rule for containment and overlap |
 | git.rs, git_command.rs, repo.rs, worktree_cleanup.rs | Worktree operations, explicit Git environment policies and Git plumbing shared with the CLI (private indexes, synthetic commits, `-z` parsers) |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
 | process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
@@ -95,8 +96,12 @@ names; changes must preserve both sides and old saved records.
 | remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 
-Lock order is **coordinator state → execution guard → runtime state**.
-TaskRuntime::start_locked requires a caller-held execution guard. Successful
+Lock order is **coordinator state → execution guard → runtime state**, and the
+types carry it: coordinator code takes the guard through `Coordinator::transact` or
+`Coordinator::execution`, which need the locked coordinator state, and
+`TaskRuntime::start_locked` takes the `&ExecutionGuard` it runs under. Coordinated
+attempts start through `Coordinator::launch_assignment`, and ledger changes go through
+`Coordinator::commit`, which keeps a change only once it is saved. Successful
 agent exit is not an integrated dependency. Integration rechecks source/target
 identity, saved checks and local files before changing a checkout. See
 [PARALLEL-WORKFLOWS.md](PARALLEL-WORKFLOWS.md) for the full contract.

@@ -109,7 +109,7 @@ fn related(items: &[QueueItem], a: &str, b: &str) -> bool {
         (Some(a), Some(b)) => {
             a.dependencies.contains(&b.id)
                 || b.dependencies.contains(&a.id)
-                || overlaps(&a.scopes, &b.scopes)
+                || any_overlap(&a.scopes, &b.scopes)
         }
         _ => true,
     }
@@ -170,7 +170,7 @@ fn updates(
 impl Coordinator {
     pub(super) fn reconcile(&self) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let mut inner = self.state();
         self.reconcile_locked(&mut inner)
     }
 
@@ -273,8 +273,10 @@ impl Coordinator {
         let excess = ledger.messages.len().saturating_sub(2000);
         ledger.messages.drain(..excess);
         if changed {
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(inner, |saved| {
+                *saved = ledger;
+                Ok::<_, String>(())
+            })?;
         }
         inner
             .delivered
@@ -366,15 +368,14 @@ impl Coordinator {
     }
 
     pub(super) fn register_launch(&self, inner: &mut Inner, id: &str) -> Result<(), String> {
-        let mut ledger = inner.ledger.clone();
-        ledger
-            .lifecycle
-            .get_or_insert_with(HashMap::new)
-            .entry(id.into())
-            .or_insert_with(|| "reserved".into());
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+        self.commit(inner, |ledger| {
+            ledger
+                .lifecycle
+                .get_or_insert_with(HashMap::new)
+                .entry(id.into())
+                .or_insert_with(|| "reserved".into());
+            Ok(())
+        })
     }
 
     pub(super) fn checkpoint(&self, headers: &HeaderMap) -> Result<Option<Value>, String> {

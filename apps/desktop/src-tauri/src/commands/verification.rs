@@ -141,42 +141,80 @@ pub(in crate::commands) fn run_disposable(
     )
 }
 
+/// Runs `work` in `workspace` holding its verification lease. Under the
+/// execution guard it refuses a workspace another live attempt owns (any
+/// attempt but `owner`, or any at all without one), lets `reuse` answer
+/// without running anything, and reserves the lease; `work` then runs with
+/// the guard released, so long checks never block launches or integration.
+fn with_workspace_lease<T>(
+    runtime: &TaskRuntime,
+    workspace: &str,
+    owner: Option<&str>,
+    busy: &str,
+    reuse: impl FnOnce(&[TaskRun]) -> Result<Option<T>, String>,
+    work: impl FnOnce(&[TaskRun]) -> Result<T, String>,
+) -> Result<T, String> {
+    let guard = super::integration::execution_guard()?;
+    let runs = runtime.integration_runs()?;
+    if runs.iter().any(|other| {
+        Some(other.id.as_str()) != owner && other.workspace == workspace && other.status.is_live()
+    }) {
+        return Err(busy.into());
+    }
+    if let Some(answer) = reuse(&runs)? {
+        return Ok(answer);
+    }
+    let _lease = leases::reserve(workspace)?;
+    drop(guard);
+    work(&runs)
+}
+
 pub(in crate::commands) fn prepare(
     runtime: &TaskRuntime,
     id: &str,
     command: &str,
     workspace: &str,
 ) -> Result<PreparationRecord, String> {
-    let guard = super::integration::execution_guard()?;
-    let runs = runtime.integration_runs()?;
-    if runs
-        .iter()
-        .any(|other| other.id != id && other.workspace == workspace && other.status.is_live())
-    {
-        return Err("Another attempt owns this workspace. Resolve it before preparation.".into());
-    }
-    // A workspace whose dependency manifests still match a completed setup run does not need
-    // the command again. This is what lets a retry, or a reused worktree, start immediately.
     let root = Path::new(workspace);
     let fingerprint = preparation::fingerprint(root, command);
-    if let Some(completed) = preparation::already_prepared(root, &fingerprint) {
-        let record = PreparationRecord::skipped(
-            command,
-            format!("Dependency manifests match the setup completed at {completed}."),
-        );
-        let saved = record.clone();
-        runtime.update_checked(id, |run| {
-            run.preparation = Some(saved);
-            run.efficiency.preparation_reuses = Some(run.efficiency.preparation_reuses.unwrap_or(0) + 1);
-            activity(
-                run,
-                "Workspace dependencies already match the project manifests. Skipped the setup command.",
+    with_workspace_lease(
+        runtime,
+        workspace,
+        Some(id),
+        "Another attempt owns this workspace. Resolve it before preparation.",
+        // A workspace whose dependency manifests still match a completed setup run does not
+        // need the command again, so a retry or a reused worktree starts immediately.
+        |_| {
+            let Some(completed) = preparation::already_prepared(root, &fingerprint) else {
+                return Ok(None);
+            };
+            let record = PreparationRecord::skipped(
+                command,
+                format!("Dependency manifests match the setup completed at {completed}."),
             );
-        })?;
-        return Ok(record);
-    }
-    let _lease = leases::reserve(workspace)?;
-    drop(guard);
+            let saved = record.clone();
+            runtime.update_checked(id, |run| {
+                run.preparation = Some(saved);
+                run.efficiency.preparation_reuses = Some(run.efficiency.preparation_reuses.unwrap_or(0) + 1);
+                activity(
+                    run,
+                    "Workspace dependencies already match the project manifests. Skipped the setup command.",
+                );
+            })?;
+            Ok(Some(record))
+        },
+        |_| run_preparation(runtime, id, command, workspace, root, &fingerprint),
+    )
+}
+
+fn run_preparation(
+    runtime: &TaskRuntime,
+    id: &str,
+    command: &str,
+    workspace: &str,
+    root: &Path,
+    fingerprint: &str,
+) -> Result<PreparationRecord, String> {
     let _slot = runtime.timed(id, "preparationWait", || {
         leases::check_slot(|| !runtime.is_running(id))
     })?;
@@ -288,12 +326,9 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
 }
 
 pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
-    let guard = super::integration::execution_guard()?;
-    let runs = runtime.integration_runs()?;
-    let run = runs
-        .iter()
-        .find(|run| run.id == id)
-        .ok_or("Task not found")?;
+    let Some(run) = runtime.run_snapshot(id) else {
+        return Err("Task not found".into());
+    };
     if !runtime.is_running(id) {
         return Ok(());
     }
@@ -302,23 +337,33 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
         .as_deref()
         .filter(|command| !command.trim().is_empty())
         .ok_or("No verification command was saved for this task.")?;
-    if runs
-        .iter()
-        .any(|other| other.id != id && other.workspace == run.workspace && other.status.is_live())
-    {
-        return Err("Checks could not start while another attempt owns this workspace.".into());
-    }
-    if reusable_check(runtime, run, command)?.is_some() {
-        runtime.update_checked(id, |r| {
-            r.efficiency.verification_reuses =
-                Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
-        })?;
-        return Ok(());
-    }
-    let _lease = leases::reserve(&run.workspace)?;
-    drop(guard);
-    execute(runtime, run, command)?;
-    Ok(())
+    with_workspace_lease(
+        runtime,
+        &run.workspace,
+        Some(id),
+        "Checks could not start while another attempt owns this workspace.",
+        |runs| {
+            let run = runs
+                .iter()
+                .find(|run| run.id == id)
+                .ok_or("Task not found")?;
+            if reusable_check(runtime, run, command)?.is_none() {
+                return Ok(None);
+            }
+            runtime.update_checked(id, |r| {
+                r.efficiency.verification_reuses =
+                    Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
+            })?;
+            Ok(Some(()))
+        },
+        |runs| {
+            let run = runs
+                .iter()
+                .find(|run| run.id == id)
+                .ok_or("Task not found")?;
+            execute(runtime, run, command).map(|_| ())
+        },
+    )
 }
 
 fn reusable_check<'a>(
@@ -370,28 +415,48 @@ fn agent_verify_blocking(
     run: &TaskRun,
     input: &super::harness::ComputerVerifyInput,
 ) -> Result<serde_json::Value, String> {
-    let guard = super::integration::execution_guard()?;
-    let runs = runtime.integration_runs()?;
-    let run = runs
-        .iter()
-        .find(|current| current.id == run.id)
-        .ok_or("Task not found")?;
     let command = agent_command(run.verify_command.as_deref(), &input)?;
     if !runtime.is_running(&run.id) {
         return Err("This attempt is no longer active.".into());
     }
-    let _lease = leases::reserve(&run.workspace)?;
-    if let Some(check) = reusable_check(&runtime, run, command)? {
-        let mut response = output::response(check);
-        runtime.update_checked(&run.id, |r| {
-            r.efficiency.verification_reuses =
-                Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
-        })?;
-        response["reused"] = true.into();
-        return Ok(response);
-    }
-    drop(guard);
-    let result = execute(&runtime, run, command)?;
+    let current = |runs: &'_ [TaskRun]| -> Result<TaskRun, String> {
+        runs.iter()
+            .find(|current| current.id == run.id)
+            .cloned()
+            .ok_or_else(|| "Task not found".to_string())
+    };
+    let (run, result) = with_workspace_lease(
+        runtime,
+        &run.workspace,
+        Some(&run.id),
+        "Checks could not start while another attempt owns this workspace.",
+        |runs| {
+            let run = current(runs)?;
+            let Some(check) = reusable_check(runtime, &run, command)? else {
+                return Ok(None);
+            };
+            let check = check.clone();
+            runtime.update_checked(&run.id, |r| {
+                r.efficiency.verification_reuses =
+                    Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
+            })?;
+            Ok(Some((run, Err(check))))
+        },
+        |runs| {
+            let run = current(runs)?;
+            let result = execute(runtime, &run, command)?;
+            Ok((run, Ok(result)))
+        },
+    )?;
+    let result = match result {
+        Err(check) => {
+            let mut response = output::response(&check);
+            response["reused"] = true.into();
+            return Ok(response);
+        }
+        Ok(result) => result,
+    };
+    let run = &run;
     let mut response = output::response(&result);
     response["reused"] = false.into();
     runtime.update_checked(&run.id, |current| {
@@ -487,17 +552,20 @@ pub async fn task_verify(
 ) -> Result<Verification, String> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let guard = super::integration::execution_guard()?;
-        let runs = runtime.integration_runs()?;
-        let run = runs.iter().find(|run| run.id == id).ok_or("Task not found")?;
-        if runs.iter().any(|other| other.workspace == run.workspace && other.status.is_live()) {
-            return Err("Stop active work and resolve interrupted attempts before verifying this workspace.".into());
-        }
+        let run = runtime.run_snapshot(&id).ok_or("Task not found")?;
         if run.verify_command.as_ref().filter(|s| !s.trim().is_empty()).is_some_and(|saved| saved != &command) {
             return Err("Run this attempt's saved verification command. Start a new attempt to change its required checks.".into());
         }
-        let _lease = leases::reserve(&run.workspace)?;
-        drop(guard);
-        execute(&runtime, run, &command)
+        with_workspace_lease(
+            &runtime,
+            &run.workspace,
+            None,
+            "Stop active work and resolve interrupted attempts before verifying this workspace.",
+            |_| Ok(None),
+            |runs| {
+                let run = runs.iter().find(|run| run.id == id).ok_or("Task not found")?;
+                execute(&runtime, run, &command)
+            },
+        )
     }).await.map_err(|e| e.to_string())?
 }

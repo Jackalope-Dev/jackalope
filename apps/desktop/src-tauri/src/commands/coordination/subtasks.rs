@@ -38,12 +38,6 @@ pub struct SubtaskInput {
     pub after_me: bool,
 }
 
-fn within(scope: &str, owned: &[String]) -> bool {
-    owned
-        .iter()
-        .any(|o| o == "." || o == scope || scope.starts_with(&format!("{o}/")))
-}
-
 /// Validates and appends a subtask for `caller`, returning the new item's ID.
 pub(super) fn propose(
     ledger: &mut Ledger,
@@ -96,19 +90,19 @@ pub(super) fn propose(
     }
     if let Some(item) = &saved {
         let owned = agreements::effective_scopes(ledger, item);
-        if let Some(outside) = scopes.iter().find(|scope| !within(scope, &owned)) {
+        if let Some(outside) = scopes.iter().find(|scope| !any_contains(&owned, scope)) {
             return Err(format!(
                 "{outside} is outside your assignment, so you cannot hand it on."
             ));
         }
         if let Some(handed) = scopes
             .iter()
-            .find(|scope| within(scope, &item.excluded_scopes))
+            .find(|scope| any_contains(&item.excluded_scopes, scope))
         {
             return Err(format!("{handed} was already handed to another subtask."));
         }
     }
-    if let Some(path) = changed.iter().find(|path| within(path, &scopes)) {
+    if let Some(path) = changed.iter().find(|path| any_contains(&scopes, path)) {
         return Err(format!(
             "You already changed {path}. Hand on only files and folders you have not edited."
         ));
@@ -338,14 +332,12 @@ pub(in crate::commands) async fn bridge_propose_subtask(
         .map_err(|status| (status, "Unauthorized".into()))?;
     let worker = service.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = worker.inner.lock().unwrap();
-        let _guard = crate::commands::integration::execution_guard()?;
+        worker.transact(|inner, _guard| {
         let (_, changed) = scope_audit::changed_paths(&caller)?;
         let merged = crate::commands::integration::applied_run_ids(&worker.runtime)?;
-        let mut ledger = inner.ledger.clone();
-        let id = propose(&mut ledger, &merged, &item, &caller, &changed, input)?;
-        worker.save(&ledger)?;
-        inner.ledger = ledger;
+        let id = worker.commit(inner, |ledger| {
+            propose(ledger, &merged, &item, &caller, &changed, input)
+        })?;
         if !inner
             .ledger
             .items
@@ -365,6 +357,7 @@ pub(in crate::commands) async fn bridge_propose_subtask(
             "taskId": id,
             "note": "The subtask is queued and starts when capacity allows. Do not edit the paths you handed on; read its progress with peers.",
         }))
+        })
     })
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -388,14 +381,14 @@ pub async fn task_request_split(
         if !run.status.is_active() || run.workspace == run.project_path || run.base_head.is_empty() {
             return Err("Only a running task in its own worktree can be split.".into());
         }
-        let mut inner = service.inner.lock().unwrap();
+        let mut inner = service.state();
         let owner = inner
             .ledger
             .items
             .iter()
             .find(|item| item.run_id.as_ref() == Some(&run.id))
             .map_or(run.task_id.clone(), |item| item.id.clone());
-        let mut ledger = inner.ledger.clone();
+        service.commit(&mut inner, |ledger| {
         if !ledger.subtask_grants.contains(&owner) {
             ledger.subtask_grants.push(owner.clone());
             let excess = ledger.subtask_grants.len().saturating_sub(500);
@@ -415,9 +408,8 @@ pub async fn task_request_split(
             source_tree: None,
             resolved_by: None,
         });
-        service.save(&ledger)?;
-        inner.ledger = ledger;
         Ok(())
+        })
     })
     .await
     .map_err(|e| e.to_string())?

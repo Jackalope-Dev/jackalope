@@ -17,14 +17,21 @@ use tauri::State;
 static INTEGRATION_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
-/// Serializes launch, integration, cleanup and update installation.
-/// Lock order: coordinator state, execution guard, then runtime state.
-pub fn execution_guard() -> Result<std::sync::MutexGuard<'static, ()>, String> {
-    let guard = INTEGRATION_LOCK.lock().map_err(|e| e.to_string())?;
+/// Held while launching, integrating, cleaning up or installing an update, so
+/// those never interleave. Functions that need it take `&ExecutionGuard`.
+///
+/// Lock order: coordinator state (taken through `Coordinator::transact`), this
+/// guard, then runtime state. The guard is not reentrant.
+pub struct ExecutionGuard {
+    _held: std::sync::MutexGuard<'static, ()>,
+}
+
+pub fn execution_guard() -> Result<ExecutionGuard, String> {
+    let held = INTEGRATION_LOCK.lock().map_err(|e| e.to_string())?;
     if super::release::installing() {
         return Err("Wait for the app update to finish before changing work.".into());
     }
-    Ok(guard)
+    Ok(ExecutionGuard { _held: held })
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -184,11 +191,35 @@ fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Resu
     repo::synthetic_commit(path, tree, parents, message, REVIEW_IDENTITY, Snapshot)
 }
 
+/// Plans live in their own folder: other features keep files of their own in
+/// the integration directory.
+fn plan_path(directory: &Path, id: &str) -> PathBuf {
+    directory.join("plans").join(format!("{id}.json"))
+}
+
+/// Where plans were saved before they had their own folder. Still read, and
+/// moved to [`plan_path`] the next time the plan is saved.
+fn legacy_plan_path(directory: &Path, id: &str) -> PathBuf {
+    directory.join(format!("{id}.json"))
+}
+
 fn save(directory: &Path, plan: &IntegrationPlan) -> Result<(), String> {
+    let path = plan_path(directory, &plan.id);
+    fs::create_dir_all(directory.join("plans")).map_err(|e| e.to_string())?;
+    if let Ok(mut cache) = APPLIED.lock() {
+        cache.retain(|(saved, _)| saved != directory);
+    }
     super::history::write_atomic(
-        &directory.join(format!("{}.json", plan.id)),
+        &path,
         &serde_json::to_vec_pretty(plan).map_err(|e| e.to_string())?,
-    )
+    )?;
+    match fs::remove_file(legacy_plan_path(directory, &plan.id)) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(format!(
+            "Saved integration {} but could not remove its earlier copy: {error}",
+            plan.id
+        )),
+        _ => Ok(()),
+    }
 }
 
 fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, String> {
@@ -552,10 +583,14 @@ pub(in crate::commands) fn load(directory: &Path, id: &str) -> Result<Integratio
     if !valid_id(id) {
         return Err("Invalid integration ID.".into());
     }
-    serde_json::from_slice(
-        &fs::read(directory.join(format!("{id}.json"))).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| format!("Could not read integration plan: {e}"))
+    let bytes = match fs::read(plan_path(directory, id)) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            fs::read(legacy_plan_path(directory, id))
+        }
+        read => read,
+    }
+    .map_err(|e| e.to_string())?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("Could not read integration plan: {e}"))
 }
 
 pub(in crate::commands) fn recover_applied(
@@ -817,33 +852,135 @@ fn cleanup_sources(
     Ok(())
 }
 
-pub fn plans(runtime: &TaskRuntime) -> Result<Vec<IntegrationPlan>, String> {
-    let directory = runtime.integration_directory();
-    if !directory.exists() {
-        return Ok(vec![]);
-    }
-    let mut plans = Vec::new();
-    for entry in fs::read_dir(&directory).map_err(|e| e.to_string())? {
-        let path = entry.map_err(|e| e.to_string())?.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let id = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .ok_or("Invalid integration record.")?;
-            plans.push(load(&directory, id)?);
+/// The saved plan files with their size and modification time, which change
+/// whenever a plan is saved. Plan ids are digits and dashes, which keeps other
+/// files in the integration directory out.
+fn plan_files(
+    directory: &Path,
+) -> Result<Vec<(String, u64, Option<std::time::SystemTime>)>, String> {
+    let mut files = Vec::new();
+    for folder in [directory.join("plans"), directory.to_path_buf()] {
+        let entries = match fs::read_dir(&folder) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        for entry in entries {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+            let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if !valid_id(id) || files.iter().any(|(saved, _, _)| saved == id) {
+                continue;
+            }
+            let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+            files.push((id.to_string(), metadata.len(), metadata.modified().ok()));
         }
     }
+    files.sort();
+    Ok(files)
+}
+
+pub fn plans(runtime: &TaskRuntime) -> Result<Vec<IntegrationPlan>, String> {
+    let directory = runtime.integration_directory();
+    let mut plans = plan_files(&directory)?
+        .into_iter()
+        .map(|(id, _, _)| load(&directory, &id))
+        .collect::<Result<Vec<_>, _>>()?;
     plans.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     Ok(plans)
 }
 
-pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
-    reachable_run_ids(plans(runtime)?, &runtime.integration_runs()?)
+/// What [`applied_run_ids`] last read from one integration directory: the
+/// plan files it saw, the target branch heads the applied plans were checked
+/// against, and the outcome.
+struct AppliedCheck {
+    files: Vec<(String, u64, Option<std::time::SystemTime>)>,
+    targets: Vec<(String, String, Option<String>)>,
+    sources: Result<Vec<Vec<String>>, String>,
 }
 
-fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Vec<String>, String> {
-    let mut ids = Vec::new();
-    for plan in plans.into_iter().filter(|plan| plan.status == "applied") {
+static APPLIED: Mutex<Vec<(PathBuf, AppliedCheck)>> = Mutex::new(Vec::new());
+
+fn branch_head(project: &str, branch: &str) -> Option<String> {
+    repo::git(
+        Path::new(project),
+        &[
+            "rev-parse",
+            "--verify",
+            "-q",
+            &format!("refs/heads/{branch}"),
+        ],
+        Snapshot,
+    )
+    .ok()
+}
+
+/// Attempts whose work an applied integration brought onto its target branch,
+/// with the earlier attempts of the same tasks. Reading every plan and asking
+/// Git about each is slow, so the answer is reused until a plan is saved or a
+/// target branch moves.
+pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
+    let directory = runtime.integration_directory();
+    let files = plan_files(&directory)?;
+    let mut cache = APPLIED.lock().map_err(|e| e.to_string())?;
+    let cached = cache.iter().position(|(path, check)| {
+        path == &directory
+            && check.files == files
+            && check
+                .targets
+                .iter()
+                .all(|(project, branch, head)| &branch_head(project, branch) == head)
+    });
+    let sources = match cached {
+        Some(index) => cache[index].1.sources.clone(),
+        None => {
+            let applied: Vec<_> = plans(runtime)?
+                .into_iter()
+                .filter(|plan| plan.status == "applied")
+                .collect();
+            let mut targets: Vec<(String, String, Option<String>)> = Vec::new();
+            for plan in &applied {
+                if !targets.iter().any(|(project, branch, _)| {
+                    project == &plan.project_path && branch == &plan.target_branch
+                }) {
+                    targets.push((
+                        plan.project_path.clone(),
+                        plan.target_branch.clone(),
+                        branch_head(&plan.project_path, &plan.target_branch),
+                    ));
+                }
+            }
+            let sources = reachable_sources(applied);
+            cache.retain(|(path, _)| path != &directory);
+            if cache.len() >= 16 {
+                cache.remove(0);
+            }
+            cache.push((
+                directory,
+                AppliedCheck {
+                    files,
+                    targets,
+                    sources: sources.clone(),
+                },
+            ));
+            sources
+        }
+    };
+    drop(cache);
+    Ok(with_earlier_attempts(
+        sources?,
+        &runtime.integration_runs()?,
+    ))
+}
+
+/// The attempts each applied plan merged, provided its target branch still contains it.
+fn reachable_sources(plans: Vec<IntegrationPlan>) -> Result<Vec<Vec<String>>, String> {
+    let mut sources = Vec::new();
+    for plan in plans {
         let head = plan
             .integration_head
             .as_deref()
@@ -863,7 +1000,15 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
         if !result.status.success() {
             return Err(format!("Dispatch paused: the target branch in {} no longer contains integration {}. Restore that integration before running dependent work.", plan.project_path, plan.id));
         }
-        for id in plan.run_ids {
+        sources.push(plan.run_ids);
+    }
+    Ok(sources)
+}
+
+fn with_earlier_attempts(sources: Vec<Vec<String>>, runs: &[TaskRun]) -> Vec<String> {
+    let mut ids = Vec::new();
+    for run_ids in sources {
+        for id in run_ids {
             if let Some(source) = runs.iter().find(|run| run.id == id) {
                 ids.extend(
                     runs.iter()
@@ -880,7 +1025,7 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
     }
     ids.sort();
     ids.dedup();
-    Ok(ids)
+    ids
 }
 
 #[tauri::command]
@@ -1539,7 +1684,8 @@ mod tests {
                 "first\n"
             );
             assert!(
-                reachable_run_ids(vec![load(&fixture.plans, &plan.id).unwrap()], &runs)
+                reachable_sources(vec![load(&fixture.plans, &plan.id).unwrap()])
+                    .map(|sources| with_earlier_attempts(sources, &runs))
                     .unwrap()
                     .contains(&runs[0].id)
             );
@@ -1836,7 +1982,9 @@ mod tests {
         let plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
         let applied = apply(&fixture.plans, &runs, &plan.id).unwrap();
         assert_eq!(
-            reachable_run_ids(vec![applied.clone()], &runs).unwrap(),
+            reachable_sources(vec![applied.clone()])
+                .map(|sources| with_earlier_attempts(sources, &runs))
+                .unwrap(),
             vec![runs[0].id.clone()]
         );
         repo::git(
@@ -1845,7 +1993,8 @@ mod tests {
             Snapshot,
         )
         .unwrap();
-        assert!(reachable_run_ids(vec![applied], &runs)
+        assert!(reachable_sources(vec![applied])
+            .map(|sources| with_earlier_attempts(sources, &runs))
             .unwrap_err()
             .contains("no longer contains integration"));
     }
