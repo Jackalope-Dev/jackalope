@@ -1,11 +1,3 @@
-.task-review-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
 .task-review-actions {
   display: flex;
   align-items: center;

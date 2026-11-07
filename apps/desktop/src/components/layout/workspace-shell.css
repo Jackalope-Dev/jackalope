@@ -724,12 +724,6 @@ button.project-tree-toggle:hover {
   width: 28px;
   padding: 0;
 }
-.statusbar-branch {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .statusbar-error {
   color: var(--color-danger);
   padding: 6px 8px;

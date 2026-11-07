@@ -364,9 +364,6 @@
   background: var(--color-surface-elevated);
   text-align: left;
 }
-.live-start-toolbar {
-  display: flex;
-}
 .chat-options-dialog {
   width: min(560px, calc(100vw - 32px));
 }

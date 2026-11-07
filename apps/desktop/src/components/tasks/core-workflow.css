@@ -73,14 +73,6 @@
 .task-tools-dialog .workspace-page-layout {
   padding: 20px 0;
 }
-@media (max-width: 1000px) {
-  .workspace-chrome {
-    gap: 12px;
-  }
-  .workspace-chrome kbd {
-    display: none;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .result-canvas * {
     scroll-behavior: auto;
