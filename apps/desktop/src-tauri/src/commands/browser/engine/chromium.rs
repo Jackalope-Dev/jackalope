@@ -32,7 +32,15 @@ impl BrowserProcess {
     ) -> Result<Self, String> {
         let profile = directory.join("chromium");
         std::fs::create_dir(&profile).map_err(|e| e.to_string())?;
-        Self::launch(executable, directory, &profile, slot, timeout, None)
+        Self::launch(
+            executable,
+            directory,
+            &profile,
+            slot,
+            timeout,
+            None,
+            "Chromium exited during startup. Check its installation and system dependencies.",
+        )
     }
 
     /// Launches Chromium on a persistent user-data directory. `directory` is the
@@ -47,6 +55,7 @@ impl BrowserProcess {
         std::fs::create_dir_all(profile).map_err(|e| e.to_string())?;
         // A port file left by an earlier or crashed session would point at a dead browser.
         let _ = std::fs::remove_file(profile.join("DevToolsActivePort"));
+        // Chromium hands a profile that is already open to that browser and exits.
         let mut owned = Self::launch(
             executable,
             directory,
@@ -54,14 +63,8 @@ impl BrowserProcess {
             slot,
             super::COMMAND_TIMEOUT,
             start,
-        )
-        .map_err(|error| {
-            if error.contains("exited during startup") {
-                "This browser profile is already open in another browser window. Close that window and try again.".to_string()
-            } else {
-                error
-            }
-        })?;
+            "This browser profile is already open in another browser window. Close that window and try again.",
+        )?;
         owned.persistent = true;
         Ok(owned)
     }
@@ -73,6 +76,7 @@ impl BrowserProcess {
         slot: &Slot,
         timeout: Duration,
         start: Option<&str>,
+        exited: &str,
     ) -> Result<Self, String> {
         let mut command = Command::new(executable);
         command.env_clear().current_dir(directory);
@@ -157,27 +161,25 @@ impl BrowserProcess {
             .lock()
             .map_err(|e| e.to_string())?
             .push(owned.tree.clone());
-        let started = Instant::now();
-        loop {
-            check_canceled(&slot.canceled)?;
-            if owned.child.try_wait().map_err(|e| e.to_string())?.is_some() {
-                return Err("Chromium exited during startup. Check its installation and system dependencies.".into());
-            }
-            if let Ok(bytes) =
-                crate::commands::history::read_bounded(&profile.join("DevToolsActivePort"), 4096)
-            {
-                if let Some(endpoint) = endpoint(&bytes) {
-                    owned.endpoint = endpoint;
-                    return Ok(owned);
+        let ready = crate::commands::platform::poll_until(
+            Instant::now() + timeout,
+            Duration::from_millis(25),
+            || {
+                check_canceled(&slot.canceled)?;
+                if owned.child.try_wait().map_err(|e| e.to_string())?.is_some() {
+                    return Err(exited.to_string());
                 }
-            }
-            if started.elapsed() >= timeout {
-                return Err(
-                    "Chromium did not become ready. Check its installation and retry.".into(),
-                );
-            }
-            std::thread::sleep(Duration::from_millis(25));
-        }
+                Ok(crate::commands::history::read_bounded(
+                    &profile.join("DevToolsActivePort"),
+                    4096,
+                )
+                .ok()
+                .and_then(|bytes| endpoint(&bytes)))
+            },
+        )?;
+        owned.endpoint =
+            ready.ok_or("Chromium did not become ready. Check its installation and retry.")?;
+        Ok(owned)
     }
 
     #[cfg(all(test, unix))]
@@ -209,10 +211,11 @@ impl BrowserProcess {
         {
             return;
         }
-        let deadline = Instant::now() + Duration::from_secs(10);
-        while self.running() && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(50));
-        }
+        let _ = crate::commands::platform::poll_until(
+            Instant::now() + Duration::from_secs(10),
+            Duration::from_millis(50),
+            || Ok::<_, ()>((!self.running()).then_some(())),
+        );
     }
 }
 

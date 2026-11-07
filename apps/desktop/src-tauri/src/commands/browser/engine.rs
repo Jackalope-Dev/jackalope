@@ -6,17 +6,12 @@ use std::{
     io::{Read, Write},
     path::PathBuf,
     process::{Child, Command, Stdio},
-    sync::{Arc, OnceLock},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
-static RESOURCES: OnceLock<PathBuf> = OnceLock::new();
 const RESPONSE_LIMIT: usize = 2_000_000;
 pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
-
-pub fn set_resource_directory(path: PathBuf) {
-    let _ = RESOURCES.set(path);
-}
 
 fn executable() -> Result<PathBuf, String> {
     let name = if cfg!(windows) {
@@ -24,21 +19,9 @@ fn executable() -> Result<PathBuf, String> {
     } else {
         "agent-browser"
     };
-    let relative = PathBuf::from("resources/agent-browser").join(name);
-    if let Some(root) = RESOURCES.get() {
-        let path = root.join(&relative);
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-    #[cfg(debug_assertions)]
-    {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative);
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-    Err("The bundled browser tool is missing. Reinstall Jackalope.".into())
+    crate::commands::resources::bundled(&format!("resources/agent-browser/{name}"))
+        .filter(|path| path.is_file())
+        .ok_or_else(|| "The bundled browser tool is missing. Reinstall Jackalope.".into())
 }
 
 pub struct Engine {
@@ -126,11 +109,7 @@ impl Engine {
             .env("AGENT_BROWSER_SOCKET_DIR", &directory)
             .env("AGENT_BROWSER_DEFAULT_TIMEOUT", "15000")
             .env("AGENT_BROWSER_IDLE_TIMEOUT_MS", "0");
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
+        crate::commands::process_control::hide_window(&mut command);
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;

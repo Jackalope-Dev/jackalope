@@ -30,6 +30,8 @@ export interface ComputerStatus {
   error?: string | null;
   /** Whether Watch / take over can open now. */
   viewer: boolean;
+  /** Stopped, and starting it would give Watch / take over. */
+  startable: boolean;
   /** An active run or an open viewer holds it, so it is not stopped. */
   inUse?: boolean;
   /** Stopped by the idle stop; it starts again when next used. */

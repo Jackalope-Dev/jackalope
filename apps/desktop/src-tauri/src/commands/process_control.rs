@@ -6,6 +6,21 @@ use std::{
 
 pub const OUTPUT_LIMIT: usize = 128_000;
 
+/// Windows' `CREATE_NO_WINDOW` process creation flag: a console program started
+/// by the app gets no console window of its own.
+#[cfg(windows)]
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Starts `command` without a console window on Windows; elsewhere unchanged.
+pub fn hide_window(command: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 pub fn read_bounded(mut reader: impl Read, limit: usize) -> std::io::Result<(String, bool)> {
     read_observed(&mut reader, limit, |_| {})
 }
@@ -325,11 +340,7 @@ fn run_supervised_input(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    hide_window(&mut command);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

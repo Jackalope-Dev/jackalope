@@ -295,10 +295,8 @@ fn start_preview(
 fn preview_process(expanded: &str, workspace: &str, port: u16) -> Command {
     #[cfg(windows)]
     let mut cmd = {
-        use std::os::windows::process::CommandExt;
         let mut c = Command::new("cmd.exe");
-        c.args(["/D", "/S", "/C", expanded])
-            .creation_flags(0x08000000);
+        super::process_control::hide_window(c.args(["/D", "/S", "/C", expanded]));
         c
     };
     #[cfg(not(windows))]

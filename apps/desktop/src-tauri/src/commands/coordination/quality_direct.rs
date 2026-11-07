@@ -102,11 +102,7 @@ pub(super) fn run(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
+    crate::commands::process_control::hide_window(&mut cmd);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

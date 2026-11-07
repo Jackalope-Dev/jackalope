@@ -72,6 +72,7 @@ pub mod planning;
 pub mod previews;
 pub mod question_risk;
 pub mod readiness;
+pub mod resources;
 pub mod schedules;
 mod site_gate;
 

@@ -11,7 +11,6 @@ use super::{
     },
     process_control::ProcessTree,
 };
-pub use engine::set_resource_directory;
 pub(super) use persistent::{cookie_sites, ProfileWindow};
 
 pub(super) fn codex_tool_policy() -> serde_json::Value {

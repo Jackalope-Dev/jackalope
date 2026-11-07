@@ -20,11 +20,7 @@ pub(super) fn command(path: &Path, args: &[&str], policy: Policy) -> Command {
             .env("GIT_OPTIONAL_LOCKS", "0")
             .env("GIT_NO_REPLACE_OBJECTS", "1");
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    super::process_control::hide_window(&mut command);
     #[cfg(unix)]
     if matches!(policy, Policy::Inherited) {
         use std::os::unix::process::CommandExt;

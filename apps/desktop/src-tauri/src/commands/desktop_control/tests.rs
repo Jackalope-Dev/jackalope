@@ -492,14 +492,14 @@ fn desktop_input_is_bounded_and_rejects_system_keys_and_extra_fields() {
         }
     );
     assert_eq!(
-        platform::key("Primary+a"),
+        actions::legacy_key("Primary+a"),
         if cfg!(target_os = "macos") {
             "Primary+a"
         } else {
             "Control+a"
         }
     );
-    assert_eq!(platform::key("Control+a"), "Control+a");
+    assert_eq!(actions::legacy_key("Control+a"), "Control+a");
 
     let mut input = request("type");
     input.text = Some("literal $() {ENTER} `characters`".into());
@@ -751,7 +751,7 @@ fn native_desktop_window_trial() {
         .env("JACKALOPE_DESKTOP_FIXTURE_RESULT", &report)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .creation_flags(0x08000000)
+        .creation_flags(crate::commands::process_control::CREATE_NO_WINDOW)
         .spawn()
         .unwrap();
     // The job object closes the fixture even if an assertion unwinds past cleanup.

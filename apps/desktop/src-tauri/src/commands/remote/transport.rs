@@ -27,11 +27,7 @@ pub(super) fn close_tunnel(id: &str) {
 }
 fn command(program: &str) -> Command {
     let mut command = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    crate::commands::process_control::hide_window(&mut command);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

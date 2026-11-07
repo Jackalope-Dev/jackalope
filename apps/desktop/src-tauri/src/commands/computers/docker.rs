@@ -10,6 +10,7 @@
 
 use super::{AgentError, Computer, MachineState, Provider, Transport};
 use crate::commands::desktop_control::helper::{Helper, Launch, Launcher};
+use crate::commands::platform::poll_until;
 use crate::commands::process_control::{self, Limits};
 use serde::Serialize;
 use serde_json::Value;
@@ -29,11 +30,7 @@ const QUICK: Duration = Duration::from_secs(20);
 fn docker(args: &[&str]) -> Command {
     let mut command = Command::new("docker");
     command.args(args);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    crate::commands::process_control::hide_window(&mut command);
     command
 }
 
@@ -510,22 +507,24 @@ impl Provider for LocalDocker {
         progress("Starting the desktop");
         run(&["start", &name], Duration::from_secs(60))?;
         let mut transport = self.transport(root, computer)?;
-        let deadline = Instant::now() + Duration::from_secs(90);
-        loop {
-            match transport.call(
+        let mut last = String::new();
+        let answered = poll_until(
+            Instant::now() + Duration::from_secs(90),
+            Duration::from_secs(1),
+            || match transport.call(
                 &serde_json::json!({"action":"list"}),
                 Duration::from_secs(20),
                 &AtomicBool::new(false),
             ) {
-                Ok(_) => return Ok(()),
-                Err(error) if Instant::now() >= deadline => {
-                    return Err(format!(
-                        "The computer started but its desktop did not answer: {error}"
-                    ))
+                Ok(_) => Ok::<_, String>(Some(())),
+                Err(error) => {
+                    last = error.message;
+                    Ok(None)
                 }
-                Err(_) => std::thread::sleep(Duration::from_secs(1)),
-            }
-        }
+            },
+        )?;
+        answered
+            .ok_or_else(|| format!("The computer started but its desktop did not answer: {last}"))
     }
 
     fn stop(&self, _: &Path, computer: &Computer) -> Result<(), String> {
@@ -607,15 +606,15 @@ pub(crate) fn stop_detached(names: &[String]) {
         .stderr(std::process::Stdio::null());
     #[cfg(windows)]
     {
+        use crate::commands::process_control::CREATE_NO_WINDOW;
         use std::os::windows::process::CommandExt;
-        // CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, so a job that closes
-        // with the app does not end the stop; retried without breakaway when
-        // the job forbids it.
-        command.creation_flags(0x08000000 | 0x01000000);
+        // CREATE_BREAKAWAY_FROM_JOB, so a job that closes with the app does not
+        // end the stop; retried without breakaway when the job forbids it.
+        command.creation_flags(CREATE_NO_WINDOW | 0x0100_0000);
         if command.spawn().is_ok() {
             return;
         }
-        command.creation_flags(0x08000000);
+        command.creation_flags(CREATE_NO_WINDOW);
     }
     if let Err(error) = command.spawn() {
         eprintln!("Bot computers could not be stopped on quit: {error}");

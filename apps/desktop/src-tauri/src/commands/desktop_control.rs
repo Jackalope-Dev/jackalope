@@ -465,28 +465,6 @@ fn take_snapshot(access: &mut Access, id: Option<&str>) -> Result<Snapshot, Stri
     Ok(snapshot)
 }
 
-#[cfg(windows)]
-fn native_command(script: &str, payload: Option<Value>) -> Result<std::process::Command, String> {
-    use std::os::windows::process::CommandExt;
-    let windows =
-        std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable.")?;
-    let mut command = std::process::Command::new(
-        std::path::PathBuf::from(&windows).join("System32/WindowsPowerShell/v1.0/powershell.exe"),
-    );
-    command
-        .env_clear()
-        .env("SystemRoot", &windows)
-        .env("WINDIR", &windows)
-        .env("TEMP", std::env::temp_dir())
-        .env("TMP", std::env::temp_dir())
-        .args(["-NoProfile", "-NonInteractive", "-Command", script]);
-    if let Some(payload) = payload {
-        command.env("JACKALOPE_DESKTOP_REQUEST", payload.to_string());
-    }
-    command.creation_flags(0x08000000);
-    Ok(command)
-}
-
 /// One request through a short-lived helper, for readiness checks and platforms
 /// without a resident helper.
 #[cfg(windows)]
@@ -1027,7 +1005,7 @@ impl Call<'_> {
                 );
             }
             payload["chord"] = chord.native();
-            payload["key"] = json!(platform::key(key));
+            payload["key"] = json!(actions::legacy_key(key));
         }
         current(self.runtime, &self.run.id)?;
         let mut value = self.session.call(payload, TIMEOUT)?;

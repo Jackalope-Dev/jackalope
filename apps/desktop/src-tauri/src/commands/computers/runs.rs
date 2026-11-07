@@ -10,10 +10,7 @@
 //! desktop actions share. See `resources/computer/agent.py` for the protocol.
 
 use super::protocol::protocol;
-use super::{
-    credentials, AgentError, Computer, Transport, AGENT37, LOCAL_DOCKER, PROJECT, REMOTE_MACHINE,
-    UNSUPPORTED,
-};
+use super::{credentials, AgentError, Computer, Transport, PROJECT, UNSUPPORTED};
 use crate::commands::git_command;
 use base64::Engine;
 use serde_json::{json, Value};
@@ -37,9 +34,10 @@ fn unsupported(error: &AgentError) -> bool {
     error.is(UNSUPPORTED) || (error.code.is_none() && error.message.contains("Unsupported action"))
 }
 
-/// Providers whose machines run the computer image's agent and so accept runs.
+/// Whether the computer's provider is one this build serves. Every provider runs
+/// the computer image's agent and so accepts runs.
 pub(crate) fn supports_runs(computer: &Computer) -> bool {
-    [LOCAL_DOCKER, REMOTE_MACHINE, AGENT37].contains(&computer.provider.as_str())
+    super::provider(&computer.provider).is_ok()
 }
 
 /// The computer a project's task agents run on, when it has one.

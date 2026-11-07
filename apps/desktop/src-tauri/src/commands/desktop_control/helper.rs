@@ -310,7 +310,7 @@ mod tests {
                 );
                 command
                     .args(["-NoProfile", "-NonInteractive", "-Command", script])
-                    .creation_flags(0x08000000);
+                    .creation_flags(crate::commands::process_control::CREATE_NO_WINDOW);
                 command
             };
             #[cfg(unix)]

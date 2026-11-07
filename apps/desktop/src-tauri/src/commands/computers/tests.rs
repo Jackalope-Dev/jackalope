@@ -192,15 +192,10 @@ fn a_paired_machine_belongs_to_one_bot() {
 }
 
 #[test]
-fn hosted_computers_refuse_every_operation() {
-    let root = root();
-    let mut computer = bot(&root, "b1");
-    computer.provider = HOSTED.into();
-    let hosted = provider(HOSTED).unwrap();
-    assert!(hosted.available(&root, &computer).is_err());
-    assert!(hosted.start(&root, &computer, &|_| {}).is_err());
-    assert!(hosted.transport(&root, &computer).is_err());
-    assert!(hosted.delete(&root, &computer).is_ok());
+fn hosted_computers_have_no_provider_yet() {
+    assert!(provider(HOSTED)
+        .err()
+        .is_some_and(|error| error.contains("not available yet")));
 }
 
 #[test]

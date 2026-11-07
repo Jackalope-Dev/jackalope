@@ -34,11 +34,7 @@ pub(super) fn gh(path: &Path, args: &[&str]) -> Result<String, String> {
         .env_remove("GH_REPO")
         .env("GH_PROMPT_DISABLED", "1")
         .env("GIT_TERMINAL_PROMPT", "0");
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    process_control::hide_window(&mut command);
     let result = process_control::run(command, Duration::from_secs(20))?;
     if !result.success {
         return Err("GitHub could not read this item. Check its number, repository, GitHub CLI sign-in and network, then retry.".into());

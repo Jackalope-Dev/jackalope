@@ -86,14 +86,29 @@ pub(crate) struct Chord {
     pub key: String,
 }
 
+/// The modifier Primary stands for on this platform.
+fn primary() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command"
+    } else {
+        "Control"
+    }
+}
+
+/// A key as the original helpers read it: macOS's resolves Primary itself,
+/// the others take Primary as Control.
+pub(crate) fn legacy_key(key: &str) -> String {
+    if cfg!(target_os = "macos") {
+        key.into()
+    } else {
+        key.replacen("Primary+", &format!("{}+", primary()), 1)
+    }
+}
+
 impl Chord {
     /// Chord for the helper with Primary resolved for this platform.
     pub fn native(&self) -> Value {
-        let primary = if cfg!(target_os = "macos") {
-            "Command"
-        } else {
-            "Control"
-        };
+        let primary = primary();
         let mut modifiers: Vec<&str> = Vec::new();
         for modifier in &self.modifiers {
             let resolved = if modifier == "Primary" {

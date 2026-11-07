@@ -91,6 +91,8 @@ names; changes must preserve both sides and old saved records.
 | cloudflare.rs, cloudflare/ | The protected Cloudflare connection and Connect Cloudflare sign-in, the product scopes it may request, and the v4 account API client shared by Artifacts, cloud resources and Swarm setup |
 | cloudflare_artifacts.rs, cloudflare_resources.rs | Artifacts repository creation, host-scoped token pushes and review snapshots; per-project cloud resources and their manifest |
 | http.rs | Outbound HTTP clients that refuse redirects, shared per timeout, and bounded response reads |
+| site_gate.rs, artifacts.rs | The once-per-site question shared by every agent-driven browser; screenshot evidence and saved output in the workspace |
+| resources.rs | Files bundled under `resources/`, with the source tree's copy in development builds |
 | remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 

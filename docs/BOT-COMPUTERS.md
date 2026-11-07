@@ -549,7 +549,7 @@ version this app bundles) on the computer's own Chromium, so a server the agent 
 there is reachable at `localhost`. They take the same requests and give the same answers
 as here. Before opening a site, and on the page each command ends on, the runner asks
 this device through `POST /v1/policy` with kind `site`; the computer's own pages
-(`localhost`, `127.0.0.1`, `::1`) and non-web addresses are not asked about. This device
+(the protocol's loopback hosts) and non-web addresses are not asked about. This device
 answers with the computer's per-site questions and saved decisions (allow for this task,
 always allow, decline, never allow, saved under the project), and a page with a visible
 password field asks the person to sign in through **Watch / take over** instead; while a
