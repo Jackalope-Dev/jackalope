@@ -59,6 +59,7 @@ import { SessionRecovery } from './SessionRecovery';
 import { SessionTopics } from './SessionTopics';
 import { TranscriptResult } from './TranscriptResult';
 import './live-session.css';
+import { describeError } from '../../lib/errors';
 
 const TaskTerminal = lazy(() =>
   import('../tasks/TaskTerminal').then((module) => ({ default: module.TaskTerminal })),
@@ -193,7 +194,7 @@ export function LiveSessionView({
       await action();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -767,7 +768,7 @@ export function LiveSessionView({
                       try {
                         nextChat(deliveryHandoff(latest, true, 'the next change'));
                       } catch (cause) {
-                        setError(String(cause));
+                        setError(describeError(cause));
                       }
                     }}
                   >

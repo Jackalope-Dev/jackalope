@@ -11,6 +11,7 @@ import { TaskPreview } from './TaskPreview';
 import { TaskTerminal } from './TaskTerminal';
 import './workbench.css';
 import '../ui/experience.css';
+import { describeError } from '../../lib/errors';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 export default function WorkPaneWindow({ id, pane }: { id: string; pane: string }) {
@@ -41,7 +42,7 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
             variant="outline"
             onClick={() =>
               void invokeNative('task_work_window', { id, pane, action: 'dock' }).catch((cause) =>
-                setError(String(cause)),
+                setError(describeError(cause)),
               )
             }
           >
@@ -74,7 +75,7 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
                   active={false}
                   content={run.result || 'No result yet.'}
                   onOpenLink={(url) =>
-                    void openExternalUrl(url).catch((cause) => setError(String(cause)))
+                    void openExternalUrl(url).catch((cause) => setError(describeError(cause)))
                   }
                 />
               </Suspense>

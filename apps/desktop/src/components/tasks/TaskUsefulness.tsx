@@ -1,6 +1,8 @@
-import { Button, Disclosure, DisclosureSummary, InlineNotice, Input } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
+import { ActionError } from '../ui/ActionError';
 
 interface Rating {
   useful: boolean;
@@ -24,7 +26,7 @@ export function TaskUsefulness({ runId, expanded = false }: { runId: string; exp
         }
       })
       .catch((cause) => {
-        if (current) setError(String(cause));
+        if (current) setError(describeError(cause));
       });
     return () => {
       current = false;
@@ -47,7 +49,7 @@ export function TaskUsefulness({ runId, expanded = false }: { runId: string; exp
         }),
       );
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -95,7 +97,7 @@ export function TaskUsefulness({ runId, expanded = false }: { runId: string; exp
             Your rating is saved.
           </p>
         )}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     </Disclosure>
   );

@@ -8,6 +8,7 @@ import {
 } from '@jackalope/ui';
 import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DesktopPermission,
@@ -42,7 +43,7 @@ export function SystemInfoView() {
       const info = await getSystemInfo();
       if (id === request.current) setHost(info);
     } catch (error) {
-      if (id === request.current) setError(String(error));
+      if (id === request.current) setError(describeError(error));
     } finally {
       if (id === request.current) setLoading(false);
     }
@@ -55,7 +56,7 @@ export function SystemInfoView() {
       setHost((current) => (current ? { ...current, desktop_control: readiness } : current));
       setRequested(true);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setRequestingPermissions(false);
     }
@@ -66,7 +67,7 @@ export function SystemInfoView() {
       await openDesktopPermissionSettings(permission);
       setRequested(true);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     }
   };
   const restart = async () => {
@@ -75,7 +76,7 @@ export function SystemInfoView() {
     try {
       await restartForDesktopPermissions();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
       setRestarting(false);
     }
   };

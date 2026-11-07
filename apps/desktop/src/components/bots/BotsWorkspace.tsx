@@ -74,7 +74,9 @@ import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
+import { describeError } from '../../lib/errors';
 import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
+import { ActionError } from '../ui/ActionError';
 
 function randomStyle() {
   return BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id;
@@ -293,7 +295,7 @@ export function BotsWorkspace() {
       {!projects.length && (
         <InlineNotice>Add a project first. Each bot works inside one project.</InlineNotice>
       )}
-      {hub.error && <InlineNotice tone="error">{hub.error}</InlineNotice>}
+      <ActionError error={hub.error} />
       {bots.length === 0 ? (
         <BotTemplates disabled={!projects.length} onUse={(template) => startNew(template)} />
       ) : !scope ? (
@@ -705,7 +707,7 @@ function BotProfile({
       await useLiveSessionStore.getState().refresh(attempt.id);
       onOpen(attempt.id);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -761,7 +763,7 @@ function BotProfile({
             }
           }}
         />
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <div className="bots-composer-actions">
           <span className="bots-composer-thread" id={`bot-thread-${bot.id}`}>
             {continuing ? (
@@ -971,7 +973,7 @@ function BotMemory({
   const [error, setError] = useState('');
   return (
     <section className="workspace-stack" aria-label="Memory">
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {notes.length ? (
         <ul className="bots-list">
           {notes.map((note) => (
@@ -1002,7 +1004,7 @@ function BotMemory({
                     try {
                       await forgetNote(note.id);
                     } catch (cause) {
-                      setError(String(cause));
+                      setError(describeError(cause));
                     } finally {
                       setBusy(null);
                     }
@@ -1054,7 +1056,7 @@ function ProposalCard({
           · {proposal.wake.name}
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <footer className="bot-card-footer">
         <OptionsMenu label={`${proposal.name} suggestion options`} disabled={busy}>
           <Menu.Item className="workspace-menu-item" onSelect={onOpen}>
@@ -1068,7 +1070,7 @@ function ProposalCard({
               try {
                 await resolveProposal(proposal.id, 'dismiss');
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -1146,7 +1148,7 @@ function BotWakeList({
   };
   return (
     <section className="workspace-stack" aria-label="Wake-ups">
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {bot.wakes.length ? (
         <ul className="bots-list">
           {bot.wakes.map((wake) => {
@@ -1185,7 +1187,7 @@ function BotWakeList({
                           onOpen(await wakeNow(bot.id, wake.id));
                           await useLiveSessionStore.getState().refresh(null);
                         } catch (cause) {
-                          setError(String(cause));
+                          setError(describeError(cause));
                         } finally {
                           setBusy(null);
                         }
@@ -1230,7 +1232,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
     try {
       setLedger(await listSchedules());
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, []);
   useEffect(() => {
@@ -1252,7 +1254,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
         title="Routines"
         description="Manage timing and history in Schedules."
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <ul className="bots-list">
         {routines.map((routine) => (
           <li key={routine.definition.id} className="bots-routine">
@@ -1275,7 +1277,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
                   });
                   await read();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             />

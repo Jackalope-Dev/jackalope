@@ -39,6 +39,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './project-overview.css';
+import { describeError } from '../../lib/errors';
 import { projectReadiness, type Readiness } from '../../lib/readiness';
 
 export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }) {
@@ -81,7 +82,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
       const data = await projectReadiness(path);
       if (request === readinessRequest.current) setReadiness({ path, value: data });
     } catch (cause) {
-      if (request === readinessRequest.current) setReadinessError(String(cause));
+      if (request === readinessRequest.current) setReadinessError(describeError(cause));
     } finally {
       if (request === readinessRequest.current) setBusyReadiness(false);
     }

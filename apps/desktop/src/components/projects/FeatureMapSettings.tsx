@@ -35,6 +35,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import './feature-map.css';
+import { describeError } from '../../lib/errors';
 
 interface Draft {
   name: string;
@@ -282,7 +283,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
       });
       setSuggestions(newSuggestions(entries, found));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSuggesting(false);
     }

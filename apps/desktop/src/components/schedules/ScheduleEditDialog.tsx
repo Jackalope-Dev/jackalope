@@ -18,6 +18,7 @@ import type { ScheduleTemplate } from '../../lib/schedule-templates';
 import type { ScheduleDefinition as Definition } from '../../lib/schedules';
 import { isAgentAllowedForProject, type Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
+import { ActionError } from '../ui/ActionError';
 import { ScheduleTiming } from './ScheduleTiming';
 
 export function ScheduleEditDialog({
@@ -324,7 +325,7 @@ export function ScheduleEditDialog({
               </div>
             </div>
             <div className="schedule-editor-footer">
-              {error && <InlineNotice tone="error">{error}</InlineNotice>}
+              <ActionError error={error} />
               {!projects.length && (
                 <InlineNotice>
                   Add a project in Projects, then return to configure this schedule.

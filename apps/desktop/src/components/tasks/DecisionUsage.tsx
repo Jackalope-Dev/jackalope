@@ -7,6 +7,7 @@ import {
   type TaskDecisionUsage,
 } from '../../lib/decision-usage';
 import { decisionLabels } from '../../lib/decisions';
+import { describeError } from '../../lib/errors';
 import { summarizeUsage } from '../../lib/usage-insights';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
@@ -28,7 +29,7 @@ export function useTaskDecisionUsage(enabled = true) {
         })
         .catch((cause) => {
           if (alive) {
-            setError(String(cause));
+            setError(describeError(cause));
             setLoading(false);
           }
         });

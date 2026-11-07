@@ -33,6 +33,8 @@ import {
 import { openExternalUrl } from '../../lib/native/env';
 import { SwarmConnection } from './SwarmConnection';
 import './artifacts-connection.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function ArtifactsTitle() {
   return (
@@ -73,7 +75,8 @@ export function ArtifactsConnectForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const waiting = useRef(false);
-  const open = (url: string) => void openExternalUrl(url).catch((cause) => setError(String(cause)));
+  const open = (url: string) =>
+    void openExternalUrl(url).catch((cause) => setError(describeError(cause)));
   // Leaving the form abandons an unfinished browser sign-in and its listener.
   useEffect(
     () => () => {
@@ -105,7 +108,7 @@ export function ArtifactsConnectForm({
           await finish(only.id);
           return;
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         }
       }
       setStage({ kind: 'choose', accounts, accountId: accounts[0]?.id ?? '' });
@@ -205,7 +208,7 @@ export function ArtifactsConnectForm({
           </div>
         )}
         {stage.kind === 'start' && fields}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     );
   if (stage.kind === 'choose')
@@ -221,7 +224,7 @@ export function ArtifactsConnectForm({
           try {
             await finish(stage.accountId);
           } catch (cause) {
-            setError(String(cause));
+            setError(describeError(cause));
           } finally {
             setBusy(false);
           }
@@ -265,7 +268,7 @@ export function ArtifactsConnectForm({
             Start over
           </Button>
         </div>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </form>
     );
   const tokenStage = stage;
@@ -309,7 +312,7 @@ export function ArtifactsConnectForm({
           setAccountId(accounts[0]?.id ?? '');
           setStage({ kind: 'token', accounts });
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         } finally {
           setBusy(false);
         }
@@ -386,7 +389,7 @@ export function ArtifactsConnectForm({
           Connect Cloudflare instead
         </Button>
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </form>
   );
 }
@@ -399,7 +402,7 @@ export function ArtifactsConnection() {
     setStatus(await artifactsStatus());
   }, []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   return (
     <>
@@ -427,7 +430,7 @@ export function ArtifactsConnection() {
                   await disconnectArtifacts();
                   await refresh();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }

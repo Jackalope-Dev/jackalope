@@ -14,6 +14,8 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 interface TerminalView {
   generation: string;
@@ -192,7 +194,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
           event.preventDefault();
           void navigator.clipboard
             .writeText(terminal.getSelection())
-            .catch((cause) => setError(String(cause)));
+            .catch((cause) => setError(describeError(cause)));
         }
         return false;
       }
@@ -202,7 +204,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       if (writable)
         void invokeNative('task_terminal_write', { id: terminalId, generation, input }).catch(
           (cause) => {
-            if (!disposed) setError(String(cause));
+            if (!disposed) setError(describeError(cause));
           },
         );
     });
@@ -241,7 +243,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
           cursor = view.cursor;
         }
       } catch (cause) {
-        if (!disposed) setError(String(cause));
+        if (!disposed) setError(describeError(cause));
       } finally {
         loading = false;
       }
@@ -294,7 +296,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       });
       await reload.current();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -354,7 +356,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
                 generation: generationRef.current,
                 input: `${command.body}\r`,
               })
-                .catch((reason) => setError(String(reason)))
+                .catch((reason) => setError(describeError(reason)))
                 .finally(() => setBusy(false));
             }}
           >
@@ -385,7 +387,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
         </Button>
         <span role="status">{searchMessage}</span>
       </form>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div ref={host} className="task-terminal-screen" />
       {hasSelection && (
         <Button
@@ -400,7 +402,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
               setError('');
               setFeedbackSaved(true);
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             }
           }}
         >

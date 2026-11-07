@@ -1,5 +1,6 @@
 import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 
@@ -24,7 +25,7 @@ export function ScreenshotPreview({
         setSource(url);
       })
       .catch((error) => {
-        if (!canceled) setError(String(error));
+        if (!canceled) setError(describeError(error));
       });
     return () => {
       canceled = true;

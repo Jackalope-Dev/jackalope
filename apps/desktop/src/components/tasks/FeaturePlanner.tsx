@@ -14,6 +14,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { describeError } from '../../lib/errors';
 import { featureDraftKey } from '../../lib/feature-draft';
 import { manualPlan, planCommands } from '../../lib/plan-mode';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -160,7 +161,7 @@ export function FeaturePlanner({
       onClose();
       navigateWorkspace('plans');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }

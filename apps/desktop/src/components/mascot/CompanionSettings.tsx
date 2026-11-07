@@ -8,6 +8,7 @@ import {
   Switch,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useHelperStore } from '../../stores/helperStore';
@@ -31,7 +32,7 @@ export function CompanionSettings() {
       await operation();
       await useHelperStore.getState().refresh();
     } catch (error) {
-      setLocalError(String(error));
+      setLocalError(describeError(error));
     }
   };
   return (
@@ -168,7 +169,7 @@ export function CompanionSettings() {
             className="helper-text-button"
             onClick={() =>
               void openExternalUrl('https://jackalope.dev/knowledge/ask-jackalope/').catch(
-                (error) => setLocalError(String(error)),
+                (error) => setLocalError(describeError(error)),
               )
             }
           >

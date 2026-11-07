@@ -20,6 +20,7 @@ import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-
 import { mcpEndpointError } from '../../lib/mcp-endpoint';
 import { useMcpStore } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import type { SavedMcpConnection } from './McpConnectionResult';
 
 export function McpConnectionForm({
@@ -570,7 +571,7 @@ export function McpConnectionForm({
           )}
         </section>
       </fieldset>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <DialogFooter className="mcp-configure-actions">
         <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel

@@ -54,6 +54,7 @@ import { openProjectSettings, openSettings } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';
+import { describeError } from '../../lib/errors';
 
 interface Run {
   kinds: CloudResourceKind[];
@@ -135,7 +136,7 @@ export function CloudResources() {
         const drafted = project?.id && useCloudResourcesStore.getState().drafts[project.id];
         setView((current) => current ?? (next?.manifest && !drafted ? 'result' : 'choose'));
       })
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, [refresh, project?.id]);
   useEffect(
     () => () => {
@@ -154,7 +155,7 @@ export function CloudResources() {
   }
   const projectId = project.id;
   const open = (link: string) =>
-    void openExternalUrl(link).catch((cause) => setError(String(cause)));
+    void openExternalUrl(link).catch((cause) => setError(describeError(cause)));
 
   const kinds = orderedKinds(draft.kinds);
   const needsPostgres =
@@ -242,7 +243,7 @@ export function CloudResources() {
         return;
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setRun(null);
       setView('choose');
     } finally {
@@ -258,7 +259,7 @@ export function CloudResources() {
       const next = await refresh();
       if (!next?.manifest) setView('choose');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
 

@@ -5,7 +5,6 @@ import {
   DialogFooter,
   DialogHeader,
   FormField,
-  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -23,6 +22,7 @@ import {
   saveAgentProfileKey,
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
+import { describeError } from '../../lib/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -30,6 +30,7 @@ import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 function ConnectProvider({
@@ -69,7 +70,7 @@ function ConnectProvider({
       await useAgentAccountsStore.getState().load('opencode', true);
       onClose();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -230,10 +231,10 @@ function ConnectProvider({
           {runner.preparing && (
             <ManagedRuntimeProgress
               progress={runner.progress}
-              onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+              onCancel={() => void runner.cancel().catch((cause) => setError(describeError(cause)))}
             />
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
               {saved.current ? 'Close' : 'Cancel'}
@@ -295,7 +296,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               await useExecutionStore.getState().discover();
               onClose();
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -351,7 +352,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               </Select>
             </FormField>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel

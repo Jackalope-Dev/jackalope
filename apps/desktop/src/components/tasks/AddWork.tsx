@@ -4,7 +4,6 @@ import {
   DialogCloseButton,
   DialogContent,
   DialogHeader,
-  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -16,11 +15,13 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { describeError } from '../../lib/errors';
 import type { QueueItem } from '../../lib/queue';
 import { queueCommand } from '../../lib/queue';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
+import { ActionError } from '../ui/ActionError';
 import { OutcomeEditor } from './OutcomeEditor';
 export function AddWork({
   project,
@@ -86,7 +87,7 @@ export function AddWork({
       await onAdded();
       onClose();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
     }
@@ -209,7 +210,7 @@ export function AddWork({
               </div>
             </fieldset>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <Button type="submit" disabled={busy} loading={busy} loadingLabel="Adding…">
             Add to plan
             <Plus size={15} />

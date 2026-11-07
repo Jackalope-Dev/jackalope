@@ -27,6 +27,7 @@ import {
 } from '../../lib/browser-profiles';
 import { isTauriEnvironment } from '../../lib/native/env';
 import '../settings/settings.css';
+import { describeError } from '../../lib/errors';
 
 function lastUsed(status: BrowserProfileStatus) {
   if (!status.lastUsedAt) return 'Not used yet';
@@ -61,7 +62,7 @@ export function BrowserProfileSettings({
     try {
       setStatus(await browserProfileStatus({ kind, id, name: '' }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setLoaded(true);
     }
@@ -96,7 +97,7 @@ export function BrowserProfileSettings({
     try {
       setStatus(await action());
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -109,7 +110,7 @@ export function BrowserProfileSettings({
       await forgetDesktopPermission(decisionKey, id);
       setDecisions((items) => items.filter((item) => item.id !== id));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -246,7 +247,7 @@ export function BrowserProfileSettings({
                 await deleteBrowserProfile(status.id);
                 setStatus(null);
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               }
             }}
           />

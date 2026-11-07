@@ -38,6 +38,7 @@ import { ComputerViewer } from './ComputerViewer';
 import { IdleStopSelect } from './IdleStopSelect';
 import '../settings/settings.css';
 import './computers.css';
+import { describeError } from '../../lib/errors';
 import { PairMachineForm } from './PairMachineForm';
 
 type Kind = 'none' | 'local-docker' | 'remote-machine' | 'agent37';
@@ -172,7 +173,7 @@ function OwnerComputerSettings({
       setStatus(next);
       if (next && !edited.current) setSettings(next.settings);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setLoaded(true);
     }
@@ -206,7 +207,7 @@ function OwnerComputerSettings({
       await action();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -371,7 +372,7 @@ function OwnerComputerSettings({
                   setStatus(null);
                   setKind('none');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             />

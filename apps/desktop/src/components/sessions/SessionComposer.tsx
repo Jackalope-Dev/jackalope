@@ -1,6 +1,7 @@
 import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { describeError } from '../../lib/errors';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
@@ -112,7 +113,7 @@ export function SessionComposer({
           saved.current = draft.text;
           if (latest.current === value) editing.current = false;
         })
-        .catch((cause) => setError(String(cause)));
+        .catch((cause) => setError(describeError(cause)));
       draftSave.current = operation;
     }, 450);
     return () => clearTimeout(timer);
@@ -179,7 +180,7 @@ export function SessionComposer({
       }
       input.current?.focus();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       sending.current = false;
       setSaving(false);

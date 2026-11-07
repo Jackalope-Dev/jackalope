@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { describeWake } from '../../lib/bot-hub';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { isWorking } from '../../lib/run-status';
@@ -20,10 +21,11 @@ import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule
 import {
   type ScheduleDefinition as Definition,
   listSchedules,
-  type ScheduleLedger,
   savedPlanDraft,
 } from '../../lib/schedules';
 import { stopTask } from '../../lib/task-client';
+import { useAction } from '../../lib/useAction';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
@@ -33,6 +35,7 @@ import {
 } from '../../stores/projectStore';
 import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { ActionError } from '../ui/ActionError';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -68,9 +71,11 @@ export function ScheduleManager(props: {
   const runners = useExecutionStore((s) => s.runners);
   const runs = useExecutionStore((s) => s.runs);
   const legacy = useScheduleStore((s) => s.schedules);
-  const [ledger, setLedger] = useState<ScheduleLedger | null>(null);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const desktop = isTauriEnvironment();
+  const schedules = useNativeResource(listSchedules, [desktop], { pollMs: 5000, enabled: desktop });
+  const ledger = schedules.data ?? null;
+  const { run: act, busy, error: actionError, setError } = useAction(schedules.reload);
+  const error = actionError || schedules.error;
   const [editing, setEditing] = useState<Definition | null>(null);
   const [importing, setImporting] = useState<string | null>(null);
   const [projectId, setProjectId] = useState(activeProjectId ?? '');
@@ -103,39 +108,6 @@ export function ScheduleManager(props: {
       scheduleFocusPending.current = false;
     }
   }, [busy, editing]);
-  const desktop = isTauriEnvironment();
-  const refresh = async () => setLedger(await listSchedules());
-  useEffect(() => {
-    if (!desktop) return;
-    let alive = true;
-    const read = () =>
-      listSchedules()
-        .then((data) => {
-          if (alive) setLedger(data);
-        })
-        .catch((cause) => {
-          if (alive) setError(String(cause));
-        });
-    void read();
-    const timer = window.setInterval(read, 5000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [desktop]);
-  const act = async (work: () => Promise<unknown>) => {
-    if (busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      await work();
-      await refresh();
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
   const open = (value?: Definition, planId: string | null = null) => {
     scheduleOpener.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -179,7 +151,7 @@ export function ScheduleManager(props: {
       const saved = ledger?.schedules.find((schedule) => schedule.definition.id === id);
       open(saved?.definition ?? savedPlanDraft(plan, id, runners), plan.id);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   useEffect(() => {
@@ -220,8 +192,8 @@ export function ScheduleManager(props: {
   const finalPrompt = instructions
     ? `${rawPrompt}\n\n[Project Guidelines]:\n${instructions}`
     : rawPrompt;
-  const save = () =>
-    act(async () => {
+  const save = async () => {
+    await act(async () => {
       if (!editing || !project) return;
       if (!monitorOnly && agent !== 'auto' && !isAgentAllowedForProject(project, agent))
         throw new Error('This agent is not allowed for the selected project.');
@@ -257,6 +229,7 @@ export function ScheduleManager(props: {
       setEditing(null);
       setImporting(null);
     });
+  };
   const visible =
     ledger?.schedules.filter(
       (s) => !activeProjectId || s.definition.request.projectId === activeProjectId,
@@ -279,9 +252,7 @@ export function ScheduleManager(props: {
       />
       {!desktop && <InlineNotice>Open the desktop app to schedule execution.</InlineNotice>}
       {visible.length > 0 && <WorkspaceSectionHeading title="Your schedules" />}
-      {(error || ledger?.error) && (
-        <InlineNotice tone="error">{error || ledger?.error}</InlineNotice>
-      )}
+      <ActionError error={error || ledger?.error} />
       {desktop && !ledger && !error && <LoadingState label={'Loading schedules…'} />}
       <div className="schedule-list">
         {visible.map(
@@ -468,7 +439,6 @@ export function ScheduleManager(props: {
               url: revealed.url,
               token: revealed.token,
             });
-            setLedger(await listSchedules());
           });
         }}
         onDisable={async () => {
@@ -476,7 +446,6 @@ export function ScheduleManager(props: {
           await act(async () => {
             await invokeNative('schedule_webhook_disable', { id: webhook.id });
             setWebhook(null);
-            setLedger(await listSchedules());
           });
         }}
       />

@@ -2,6 +2,7 @@ import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import { isLive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
+import { ActionError } from '../ui/ActionError';
 
 export function CoordinationDecisions({
   queue,
@@ -30,7 +31,7 @@ export function CoordinationDecisions({
         return (
           <article className="queue-message" key={audit.runId}>
             <h3>Changed files · {title(audit.taskId)}</h3>
-            {audit.error && <InlineNotice tone="error">{audit.error}</InlineNotice>}
+            <ActionError error={audit.error} />
             {audit.overlaps.length > 0 && (
               <InlineNotice tone="error">
                 These files also changed in another task. Reconcile the edits before merging.

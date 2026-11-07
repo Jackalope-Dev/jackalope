@@ -1,10 +1,11 @@
 import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
-import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
+import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 
 /**
  * Commits the task's remaining changes with the project's commit policy, pushes
@@ -63,7 +64,7 @@ export function CreatePullRequest({
         }),
       );
     } catch (cause) {
-      throw new Error(errorMessage(cause));
+      throw new Error(describeError(cause));
     }
   };
   const steps = uncommitted?.length

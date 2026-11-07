@@ -8,6 +8,7 @@ import {
 } from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { openKnowledgeTask, prepareLessonCheck, useKnowledge } from '../../lib/knowledge';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import {
@@ -22,7 +23,6 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
-
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 import { LearnedHistory } from './LearnedHistory';
@@ -34,7 +34,9 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const [actionError, setActionError] = useState('');
   const openSource = (runId: string) => {
     setActionError('');
-    void openKnowledgeTask(project.id, runId).catch((cause) => setActionError(String(cause)));
+    void openKnowledgeTask(project.id, runId).catch((cause) =>
+      setActionError(describeError(cause)),
+    );
   };
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -61,7 +63,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
       });
       await refresh();
     } catch (cause) {
-      setActionError(String(cause));
+      setActionError(describeError(cause));
     }
   };
   const makeCheck = async (entry: KnowledgeEntry) => {
@@ -69,7 +71,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
     try {
       await prepareLessonCheck(project, entry);
     } catch (cause) {
-      setActionError(String(cause));
+      setActionError(describeError(cause));
     }
   };
   const retireEnforced = async (entry: KnowledgeEntry) => {
@@ -78,7 +80,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
       await invokeNative('knowledge_retire_enforced', { id: entry.id, revision: entry.revision });
       await refresh();
     } catch (cause) {
-      setActionError(String(cause));
+      setActionError(describeError(cause));
     }
   };
   return (
@@ -110,7 +112,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                     entry.title = file.name.replace(/\.md$/i, '').slice(0, 100);
                     setEditing(entry);
                   } catch (cause) {
-                    setActionError(String(cause));
+                    setActionError(describeError(cause));
                   }
                 }}
               />
@@ -297,7 +299,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                           });
                           await refresh();
                         } catch (e) {
-                          setActionError(String(e));
+                          setActionError(describeError(e));
                         }
                       }}
                       trigger={<Button variant="ghost">Remove</Button>}
@@ -381,7 +383,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             try {
               setMatches(await invokeNative('knowledge_search', { projectId: project.id, query }));
             } catch (cause) {
-              setActionError(String(cause));
+              setActionError(describeError(cause));
             } finally {
               setSearching(false);
             }

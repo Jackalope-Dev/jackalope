@@ -1,9 +1,11 @@
-import { Button, InlineNotice, LinkButton, Textarea } from '@jackalope/ui';
+import { Button, LinkButton, Textarea } from '@jackalope/ui';
 import { Check, Hand } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import type { PendingUserPrompt } from '../../lib/run-types';
 import './agent-decision.css';
 import './task-experience.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const DONE = 'Done';
 const DECLINED = 'Declined';
@@ -59,7 +61,7 @@ export function HumanActionCard({
       await onAnswer(value);
       setSent(value);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setSending(null);
@@ -131,7 +133,7 @@ export function HumanActionCard({
               placeholder="Anything it should know, such as which account you used"
             />
           </label>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <div className="agent-question-footer">
             <span className="task-experience-muted">
               {agentName ?? 'The agent'} waits until you finish.

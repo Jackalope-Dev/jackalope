@@ -8,6 +8,7 @@ import type { TaskRun } from '../../lib/run-types';
 import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { TaskFollowUp } from '../../lib/task-followups';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 import { DismissButton } from '../ui/DismissButton';
 import { AttachButton } from './AttachButton';
 
@@ -63,7 +64,7 @@ export function TaskFollowUpPanel({
   return (
     <div className="task-next">
       <h2 className="task-followup-heading">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
-      {queueError && <InlineNotice tone="error">{queueError}</InlineNotice>}
+      <ActionError error={queueError} />
       {followups.length > 0 && (
         <ul className="task-followup-queue" aria-label="Queued follow-ups">
           {followups.map((item) => (

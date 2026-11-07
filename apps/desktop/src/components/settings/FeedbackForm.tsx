@@ -11,6 +11,7 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useId, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useCommunityStore } from '../../stores/communityStore';
@@ -53,7 +54,7 @@ export function FeedbackForm({
     try {
       await action();
     } catch (error) {
-      setStatus(String(error));
+      setStatus(describeError(error));
     } finally {
       locked.current = false;
       setBusy(false);

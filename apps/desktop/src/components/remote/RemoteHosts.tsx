@@ -9,6 +9,7 @@ import {
   SelectItem,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import {
   pairRemoteHost,
@@ -51,7 +52,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
         if (!disposed) setDistributions(items);
       },
       (reason) => {
-        if (!disposed) setError(String(reason));
+        if (!disposed) setError(describeError(reason));
       },
     );
     return () => {
@@ -67,7 +68,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
         setError('');
       }
     } catch (cause) {
-      if (!signal?.aborted) setError(String(cause));
+      if (!signal?.aborted) setError(describeError(cause));
     }
   }, []);
   useEffect(() => {
@@ -127,7 +128,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                     await removeRemoteHost(host.id);
                     setHosts(await remoteHosts());
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   } finally {
                     setBusy(false);
                   }
@@ -175,7 +176,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                 setAdding(false);
                 setCode('');
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }

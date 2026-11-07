@@ -17,6 +17,8 @@ import type { TaskRun } from '../../lib/run-types';
 import { ComputerViewer } from '../computers/ComputerViewer';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import './agent-screen.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 2000;
 
@@ -52,7 +54,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
         else if (next.browser.status === 'stopped' || next.browser.status === 'unavailable')
           setFrame(null);
       } catch (cause) {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       } finally {
         reading.current = false;
       }
@@ -75,7 +77,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
       setScreen(next);
       if (target === 'browser') setFrame(null);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setRevoking('');
     }
@@ -88,7 +90,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
       await rememberDesktopGrant(runId);
       setScreen(await readAgentScreen(runId, false));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setRemembering(false);
     }
@@ -118,7 +120,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
       {!isTauriEnvironment() && (
         <InlineNotice>The agent’s screen is available in the desktop app.</InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
 
       <div className="agent-screen-section">
         <div className="agent-screen-heading">

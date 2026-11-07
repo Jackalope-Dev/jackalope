@@ -10,6 +10,7 @@ import {
   Switch,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import {
@@ -56,7 +57,7 @@ export function DesktopPreferences() {
           setActivityError('');
         }
       } catch (reason) {
-        if (!disposed) setActivityError(String(reason));
+        if (!disposed) setActivityError(describeError(reason));
       } finally {
         pending = false;
       }
@@ -75,7 +76,7 @@ export function DesktopPreferences() {
       await invokeNative('desktop_keep_awake', { mode });
       setActivity(await invokeNative('desktop_activity'));
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setSaving(false);
     }

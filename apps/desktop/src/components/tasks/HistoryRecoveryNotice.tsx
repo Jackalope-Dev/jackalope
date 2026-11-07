@@ -12,6 +12,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import './history-recovery.css';
+import { describeError } from '../../lib/errors';
 
 interface HistoryRecovery {
   directory: string;
@@ -37,7 +38,7 @@ export function HistoryRecoveryNotice() {
         setError('');
       }
     } catch (error) {
-      if (current === requestId.current) setError(String(error));
+      if (current === requestId.current) setError(describeError(error));
     } finally {
       if (current === requestId.current) setLoading(false);
     }

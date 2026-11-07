@@ -39,6 +39,7 @@ import { DismissButton } from '../ui/DismissButton';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
 import { taskChangeStats } from '../../lib/task-client';
+import { ActionError } from '../ui/ActionError';
 
 function duration(run: TaskRun) {
   if (run.durationMs != null) return durationLabel(run.durationMs / 1000);
@@ -450,7 +451,7 @@ function ComparisonDialog({
           );
         })}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <DialogFooter>
         <p className="task-comparison-footnote">
           Keeping one archives the other finished attempts. Archived work, branches and worktrees

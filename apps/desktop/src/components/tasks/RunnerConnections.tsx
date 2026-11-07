@@ -46,6 +46,7 @@ import { openAgentConfiguration } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import '../agents/agents-workspace.css';
+import { describeError } from '../../lib/errors';
 
 function SetupCommandBox({
   command,
@@ -169,7 +170,7 @@ export function RunnerConnections({
     if (!desktop) return;
     let active = true;
     void discover(false).catch((cause) => {
-      if (active) setCheckError(String(cause));
+      if (active) setCheckError(describeError(cause));
     });
     return () => {
       active = false;
@@ -183,7 +184,7 @@ export function RunnerConnections({
       for (const agent of JSON.parse(accountAgents) as string[])
         void useAgentAccountsStore.getState().load(agent, true);
     } catch (error) {
-      setCheckError(String(error));
+      setCheckError(describeError(error));
     } finally {
       setChecking(false);
     }
@@ -403,7 +404,7 @@ export function RunnerConnections({
               onCheckedChange={(value) => {
                 setCheckError('');
                 config.toggleAgent(runner.id, value, scoped?.id);
-                void agentPolicySaved().catch((cause) => setCheckError(String(cause)));
+                void agentPolicySaved().catch((cause) => setCheckError(describeError(cause)));
               }}
               label={`Enable ${custom?.name ?? runner.name}${scoped ? ` for ${scoped.name}` : ' app-wide'}`}
             />

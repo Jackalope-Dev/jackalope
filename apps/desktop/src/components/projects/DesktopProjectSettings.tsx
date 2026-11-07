@@ -6,6 +6,7 @@ import {
   forgetDesktopPermission,
   type RememberedDesktopGrant,
 } from '../../lib/agent-screen';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 
 /** Remembered desktop-control grants and website decisions for one project, each removable. */
@@ -25,7 +26,7 @@ export function DesktopProjectSettings({ projectId }: { projectId: string }) {
         setGrants(value.grants);
         setSites(value.sites);
       })
-      .catch((cause) => current && setError(String(cause)));
+      .catch((cause) => current && setError(describeError(cause)));
     return () => {
       current = false;
     };
@@ -39,7 +40,7 @@ export function DesktopProjectSettings({ projectId }: { projectId: string }) {
       setGrants((items) => items.filter((item) => item.id !== id));
       setSites((items) => items.filter((item) => item.id !== id));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setRemoving('');
     }

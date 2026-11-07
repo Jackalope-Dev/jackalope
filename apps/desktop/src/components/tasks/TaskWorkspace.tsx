@@ -6,7 +6,6 @@ import './core-workflow.css';
 import {
   Button,
   EmptyState,
-  InlineNotice,
   LoadingState,
   DropdownMenu as Menu,
   Select,
@@ -31,6 +30,7 @@ import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
+import { ActionError } from '../ui/ActionError';
 import { WorkCatchUp } from './WorkCatchUp';
 
 const ManagedTaskView = lazy(() =>
@@ -349,7 +349,7 @@ export function TaskWorkspace({
         </div>
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {hasWork && !archived && <WorkCatchUp />}
       {hasWork ? (
         <Suspense fallback={<LoadingState label="Loading work list…" />}>

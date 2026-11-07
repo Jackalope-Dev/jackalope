@@ -40,6 +40,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import './repo-todos.css';
+import { describeError } from '../../lib/errors';
 
 export function RepoTodos({
   onOpenProject,
@@ -122,7 +123,7 @@ export function RepoTodos({
           '',
       );
     } catch (cause) {
-      if (version === request.current) setError(String(cause));
+      if (version === request.current) setError(describeError(cause));
     } finally {
       if (version === request.current) setLoading(false);
     }
@@ -178,7 +179,7 @@ export function RepoTodos({
         .refreshMemory(project, { silent: true })
         .catch(() => {});
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSaving(key, false);
     }
@@ -493,7 +494,7 @@ export function RepoTodos({
                               setQuery('');
                               addInput.current?.focus();
                             } catch (cause) {
-                              setError(String(cause));
+                              setError(describeError(cause));
                             }
                           }}
                         >

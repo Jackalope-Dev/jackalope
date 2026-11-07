@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { listSchedules, type SavedSchedule } from '../../lib/schedules';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -32,7 +33,7 @@ export function ScheduleNotice() {
           }
         })
         .catch((cause) => {
-          if (active) setError(String(cause));
+          if (active) setError(describeError(cause));
         });
     void refresh();
     const timer = setInterval(refresh, 15000);

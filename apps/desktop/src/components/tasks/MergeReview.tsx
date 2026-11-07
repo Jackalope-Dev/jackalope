@@ -21,7 +21,9 @@ import type { Project } from '../../stores/projectStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';
+import { describeError } from '../../lib/errors';
 import { isFinished } from '../../lib/run-status';
+import { ActionError } from '../ui/ActionError';
 export function MergeReview({
   project,
   runs,
@@ -117,7 +119,7 @@ export function MergeReview({
     }
   }, [onlyRunId, managedTitle, onlyRunIdsKey]);
   useEffect(() => {
-    void load().catch((error) => setError(String(error)));
+    void load().catch((error) => setError(describeError(error)));
   }, [load]);
   const prepare = async () => {
     setBusy(true);
@@ -129,7 +131,7 @@ export function MergeReview({
       setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
       await load();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
     }
@@ -145,7 +147,7 @@ export function MergeReview({
       await onChanged();
       await load();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
       setApplying(false);
@@ -289,7 +291,7 @@ export function MergeReview({
             : 'Finished tasks arrive here with their results and changes.'}
         </p>
       ) : null}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {managedTitle && !plan && busy && (
         <p className="task-muted" role="status">
           Preparing the combined changes…

@@ -13,6 +13,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { describeError } from '../../lib/errors';
 import {
   type FeatureStep,
   type ManagedTask,
@@ -31,6 +32,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -135,7 +137,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
       await action();
       await refreshAll();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -159,7 +161,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
         }
       })
       .catch((cause) => {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       })
       .finally(() => {
         if (alive) setPlanPending(false);
@@ -643,7 +645,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                     </Button>
                   }
                 />
-                {detail.error && <InlineNotice tone="error">{detail.error}</InlineNotice>}
+                <ActionError error={detail.error} />
                 {detail.detailsOmitted ? (
                   <p role="status">Loading result…</p>
                 ) : (

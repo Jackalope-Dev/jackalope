@@ -18,6 +18,7 @@ import { ReviewActions } from './ReviewActions';
 import { ReviewFeedback } from './ReviewFeedback';
 import { ReviewScreenshots } from './ReviewScreenshots';
 import './result-review.css';
+import { describeError } from '../../lib/errors';
 import { taskReview } from '../../lib/task-client';
 
 export type ReviewSection = 'changes' | 'screenshots' | 'checks' | 'delivery';
@@ -96,7 +97,7 @@ export function ResultReview({
       if (suppliedReview) await onRefresh?.();
       else setReview(await taskReview(run.id));
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setLoading(false);
     }

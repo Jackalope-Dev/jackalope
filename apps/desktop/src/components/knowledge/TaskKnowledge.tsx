@@ -15,6 +15,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { navigateWorkspace } from '../layout/navigation';
 import './task-knowledge.css';
+import { describeError } from '../../lib/errors';
 
 export function TaskKnowledge({
   projectId,
@@ -55,7 +56,7 @@ export function TaskKnowledge({
           }
         })
         .catch((cause) => {
-          if (alive) setPreviewError(String(cause));
+          if (alive) setPreviewError(describeError(cause));
         });
     }, 200);
     return () => {

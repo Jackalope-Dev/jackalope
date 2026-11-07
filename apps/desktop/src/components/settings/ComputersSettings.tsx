@@ -2,7 +2,6 @@ import {
   Badge,
   Button,
   ConfirmDialog,
-  InlineNotice,
   SettingBody,
   SettingGroup,
   SettingRow,
@@ -27,11 +26,13 @@ import {
   stopComputer,
   testCloudMachine,
 } from '../../lib/computers';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { Agent37Settings } from '../computers/Agent37Connect';
 import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
 import { PairMachineForm } from '../computers/PairMachineForm';
+import { ActionError } from '../ui/ActionError';
 
 function dockerSummary(status: DockerStatus) {
   const engine =
@@ -71,7 +72,7 @@ export function ComputersSettings() {
   }, []);
 
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
 
   // Keep idle countdowns and starting phases current.
@@ -95,7 +96,7 @@ export function ComputersSettings() {
       await action();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -114,7 +115,7 @@ export function ComputersSettings() {
 
   return (
     <>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <SettingGroup
         title="Local sandboxes"
         description="Bots and tasks get their own Linux desktop and browser in Docker on this device."
@@ -161,7 +162,7 @@ export function ComputersSettings() {
             disabled={!preferences}
             onCheckedChange={(keepRunningOnQuit) =>
               void setComputerPreferences({ keepRunningOnQuit }).then(setPreferences, (cause) =>
-                setError(String(cause)),
+                setError(describeError(cause)),
               )
             }
           />
@@ -210,7 +211,7 @@ export function ComputersSettings() {
               onCancel={() => setPairing(false)}
               onPaired={() => {
                 setPairing(false);
-                void refresh().catch((cause) => setError(String(cause)));
+                void refresh().catch((cause) => setError(describeError(cause)));
               }}
             />
           </SettingBody>

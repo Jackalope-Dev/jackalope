@@ -36,7 +36,9 @@ import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { agentAdapter } from './CrossModelReviewPanel';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';
+import { describeError } from '../../lib/errors';
 import { stopTask } from '../../lib/task-client';
+import { ActionError } from '../ui/ActionError';
 
 const SEVERITY = {
   high: { label: 'High', variant: 'danger' },
@@ -101,7 +103,7 @@ export function AgentReview({
       });
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setStarting(false);
     }
@@ -309,7 +311,7 @@ function ReviewBody({
       await stopTask(reviewer.id);
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const send = async () => {
@@ -323,7 +325,7 @@ function ReviewBody({
       await handoff(prompt);
       onDone();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSending(false);
     }
@@ -356,7 +358,7 @@ function ReviewBody({
               {elapsedLabel(reviewer.startedAt)} so far. You can close this; the review keeps going.
             </p>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <ReviewerActivity reviewer={reviewer} />
         </div>
         <DialogFooter>
@@ -430,7 +432,7 @@ function ReviewBody({
             This attempt can’t take a follow-up, so fixes can’t be sent from here.
           </p>
         )}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <ReviewerActivity reviewer={reviewer} />
       </div>
       {handoff && (unreadable || findings.length > 0) && (

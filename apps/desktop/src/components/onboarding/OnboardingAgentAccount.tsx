@@ -5,9 +5,11 @@ import {
   accountStatusLabel,
   checkAgentProfile,
 } from '../../lib/agent-profiles';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { ActionError } from '../ui/ActionError';
 
 const AgentSignIn = lazy(() =>
   import('../agents/AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
@@ -82,7 +84,7 @@ export function OnboardingAgentAccount({
       await agentPolicySaved();
     } catch (cause) {
       useAgentConfigStore.setState({ disabledAccounts: before });
-      setFailure(String(cause));
+      setFailure(describeError(cause));
     }
   };
   return (
@@ -166,7 +168,7 @@ export function OnboardingAgentAccount({
           </Button>
         </div>
       )}
-      {failure && <InlineNotice tone="error">{failure}</InlineNotice>}
+      <ActionError error={failure} />
       {signIn && (
         <Suspense fallback={null}>
           <AgentSignIn

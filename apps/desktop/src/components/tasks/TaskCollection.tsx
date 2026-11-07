@@ -37,6 +37,7 @@ import { useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './task-collection.css';
+import { describeError } from '../../lib/errors';
 import type { ChangeStats } from '../../lib/run-types';
 
 export interface TaskCollectionView {
@@ -116,7 +117,7 @@ export function TaskCollection({
       );
       if (archive) setUndo(targets);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       pending.current = false;
       setBusy(false);

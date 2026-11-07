@@ -1,9 +1,10 @@
-import { InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './commit-history.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 interface GraphLine {
   graph: string;
@@ -26,7 +27,7 @@ export function CommitHistory({ projectPath, version }: { projectPath: string; v
     try {
       setLines(await invokeNative<GraphLine[]>('project_commit_graph', { projectPath, limit: 40 }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, [projectPath]);
   // The page's Refresh and each change refresh bump `version`, so history follows new commits.
@@ -37,7 +38,7 @@ export function CommitHistory({ projectPath, version }: { projectPath: string; v
   return (
     <section className="workspace-section workspace-stack commit-history" aria-label="History">
       <WorkspaceSectionHeading title="History" />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {lines && !lines.length && !error && <p className="task-muted">No commits yet.</p>}
       {!!lines?.length && (
         <ol className="commit-graph">

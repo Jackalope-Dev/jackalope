@@ -26,7 +26,9 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
 import './onboarding.css';
+import { describeError } from '../../lib/errors';
 import { projectReadiness } from '../../lib/readiness';
+import { ActionError } from '../ui/ActionError';
 
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
@@ -238,7 +240,7 @@ export function OnboardingFlow({
     try {
       await action();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       attempting.current = false;
       setBusy(false);
@@ -547,7 +549,7 @@ export function OnboardingFlow({
                   Enable at least one available agent to continue.
                 </p>
               )}
-              {execution.error && <InlineNotice tone="error">{execution.error}</InlineNotice>}
+              <ActionError error={execution.error} />
 
               {runner && !runner.signedIn && runner.available && !accounts[runnerAdapter]?.view && (
                 <div className="onboarding-signin-tip">

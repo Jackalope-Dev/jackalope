@@ -11,6 +11,7 @@ import {
 } from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
@@ -35,7 +36,7 @@ export function NotificationSettings() {
       await invokeNative('notification_test');
       setResult('Sent to your desktop. If it did not appear, check system notification settings.');
     } catch (error) {
-      setResult(String(error));
+      setResult(describeError(error));
     } finally {
       setBusy(false);
     }

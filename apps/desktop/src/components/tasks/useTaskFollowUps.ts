@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
@@ -73,7 +74,7 @@ export function useTaskFollowUps({
           }
         }
       } catch (cause) {
-        if (alive) setQueueError(String(cause));
+        if (alive) setQueueError(describeError(cause));
       } finally {
         pending = false;
       }

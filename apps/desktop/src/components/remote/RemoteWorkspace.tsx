@@ -15,6 +15,7 @@ import { AgentQuestion } from '../tasks/AgentQuestion';
 import { ChangedFiles } from '../tasks/ChangedFiles';
 import { type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
 import './remote.css';
+import { ActionError } from '../ui/ActionError';
 
 export type { RemoteAction, RemoteRequest } from './useRemoteWorkspace';
 
@@ -70,8 +71,8 @@ export function RemoteWorkspace({
           New task
         </Button>
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {connectionError && <InlineNotice tone="error">{connectionError}</InlineNotice>}
+      <ActionError error={error} />
+      <ActionError error={connectionError} />
       <div className="remote-layout">
         <nav className="remote-task-list" aria-label="Host tasks">
           {waitingSessions.map((session) => (

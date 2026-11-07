@@ -1,10 +1,12 @@
-import { Button, Checkbox, InlineNotice, Input, Textarea, useDialogFocus } from '@jackalope/ui';
+import { Button, Checkbox, Input, Textarea, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import { invokeNative } from '../../lib/native/transport';
 import { OutcomeEditor } from '../tasks/OutcomeEditor';
+import { ActionError } from '../ui/ActionError';
 
 export function KnowledgeEditor({
   entry,
@@ -64,7 +66,7 @@ export function KnowledgeEditor({
                 });
                 onSaved();
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -159,7 +161,7 @@ export function KnowledgeEditor({
               />
               Available for future tasks
             </label>
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
             <Button
               type="submit"
               disabled={busy || bytes > limit}

@@ -12,8 +12,10 @@ import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { completeProviderProfile } from '../../lib/agent-profiles';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
+import { ActionError } from '../ui/ActionError';
 
 export function AgentModels({
   agentId,
@@ -89,7 +91,7 @@ export function AgentModels({
         </Button>
       </div>
       {loading && <LoadingState label="Reading available models…" compact />}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {catalog?.detail && <p className="task-muted text-xs">{catalog.detail}</p>}
       {agentId === 'opencode' && account?.preferredModel && (
         <label className="task-label" htmlFor={accountModelId}>
@@ -106,7 +108,7 @@ export function AgentModels({
                 await completeProviderProfile(account.id, model, false);
                 await useAgentAccountsStore.getState().load(agentId, true);
               } catch (cause) {
-                setAccountError(String(cause));
+                setAccountError(describeError(cause));
               } finally {
                 setSavingAccount(false);
               }
@@ -120,7 +122,7 @@ export function AgentModels({
           </Select>
         </label>
       )}
-      {accountError && <InlineNotice tone="error">{accountError}</InlineNotice>}
+      <ActionError error={accountError} />
       {!loading && !models.length && (
         <p className="task-muted">
           Available models could not be detected. Model selection is unavailable.

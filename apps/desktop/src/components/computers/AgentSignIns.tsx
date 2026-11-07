@@ -9,6 +9,7 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type AgentCredential, agentCredentials, setAgentCredential } from '../../lib/computers';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 
 const HINTS: Record<string, string> = {
@@ -29,7 +30,7 @@ export function AgentSignIns() {
     if (!isTauriEnvironment()) return;
     void agentCredentials()
       .then(setCredentials)
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, []);
 
   const save = async (id: string, value: string | null) => {
@@ -39,7 +40,7 @@ export function AgentSignIns() {
       setCredentials(await setAgentCredential(id, value));
       setDrafts((current) => ({ ...current, [id]: '' }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }

@@ -4,6 +4,7 @@ import { providerLabel, type SwarmHosts, setProjectHosts } from '../../lib/compu
 import { isTauriEnvironment } from '../../lib/native/env';
 import { HostCapacity, useProjectHosts } from './HostCapacity';
 import './computers.css';
+import { describeError } from '../../lib/errors';
 
 const CHOICES: { value: SwarmHosts; title: string; description: string }[] = [
   {
@@ -42,7 +43,7 @@ export function ProjectSwarmHosts({ projectId }: { projectId: string }) {
     try {
       setHosts(await setProjectHosts(projectId, swarmHosts, computers));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }

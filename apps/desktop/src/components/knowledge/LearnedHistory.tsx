@@ -1,5 +1,6 @@
 import { Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { type LedgerRecord, ledgerActionLabel } from '../../lib/learning';
 import { invokeNative } from '../../lib/native/transport';
 
@@ -14,7 +15,7 @@ export function LearnedHistory({ projectId, entryId }: { projectId: string; entr
         setError('');
         invokeNative<LedgerRecord[]>('knowledge_history', { projectId, entryId })
           .then(setRecords)
-          .catch((cause) => setError(String(cause)));
+          .catch((cause) => setError(describeError(cause)));
       }}
     >
       <DisclosureSummary>History</DisclosureSummary>

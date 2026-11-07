@@ -35,6 +35,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '@xyflow/react/dist/style.css';
 import { CodebaseChecks } from './CodebaseChecks';
 import './codebase.css';
+import { describeError } from '../../lib/errors';
 
 export default function CodebaseExplorer({ project }: { project: Project }) {
   const [snapshot, setSnapshot] = useState<CodebaseSnapshot | null>(null);
@@ -76,7 +77,7 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
           }
         })
         .catch((cause) => {
-          if (!canceled) setError(String(cause));
+          if (!canceled) setError(describeError(cause));
         })
         .finally(() => {
           if (!canceled) setBusy(false);
@@ -132,7 +133,7 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       setStale(startedRevision !== revision.current);
       setSelected((path) => (next.files.some((file) => file.path === path) ? path : null));
     } catch (cause) {
-      if (mounted.current) setError(String(cause));
+      if (mounted.current) setError(describeError(cause));
     } finally {
       running.current = false;
       if (mounted.current) setBusy(false);

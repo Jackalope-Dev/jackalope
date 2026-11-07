@@ -1,7 +1,7 @@
 import { Button, ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
 import { telemetry } from '../../lib/telemetry-client';
-import { errorMessage } from './PageErrorBoundary';
+import { crashMessage } from './PageErrorBoundary';
 
 /**
  * The last line of defence for the whole window. Pages have their own
@@ -15,7 +15,7 @@ export class AppErrorBoundary extends Component<
   state = { failed: false, message: '' };
 
   static getDerivedStateFromError(error: unknown) {
-    return { failed: true, message: errorMessage(error) };
+    return { failed: true, message: crashMessage(error) };
   }
 
   componentDidCatch() {

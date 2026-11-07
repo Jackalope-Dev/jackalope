@@ -26,6 +26,8 @@ import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import { ProviderMark } from './ProviderMark';
 import './agents-workspace.css';
 import './agent-manager.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const config = useAgentConfigStore();
@@ -99,7 +101,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
       setDirty(false);
       refreshModels();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -322,7 +324,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         </div>
       </div>
 
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {saved && (
         <InlineNotice tone="success">
           Agent settings saved. Existing runs keep their current configuration.

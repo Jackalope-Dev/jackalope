@@ -14,6 +14,7 @@ import {
 import { CalendarClock, GitCommitHorizontal, Plug } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { connectionTools, describeWake } from '../../lib/bot-hub';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   parseScheduleTiming,
@@ -27,6 +28,7 @@ import {
   validateWake,
   WAKE_PROMPT_MAX,
 } from '../../stores/botStore';
+import { ActionError } from '../ui/ActionError';
 
 const INTERVALS = [
   { value: 5, label: 'Every 5 minutes' },
@@ -278,7 +280,7 @@ function WakeForm({
           onChange={(event) => onChange({ ...wake, prompt: event.target.value })}
         />
       </FormField>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div className="bots-composer-actions">
         <Button variant="ghost" type="button" onClick={onCancel}>
           Cancel
@@ -384,7 +386,7 @@ function ConnectionFields({
     if (!trigger.connectionId || !isTauriEnvironment()) return;
     connectionTools(projectId, trigger.connectionId)
       .then((found) => current && setTools(found))
-      .catch((cause) => current && setError(String(cause)));
+      .catch((cause) => current && setError(describeError(cause)));
     return () => {
       current = false;
     };

@@ -11,6 +11,7 @@ import {
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { FeedbackForm } from './FeedbackForm';
@@ -29,7 +30,7 @@ export function ReleaseSupport() {
     try {
       await action();
     } catch (error) {
-      setMessage(String(error));
+      setMessage(describeError(error));
     } finally {
       setBusy(false);
     }

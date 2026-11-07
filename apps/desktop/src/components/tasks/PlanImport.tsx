@@ -13,6 +13,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { describeError } from '../../lib/errors';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
@@ -184,7 +185,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
       setPreview(parsePlan(text));
     } catch (cause) {
       setPreview(null);
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const loadFile = async (file: File | undefined) => {
@@ -230,7 +231,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
       await onAdded();
       onClose();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       submitting.current = false;
       setBusy(false);

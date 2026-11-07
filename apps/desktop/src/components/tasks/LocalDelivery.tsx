@@ -1,10 +1,11 @@
 import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitCommitHorizontal, GitMerge } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
-import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
+import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 
 const files = (count: number) => `${count} changed ${count === 1 ? 'file' : 'files'}`;
 
@@ -77,8 +78,8 @@ export function LocalDelivery({
       if (done.length) onDone(`${done.join(', ')}.`);
       throw new Error(
         done.length
-          ? `${done.join(', ')}, then stopped: ${errorMessage(cause)}`
-          : errorMessage(cause),
+          ? `${done.join(', ')}, then stopped: ${describeError(cause)}`
+          : describeError(cause),
       );
     }
     const summary = done.join(', ');

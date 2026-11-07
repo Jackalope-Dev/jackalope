@@ -8,6 +8,7 @@ import { useHelperStore } from '../../stores/helperStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { HelperAction } from './HelperAction';
 import './helper.css';
+import { describeError } from '../../lib/errors';
 
 const Markdown = lazy(() => import('../tasks/TaskMarkdown'));
 async function openLink(url: string) {
@@ -33,7 +34,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
       await operation();
       await useHelperStore.getState().refresh();
     } catch (error) {
-      setLocalError(String(error));
+      setLocalError(describeError(error));
     }
   };
   return (
@@ -96,7 +97,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
                       content={turn.answer}
                       active={false}
                       onOpenLink={(url) =>
-                        void openLink(url).catch((error) => setLocalError(String(error)))
+                        void openLink(url).catch((error) => setLocalError(describeError(error)))
                       }
                     />
                   </Suspense>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { prepareRemoteRequest } from '../../lib/remote-request.ts';
 import type { PendingUserPrompt, Review } from '../../lib/run-types';
 
@@ -137,7 +138,7 @@ export function useRemoteWorkspace(
     } catch (cause) {
       if (revision.current === current) {
         setStatus('Disconnected');
-        setConnectionError(String(cause));
+        setConnectionError(describeError(cause));
       }
     }
   }, [request, selected]);
@@ -164,7 +165,7 @@ export function useRemoteWorkspace(
       await request(action);
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -210,7 +211,7 @@ export function useRemoteWorkspace(
       }
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -227,7 +228,7 @@ export function useRemoteWorkspace(
       setReview({ runId, value: next });
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);

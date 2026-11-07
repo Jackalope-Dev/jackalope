@@ -1,5 +1,6 @@
 import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 
 interface BetaRequest {
@@ -41,7 +42,7 @@ export function BetaProgram({ onBeta }: { onBeta: boolean }) {
       setRequest(view.request);
       setLoaded(true);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       busyRef.current = false;
       setBusy(false);

@@ -1,6 +1,7 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
-import { Button, InlineNotice } from '@jackalope/ui';
+import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import {
   helperPreferencePatch,
   helperTheme,
@@ -20,6 +21,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { type ActiveTab, navigateWorkspace, openHelperDraft } from '../layout/navigation';
+import { ActionError } from '../ui/ActionError';
 
 const destinations: Record<string, ActiveTab> = {
   tasks: 'live-sessions',
@@ -218,7 +220,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
       await invokeNative('helper_action', { id: action.id, decision: 'complete', result });
       await useHelperStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       if (claimed)
         await invokeNative('helper_action', {
           id: action.id,
@@ -257,7 +259,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
                   setPreview(checkTheme().theme);
                   setError('');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             >
@@ -286,7 +288,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
               setPreview(undefined);
               void invokeNative('helper_action', { id: action.id, decision: 'dismiss' })
                 .then(() => useHelperStore.getState().refresh())
-                .catch((cause) => setError(String(cause)));
+                .catch((cause) => setError(describeError(cause)));
             }}
           >
             Cancel
@@ -311,7 +313,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
               setError('');
               await useHelperStore.getState().refresh();
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -320,7 +322,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           Undo change
         </button>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </article>
   );
 }

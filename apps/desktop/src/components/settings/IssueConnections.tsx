@@ -9,6 +9,7 @@ import {
   SettingRow,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 
@@ -28,7 +29,7 @@ export function IssueConnections() {
     setLoaded(true);
   }, []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   return (
     <SettingGroup title="Connected work">
@@ -49,7 +50,7 @@ export function IssueConnections() {
                 await invokeNative('issue_connection_remove', { provider: connection.provider });
                 await refresh();
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -73,7 +74,7 @@ export function IssueConnections() {
             setToken('');
             await refresh();
           } catch (cause) {
-            setError(String(cause));
+            setError(describeError(cause));
           } finally {
             setBusy(false);
           }
@@ -143,7 +144,7 @@ export function IssueConnections() {
                 provider === 'linear'
                   ? 'https://linear.app/settings/api'
                   : 'https://id.atlassian.com/manage-profile/security/api-tokens',
-              ).catch((cause) => setError(String(cause)))
+              ).catch((cause) => setError(describeError(cause)))
             }
           >
             Create API token
@@ -160,7 +161,7 @@ export function IssueConnections() {
               onClick={() =>
                 void refresh()
                   .then(() => setError(''))
-                  .catch((cause) => setError(String(cause)))
+                  .catch((cause) => setError(describeError(cause)))
               }
             >
               Retry

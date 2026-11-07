@@ -1,5 +1,6 @@
 import { Button, CopyButton, InlineNotice, SettingRow } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 
@@ -21,7 +22,7 @@ export function CliCommandSetting() {
     if (!isTauriEnvironment()) return;
     invokeNative<CommandStatus>('cli_install_status')
       .then(setStatus)
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, []);
   if (!isTauriEnvironment()) return null;
 
@@ -31,7 +32,7 @@ export function CliCommandSetting() {
     try {
       setStatus(await invokeNative<CommandStatus>('cli_install_system'));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setInstalling(false);
     }

@@ -5,15 +5,16 @@ import {
   DialogFooter,
   DialogHeader,
   FormField,
-  InlineNotice,
   Textarea,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 
 export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () => void }) {
   const [open, setOpen] = useState(false);
@@ -36,7 +37,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
         if (alive) setTree(value);
       },
       (cause) => {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       },
     );
     return () => {
@@ -66,7 +67,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
       setOpen(false);
       onApproved();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -121,7 +122,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
           </div>
         )}
         {!tree && !error && <p role="status">Checking the current files…</p>}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
             Cancel

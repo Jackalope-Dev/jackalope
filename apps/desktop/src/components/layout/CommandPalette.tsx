@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import { describeError } from '../../lib/errors';
 import { searchFiles } from '../../lib/file-search';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -309,7 +310,7 @@ export function CommandPalette({
                         editor: preferredEditor,
                       })
                         .then(onClose)
-                        .catch((cause) => setFileError(String(cause)));
+                        .catch((cause) => setFileError(describeError(cause)));
                     }}
                   >
                     <FileText size={16} />

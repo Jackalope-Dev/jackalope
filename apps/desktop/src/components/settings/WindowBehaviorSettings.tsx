@@ -1,5 +1,6 @@
 import { InlineNotice, SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 
@@ -23,7 +24,7 @@ export function WindowBehaviorSettings() {
         if (active) setSettings(value);
       },
       (reason) => {
-        if (active) setError(String(reason));
+        if (active) setError(describeError(reason));
       },
     );
     return () => {
@@ -39,7 +40,7 @@ export function WindowBehaviorSettings() {
       await invokeNative('desktop_set_close_to_tray', { enabled });
       setSettings({ ...settings, closeToTray: enabled });
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setSaving(false);
     }
@@ -53,7 +54,7 @@ export function WindowBehaviorSettings() {
       await invokeNative('desktop_set_launch_at_login', { enabled });
       setSettings({ ...settings, launchAtLogin: enabled });
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setSaving(false);
     }

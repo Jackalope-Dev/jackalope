@@ -7,18 +7,19 @@ import {
   DialogHeader,
   Disclosure,
   DisclosureSummary,
-  InlineNotice,
   Input,
   SearchField,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { type LiveSession, type SessionTopic, sessionCommand } from '../../lib/live-session';
 import { suggestTopics, topicDraft } from '../../lib/session-topics';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { openHelperDraft } from '../layout/navigation';
+import { ActionError } from '../ui/ActionError';
 
 export function SessionTopics({
   session,
@@ -82,7 +83,7 @@ export function SessionTopics({
       await useLiveSessionStore.getState().refresh(session.id);
       setEditing(null);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -103,7 +104,7 @@ export function SessionTopics({
       setOpen(false);
       openHelperDraft(key);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   return (
@@ -137,7 +138,7 @@ export function SessionTopics({
             New topic
           </Button>
         </div>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <div className="work-topics-layout">
           <nav className="work-topic-list" aria-label="Saved and suggested topics">
             {topics.map((topic) => (

@@ -19,6 +19,8 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { SwarmDelivery } from './SwarmDelivery';
 import { SwarmMap } from './SwarmMap';
 import './swarm.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 5000;
 const FILES_SHOWN = 8;
@@ -50,7 +52,7 @@ export function SwarmBoard() {
           setState(next);
           setError('');
         })
-        .catch((cause) => alive && setError(String(cause)));
+        .catch((cause) => alive && setError(describeError(cause)));
       if (projectPath)
         deployStatus(projectPath)
           .then((next) => alive && setDelivery(next))
@@ -119,7 +121,7 @@ export function SwarmBoard() {
       {!isTauriEnvironment() && (
         <InlineNotice>The swarm is available in the desktop app.</InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {!state && isTauriEnvironment() && !error && (
         <LoadingState compact label="Reading the swarm…" />
       )}

@@ -1,6 +1,7 @@
 import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { MousePointer2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -135,7 +136,7 @@ export function DesignPreview({
         }
       } catch (cause) {
         if (alive) {
-          setError(String(cause));
+          setError(describeError(cause));
           setWatching(false);
         }
       } finally {
@@ -173,7 +174,7 @@ export function DesignPreview({
                 'Select an element in the preview window. Its current page state is preserved.',
               );
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -210,7 +211,7 @@ export function DesignPreview({
                     : 'Feedback added. Selections were kept because storage is unavailable.',
                 );
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }

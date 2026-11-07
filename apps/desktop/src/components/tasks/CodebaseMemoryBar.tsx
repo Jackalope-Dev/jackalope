@@ -1,4 +1,4 @@
-import { Button, EmptyState, InlineNotice, LoadingState, RefreshIcon } from '@jackalope/ui';
+import { Button, EmptyState, LoadingState, RefreshIcon } from '@jackalope/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -17,6 +17,8 @@ import type { Project } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../projects/project-context.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function CodebaseMemoryBar({ project }: { project: Project }) {
   const { memories, scanning, refreshMemory } = useContextMemoryStore(
@@ -38,7 +40,7 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
     try {
       await refreshMemory(project);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     }
   };
   return (
@@ -58,7 +60,7 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
           </Button>
         }
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {busy && <LoadingState label="Reading project files…" compact={!!memory} />}
       {!memory ? (
         !busy && (

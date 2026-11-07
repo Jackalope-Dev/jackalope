@@ -30,6 +30,7 @@ import {
   swarmConnection,
 } from '../../lib/swarm';
 import './swarm-connection.css';
+import { describeError } from '../../lib/errors';
 
 type Phase = 'allow' | SwarmSetupStep;
 
@@ -82,7 +83,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
   const signingIn = useRef(false);
   const refresh = useCallback(async () => setStatus(await swarmConnection()), []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   useEffect(
     () => () => {
@@ -91,7 +92,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
     [],
   );
   const open = (link: string) =>
-    void openExternalUrl(link).catch((cause) => setError(String(cause)));
+    void openExternalUrl(link).catch((cause) => setError(describeError(cause)));
 
   const act = async (work: () => Promise<unknown>) => {
     setBusy(true);
@@ -100,7 +101,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
       await work();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -167,7 +168,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
         return;
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setRun(null);
     } finally {
       stop?.();

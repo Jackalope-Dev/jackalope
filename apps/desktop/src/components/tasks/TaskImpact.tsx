@@ -1,8 +1,10 @@
-import { Button, InlineNotice } from '@jackalope/ui';
+import { Button } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { scanCodebase } from '../../lib/codebase';
 import { affectedFiles } from '../../lib/codebase-impact';
+import { describeError } from '../../lib/errors';
 import type { TaskRun } from '../../lib/run-types';
+import { ActionError } from '../ui/ActionError';
 
 export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
   const [affected, setAffected] = useState<string[] | null>(null);
@@ -27,7 +29,7 @@ export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
       setTime(snapshot.scannedAt);
       if (snapshot.truncated) setError('The scan reached its limit; impact coverage is partial.');
     } catch (cause) {
-      if (generation.current === current) setError(String(cause));
+      if (generation.current === current) setError(describeError(cause));
     } finally {
       if (generation.current === current) setBusy(false);
     }
@@ -43,7 +45,7 @@ export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
       >
         Check affected files
       </Button>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {affected && (
         <section className="mt-3">
           <h3 className="text-base font-medium">{affected.length} files depend on these changes</h3>

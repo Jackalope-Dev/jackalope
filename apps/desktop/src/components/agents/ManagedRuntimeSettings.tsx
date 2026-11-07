@@ -1,8 +1,10 @@
 import { Button, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 interface RuntimeStatus {
@@ -26,7 +28,7 @@ export function ManagedRuntimeSettings() {
     [],
   );
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   const run = async (action: 'prepare' | 'cleanup' | 'remove') => {
     setBusy(true);
@@ -46,7 +48,7 @@ export function ManagedRuntimeSettings() {
       await refresh();
       await useExecutionStore.getState().discover();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -97,7 +99,7 @@ export function ManagedRuntimeSettings() {
       {runner.preparing && (
         <ManagedRuntimeProgress
           progress={runner.progress}
-          onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+          onCancel={() => void runner.cancel().catch((cause) => setError(describeError(cause)))}
         />
       )}
       {notice && (
@@ -105,7 +107,7 @@ export function ManagedRuntimeSettings() {
           {notice}
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

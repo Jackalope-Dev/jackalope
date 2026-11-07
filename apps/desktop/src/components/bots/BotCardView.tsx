@@ -1,4 +1,4 @@
-import { Button, InlineNotice, DropdownMenu as Menu, Textarea } from '@jackalope/ui';
+import { Button, DropdownMenu as Menu, Textarea } from '@jackalope/ui';
 import {
   CircleHelp,
   ExternalLink,
@@ -13,6 +13,8 @@ import { answerCard, type BotCard, dismissCard } from '../../lib/bot-hub';
 import { openExternalUrl } from '../../lib/native/env';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import './bot-card.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const KIND_ICONS = {
   decision: ListChecks,
@@ -42,7 +44,7 @@ export function BotCardView({
       await action();
       if (key === 'text') setText('');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(null);
     }
@@ -121,7 +123,7 @@ export function BotCardView({
           </Button>
         </form>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <footer className="bot-card-footer">
         {card.status === 'answered' && (
           <span>

@@ -1,5 +1,6 @@
 import { InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunUsage } from '../../lib/run-types';
@@ -21,7 +22,7 @@ export function JevConnectionUsage() {
         if (current) setTotals(value);
       })
       .catch((error) => {
-        if (current) setError(String(error));
+        if (current) setError(describeError(error));
       });
     return () => {
       current = false;

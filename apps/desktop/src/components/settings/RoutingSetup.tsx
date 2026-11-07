@@ -24,6 +24,7 @@ import {
   routingSettings,
 } from '../../lib/routing-settings';
 import './routing.css';
+import { describeError } from '../../lib/errors';
 import { DecisionOptions } from './DecisionOptions';
 
 function RoutingCircuit({ mode }: { mode: RoutingMode }) {
@@ -110,7 +111,7 @@ function RoutingSetup({
       setSettings(value);
       onChangeRef.current?.(value);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setLoading(false);
     }
@@ -143,7 +144,7 @@ function RoutingSetup({
       setKey('');
       setReplacing(false);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       operation.current = false;
       setPending(false);
@@ -161,7 +162,7 @@ function RoutingSetup({
       onModeChange(value.mode);
       setKey('');
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       operation.current = false;
       setPending(false);
@@ -422,7 +423,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
       );
       setMessage('Routing preference saved.');
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setSaving(false);
     }
@@ -480,7 +481,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
                       setJevFallback(value.jevFallback);
                       setMessage('Using the app default.');
                     })
-                    .catch((error) => setError(String(error)))
+                    .catch((error) => setError(describeError(error)))
                     .finally(() => setSaving(false));
                 }}
               >

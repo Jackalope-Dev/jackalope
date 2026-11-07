@@ -6,7 +6,6 @@ import {
   DialogFooter,
   DialogHeader,
   FormField,
-  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -30,6 +29,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { BotComputerSettings } from '../computers/BotComputerSettings';
 import { BrowserProfileSettings } from '../projects/BrowserProfileSettings';
 import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
+import { ActionError } from '../ui/ActionError';
 import { BotAppearancePicker } from './BotAppearancePicker';
 import { BotWakes } from './BotWakes';
 
@@ -409,7 +409,7 @@ export function BotEditor({
                 </>
               )}
             </div>
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
           </form>
           {bot && <BrowserProfileSettings owner={{ kind: 'bot', id: bot.id, name: bot.name }} />}
           {bot && <BotComputerSettings bot={{ id: bot.id, name: bot.name }} />}

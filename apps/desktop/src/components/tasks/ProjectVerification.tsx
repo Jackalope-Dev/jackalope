@@ -1,8 +1,10 @@
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun, Verification } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 
 export function ProjectVerification({
   run,
@@ -29,7 +31,7 @@ export function ProjectVerification({
     try {
       setResult(await invokeNative<Verification>('task_verify', { id: run.id, command: selected }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       await useExecutionStore.getState().refresh();
       setBusy(false);
@@ -60,7 +62,7 @@ export function ProjectVerification({
           Automatic checks could not finish: {run.verificationError}
         </InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {check ? (
         <div className="space-y-2">
           <p
@@ -104,7 +106,7 @@ export function ProjectVerification({
                   );
                   document.getElementById('task-reply')?.focus();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setCorrecting(false);
                 }

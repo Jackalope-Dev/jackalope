@@ -1,6 +1,5 @@
 import {
   Button,
-  InlineNotice,
   Select,
   SelectItem,
   SettingActions,
@@ -15,6 +14,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
+import { ActionError } from '../ui/ActionError';
 
 /**
  * Choices that apply across agents: which one starts new work, quota handoff and,
@@ -156,7 +156,7 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
           }
         />
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </div>
   );
 }

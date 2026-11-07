@@ -11,6 +11,7 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DecideSettings,
@@ -19,6 +20,7 @@ import {
   planCommands,
 } from '../../lib/plan-mode';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 
 const QUESTION_LIMITS = Array.from({ length: 13 }, (_, limit) => limit);
 const ROUND_LIMITS = [1, 2, 3, 5, 8, 12, 20];
@@ -57,7 +59,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
         setSettings(value);
         setPath(value.exportPath);
       })
-      .catch((cause) => current && setError(String(cause)));
+      .catch((cause) => current && setError(describeError(cause)));
     return () => {
       current = false;
     };
@@ -78,7 +80,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
     } catch (cause) {
       setSettings(previous);
       setPath(previous.exportPath);
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const agents = runners.filter((runner) => runner.available);
@@ -254,7 +256,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
             }}
           />
         </SettingRow>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </SettingGroup>
       <SettingGroup
         title="Autonomy"

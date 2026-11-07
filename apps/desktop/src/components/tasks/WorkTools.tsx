@@ -3,16 +3,17 @@ import {
   DialogCloseButton,
   DialogContent,
   DialogHeader,
-  InlineNotice,
   DropdownMenu as Menu,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { sessionCommand } from '../../lib/live-session';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { ActionError } from '../ui/ActionError';
 
 const TaskTerminal = lazy(() =>
   import('./TaskTerminal').then((m) => ({ default: m.TaskTerminal })),
@@ -84,7 +85,7 @@ export function WorkTools({
           </Menu.Content>
         </Menu.Portal>
       </Menu.Root>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </>
   );
 }
@@ -101,7 +102,7 @@ export function useWorkspaceActions(run?: TaskRun) {
     try {
       await action();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const windows: WorkspaceAction[] = (['result', 'changes', 'preview', 'terminal'] as const).map(

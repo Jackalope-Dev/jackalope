@@ -5,6 +5,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { capturedPages, capturePageName, type ReviewCaptures } from '../../lib/review-captures';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 import './review-screenshots.css';
+import { describeError } from '../../lib/errors';
 
 type Mode = 'slider' | 'side';
 
@@ -24,7 +25,7 @@ function useScreenshot(runId: string, artifact: ScreenshotArtifact | null | unde
         setSource(url);
       })
       .catch((reason) => {
-        if (!canceled) setError(String(reason));
+        if (!canceled) setError(describeError(reason));
       });
     return () => {
       canceled = true;

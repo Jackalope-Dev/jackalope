@@ -9,6 +9,7 @@ import {
   SelectItem,
 } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { previewUrl } from '../../lib/preview-url';
@@ -16,6 +17,7 @@ import { projectReadiness } from '../../lib/readiness';
 import type { ScreenshotArtifact, TaskRun } from '../../lib/run-types';
 import { stopPreview } from '../../lib/task-client';
 import { useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import { DesignPreview } from './DesignPreview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
@@ -102,7 +104,7 @@ export function TaskPreview({
         const value = await invokeNative<Preview | null>('task_preview_status', { id: run.id });
         if (alive && revision === statusRevision.current) setPreview(value);
       } catch (cause) {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       } finally {
         loading = false;
       }
@@ -123,7 +125,7 @@ export function TaskPreview({
     try {
       await fn();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       mutating.current = false;
       setBusy(false);
@@ -334,7 +336,7 @@ export function TaskPreview({
                     }>('task_preview_inspect', { id: run.id, requestId, path: address, narrow });
                     if (inspectionId.current === requestId) setInspection(result);
                   } catch (cause) {
-                    if (inspectionId.current === requestId) setError(String(cause));
+                    if (inspectionId.current === requestId) setError(describeError(cause));
                   } finally {
                     if (inspectionId.current === requestId) {
                       inspectionId.current = null;
@@ -354,7 +356,7 @@ export function TaskPreview({
                     setInspecting(false);
                     if (requestId)
                       void invokeNative('task_preview_inspect_cancel', { requestId }).catch(
-                        (cause) => setError(String(cause)),
+                        (cause) => setError(describeError(cause)),
                       );
                   }}
                 >
@@ -443,7 +445,7 @@ export function TaskPreview({
           {notice}
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {preview?.running && (
         <p className="task-muted">
           Stop preview before continuing or merging. It keeps running when you leave this view.

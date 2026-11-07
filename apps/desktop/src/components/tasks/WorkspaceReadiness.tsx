@@ -1,8 +1,10 @@
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { projectReadiness, type Readiness } from '../../lib/readiness';
 import { type Project, useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 
 export function WorkspaceReadiness({
   project,
@@ -33,7 +35,7 @@ export function WorkspaceReadiness({
       const value = await projectReadiness(path);
       if (version === request.current) setResult(value);
     } catch (cause) {
-      if (version === request.current) setError(String(cause));
+      if (version === request.current) setError(describeError(cause));
     } finally {
       if (version === request.current) setBusy(false);
     }
@@ -176,7 +178,7 @@ export function WorkspaceReadiness({
           </>
         )}
         {saved && <p role="status">{saved}</p>}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     </Disclosure>
   );

@@ -1,7 +1,6 @@
 import {
   Button,
   FormField,
-  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -13,8 +12,10 @@ import {
 } from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { describeError } from '../../lib/errors';
 import { useProjectStore } from '../../stores/projectStore';
 import { type SavedAction, useSavedActionsStore } from '../../stores/savedActionsStore';
+import { ActionError } from '../ui/ActionError';
 
 const empty = (): SavedAction => ({
   id: crypto.randomUUID(),
@@ -75,7 +76,7 @@ export function SavedActions() {
             setDraft(empty());
             setError('');
           } catch (reason) {
-            setError(String(reason));
+            setError(describeError(reason));
           }
         }}
       >
@@ -142,7 +143,7 @@ export function SavedActions() {
           </SettingActions>
         </SettingGroup>
       </form>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { Button, InlineNotice, Textarea } from '@jackalope/ui';
+import { Button, Textarea } from '@jackalope/ui';
 import { Check, MessageCircle, Send } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { PendingUserPrompt } from '../../lib/run-types';
@@ -10,6 +10,8 @@ import {
 } from './AgentDecision';
 import { HumanActionCard } from './HumanActionCard';
 import './task-experience.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function AgentQuestion(props: {
   prompt: PendingUserPrompt;
@@ -97,7 +99,7 @@ function QuestionCard({
       else await onContinue?.(displayAnswer(response, multiple) ?? response);
       setSent(response);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       inFlight.current = false;
       setSending(false);
@@ -256,7 +258,7 @@ function QuestionCard({
               />
             </label>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <div className="agent-question-footer">
             <span className="task-experience-muted">
               {continuing
@@ -324,7 +326,7 @@ export function OverrideAnswer({
           await onOverride(text.trim());
           setDone(true);
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         } finally {
           setSending(false);
         }
@@ -342,7 +344,7 @@ export function OverrideAnswer({
         onChange={(event) => setText(event.target.value)}
         disabled={sending}
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div className="agent-question-footer">
         <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={sending}>
           Cancel

@@ -7,11 +7,13 @@ import {
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
+import { ActionError } from '../ui/ActionError';
 
 export function UnsavedTasksNotice() {
   const runs = useExecutionStore((state) => state.runs);
@@ -74,7 +76,7 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
       }
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -114,7 +116,7 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
           {message}
         </InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

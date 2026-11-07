@@ -22,6 +22,7 @@ import {
   setProjectSecret,
 } from '../../lib/project-secrets';
 import './project-secrets.css';
+import { describeError } from '../../lib/errors';
 
 const AVAILABILITY: { value: SecretAvailability; title: string; description: string }[] = [
   { value: 'both', title: 'All agents', description: 'On this device and on computers.' },
@@ -107,7 +108,7 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
     setError('');
     void projectSecrets(projectId)
       .then((value) => current && setSecrets(value))
-      .catch((cause) => current && setError(String(cause)));
+      .catch((cause) => current && setError(describeError(cause)));
     return () => {
       current = false;
     };
@@ -120,7 +121,7 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
       setSecrets(await operation());
       return true;
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       return false;
     } finally {
       setBusy('');

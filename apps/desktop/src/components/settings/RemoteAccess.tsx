@@ -17,6 +17,7 @@ import type { RunRequest } from '../../lib/run-types';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
+import { describeError } from '../../lib/errors';
 
 interface Status {
   enabled: boolean;
@@ -156,7 +157,7 @@ export function RemoteAccess() {
           setError('');
         }
       } catch (cause) {
-        if (!signal?.aborted) setError(String(cause));
+        if (!signal?.aborted) setError(describeError(cause));
       }
     },
     [apply],
@@ -176,7 +177,7 @@ export function RemoteAccess() {
           const next = await invokeNative<Status>('remote_status');
           if (alive) setStatus(next);
         } catch (cause) {
-          if (alive) setError(String(cause));
+          if (alive) setError(describeError(cause));
         }
       }
       if (alive) timer = setTimeout(poll, 4000);
@@ -206,7 +207,7 @@ export function RemoteAccess() {
     try {
       await operation();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,8 @@
-import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { pendingWorkFeedback, type WorkFeedback } from '../../lib/work-feedback';
+import { ActionError } from '../ui/ActionError';
 
 export function WorkFeedbackInbox({
   taskId,
@@ -51,7 +53,7 @@ export function WorkFeedbackInbox({
                   localStorage.removeItem(item.key);
                   setItems(pendingWorkFeedback(taskId));
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }
@@ -67,7 +69,7 @@ export function WorkFeedbackInbox({
                   localStorage.removeItem(item.key);
                   setItems(pendingWorkFeedback(taskId));
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             >
@@ -75,7 +77,7 @@ export function WorkFeedbackInbox({
             </Button>
           </div>
         ))}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     </Disclosure>
   );

@@ -1,6 +1,5 @@
 import {
   Button,
-  InlineNotice,
   RefreshIcon,
   SettingActions,
   SettingBody,
@@ -9,12 +8,14 @@ import {
 } from '@jackalope/ui';
 import { Archive, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { statusLabel } from '../../lib/run-status';
 import type { ArchivedRun } from '../../lib/run-types';
 import { restoreArchivedTask } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 
 const PAGE = 20;
 
@@ -41,7 +42,7 @@ export function ArchivedHistory() {
         setShown(PAGE);
       }
     } catch (cause) {
-      if (id === request.current) setError(String(cause));
+      if (id === request.current) setError(describeError(cause));
     } finally {
       if (id === request.current) setLoading(false);
     }
@@ -65,7 +66,7 @@ export function ArchivedHistory() {
       setNotice('Task restored to your loaded history.');
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusyId(null);
     }
@@ -84,7 +85,7 @@ export function ArchivedHistory() {
         await load();
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setImporting(false);
     }
@@ -121,7 +122,7 @@ export function ArchivedHistory() {
     >
       {(error || notice || (!loading && runs.length === 0)) && (
         <SettingBody>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           {notice && (
             <p role="status" className="task-muted">
               {notice}

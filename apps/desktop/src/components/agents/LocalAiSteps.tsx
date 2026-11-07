@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import {
   downloadPercent,
   formatMemory,
@@ -93,7 +94,7 @@ export function LocalAiSteps({
       try {
         await action();
       } catch (cause) {
-        if (active.current) setError(String(cause));
+        if (active.current) setError(describeError(cause));
       } finally {
         working.current = false;
         if (active.current) {
@@ -138,7 +139,7 @@ export function LocalAiSteps({
     try {
       await openInBrowser(url);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const install = (tool: 'ollama' | 'opencode') =>
@@ -213,7 +214,7 @@ export function LocalAiSteps({
                   if (runner.preparing) await runner.cancel();
                   else await invokeNative('local_ai_cancel');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                   setStopping(false);
                 }
               }

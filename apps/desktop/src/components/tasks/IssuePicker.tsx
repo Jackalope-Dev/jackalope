@@ -5,6 +5,7 @@ import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { openSettings } from '../layout/navigation';
 import './issue-picker.css';
+import { describeError } from '../../lib/errors';
 
 export function IssuePicker({
   projectPath,
@@ -50,7 +51,7 @@ export function IssuePicker({
         ]);
         setNext(result.next);
       } catch (cause) {
-        if (current === revision.current) setError(String(cause));
+        if (current === revision.current) setError(describeError(cause));
       } finally {
         if (current === revision.current) setBusy(false);
       }
@@ -152,7 +153,7 @@ export function IssuePicker({
                   try {
                     onDraft(issuePrompt(selected));
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   }
                 }}
               >
@@ -164,7 +165,7 @@ export function IssuePicker({
                   try {
                     await openExternalUrl(issueUrl(selected.url));
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   }
                 }}
               >

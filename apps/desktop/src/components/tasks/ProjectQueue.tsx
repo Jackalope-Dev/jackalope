@@ -49,6 +49,8 @@ import { FeaturePlanner } from './FeaturePlanner';
 import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const emptyQueue: QueueView = {
   items: [],
@@ -102,7 +104,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           if (!disposed) setQueue(result);
         }
       } catch (error) {
-        if (!disposed) setError(String(error));
+        if (!disposed) setError(describeError(error));
       } finally {
         if (!disposed) {
           setLoading(false);
@@ -127,7 +129,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       await load();
       await refresh();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
     }
@@ -434,7 +436,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                         <p className="task-muted text-xs">{item.scopes.join(', ')}</p>
                       )}
                       {phase === 'queued' && <p className="queue-wait">{reason(item)}</p>}
-                      {item.error && <InlineNotice tone="error">{item.error}</InlineNotice>}
+                      <ActionError error={item.error} />
                       <Disclosure className="mt-2">
                         <DisclosureSummary className="task-summary">Task brief</DisclosureSummary>
                         <p className="queue-brief">{item.prompt}</p>

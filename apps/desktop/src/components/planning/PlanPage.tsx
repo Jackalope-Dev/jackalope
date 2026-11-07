@@ -52,6 +52,8 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { WorkspaceTabs } from '../ui/WorkspaceTabs';
 import { PlanAutonomyPanel } from './PlanAutonomy';
 import './plan-page.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 type Tab = 'plan' | 'progress' | 'revisions';
 const toneVariant = {
@@ -124,7 +126,7 @@ export function PlanPage() {
       setPlans(result.plans);
       setProblems(result.problems);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setPlans([]);
     }
   }, [project]);
@@ -141,7 +143,7 @@ export function PlanPage() {
       setView(await planCommands.get(current));
       setError('');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       loading.current = false;
     }
@@ -158,7 +160,7 @@ export function PlanPage() {
       await work();
       await Promise.all([load(), loadList()]);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
 
@@ -229,7 +231,7 @@ export function PlanPage() {
             ))}
           </nav>
           <div className="plan-detail">
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
             {view && view.id === current ? (
               <PlanDetail view={view} act={act} />
             ) : (
@@ -1107,7 +1109,7 @@ function PlanRevisions({ view }: { view: PlanView }) {
     planCommands
       .diff(view.id, from, to)
       .then((value) => alive && setChanges(value))
-      .catch((cause) => alive && setError(String(cause)));
+      .catch((cause) => alive && setError(describeError(cause)));
     return () => {
       alive = false;
     };
@@ -1150,7 +1152,7 @@ function PlanRevisions({ view }: { view: PlanView }) {
               ))}
             </Select>
           </div>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           {changes?.length === 0 && <p className="plan-muted">No section changed.</p>}
           {changes?.map((change) => (
             <section key={change.section} className="plan-diff">

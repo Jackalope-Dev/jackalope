@@ -7,12 +7,12 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
-  InlineNotice,
   Select,
   SelectItem,
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import {
@@ -27,6 +27,7 @@ import {
   weakestEvidence,
 } from '../../lib/task-outcomes';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ActionError } from '../ui/ActionError';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
 type OutcomeRun = Pick<
@@ -62,7 +63,7 @@ export function TaskOutcomes({
     try {
       setTree(await invokeNative<string>('task_outcome_snapshot', { id: run.id }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   useEffect(() => {
@@ -77,7 +78,7 @@ export function TaskOutcomes({
           }
         })
         .catch((cause) => {
-          if (alive) setError(String(cause));
+          if (alive) setError(describeError(cause));
         });
     return () => {
       alive = false;
@@ -103,7 +104,7 @@ export function TaskOutcomes({
       setEditing(null);
       setNote('');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setTree(null);
     } finally {
       setBusy(false);
@@ -278,7 +279,7 @@ export function TaskOutcomes({
               try {
                 await onAdvance();
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -300,7 +301,7 @@ export function TaskOutcomes({
           {selected.length === 1 ? 'requirement' : 'requirements'}
         </Button>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

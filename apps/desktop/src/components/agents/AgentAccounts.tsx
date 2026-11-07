@@ -30,6 +30,7 @@ import {
   setAgentProfileTag,
   setConfigDir,
 } from '../../lib/agent-profiles';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   accountProfiles,
@@ -39,6 +40,7 @@ import {
 } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import { AgentKeySignIn } from './AgentKeySignIn';
 import { DetectedKeysModal } from './DetectedKeysModal';
 
@@ -118,7 +120,7 @@ function EditAccount({
               }
               onClose();
             } catch (e) {
-              setError(String(e));
+              setError(describeError(e));
             } finally {
               setBusy(false);
             }
@@ -164,7 +166,7 @@ function EditAccount({
               the agent's default path when empty.
             </p>
           </details>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
               Cancel
@@ -256,7 +258,7 @@ export function AgentAccounts({
     try {
       await run();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setBusy('');
     }

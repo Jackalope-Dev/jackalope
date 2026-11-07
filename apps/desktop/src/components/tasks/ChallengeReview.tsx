@@ -30,6 +30,8 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { agentAdapter } from './CrossModelReviewPanel';
 import './challenge-review.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const NONE = 'none';
 
@@ -104,7 +106,7 @@ export function ChallengeDialog({
       if (failures.length < agents.length) onStarted();
       if (failures.length) setError(failures.join(' '));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -165,7 +167,7 @@ export function ChallengeDialog({
               Connect an agent in Agents to challenge work.
             </InlineNotice>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
               Cancel
@@ -230,7 +232,7 @@ function FindingCard({
         }),
       );
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -283,7 +285,7 @@ function FindingCard({
           </p>
         )}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {output && (
         <Disclosure>
           <DisclosureSummary className="task-summary">Output from the new run</DisclosureSummary>
@@ -359,7 +361,7 @@ export function ChallengeFindings({
       await onCorrect(authorFollowUp(chosen, agentName));
       document.getElementById('task-reply')?.focus();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSending(false);
     }
@@ -405,7 +407,7 @@ export function ChallengeFindings({
           This attempt can’t take a follow-up, so findings can’t be sent from here.
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {findings.length > 0 ? (
         <ol className="challenge-findings" aria-label="Proven findings">
           {findings.map((finding) => (

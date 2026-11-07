@@ -1,18 +1,12 @@
 import { Button, FormField, Input, Textarea } from '@jackalope/ui';
 import { Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import './drafted-message.css';
 
 interface Message {
   title: string;
   body: string;
-}
-
-/** Commit failures arrive as structured objects; everything else as text. */
-export function errorMessage(cause: unknown) {
-  if (cause && typeof cause === 'object' && 'message' in cause)
-    return String((cause as { message: unknown }).message);
-  return String(cause);
 }
 
 /**
@@ -36,7 +30,7 @@ export function useDraftedMessage(generate: () => Promise<Message>) {
         setBody((typed) => (replace ? text.body : typed || text.body));
       })
       .catch((cause) => {
-        if (current === attempt.current) setError(errorMessage(cause));
+        if (current === attempt.current) setError(describeError(cause));
       })
       .finally(() => {
         if (current === attempt.current) setDrafting(false);

@@ -46,6 +46,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
+import { describeError } from '../../lib/errors';
 import { stopTask } from '../../lib/task-client';
 import { CommitFilesList, STATUS } from './CommitFilesList';
 import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
@@ -188,7 +189,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       if (kept.length !== (excluded[target] ?? []).length) setExcluded(target, kept);
       setFocused((previous) => (paths.has(previous) ? previous : (next.files[0]?.path ?? '')));
     } catch (cause) {
-      if (current.current === target) setError(String(cause));
+      if (current.current === target) setError(describeError(cause));
     } finally {
       if (current.current === target) setLoading(false);
     }
@@ -208,7 +209,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     if (!projectPath || !desktop) return;
     projectGitPolicy(projectPath)
       .then(setPolicy)
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, [projectPath, desktop]);
   useEffect(() => {
     const onFocus = () => void refresh();
@@ -232,7 +233,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       .catch((cause) => {
         if (!live) return;
         setPatch(null);
-        setPatchError(String(cause));
+        setPatchError(describeError(cause));
       });
     return () => {
       live = false;
@@ -267,7 +268,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       });
       setFeedback(`Discarded changes to ${file.path}.`);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       await refresh();
     }
@@ -289,7 +290,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       setTitle(message.title);
       setBody(message.body);
     } catch (cause) {
-      setGenerateError(String(cause));
+      setGenerateError(describeError(cause));
     } finally {
       setGenerating(false);
     }

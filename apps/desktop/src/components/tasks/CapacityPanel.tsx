@@ -1,4 +1,4 @@
-import { Badge, Button, InlineNotice, LoadingState, Panel, RefreshIcon } from '@jackalope/ui';
+import { Badge, Button, LoadingState, Panel, RefreshIcon } from '@jackalope/ui';
 import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
@@ -10,6 +10,7 @@ import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStor
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 import { ProviderMark } from '../agents/ProviderMark';
+import { ActionError } from '../ui/ActionError';
 
 const agentName = (agent: string) =>
   agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
@@ -126,7 +127,7 @@ export function CapacityPanel() {
           </Button>
         }
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {loading && (
         <LoadingState
           label={records.length ? 'Updating account limits…' : 'Reading available account limits…'}

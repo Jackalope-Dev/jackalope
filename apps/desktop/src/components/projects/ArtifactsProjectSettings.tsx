@@ -23,6 +23,7 @@ import {
   suggestRepoName,
   validRepoName,
 } from '../../lib/cloudflare-artifacts';
+import { describeError } from '../../lib/errors';
 import { ArtifactsConnectForm, ArtifactsTitle } from '../settings/ArtifactsConnection';
 import { FirstCommit } from './FirstCommit';
 
@@ -52,7 +53,7 @@ export function ArtifactsProjectSettings({
     setLink(nextLink);
   }, [projectPath]);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   const run = async (kind: Busy, action: () => Promise<void>) => {
     if (busy) return;
@@ -62,7 +63,7 @@ export function ArtifactsProjectSettings({
     try {
       await action();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       await refresh().catch(() => {});
     } finally {
       setBusy('');
@@ -76,7 +77,7 @@ export function ArtifactsProjectSettings({
           className="settings-block"
           onConnected={(next) => {
             setStatus(next);
-            void refresh().catch((cause) => setError(String(cause)));
+            void refresh().catch((cause) => setError(describeError(cause)));
           }}
         />
       )}
@@ -86,14 +87,14 @@ export function ArtifactsProjectSettings({
             <FirstCommit
               projectPath={projectPath}
               reason="Artifacts needs at least one commit."
-              onCommitted={() => void refresh().catch((cause) => setError(String(cause)))}
+              onCommitted={() => void refresh().catch((cause) => setError(describeError(cause)))}
             />
           ) : (
             <InlineNotice
               action={
                 <Button
                   variant="outline"
-                  onClick={() => void refresh().catch((cause) => setError(String(cause)))}
+                  onClick={() => void refresh().catch((cause) => setError(describeError(cause)))}
                 >
                   Check again
                 </Button>

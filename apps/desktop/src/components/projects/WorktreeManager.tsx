@@ -29,6 +29,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
+import { describeError } from '../../lib/errors';
 import {
   archiveWorktree,
   cleanupWorktree,
@@ -44,6 +45,7 @@ import { openChanges } from '../../stores/commitReviewStore';
 import { useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorktreeRemovalPlan as RemovalPlan } from './WorktreeRemovalPlan';
@@ -170,7 +172,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       }>('git_worktree_usage', { repoPath: projectPath, worktreePath: path });
       setSizes((previous) => ({ ...previous, [path]: value }));
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setMeasuring('');
     }
@@ -645,7 +647,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )}
           {loading && <LoadingState label="Loading worktrees…" compact={!!worktrees.length} />}
           {checkingWorktrees && <LoadingState label="Checking merge and cleanup status…" compact />}
-          {worktreesError && <InlineNotice tone="error">{worktreesError}</InlineNotice>}
+          <ActionError error={worktreesError} />
           {active.length > 0 && (
             <section className="worktree-group" aria-labelledby="worktrees-active">
               <header className="worktree-group-heading">

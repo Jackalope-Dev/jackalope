@@ -10,6 +10,7 @@ import {
   type LocalLlmEndpoint,
 } from '../../lib/local-detection';
 import './detected-keys.css';
+import { describeError } from '../../lib/errors';
 
 export function DetectedKeysModal({
   open,
@@ -40,7 +41,7 @@ export function DetectedKeysModal({
       // Keys start unselected so nothing is imported without a choice.
       setSelectedKeys(new Set());
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }
@@ -83,7 +84,7 @@ export function DetectedKeysModal({
       await scan();
       onImported?.();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setImporting(false);
     }

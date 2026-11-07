@@ -75,6 +75,8 @@ import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 import { useWorkspaceActions } from './WorkTools';
 import './task-detail.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 const TaskTerminal = lazy(() =>
@@ -255,7 +257,7 @@ export function TaskDetail({
         if (alive) setConnections(projectConnections(servers, run.projectId));
       })
       .catch((cause) => {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       });
     return () => {
       alive = false;
@@ -269,7 +271,7 @@ export function TaskDetail({
       await invokeNative(command, { id: run.id });
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setActing(false);
     }
@@ -284,7 +286,7 @@ export function TaskDetail({
       await refresh();
       useExecutionStore.getState().select(id);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setRetrying(false);
     }
@@ -325,7 +327,7 @@ export function TaskDetail({
       if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
         draft(key, { prompt: '' });
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setActing(false);
     }
@@ -350,7 +352,7 @@ export function TaskDetail({
     try {
       await openInBrowser(href);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, []);
   const copyResult = async () => {
@@ -616,7 +618,7 @@ export function TaskDetail({
           />
         )}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {notice && (
         <p role="status" className="task-muted">
           {notice}
@@ -921,7 +923,7 @@ export function TaskDetail({
               setToolsOpen(false);
               void listMcpServers(run.projectId)
                 .then((servers) => setConnections(projectConnections(servers, run.projectId)))
-                .catch((cause) => setError(String(cause)));
+                .catch((cause) => setError(describeError(cause)));
             }}
           />
         </Suspense>

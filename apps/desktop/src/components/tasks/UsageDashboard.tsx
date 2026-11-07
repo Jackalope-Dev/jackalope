@@ -15,6 +15,7 @@ import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { countedTaskDecisions } from '../../lib/decision-usage';
+import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { taskTitle } from '../../lib/task-title';
@@ -31,6 +32,7 @@ import {
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -82,7 +84,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
       setHelperReport(report);
       setHelperLedgerError(null);
     } catch (error) {
-      setHelperLedgerError(String(error));
+      setHelperLedgerError(describeError(error));
     }
   }, [refreshHelper]);
   useEffect(() => {
@@ -489,7 +491,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
               }
             />
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           {loading ? (
             <p role="status">Loading usage…</p>
           ) : historyError ? null : !sorted.length ? (

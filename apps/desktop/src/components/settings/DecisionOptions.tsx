@@ -16,6 +16,7 @@ import type {
   ModelEvidence,
   DecisionOptions as Options,
 } from '../../lib/decisions';
+import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 
 const helpers = [
@@ -84,7 +85,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
         setModelKeys(value.options.models.map(() => crypto.randomUUID()));
       }
     } catch (cause) {
-      if (ticket === generation.current) setError(String(cause));
+      if (ticket === generation.current) setError(describeError(cause));
     }
   }, [projectId]);
   useEffect(() => {
@@ -111,7 +112,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
       setModelKeys(value.options.models.map(() => crypto.randomUUID()));
       setMessage('Decision assistance saved.');
     } catch (cause) {
-      if (ticket === generation.current) setError(String(cause));
+      if (ticket === generation.current) setError(describeError(cause));
     } finally {
       if (ticket === generation.current) setPending(false);
     }
