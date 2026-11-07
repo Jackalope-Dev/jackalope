@@ -25,7 +25,7 @@ import { type ActiveTab, navigateWorkspace, openHelperDraft } from '../layout/na
 import { ActionError } from '../ui/ActionError';
 
 const destinations: Record<string, ActiveTab> = {
-  tasks: 'live-sessions',
+  tasks: 'kanban',
   agents: 'agents',
   'agent-settings': 'agent-settings',
   mcp: 'mcps',

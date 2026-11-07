@@ -12,22 +12,43 @@ import {
   GitCommitHorizontal,
   GitFork,
   History,
-  Layers3,
   ListTodo,
+  type LucideIcon,
   Network,
   Plug,
   Settings2,
   Share2,
 } from 'lucide-react';
+import { openExternalUrl } from '../../lib/native/env';
+import type { Feature } from '../../lib/telemetry';
+export type ViewGroup = 'tasks' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
+
+/**
+ * Every workspace view. Shell renders each page from workspace-views.tsx, records the
+ * view's telemetry feature and builds group subnavigation from these entries; command
+ * search lists them by label, description and keywords.
+ */
+interface ViewEntry {
+  id: string;
+  label: string;
+  /** The label in its group's subnavigation and the project menu. */
+  shortLabel?: string;
+  description: string;
+  icon: LucideIcon;
+  group: ViewGroup;
+  /** Listed in the sidebar's top navigation. */
+  primary?: boolean;
+  feature: Feature;
+  keywords?: string;
+  /** A search entry for a Settings category rather than a page of its own. */
+  settings?: 'Diagnostics' | 'System';
+  /** A page reached from another view, whose subnavigation item stays highlighted. */
+  within?: string;
+  /** Left out of subnavigation and the project menu unless open (or Swarm is connected). */
+  listed?: 'when-open' | 'when-swarm';
+}
+
 export const WORKSPACE_VIEWS = [
-  {
-    id: 'live-sessions',
-    label: 'Work',
-    description: 'Work: a conversation to send a message, follow work and review changes.',
-    icon: Layers3,
-    group: 'tasks',
-    primary: false,
-  },
   {
     id: 'kanban',
     label: 'Work',
@@ -36,6 +57,7 @@ export const WORKSPACE_VIEWS = [
     icon: ListTodo,
     group: 'tasks',
     primary: true,
+    feature: 'tasks',
   },
   {
     id: 'bots',
@@ -44,6 +66,7 @@ export const WORKSPACE_VIEWS = [
     icon: BotMessageSquare,
     group: 'bots',
     primary: true,
+    feature: 'agents',
   },
   {
     id: 'schedules',
@@ -51,7 +74,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Bots: recurring tasks and their run history.',
     icon: CalendarClock,
     group: 'bots',
-    primary: false,
+    feature: 'schedules',
   },
   {
     id: 'remote-hosts',
@@ -59,7 +82,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Connect to trusted hosts and continue work from another device.',
     icon: Network,
     group: 'hosts',
-    primary: false,
+    feature: 'connections',
   },
   {
     id: 'project-overview',
@@ -68,7 +91,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Resume work, prepare your project and deliver results.',
     icon: Network,
     group: 'project',
-    primary: false,
+    feature: 'project',
   },
   {
     id: 'changes',
@@ -76,7 +99,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: review uncommitted work and commit it.',
     icon: GitCommitHorizontal,
     group: 'project',
-    primary: false,
+    feature: 'project',
   },
   {
     id: 'worktrees',
@@ -84,7 +107,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: inspect and clean up branches.',
     icon: GitBranch,
     group: 'project',
-    primary: false,
+    feature: 'worktrees',
   },
   {
     id: 'topology',
@@ -92,7 +115,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Explore codebase dependencies and project worktrees.',
     icon: Network,
     group: 'project',
-    primary: false,
+    feature: 'codebase',
   },
   {
     id: 'project-knowledge',
@@ -100,7 +123,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: repository context, saved lessons and workflows.',
     icon: BookOpen,
     group: 'project',
-    primary: false,
+    feature: 'knowledge',
   },
   {
     id: 'repo-todos',
@@ -109,7 +132,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: view, edit and create repository TODOs and roadmaps.',
     icon: ListTodo,
     group: 'project',
-    primary: false,
+    feature: 'project',
   },
   {
     id: 'plans',
@@ -117,7 +140,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: plans to review, approve and follow while they run.',
     icon: ClipboardList,
     group: 'project',
-    primary: false,
+    feature: 'tasks',
   },
   {
     id: 'swarm',
@@ -125,7 +148,8 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: every agent fork on Artifacts and the conflicts between them.',
     icon: GitFork,
     group: 'project',
-    primary: false,
+    feature: 'project',
+    listed: 'when-swarm',
   },
   {
     id: 'cloud-resources',
@@ -133,7 +157,8 @@ export const WORKSPACE_VIEWS = [
     description: 'Project: Cloudflare storage, databases and queues for this project.',
     icon: Cloud,
     group: 'project',
-    primary: false,
+    feature: 'settings',
+    listed: 'when-open',
   },
   {
     id: 'project-settings',
@@ -142,7 +167,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Repository preferences, instructions and verification.',
     icon: Settings2,
     group: 'project',
-    primary: false,
+    feature: 'settings',
   },
   {
     id: 'agents',
@@ -151,6 +176,7 @@ export const WORKSPACE_VIEWS = [
     icon: Bot,
     group: 'agents',
     primary: true,
+    feature: 'agents',
   },
   {
     id: 'mcps',
@@ -158,7 +184,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Install and configure MCP tools.',
     icon: Plug,
     group: 'agents',
-    primary: false,
+    feature: 'connections',
   },
   {
     id: 'mcp-marketplace',
@@ -166,7 +192,8 @@ export const WORKSPACE_VIEWS = [
     description: 'MCP: discover and install tools and services.',
     icon: Plug,
     group: 'agents',
-    primary: false,
+    feature: 'connections',
+    within: 'mcps',
   },
   {
     id: 'connected-apps',
@@ -175,7 +202,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Agents: sign in to apps once through Composio for every agent.',
     icon: Blocks,
     group: 'agents',
-    primary: false,
+    feature: 'connections',
   },
   {
     id: 'usage',
@@ -184,7 +211,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Agents: account limits and recorded token usage.',
     icon: ChartNoAxesColumn,
     group: 'agents',
-    primary: false,
+    feature: 'usage',
   },
   {
     id: 'browser',
@@ -192,7 +219,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Tasks: screenshots and check results.',
     icon: FileCheck2,
     group: 'tasks',
-    primary: false,
+    feature: 'browser',
   },
   {
     id: 'agent-settings',
@@ -200,7 +227,8 @@ export const WORKSPACE_VIEWS = [
     description: 'Agents: accounts, models, paths and defaults.',
     icon: Settings2,
     group: 'agents',
-    primary: false,
+    feature: 'agents',
+    within: 'agents',
   },
   {
     id: 'audit',
@@ -208,7 +236,8 @@ export const WORKSPACE_VIEWS = [
     description: 'Settings: activity log, routing and discovery events.',
     icon: History,
     group: 'settings',
-    primary: false,
+    feature: 'settings',
+    settings: 'Diagnostics',
   },
   {
     id: 'mesh',
@@ -216,7 +245,8 @@ export const WORKSPACE_VIEWS = [
     description: 'Settings: this computer and device information.',
     icon: Share2,
     group: 'settings',
-    primary: false,
+    feature: 'settings',
+    settings: 'System',
   },
   {
     id: 'preferences',
@@ -224,26 +254,44 @@ export const WORKSPACE_VIEWS = [
     description: 'App preferences, appearance, privacy and support.',
     icon: Settings2,
     group: 'settings',
-    primary: false,
+    feature: 'settings',
   },
-] as const;
+] as const satisfies readonly ViewEntry[];
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
+/** Views with a page of their own; the others open a Settings category. */
+export type PageTab = Exclude<
+  ActiveTab,
+  Extract<(typeof WORKSPACE_VIEWS)[number], { settings: string }>['id']
+>;
 export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'kanban';
-/** Agents subnavigation; the tool marketplace opens from Tools and highlights it. */
-export const AGENT_VIEWS = [
-  { id: 'agents', label: 'Agents' },
-  { id: 'mcps', label: 'Tools' },
-  { id: 'connected-apps', label: 'Apps' },
-  { id: 'usage', label: 'Usage' },
-] as const;
+
+export function workspaceView(id: ActiveTab): ViewEntry {
+  return WORKSPACE_VIEWS.find((item) => item.id === id) ?? WORKSPACE_VIEWS[0];
+}
 
 /** The label a view shows in its group's subnavigation. */
 export function viewLabel(id: ActiveTab) {
-  const view: { label: string; shortLabel?: string } | undefined = WORKSPACE_VIEWS.find(
-    (item) => item.id === id,
-  );
-  return view?.shortLabel ?? view?.label ?? id;
+  const view = workspaceView(id);
+  return view.shortLabel ?? view.label;
 }
+
+/** The subnavigation item that stays highlighted while `id` is open. */
+export function highlightedView(id: ActiveTab) {
+  return (workspaceView(id).within as ActiveTab | undefined) ?? id;
+}
+
+export const PRIMARY_VIEWS = WORKSPACE_VIEWS.filter((item) => 'primary' in item && item.primary);
+
+/** The views a group's subnavigation and the project menu list. */
+export function groupViews(group: ViewGroup, open?: ActiveTab, swarmConnected = false) {
+  return WORKSPACE_VIEWS.filter((item: ViewEntry) => {
+    if (item.group !== group || item.within || item.settings) return false;
+    if (item.listed === 'when-open') return item.id === open;
+    if (item.listed === 'when-swarm') return swarmConnected || item.id === open;
+    return true;
+  });
+}
+
 export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
 }
@@ -289,4 +337,16 @@ export function openHelperDraft(key: string) {
 
 export function openAgentConfiguration(agentId: string) {
   window.dispatchEvent(new CustomEvent('jackalope:configure-agent', { detail: agentId }));
+}
+
+export const OPEN_SHORTCUTS_EVENT = 'jackalope:open-shortcuts';
+
+export function openShortcuts() {
+  window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_EVENT));
+}
+
+const HELP_URL = 'https://jackalope.dev/knowledge/';
+
+export function openHelp() {
+  return openExternalUrl(HELP_URL);
 }

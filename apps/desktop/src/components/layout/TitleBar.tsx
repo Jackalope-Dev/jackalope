@@ -1,11 +1,12 @@
 import { Tooltip } from '@jackalope/ui';
 import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { openHelp } from './navigation';
 
 const isMac = isMacPlatform();
 
@@ -136,7 +137,7 @@ export function TitleBar({
             aria-label="Help and knowledgebase"
             onMouseDown={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
-            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+            onClick={() => void openHelp()}
           >
             <LifeBuoy size={16} />
           </button>

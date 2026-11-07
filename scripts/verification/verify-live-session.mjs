@@ -388,7 +388,7 @@ try {
   assert.ok(
     await page.evaluate(() =>
       window.sessionFixture.navigation.some(
-        (view) => view.id === 'live-sessions' && view.group === 'tasks',
+        (view) => view.id === 'kanban' && view.group === 'tasks',
       ),
     ),
   );

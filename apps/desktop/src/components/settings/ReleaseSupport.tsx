@@ -14,6 +14,7 @@ import { DISCORD_URL } from '../../lib/community';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useAction } from '../../lib/useAction';
+import { openHelp } from '../layout/navigation';
 import { FeedbackForm } from './FeedbackForm';
 import { UpdateSettings } from './UpdateSettings';
 
@@ -38,10 +39,7 @@ export function ReleaseSupport() {
           title="Documentation & guides"
           description="Architecture guides, agent configuration, worktree workflows and troubleshooting recipes in the online Knowledgebase."
         >
-          <Button
-            variant="outline"
-            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
-          >
+          <Button variant="outline" onClick={() => void openHelp()}>
             <LifeBuoy className="size-4 mr-2" />
             Browse Knowledgebase
           </Button>

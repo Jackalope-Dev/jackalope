@@ -2,20 +2,10 @@ import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 import { primaryModifier } from '../../lib/platform-shortcuts';
-import {
-  displayShortcut,
-  resolveShortcuts,
-  type ShortcutAction,
-  shortcutNames,
-} from '../../lib/shortcuts';
+import { displayShortcut, resolveShortcuts, shortcutNames } from '../../lib/shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
-
-/** Window event that opens the keyboard shortcut sheet. */
-const OPEN_SHORTCUTS = 'jackalope:open-shortcuts';
-
-export function openShortcuts() {
-  window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS));
-}
+import { COMMANDS } from './commands';
+import { OPEN_SHORTCUTS_EVENT } from './navigation';
 
 function typing(target: EventTarget | null) {
   return (
@@ -36,10 +26,10 @@ export function ShortcutSheet() {
       event.preventDefault();
       setOpen(true);
     };
-    window.addEventListener(OPEN_SHORTCUTS, show);
+    window.addEventListener(OPEN_SHORTCUTS_EVENT, show);
     window.addEventListener('keydown', key);
     return () => {
-      window.removeEventListener(OPEN_SHORTCUTS, show);
+      window.removeEventListener(OPEN_SHORTCUTS_EVENT, show);
       window.removeEventListener('keydown', key);
     };
   }, []);
@@ -48,10 +38,11 @@ export function ShortcutSheet() {
   const groups: { title: string; rows: [string, string][] }[] = [
     {
       title: 'Workspace',
-      rows: (Object.keys(bindings) as ShortcutAction[]).map((action) => [
-        shortcutNames[action],
-        displayShortcut(bindings[action]),
-      ]),
+      rows: COMMANDS.flatMap(({ shortcut }) =>
+        shortcut
+          ? [[shortcutNames[shortcut], displayShortcut(bindings[shortcut])] as [string, string]]
+          : [],
+      ),
     },
     {
       title: 'Open work',

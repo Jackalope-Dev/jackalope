@@ -24,7 +24,7 @@ import {
   useWorkSignals,
   WorkSignals,
 } from '../tasks/WorkSignals';
-import { type ActiveTab, viewLabel, WORKSPACE_VIEWS } from './navigation';
+import { type ActiveTab, groupViews, viewLabel, workspaceView } from './navigation';
 
 /** Finished rows shown per project before the rest are left to the Work page. */
 const RECENT_PER_PROJECT = 3;
@@ -79,9 +79,7 @@ type ProjectActions = {
   onRemoveProject: (project: Project) => void;
 };
 
-const projectViews = WORKSPACE_VIEWS.filter(
-  (view) => view.group === 'project' && view.id !== 'swarm' && view.id !== 'cloud-resources',
-);
+const projectViews = groupViews('project');
 
 /**
  * A project's actions, shared by its options button and its right-click menu so both
@@ -113,7 +111,7 @@ function ProjectMenuItems({
           onSelect={() => onOpenProject(project.id, view.id)}
         >
           <view.icon size={16} aria-hidden="true" />
-          {view.id === 'project-overview' ? 'Overview' : viewLabel(view.id)}
+          {viewLabel(view.id)}
         </M.Item>
       ))}
       <M.Separator className="menu-separator" />
@@ -209,7 +207,7 @@ export function WorkSidebar({
       .map((item) => item.run),
   );
   const somethingOpen = Boolean(selectedRun || selectedSession || selectedManaged);
-  const projectView = WORKSPACE_VIEWS.find((view) => view.id === activeTab)?.group === 'project';
+  const projectView = workspaceView(activeTab).group === 'project';
   const open = (item: WorkItem) => {
     openWork(item);
     onOpen();
