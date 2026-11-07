@@ -439,7 +439,11 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
         .is_none());
     let host = runtime.run_snapshot(&anywhere).unwrap().host.unwrap();
     assert!(host.is_device(), "{host:?}");
-    assert!(host.reason.contains("cannot run on Box yet"), "{}", host.reason);
+    assert!(
+        host.reason.contains("cannot run on Box yet"),
+        "{}",
+        host.reason
+    );
 
     // Computers only: the fork fails with the reason and never runs here.
     pool::save(
@@ -476,7 +480,9 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
     );
     let mut policy = crate::commands::agent_policy::AgentPolicy::default();
     for agent in super::super::BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*agent).into(), *agent == "gemini");
+        policy
+            .enabled_agents
+            .insert((*agent).into(), *agent == "gemini");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -488,7 +494,8 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
     };
     let error = runtime.route(&mut auto).unwrap_err();
     assert!(
-        error.starts_with("No enabled agent that can run on Box") && error.contains(COMPUTERS_ONLY_FIX),
+        error.starts_with("No enabled agent that can run on Box")
+            && error.contains(COMPUTERS_ONLY_FIX),
         "{error}"
     );
     assert_eq!(auto.agent, "auto");
@@ -507,7 +514,9 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
     runtime.update(&here, |run| {
         run.host = Some(RunHost::device("Placed on this device.".into()))
     });
-    assert!(runtime.computers_only_host(&here, "fixture", None).is_none());
+    assert!(runtime
+        .computers_only_host(&here, "fixture", None)
+        .is_none());
     // A continuation follows the attempt it continues.
     let next = insert_run(&runtime, &folder);
     assert!(runtime

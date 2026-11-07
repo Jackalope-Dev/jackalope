@@ -712,13 +712,13 @@ impl TaskRuntime {
         let mut candidates = self.routing_candidates(req, &policy, false)?;
         candidates.retain(|candidate| eligible(candidate, &history.handoffs));
         if candidates.is_empty() {
-            if let Some(host) = self.computers_only_host(
-                &req.id,
-                &req.project_id,
-                req.previous_run_id.as_deref(),
-            ) {
+            if let Some(host) =
+                self.computers_only_host(&req.id, &req.project_id, req.previous_run_id.as_deref())
+            {
                 let reason = super::runner::no_computer_agent(&host);
-                self.update(&req.id, |run| activity(run, &format!("Placement: {reason}")));
+                self.update(&req.id, |run| {
+                    activity(run, &format!("Placement: {reason}"))
+                });
                 return Err(reason);
             }
             return Err("No enabled agent, model and account combination has sufficient available quota. Review Agents settings or wait for quota to reset.".into());
