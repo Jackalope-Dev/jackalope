@@ -1,6 +1,6 @@
 import { Button, Disclosure, DisclosureSummary, InlineNotice, Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -9,6 +9,7 @@ import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice'
 import { HelperAction } from './HelperAction';
 import './helper.css';
 import { describeError } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
 
 const Markdown = lazy(() => import('../tasks/TaskMarkdown'));
 async function openLink(url: string) {
@@ -19,7 +20,11 @@ async function openLink(url: string) {
 export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
   const helper = useHelperStore();
   const agent = useAgentConfigStore((state) => state.defaultMetaAgent);
-  const [localError, setLocalError] = useState('');
+  const {
+    run: action,
+    error: localError,
+    setError: setLocalError,
+  } = useAction(() => useHelperStore.getState().refresh());
   const input = useRef<HTMLTextAreaElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const working = helper.sending || helper.view.turns.some((turn) => turn.status === 'working');
@@ -28,15 +33,6 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
   useEffect(() => {
     if (count) scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
   }, [count]);
-  const action = async (operation: () => Promise<unknown>) => {
-    setLocalError('');
-    try {
-      await operation();
-      await useHelperStore.getState().refresh();
-    } catch (error) {
-      setLocalError(describeError(error));
-    }
-  };
   return (
     <section className="helper-chat" aria-label="Ask Jackalope">
       <div className="helper-body" ref={scroll}>

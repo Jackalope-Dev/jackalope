@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { useAction } from '../../lib/useAction';
 import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
@@ -20,21 +21,16 @@ export function CompanionSettings() {
   const settings = useSettingsStore();
   const supported = useNotificationStore((state) => state.status?.supported);
   const native = isTauriEnvironment();
-  const [localError, setLocalError] = useState('');
+  const {
+    run: action,
+    error: localError,
+    setError: setLocalError,
+  } = useAction(() => useHelperStore.getState().refresh());
   const [connection, setConnection] = useState<{ url: string; token: string }>();
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!helper.view.connected) setConnection(undefined);
   }, [helper.view.connected]);
-  const action = async (operation: () => Promise<unknown>) => {
-    setLocalError('');
-    try {
-      await operation();
-      await useHelperStore.getState().refresh();
-    } catch (error) {
-      setLocalError(describeError(error));
-    }
-  };
   return (
     <section className="helper-settings" aria-label="Helper settings">
       <section>

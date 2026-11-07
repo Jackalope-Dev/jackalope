@@ -11,30 +11,17 @@ import {
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
-import { describeError } from '../../lib/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { useAction } from '../../lib/useAction';
 import { FeedbackForm } from './FeedbackForm';
 import { UpdateSettings } from './UpdateSettings';
 
 export function ReleaseSupport() {
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [feedback, setFeedback] = useState('');
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { run: act, busy, error: message, setError: setMessage } = useAction();
   const desktop = isTauriEnvironment();
-  const act = async (action: () => Promise<void>) => {
-    if (busy) return;
-    setBusy(true);
-    setMessage('');
-    try {
-      await action();
-    } catch (error) {
-      setMessage(describeError(error));
-    } finally {
-      setBusy(false);
-    }
-  };
   const copy = async () => {
     if (!diagnostics) return;
     await navigator.clipboard.writeText(

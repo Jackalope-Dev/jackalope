@@ -8,10 +8,10 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { describeError } from '../../lib/errors';
 import { sessionCommand } from '../../lib/live-session';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
+import { useAction } from '../../lib/useAction';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { ActionError } from '../ui/ActionError';
 
@@ -94,17 +94,9 @@ type WorkspaceAction = { id: string; label: string; onSelect: () => void };
 
 /** Pop-out windows, then editors and the workspace path, for a run. */
 export function useWorkspaceActions(run?: TaskRun) {
-  const [error, setError] = useState('');
+  const { run: act, error } = useAction();
   const preferredEditor = useSettingsStore((state) => state.preferredEditor);
   if (!run) return { groups: [] as WorkspaceAction[][], error };
-  const act = async (action: () => Promise<unknown>) => {
-    setError('');
-    try {
-      await action();
-    } catch (cause) {
-      setError(describeError(cause));
-    }
-  };
   const windows: WorkspaceAction[] = (['result', 'changes', 'preview', 'terminal'] as const).map(
     (pane) => ({
       id: `pop-${pane}`,

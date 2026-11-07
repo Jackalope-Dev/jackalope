@@ -11,7 +11,6 @@ import {
 } from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { runHostName } from '../../lib/computers';
 import {
   type AutonomyEntry,
@@ -40,7 +39,7 @@ import { respondToPrompt } from '../../lib/task-client';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { EscalationNote } from '../tasks/AgentDecision';
@@ -53,6 +52,8 @@ import { WorkspaceTabs } from '../ui/WorkspaceTabs';
 import { PlanAutonomyPanel } from './PlanAutonomy';
 import './plan-page.css';
 import { describeError } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { ActionError } from '../ui/ActionError';
 
 type Tab = 'plan' | 'progress' | 'revisions';
@@ -108,15 +109,12 @@ function Assumptions({ items }: { items: string[] }) {
 }
 
 export function PlanPage() {
-  const { activeProjectId, projects } = useProjectStore(
-    useShallow((state) => ({ activeProjectId: state.activeProjectId, projects: state.projects })),
-  );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   const { selectedId, select } = usePlanStore();
   const [plans, setPlans] = useState<PlanSummary[] | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [view, setView] = useState<PlanView | null>(null);
-  const [error, setError] = useState('');
+  const { run: act, error, setError } = useAction(() => Promise.all([load(), loadList()]));
   const runs = useExecutionStore((state) => state.runs);
 
   const loadList = useCallback(async () => {
@@ -153,16 +151,6 @@ export function PlanPage() {
   useEffect(() => {
     void load();
   }, [load, runs]);
-
-  const act = async (work: () => Promise<unknown>) => {
-    setError('');
-    try {
-      await work();
-      await Promise.all([load(), loadList()]);
-    } catch (cause) {
-      setError(describeError(cause));
-    }
-  };
 
   if (!project)
     return (
@@ -249,7 +237,7 @@ function PlanDetail({
   act,
 }: {
   view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const [tab, setTab] = useState<Tab>(view.progress ? 'progress' : 'plan');
   const pending = view.deviations.filter((deviation) => deviation.status === 'pending');
@@ -340,7 +328,9 @@ function PlanDetail({
         <PlanAutonomyPanel
           planId={view.id}
           autonomy={view.autonomy}
-          onChanged={() => act(async () => {})}
+          onChanged={async () => {
+            await act(async () => {});
+          }}
         />
       )}
       {view.questions.map((prompt) => {
@@ -388,7 +378,7 @@ function PlanReview({
   act,
 }: {
   view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const doc = view.document;
   const id = useId();
@@ -714,7 +704,7 @@ function PlanProgress({
   act,
 }: {
   view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const progress = view.progress;
   const runs = useExecutionStore((state) => state.runs);
@@ -856,7 +846,7 @@ function PlanRoundList({
   rounds: PlanRounds;
   /** Why the proposed round came to the person although an agent could approve it. */
   escalation?: AutonomyEntry;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const current = rounds.rounds.at(-1);
   const open = current && ['working', 'reviewing', 'held', 'approval'].includes(current.state);
@@ -980,7 +970,7 @@ function RoundProposal({
   /** An agent is deciding it for the person. */
   deciding: boolean;
   escalation?: AutonomyEntry;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const id = useId();
   const [draft, setDraft] = useState<RoundAssignment[] | null>(null);
@@ -1098,22 +1088,10 @@ function PlanRevisions({ view }: { view: PlanView }) {
   const numbers = view.revisions.map((revision) => revision.number);
   const [from, setFrom] = useState(numbers.at(-2) ?? numbers[0] ?? 0);
   const [to, setTo] = useState(numbers.at(-1) ?? 0);
-  const [changes, setChanges] = useState<SectionChange[] | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!from || !to || from === to) {
-      setChanges([]);
-      return;
-    }
-    let alive = true;
-    planCommands
-      .diff(view.id, from, to)
-      .then((value) => alive && setChanges(value))
-      .catch((cause) => alive && setError(describeError(cause)));
-    return () => {
-      alive = false;
-    };
-  }, [view.id, from, to]);
+  const { data: changes, error } = useNativeResource<SectionChange[]>(
+    async () => (!from || !to || from === to ? [] : planCommands.diff(view.id, from, to)),
+    [view.id, from, to],
+  );
   return (
     <div className="plan-revisions">
       <ul className="plan-rows">

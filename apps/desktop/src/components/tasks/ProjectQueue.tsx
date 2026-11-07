@@ -50,6 +50,7 @@ import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
 import { describeError } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
 import { ActionError } from '../ui/ActionError';
 
 const emptyQueue: QueueView = {
@@ -74,8 +75,15 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   const [importing, setImporting] = useState(false);
   const [tab, setTab] = useState('plan');
   const [filter, setFilter] = useState('all');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const {
+    run: runAction,
+    busy,
+    error,
+    setError,
+  } = useAction(async () => {
+    await load();
+    await refresh();
+  });
   const [loading, setLoading] = useState(true);
   const [onComputer, setOnComputer] = useState(false);
   const desktop = isTauriEnvironment();
@@ -121,18 +129,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   const items = queue.items.filter((i) => i.projectId === project.id && !i.canceled);
   const enabled = queue.enabledProjects.includes(project.id);
   const act = async (command: QueueCommand | 'task_stop', args: Record<string, unknown>) => {
-    setBusy(true);
-    setError('');
-    try {
-      if (command === 'task_stop') await invokeNative(command, args);
-      else await queueCommand(command, args);
-      await load();
-      await refresh();
-    } catch (error) {
-      setError(describeError(error));
-    } finally {
-      setBusy(false);
-    }
+    await runAction(() =>
+      command === 'task_stop' ? invokeNative(command, args) : queueCommand(command, args),
+    );
   };
   const state = (item: QueueItem) => {
     const original = runs.find((r) => r.id === item.runId);

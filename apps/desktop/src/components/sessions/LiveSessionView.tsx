@@ -60,6 +60,7 @@ import { SessionTopics } from './SessionTopics';
 import { TranscriptResult } from './TranscriptResult';
 import './live-session.css';
 import { describeError } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
 
 const TaskTerminal = lazy(() =>
   import('../tasks/TaskTerminal').then((module) => ({ default: module.TaskTerminal })),
@@ -175,8 +176,7 @@ export function LiveSessionView({
         },
       }));
     });
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { run: act, busy, error, setError } = useAction(() => refresh());
   const [review, setReview] = useState<SessionReview | null>(null);
   const reviewAttempt = useRef('');
   const transcript = useRef<HTMLDivElement>(null);
@@ -187,18 +187,6 @@ export function LiveSessionView({
   const tooled = !detached && !simple;
   useWorkSeen(tooled ? latest : undefined);
   const workspace = useWorkspaceActions(tooled ? latest : undefined);
-  const act = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-      await refresh();
-    } catch (cause) {
-      setError(describeError(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
   useEffect(() => {
     const node = transcript.current;
     if (collapsed || !node) return;
@@ -221,11 +209,14 @@ export function LiveSessionView({
       setReview(null);
     }
   }, [latest?.id, latest?.status, session.paused]);
-  const windowAction = (action: 'minimize' | 'close') =>
-    act(async () => {
+  const windowAction = async (action: 'minimize' | 'close') => {
+    try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow()[action]();
-    });
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+  };
   const changeStats = useChangeStats([latest]);
   const latestChanges = latest ? changeStats[latest.id]?.value : undefined;
   // Review holds queued messages so the diff stays put; leaving Review lets them run again

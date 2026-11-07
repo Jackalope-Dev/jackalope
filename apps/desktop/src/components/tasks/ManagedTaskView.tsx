@@ -28,6 +28,7 @@ import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { isActive, isFinished } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { stopPreview } from '../../lib/task-client';
+import { useAction } from '../../lib/useAction';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -73,9 +74,8 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
   );
   const [planRunId, setPlanRunId] = useState('');
   const [plan, setPlan] = useState<FeatureStep[]>([]);
-  const [error, setError] = useState('');
+  const { run: act, busy, error, setError } = useAction(() => refreshAll());
   const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [activityId, setActivityId] = useState<string | null>(null);
   const correctionKey = `managed-reply:${task.id}`;
@@ -128,19 +128,6 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
   const refreshAll = async () => {
     await refresh();
     await useExecutionStore.getState().refresh();
-  };
-  const act = async (action: () => Promise<unknown>) => {
-    if (busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-      await refreshAll();
-    } catch (cause) {
-      setError(describeError(cause));
-    } finally {
-      setBusy(false);
-    }
   };
   const plannerId = work.planner?.id;
   const plannerStatus = work.planner?.status;

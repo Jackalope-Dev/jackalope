@@ -11,9 +11,9 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useId, useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { useAction } from '../../lib/useAction';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 
@@ -43,23 +43,7 @@ export function FeedbackForm({
   const [message, setMessage] = useState('');
   const [include, setInclude] = useState(false);
   const [preview, setPreview] = useState<Report | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('');
-  const locked = useRef(false);
-  const act = async (action: () => Promise<void>) => {
-    if (locked.current) return;
-    locked.current = true;
-    setBusy(true);
-    setStatus('');
-    try {
-      await action();
-    } catch (error) {
-      setStatus(describeError(error));
-    } finally {
-      locked.current = false;
-      setBusy(false);
-    }
-  };
+  const { run: act, busy, error: status, setError: setStatus } = useAction();
   const review = async () => {
     const diagnostics = include ? await invokeNative<Counts>('app_diagnostics') : undefined;
     setPreview({
