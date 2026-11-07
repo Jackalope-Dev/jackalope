@@ -296,7 +296,7 @@ fn the_image_tag_follows_the_bundled_definition() {
     assert!(tag.starts_with("jackalope-computer:"));
     assert_eq!(tag, docker::image_tag(&directory).unwrap());
     let copy = root();
-    for name in ["Dockerfile", "start.sh", "agent.py"] {
+    for name in docker::IMAGE_FILES {
         std::fs::copy(directory.join(name), copy.join(name)).unwrap();
     }
     assert_eq!(docker::image_tag(&copy).unwrap(), tag);
@@ -528,8 +528,8 @@ fn local_docker_computer_round_trip() {
                 &["bash".into(), "-c".into(), script.into()],
                 &[
                     ("EXAMPLE".into(), "1".into()),
-                    ("JACKALOPE_BRIDGE_URL".into(), runs::RELAY_URL.into()),
-                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::RELAY_TOKEN.into()),
+                    ("JACKALOPE_BRIDGE_URL".into(), runs::relay_url().into()),
+                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::relay_token().into()),
                 ],
                 "hello\n",
                 true,

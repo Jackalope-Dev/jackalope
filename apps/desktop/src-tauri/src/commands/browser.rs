@@ -100,9 +100,6 @@ pub(super) enum Verdict {
     SignIn,
 }
 
-/// Reads the current address and whether a password field is visible.
-const PAGE_STATE: &str = "(()=>({url:location.href,login:[...document.querySelectorAll('input[type=password]')].some(e=>!e.disabled&&e.getClientRects().length>0)}))()";
-
 struct Slot {
     headed: bool,
     canceled: Arc<AtomicBool>,
@@ -415,7 +412,7 @@ fn check_page(engine: &mut Option<Engine>, guard: &dyn ProfileGuard) -> Result<(
     let Some(open) = engine.as_ref() else {
         return Ok(());
     };
-    let state = open.call(json!({"action":"evaluate", "script":PAGE_STATE}))?["result"].clone();
+    let state = open.call(json!({"action":"evaluate", "script":super::computers::protocol::protocol().browser.page_state}))?["result"].clone();
     let url = state["url"].as_str().unwrap_or_default().to_owned();
     match guard.page(&url, state["login"] == true)? {
         Verdict::Proceed => Ok(()),
@@ -521,7 +518,10 @@ pub(super) fn capture_first_screen(
 
 fn bounded(text: &str) -> (String, bool) {
     let mut chars = text.chars();
-    let text = chars.by_ref().take(40_000).collect();
+    let text = chars
+        .by_ref()
+        .take(super::computers::protocol::protocol().browser.text_limit)
+        .collect();
     (text, chars.next().is_some())
 }
 

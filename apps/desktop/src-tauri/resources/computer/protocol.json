@@ -1,0 +1,149 @@
+{
+  "hello": 1,
+  "errorCodes": ["failed", "unsupported", "permanent"],
+  "runs": 4,
+  "capabilities": [
+    "local-bridge",
+    "browser",
+    "workspace-tools",
+    "policy-callbacks",
+    "git-sync",
+    "artifacts"
+  ],
+  "slotsMax": 32,
+  "runActions": [
+    "workspace_put",
+    "run_start",
+    "run_read",
+    "run_stop",
+    "workspace_diff",
+    "workspace_get",
+    "run_remove",
+    "run_status",
+    "run_answer",
+    "artifact_stat",
+    "artifact_put",
+    "artifact_get",
+    "sync_status",
+    "sync_checkout",
+    "sync_result"
+  ],
+  "transfer": {
+    "chunk": 524288,
+    "upload": 536870912,
+    "patch": 268435456
+  },
+  "relay": {
+    "url": "@@JACKALOPE_RELAY_URL@@",
+    "token": "@@JACKALOPE_RELAY_TOKEN@@",
+    "requestLimit": 65536,
+    "answerLimit": 524288,
+    "artifactLimit": 16777216,
+    "pendingLimit": 32,
+    "tooLarge": "Jackalope tool calls from a computer are limited to 64 KB, so this call was not sent and nothing ran. Send smaller arguments, for example over several calls.",
+    "headers": ["content-type", "accept", "mcp-protocol-version", "mcp-session-id", "last-event-id"]
+  },
+  "localTools": {
+    "workspace-tools": {
+      "computer_verify": "/v1/computer/verify",
+      "verification_output": "/v1/computer/output",
+      "read_context": null
+    },
+    "browser": {
+      "browser_navigate": "/v1/browser/navigate",
+      "browser_screenshot": "/v1/browser/screenshot",
+      "browser_snapshot": "/v1/browser/snapshot",
+      "browser_interact": "/v1/browser/interact",
+      "browser_configure": "/v1/browser/configure",
+      "browser_inspect": "/v1/browser/inspect",
+      "browser_tabs": "/v1/browser/tabs"
+    }
+  },
+  "gitIdentity": {
+    "name": "Jackalope",
+    "email": "jackalope@agents.jackalope.invalid"
+  },
+  "sync": {
+    "knownBases": 64,
+    "resultArtifacts": 2000,
+    "resultArtifactBytes": 268435456
+  },
+  "search": {
+    "skip": [
+      ".git",
+      ".worktrees",
+      "node_modules",
+      "target",
+      "vendor",
+      "dist",
+      "build",
+      "coverage",
+      "output",
+      ".next",
+      ".venv",
+      "__pycache__"
+    ],
+    "files": 6000,
+    "bytes": 33554432,
+    "seconds": 20,
+    "stopWords": [
+      "a",
+      "an",
+      "and",
+      "are",
+      "as",
+      "at",
+      "be",
+      "by",
+      "can",
+      "do",
+      "for",
+      "from",
+      "how",
+      "i",
+      "in",
+      "is",
+      "it",
+      "my",
+      "of",
+      "on",
+      "or",
+      "the",
+      "this",
+      "to",
+      "was",
+      "what",
+      "when",
+      "where",
+      "with",
+      "you",
+      "your"
+    ]
+  },
+  "browser": {
+    "textLimit": 40000,
+    "pageState": "(()=>({url:location.href,login:[...document.querySelectorAll('input[type=password]')].some(e=>!e.disabled&&e.getClientRects().length>0)}))()",
+    "loopbackHosts": ["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"]
+  },
+  "screenshots": {
+    "folder": ".jackalope/artifacts/screenshots",
+    "limit": 8388608
+  },
+  "namedKeys": [
+    "Tab",
+    "Enter",
+    "Escape",
+    "Space",
+    "Backspace",
+    "Delete",
+    "Insert",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown"
+  ]
+}

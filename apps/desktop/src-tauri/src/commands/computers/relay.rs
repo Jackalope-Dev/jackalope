@@ -18,6 +18,7 @@
 //! `tools/list` itself, from the attempt's attached placement
 //! ([`super::runner::attach`]).
 
+use super::protocol::protocol;
 pub(crate) use super::runner::Access;
 use super::runner::Where;
 use base64::Engine;
@@ -28,25 +29,12 @@ use std::{
     time::Duration,
 };
 
-const REQUEST_LIMIT: usize = 64 * 1024;
-/// Raw bytes per answer, which keeps each `run_answer` under the agent's 1 MB body limit.
+/// `relay.answerLimit` of the computer protocol, as a constant for limits derived from it.
 pub(crate) const ANSWER_LIMIT: usize = 512 * 1024;
-/// The largest answer for a runner with `artifacts`, which receives a larger
-/// one as an artifact (`RELAY_ARTIFACT_LIMIT` in agent.py).
+/// `relay.artifactLimit` of the computer protocol.
 pub(crate) const LARGE_ANSWER_LIMIT: usize = 16 * 1024 * 1024;
-/// Calls forwarded at once; more are refused until one finishes.
-const IN_FLIGHT_LIMIT: usize = 32;
-/// Told to an agent whose call is too large to relay; nothing was forwarded.
-const REQUEST_TOO_LARGE: &str = "Jackalope tool calls from a computer are limited to 64 KB, so this call was not sent and nothing ran. Send smaller arguments, for example over several calls.";
 /// Told to an agent whose answer is too large to relay. The call itself ran.
 const ANSWER_TOO_LARGE: &str = "The answer is larger than 512 KB, so it cannot reach this computer. The call itself ran: do not repeat a change. Ask for less, for example with output.jsonPointers, output.rows or output.maxChars, or page a captured result with read_tool_result.";
-const FORWARDED_HEADERS: &[&str] = &[
-    "content-type",
-    "accept",
-    "mcp-protocol-version",
-    "mcp-session-id",
-    "last-event-id",
-];
 
 /// One answer to a bridge request.
 #[derive(Debug, Clone, PartialEq)]
@@ -134,7 +122,7 @@ impl Relay {
                 self.ready.push(answer);
                 continue;
             }
-            if self.in_flight.len() > IN_FLIGHT_LIMIT {
+            if self.in_flight.len() > protocol().relay.pending_limit {
                 self.ready.push(Answer::refused(
                     &id,
                     decoded_json(call).as_ref(),
@@ -203,12 +191,12 @@ fn screen(id: &str, call: &Value, access: &Access) -> Option<Answer> {
             "Not a Jackalope bridge route.",
         ));
     }
-    if body.len() > REQUEST_LIMIT {
+    if body.len() > protocol().relay.request_limit {
         return Some(Answer::refused(
             id,
             request.as_ref(),
             413,
-            REQUEST_TOO_LARGE,
+            &protocol().relay.too_large,
         ));
     }
     let place = if route.starts_with("/mcp") {
@@ -253,8 +241,7 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, limit: usi
     if let Some(headers) = call["headers"].as_object() {
         for (name, value) in headers {
             let name = name.to_ascii_lowercase();
-            if let (true, Some(value)) =
-                (FORWARDED_HEADERS.contains(&name.as_str()), value.as_str())
+            if let (true, Some(value)) = (protocol().relay.headers.contains(&name), value.as_str())
             {
                 builder = builder.header(name, value);
             }
@@ -488,7 +475,7 @@ mod tests {
             &writer()
         )
         .is_none());
-        let large = json!({ "text": "x".repeat(REQUEST_LIMIT) });
+        let large = json!({ "text": "x".repeat(protocol().relay.request_limit) });
         assert_eq!(
             screen("c", &call("POST", "/v1/messages", &large), &writer())
                 .unwrap()
@@ -500,7 +487,8 @@ mod tests {
     #[test]
     fn oversized_calls_and_answers_are_clear_tool_errors() {
         use std::io::{BufRead, BufReader, Read, Write};
-        let arguments = json!({"handle":"h","arguments":{"text":"x".repeat(REQUEST_LIMIT)}});
+        let arguments =
+            json!({"handle":"h","arguments":{"text":"x".repeat(protocol().relay.request_limit)}});
         let large = call(
             "POST",
             "/mcp",

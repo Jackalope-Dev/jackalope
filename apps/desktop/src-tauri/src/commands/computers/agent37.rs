@@ -710,6 +710,6 @@ mod tests {
                     .into_owned()
             })
             .collect();
-        assert_eq!(names, ["Dockerfile", "start.sh", "agent.py"]);
+        assert_eq!(names, super::super::docker::IMAGE_FILES);
     }
 }

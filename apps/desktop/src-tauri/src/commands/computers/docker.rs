@@ -8,7 +8,7 @@
 //! container has no network at all. The agent is reached with `docker exec`,
 //! so it needs no port or secret.
 
-use super::{Computer, MachineState, Provider, Transport};
+use super::{AgentError, Computer, MachineState, Provider, Transport};
 use crate::commands::desktop_control::helper::{Helper, Launch, Launcher};
 use crate::commands::process_control::{self, Limits};
 use serde::Serialize;
@@ -23,7 +23,7 @@ use std::{
 
 pub(crate) const LABEL: &str = "dev.jackalope.computer";
 const CONFIG_LABEL: &str = "dev.jackalope.computer.config";
-pub(crate) const IMAGE_FILES: &[&str] = &["Dockerfile", "start.sh", "agent.py"];
+pub(crate) const IMAGE_FILES: &[&str] = &["Dockerfile", "start.sh", "agent.py", "protocol.json"];
 const QUICK: Duration = Duration::from_secs(20);
 
 fn docker(args: &[&str]) -> Command {
@@ -641,10 +641,13 @@ impl Transport for Resident {
         payload: &Value,
         timeout: Duration,
         canceled: &AtomicBool,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, AgentError> {
         self.0
             .call(payload, timeout, canceled)
-            .map_err(String::from)
+            .map_err(|error| AgentError {
+                code: error.code,
+                message: error.message,
+            })
     }
 
     fn shutdown(&mut self) {

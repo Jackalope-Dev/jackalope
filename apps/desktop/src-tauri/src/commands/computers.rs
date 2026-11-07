@@ -25,6 +25,7 @@ pub(crate) mod docker;
 pub(crate) mod image;
 pub(crate) mod policy;
 pub(crate) mod pool;
+pub(crate) mod protocol;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runner;
@@ -358,6 +359,53 @@ pub(crate) enum MachineState {
     Running,
 }
 
+/// A failed request to a computer's agent.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct AgentError {
+    /// The agent's reason (`errorCodes` in the computer protocol). `None` for a
+    /// failure on this side, or from an agent in an image published before codes.
+    pub code: Option<String>,
+    pub message: String,
+}
+
+/// The agent does not know the action.
+pub(crate) const UNSUPPORTED: &str = "unsupported";
+/// Retrying the same request cannot succeed.
+pub(crate) const PERMANENT: &str = "permanent";
+
+impl AgentError {
+    pub fn is(&self, code: &str) -> bool {
+        self.code.as_deref() == Some(code)
+    }
+}
+
+impl From<String> for AgentError {
+    fn from(message: String) -> Self {
+        Self {
+            code: None,
+            message,
+        }
+    }
+}
+
+impl From<&str> for AgentError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+impl From<AgentError> for String {
+    fn from(error: AgentError) -> Self {
+        error.message
+    }
+}
+
+impl std::fmt::Display for AgentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 /// One JSON-lines conversation with a computer's in-sandbox agent.
 pub(crate) trait Transport: Send {
     fn call(
@@ -365,7 +413,7 @@ pub(crate) trait Transport: Send {
         payload: &Value,
         timeout: Duration,
         canceled: &AtomicBool,
-    ) -> Result<Value, String>;
+    ) -> Result<Value, AgentError>;
     fn shutdown(&mut self) {}
 }
 
@@ -555,7 +603,9 @@ pub(crate) fn call(
         }
     };
     let mut transport = connection.lock().map_err(|e| e.to_string())?;
-    transport.call(&payload, timeout, canceled)
+    transport
+        .call(&payload, timeout, canceled)
+        .map_err(String::from)
 }
 
 /// How long agent work waits for a stopped computer to start before it is

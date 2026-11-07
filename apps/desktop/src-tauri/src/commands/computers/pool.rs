@@ -28,8 +28,6 @@ pub(crate) const DEVICE_NAME: &str = "This device";
 /// Runs a computer the person added takes at once, unless its runner reports
 /// more.
 pub(crate) const DEFAULT_COMPUTER_SLOTS: usize = 2;
-/// The most runs a runner may report it takes.
-const MAX_SLOTS: u64 = 32;
 /// The most computers a project may add to its pool.
 const MAX_ADDED: usize = 16;
 /// How long a computer that lost contact gets no new work, unless it is
@@ -357,7 +355,7 @@ pub(crate) fn health(id: &str) -> Health {
 pub(crate) fn reported_slots(status: Option<&serde_json::Value>) -> Option<usize> {
     status
         .and_then(|status| status["slots"].as_u64())
-        .filter(|slots| (1..=MAX_SLOTS).contains(slots))
+        .filter(|slots| (1..=super::protocol::protocol().slots_max).contains(slots))
         .map(|slots| slots as usize)
 }
 

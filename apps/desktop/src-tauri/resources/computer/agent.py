@@ -94,23 +94,20 @@ import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-PROTOCOL = 1
+# Values Jackalope's desktop reads from the same file (commands/computers/protocol.rs).
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "protocol.json"),
+          encoding="utf-8") as _shared:
+    SHARED = json.load(_shared)
+PROTOCOL = SHARED["hello"]
 # Agent runs, reported by hello and run_status as `runs`.
-RUNS_PROTOCOL = 4
+RUNS_PROTOCOL = SHARED["runs"]
 # What this runner can do for a run, reported with `runs` as `capabilities`.
-# Jackalope enables each behaviour only when its name is listed. One name per
-# line; `browser` is left out when agent-browser is missing (see capabilities()).
-CAPABILITIES = [
-    "local-bridge",
-    "browser",
-    "workspace-tools",
-    "policy-callbacks",
-    "git-sync",
-    "artifacts",
-]
+# Jackalope enables each behaviour only when its name is listed; `browser` is
+# left out when agent-browser is missing (see capabilities()).
+CAPABILITIES = SHARED["capabilities"]
 # Runs reported as `slots` with `runs`: Jackalope accepts 1 to SLOTS_MAX, and a
 # size-derived value stops at SLOTS_DERIVED_MAX (see slots_for()).
-SLOTS_MAX = 32
+SLOTS_MAX = SHARED["slotsMax"]
 SLOTS_DERIVED_MAX = 8
 CGROUP = "/sys/fs/cgroup"
 OUTPUT_LIMIT = 64 * 1024
@@ -122,17 +119,12 @@ ELEMENT_LIMIT = 300
 VISIT_LIMIT = 4000
 RUNS = os.environ.get("JACKALOPE_RUNS") or os.path.join(HOME, ".jackalope-runs")
 RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}")
-CHUNK_LIMIT = 512 * 1024
-UPLOAD_LIMIT = 512 * 1024 * 1024
-PATCH_LIMIT = 256 * 1024 * 1024
+CHUNK_LIMIT = SHARED["transfer"]["chunk"]
+UPLOAD_LIMIT = SHARED["transfer"]["upload"]
+PATCH_LIMIT = SHARED["transfer"]["patch"]
 READ_WAIT_LIMIT = 5.0
 ORPHAN_SECONDS = int(os.environ.get("JACKALOPE_RUN_ORPHAN_SECONDS") or 600)
-RUN_ACTIONS = {
-    "workspace_put", "run_start", "run_read", "run_stop",
-    "workspace_diff", "workspace_get", "run_remove", "run_status", "run_answer",
-    "artifact_stat", "artifact_put", "artifact_get",
-    "sync_status", "sync_checkout", "sync_result",
-}
+RUN_ACTIONS = set(SHARED["runActions"])
 # Content-addressed transfers and the per-project repositories of git-sync.
 # Neither name can be a run's, which starts with a letter or digit.
 ARTIFACTS = os.path.join(RUNS, ".artifacts")
@@ -143,17 +135,16 @@ REPO_ID = re.compile(r"[a-z0-9]{1,64}")
 ARTIFACT_LIMIT = 1024 * 1024 * 1024
 ARTIFACT_KEEP_SECONDS = 24 * 3600
 # Bridge answers delivered from an artifact.
-RELAY_ARTIFACT_LIMIT = 16 * 1024 * 1024
+RELAY_ARTIFACT_LIMIT = SHARED["relay"]["artifactLimit"]
 # Base commits a project's repository reports, newest first.
-KNOWN_BASES = 64
-RESULT_ARTIFACTS = 2000
-RESULT_ARTIFACT_BYTES = 256 * 1024 * 1024
-RELAY_URL = "@@JACKALOPE_RELAY_URL@@"
-RELAY_TOKEN = "@@JACKALOPE_RELAY_TOKEN@@"
-RELAY_BODY_LIMIT = 64 * 1024
-RELAY_ANSWER_LIMIT = 512 * 1024
-RELAY_TOO_LARGE = ("Jackalope tool calls from a computer are limited to 64 KB, so this call was "
-                   "not sent and nothing ran. Send smaller arguments, for example over several calls.")
+KNOWN_BASES = SHARED["sync"]["knownBases"]
+RESULT_ARTIFACTS = SHARED["sync"]["resultArtifacts"]
+RESULT_ARTIFACT_BYTES = SHARED["sync"]["resultArtifactBytes"]
+RELAY_URL = SHARED["relay"]["url"]
+RELAY_TOKEN = SHARED["relay"]["token"]
+RELAY_BODY_LIMIT = SHARED["relay"]["requestLimit"]
+RELAY_ANSWER_LIMIT = SHARED["relay"]["answerLimit"]
+RELAY_TOO_LARGE = SHARED["relay"]["tooLarge"]
 # Agent CLIs whose licenses do not allow shipping them in a published image are
 # installed into the bot's home on first use, from the package registry.
 ON_DEMAND = {"claude": "@anthropic-ai/claude-code"}
@@ -162,10 +153,10 @@ INSTALL_SECONDS = 100
 # Bridge calls handed over per read, and their total size.
 RELAY_READ_CALLS = 8
 RELAY_READ_LIMIT = 256 * 1024
-RELAY_PENDING_LIMIT = 32
+RELAY_PENDING_LIMIT = SHARED["relay"]["pendingLimit"]
 # Longer than the bridge's own longest call (a queued saved check).
 RELAY_TIMEOUT = int(os.environ.get("JACKALOPE_RELAY_TIMEOUT") or 2400)
-RELAY_HEADERS = ("content-type", "accept", "mcp-protocol-version", "mcp-session-id", "last-event-id")
+RELAY_HEADERS = tuple(SHARED["relay"]["headers"])
 CALL_ID = re.compile(r"[0-9a-f]{16,48}")
 # Selected stdio connections of a run.
 CONNECTION_LIMIT = 16
@@ -186,20 +177,20 @@ UV_LIMIT = 128 * 1024 * 1024
 # Longer than Jackalope waits for the person to answer an approval.
 APPROVAL_SECONDS = 1900
 GIT_IDENTITY = [
-    "-c", "user.name=Jackalope", "-c", "user.email=jackalope@agents.jackalope.invalid",
+    "-c", "user.name=" + SHARED["gitIdentity"]["name"],
+    "-c", "user.email=" + SHARED["gitIdentity"]["email"],
     "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false",
 ]
 # Bridge tools a runner serves itself for a run started with `local`, by the
-# capability each needs. Jackalope's placement table (computers/runner.rs)
-# decides which of them a run gets.
-WORKSPACE_TOOLS = ("computer_verify", "verification_output", "read_context")
-BROWSER_TOOLS = ("browser_navigate", "browser_screenshot", "browser_snapshot", "browser_interact",
-                 "browser_configure", "browser_inspect", "browser_tabs")
-# Bridge REST routes of the same tools.
+# capability each needs, with their bridge REST routes. Jackalope's placement
+# table (computers/runner.rs) decides which of them a run gets.
+WORKSPACE_TOOLS = tuple(SHARED["localTools"]["workspace-tools"])
+BROWSER_TOOLS = tuple(SHARED["localTools"]["browser"])
 LOCAL_ROUTES = {
-    "/v1/computer/verify": "computer_verify",
-    "/v1/computer/output": "verification_output",
-    **{"/v1/browser/" + name[len("browser_"):]: name for name in BROWSER_TOOLS},
+    route: name
+    for tools in SHARED["localTools"].values()
+    for name, route in tools.items()
+    if route
 }
 # Saved checks, bounded like Jackalope's own project checks.
 CHECK_TIMEOUT = int(os.environ.get("JACKALOPE_CHECK_TIMEOUT") or 1800)
@@ -208,12 +199,11 @@ CHECK_OUTPUT_LIMIT = 128000
 # agent-browser, installed from npm by the image at the version the desktop bundles.
 AGENT_BROWSER_HOME = os.environ.get("JACKALOPE_AGENT_BROWSER_HOME") or "/usr/local/lib/node_modules/agent-browser"
 BROWSER_COMMAND_SECONDS = 30
-BROWSER_TEXT_LIMIT = 40000
-SCREENSHOT_LIMIT = 8 * 1024 * 1024
-SCREENSHOTS = os.path.join(".jackalope", "artifacts", "screenshots")
-PAGE_STATE = ("(()=>({url:location.href,login:[...document.querySelectorAll('input[type=password]')]"
-              ".some(e=>!e.disabled&&e.getClientRects().length>0)}))()")
-LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1", "[::1]")
+BROWSER_TEXT_LIMIT = SHARED["browser"]["textLimit"]
+SCREENSHOT_LIMIT = SHARED["screenshots"]["limit"]
+SCREENSHOTS = os.path.join(*SHARED["screenshots"]["folder"].split("/"))
+PAGE_STATE = SHARED["browser"]["pageState"]
+LOOPBACK_HOSTS = tuple(SHARED["browser"]["loopbackHosts"])
 # Source reads (read_context), bounded like Jackalope's own.
 SOURCE_EXTENSIONS = {
     "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "rs", "py", "go", "java", "kt", "cs",
@@ -223,28 +213,31 @@ SOURCE_FILE_LIMIT = 512 * 1024
 SOURCE_BLOCK_LIMIT = 8000
 # read_context's repository search, within the limits of Jackalope's own scan
 # (commands/codebase.rs) and its candidates (codebase/map.rs).
-SEARCH_SKIP = {".git", ".worktrees", "node_modules", "target", "vendor", "dist", "build",
-               "coverage", "output", ".next", ".venv", "__pycache__"}
-SEARCH_FILES = 6000
-SEARCH_BYTES = 32 * 1024 * 1024
-SEARCH_SECONDS = 20
+SEARCH_SKIP = set(SHARED["search"]["skip"])
+SEARCH_FILES = SHARED["search"]["files"]
+SEARCH_BYTES = SHARED["search"]["bytes"]
+SEARCH_SECONDS = SHARED["search"]["seconds"]
 SEARCH_RESULTS = 12
 SEARCH_RESULT_BYTES = 16000
 FILE_SYMBOLS = 64
-# The stop words of Jackalope's retrieval ranking (commands/retrieval.rs).
-SEARCH_STOP = {
-    "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "for", "from", "how", "i",
-    "in", "is", "it", "my", "of", "on", "or", "the", "this", "to", "was", "what", "when",
-    "where", "with", "you", "your",
-}
+SEARCH_STOP = set(SHARED["search"]["stopWords"])
 SYMBOL_LANGUAGES = {
     "rs": "rust", "py": "python", "go": "go",
     **{extension: "script" for extension in ("ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs")},
 }
 
 
+# Why a request failed, sent as `code` beside `error` (SHARED["errorCodes"]).
+FAILED = "failed"
+UNSUPPORTED = "unsupported"
+# Retrying the same request cannot succeed.
+PERMANENT = "permanent"
+
+
 class Failure(Exception):
-    pass
+    def __init__(self, message, code=FAILED):
+        super().__init__(message)
+        self.code = code
 
 
 def run(args, timeout=10, data=None):
@@ -548,6 +541,7 @@ def capture(thumb=None):
     return image.width, image.height, base64.b64encode(buffer.getvalue()).decode()
 
 
+# xdotool's names for the protocol's named keys (SHARED["namedKeys"]).
 KEYS = {
     "Enter": "Return", "Escape": "Escape", "Tab": "Tab", "Space": "space",
     "Backspace": "BackSpace", "Delete": "Delete", "Insert": "Insert",
@@ -2557,7 +2551,7 @@ def artifact_put(request):
     path, digest = artifact_path(request)
     size = request.get("size")
     if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= ARTIFACT_LIMIT:
-        raise Failure("Artifacts are limited to 1 GB.")
+        raise Failure("Artifacts are limited to 1 GB.", PERMANENT)
     os.makedirs(ARTIFACTS, mode=0o700, exist_ok=True)
     if os.path.isfile(path):
         os.utime(path)
@@ -2573,7 +2567,7 @@ def artifact_put(request):
     if offset != current:
         raise Failure(f"Artifact offset {offset} does not follow {current}.")
     if current + len(raw) > size:
-        raise Failure("The artifact is larger than announced.")
+        raise Failure("The artifact is larger than announced.", PERMANENT)
     with open(part, "ab") as handle:
         handle.write(raw)
     received = current + len(raw)
@@ -2581,7 +2575,8 @@ def artifact_put(request):
         return {"received": received, "complete": False}
     if file_digest(part) != digest:
         os.unlink(part)
-        raise Failure("The artifact was corrupted in transfer (SHA-256 mismatch). Send it again.")
+        raise Failure("The artifact was corrupted in transfer (SHA-256 mismatch). Send it again.",
+                      PERMANENT)
     os.replace(part, path)
     return {"received": received, "complete": True}
 
@@ -2589,7 +2584,7 @@ def artifact_put(request):
 def artifact_get(request):
     path, _ = artifact_path(request)
     if not os.path.isfile(path):
-        raise Failure("That artifact is not on this computer.")
+        raise Failure("That artifact is not on this computer.", PERMANENT)
     offset = max(int(request.get("offset") or 0), 0)
     data, after = read_from(path, offset, CHUNK_LIMIT)
     return {"data": base64.b64encode(data).decode(), "offset": after, "size": os.path.getsize(path)}
@@ -2991,7 +2986,7 @@ def handle(request):
     elif action == "exec":
         return execute(request)
     else:
-        raise Failure("Unsupported action.")
+        raise Failure("Unsupported action.", UNSUPPORTED)
     return {"method": "pointer or keyboard", "focusChanged": False}
 
 
@@ -3002,9 +2997,10 @@ def respond(request):
             raise Failure("Send a JSON object.")
         return {"id": identifier, "ok": True, "result": handle(request)}
     except Failure as error:
-        return {"id": identifier, "ok": False, "error": str(error)}
+        return {"id": identifier, "ok": False, "error": str(error), "code": error.code}
     except Exception as error:  # Report, never crash the serving loop.
-        return {"id": identifier, "ok": False, "error": f"{type(error).__name__}: {error}"[:500]}
+        return {"id": identifier, "ok": False, "error": f"{type(error).__name__}: {error}"[:500],
+                "code": FAILED}
 
 
 def serve():

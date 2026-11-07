@@ -502,7 +502,6 @@ mod tests {
     #[test]
     fn slots_count_from_protocol_four_within_bounds() {
         let slots = |status: Value| RunnerCapabilities::from_status(Some(&status)).slots;
-        // What agent.py reports in `hello` and `run_status`.
         let hello = json!({"protocol": 1, "runs": 4, "capabilities": [LOCAL_BRIDGE],
             "slots": 3, "screen": [1280, 800], "browser": true});
         assert_eq!(slots(hello), Some(3));

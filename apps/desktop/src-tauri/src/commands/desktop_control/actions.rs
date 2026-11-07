@@ -50,23 +50,6 @@ pub(crate) fn is_input(request: &DesktopRequest) -> bool {
         || (request.action == "focus" && request.element.is_some())
 }
 
-const NAMED: &[&str] = &[
-    "Tab",
-    "Enter",
-    "Escape",
-    "Space",
-    "Backspace",
-    "Delete",
-    "Insert",
-    "ArrowUp",
-    "ArrowDown",
-    "ArrowLeft",
-    "ArrowRight",
-    "Home",
-    "End",
-    "PageUp",
-    "PageDown",
-];
 const PUNCTUATION: &str = "-=,./;'[]\\`";
 
 /// Keys the original helpers understand; platforms without chord support accept only these.
@@ -148,7 +131,10 @@ pub(crate) fn chord(text: &str) -> Result<Chord, String> {
     if ordered.len() != modifiers.len() {
         return Err(unsupported());
     }
-    let named = NAMED.contains(&key);
+    let named = crate::commands::computers::protocol::protocol()
+        .named_keys
+        .iter()
+        .any(|name| name == key);
     let function = key.len() >= 2
         && key.len() <= 3
         && key.starts_with('F')

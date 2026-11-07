@@ -1,14 +1,16 @@
 //! Content-addressed transfers with a computer's runner (capability
 //! `artifacts`), over the run's own [`Transport`](super::Transport).
 //!
-//! An artifact is named by its SHA-256 and moves in [`CHUNK`]-byte pieces, so
+//! An artifact is named by its SHA-256 and moves in `transfer.chunk`-byte pieces, so
 //! no single request comes near the agent's 1 MB body limit whatever the size.
 //! An upload first asks what the runner already holds (`artifact_stat`): a
 //! stored artifact is not sent again and a partial one resumes at its last
 //! byte. A download appends to a `.part` file beside its destination, so it
 //! resumes the same way. Both check the digest before the artifact is used.
 
-use super::runs::{Session, CALL_TIMEOUT, CHUNK};
+use super::protocol::protocol;
+use super::runs::{Session, CALL_TIMEOUT};
+use super::{AgentError, PERMANENT};
 use base64::Engine;
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
@@ -81,12 +83,19 @@ fn partial(destination: &Path) -> PathBuf {
     destination.with_file_name(name)
 }
 
-/// Errors that a retry cannot fix.
-fn permanent(error: &str) -> bool {
-    error.contains("SHA-256 mismatch")
-        || error.contains("not on this computer")
-        || error.contains("limited to")
-        || error.contains("larger than announced")
+/// Errors that a retry cannot fix. Agents in images published before error
+/// codes say so only in their message.
+fn permanent(error: &AgentError) -> bool {
+    error.is(PERMANENT)
+        || (error.code.is_none()
+            && [
+                "SHA-256 mismatch",
+                "not on this computer",
+                "Artifacts are limited to",
+                "larger than announced",
+            ]
+            .iter()
+            .any(|text| error.message.contains(text)))
 }
 
 impl Session {
@@ -105,7 +114,7 @@ impl Session {
                 Err(error) => {
                     failures += 1;
                     if permanent(&error) || failures >= ATTEMPTS {
-                        return Err(error);
+                        return Err(error.into());
                     }
                 }
             }
@@ -126,7 +135,7 @@ impl Session {
         reader: &mut (impl Read + Seek),
         digest: &Digest,
         progress: &dyn Fn(u64, u64),
-    ) -> Result<(), String> {
+    ) -> Result<(), AgentError> {
         let stat = self.call(
             json!({"action":"artifact_stat","sha256":digest.sha256}),
             CALL_TIMEOUT,
@@ -139,9 +148,9 @@ impl Session {
         reader
             .seek(SeekFrom::Start(offset))
             .map_err(|e| e.to_string())?;
-        let mut buffer = vec![0u8; CHUNK];
+        let mut buffer = vec![0u8; protocol().transfer.chunk];
         loop {
-            let length = (digest.size - offset).min(CHUNK as u64) as usize;
+            let length = (digest.size - offset).min(protocol().transfer.chunk as u64) as usize;
             reader
                 .read_exact(&mut buffer[..length])
                 .map_err(|e| e.to_string())?;
@@ -177,7 +186,7 @@ impl Session {
                 Err(error) => {
                     failures += 1;
                     if permanent(&error) || failures >= ATTEMPTS {
-                        return Err(error);
+                        return Err(error.into());
                     }
                 }
             }
@@ -192,7 +201,7 @@ impl Session {
         std::fs::rename(&part, destination).map_err(|e| e.to_string())
     }
 
-    fn resume_fetch(&mut self, digest: &Digest, part: &Path) -> Result<(), String> {
+    fn resume_fetch(&mut self, digest: &Digest, part: &Path) -> Result<(), AgentError> {
         let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -220,7 +229,7 @@ impl Session {
             file.write_all(&data).map_err(|e| e.to_string())?;
             have += data.len() as u64;
         }
-        file.flush().map_err(|e| e.to_string())
+        file.flush().map_err(|e| e.to_string().into())
     }
 }
 
@@ -252,7 +261,12 @@ pub(crate) mod tests {
     pub(crate) struct Fake(pub Arc<Mutex<Store>>);
 
     impl Fake {
-        pub fn answer(store: &mut Store, payload: &Value) -> Option<Result<Value, String>> {
+        /// Answers an artifact request as the runner does, with its error codes.
+        pub fn answer(store: &mut Store, payload: &Value) -> Option<Result<Value, AgentError>> {
+            let permanent = |message: &str| AgentError {
+                code: Some(PERMANENT.into()),
+                message: message.into(),
+            };
             let engine = base64::engine::general_purpose::STANDARD;
             let sha = payload["sha256"].as_str().unwrap_or_default().to_string();
             Some(match payload["action"].as_str()? {
@@ -271,13 +285,15 @@ pub(crate) mod tests {
                     let offset = payload["offset"].as_u64().unwrap();
                     store.puts.push(offset);
                     let data = engine.decode(payload["data"].as_str().unwrap()).unwrap();
-                    assert!(data.len() <= CHUNK);
+                    assert!(data.len() <= protocol().transfer.chunk);
                     let part = store.partial.entry(sha.clone()).or_default();
                     if offset == 0 {
                         part.clear();
                     }
                     if offset != part.len() as u64 {
-                        return Some(Err(format!("Artifact offset {offset} does not follow")));
+                        return Some(Err(
+                            format!("Artifact offset {offset} does not follow").into()
+                        ));
                     }
                     part.extend(data);
                     let size = payload["size"].as_u64().unwrap() as usize;
@@ -286,7 +302,7 @@ pub(crate) mod tests {
                     }
                     let part = store.partial.remove(&sha).unwrap();
                     if hex(&Sha256::digest(&part)) != sha {
-                        return Some(Err("The artifact was corrupted in transfer (SHA-256 mismatch). Send it again.".into()));
+                        return Some(Err(permanent("The artifact was corrupted in transfer (SHA-256 mismatch). Send it again.")));
                     }
                     store.stored.insert(sha, part);
                     Ok(json!({"complete": true, "received": size}))
@@ -298,7 +314,7 @@ pub(crate) mod tests {
                         return Some(Err("connection reset".into()));
                     }
                     let Some(data) = store.stored.get(&sha) else {
-                        return Some(Err("That artifact is not on this computer.".into()));
+                        return Some(Err(permanent("That artifact is not on this computer.")));
                     };
                     let offset = payload["offset"].as_u64().unwrap() as usize;
                     // Small pages, to exercise resuming.
@@ -314,7 +330,12 @@ pub(crate) mod tests {
     }
 
     impl Transport for Fake {
-        fn call(&mut self, payload: &Value, _: Duration, _: &AtomicBool) -> Result<Value, String> {
+        fn call(
+            &mut self,
+            payload: &Value,
+            _: Duration,
+            _: &AtomicBool,
+        ) -> Result<Value, AgentError> {
             let mut store = self.0.lock().unwrap();
             match Self::answer(&mut store, payload) {
                 Some(result) => result,
@@ -343,7 +364,9 @@ pub(crate) mod tests {
             fail_put_at: Some(1),
             ..Store::default()
         }));
-        let data: Vec<u8> = (0..CHUNK * 2 + 7).map(|n| (n % 253) as u8).collect();
+        let data: Vec<u8> = (0..protocol().transfer.chunk * 2 + 7)
+            .map(|n| (n % 253) as u8)
+            .collect();
         let mut session = session(&store);
         let digest = session
             .put_artifact(&mut std::io::Cursor::new(&data), &|_, _| {})
@@ -353,7 +376,7 @@ pub(crate) mod tests {
             let store = store.lock().unwrap();
             assert_eq!(store.stored[&digest.sha256], data);
             // The second chunk was lost; the upload resumed there, not at zero.
-            let chunk = CHUNK as u64;
+            let chunk = protocol().transfer.chunk as u64;
             assert_eq!(store.puts, [0, u64::MAX, chunk, chunk * 2]);
         }
         store.lock().unwrap().puts.clear();
@@ -408,6 +431,24 @@ pub(crate) mod tests {
         let error = session.fetch_artifact(&missing, &other).unwrap_err();
         assert!(error.contains("not on this computer"), "{error}");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn permanence_follows_the_code_and_old_agents_wording() {
+        let error = |code: Option<&str>, message: &str| AgentError {
+            code: code.map(str::to_owned),
+            message: message.into(),
+        };
+        assert!(permanent(&error(Some(PERMANENT), "anything")));
+        assert!(!permanent(&error(
+            Some("failed"),
+            "That artifact is not on this computer."
+        )));
+        assert!(permanent(&error(
+            None,
+            "That artifact is not on this computer."
+        )));
+        assert!(!permanent(&error(None, "connection reset")));
     }
 
     #[test]

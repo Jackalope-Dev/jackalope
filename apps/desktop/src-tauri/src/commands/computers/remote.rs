@@ -4,7 +4,7 @@
 //! creates, starts or deletes the machine itself; deleting the computer only
 //! forgets the pairing. The secret is kept in protected storage.
 
-use super::{Computer, MachineState, Provider, Transport};
+use super::{AgentError, Computer, MachineState, Provider, Transport};
 use crate::commands::{account_storage, http};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -157,7 +157,10 @@ pub(crate) async fn hello_with(
         .json()
         .await
         .map_err(|_| "The address answered, but not as a Jackalope computer.".to_string())?;
-    if !status.is_success() || body["ok"] != true || body["result"]["protocol"] != 1 {
+    if !status.is_success()
+        || body["ok"] != true
+        || body["result"]["protocol"] != super::protocol::protocol().hello
+    {
         return Err("The address answered, but not as a Jackalope computer.".into());
     }
     Ok(body["result"].clone())
@@ -328,7 +331,7 @@ impl Transport for Http {
         payload: &Value,
         timeout: Duration,
         canceled: &AtomicBool,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, AgentError> {
         if canceled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err("The computer request was canceled.".into());
         }
@@ -366,15 +369,11 @@ impl Transport for Http {
                 .await
                 .map_err(|_| "The machine returned an invalid response.".to_string())
         })?;
-        if body["ok"] == true {
-            Ok(body["result"].clone())
-        } else {
-            Err(body["error"]
-                .as_str()
-                .unwrap_or("The computer failed.")
-                .chars()
-                .take(1200)
-                .collect())
-        }
+        crate::commands::desktop_control::helper::answer(&body, "The computer failed.").map_err(
+            |error| AgentError {
+                code: error.code,
+                message: error.message,
+            },
+        )
     }
 }

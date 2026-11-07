@@ -8,11 +8,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tree_sitter::{Node, ParseOptions, Parser, Tree};
 
-const MAX_FILES: usize = 6_000;
 const MAX_FILE_BYTES: u64 = 512 * 1024;
-const MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
+
+/// The scan bounds a computer's runner applies to its own repository search too.
+fn search() -> &'static super::computers::protocol::Search {
+    &super::computers::protocol::protocol().search
+}
 
 mod analysis_cache;
 pub(crate) mod context_read;
@@ -496,25 +499,16 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
         .sort_by_file_path(|a, b| a.cmp(b))
         .filter_entry(|e| {
             e.depth() == 0
-                || !matches!(
-                    e.file_name().to_str().unwrap_or(""),
-                    ".git"
-                        | ".worktrees"
-                        | "node_modules"
-                        | "target"
-                        | "vendor"
-                        | "dist"
-                        | "build"
-                        | "coverage"
-                        | "output"
-                        | ".next"
-                        | ".venv"
-                        | "__pycache__"
-                )
+                || !search()
+                    .skip
+                    .iter()
+                    .any(|skip| e.file_name().to_str() == Some(skip.as_str()))
         })
         .build();
     for entry in walker {
-        if started.elapsed() > Duration::from_secs(20) || result.files.len() >= MAX_FILES {
+        if started.elapsed() > Duration::from_secs(search().seconds)
+            || result.files.len() >= search().files
+        {
             result.truncated = true;
             break;
         }
@@ -604,7 +598,7 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
             _ => continue,
         };
         if started.elapsed() > Duration::from_secs(20)
-            || total_bytes + file.bytes > MAX_TOTAL_BYTES
+            || total_bytes + file.bytes > search().bytes
             || result.references.len() >= MAX_REFERENCES
         {
             result.truncated = true;
@@ -960,7 +954,7 @@ mod tests {
 
     #[test]
     fn long_dependency_chains_and_self_imports_are_checked_without_recursion() {
-        let mut refs = (0..MAX_FILES)
+        let mut refs = (0..search().files)
             .map(|i| CodebaseReference {
                 source: format!("{i}.ts"),
                 target: Some(format!("{}.ts", i + 1)),
@@ -972,7 +966,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(dependency_cycles(&refs).is_empty());
         refs.last_mut().unwrap().target = Some("0.ts".into());
-        assert_eq!(dependency_cycles(&refs)[0].len(), MAX_FILES);
+        assert_eq!(dependency_cycles(&refs)[0].len(), search().files);
         refs.truncate(1);
         refs[0].target = Some("0.ts".into());
         assert_eq!(dependency_cycles(&refs), vec![vec!["0.ts".to_string()]]);

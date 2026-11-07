@@ -25,7 +25,8 @@
 //! as files instead; [`Prepared::Archive`] says why.
 
 use super::artifacts::{self, Digest};
-use super::runs::{Session, PATCH_LIMIT, UPLOAD_LIMIT};
+use super::protocol::protocol;
+use super::runs::Session;
 use crate::commands::{git_command, process_control};
 use serde_json::{json, Value};
 use sha2::{Digest as _, Sha256};
@@ -36,18 +37,18 @@ use std::{
 
 const GIT_TIMEOUT: Duration = Duration::from_secs(600);
 const SYNC_TIMEOUT: Duration = Duration::from_secs(660);
-/// Commits the runner reports as present, at most.
-const KNOWN_LIMIT: usize = 64;
-const ARTIFACT_COUNT: usize = 2000;
-const ARTIFACT_BYTES: u64 = 256 * 1024 * 1024;
 /// Where an agent's saved output lives in a workspace.
 pub(crate) const ARTIFACT_FOLDER: &str = ".jackalope/artifacts/";
-const IDENTITY: [(&str, &str); 4] = [
-    ("GIT_AUTHOR_NAME", "Jackalope"),
-    ("GIT_AUTHOR_EMAIL", "jackalope@agents.jackalope.invalid"),
-    ("GIT_COMMITTER_NAME", "Jackalope"),
-    ("GIT_COMMITTER_EMAIL", "jackalope@agents.jackalope.invalid"),
-];
+/// The commit identity the runner also uses, as Git environment variables.
+fn identity() -> [(&'static str, &'static str); 4] {
+    let identity = &protocol().git_identity;
+    [
+        ("GIT_AUTHOR_NAME", &identity.name),
+        ("GIT_AUTHOR_EMAIL", &identity.email),
+        ("GIT_COMMITTER_NAME", &identity.name),
+        ("GIT_COMMITTER_EMAIL", &identity.email),
+    ]
+}
 
 /// A temporary bare repository, removed when dropped.
 struct Scratch(PathBuf);
@@ -252,7 +253,7 @@ pub(crate) fn prepare(
     let base = git(workspace, &["rev-parse", "--verify", "HEAD^{commit}"], &[])?;
     let scratch = Scratch::borrowing(&objects)?;
     let known = present(&scratch, have)?;
-    if known.is_empty() && history_bytes(workspace) > UPLOAD_LIMIT {
+    if known.is_empty() && history_bytes(workspace) > protocol().transfer.upload {
         return Ok(Prepared::Archive(
             "its Git history is larger than 512 MB; later attempts can send it as a bundle once the computer has it"
                 .into(),
@@ -270,9 +271,9 @@ pub(crate) fn prepare(
     git(workspace, &["add", "-A"], &env)?;
     let tree = git(workspace, &["write-tree"], &env)?;
     env.extend(
-        IDENTITY
-            .iter()
-            .map(|(name, value)| (*name, std::ffi::OsStr::new(value))),
+        identity()
+            .into_iter()
+            .map(|(name, value)| (name, std::ffi::OsStr::new(value))),
     );
     let snapshot = git(
         workspace,
@@ -301,7 +302,7 @@ pub(crate) fn prepare(
     }
     scratch.git(&args)?;
     let size = std::fs::metadata(&bundle).map_err(|e| e.to_string())?.len();
-    if size > UPLOAD_LIMIT {
+    if size > protocol().transfer.upload {
         return Ok(Prepared::Archive(
             "its Git bundle would be larger than 512 MB".into(),
         ));
@@ -324,7 +325,7 @@ fn present(scratch: &Scratch, have: &[String]) -> Result<Vec<String>, String> {
     let candidates: Vec<&String> = have
         .iter()
         .filter(|id| is_object_id(id))
-        .take(KNOWN_LIMIT)
+        .take(protocol().sync.known_bases)
         .collect();
     if candidates.is_empty() {
         return Ok(Vec::new());
@@ -427,7 +428,7 @@ pub(crate) fn result_patch(
         result,
     ])?;
     let size = std::fs::metadata(&patch).map_err(|e| e.to_string())?.len();
-    if size > PATCH_LIMIT as u64 {
+    if size > protocol().transfer.patch as u64 {
         return Err("The agent changed more than 256 MB of files.".into());
     }
     std::fs::read(&patch).map_err(|e| e.to_string())
@@ -488,7 +489,9 @@ pub(crate) fn parse_artifacts(value: &Value) -> Result<Vec<Artifact>, String> {
         }
         let digest = Digest::parse(item)?;
         total += digest.size;
-        if artifacts.len() >= ARTIFACT_COUNT || total > ARTIFACT_BYTES {
+        if artifacts.len() >= protocol().sync.result_artifacts
+            || total > protocol().sync.result_artifact_bytes
+        {
             return Err("The computer returned more saved output than Jackalope accepts.".into());
         }
         artifacts.push(Artifact {
@@ -581,7 +584,7 @@ impl Session {
         }
         let result = self.call(json!({"action":"sync_result"}), SYNC_TIMEOUT)?;
         let bundle = Digest::parse(&result["bundle"])?;
-        if bundle.size > PATCH_LIMIT as u64 {
+        if bundle.size > protocol().transfer.patch as u64 {
             return Err("The agent changed more than 256 MB of files.".into());
         }
         let artifacts = parse_artifacts(&result["artifacts"])?;
