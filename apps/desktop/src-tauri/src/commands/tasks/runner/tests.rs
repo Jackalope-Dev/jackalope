@@ -1,5 +1,7 @@
 //! One launch through both runners: this device's, with a real agent process,
 //! and a computer's, through a stand-in for the computer's runner.
+// Tests that keep a saved sign-in are skipped on Linux CI, which leaves some helpers unused there.
+#![cfg_attr(target_os = "linux", allow(dead_code, unused_imports))]
 
 use super::*;
 use crate::commands::computers::runner::{
@@ -186,6 +188,8 @@ fn both_runners_place_tools_from_one_table() {
     assert!(local.access().instructions().is_empty());
 }
 
+// Linux CI has no Secret Service keyring to hold the saved sign-in.
+#[cfg(not(target_os = "linux"))]
 #[test]
 fn one_launch_records_the_same_result_through_both_runners() {
     let folder = std::env::temp_dir().join(format!("jackalope-runners-{}", uuid::Uuid::new_v4()));
@@ -213,7 +217,8 @@ fn one_launch_records_the_same_result_through_both_runners() {
     let input = "Task:\nFixture only\n";
 
     let mut local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
-    let mut agent = Command::new("node");
+    // Like every agent launch, the fixture gets its own process group (unix) so its tree can be stopped.
+    let mut agent = super::super::command("node");
     agent.arg(&script);
     let (local_outcome, local_run) = drive(&runtime, &mut local, &here, agent, input);
 
@@ -526,6 +531,8 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
     let _ = std::fs::remove_dir_all(folder);
 }
 
+// Linux CI has no Secret Service keyring to hold the saved sign-in.
+#[cfg(not(target_os = "linux"))]
 #[test]
 fn a_computer_that_does_not_answer_is_a_lost_host() {
     let folder = std::env::temp_dir().join(format!("jackalope-lost-{}", uuid::Uuid::new_v4()));
@@ -754,6 +761,8 @@ fn prepare_on(
     assert_eq!(remote.prepare(runtime, &mut launch).unwrap(), Step::Ready);
 }
 
+// Linux CI has no Secret Service keyring to hold the saved sign-in.
+#[cfg(not(target_os = "linux"))]
 #[test]
 fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     let root = std::env::temp_dir().join(format!("jackalope-stale-{}", uuid::Uuid::new_v4()));
