@@ -34,7 +34,7 @@ import {
 import { workspaceModeFor } from '../../lib/workspace-mode';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { todoDraftKey, useRepoTodoStore } from '../../stores/repoTodoStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -49,10 +49,7 @@ export function RepoTodos({
   onOpenProject: () => void;
   onCapture: (draftKey: string) => void;
 }) {
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   const [documents, setDocuments] = useState<RepoTodoDocument[]>([]);
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);

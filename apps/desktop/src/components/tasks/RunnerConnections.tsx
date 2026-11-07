@@ -35,7 +35,7 @@ import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigS
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentDefaults } from '../agents/AgentDefaults';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
@@ -134,10 +134,7 @@ export function RunnerConnections({
       toggleAgent: s.toggleAgent,
     })),
   );
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   // Enablement, defaults and account choices apply to this project or every project.
   const { scope, setScope } = useAgentScopeStore(
     useShallow((s) => ({ scope: s.scope, setScope: s.setScope })),

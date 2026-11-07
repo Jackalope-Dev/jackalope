@@ -9,7 +9,7 @@ import { swarmMap } from '../../lib/swarm-map';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openCloudResources, openSettings } from '../layout/navigation';
@@ -31,9 +31,7 @@ const FILES_SHOWN = 8;
  */
 export function SwarmBoard() {
   const projectId = useProjectStore((state) => state.activeProjectId);
-  const projectPath = useProjectStore(
-    (state) => state.projects.find((project) => project.id === state.activeProjectId)?.path,
-  );
+  const projectPath = useActiveProject()?.path;
   const runs = useExecutionStore((state) => state.runs);
   const queue = useManagedTaskStore((state) => state.queue);
   const [state, setState] = useState<CloudState | null>(null);

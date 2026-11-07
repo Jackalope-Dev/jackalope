@@ -15,7 +15,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
@@ -31,10 +31,7 @@ import { ActionError } from '../ui/ActionError';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const config = useAgentConfigStore();
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const activeProject = projects.find((item) => item.id === activeProjectId);
+  const activeProject = useActiveProject();
   const { scope, setScope } = useAgentScopeStore(
     useShallow((s) => ({ scope: s.scope, setScope: s.setScope })),
   );

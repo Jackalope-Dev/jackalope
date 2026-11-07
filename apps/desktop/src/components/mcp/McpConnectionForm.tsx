@@ -12,14 +12,13 @@ import {
 } from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { builtinAgents } from '../../lib/agent-catalog';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-connection';
 import { mcpEndpointError } from '../../lib/mcp-endpoint';
 import { useMcpStore } from '../../stores/mcpStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import type { SavedMcpConnection } from './McpConnectionResult';
 
@@ -38,10 +37,7 @@ export function McpConnectionForm({
   onSaved: (saved: SavedMcpConnection) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const project = projects.find((project) => project.id === activeProjectId);
+  const project = useActiveProject();
   const initialToken = bearerToken(initial?.extra);
   const defaultsToAgentSignIn =
     initialAuthentication === 'oauth' ||
