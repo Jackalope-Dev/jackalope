@@ -1,3 +1,5 @@
+import type { AccessMember, ReleaseBuild } from '@jackalope/contracts/access';
+import type { Platform } from '@jackalope/contracts/platform';
 import { Badge, Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import {
   ArrowDownToLine,
@@ -13,23 +15,15 @@ import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from '
 import { BrandMark } from './BrandMark';
 import { desktopDownloads } from './download-config';
 import {
-  type DesktopPlatform,
   detectDesktopPlatform,
   type PlatformDownload,
   publicReleaseBuilds,
-  type ReleaseBuild,
 } from './platform-downloads';
 import { WaitlistButton } from './Signup';
 import './download.css';
 
 const platformIcons = { windows: Monitor, macos: Command, linux: Terminal };
-interface DownloadMember {
-  email: string;
-  download?: { kind?: 'store' } | null;
-  /** Builds this member can download while they are not public. */
-  macos?: ReleaseBuild[];
-  linux?: ReleaseBuild[];
-}
+type DownloadMember = Pick<AccessMember, 'email' | 'download' | 'macos' | 'linux'>;
 const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
 
 /** The member's builds for one platform, with a release channel choice when several are offered. */
@@ -71,7 +65,7 @@ function ReleaseDownloads({ builds }: { builds: ReleaseBuild[] }) {
 }
 
 export function DownloadPage({ downloads = desktopDownloads }: { downloads?: PlatformDownload[] }) {
-  const [platform, setPlatform] = useState<DesktopPlatform | null>(null);
+  const [platform, setPlatform] = useState<Platform | null>(null);
   const [member, setMember] = useState<DownloadMember | null>(null);
   const email = member?.email ?? '';
   const [token, setToken] = useState('');

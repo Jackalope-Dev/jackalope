@@ -2,6 +2,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { unseal } from '../src/access/crypto';
+import { stableDownloads } from '../src/access/downloads';
 import { waitlistInsights } from '../src/access/insights';
 import {
   type AccessMail,
@@ -10,7 +11,6 @@ import {
   type WaitlistMail,
 } from '../src/access/mail';
 import { syncNewsletter } from '../src/access/newsletter';
-import { stableDownloads } from '../src/access/routes';
 import {
   acceptToken,
   approve,

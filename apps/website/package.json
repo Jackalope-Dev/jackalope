@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@jackalope/brand": "workspace:*",
+    "@jackalope/contracts": "workspace:*",
     "@jackalope/knowledge": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.6",
     "lucide-react": "^1.46.0",

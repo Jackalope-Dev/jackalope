@@ -1,3 +1,4 @@
+import { dimensionParts, operationCounts, taskCounts } from '@jackalope/contracts/telemetry';
 import {
   Button,
   DefinitionList,
@@ -21,7 +22,6 @@ import {
   useResource,
 } from './api';
 import { ErrorNotice, Heading, QuickLink, Refresh, SelectField, Table } from './components';
-import { operationCounts, taskCounts } from './metrics';
 
 export function Dashboard() {
   const summary = useResource<Summary>('/admin/api/summary');
@@ -209,12 +209,12 @@ export function Usage() {
       row[3] = Number(row[3]) + metric.count;
       totals.set(metric.day, (totals.get(metric.day) || 0) + metric.count);
     }
-    if (metric.name === 'task_state' && metric.dimension.split('|')[0] === 'starting')
+    if (metric.name === 'task_state' && dimensionParts(metric.dimension)[0] === 'starting')
       row[4] = Number(row[4]) + metric.count;
     if (metric.name === 'app_error') row[5] = Number(row[5]) + metric.count;
     releases.set(key, row);
     if (metric.name === 'feature_used' || metric.name === 'app_error') {
-      const key = `${metric.name === 'app_error' ? 'Error' : 'View'} / ${metric.dimension.split('|').filter(Boolean).map(displayName).join(' / ')}`;
+      const key = `${metric.name === 'app_error' ? 'Error' : 'View'} / ${dimensionParts(metric.dimension).map(displayName).join(' / ')}`;
       events.set(key, (events.get(key) || 0) + metric.count);
     }
   }

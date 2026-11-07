@@ -1,3 +1,4 @@
+import type { Invitation, InvitationSummary } from '@jackalope/contracts/access';
 import { z } from 'zod';
 import { ServiceError as AccessError } from '../errors';
 import { randomToken, tokenHash } from './crypto';
@@ -237,21 +238,16 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
     throw new AccessError(410, 'link_expired');
   return session;
 }
-export async function invitations(env: Env, member: Member, now = Date.now()) {
+export async function invitations(
+  env: Env,
+  member: Member,
+  now = Date.now(),
+): Promise<InvitationSummary> {
   const rows = await env.DB.prepare(
     "SELECT i.id,i.email,i.status,i.created_at,i.expires_at,i.accepted_at,i.last_sent,(SELECT invited.first_download_at FROM access_members invited WHERE invited.email=i.email AND invited.invited_by=i.owner_id) AS downloaded_at,(SELECT invited.first_desktop_at FROM access_members invited WHERE invited.email=i.email AND invited.invited_by=i.owner_id) AS connected_at FROM access_invites i WHERE i.owner_id=? AND (i.status='accepted' OR (i.status='pending' AND i.expires_at>?)) ORDER BY i.created_at DESC LIMIT 100",
   )
     .bind(member.id, now)
-    .all<{
-      id: string;
-      email: string;
-      status: string;
-      expires_at: number;
-      accepted_at: number | null;
-      downloaded_at: number | null;
-      connected_at: number | null;
-      last_sent: number;
-    }>();
+    .all<Invitation>();
   const used = rows.results.filter((i) => i.status === 'accepted' || i.expires_at > now).length;
   const accepted = rows.results.filter((i) => i.status === 'accepted').length;
   const downloaded = rows.results.filter((i) => i.downloaded_at !== null).length;

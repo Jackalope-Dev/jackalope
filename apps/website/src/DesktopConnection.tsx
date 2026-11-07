@@ -1,4 +1,5 @@
 import { EchoMark } from '@jackalope/brand/echo';
+import type { ConnectedDevice } from '@jackalope/contracts/access';
 import {
   Button,
   Checkbox,
@@ -271,22 +272,8 @@ export function DesktopConnection({
   );
 }
 
-interface Device {
-  id: string;
-  name?: string | null;
-  createdAt: number;
-  expiresAt: number;
-  appVersion?: string | null;
-  platform?: 'windows' | 'macos' | 'linux' | null;
-  buildKind?: 'development' | 'release' | null;
-  profileKind?: 'default' | 'isolated' | null;
-  lastSeenAt?: number | null;
-  settingsCheckedAt?: number | null;
-  settingsSync?: number;
-}
-
-function groupDevices(devices: Device[]) {
-  const groups = new Map<string, Device[]>();
+function groupDevices(devices: ConnectedDevice[]) {
+  const groups = new Map<string, ConnectedDevice[]>();
   for (const device of devices) {
     const name = device.name?.trim().toLowerCase();
     const key = name ? JSON.stringify([name, device.platform || null]) : device.id;
@@ -297,7 +284,7 @@ function groupDevices(devices: Device[]) {
   return [...groups.entries()];
 }
 
-function DesktopGroup({ devices, children }: { devices: Device[]; children: ReactNode }) {
+function DesktopGroup({ devices, children }: { devices: ConnectedDevice[]; children: ReactNode }) {
   if (devices.length === 1) return children;
   return (
     <Disclosure className="desktop-device-group">
@@ -323,7 +310,7 @@ function DesktopGroup({ devices, children }: { devices: Device[]; children: Reac
 }
 
 export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
-  const [devices, setDevices] = useState<Device[] | null>(null);
+  const [devices, setDevices] = useState<ConnectedDevice[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -333,7 +320,7 @@ export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
     const controller = new AbortController();
     request.current = controller;
     try {
-      const next = await accessRequest<Device[]>(
+      const next = await accessRequest<ConnectedDevice[]>(
         `${waiting ? 'waitlist/' : ''}devices`,
         undefined,
         controller.signal,

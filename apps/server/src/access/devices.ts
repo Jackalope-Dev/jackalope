@@ -1,3 +1,5 @@
+import { BUILD_KINDS, type ConnectedDevice, PROFILE_KINDS } from '@jackalope/contracts/access';
+import { PLATFORMS } from '@jackalope/contracts/platform';
 import { z } from 'zod';
 import { latestBetaRequest, requestBeta, withdrawBeta } from './beta';
 import { randomToken, tokenHash } from './crypto';
@@ -14,7 +16,7 @@ export async function connectedDevices(env: Env, memberId: string) {
       'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt,app_version AS appVersion,platform,build_kind AS buildKind,profile_kind AS profileKind,last_seen_at AS lastSeenAt,settings_checked_at AS settingsCheckedAt,settings_sync AS settingsSync FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 10',
     )
       .bind(memberId, Date.now())
-      .all()
+      .all<ConnectedDevice>()
   ).results;
 }
 async function deviceMember(env: Env, hash: string, now = Date.now()) {
@@ -127,9 +129,9 @@ export async function deviceRoutes(
             .min(1)
             .max(64)
             .regex(/^[0-9A-Za-z.+-]+$/),
-          platform: z.enum(['windows', 'macos', 'linux']),
-          buildKind: z.enum(['development', 'release']),
-          profileKind: z.enum(['default', 'isolated']),
+          platform: z.enum(PLATFORMS),
+          buildKind: z.enum(BUILD_KINDS),
+          profileKind: z.enum(PROFILE_KINDS),
         })
         .parse(await readJson(request));
       await env.DB.prepare(

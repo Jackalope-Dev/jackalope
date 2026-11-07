@@ -1,8 +1,8 @@
+import type { PublishedRelease } from '@jackalope/contracts/release';
 import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 
 const service = 'https://api.jackalope.dev';
-type Release = { version: string; date: string; notes: string };
 
 function Notes({ text }: { text: string }) {
   return text.split(/\r?\n\r?\n/).map((block, index) => {
@@ -22,7 +22,7 @@ function Notes({ text }: { text: string }) {
 }
 
 export function PublishedReleases() {
-  const [releases, setReleases] = useState<Release[]>([]);
+  const [releases, setReleases] = useState<PublishedRelease[]>([]);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -54,7 +54,7 @@ export function PublishedReleases() {
           )
         )
           throw new Error('Invalid release history');
-        return data as Release[];
+        return data as PublishedRelease[];
       })
       .then((data) => {
         if (active) setReleases(data);

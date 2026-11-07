@@ -1,3 +1,4 @@
+import { PLATFORMS } from '@jackalope/contracts/platform';
 import { z } from 'zod';
 import { adminPage } from '../admin-page';
 import { MANAGED_TAGS } from './audience';
@@ -8,12 +9,12 @@ import {
   createBroadcastDraft,
 } from './broadcast';
 import { randomToken } from './crypto';
+import { installerKey, linuxChannels, macChannels, stableDownloads, storeUrl } from './downloads';
 import { waitlistInsights } from './insights';
 import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import type { Mail } from './mail-templates';
 import { markAudienceStale } from './newsletter';
-import { installerKey, linuxChannels, macChannels, stableDownloads, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
 import { openSignup, waitlistRankSql } from './waitlist';
 
@@ -54,6 +55,24 @@ export async function accessReadiness(env: Env) {
   };
 }
 
+function previewMail(kind: string | null): Mail {
+  const to = 'preview@example.invalid';
+  switch (kind) {
+    case 'referral':
+    case 'passes_ready':
+    case 'pass_claimed':
+    case 'pass_expired':
+      return { to, kind, total: 5 };
+    case 'waitlist':
+    case 'feedback_request':
+    case 'invite':
+    case 'login':
+      return { to, kind, token: 'preview-only' };
+    default:
+      return { to, kind: 'welcome', token: 'preview-only' };
+  }
+}
+
 export async function accessAdmin(
   request: Request,
   env: Env,
@@ -78,22 +97,7 @@ export async function accessAdmin(
     });
   }
   if (request.method === 'GET' && url.pathname === '/admin/access/email-preview') {
-    const kind = url.searchParams.get('kind');
-    const mail: Mail =
-      kind === 'feedback_request'
-        ? { to: 'preview@example.invalid', kind: 'feedback_request', token: 'preview-only' }
-        : kind === 'waitlist'
-          ? { to: 'preview@example.invalid', kind: 'waitlist', token: 'preview-only' }
-          : kind === 'referral' ||
-              kind === 'passes_ready' ||
-              kind === 'pass_claimed' ||
-              kind === 'pass_expired'
-            ? { to: 'preview@example.invalid', kind, total: 5 }
-            : {
-                to: 'preview@example.invalid',
-                kind: kind === 'invite' ? 'invite' : kind === 'login' ? 'login' : 'welcome',
-                token: 'preview-only',
-              };
+    const mail = previewMail(url.searchParams.get('kind'));
     return new Response(
       accessEmail(mail, env.ACCESS_WEB_ORIGIN, stableDownloads(env), openSignup(env)).body,
       {
@@ -216,7 +220,7 @@ export async function accessAdmin(
       const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
       const query = (url.searchParams.get('query') ?? '').trim().toLowerCase();
       const platform = z
-        .enum(['all', 'macos', 'windows', 'linux'])
+        .enum(['all', ...PLATFORMS])
         .parse(url.searchParams.get('platform') ?? 'all');
       const stage = z
         .enum(['all', 'not-signed-in', 'not-connected', 'connected', 'email-failed'])

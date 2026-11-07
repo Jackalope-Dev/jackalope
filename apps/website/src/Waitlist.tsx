@@ -1,10 +1,11 @@
+import type { WaitlistPreferences as Preferences } from '@jackalope/contracts/access';
 import { Button, Input, MailIcon, Panel, RefreshIcon } from '@jackalope/ui';
 import { ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
-import { type Preferences, WaitlistQuestions } from './WaitlistPreferences';
+import { WaitlistQuestions } from './WaitlistPreferences';
 import './access.css';
 import './waitlist.css';
 

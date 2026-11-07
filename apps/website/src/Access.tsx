@@ -1,3 +1,4 @@
+import type { AccessMember } from '@jackalope/contracts/access';
 import { Button, CopyButton, Input, LoadingState, MailIcon, Panel, Textarea } from '@jackalope/ui';
 import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -7,36 +8,11 @@ import './access.css';
 import './waitlist.css';
 import { AccessPasses } from './AccessPasses';
 
-interface Invitation {
-  id: string;
-  email: string;
-  status: string;
-  expires_at: number;
-  accepted_at: number | null;
-  downloaded_at: number | null;
-  connected_at: number | null;
-  last_sent: number;
-}
-interface Membership {
-  email: string;
-  /** Anyone can join, so Instant Access Passes no longer admit anyone. */
-  openSignup?: boolean;
-  limit: number;
-  remaining: number;
-  accepted: number;
-  downloaded: number;
-  connected: number;
-  shareUrl: string;
-  invites: Invitation[];
-  download: { url: string; bytes?: number; kind?: 'store' } | null;
-  macos?: { id: string; label: string; url: string }[];
-}
-
 const invitationMessage =
   'I have an Instant Access Pass to Jackalope: one cross-platform workspace for coding agents, Git worktrees, and review. Skip the waitlist after verifying your email, while a pass is available.';
 
 export function AccessPage() {
-  const [member, setMember] = useState<Membership | null>(null);
+  const [member, setMember] = useState<AccessMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -47,7 +23,7 @@ export function AccessPage() {
   const [sent, setSent] = useState(false);
   const pending = useRef(false);
   const refreshMembership = useCallback(() => {
-    void accessRequest<Membership>('me')
+    void accessRequest<AccessMember>('me')
       .then((value) => {
         setMember(value);
         setError('');
@@ -78,7 +54,7 @@ export function AccessPage() {
     const controller = new AbortController();
     async function load() {
       try {
-        setMember(await accessRequest<Membership>('me', undefined, controller.signal));
+        setMember(await accessRequest<AccessMember>('me', undefined, controller.signal));
       } catch (e) {
         if (!(e instanceof AccessRequestError && e.status === 401) && !controller.signal.aborted)
           setError(accessMessage(e));
@@ -127,7 +103,7 @@ export function AccessPage() {
     await act(async () => {
       await accessRequest('accept', { token });
       setToken('');
-      setMember(await accessRequest<Membership>('me'));
+      setMember(await accessRequest<AccessMember>('me'));
       setNotice('You’re signed in.');
     });
   }
@@ -159,7 +135,7 @@ export function AccessPage() {
       return;
     }
     await act(async () => {
-      const updated = await accessRequest<Membership>('invites', { emails });
+      const updated = await accessRequest<AccessMember>('invites', { emails });
       setMember((current) => (current ? { ...current, ...updated } : current));
       form.reset();
       setNotice(
@@ -169,7 +145,7 @@ export function AccessPage() {
   }
   async function change(id: string, action: 'resend' | 'revoke') {
     await act(async () => {
-      const updated = await accessRequest<Membership>('invites/change', { id, action });
+      const updated = await accessRequest<AccessMember>('invites/change', { id, action });
       setMember((current) => (current ? { ...current, ...updated } : current));
       setNotice(
         action === 'resend'

@@ -1,3 +1,4 @@
+import { isPlatform, isReleaseChannel } from '@jackalope/contracts/platform';
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from 'jose';
 import { accessAdmin } from './access/admin';
 import { adminBetaRequests, resolveBetaRequest } from './access/beta';
@@ -83,8 +84,8 @@ export async function adminRoutes(
     const os = url.searchParams.get('os') ?? 'all';
     if (
       ![7, 30].includes(days) ||
-      !['all', 'stable', 'beta'].includes(channel) ||
-      !['all', 'windows', 'macos', 'linux'].includes(os) ||
+      !(channel === 'all' || isReleaseChannel(channel)) ||
+      !(os === 'all' || isPlatform(os)) ||
       !/^$|^\d+\.\d+\.\d+$/.test(version) ||
       version.length > 32
     )

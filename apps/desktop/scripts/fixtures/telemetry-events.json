@@ -403,5 +403,95 @@
   {
     "id": "00000000-0000-4000-8000-000000000068",
     "name": "app_opened"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000069",
+    "name": "feature_used",
+    "feature": "tasks"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000070",
+    "name": "feature_used",
+    "feature": "worktrees"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000071",
+    "name": "feature_used",
+    "feature": "agents"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000072",
+    "name": "feature_used",
+    "feature": "usage"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000073",
+    "name": "feature_used",
+    "feature": "codebase"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000074",
+    "name": "feature_used",
+    "feature": "settings"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000075",
+    "name": "feature_used",
+    "feature": "connections"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000076",
+    "name": "feature_used",
+    "feature": "schedules"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000077",
+    "name": "feature_used",
+    "feature": "browser"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000078",
+    "name": "feature_used",
+    "feature": "queue"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000079",
+    "name": "app_error",
+    "code": "history_save_failed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000080",
+    "name": "app_error",
+    "code": "verification_failed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000081",
+    "name": "app_error",
+    "code": "update_failed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000082",
+    "name": "app_error",
+    "code": "task_failed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000083",
+    "name": "task_state",
+    "state": "reviewed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000084",
+    "name": "task_state",
+    "state": "failed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000085",
+    "name": "task_state",
+    "state": "stopped"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000086",
+    "name": "task_state",
+    "state": "interrupted"
   }
 ]
