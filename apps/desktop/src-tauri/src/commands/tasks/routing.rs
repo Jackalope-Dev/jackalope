@@ -469,9 +469,8 @@ fn ranked_fallback<'a>(
 /// Whether routing may offer an agent with `adapter`: Jackalope can run it,
 /// and when the attempt must run on a computer, it runs there.
 fn routable(adapter: &str, computers_only: bool) -> bool {
-    super::runtime::EXECUTABLE_ADAPTERS.contains(&adapter)
-        && (!computers_only
-            || crate::commands::computers::credentials::REMOTE_ADAPTERS.contains(&adapter))
+    crate::commands::agents::is_executable(adapter)
+        && (!computers_only || crate::commands::agents::runs_on_computers(adapter))
 }
 
 impl TaskRuntime {
@@ -489,9 +488,8 @@ impl TaskRuntime {
         let mut agents: Vec<String> = if orchestrator {
             vec![policy.routing_agent(&req.project_id)?.to_string()]
         } else {
-            BUILTIN_AGENTS
-                .iter()
-                .map(|id| (*id).into())
+            crate::commands::agents::builtin_ids()
+                .map(String::from)
                 .chain(policy.custom_agents.iter().map(|agent| agent.id.clone()))
                 .collect()
         };

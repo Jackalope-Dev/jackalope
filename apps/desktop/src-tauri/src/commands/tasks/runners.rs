@@ -1,15 +1,5 @@
 use super::*;
 
-pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &[
-    "codex",
-    "claude",
-    "grok",
-    "opencode",
-    "kimi",
-    "antigravity",
-    "gemini",
-];
-
 pub(super) fn discover_runner(
     policy: &crate::commands::agent_policy::AgentPolicy,
     id: &str,
@@ -18,17 +8,7 @@ pub(super) fn discover_runner(
     let mut runner = Runner {
         desktop_installed: id == "antigravity" && antigravity_desktop_installed(),
         id: id.to_string(),
-        name: match id {
-            "codex" => "Codex",
-            "claude" => "Claude Code",
-            "grok" => "Grok",
-            "opencode" => "OpenCode",
-            "kimi" => "Kimi Code",
-            "antigravity" => "Antigravity",
-            "gemini" => "Gemini CLI",
-            _ => id,
-        }
-        .into(),
+        name: crate::commands::agents::name(id).into(),
         available: false,
         signed_in: false,
         account: "Current CLI account".into(),
@@ -128,15 +108,15 @@ pub(super) fn discover_runner(
 }
 
 pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
-    if !BUILTIN_AGENTS.contains(&agent) {
+    let Some(binary) = crate::commands::agents::find(agent).and_then(|spec| spec.binary.as_deref())
+    else {
         return Err("Unsupported agent".into());
-    }
+    };
     if agent == "opencode" {
         if let Some(path) = crate::commands::managed_runtime::executable()? {
             return Ok(path);
         }
     }
-    let binary = if agent == "antigravity" { "agy" } else { agent };
     let candidates: Vec<String> = if cfg!(windows) {
         vec![
             format!("{binary}.exe"),

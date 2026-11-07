@@ -12,24 +12,10 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
-/// Agent ID → npm package. Keep in step with `installCommand` in
-/// src/lib/agent-catalog.ts; a test checks that they match.
-const PACKAGES: [(&str, &str); 6] = [
-    ("codex", "@openai/codex"),
-    ("claude", "@anthropic-ai/claude-code"),
-    ("grok", "@xai/grok-cli"),
-    ("kimi", "@moonshot-ai/kimi-code"),
-    ("opencode", "opencode-ai"),
-    ("gemini", "@google/gemini-cli"),
-];
-
 const NODE_MISSING: &str = "Installing this agent needs Node.js with npm. Install the Node.js LTS release from nodejs.org, restart Jackalope, then try again.";
 
 fn package(agent: &str) -> Option<&'static str> {
-    PACKAGES
-        .iter()
-        .find(|(id, _)| *id == agent)
-        .map(|(_, package)| *package)
+    super::agents::find(agent)?.npm_package.as_deref()
 }
 
 fn install_args(package: &str) -> [&str; 3] {
@@ -158,13 +144,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn install_commands_match_the_catalog() {
-        let catalog = include_str!("../../../src/lib/agent-catalog.ts");
-        for (agent, _) in PACKAGES {
-            let command = display_command(agent).unwrap();
-            assert!(
-                catalog.contains(&format!("installCommand: '{command}'")),
-                "{agent}: {command} is not the catalog's install command"
+    fn install_commands_come_from_the_catalog_package() {
+        for agent in super::super::agents::all() {
+            assert_eq!(
+                display_command(&agent.id),
+                agent
+                    .npm_package
+                    .as_ref()
+                    .map(|package| format!("npm install -g {package}")),
+                "{}",
+                agent.id
             );
         }
         assert_eq!(

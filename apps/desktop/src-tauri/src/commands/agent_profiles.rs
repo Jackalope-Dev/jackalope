@@ -84,26 +84,11 @@ pub struct AgentProfilesView {
 }
 
 pub fn env_var_for(adapter: &str) -> Option<&'static str> {
-    match adapter {
-        "codex" => Some("CODEX_HOME"),
-        "claude" => Some("CLAUDE_CONFIG_DIR"),
-        "grok" => Some("GROK_HOME"),
-        "kimi" => Some("KIMI_CODE_HOME"),
-        "opencode" => Some("XDG_DATA_HOME"),
-        "gemini" => Some("GEMINI_CLI_HOME"),
-        "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
-        _ => None,
-    }
+    super::agents::find(adapter)?.account_env()
 }
 
-pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
-    match adapter {
-        "codex" => &["login"],
-        "grok" | "kimi" => &["login"],
-        "opencode" => &["auth", "login"],
-        "claude" => &["auth", "login"],
-        _ => &[],
-    }
+pub(super) fn login_args(adapter: &str) -> &'static [String] {
+    super::agents::find(adapter).map_or(&[], |agent| &agent.login_args)
 }
 
 fn manifest_path(root: &Path) -> PathBuf {
@@ -305,9 +290,11 @@ fn bind_account_selection(
             label: "This CLI's own sign-in".into(),
         });
     }
+    let spec = super::agents::find(adapter);
     if adapter == "antigravity" && selected.is_none() {
         let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .map(|home| PathBuf::from(home).join(".gemini"))
+            .zip(spec)
+            .map(|(home, spec)| spec.default_directory(Path::new(&home)))
             .filter(|path| path.is_absolute())
             .ok_or("Cannot locate Antigravity's CLI data directory.")?;
         return Ok(AccountBinding {
@@ -321,7 +308,9 @@ fn bind_account_selection(
                 .unwrap_or_else(|| "Current Antigravity CLI account (identity not pinned)".into()),
         });
     }
-    let env_name = env_var_for(adapter).ok_or("This agent does not support account isolation.")?;
+    let (spec, env_name) = spec
+        .and_then(|spec| Some((spec, spec.account_env()?)))
+        .ok_or("This agent does not support account isolation.")?;
     let entry = saved.agents.get(adapter);
     let id = selected;
     let (profile_id, directory, label) = if let Some(id) = id {
@@ -344,18 +333,8 @@ fn bind_account_selection(
         let directory = std::env::var_os(env_name)
             .map(PathBuf::from)
             .or_else(|| {
-                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|home| {
-                    if adapter == "gemini" {
-                        return PathBuf::from(home);
-                    }
-                    PathBuf::from(home).join(if adapter == "opencode" {
-                        ".local/share".to_string()
-                    } else if adapter == "kimi" {
-                        ".kimi-code".to_string()
-                    } else {
-                        format!(".{adapter}")
-                    })
-                })
+                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                    .map(|home| spec.default_directory(Path::new(&home)))
             })
             .ok_or("Cannot locate the agent's default account directory.")?;
         (
@@ -974,56 +953,8 @@ pub fn agent_profile_set_active(
     save(&root, &manifest)
 }
 
-pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
-    match adapter {
-        "codex" => &["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"],
-        "claude" => &[
-            "ANTHROPIC_API_KEY",
-            "ANTHROPIC_AUTH_TOKEN",
-            "CLAUDE_CODE_OAUTH_TOKEN",
-        ],
-        "grok" => &["XAI_API_KEY", "GROK_API_KEY", "GROK_DEPLOYMENT_KEY"],
-        "kimi" => &[
-            "KIMI_API_KEY",
-            "KIMI_BASE_URL",
-            "KIMI_MODEL_NAME",
-            "KIMI_MODEL_API_KEY",
-            "KIMI_MODEL_BASE_URL",
-            "KIMI_MODEL_PROVIDER_TYPE",
-            "KIMI_CODE_CUSTOM_HEADERS",
-        ],
-        "gemini" | "antigravity" => &[
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
-            "GOOGLE_GENERATIVE_AI_API_KEY",
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            "GOOGLE_GENAI_USE_VERTEXAI",
-            "GOOGLE_GENAI_USE_GCA",
-            "AGY_ADC_AUTH",
-        ],
-        "opencode" => &[
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "ANTHROPIC_AUTH_TOKEN",
-            "CLAUDE_CODE_OAUTH_TOKEN",
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
-            "GOOGLE_GENERATIVE_AI_API_KEY",
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            "XAI_API_KEY",
-            "GROK_API_KEY",
-            "OPENROUTER_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "GROQ_API_KEY",
-            "MISTRAL_API_KEY",
-            "AZURE_API_KEY",
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-            "AWS_SESSION_TOKEN",
-            "AWS_PROFILE",
-        ],
-        _ => &[],
-    }
+pub fn credential_env_vars(adapter: &str) -> &'static [String] {
+    super::agents::find(adapter).map_or(&[], |agent| &agent.credential_env)
 }
 
 #[cfg(test)]

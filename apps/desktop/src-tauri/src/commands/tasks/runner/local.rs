@@ -86,6 +86,7 @@ impl AttemptRunner for LocalRunner {
         }
         let (id, req, adapter, workspace) =
             (launch.id, launch.req, launch.adapter, launch.workspace);
+        let spec = crate::commands::agents::find(adapter).ok_or("Unsupported agent")?;
         let cmd = &mut launch.cmd;
         cmd.current_dir(workspace)
             .stdin(Stdio::piped())
@@ -151,13 +152,13 @@ impl AttemptRunner for LocalRunner {
         let opencode_connection = self.opencode.take();
         let server_transport = opencode_connection.is_some();
         let input = std::mem::take(&mut launch.input);
-        let input_result =
-            if adapter == "grok" || adapter == "kimi" || adapter == "acp" || server_transport {
-                Ok(())
-            } else {
-                stdin.write_all(input.as_bytes())
-            };
-        let mut acp_input = (adapter == "kimi" || adapter == "acp").then_some(stdin);
+        let input_result = if spec.prompt != Prompt::Stdin || server_transport {
+            Ok(())
+        } else {
+            stdin.write_all(input.as_bytes())
+        };
+        let protocol = spec.protocol;
+        let mut acp_input = (protocol == Protocol::Acp).then_some(stdin);
         if let Err(error) = input_result {
             let _ = runtime.stop(id);
             return Err(format!("Could not deliver task: {error}"));
@@ -195,7 +196,7 @@ impl AttemptRunner for LocalRunner {
                 return;
             }
             let stdout = stdout.unwrap();
-            if output_adapter == "kimi" || output_adapter == "acp" {
+            if protocol == Protocol::Acp {
                 let result = kimi::drive_with_servers(
                     BufReader::new(stdout),
                     &mut acp_input.take().unwrap(),
@@ -249,11 +250,10 @@ impl AttemptRunner for LocalRunner {
                     }
                     if truncated {
                         activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
-                        if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
-                        if output_adapter == "gemini" { r.error.get_or_insert("Gemini CLI returned an oversized protocol event; the result could not be fully verified.".into()); }
+                        if matches!(protocol, Protocol::Antigravity | Protocol::Gemini) { r.error.get_or_insert(format!("{} returned an oversized protocol event; the result could not be fully verified.", spec.name)); }
                     }
-                    else if output_adapter == "antigravity" { stream.consume(r, &line); }
-                    else if output_adapter == "gemini" { gemini_stream.consume(r, &line); }
+                    else if protocol == Protocol::Antigravity { stream.consume(r, &line); }
+                    else if protocol == Protocol::Gemini { gemini_stream.consume(r, &line); }
                     else { consume_adapter_event(r, &line, &output_adapter); }
                 });
                 },
@@ -265,10 +265,10 @@ impl AttemptRunner for LocalRunner {
             if output_adapter == "claude" {
                 partials.complete(&runtime, &event_id);
             }
-            if output_adapter == "antigravity" {
+            if protocol == Protocol::Antigravity {
                 runtime.update(&event_id, |run| stream.finish(run));
             }
-            if output_adapter == "gemini" {
+            if protocol == Protocol::Gemini {
                 runtime.update(&event_id, |run| gemini_stream.finish(run));
             }
         });
@@ -313,6 +313,7 @@ impl AttemptRunner for LocalRunner {
         launch: &mut Launch,
     ) -> Result<Option<Outcome>, String> {
         let (id, adapter) = (launch.id, launch.adapter);
+        let spec = crate::commands::agents::find(adapter).ok_or("Unsupported agent")?;
         if let Some(persistent) = self.persistent.take() {
             let outcome = runtime.run_claude_session(claude_session::Launch {
                 id,
@@ -349,8 +350,7 @@ impl AttemptRunner for LocalRunner {
                 break exit;
             }
             let process = self.process.as_ref().unwrap();
-            if (adapter == "kimi" || adapter == "acp" || server_transport)
-                && process.reader.is_finished()
+            if (spec.protocol == Protocol::Acp || server_transport) && process.reader.is_finished()
             {
                 process.tree.terminate();
                 let mut child = child.lock().unwrap();
@@ -361,14 +361,14 @@ impl AttemptRunner for LocalRunner {
             if let Some((began, after_turn)) = probe {
                 if began.elapsed() > Duration::from_secs(15) {
                     if !after_turn {
-                        runtime.update(id, |run| run.error = Some("Kimi's usage command timed out before the task started. Update the CLI and retry.".into()));
+                        runtime.update(id, |run| run.error = Some(format!("{}'s usage command timed out before the task started. Update the CLI and retry.", spec.short_name)));
                     }
                     self.stop()?;
                 }
             }
-            if (matches!(adapter, "antigravity" | "kimi" | "acp" | "gemini") || server_transport)
+            if (spec.attempt_limit || server_transport)
                 && !timed_out
-                && started.elapsed() > antigravity::TIMEOUT
+                && started.elapsed() > crate::commands::agents::ATTEMPT_LIMIT
             {
                 timed_out = true;
                 runtime.update(id, |run| run.error = Some(format!("{adapter} exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.")));
@@ -392,12 +392,12 @@ impl AttemptRunner for LocalRunner {
             });
         }
         // ACP completion is the turn receipt; its persistent server is stopped by the owner.
-        let success = if adapter == "kimi" || adapter == "acp" || server_transport {
+        let success = if spec.protocol == Protocol::Acp || server_transport {
             process.turn_succeeded.load(Ordering::SeqCst) && !timed_out
         } else {
             exit.success()
         };
-        if adapter == "grok" {
+        if spec.prompt == Prompt::File {
             let _ = std::fs::remove_file(runtime.directory.join(format!("{id}.prompt")));
         }
         runtime.inner.lock().unwrap().processes.remove(id);

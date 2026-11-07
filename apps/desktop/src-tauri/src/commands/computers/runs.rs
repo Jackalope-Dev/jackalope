@@ -76,7 +76,7 @@ pub(crate) fn translate(
     root: &Path,
     bridge: Option<&str>,
 ) -> Result<(Vec<String>, Environment), String> {
-    if !credentials::REMOTE_ADAPTERS.contains(&adapter) {
+    if !crate::commands::agents::runs_on_computers(adapter) {
         return Err(format!("{adapter} cannot run on a computer yet."));
     }
     let args: Vec<String> = command

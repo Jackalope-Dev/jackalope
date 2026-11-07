@@ -120,15 +120,9 @@ fn agent_identity(agent: &str) -> (String, String) {
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
         .take(80)
         .collect();
-    let name = match id.as_str() {
-        "codex" => "Codex",
-        "claude" => "Claude",
-        "grok" => "Grok",
-        "opencode" => "OpenCode",
-        "kimi" => "Kimi Code",
-        "antigravity" => "Antigravity",
-        _ => "Jackalope agent",
-    };
+    let name = super::agents::find(&id)
+        .filter(|agent| agent.binary.is_some())
+        .map_or("Jackalope agent", |agent| agent.short_name.as_str());
     (
         name.into(),
         format!(

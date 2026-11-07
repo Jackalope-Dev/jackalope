@@ -209,8 +209,8 @@ fn main() {
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
     policy.automatic_quota_handoff = Some(enabled);
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for (id, adapter) in [("fixture-a", "codex"), ("fixture-b", "claude")] {
@@ -400,8 +400,8 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "codex".into();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), *id == "codex");
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), id == "codex");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -558,8 +558,8 @@ fn main() {
     .unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for id in ["fixture-a", "fixture-b"] {

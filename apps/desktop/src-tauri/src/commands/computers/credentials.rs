@@ -39,9 +39,6 @@ pub(crate) const KINDS: &[Kind] = &[
     },
 ];
 
-/// Agents that can run on a computer.
-pub(crate) const REMOTE_ADAPTERS: &[&str] = &["claude", "codex"];
-
 #[derive(Default, Serialize, Deserialize)]
 struct Saved {
     #[serde(default)]

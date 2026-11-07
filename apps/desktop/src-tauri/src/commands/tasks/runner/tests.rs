@@ -208,7 +208,7 @@ fn one_launch_records_the_same_result_through_both_runners() {
     )
     .unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
-    credentials::set(
+    computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
         Some("sk-fixture-0123456789abcdef"),
@@ -465,7 +465,7 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
         .placed_target(&strict, &gemini(&strict), "gemini", None)
         .unwrap_err();
     assert!(
-        error.contains("swarms run only on computers") && error.contains(COMPUTERS_ONLY_FIX),
+        error.contains("swarms run only on computers") && error.contains(&computers_only_fix()),
         "{error}"
     );
     let run = runtime.run_snapshot(&strict).unwrap();
@@ -484,10 +484,10 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
         Some(computer.id.clone())
     );
     let mut policy = crate::commands::agent_policy::AgentPolicy::default();
-    for agent in super::super::BUILTIN_AGENTS {
+    for agent in crate::commands::agents::builtin_ids() {
         policy
             .enabled_agents
-            .insert((*agent).into(), *agent == "gemini");
+            .insert(agent.into(), agent == "gemini");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -500,7 +500,7 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
     let error = runtime.route(&mut auto).unwrap_err();
     assert!(
         error.starts_with("No enabled agent that can run on Box")
-            && error.contains(COMPUTERS_ONLY_FIX),
+            && error.contains(&computers_only_fix()),
         "{error}"
     );
     assert_eq!(auto.agent, "auto");
@@ -539,7 +539,7 @@ fn a_computer_that_does_not_answer_is_a_lost_host() {
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
-    credentials::set(
+    computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
         Some("sk-fixture-0123456789abcdef"),
@@ -770,7 +770,7 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
-    credentials::set(
+    computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
         Some("sk-fixture-0123456789abcdef"),

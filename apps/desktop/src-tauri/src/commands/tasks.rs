@@ -38,9 +38,9 @@ pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
-pub(super) use runners::BUILTIN_AGENTS;
 pub use snapshots::{task_changes, TaskHighlight};
 
+use super::agents::{Bridge, Prompt, Protocol};
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
 use serde::Serialize;
@@ -262,7 +262,9 @@ pub(super) fn probe_auth(
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;
     let profiles_root = runtime.profiles_root();
-    let mut ids: Vec<String> = BUILTIN_AGENTS.iter().map(|id| (*id).into()).collect();
+    let mut ids: Vec<String> = crate::commands::agents::builtin_ids()
+        .map(String::from)
+        .collect();
     ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
     // Each agent's discovery/sign-in probe can take up to probe_auth's own
     // 10-second timeout. Running them in one sequential closure (the

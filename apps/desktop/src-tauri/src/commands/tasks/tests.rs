@@ -332,16 +332,6 @@ fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
 }
 
 #[test]
-fn every_builtin_agent_is_executable() {
-    for adapter in BUILTIN_AGENTS {
-        assert!(runtime::EXECUTABLE_ADAPTERS.contains(adapter), "{adapter}");
-    }
-    let message = runtime::unimplemented_adapter("other");
-    assert!(message.starts_with("The other task adapter is not implemented yet"));
-    assert!(message.contains("Gemini CLI"));
-}
-
-#[test]
 #[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
 fn installed_agent_lifecycle_trial() {
     let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");
@@ -359,7 +349,7 @@ fn installed_agent_lifecycle_trial() {
 }
 
 pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
-    assert!(BUILTIN_AGENTS.contains(&agent));
+    assert!(crate::commands::agents::is_builtin(agent));
     let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();

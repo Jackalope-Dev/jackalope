@@ -5,22 +5,6 @@ use super::*;
 const RECENT_TOUCHED_ATTEMPTS: usize = 3;
 const RECENT_TOUCHED_PATHS: usize = 60;
 
-/// Adapters with a native task protocol. Others fail explicitly at launch.
-pub(super) const EXECUTABLE_ADAPTERS: &[&str] = &[
-    "codex",
-    "claude",
-    "kimi",
-    "antigravity",
-    "opencode",
-    "grok",
-    "gemini",
-    "acp",
-];
-
-pub(super) fn unimplemented_adapter(adapter: &str) -> String {
-    format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code, Antigravity, Gemini CLI or an ACP agent to run this task.")
-}
-
 /// Launch the agent, retrying a transient failure (an antivirus or indexer lock
 /// on the executable, `ETXTBSY` just after a write) a bounded number of times.
 /// A missing executable is not retried. Returns the child and the attempt count.
@@ -668,11 +652,9 @@ impl TaskRuntime {
         let policy = self.policy()?;
         // An agent on the project's computer uses the CLI installed there.
         let adapter = policy.adapter(&req.agent)?;
-        let remote = if EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
-            self.placed_target(id, req, &adapter, previous.as_ref())?
-        } else {
-            None
-        };
+        let spec = crate::commands::agents::find(&adapter)
+            .ok_or("Choose a supported CLI adapter for this agent.")?;
+        let remote = self.placed_target(id, req, &adapter, previous.as_ref())?;
         let executable = match remote {
             Some(_) => PathBuf::from(&adapter),
             None => policy.resolve(&req.agent)?.1,
@@ -725,9 +707,6 @@ impl TaskRuntime {
         {
             return Err("This agent was disabled for the project before launch.".into());
         }
-        if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
-            return Err(unimplemented_adapter(&adapter));
-        }
         let runner_lease = match remote {
             Some(_) => None,
             None => crate::commands::managed_runtime::acquire(&executable)?,
@@ -751,7 +730,7 @@ impl TaskRuntime {
             }
         }
         // Agents on a computer use the sign-ins saved for computers instead.
-        if remote.is_none() && crate::commands::agent_profiles::env_var_for(&adapter).is_some() {
+        if remote.is_none() && spec.account_env().is_some() {
             let binding = req
                 .account_binding
                 .as_ref()
@@ -873,7 +852,7 @@ impl TaskRuntime {
                 previous.as_ref().and_then(|old| old.session_id.as_deref()),
             );
         } else {
-            return Err(unimplemented_adapter(&adapter));
+            return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
         let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
@@ -882,7 +861,7 @@ impl TaskRuntime {
             run.requested_service_tier = tier;
         })?;
         if let Some(model) = &selected_model {
-            if adapter != "kimi" && adapter != "acp" && opencode_connection.is_none() {
+            if spec.protocol != Protocol::Acp && opencode_connection.is_none() {
                 cmd.args(["--model", model]);
             }
             self.update_checked(id, |run| run.model = Some(model.clone()))?;
@@ -1145,8 +1124,7 @@ impl TaskRuntime {
             .map(|run| super::efficiency::launch_context(run, host_parallelism))
             .unwrap_or_default();
         input.push_str(&launch_context);
-        let native_mcp = req.coordination.is_some()
-            && matches!(adapter.as_str(), "codex" | "claude" | "opencode" | "kimi");
+        let native_mcp = req.coordination.is_some() && spec.bridge() == Bridge::Mcp;
         if native_mcp && crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             input.push_str("\nread_context provides bounded source ranges and repository symbol locations. Reuse returned blockHash only while its original text remains in your context; unchanged ranges omit text, changed ranges refresh it. Use the agent's own file tools whenever they are simpler.\n");
         }
@@ -1166,7 +1144,7 @@ impl TaskRuntime {
                     &adapter,
                 ));
             }
-            if matches!(adapter.as_str(), "grok" | "antigravity" | "gemini") {
+            if spec.bridge() == Bridge::Http {
                 input.push_str(crate::commands::coordination::http_bootstrap());
             }
             if has_discovery {
@@ -1220,7 +1198,7 @@ impl TaskRuntime {
                 Path::new(&req.project_path)
             )
         ));
-        if adapter == "grok" {
+        if spec.prompt == Prompt::File {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
         }
@@ -1238,7 +1216,7 @@ impl TaskRuntime {
                 );
             }
         }
-        let acp_servers = if adapter == "kimi" || adapter == "acp" {
+        let acp_servers = if spec.protocol == Protocol::Acp {
             crate::commands::mcp::acp_servers(&project_mcp, &cmd)?
         } else {
             Vec::new()

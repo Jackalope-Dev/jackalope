@@ -23,16 +23,12 @@ fn request(
     observations: Value,
     options: &Options,
 ) -> Value {
-    let capabilities: Value = serde_json::from_str(include_str!(
-        "../../../../../src/lib/agent-capabilities.json"
-    ))
-    .expect("checked capability catalog");
     let assessed = assessed_workers(candidates);
     let workers: Vec<_> = assessed.iter().map(|candidate| {
         let evidence = options.model(&candidate.adapter, candidate.model.as_deref()).cloned()
             .or_else(|| crate::commands::agent_models::evidence(&candidate.binding, candidate.model.as_deref()));
         json!({"id":candidate.id,"agent":candidate.agent,"adapter":candidate.adapter,"model":candidate.model,
-            "capabilities":capabilities[&candidate.adapter],"toolDelivery":decisions::context::tool_evidence(req,&candidate.adapter),
+            "capabilities":crate::commands::agents::find(&candidate.adapter).map(|agent| &agent.capabilities),"toolDelivery":decisions::context::tool_evidence(req,&candidate.adapter),
             "modelEvidence":evidence,"requestedEffort":req.effort,"modelEvidenceSource":"Explicit user evidence takes precedence over this account's discovered catalog. Neither establishes task quality or provider access. Catalog retrieval time does not establish upstream freshness.",
             "modelEvidenceStale":evidence.as_ref().is_some_and(|e| chrono::DateTime::parse_from_rfc3339(&e.checked_at).is_ok_and(|at| Utc::now().signed_duration_since(at).num_days()>90))})
     }).collect();

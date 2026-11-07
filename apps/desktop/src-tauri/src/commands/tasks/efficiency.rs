@@ -1,3 +1,4 @@
+use crate::commands::agents::{Bridge, Protocol};
 use serde::{Deserialize, Serialize};
 
 pub(super) const INSTRUCTIONS: &str = "\nWork efficiently while preserving correctness: batch independent file reads and searches when the available tools support it; keep dependent operations ordered. Start with the supplied repository map and concrete file, symbol or error references, then broaden the search when evidence requires it. Reuse facts already established in this task and avoid repeating broad repository exploration. Keep progress updates concise. Complete the coherent implementation first, then batch required tests, builds and evidence capture in one final verification phase. Run checks earlier only for explicit test-first or repository instructions, or when a diagnostic result is necessary to choose the implementation. Do not run builds or full suites after each edit. Use Jackalope verification tools when available so results are saved. After checks pass, repeat or broaden them when subsequent changes, failures or unresolved concerns warrant it. Report unavailable required tools or documentation instead of guessing external contracts. Let a running check finish before editing its workspace or starting another check; a client timeout does not mean the command stopped. Never trade away required verification or hide uncertainty to finish faster.\n";
@@ -6,11 +7,11 @@ pub(super) fn verification_instructions(command: Option<&str>, adapter: &str) ->
     let Some(command) = command.filter(|command| !command.trim().is_empty()) else {
         return String::new();
     };
-    if ["grok", "antigravity", "gemini"].contains(&adapter) {
-        return format!("\nSaved project check (command data): {}. Run this exact check once using authenticated POST /v1/computer/verify with {{}} through the supplied Jackalope bridge, before any separate shell invocation of the same check. Its saved receipt completes that verification requirement; do not add a validation step merely to repeat it. Record additional acceptance evidence when needed. GET /v1/help describes authentication and the response. After a client timeout, POST /v1/computer/output with {{}} retrieves the saved result; do not start a duplicate check. This authorizes only the saved check; other commands require independent permission.\n", serde_json::to_string(command).unwrap());
-    }
-    if !["codex", "claude", "kimi", "opencode"].contains(&adapter) {
+    let Some(bridge) = crate::commands::agents::find(adapter).map(|agent| agent.bridge()) else {
         return String::new();
+    };
+    if bridge == Bridge::Http {
+        return format!("\nSaved project check (command data): {}. Run this exact check once using authenticated POST /v1/computer/verify with {{}} through the supplied Jackalope bridge, before any separate shell invocation of the same check. Its saved receipt completes that verification requirement; do not add a validation step merely to repeat it. Record additional acceptance evidence when needed. GET /v1/help describes authentication and the response. After a client timeout, POST /v1/computer/output with {{}} retrieves the saved result; do not start a duplicate check. This authorizes only the saved check; other commands require independent permission.\n", serde_json::to_string(command).unwrap());
     }
     let tool = if adapter == "claude" {
         "mcp__jackalope__computer_verify"
@@ -46,8 +47,11 @@ pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
     let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
         return false;
     };
-    match adapter {
-        "codex" => {
+    let Some(protocol) = crate::commands::agents::find(adapter).map(|agent| agent.protocol) else {
+        return false;
+    };
+    match protocol {
+        Protocol::Codex => {
             matches!(
                 event["type"].as_str(),
                 Some("item.started" | "item.updated" | "item.completed")
@@ -62,7 +66,7 @@ pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
                 )
             )
         }
-        "claude" | "grok" => {
+        Protocol::ClaudeStream => {
             event["type"] == "assistant"
                 && event["message"]["content"]
                     .as_array()
@@ -72,15 +76,15 @@ pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
                         })
                     })
         }
-        "opencode" => matches!(event["type"].as_str(), Some("text" | "tool_use")),
-        "antigravity" => {
+        Protocol::Opencode => matches!(event["type"].as_str(), Some("text" | "tool_use")),
+        Protocol::Antigravity => {
             event["event"] == "step_update"
                 && (event["step_update"]["step_type"] == "tool"
                     || event["step_update"]["text_delta"]
                         .as_str()
                         .is_some_and(|text| !text.is_empty()))
         }
-        "gemini" => {
+        Protocol::Gemini => {
             event["type"] == "tool_use"
                 || (event["type"] == "message"
                     && event["role"] == "assistant"
@@ -88,7 +92,7 @@ pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
                         .as_str()
                         .is_some_and(|text| !text.is_empty()))
         }
-        _ => false,
+        Protocol::Acp => false,
     }
 }
 
@@ -230,7 +234,8 @@ impl Efficiency {
     }
 
     pub fn observe(&mut self, event: &serde_json::Value, adapter: &str, workspace: &str) {
-        if adapter == "opencode" && event["type"] == "tool_use" {
+        let protocol = crate::commands::agents::find(adapter).map(|agent| agent.protocol);
+        if protocol == Some(Protocol::Opencode) && event["type"] == "tool_use" {
             let part = &event["part"];
             let id = part["callID"].as_str().or_else(|| part["id"].as_str());
             if let (Some(id), Some(name)) = (id, part["tool"].as_str()) {
@@ -238,7 +243,7 @@ impl Efficiency {
                 self.touched(&part["state"]["input"], workspace);
             }
         }
-        if adapter == "antigravity" && event["event"] == "step_update" {
+        if protocol == Some(Protocol::Antigravity) && event["event"] == "step_update" {
             let step = &event["step_update"];
             if step["step_type"] == "tool" {
                 if let (Some(index), Some(name)) =
@@ -249,7 +254,7 @@ impl Efficiency {
                 }
             }
         }
-        if adapter == "codex" && event["type"] == "item.completed" {
+        if protocol == Some(Protocol::Codex) && event["type"] == "item.completed" {
             let item = &event["item"];
             if let (Some(id), Some(kind)) = (item["id"].as_str(), item["type"].as_str()) {
                 if [
@@ -278,7 +283,7 @@ impl Efficiency {
                 }
             }
         }
-        if ["claude", "grok"].contains(&adapter) && event["type"] == "assistant" {
+        if protocol == Some(Protocol::ClaudeStream) && event["type"] == "assistant" {
             for block in event["message"]["content"].as_array().into_iter().flatten() {
                 if block["type"] == "tool_use" {
                     if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
@@ -288,7 +293,7 @@ impl Efficiency {
                 }
             }
         }
-        if adapter == "gemini" && event["type"] == "tool_use" {
+        if protocol == Some(Protocol::Gemini) && event["type"] == "tool_use" {
             let name = event["tool_name"].as_str();
             if let (Some(id), Some(name)) = (event["tool_id"].as_str(), name) {
                 self.tool(id, name);
@@ -354,6 +359,10 @@ mod tests {
         assert!(instructions.contains("A denial is not permission"));
         for command in [None, Some(""), Some("   ")] {
             assert!(verification_instructions(command, "claude").is_empty());
+        }
+        for adapter in ["kimi", "acp"] {
+            let instructions = verification_instructions(Some(command), adapter);
+            assert!(instructions.contains("Jackalope computer_verify with {}"));
         }
         for adapter in ["grok", "antigravity", "gemini"] {
             let instructions = verification_instructions(Some(command), adapter);

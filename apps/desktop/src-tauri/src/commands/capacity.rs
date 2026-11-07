@@ -46,11 +46,7 @@ pub struct CapacityRecord {
 #[derive(Default)]
 struct Cache {
     checked: Option<Instant>,
-    codex: Option<CapacityRecord>,
-    claude: Option<CapacityRecord>,
-    grok: Option<CapacityRecord>,
-    kimi: Option<CapacityRecord>,
-    antigravity: Option<CapacityRecord>,
+    records: std::collections::HashMap<&'static str, CapacityRecord>,
 }
 
 #[derive(Default)]
@@ -61,15 +57,10 @@ fn unavailable(agent: &str, status: &str, detail: &str, account: Option<String>)
         agent: agent.into(),
         status: status.into(),
         account: account.unwrap_or_else(|| "Account identity not available for this agent".into()),
-        source: match agent {
-            "codex" => "Codex account/rateLimits/read",
-            "claude" => "Claude CLI get_usage (experimental)",
-            "grok" => "Grok CLI x.ai/billing",
-            "kimi" => "Kimi Code membership usages",
-            "antigravity" => "Antigravity CLI /usage",
-            _ => "No connected quota adapter",
-        }
-        .into(),
+        source: super::agents::find(agent)
+            .and_then(|agent| agent.quota_source.as_deref())
+            .unwrap_or("No connected quota adapter")
+            .into(),
         observed_at: None,
         detail: detail.into(),
         windows: vec![],
@@ -295,15 +286,12 @@ pub(in crate::commands) async fn routing_snapshots(
         .collect()
 }
 
-fn failed_refresh(previous: Option<&CapacityRecord>, message: &str) -> CapacityRecord {
-    if let Some(previous) = previous {
-        let mut record = previous.clone();
-        record.status = "stale".into();
-        record.detail = format!("{message} Values below are the last successful snapshot.");
-        record
-    } else {
-        unavailable("codex", "unavailable", message, None)
-    }
+/// Agents whose account quota Jackalope reads, in display order.
+fn quota_agents() -> impl Iterator<Item = &'static str> {
+    super::agents::all()
+        .iter()
+        .filter(|agent| agent.capabilities.capacity)
+        .map(|agent| agent.id.as_str())
 }
 
 fn connected_refresh(
@@ -358,47 +346,28 @@ pub async fn capacity_snapshot(
         || (refresh.unwrap_or(false) && age.is_some_and(|age| age >= Duration::from_secs(60)));
     if should_refresh {
         let profiles_root = runtime.profiles_root();
-        let (codex, claude, grok, kimi, antigravity) = tokio::join!(
-            account_snapshot(&profiles_root, "codex"),
-            account_snapshot(&profiles_root, "claude"),
-            account_snapshot(&profiles_root, "grok"),
-            account_snapshot(&profiles_root, "kimi"),
-            account_snapshot(&profiles_root, "antigravity")
-        );
-        cache.codex = Some(match codex {
-            Ok(record) => record,
-            Err(error) => failed_refresh(
-                cache.codex.as_ref().filter(|r| r.observed_at.is_some()),
-                &error,
-            ),
-        });
-        cache.claude = Some(connected_refresh("claude", cache.claude.as_ref(), claude));
-        cache.grok = Some(connected_refresh("grok", cache.grok.as_ref(), grok));
-        cache.kimi = Some(connected_refresh("kimi", cache.kimi.as_ref(), kimi));
-        cache.antigravity = Some(connected_refresh(
-            "antigravity",
-            cache.antigravity.as_ref(),
-            antigravity,
-        ));
+        let mut reads = tokio::task::JoinSet::new();
+        for agent in quota_agents() {
+            let root = profiles_root.clone();
+            reads.spawn(async move { (agent, account_snapshot(&root, agent).await) });
+        }
+        while let Some(read) = reads.join_next().await {
+            let (agent, result) = read.map_err(|error| error.to_string())?;
+            let record = connected_refresh(agent, cache.records.get(agent), result);
+            cache.records.insert(agent, record);
+        }
         cache.checked = Some(Instant::now());
     }
-    let mut records: Vec<_> = [
-        ("codex", &cache.codex),
-        ("claude", &cache.claude),
-        ("grok", &cache.grok),
-        ("kimi", &cache.kimi),
-        ("antigravity", &cache.antigravity),
-    ]
-    .into_iter()
-    .map(|(agent, record)| {
-        current_snapshot(
-            record.clone().unwrap_or_else(|| {
-                unavailable(agent, "unavailable", "No quota snapshot yet", None)
-            }),
-            Utc::now().timestamp(),
-        )
-    })
-    .collect();
+    let mut records: Vec<_> = quota_agents()
+        .map(|agent| {
+            current_snapshot(
+                cache.records.get(agent).cloned().unwrap_or_else(|| {
+                    unavailable(agent, "unavailable", "No quota snapshot yet", None)
+                }),
+                Utc::now().timestamp(),
+            )
+        })
+        .collect();
     if let Some(record) = super::jev::capacity_record(&runtime) {
         records.push(record);
     }
@@ -463,11 +432,17 @@ mod tests {
     #[test]
     fn refresh_error_keeps_original_observation_time_and_marks_stale() {
         let record = parse_codex(&json!({"rateLimits":{"primary":{"usedPercent":20}}})).unwrap();
-        let stale = failed_refresh(Some(&record), "Connection failed");
-        assert_eq!(stale.status, "stale");
-        assert_eq!(stale.observed_at, record.observed_at);
-        assert_eq!(stale.windows[0].remaining_percent, Some(80.0));
-        assert!(failed_refresh(None, "Offline").windows.is_empty());
+        let stale = connected_refresh("codex", Some(&record), Err("Connection failed".into()));
+        if super::super::tasks::executable("codex").is_err() {
+            assert_eq!(stale.status, "notInstalled");
+        } else {
+            assert_eq!(stale.status, "stale");
+            assert_eq!(stale.observed_at, record.observed_at);
+            assert_eq!(stale.windows[0].remaining_percent, Some(80.0));
+        }
+        assert!(connected_refresh("codex", None, Err("Offline".into()))
+            .windows
+            .is_empty());
     }
 
     #[test]

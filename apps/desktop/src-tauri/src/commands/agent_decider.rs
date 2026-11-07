@@ -144,14 +144,9 @@ fn effective_for(store: &Store, record: &PlanRecord) -> Effective {
 // Choosing the decider
 
 fn family(adapter: &str) -> &str {
-    match adapter {
-        "codex" => "openai",
-        "claude" => "anthropic",
-        "gemini" | "antigravity" => "google",
-        "grok" => "xai",
-        "kimi" => "moonshot",
-        other => other,
-    }
+    super::agents::find(adapter)
+        .and_then(|agent| agent.family.as_deref())
+        .unwrap_or(adapter)
 }
 
 /// The deciding agent: the named one when available, or for `auto` the
@@ -182,10 +177,9 @@ fn available_agents(coordinator: &Coordinator, project_id: &str) -> Vec<String> 
     let Ok(policy) = coordinator.runtime.policy() else {
         return vec![];
     };
-    super::tasks::BUILTIN_AGENTS
-        .iter()
+    super::agents::builtin_ids()
         .filter(|agent| policy.agent_allowed(project_id, agent) && policy.resolve(agent).is_ok())
-        .map(|agent| agent.to_string())
+        .map(String::from)
         .collect()
 }
 
@@ -845,16 +839,7 @@ pub fn human_action(
 
 /// The text the asking agent receives for an agent's answer.
 pub fn attributed(agent: &str, answer: &str) -> String {
-    let name = match agent {
-        "claude" => "Claude",
-        "codex" => "Codex",
-        "grok" => "Grok",
-        "kimi" => "Kimi",
-        "opencode" => "OpenCode",
-        "gemini" => "Gemini",
-        "antigravity" => "Antigravity",
-        other => other,
-    };
+    let name = super::agents::find(agent).map_or(agent, |agent| agent.short_name.as_str());
     format!("Answered by {name} on your owner's behalf: {answer}")
 }
 

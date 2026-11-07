@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const NATIVE_INPUTS = [
   /^apps\/desktop\/src-tauri\//,
   /^apps\/desktop\/icons\//,
-  /^apps\/desktop\/src\/lib\/agent-capabilities\.json$/,
+  /^apps\/desktop\/src\/lib\/agents\.json$/,
   /^apps\/desktop\/scripts\/fixtures\//,
   /^packages\/knowledge\/catalog\.json$/,
   /^scripts\/evaluation\/cases\.json$/,

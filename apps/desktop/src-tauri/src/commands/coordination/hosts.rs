@@ -3,10 +3,7 @@
 //! retrying once on another host a fork whose host was lost.
 
 use super::*;
-use crate::commands::computers::{
-    credentials,
-    pool::{self, Decision, Needs},
-};
+use crate::commands::computers::pool::{self, Decision, Needs};
 use crate::commands::project_secrets::{self, Availability, Place};
 use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
@@ -62,7 +59,7 @@ impl Coordinator {
             .ok()
             .and_then(|policy| policy.adapter(&item.agent).ok());
         if let Some(adapter) = adapter.as_deref() {
-            if item.agent != "auto" && !credentials::REMOTE_ADAPTERS.contains(&adapter) {
+            if item.agent != "auto" && !crate::commands::agents::runs_on_computers(adapter) {
                 needs.device_only = Some(format!("{} cannot run on a computer", item.agent));
             }
         }
