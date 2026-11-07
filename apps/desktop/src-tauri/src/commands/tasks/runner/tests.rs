@@ -828,8 +828,11 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
         &continued,
         &other,
     );
+    // Applying the changes follows the machine's core.autocrlf, so Windows can write CRLF.
     assert_eq!(
-        std::fs::read_to_string(other.join("README.md")).unwrap(),
+        std::fs::read_to_string(other.join("README.md"))
+            .unwrap()
+            .replace("\r\n", "\n"),
         "changed on the computer\n"
     );
     let left = left_changes(&runtime, &lost);
