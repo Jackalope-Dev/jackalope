@@ -219,5 +219,57 @@ export function computerUsage(status: ComputerStatus): string | null {
   return usage ? usage.charAt(0).toUpperCase() + usage.slice(1) : null;
 }
 
+/** Where a project's swarm forks and planned attempts may run. */
+export type SwarmHosts = 'device' | 'computers' | 'anywhere';
+
+/** One execution host of a project's capacity pool. */
+export interface PoolHost {
+  id: string;
+  name: string;
+  device: boolean;
+  /** The project's own computer. */
+  pinned: boolean;
+  running: number;
+  limit: number;
+  lastSeen: string | null;
+  /** Why contact was lost, until the computer is reached again. */
+  lost: string | null;
+}
+
+/** A computer the person can add to a project's pool. */
+interface PoolChoice {
+  id: string;
+  name: string;
+  provider: string;
+  ownerKind: string;
+  added: boolean;
+}
+
+export interface ProjectHosts {
+  swarmHosts: SwarmHosts;
+  /** Whether the person chose; otherwise the default applies. */
+  chosen: boolean;
+  hosts: PoolHost[];
+  computers: PoolChoice[];
+}
+
+export const projectHosts = (projectId: string) =>
+  nativeTask<ProjectHosts>('queue_hosts', { projectId });
+
+export const setProjectHosts = (projectId: string, swarmHosts: SwarmHosts, computers: string[]) =>
+  nativeTask<ProjectHosts>('queue_set_hosts', { projectId, swarmHosts, computers });
+
+/** A host's load and health in a few words, such as "2 of 8 running" or "Lost contact". */
+export function hostLoad(host: PoolHost): string {
+  if (host.lost) return 'Lost contact';
+  return `${host.running} of ${host.limit} running`;
+}
+
+/** The name an attempt's host goes by: this device, or the computer's name. */
+export const runHostName = (run: {
+  host?: { name: string } | null;
+  remote?: { computerName: string } | null;
+}) => run.host?.name ?? run.remote?.computerName ?? null;
+
 /** The app's content policy embeds only viewers served on this device's loopback address. */
 export const embeddableViewer = (url: string) => url.startsWith('http://127.0.0.1:');

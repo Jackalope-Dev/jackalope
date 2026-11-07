@@ -300,6 +300,58 @@
   gap: 8px;
 }
 
+.plan-autonomy {
+  display: grid;
+  gap: 8px;
+}
+.plan-autonomy-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.plan-autonomy-stats > div {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.plan-autonomy-stats dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.plan-autonomy-stats dd {
+  margin: 2px 0 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.plan-autonomy-stats > div[data-attention] dd {
+  color: var(--color-warning);
+}
+.plan-autonomy-list {
+  display: grid;
+  gap: 4px;
+}
+.plan-autonomy-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.plan-autonomy-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.plan-autonomy-subject {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .plan-check-form {
   display: flex;
   flex-wrap: wrap;

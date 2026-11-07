@@ -627,3 +627,18 @@ fn main() {
     assert!(routed < 12_000, "routing took {routed} ms");
     assert!(runtime.inner.lock().unwrap().processes.is_empty());
 }
+
+#[test]
+fn computers_only_routing_offers_only_agents_that_run_on_computers() {
+    for adapter in ["claude", "codex"] {
+        assert!(
+            routable(adapter, false) && routable(adapter, true),
+            "{adapter}"
+        );
+    }
+    for adapter in ["gemini", "kimi", "opencode"] {
+        assert!(routable(adapter, false), "{adapter}");
+        assert!(!routable(adapter, true), "{adapter}");
+    }
+    assert!(!routable("unknown", false));
+}

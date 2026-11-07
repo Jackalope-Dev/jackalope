@@ -3,6 +3,7 @@ import { Button, Disclosure, DisclosureSummary, SearchField } from '@jackalope/u
 import { ArrowLeft, ArrowRight, Check, Copy, Info, Play } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { siteOrigin } from './content';
+import { InlineLinks, stripInlineLinks } from './InlineLinks';
 import { KnowledgeMedia } from './KnowledgeMedia';
 import {
   type GuideCategory,
@@ -24,7 +25,7 @@ const matchesTerms = (text: string, terms: string[]) => {
 const sectionText = (section: KnowledgeGuideSection) =>
   [
     section.question,
-    ...section.paragraphs,
+    ...section.paragraphs.map(stripInlineLinks),
     ...(section.bullets ?? []),
     ...(section.steps ?? []),
     section.codeBox?.code,
@@ -209,7 +210,9 @@ export function KnowledgebasePage({
                 <h2>{section.question}</h2>
                 <KnowledgeMedia slug={activeGuide.slug} section={section.id} dark={dark} />
                 {section.paragraphs.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
+                  <p key={paragraph}>
+                    <InlineLinks text={paragraph} />
+                  </p>
                 ))}
                 {section.steps && (
                   <ol className="knowledge-steps">
@@ -351,7 +354,7 @@ export function KnowledgebasePage({
                     {categoryLabel(guide.category)} · {guide.readingTime}
                   </span>
                   <h3>{guide.shortTitle}</h3>
-                  <p>{section?.paragraphs[0] ?? guide.description}</p>
+                  <p>{stripInlineLinks(section?.paragraphs[0] ?? guide.description)}</p>
                   <span className="knowledge-card-link">
                     {section?.question ?? 'Read guide'} <ArrowRight size={15} />
                   </span>

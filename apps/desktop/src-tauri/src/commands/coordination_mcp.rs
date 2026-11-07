@@ -1,4 +1,5 @@
 use super::coordination::{bridge_message, bridge_project, Coordinator, MessageRequest};
+use super::tasks::runner::record::{record, ToolEvent};
 use axum::{
     extract::{Request, State as WebState},
     http::{request::Parts, HeaderMap, StatusCode},
@@ -144,6 +145,172 @@ fn permission_decision(input: serde_json::Value, answer: Option<&str>) -> serde_
     } else {
         serde_json::json!({"behavior":"deny","message":"The user denied this action in Jackalope or did not answer. Do not retry it or work around it; report what is blocked."})
     }
+}
+
+/// Decides a Claude Code style permission request the way Claude Code's
+/// permission prompt tool does: standing project rules, then the project's
+/// auto-approval, then a question to the person. Returns the prompt tool's
+/// `behavior` answer.
+async fn permission_for(
+    service: &Coordinator,
+    run: &crate::commands::tasks::TaskRun,
+    input: PermissionPromptInput,
+) -> serde_json::Value {
+    let rules = super::permission_rules::path(&service.runtime.preferences_directory());
+    let standing = super::permission_rules::rule_for(&input.tool_name, &input.input);
+    let always = standing
+        .as_ref()
+        .map(|(_, label)| format!("{ALWAYS_PREFIX}{label} in {}", run.project_name));
+    let mut asked = false;
+    let mut automatic = false;
+    let mut escalation = None;
+    let answer = if super::permission_rules::allows(
+        &rules,
+        &run.project_id,
+        &input.tool_name,
+        &input.input,
+    ) {
+        Some(ALLOW_ONCE.to_string())
+    } else if let super::permission_risk::Decision::Ask(reason) = super::permission_risk::decide(
+        &service.runtime,
+        &run.id,
+        &super::permission_risk::label(&input.tool_name, &input.input),
+        |workspace| super::permission_risk::assess(&input.tool_name, &input.input, workspace),
+    ) {
+        escalation = reason;
+        asked = true;
+        None
+    } else {
+        automatic = true;
+        Some(ALLOW_ONCE.to_string())
+    };
+    let answer = if !asked {
+        answer
+    } else if run.prompts.len() >= 100 {
+        None
+    } else {
+        let mut options = vec![ALLOW_ONCE.to_string()];
+        options.extend(always.clone());
+        options.push(DENY.into());
+        let question = super::harness::AskUserInput {
+            question: permission_question(&input, escalation.as_deref()),
+            input_type: "choice".into(),
+            options,
+            default_value: None,
+            presentation: Default::default(),
+            category: None,
+        };
+        let prompt = super::harness::ask_user_async(
+            &run.id,
+            question,
+            std::time::Duration::from_secs(PERMISSION_WAIT_SECS),
+            |prompt| service.runtime.record_prompt(prompt),
+        )
+        .await;
+        service.runtime.record_prompt(&prompt);
+        match (prompt.answer, &always, &standing) {
+            (Some(answer), Some(always), Some((standing, _))) if &answer == always => {
+                if let Err(error) =
+                    super::permission_rules::remember(&rules, &run.project_id, standing)
+                {
+                    service.runtime.update(&run.id, |r| {
+                        r.activity
+                            .push(format!("Could not save the permission rule: {error}"))
+                    });
+                }
+                Some(ALLOW_ONCE.to_string())
+            }
+            (answer, _, _) => answer,
+        }
+    };
+    let decision = permission_decision(input.input, answer.as_deref());
+    // Automatic approvals already recorded their own activity line.
+    if !automatic {
+        service.runtime.update(&run.id, |r| {
+            r.activity.push(format!(
+                "Claude Code permission {}",
+                if decision["behavior"] == "allow" {
+                    "allowed"
+                } else {
+                    "denied"
+                }
+            ))
+        });
+    }
+    decision
+}
+
+/// Approves `execute_tool` at the bridge for attempts whose agent runs without
+/// its own permission prompt (Claude Code on a computer, which runs with
+/// `bypassPermissions`). The request goes through the same rules, auto-approval
+/// and question as Claude Code's prompt for `mcp__jackalope__execute_tool`
+/// locally, so moving the agent does not skip an approval.
+pub(super) async fn approve_remote_execute(
+    service: &Coordinator,
+    run: &crate::commands::tasks::TaskRun,
+    input: &super::mcp_broker::ExecuteInput,
+) -> Result<(), String> {
+    let broker = &service.runtime.mcp_broker;
+    if !broker.approves_executes(&run.id) {
+        return Ok(());
+    }
+    let (server, tool) = broker
+        .describe(&run.id, &input.handle)
+        .await
+        .ok_or("Unknown or expired tool handle. Search for the tool first.")?;
+    let request = PermissionPromptInput {
+        tool_name: "mcp__jackalope__execute_tool".into(),
+        input: serde_json::json!({
+            "handle": input.handle,
+            "connection": server,
+            "tool": tool,
+            "arguments": input.arguments,
+        }),
+    };
+    let decision = permission_for(service, run, request).await;
+    if decision["behavior"] == "allow" {
+        Ok(())
+    } else {
+        Err(decision["message"]
+            .as_str()
+            .unwrap_or("The user denied this action.")
+            .to_string())
+    }
+}
+
+/// Approves a tool of a connection that runs on the computer of a Claude Code
+/// attempt. Claude Code runs there with `bypassPermissions`, so the
+/// computer's agent installs a `PreToolUse` hook for those tools (see
+/// `resources/computer/agent.py`, `mcp-approve`) that asks here through the
+/// bridge relay. The request goes through the same rules, auto-approval and
+/// question as Claude Code's permission prompt for that tool on this device.
+/// Returns the prompt tool's answer: `behavior` is `allow` or `deny`.
+pub(super) async fn approve_computer_tool(
+    service: &Coordinator,
+    run: &crate::commands::tasks::TaskRun,
+    body: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let remote = !super::computers::runner::for_run(&run.id).on_device();
+    let request = computer_tool_request(remote, body)?;
+    Ok(permission_for(service, run, request).await)
+}
+
+fn computer_tool_request(
+    remote: bool,
+    body: serde_json::Value,
+) -> Result<PermissionPromptInput, String> {
+    if !remote {
+        return Err("Only an agent on a computer asks for tool approval this way.".into());
+    }
+    let request: PermissionPromptInput =
+        serde_json::from_value(body).map_err(|_| "Send tool_name and input.".to_string())?;
+    let name = request.tool_name.as_str();
+    if !name.starts_with("mcp__") || name.starts_with("mcp__jackalope__") || name.len() > 300 {
+        return Err(
+            "Only tools of connections that run on the computer are approved this way.".into(),
+        );
+    }
+    Ok(request)
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -523,6 +690,11 @@ impl CoordinationTools {
             .service
             .authorized_run(&request_headers(&context)?)
             .map_err(bridge_error)?;
+        if let Err(message) = approve_remote_execute(&self.service, &run, &input).await {
+            return Ok(CallToolResult::error(vec![
+                rmcp::model::ContentBlock::text(message),
+            ]));
+        }
         let (result, usage) = self
             .service
             .runtime
@@ -847,9 +1019,12 @@ impl CoordinationTools {
         let result = super::browser::browser_navigate(&run.id, &input.url)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            super::previews::review::record_visit(r, &input.url)
-        });
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Visited(input.url),
+        );
         Ok(CallToolResult::structured(result))
     }
 
@@ -876,11 +1051,12 @@ impl CoordinationTools {
             super::browser::browser_screenshot(&run.id, &workspace, input.name, input.url)
                 .await
                 .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            r.screenshots.push(artifact.clone());
-            r.activity
-                .push(format!("Captured browser screenshot: {}", artifact.name));
-        });
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Screenshot(artifact.clone()),
+        );
         let value = serde_json::to_value(artifact)
             .map_err(|_| ErrorData::internal_error("Could not encode screenshot artifact", None))?;
         Ok(CallToolResult::structured(value))
@@ -928,10 +1104,15 @@ impl CoordinationTools {
         let res = super::browser::browser_interact(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            r.activity
-                .push(format!("Browser interaction: {action_desc}"));
-        });
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Interaction {
+                label: "Browser interaction",
+                summary: action_desc,
+            },
+        );
         Ok(CallToolResult::structured(res))
     }
 
@@ -970,11 +1151,12 @@ impl CoordinationTools {
         let value = super::browser::browser_inspect(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        if let Some(step) = super::browser::accessibility_checkpoint(&value) {
-            self.service
-                .runtime
-                .update(&run.id, |r| r.validation_steps.push(step));
-        }
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Inspected(value.clone()),
+        );
         Ok(CallToolResult::structured(value))
     }
 
@@ -994,9 +1176,7 @@ impl CoordinationTools {
         let value = super::browser::browser_tabs(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            r.activity.push("Updated task browser tabs".into())
-        });
+        record(&self.service.runtime, &run.id, None, ToolEvent::Tabs);
         Ok(CallToolResult::structured(value))
     }
 
@@ -1020,7 +1200,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
+        description = "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets; use request_human_action for sign-ins, payment, accounts and secrets. Routine questions on an approved plan may be answered by another agent on the owner's behalf, marked in the answer. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1048,16 +1228,58 @@ impl CoordinationTools {
         if let Some(reply) = super::planning::question_gate(&run, &mut input) {
             return Ok(CallToolResult::structured(reply));
         }
-        let prompt = super::harness::ask_user_async(
-            &run.id,
+        let prompt = super::agent_decider::ask(
+            &self.service,
+            &run,
             input,
+            std::time::Duration::from_secs(60),
+        )
+        .await;
+        self.service.runtime.record_prompt(&prompt);
+        let value = serde_json::to_value(prompt)
+            .map_err(|_| ErrorData::internal_error("Could not encode user prompt", None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "Ask the person to do something only they can: sign in, pay, create an account, add a secret or another manual step. Give short numbered steps and a link. Never ask them to paste a secret into the conversation; for a secret, name the environment variable. Always goes to the person, never to another agent. Waits briefly and returns pending; poll user_response for Done or Declined and any note.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn request_human_action(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::harness::HumanActionInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        if run.prompts.len() >= 100 {
+            return Err(ErrorData::invalid_request(
+                "This attempt has reached the question limit.",
+                None,
+            ));
+        }
+        let (question, autonomy) = super::agent_decider::human_action(input)
+            .map_err(|error| ErrorData::invalid_params(error, None))?;
+        let prompt = super::harness::ask_routed(
+            &run.id,
+            question,
+            autonomy,
+            false,
             std::time::Duration::from_secs(60),
             |prompt| self.service.runtime.record_prompt(prompt),
         )
         .await;
         self.service.runtime.record_prompt(&prompt);
         let value = serde_json::to_value(prompt)
-            .map_err(|_| ErrorData::internal_error("Could not encode user prompt", None))?;
+            .map_err(|_| ErrorData::internal_error("Could not encode the request", None))?;
         Ok(CallToolResult::structured(value))
     }
 
@@ -1080,93 +1302,14 @@ impl CoordinationTools {
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
-        let rules = super::permission_rules::path(&self.service.runtime.preferences_directory());
-        let standing = super::permission_rules::rule_for(&input.tool_name, &input.input);
-        let always = standing
-            .as_ref()
-            .map(|(_, label)| format!("{ALWAYS_PREFIX}{label} in {}", run.project_name));
-        let mut asked = false;
-        let mut automatic = false;
-        let mut escalation = None;
-        let answer = if super::permission_rules::allows(
-            &rules,
-            &run.project_id,
-            &input.tool_name,
-            &input.input,
-        ) {
-            Some(ALLOW_ONCE.to_string())
-        } else if let super::permission_risk::Decision::Ask(reason) = super::permission_risk::decide(
-            &self.service.runtime,
-            &run.id,
-            &super::permission_risk::label(&input.tool_name, &input.input),
-            |workspace| super::permission_risk::assess(&input.tool_name, &input.input, workspace),
-        ) {
-            escalation = reason;
-            asked = true;
-            None
-        } else {
-            automatic = true;
-            Some(ALLOW_ONCE.to_string())
-        };
-        let answer = if !asked {
-            answer
-        } else if run.prompts.len() >= 100 {
-            None
-        } else {
-            let mut options = vec![ALLOW_ONCE.to_string()];
-            options.extend(always.clone());
-            options.push(DENY.into());
-            let question = super::harness::AskUserInput {
-                question: permission_question(&input, escalation.as_deref()),
-                input_type: "choice".into(),
-                options,
-                default_value: None,
-                presentation: Default::default(),
-            };
-            let prompt = super::harness::ask_user_async(
-                &run.id,
-                question,
-                std::time::Duration::from_secs(PERMISSION_WAIT_SECS),
-                |prompt| self.service.runtime.record_prompt(prompt),
-            )
-            .await;
-            self.service.runtime.record_prompt(&prompt);
-            match (prompt.answer, &always, &standing) {
-                (Some(answer), Some(always), Some((standing, _))) if &answer == always => {
-                    if let Err(error) =
-                        super::permission_rules::remember(&rules, &run.project_id, standing)
-                    {
-                        self.service.runtime.update(&run.id, |r| {
-                            r.activity
-                                .push(format!("Could not save the permission rule: {error}"))
-                        });
-                    }
-                    Some(ALLOW_ONCE.to_string())
-                }
-                (answer, _, _) => answer,
-            }
-        };
-        let decision = permission_decision(input.input, answer.as_deref());
-        // Automatic approvals already recorded their own activity line.
-        if !automatic {
-            self.service.runtime.update(&run.id, |r| {
-                r.activity.push(format!(
-                    "Claude Code permission {}",
-                    if decision["behavior"] == "allow" {
-                        "allowed"
-                    } else {
-                        "denied"
-                    }
-                ))
-            });
-        }
+        let decision = permission_for(&self.service, &run, input).await;
         Ok(CallToolResult::success(vec![
             rmcp::model::ContentBlock::text(decision.to_string()),
         ]))
     }
 
     #[tool(
-        description = "Read the user's saved answer to a question from this attempt. Poll this after ask_user returns pending. An unanswered question is not approval.",
+        description = "Read the user's saved answer to a question from this attempt. Poll this after ask_user returns pending or deciding (another agent is answering for the owner). An unanswered question is not approval.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn user_response(
@@ -1371,6 +1514,17 @@ impl ServerHandler for CoordinationTools {
             .authorized_run(&headers)
             .map_err(bridge_error)?;
         let mut tools = self.tool_router.list_all();
+        // Where the attempt's runner places each tool; an attempt on this
+        // device is offered all of them.
+        let placement = super::computers::runner::for_run(&run.id);
+        let offered = super::computers::runner::offered(
+            &placement,
+            tools.iter().map(|tool| tool.name.as_ref()),
+        )
+        .into_iter()
+        .map(str::to_string)
+        .collect::<std::collections::HashSet<_>>();
+        tools.retain(|tool| offered.contains(tool.name.as_ref()));
         if !super::bot_hub::installed().is_some_and(|hub| hub.is_bot_run(&run)) {
             tools.retain(|tool| !super::bot_hub::BOT_TOOLS.contains(&tool.name.as_ref()));
         }
@@ -1520,6 +1674,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn every_bridge_tool_declares_where_it_executes() {
+        let placed: std::collections::HashSet<&str> = crate::commands::computers::runner::TOOLS
+            .iter()
+            .map(|tool| tool.name)
+            .collect();
+        for tool in CoordinationTools::platform_router().list_all() {
+            assert!(
+                placed.contains(tool.name.as_ref()),
+                "{} has no placement in computers::runner::TOOLS",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
     fn ordinary_read_schemas_omit_experimental_row_fields_and_references() {
         let router = CoordinationTools::platform_router();
         for tool in router
@@ -1534,6 +1703,19 @@ mod tests {
             assert!(!schema.to_string().contains("\"rows\""));
             assert!(schema.to_string().contains("jsonPointers"));
         }
+    }
+
+    #[test]
+    fn computer_tool_approvals_accept_only_computer_connection_tools() {
+        let body = |name: &str| serde_json::json!({"tool_name": name, "input": {"q": 1}});
+        let request = computer_tool_request(true, body("mcp__linear__create_issue")).unwrap();
+        assert_eq!(request.tool_name, "mcp__linear__create_issue");
+        assert_eq!(request.input["q"], 1);
+        assert!(computer_tool_request(false, body("mcp__linear__create_issue")).is_err());
+        for name in ["Bash", "mcp__jackalope__ask_user", "mcp_", ""] {
+            assert!(computer_tool_request(true, body(name)).is_err(), "{name}");
+        }
+        assert!(computer_tool_request(true, serde_json::json!({"input": {}})).is_err());
     }
 
     #[test]

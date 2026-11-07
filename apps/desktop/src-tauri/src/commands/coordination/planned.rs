@@ -198,15 +198,18 @@ impl Coordinator {
         cloud::configured(&self.runtime)
     }
 
-    /// Assignments one swarm round of the project may run: more when its
-    /// agents run on a computer with more slots, or local concurrency allows.
+    /// Assignments one swarm round of the project may run: as many as the
+    /// hosts in its capacity pool can run at once, within the round limits.
     pub(crate) fn swarm_limit(&self, project_id: &str) -> usize {
         let inner = self.inner.lock().unwrap();
-        let slots = if inner.remote_projects.contains(project_id) {
-            inner.remote_concurrency
-        } else {
-            inner.concurrency
-        };
+        let slots = inner.pool.slots(
+            project_id,
+            inner.remote_projects.contains(project_id),
+            crate::commands::computers::pool::Limits {
+                device: inner.concurrency,
+                remote: inner.remote_concurrency,
+            },
+        );
         managed::swarm_assignment_limit(slots)
     }
 
@@ -220,5 +223,40 @@ impl Coordinator {
             .iter()
             .find(|task| task.id == id)?;
         Some((task.request.clone(), task.plan.clone()?))
+    }
+
+    /// Sends one direct message from Jackalope to the task `run` belongs to. It
+    /// arrives at the agent's next tool response, or with a continuation.
+    pub(crate) fn tell_task(
+        &self,
+        run: &crate::commands::tasks::TaskRun,
+        text: String,
+    ) -> Result<(), String> {
+        self.ensure_storage_loaded()?;
+        let mut inner = self.inner.lock().unwrap();
+        let owner = inner
+            .ledger
+            .items
+            .iter()
+            .find(|item| item.run_id.as_ref() == Some(&run.id))
+            .map_or(run.task_id.clone(), |item| item.id.clone());
+        let mut ledger = inner.ledger.clone();
+        ledger.messages.push(CoordinationMessage {
+            id: Uuid::new_v4().to_string(),
+            project_id: run.project_id.clone(),
+            task_id: "jackalope".into(),
+            kind: "handoff".into(),
+            text,
+            created_at: Utc::now().to_rfc3339(),
+            recipient_task_id: Some(owner),
+            acknowledged_by: vec![],
+            report: None,
+            run_id: Some(run.id.clone()),
+            source_tree: None,
+            resolved_by: None,
+        });
+        self.save(&ledger)?;
+        inner.ledger = ledger;
+        Ok(())
     }
 }

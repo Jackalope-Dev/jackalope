@@ -52,7 +52,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'shared-resources',
         title: 'Find the shared resources before the agents do',
         paragraphs: [
-          'Separate checkouts stop two agents from editing the same files. They do not separate everything else the project touches. Most surprising failures in parallel agent work come from a resource that both tasks quietly share.',
+          '[Separate checkouts](/git-worktrees-for-ai-agents/) stop two agents from editing the same files. They do not separate everything else the project touches. Most surprising failures in parallel agent work come from a resource that both tasks quietly share.',
           'Before starting, list what a typical task reads and writes outside its own source files. Then give each task its own copy, make the resource read-only for agents, or decide that tasks touching it run one at a time.',
         ],
         bullets: [
@@ -304,7 +304,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Start with a task that can stand on its own',
         paragraphs: [
           'You are halfway through a feature when a small production bug arrives. Switching branches means deciding what to do with unfinished changes, stopping a development server, and later reconstructing your context. A second agent makes the same problem more visible: two conversations can move independently, but they still need somewhere to put their files.',
-          'A Git worktree gives another task its own checkout while sharing the repository. That is useful for a bug fix beside a feature, two independent improvements, or a review that should leave your working copy alone. It is less useful when two tasks are both redesigning the same interface. Separate folders cannot settle a disagreement about what that interface should mean.',
+          'A Git worktree gives another task its own checkout while sharing the repository. That is useful for a bug fix beside a feature, [two independent improvements](/blog/run-ai-coding-agents-in-parallel/), or a review that should leave your working copy alone. It is less useful when two tasks are both redesigning the same interface. Separate folders cannot settle a disagreement about what that interface should mean.',
           'This walkthrough uses an illustrative search feature. One task adds keyboard navigation; another improves an unrelated help page. Start with a disposable or familiar repository, a committed baseline, Git, and an already configured coding agent. The commands assume the integration branch is main and the sibling directory names are unused. Substitute your actual branch and paths before running them.',
         ],
       },
@@ -349,7 +349,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'brief-the-agent',
         title: 'Give each agent a bounded brief',
         paragraphs: [
-          'Open the agent in the exact checkout assigned to it. Confirm the current folder in that session, not just the title of the terminal window. Include the outcome, the files it owns, the relevant project instructions, and the checks you expect. If another task is active, say what it owns and how to report a dependency.',
+          'Open the agent in the exact checkout assigned to it. Confirm the current folder in that session, not just the title of the terminal window. Include the outcome, the files it owns, the [relevant project instructions](/blog/agents-md-claude-md-project-instructions/), and the checks you expect. If another task is active, say what it owns and how to report a dependency.',
           'A useful brief leaves room for investigation while making expansion visible. The keyboard task may discover that the shared menu component needs a change. It should report that dependency before also taking over a component another agent is editing. File ownership is a coordination agreement; it is not a filesystem permission boundary.',
           'Claude Code can also create a worktree through its own --worktree option. Choose whether Git, the agent, or a workspace app manages the checkout, and keep that ownership consistent. Creating another managed worktree from inside an existing task can make it easy to review the wrong folder.',
         ],
@@ -426,7 +426,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'Using Claude Code and Codex together is most useful when you can describe separate responsibilities. More conversations do not automatically shorten a project. Someone still has to define the contract between tasks, answer questions, inspect output, and decide what should be integrated. Your attention and the project’s shared resources are part of the capacity limit.',
           'Consider an illustrative feature: users need a keyboard-accessible search box, and the help page needs to explain the shortcuts. The interface and documentation can be developed independently once the shortcut behavior is settled. Assign either agent to either task based on your own experience and available access. This is a workflow example, not a claim that one provider is always better at a particular kind of work.',
-          'A different feature may call for sequential work. If the search API shape is undecided, complete that decision before asking a second agent to build the client. Parallelize exploration or independent tests while the contract is being resolved, then start implementation against the agreed result.',
+          'A different feature may call for sequential work. If the search API shape is undecided, complete that decision before asking a second agent to build the client. [Parallelize exploration or independent tests](/blog/run-ai-coding-agents-in-parallel/) while the contract is being resolved, then start implementation against the agreed result.',
         ],
       },
       {
@@ -689,7 +689,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'Think about three separate decisions: which service or program you connect, which identity it uses, and which actions that identity can perform. A successful connection answers only the first part. A tool can appear in a list while its account lacks access to the project, or while the account has far broader access than the task requires.',
           'The protocol distinguishes tools, resources, and prompts. A client may expose these differently. For practical evaluation, ask what the agent can read, what it can change, and what will require your decision. Check the server’s actual behavior rather than inferring permissions from a friendly tool name.',
-          'Project instructions can tell an agent to work within certain boundaries, but prose is not an access-control mechanism. If the service supports read-only or project-scoped credentials, use the appropriate scope. If it does not support the boundary you need, choose a different setup or keep that action manual.',
+          '[Project instructions](/blog/agents-md-claude-md-project-instructions/) can tell an agent to work within certain boundaries, but prose is not an access-control mechanism. If the service supports read-only or project-scoped credentials, use the appropriate scope. If it does not support the boundary you need, choose a different setup or keep that action manual.',
         ],
         links: [
           {

@@ -117,7 +117,10 @@ formatting and Rust tests run only when files the native build reads changed
 Cargo settings and the JavaScript lockfiles), and the JavaScript and shared checks run
 only when something outside `src-tauri` changed. `scripts/change-scope.mjs` holds these
 path rules for both the hook and CI. When the comparison is unavailable it runs
-everything; CI always runs the full gate. Allow many minutes when Rust tests run.
+everything; CI always runs the full gate. `--changed` also leaves the builds and the
+website deploy dry-run to CI, which runs them on every push to master and every pull
+request, and runs only the server tests that import a changed file, with at most four
+Vitest workers. Allow many minutes when Rust tests run.
 TypeScript runs early so type failures stop before native compilation. Check timings
 are printed. Use `pnpm exec lefthook run pre-push` to exercise the checks without
 publishing.
@@ -192,11 +195,15 @@ pnpm changelog:add -- --title "A clearer task review." --description "Review now
 
 Repeat `--item` for additional bullets. Use optional `--note` only for useful
 context or a specific limitation, without repeating a development-release disclaimer.
-Optional `--id`, `--date`, and `--status`
-flags override the generated ID, today's date, and `In development` status. The
-website changelog and LLM-readable discovery output both consume the resulting
-JSON directly. `pnpm verify` rejects duplicate IDs, invalid dates, unsupported
-statuses, incorrect ordering, empty fields, and em dashes.
+Optional `--id` and `--date`
+flags override the generated ID and today's date; `--kind website` marks a change
+to the website itself rather than the app. Do not write a
+status: the website build reads it from release tags, so an entry reads Coming soon
+once merged, In beta once a `beta-v*` tag contains it and Released once a
+`stable-v*` tag does. The website changelog and LLM-readable discovery output both
+consume the resulting JSON directly. `pnpm verify` rejects duplicate IDs, invalid
+dates, hand-written statuses, unknown kinds, incorrect ordering, empty fields, and
+em dashes.
 
 Use targeted checks while iterating; finish with the combined check. For UI
 changes, exercise keyboard/focus behavior, light/dark appearance, reduced motion,

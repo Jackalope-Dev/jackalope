@@ -6,9 +6,8 @@ import {
   FormField,
   Input,
   LinkButton,
-  LoadingIcon,
+  Stepper,
 } from '@jackalope/ui';
-import { Check, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   beginCloudflareSignIn,
@@ -52,33 +51,14 @@ function SetupSteps({ run }: { run: Run }) {
   const steps = STEPS.filter((step) => step.id !== 'allow' || run.allowed);
   const at = steps.findIndex((step) => step.id === run.current);
   return (
-    <ol className="swarm-steps" aria-label="Swarm setup">
-      {steps.map((step, index) => {
-        const state =
-          index < at ? 'done' : index > at ? 'waiting' : run.failure ? 'failed' : 'running';
-        return (
-          <li key={step.id} data-state={state} aria-current={index === at ? 'step' : undefined}>
-            <span className="swarm-step-mark" aria-hidden="true">
-              {state === 'done' ? (
-                <Check size={14} />
-              ) : state === 'failed' ? (
-                <X size={14} />
-              ) : state === 'running' ? (
-                <LoadingIcon />
-              ) : (
-                index + 1
-              )}
-            </span>
-            <span>
-              {step.label}
-              <span className="sr-only">
-                {state === 'done' ? ' (done)' : state === 'failed' ? ' (failed)' : ''}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <Stepper
+      label="Swarm setup"
+      steps={steps.map((step, index) => ({
+        id: step.id,
+        label: step.label,
+        state: index < at ? 'done' : index > at ? 'waiting' : run.failure ? 'failed' : 'running',
+      }))}
+    />
   );
 }
 

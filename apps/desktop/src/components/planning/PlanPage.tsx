@@ -2,7 +2,9 @@ import { Badge, Input, Textarea } from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { runHostName } from '../../lib/computers';
 import {
+  type AutonomyEntry,
   approvalVerification,
   areaStateLabels,
   criterionCoverage,
@@ -29,7 +31,9 @@ import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
+import { EscalationNote } from '../tasks/AgentDecision';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { agentAdapter } from '../tasks/CrossModelReviewPanel';
 import { Button } from '../ui/button';
@@ -41,6 +45,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { WorkspaceTabs } from '../ui/WorkspaceTabs';
+import { PlanAutonomyPanel } from './PlanAutonomy';
 import './plan-page.css';
 
 type Tab = 'plan' | 'progress' | 'revisions';
@@ -241,6 +246,12 @@ function PlanDetail({
 }) {
   const [tab, setTab] = useState<Tab>(view.progress ? 'progress' : 'plan');
   const pending = view.deviations.filter((deviation) => deviation.status === 'pending');
+  const deciding = pending.length > 0 && pending.every((deviation) => deviation.agentDeciding);
+  /** Why a deviation came to the person although an agent could have accepted it. */
+  const escalation = (id: string) =>
+    view.autonomy?.entries.find(
+      (entry) => entry.deviationId === id && entry.outcome === 'escalated' && entry.reason,
+    );
   return (
     <section className="plan-detail-body" aria-labelledby="plan-title">
       <header className="plan-detail-header">
@@ -263,9 +274,13 @@ function PlanDetail({
       {pending.length > 0 && (
         <section className="plan-needs-you" aria-labelledby="plan-needs-you">
           <WorkspaceSectionHeading
-            title="Needs you"
+            title={deciding ? 'An agent is deciding' : 'Needs you'}
             titleId="plan-needs-you"
-            description="The work departed from the approved plan. Dependent tasks are paused until you decide."
+            description={
+              deciding
+                ? 'An agent is checking whether this stays within the plan. Dependent tasks wait; you can still decide.'
+                : 'The work departed from the approved plan. Dependent tasks are paused until you decide.'
+            }
           />
           {pending.map((deviation) => (
             <InlineNotice
@@ -300,11 +315,26 @@ function PlanDetail({
                 </div>
               }
             >
+              {deviation.agentDeciding && <Badge variant="accent">Agent deciding</Badge>}{' '}
               <strong>{deviationKinds[deviation.kind]}</strong> {deviation.summary}
               {deviation.amendment && <p>Proposed amendment: {deviation.amendment}</p>}
+              {!deviation.agentDeciding &&
+                (() => {
+                  const sent = escalation(deviation.id);
+                  return sent?.reason ? (
+                    <EscalationNote category={sent.category ?? 'decider'} reason={sent.reason} />
+                  ) : null;
+                })()}
             </InlineNotice>
           ))}
         </section>
+      )}
+      {view.autonomy && (
+        <PlanAutonomyPanel
+          planId={view.id}
+          autonomy={view.autonomy}
+          onChanged={() => act(async () => {})}
+        />
       )}
       {view.questions.map((prompt) => {
         const { choices, stops } = interviewOptions(prompt);
@@ -680,8 +710,13 @@ function PlanProgress({
   act: (work: () => Promise<unknown>) => Promise<void>;
 }) {
   const progress = view.progress;
+  const runs = useExecutionStore((state) => state.runs);
   if (!progress) return null;
   const states = new Map(view.criteria.map((state) => [state.id, state]));
+  const hostOf = (runId: string | null | undefined) => {
+    const run = runId ? runs.find((candidate) => candidate.id === runId) : undefined;
+    return run ? runHostName(run) : null;
+  };
   return (
     <div className="plan-progress">
       {progress.error && <InlineNotice tone="warning">{progress.error}</InlineNotice>}
@@ -704,7 +739,20 @@ function PlanProgress({
           </span>
         )}
       </div>
-      {view.rounds && <PlanRoundList planId={view.id} rounds={view.rounds} act={act} />}
+      {view.rounds && (
+        <PlanRoundList
+          planId={view.id}
+          projectId={view.projectId}
+          rounds={view.rounds}
+          escalation={view.autonomy?.entries.find(
+            (entry) =>
+              entry.kind === 'round' &&
+              entry.outcome === 'escalated' &&
+              entry.subject === `Start round ${(view.rounds?.current ?? 0) + 1}`,
+          )}
+          act={act}
+        />
+      )}
       <WorkspaceSectionHeading
         title={view.rounds ? `Round ${view.rounds.current} tasks` : 'Tasks'}
         level={3}
@@ -714,6 +762,7 @@ function PlanProgress({
           <li key={`${task.key}:${task.runId ?? ''}`}>
             <span>
               {task.key === 'review' ? 'Independent review' : task.title}
+              {hostOf(task.runId) && <span className="plan-muted"> · on {hostOf(task.runId)}</span>}
               {!!task.outside?.length && (
                 <span className="plan-muted"> · outside scope: {task.outside.join(', ')}</span>
               )}
@@ -790,11 +839,16 @@ function PlanProgress({
 /** Each swarm round's verdict, evidence and the work it queued next. */
 function PlanRoundList({
   planId,
+  projectId,
   rounds,
+  escalation,
   act,
 }: {
   planId: string;
+  projectId: string;
   rounds: PlanRounds;
+  /** Why the proposed round came to the person although an agent could approve it. */
+  escalation?: AutonomyEntry;
   act: (work: () => Promise<unknown>) => Promise<void>;
 }) {
   const current = rounds.rounds.at(-1);
@@ -816,6 +870,7 @@ function PlanRoundList({
             : 'an orchestrator checks'
         } the criteria.`}
       />
+      {open && <HostCapacity projectId={projectId} label="Where this round runs" />}
       {open && (
         <div className="plan-actions">
           <Select
@@ -857,7 +912,14 @@ function PlanRoundList({
       )}
       {current?.held && <InlineNotice tone="warning">{current.held}</InlineNotice>}
       {current?.proposal && (
-        <RoundProposal key={current.number} planId={planId} proposal={current.proposal} act={act} />
+        <RoundProposal
+          key={current.number}
+          planId={planId}
+          proposal={current.proposal}
+          deciding={!!current.agentDeciding}
+          escalation={escalation}
+          act={act}
+        />
       )}
       <ol className="plan-rows">
         {[...rounds.rounds].reverse().map((round) => (
@@ -902,10 +964,15 @@ function PlanRoundList({
 function RoundProposal({
   planId,
   proposal,
+  deciding,
+  escalation,
   act,
 }: {
   planId: string;
   proposal: RoundAssignment[];
+  /** An agent is deciding it for the person. */
+  deciding: boolean;
+  escalation?: AutonomyEntry;
   act: (work: () => Promise<unknown>) => Promise<void>;
 }) {
   const id = useId();
@@ -934,8 +1001,15 @@ function RoundProposal({
         title="Next round"
         titleId={`${id}-proposal`}
         level={3}
-        description="Nothing starts until you approve."
+        description={
+          deciding
+            ? 'An agent is checking this round against the plan. You can still approve, edit or stop it.'
+            : 'Nothing starts until you approve.'
+        }
       />
+      {!deciding && escalation?.reason && (
+        <EscalationNote category={escalation.category ?? 'decider'} reason={escalation.reason} />
+      )}
       <ol className="plan-rows">
         {items.map((item, index) =>
           draft ? (

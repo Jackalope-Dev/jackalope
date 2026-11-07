@@ -150,6 +150,8 @@ pub fn run(launch: Launch) {
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
             runtime.observe_changes(app.handle().clone());
+            commands::computers::pool::restore_health(&runtime.computers_root());
+            runtime.launch_lost_host_recovery();
             commands::computers::install_browser_routing(runtime.clone());
             commands::computers::launch_idle_stop(runtime.clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
@@ -364,6 +366,9 @@ pub fn run(launch: Launch) {
             commands::computers::computer_machine_remove,
             commands::computers::computer_agent_credentials,
             commands::computers::computer_set_agent_credential,
+            commands::project_secrets::project_secrets,
+            commands::project_secrets::project_secret_set,
+            commands::project_secrets::project_secret_remove,
             commands::computers::computer_agent37,
             commands::computers::computer_set_agent37_key,
             commands::computers::computer_agent37_usage,
@@ -495,6 +500,11 @@ pub fn run(launch: Launch) {
             commands::cloudflare_artifacts::cloudflare_artifacts_convert,
             commands::cloudflare_artifacts::cloudflare_artifacts_push,
             commands::cloudflare_artifacts::cloudflare_artifacts_share,
+            commands::cloudflare_resources::cloudflare_resources_status,
+            commands::cloudflare_resources::cloudflare_resources_provision,
+            commands::cloudflare_resources::cloudflare_resources_forget,
+            commands::cloudflare_resources::cloudflare_resources_delete,
+            commands::cloudflare_resources::cloudflare_resources_turnstile_secret,
             commands::remote::remote_status,
             commands::remote::remote_configure,
             commands::remote::remote_pairing,
@@ -517,6 +527,8 @@ pub fn run(launch: Launch) {
             queue_add,
             queue_import,
             queue_dispatch,
+            commands::coordination::hosts::queue_hosts,
+            commands::coordination::hosts::queue_set_hosts,
             queue_cancel,
             queue_release,
             queue_cancel_agreement,
@@ -575,6 +587,8 @@ pub fn run(launch: Launch) {
             commands::planning::plan_archive,
             commands::planning::plan_settings_get,
             commands::planning::plan_settings_set,
+            commands::agent_decider::plan_autonomy_override,
+            commands::agent_decider::task_prompt_override,
             commands::planning::plan_create,
             agent_profile_rename,
             agent_profile_delete,

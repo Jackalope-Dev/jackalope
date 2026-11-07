@@ -216,7 +216,10 @@ The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`,
 `approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
 `replan-deviation`, and `rounds` with `pause`, `resume`, `stop` or `approve` in `text`)
 with `plan`, `plans` or `exported` responses. Questions carry optional
-`header`, `recommended`, `multiSelect`, `rationale` and `whyAsk`; plan views carry `verification`
+`header`, `recommended`, `multiSelect`, `rationale` and `whyAsk`; a question listed while
+agents may decide carries why it was sent to the person on its `rationale` line, and a
+human action (sign-in, payment, account or secret) carries its steps there with `Done`
+and `Declined` as options. Questions an agent is deciding or answered are not listed. Plan views carry `verification`
 (`project`, `criteria` or `review`), `check` and `nextRound` (a proposed round's
 assignment titles); plan summaries carry `needsYou`, which a proposed round also sets;
 deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,

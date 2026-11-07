@@ -362,3 +362,29 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
+
+.task-run-host {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.task-run-left {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 6px;
+}
+.task-run-left-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.task-run-left-file code {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  user-select: text;
+}

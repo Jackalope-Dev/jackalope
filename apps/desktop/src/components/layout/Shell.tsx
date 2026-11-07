@@ -125,6 +125,9 @@ const BotsWorkspace = lazy(() =>
 const SwarmBoard = lazy(() =>
   import('../swarm/SwarmBoard').then((m) => ({ default: m.SwarmBoard })),
 );
+const CloudResources = lazy(() =>
+  import('../projects/CloudResources').then((m) => ({ default: m.CloudResources })),
+);
 const PlanPage = lazy(() => import('../planning/PlanPage').then((m) => ({ default: m.PlanPage })));
 const ConnectedApps = lazy(() =>
   import('../mcp/ConnectedApps').then((m) => ({ default: m.ConnectedApps })),
@@ -266,6 +269,7 @@ export function Shell({
     'project-overview': 'project',
     'project-knowledge': 'knowledge',
     'project-settings': 'settings',
+    'cloud-resources': 'settings',
     'agent-settings': 'agents',
     preferences: 'settings',
     topology: 'codebase',
@@ -459,6 +463,10 @@ export function Shell({
       setActiveTab('preferences');
     },
   );
+  useWindowEvent<string>('jackalope:open-cloud-resources', (projectId) => {
+    selectProject(projectId);
+    setActiveTab('cloud-resources');
+  });
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
@@ -706,7 +714,8 @@ export function Shell({
                 items={WORKSPACE_VIEWS.filter(
                   (item) =>
                     item.group === view.group &&
-                    (item.id !== 'swarm' || swarmConfigured || activeTab === 'swarm'),
+                    (item.id !== 'swarm' || swarmConfigured || activeTab === 'swarm') &&
+                    (item.id !== 'cloud-resources' || activeTab === 'cloud-resources'),
                 ).map((item) => ({ id: item.id, label: viewLabel(item.id) }))}
               />
             )}
@@ -804,6 +813,7 @@ export function Shell({
               {activeTab === 'bots' && <BotsWorkspace />}
               {activeTab === 'connected-apps' && <ConnectedApps />}
               {activeTab === 'swarm' && <SwarmBoard />}
+              {activeTab === 'cloud-resources' && <CloudResources key={activeProjectId} />}
               {activeTab === 'plans' && <PlanPage key={activeProjectId} />}
               {activeTab === 'schedules' && (
                 <ScheduleManager

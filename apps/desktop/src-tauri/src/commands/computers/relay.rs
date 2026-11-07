@@ -8,12 +8,18 @@
 //! stalls output, and the answers go back through `run_answer`. The credential
 //! stays on this device: the computer only holds the stand-in's own secret.
 //!
-//! Desktop control and the browser tools act on the run's own computer, where
-//! the agent is (see [`crate::commands::computers::for_run`]). Tools that read
-//! or change this device's copy of the workspace, or use this device's
-//! sign-ins, would act on the wrong machine, so they are left out of
-//! `tools/list` and refused when called; see [`Access`].
+//! Only control-plane calls belong here. Where each tool runs follows the
+//! placement table in [`super::runner`]: a runner with the local bridge
+//! answers workspace tools itself, so they never arrive; desktop control acts
+//! on the run's own computer (see [`crate::commands::computers::for_run`]).
+//! Tools that would act on this device's copy of the workspace or use its
+//! sign-ins are refused when called, and so is a workspace tool that should
+//! have run on the computer. The bridge leaves unavailable tools out of
+//! `tools/list` itself, from the attempt's attached placement
+//! ([`super::runner::attach`]).
 
+pub(crate) use super::runner::Access;
+use super::runner::Where;
 use base64::Engine;
 use serde_json::{json, Value};
 use std::{
@@ -22,81 +28,18 @@ use std::{
     time::Duration,
 };
 
-/// Browser tools, available when the computer's own browser is reachable.
-const BROWSER_TOOLS: &[&str] = &[
-    "browser_navigate",
-    "browser_screenshot",
-    "browser_snapshot",
-    "browser_interact",
-    "browser_configure",
-    "browser_inspect",
-    "browser_tabs",
-];
-/// Tools that read this device's copy of the workspace. A read-only attempt
-/// changes nothing, so that copy matches the computer's and they stay correct.
-const WORKSPACE_TOOLS: &[&str] = &["computer_verify", "verification_output", "read_context"];
-/// Never available on a computer: a persistent profile holds this device's
-/// sign-ins, `peer_adopt` writes another attempt's changes into this device's
-/// copy while the agent edits its own, and permission prompts and native
-/// output belong to a local process.
-const NEVER_TOOLS: &[&str] = &["browser_open_profile", "peer_adopt", "permission_prompt"];
-const BROWSER_ROUTE: &str = "/v1/browser/";
-const WORKSPACE_ROUTES: &[&str] = &["/v1/computer/verify", "/v1/computer/output"];
-const NEVER_ROUTES: &[&str] = &[
-    "/v1/browser/profile",
-    "/v1/peers/adopt",
-    "/v1/native/output",
-];
-
-/// Which device-bound tools an agent on a computer may use.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct Access {
-    /// The computer's Chromium is reachable from this device, so the browser
-    /// tools drive it.
-    pub browser: bool,
-    /// The attempt is read-only (planning), so tools reading this device's
-    /// copy of the workspace see what the agent sees.
-    pub read_only: bool,
-}
-
-impl Access {
-    pub fn tool_unavailable(&self, name: &str) -> bool {
-        NEVER_TOOLS.contains(&name)
-            || (!self.browser && BROWSER_TOOLS.contains(&name))
-            || (!self.read_only && WORKSPACE_TOOLS.contains(&name))
-    }
-
-    fn route_unavailable(&self, route: &str) -> bool {
-        NEVER_ROUTES
-            .iter()
-            .any(|blocked| route.starts_with(blocked))
-            || (!self.browser && route.starts_with(BROWSER_ROUTE))
-            || (!self.read_only && WORKSPACE_ROUTES.contains(&route))
-    }
-
-    /// What the agent is told about where its tools act.
-    pub fn instructions(&self) -> String {
-        let mut text = String::from("\nYou run on a separate computer, not on the person's device. Jackalope's coordination, question and planning tools work as usual. desktop_control acts on this computer's own screen");
-        text.push_str(if self.browser {
-            ", and the browser tools drive its own Chromium, so a server you start here is reachable at localhost."
-        } else {
-            ". The browser tools are not available here."
-        });
-        text.push_str(if self.read_only {
-            " computer_verify runs the saved check on Jackalope's identical copy of this read-only workspace."
-        } else {
-            " computer_verify, verification_output, read_context and peer_adopt are not available: use your own shell and file tools, and run checks in the shell."
-        });
-        text.push('\n');
-        text
-    }
-}
-
 const REQUEST_LIMIT: usize = 64 * 1024;
 /// Raw bytes per answer, which keeps each `run_answer` under the agent's 1 MB body limit.
 pub(crate) const ANSWER_LIMIT: usize = 512 * 1024;
+/// The largest answer for a runner with `artifacts`, which receives a larger
+/// one as an artifact (`RELAY_ARTIFACT_LIMIT` in agent.py).
+pub(crate) const LARGE_ANSWER_LIMIT: usize = 16 * 1024 * 1024;
 /// Calls forwarded at once; more are refused until one finishes.
 const IN_FLIGHT_LIMIT: usize = 32;
+/// Told to an agent whose call is too large to relay; nothing was forwarded.
+const REQUEST_TOO_LARGE: &str = "Jackalope tool calls from a computer are limited to 64 KB, so this call was not sent and nothing ran. Send smaller arguments, for example over several calls.";
+/// Told to an agent whose answer is too large to relay. The call itself ran.
+const ANSWER_TOO_LARGE: &str = "The answer is larger than 512 KB, so it cannot reach this computer. The call itself ran: do not repeat a change. Ask for less, for example with output.jsonPointers, output.rows or output.maxChars, or page a captured result with read_tool_result.";
 const FORWARDED_HEADERS: &[&str] = &[
     "content-type",
     "accept",
@@ -148,6 +91,7 @@ pub(crate) struct Relay {
     endpoint: String,
     token: String,
     access: Access,
+    answer_limit: usize,
     in_flight: HashSet<String>,
     ready: Vec<Answer>,
     sender: Sender<Answer>,
@@ -161,11 +105,19 @@ impl Relay {
             endpoint: endpoint.trim_end_matches('/').to_string(),
             token: token.to_string(),
             access,
+            answer_limit: ANSWER_LIMIT,
             in_flight: HashSet::new(),
             ready: Vec::new(),
             sender,
             receiver,
         }
+    }
+
+    /// Accepts answers up to `limit` bytes, for a runner that receives those
+    /// above [`ANSWER_LIMIT`] as artifacts.
+    pub fn with_answer_limit(mut self, limit: usize) -> Self {
+        self.answer_limit = limit;
+        self
     }
 
     /// Starts forwarding requests from a read. A request already being
@@ -178,7 +130,7 @@ impl Relay {
             if !self.in_flight.insert(id.clone()) {
                 continue;
             }
-            if let Some(answer) = screen(&id, call, self.access) {
+            if let Some(answer) = screen(&id, call, &self.access) {
                 self.ready.push(answer);
                 continue;
             }
@@ -191,15 +143,15 @@ impl Relay {
                 ));
                 continue;
             }
-            let (endpoint, token, sender, access) = (
+            let (endpoint, token, sender, limit) = (
                 self.endpoint.clone(),
                 self.token.clone(),
                 self.sender.clone(),
-                self.access,
+                self.answer_limit,
             );
             let call = call.clone();
             std::thread::spawn(move || {
-                let answer = super::remote::block(forward(&endpoint, &token, &id, &call, access));
+                let answer = super::remote::block(forward(&endpoint, &token, &id, &call, limit));
                 let _ = sender.send(answer);
             });
         }
@@ -234,7 +186,7 @@ fn decoded_json(call: &Value) -> Option<Value> {
 }
 
 /// Refuses requests that must not reach the bridge, before forwarding.
-fn screen(id: &str, call: &Value, access: Access) -> Option<Answer> {
+fn screen(id: &str, call: &Value, access: &Access) -> Option<Answer> {
     let method = call["method"].as_str().unwrap_or_default();
     let path = call["path"].as_str().unwrap_or_default();
     let body = decoded(call);
@@ -256,29 +208,29 @@ fn screen(id: &str, call: &Value, access: Access) -> Option<Answer> {
             id,
             request.as_ref(),
             413,
-            "Bridge requests are limited to 64 KB.",
+            REQUEST_TOO_LARGE,
         ));
     }
-    let unavailable = if route.starts_with("/mcp") {
+    let place = if route.starts_with("/mcp") {
         request
             .as_ref()
             .filter(|request| request["method"] == "tools/call")
             .and_then(|request| request["params"]["name"].as_str())
-            .is_some_and(|name| access.tool_unavailable(name))
+            .map_or(Where::Device, |name| access.tool(name))
     } else {
-        access.route_unavailable(route)
+        access.route(route)
     };
-    unavailable.then(|| {
-        Answer::refused(
-            id,
-            request.as_ref(),
-            403,
-            "This tool acts on the person's device or its copy of the workspace, so it is not available to an agent on a computer. Use your own shell and file tools.",
-        )
-    })
+    let message = match place {
+        Where::Device => return None,
+        Where::Unavailable => "This tool acts on the person's device or its copy of the workspace, so it is not available to an agent on a computer. Use your own shell and file tools.",
+        // The computer's runner answers these itself; one arriving here would
+        // act on this device's stale copy of the workspace.
+        Where::Runner => "This tool runs on the computer itself, but the computer did not answer it. Call it again; if it keeps failing, use your own shell and file tools.",
+    };
+    Some(Answer::refused(id, request.as_ref(), 403, message))
 }
 
-async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, access: Access) -> Answer {
+async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, limit: usize) -> Answer {
     let request = decoded_json(call);
     let failed = |message: &str| Answer::refused(id, request.as_ref(), 502, message);
     let method = match call["method"].as_str() {
@@ -337,61 +289,18 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, access: Ac
             ))
         }
     };
-    let body = if request
-        .as_ref()
-        .is_some_and(|r| r["method"] == "tools/list")
-    {
-        without_unavailable_tools(&body, &content_type, access)
-    } else {
-        body
-    };
-    if body.len() > ANSWER_LIMIT {
-        return failed(
-            "The tool's answer is larger than 512 KB, so it cannot reach a computer. Ask for less.",
-        );
+    if body.len() > limit {
+        return failed(&if limit == ANSWER_LIMIT {
+            ANSWER_TOO_LARGE.to_string()
+        } else {
+            ANSWER_TOO_LARGE.replace("512 KB", &format!("{} MB", limit / (1024 * 1024)))
+        });
     }
     Answer {
         call: id.into(),
         status,
         content_type,
         body,
-    }
-}
-
-/// Removes unavailable tools from a `tools/list` answer, sent as JSON or as
-/// server-sent events.
-pub(crate) fn without_unavailable_tools(
-    body: &[u8],
-    content_type: &str,
-    access: Access,
-) -> Vec<u8> {
-    let filter = |text: &str| -> Option<String> {
-        let mut message: Value = serde_json::from_str(text).ok()?;
-        let tools = message["result"]["tools"].as_array_mut()?;
-        tools.retain(|tool| {
-            !tool["name"]
-                .as_str()
-                .is_some_and(|name| access.tool_unavailable(name))
-        });
-        Some(message.to_string())
-    };
-    let Ok(text) = std::str::from_utf8(body) else {
-        return body.to_vec();
-    };
-    if content_type.starts_with("text/event-stream") {
-        let mut lines = Vec::new();
-        for line in text.split('\n') {
-            match line
-                .strip_prefix("data:")
-                .and_then(|data| filter(data.trim()))
-            {
-                Some(filtered) => lines.push(format!("data: {filtered}")),
-                None => lines.push(line.to_string()),
-            }
-        }
-        lines.join("\n").into_bytes()
-    } else {
-        filter(text).map_or_else(|| body.to_vec(), String::into_bytes)
     }
 }
 
@@ -409,10 +318,17 @@ mod tests {
         })
     }
 
-    const WRITER: Access = Access {
-        browser: false,
-        read_only: false,
-    };
+    fn access(devtools: bool, read_only: bool) -> Access {
+        Access {
+            runner: Default::default(),
+            devtools,
+            read_only,
+        }
+    }
+
+    fn writer() -> Access {
+        access(false, false)
+    }
 
     fn tool_call(name: &str) -> Value {
         call(
@@ -424,31 +340,28 @@ mod tests {
 
     #[test]
     fn device_tools_are_refused_as_tool_errors() {
-        let answer = screen("c", &tool_call("browser_navigate"), WRITER).unwrap();
+        let answer = screen("c", &tool_call("browser_navigate"), &writer()).unwrap();
         assert_eq!(answer.status, 200);
         let body: Value = serde_json::from_slice(&answer.body).unwrap();
         assert_eq!(body["id"], 7);
         assert_eq!(body["result"]["isError"], true);
         let allowed = json!({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"propose_subtask","arguments":{}}});
-        assert!(screen("c", &call("POST", "/mcp", &allowed), WRITER).is_none());
+        assert!(screen("c", &call("POST", "/mcp", &allowed), &writer()).is_none());
         let list = json!({"jsonrpc":"2.0","id":9,"method":"tools/list"});
-        assert!(screen("c", &call("POST", "/mcp", &list), WRITER).is_none());
-        assert!(screen("c", &tool_call("desktop_control"), WRITER).is_none());
+        assert!(screen("c", &call("POST", "/mcp", &list), &writer()).is_none());
+        assert!(screen("c", &tool_call("desktop_control"), &writer()).is_none());
     }
 
     #[test]
     fn access_follows_the_computer_browser_and_read_only_attempts() {
-        let everything = Access {
-            browser: true,
-            read_only: true,
-        };
+        let everything = &access(true, true);
         for name in [
             "browser_navigate",
             "browser_tabs",
             "computer_verify",
             "read_context",
         ] {
-            assert!(screen("c", &tool_call(name), WRITER).is_some(), "{name}");
+            assert!(screen("c", &tool_call(name), &writer()).is_some(), "{name}");
             assert!(
                 screen("c", &tool_call(name), everything).is_none(),
                 "{name}"
@@ -460,10 +373,7 @@ mod tests {
                 "{name}"
             );
         }
-        let browser_only = Access {
-            browser: true,
-            read_only: false,
-        };
+        let browser_only = &access(true, false);
         assert!(screen("c", &tool_call("browser_snapshot"), browser_only).is_none());
         assert!(screen("c", &tool_call("verification_output"), browser_only).is_some());
         for (path, open) in [
@@ -481,11 +391,65 @@ mod tests {
                 "{path}"
             );
         }
-        assert!(WRITER
+        assert!(writer()
             .instructions()
             .contains("browser tools are not available"));
-        assert!(everything.instructions().contains("its own Chromium"));
+        assert!(everything.instructions().contains("own Chromium"));
         assert!(everything.instructions().contains("read-only workspace"));
+    }
+
+    #[test]
+    fn a_runner_with_the_local_bridge_keeps_only_control_tools_here() {
+        let current = Access {
+            runner: super::super::runner::RunnerCapabilities::from_status(Some(&json!({
+                "runs": 4,
+                "capabilities": ["local-bridge", "browser", "workspace-tools", "policy-callbacks"],
+            }))),
+            devtools: false,
+            read_only: false,
+        };
+        // Control tools, policy callbacks and runner events are forwarded.
+        for name in [
+            "ask_user",
+            "message",
+            "request_human_action",
+            "execute_tool",
+            "record_decision",
+        ] {
+            assert!(screen("c", &tool_call(name), &current).is_none(), "{name}");
+        }
+        for path in [
+            "/v1/policy",
+            "/v1/runner/event",
+            "/v1/tools/approve",
+            "/v1/human-action",
+        ] {
+            assert!(
+                screen("c", &call("POST", path, &json!({})), &current).is_none(),
+                "{path}"
+            );
+        }
+        // Workspace tools are answered on the computer; one reaching this device is refused.
+        for name in ["computer_verify", "browser_navigate", "read_context"] {
+            let answer = screen("c", &tool_call(name), &current).unwrap();
+            let body: Value = serde_json::from_slice(&answer.body).unwrap();
+            let text = body["result"]["content"][0]["text"].as_str().unwrap();
+            assert!(text.contains("runs on the computer"), "{text}");
+        }
+        assert_eq!(
+            screen("c", &call("POST", "/v1/browser/tabs", &json!({})), &current)
+                .unwrap()
+                .status,
+            403
+        );
+        // The tool list still offers them, since the computer serves them.
+        assert_eq!(
+            super::super::runner::offered(
+                &current,
+                ["browser_tabs", "computer_verify", "peer_adopt"]
+            ),
+            ["browser_tabs", "computer_verify"]
+        );
     }
 
     #[test]
@@ -496,7 +460,7 @@ mod tests {
             "/v1/peers/adopt",
         ] {
             assert_eq!(
-                screen("c", &call("POST", path, &json!({})), WRITER)
+                screen("c", &call("POST", path, &json!({})), &writer())
                     .unwrap()
                     .status,
                 403
@@ -508,22 +472,29 @@ mod tests {
             ("PUT", "/v1/messages"),
         ] {
             assert_eq!(
-                screen("c", &call(method, path, &json!({})), WRITER)
+                screen("c", &call(method, path, &json!({})), &writer())
                     .unwrap()
                     .status,
                 404
             );
         }
-        assert!(screen("c", &call("POST", "/v1/subtasks", &json!({})), WRITER).is_none());
+        assert!(screen("c", &call("POST", "/v1/subtasks", &json!({})), &writer()).is_none());
+        // Approvals for tools of connections that run on the computer.
+        assert!(screen(
+            "c",
+            &call("POST", "/v1/tools/approve", &json!({})),
+            &writer()
+        )
+        .is_none());
         assert!(screen(
             "c",
             &call("GET", "/v1/messages?after=3", &json!({})),
-            WRITER
+            &writer()
         )
         .is_none());
         let large = json!({ "text": "x".repeat(REQUEST_LIMIT) });
         assert_eq!(
-            screen("c", &call("POST", "/v1/messages", &large), WRITER)
+            screen("c", &call("POST", "/v1/messages", &large), &writer())
                 .unwrap()
                 .status,
             413
@@ -531,47 +502,103 @@ mod tests {
     }
 
     #[test]
-    fn tool_lists_omit_unavailable_tools() {
-        let list = json!({"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"peers"},{"name":"browser_tabs"},{"name":"desktop_control"},{"name":"ask_user"}]}});
-        let names = |body: &[u8]| -> Vec<String> {
-            let text = std::str::from_utf8(body).unwrap();
-            let json = text.trim().strip_prefix("data: ").unwrap_or(text);
-            serde_json::from_str::<Value>(json).unwrap()["result"]["tools"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|tool| tool["name"].as_str().unwrap().to_string())
-                .collect()
-        };
-        let filtered =
-            without_unavailable_tools(list.to_string().as_bytes(), "application/json", WRITER);
-        assert_eq!(names(&filtered), ["peers", "desktop_control", "ask_user"]);
-        let browser = Access {
-            browser: true,
-            read_only: false,
-        };
-        let filtered =
-            without_unavailable_tools(list.to_string().as_bytes(), "application/json", browser);
-        assert_eq!(
-            names(&filtered),
-            ["peers", "browser_tabs", "desktop_control", "ask_user"]
+    fn oversized_calls_and_answers_are_clear_tool_errors() {
+        use std::io::{BufRead, BufReader, Read, Write};
+        let arguments = json!({"handle":"h","arguments":{"text":"x".repeat(REQUEST_LIMIT)}});
+        let large = call(
+            "POST",
+            "/mcp",
+            &json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"execute_tool","arguments":arguments}}),
         );
-        let events = format!("event: message\ndata: {list}\n\n");
-        let filtered = without_unavailable_tools(events.as_bytes(), "text/event-stream", WRITER);
-        let data = std::str::from_utf8(&filtered)
-            .unwrap()
-            .lines()
-            .find(|line| line.starts_with("data:"))
-            .unwrap()
-            .to_string();
+        let answer = screen("c", &large, &writer()).unwrap();
+        assert_eq!(answer.status, 200);
+        let body: Value = serde_json::from_slice(&answer.body).unwrap();
+        assert_eq!(body["id"], 3);
+        assert_eq!(body["result"]["isError"], true);
+        let text = body["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("64 KB") && text.contains("nothing ran"),
+            "{text}"
+        );
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line.trim().is_empty() {
+                        break;
+                    }
+                    if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse().unwrap();
+                    }
+                }
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                let reply = json!({"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"y".repeat(ANSWER_LIMIT)}]}}).to_string();
+                let mut stream = stream;
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK
+content-type: application/json
+content-length: {}
+connection: close
+
+{reply}",
+                    reply.len()
+                )
+                .unwrap();
+            }
+        });
+        let answer = |relay: Relay| {
+            let mut relay = relay;
+            relay.accept(&[call(
+                "POST",
+                "/mcp",
+                &json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_tool","arguments":{"handle":"h"}}}),
+            )]);
+            let deadline = std::time::Instant::now() + Duration::from_secs(20);
+            let mut answers = Vec::new();
+            while answers.is_empty() && std::time::Instant::now() < deadline {
+                answers = relay.answers();
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            assert_eq!(answers.len(), 1);
+            answers.remove(0)
+        };
+        let refused = answer(Relay::new(&endpoint, "token", writer()));
+        assert!(refused.body.len() < 4096);
+        let body: Value = serde_json::from_slice(&refused.body).unwrap();
+        assert_eq!(body["id"], 4);
+        assert_eq!(body["result"]["isError"], true);
+        let text = body["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("512 KB") && text.contains("read_tool_result"),
+            "{text}"
+        );
+        // A runner with artifacts receives the whole answer.
+        let full =
+            answer(Relay::new(&endpoint, "token", writer()).with_answer_limit(LARGE_ANSWER_LIMIT));
+        server.join().unwrap();
+        assert!(full.body.len() > ANSWER_LIMIT);
+        let body: Value = serde_json::from_slice(&full.body).unwrap();
+        assert!(body["result"]["isError"].is_null());
+    }
+
+    #[test]
+    fn tool_lists_omit_unavailable_tools() {
+        use super::super::runner::offered;
+        let names = ["peers", "browser_tabs", "desktop_control", "ask_user"];
         assert_eq!(
-            names(data.as_bytes()),
+            offered(&writer(), names),
             ["peers", "desktop_control", "ask_user"]
         );
-        assert_eq!(
-            without_unavailable_tools(b"not json", "application/json", WRITER),
-            b"not json"
-        );
+        assert_eq!(offered(&access(true, false), names), names);
     }
 
     #[test]
@@ -607,7 +634,7 @@ mod tests {
             .unwrap();
             (headers, body)
         });
-        let mut relay = Relay::new(&endpoint, "real-token", WRITER);
+        let mut relay = Relay::new(&endpoint, "real-token", writer());
         let list = call(
             "POST",
             "/mcp",
@@ -622,8 +649,9 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(answers.len(), 1);
+        // The bridge's own answer is passed on as it is.
         let body: Value = serde_json::from_slice(&answers[0].body).unwrap();
-        assert_eq!(body["result"]["tools"].as_array().unwrap().len(), 1);
+        assert_eq!(body["result"]["tools"].as_array().unwrap().len(), 2);
         let (headers, body) = server.join().unwrap();
         assert!(headers
             .iter()

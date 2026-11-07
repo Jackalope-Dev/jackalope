@@ -3,8 +3,8 @@ import { Bot } from 'lucide-react';
 import { agentProvider } from '../../lib/agent-provider';
 
 /**
- * A provider's product mark, for places where people pick or identify an agent.
- * Live activity keeps the animated AgentAvatar characters.
+ * A provider's product mark, wherever people pick or identify an agent. AgentAvatar puts it
+ * on a tile that shows live state; bots keep their own characters (BotAvatar).
  */
 export function ProviderMark({ provider, size = 18 }: { provider: string; size?: number }) {
   const lower = provider.toLowerCase();

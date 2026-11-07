@@ -190,7 +190,14 @@ export interface Broadcast {
   configured: boolean;
   synced: number;
   tags: string[];
-  entries: { id: string; title: string; date: string; description: string; status?: string }[];
+  entries: {
+    id: string;
+    title: string;
+    date: string;
+    description: string;
+    status?: string;
+    version?: string;
+  }[];
 }
 
 export const date = (value?: number | null) =>

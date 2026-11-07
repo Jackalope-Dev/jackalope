@@ -11,8 +11,9 @@ fn main() {
     let package = root.join("../../../node_modules/agent-browser");
     let metadata = std::fs::read_to_string(package.join("package.json"))
         .expect("Run pnpm install --frozen-lockfile before building Jackalope");
+    // The computer image installs the same version (resources/computer/Dockerfile).
     assert!(
-        metadata.contains("\"version\": \"0.40.0\""),
+        metadata.contains("\"version\": \"0.41.1\""),
         "Unexpected agent-browser version"
     );
     let target = std::env::var("TARGET").unwrap();

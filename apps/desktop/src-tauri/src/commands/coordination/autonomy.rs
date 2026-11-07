@@ -77,6 +77,40 @@ pub struct AutonomyPolicy {
     /// Deploys the branch each time it moves, when automatic merging is on.
     #[serde(default)]
     pub deploy: Option<DeployPolicy>,
+    /// Limits what agents may decide for the person. Absent, the project's own
+    /// Autonomy settings apply unchanged; it can only make them stricter.
+    #[serde(default)]
+    pub decide: Option<DecidePolicy>,
+}
+
+/// Who answers one kind of decision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Decider {
+    Person,
+    Agent,
+}
+
+/// The committed `decide` section. Each field left out keeps the project's
+/// setting; `person` turns that kind of agent decision off for everyone.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DecidePolicy {
+    #[serde(default)]
+    pub questions: Option<Decider>,
+    #[serde(default)]
+    pub rounds: Option<Decider>,
+    #[serde(default)]
+    pub deviations: Option<Decider>,
+    /// Added to the categories that always reach the person.
+    #[serde(default)]
+    pub escalate: Vec<crate::commands::question_risk::QuestionCategory>,
+    /// Lowers the project's per-plan limit on agent decisions.
+    #[serde(default)]
+    pub max_agent_decisions: Option<u32>,
+    /// `auto` or an agent ID; replaces the project's choice when set.
+    #[serde(default)]
+    pub decider: Option<String>,
 }
 
 /// How a branch reaches production. Each command runs in a clean checkout of
@@ -130,6 +164,14 @@ impl AutonomyPolicy {
                 "{POLICY_PATH} has more than {MAX_PATTERNS} path patterns."
             ));
         }
+        if let Some(decider) = policy.decide.as_ref().and_then(|d| d.decider.as_deref()) {
+            if decider.trim().is_empty()
+                || decider.len() > 80
+                || decider.chars().any(|c| c.is_whitespace() || c.is_control())
+            {
+                return Err(format!("{POLICY_PATH} needs a valid decide.decider agent."));
+            }
+        }
         if let Some(deploy) = &policy.deploy {
             let branch = deploy.branch.trim();
             if branch.is_empty()
@@ -174,6 +216,14 @@ impl AutonomyPolicy {
             .map_or(self.default, |rule| rule.level)
     }
 
+    /// Every path glob only the person may approve changes to.
+    pub fn protected_globs(&self) -> Vec<String> {
+        always_protected()
+            .into_iter()
+            .chain(self.protected.iter().cloned())
+            .collect()
+    }
+
     /// Why this change must be reviewed by a person, or `None` when it may merge.
     pub fn hold_reason(&self, files: &[ChangedFile]) -> Option<String> {
         let max_files = self.max_files.unwrap_or(DEFAULT_MAX_FILES);
@@ -204,6 +254,14 @@ impl AutonomyPolicy {
             )),
         }
     }
+}
+
+/// The paths that need a person in every project, with or without a policy.
+pub fn always_protected() -> Vec<String> {
+    ALWAYS_PROTECTED
+        .iter()
+        .map(|glob| glob.to_string())
+        .collect()
 }
 
 fn git(project: &Path, args: &[&str]) -> Result<std::process::Output, String> {
@@ -528,6 +586,33 @@ mod tests {
         let mut accepted = proven("stated", "met", early);
         accepted.contract.requirements[0].receipt = Some(receipt(true));
         assert!(provable_outcomes(&accepted, "tree").unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_decide_section_is_optional_and_strictly_typed() {
+        let bare = policy(r#"{"version":1}"#);
+        assert!(bare.decide.is_none());
+        let decide = policy(
+            r#"{"version":1,"decide":{"questions":"agent","rounds":"person","escalate":["payment"],"maxAgentDecisions":10,"decider":"claude"}}"#,
+        )
+        .decide
+        .unwrap();
+        assert_eq!(decide.questions, Some(Decider::Agent));
+        assert_eq!(decide.rounds, Some(Decider::Person));
+        assert_eq!(decide.deviations, None);
+        assert_eq!(decide.max_agent_decisions, Some(10));
+        assert_eq!(decide.decider.as_deref(), Some("claude"));
+        for bad in [
+            r#"{"version":1,"decide":{"questions":"bot"}}"#,
+            r#"{"version":1,"decide":{"escalate":["everything"]}}"#,
+            r#"{"version":1,"decide":{"answers":"agent"}}"#,
+            r#"{"version":1,"decide":{"decider":"two words"}}"#,
+        ] {
+            assert!(AutonomyPolicy::parse(bad.as_bytes()).is_err(), "{bad}");
+        }
+        let globs = policy(r#"{"version":1,"protected":["migrations/**"]}"#).protected_globs();
+        assert!(globs.contains(&".jackalope/**".to_string()));
+        assert!(globs.contains(&"migrations/**".to_string()));
     }
 
     #[test]

@@ -39,6 +39,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         target_branch: None,
         process_contained: false,
         remote: None,
+        host: None,
         verify_command: None,
         prepare_command: None,
         setup_files: Vec::new(),
@@ -768,6 +769,7 @@ fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
         created_at: Utc::now().to_rfc3339(),
         answered_at: None,
         presentation: Default::default(),
+        autonomy: Default::default(),
     };
     runtime.record_prompt(&prompt);
     assert!(runtime

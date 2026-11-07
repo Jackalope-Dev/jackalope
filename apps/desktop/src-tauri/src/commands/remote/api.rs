@@ -162,7 +162,7 @@ fn task(run: &TaskRun, detail: bool) -> Value {
         .filter(|prompt| detail || prompt.status == "pending")
         .take(if detail { usize::MAX } else { LISTED_PROMPTS })
         .collect();
-    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"agent":run.agent,"title":run.prompt.chars().take(if detail { 12_000 } else { 160 }).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"prompts":prompts,"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
+    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"agent":run.agent,"title":run.prompt.chars().take(if detail { 12_000 } else { 160 }).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"host":if detail { run.host.as_ref().map(|host| host.name.clone()) } else { None },"prompts":prompts,"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
 }
 async fn request(
     State(service): State<RemoteAccess>,

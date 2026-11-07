@@ -24,10 +24,10 @@ use std::{
 };
 
 /// Raw bytes per upload chunk; base64 keeps each request under the agent's 1 MB body limit.
-const CHUNK: usize = 512 * 1024;
-const UPLOAD_LIMIT: u64 = 512 * 1024 * 1024;
-const PATCH_LIMIT: usize = 256 * 1024 * 1024;
-const CALL_TIMEOUT: Duration = Duration::from_secs(120);
+pub(super) const CHUNK: usize = 512 * 1024;
+pub(super) const UPLOAD_LIMIT: u64 = 512 * 1024 * 1024;
+pub(super) const PATCH_LIMIT: usize = 256 * 1024 * 1024;
+pub(super) const CALL_TIMEOUT: Duration = Duration::from_secs(120);
 /// How long a run's agent waits for new output before answering a read.
 pub(crate) const READ_WAIT_MS: u64 = 1000;
 
@@ -39,16 +39,6 @@ pub(crate) fn supports_runs(computer: &Computer) -> bool {
 /// The computer a project's task agents run on, when it has one.
 pub(crate) fn project_computer(root: &Path, project_id: &str) -> Option<Computer> {
     super::find(root, PROJECT, project_id).filter(supports_runs)
-}
-
-/// Projects whose agents run on a computer, for scheduling.
-pub(crate) fn run_projects(root: &Path) -> HashSet<String> {
-    super::list(root)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|computer| computer.owner_kind == PROJECT && supports_runs(computer))
-        .map(|computer| computer.owner_id)
-        .collect()
 }
 
 /// The run's name inside the computer. It follows the local workspace, so a
@@ -105,7 +95,7 @@ pub(crate) fn translate(
         });
         match (adapter, arg.as_str()) {
             ("claude", "--mcp-config") | ("codex", "-c") if relayed.is_some() => {
-                argv.extend([arg.clone(), relayed.unwrap()]);
+                argv.extend([arg.clone(), bridge_only(adapter, &relayed.unwrap())?]);
                 index += 2;
                 continue;
             }
@@ -162,10 +152,102 @@ pub(crate) fn translate(
     Ok((argv, env))
 }
 
-fn looks_local(value: &str) -> bool {
+/// Adds project secrets to a run's environment. They replace a variable of the
+/// same name from the local command and are kept whatever they look like (the
+/// local-path check applies only to the translated command), but never replace
+/// an agent sign-in or one of Jackalope's own variables.
+pub(crate) fn add_secrets(env: &mut Environment, secrets: Environment) {
+    let owned = |name: &str| {
+        name.starts_with("JACKALOPE_")
+            || credentials::KINDS
+                .iter()
+                .any(|kind| kind.variables.contains(&name))
+    };
+    for (name, value) in secrets {
+        if owned(&name) {
+            continue;
+        }
+        env.retain(|(existing, _)| existing != &name);
+        env.push((name, value));
+    }
+}
+
+/// Keeps only the Jackalope bridge from an MCP configuration argument. Other
+/// entries name this device's programs, environment references and sign-ins,
+/// which never go to a computer; selected on-demand connections reach the
+/// agent through the bridge instead.
+fn bridge_only(adapter: &str, value: &str) -> Result<String, String> {
+    let unreadable = || {
+        format!("This task's {adapter} MCP configuration could not be read, so it cannot run on a computer.")
+    };
+    if adapter == "claude" {
+        let mut config: Value = serde_json::from_str(value).map_err(|_| unreadable())?;
+        let bridge = config["mcpServers"]["jackalope"].take();
+        if !bridge.is_object() {
+            return Err(unreadable());
+        }
+        return Ok(json!({"mcpServers":{"jackalope":bridge}}).to_string());
+    }
+    let parsed: toml::Table = toml::from_str(value).map_err(|_| unreadable())?;
+    let bridge = parsed
+        .get("mcp_servers")
+        .and_then(|servers| servers.get("jackalope"))
+        .cloned()
+        .ok_or_else(unreadable)?;
+    let mut servers = toml::Table::new();
+    servers.insert("jackalope".into(), bridge);
+    Ok(format!("mcp_servers={}", toml::Value::Table(servers)))
+}
+
+/// Whether a value names a file on this device: a Windows drive or network
+/// path, or an absolute path that exists here.
+pub(crate) fn looks_local(value: &str) -> bool {
     let bytes = value.as_bytes();
     let windows = bytes.len() > 2 && bytes[1] == b':' && (bytes[2] == b'\\' || bytes[2] == b'/');
     windows || value.starts_with("\\\\") || (value.starts_with('/') && Path::new(value).exists())
+}
+
+/// The runs protocol from which a computer's agent runs selected stdio
+/// connections and reports it in `run_status`.
+const CONNECTIONS_PROTOCOL: u64 = 3;
+
+/// Whether the computer's agent, by its run status, runs stdio connections.
+pub(crate) fn runs_connections(status: Option<&Value>) -> bool {
+    status
+        .and_then(|status| status["runs"].as_u64())
+        .is_some_and(|protocol| protocol >= CONNECTIONS_PROTOCOL)
+}
+
+/// The `mcp` part of `run_start`: each connection's command, arguments and
+/// resolved environment. The computer's agent keeps them out of the command
+/// line and the CLI's configuration: it writes each to a private file beside
+/// the workspace and adds an entry that starts the server from it. With
+/// `approve`, Claude Code asks Jackalope before each of their tools runs.
+pub(crate) fn connections_request(
+    adapter: &str,
+    connections: &[crate::commands::mcp::ComputerConnection],
+) -> Value {
+    json!({
+        "config": adapter,
+        "approve": adapter == "claude",
+        "servers": connections.iter().map(|connection| json!({
+            "key": connection.key,
+            "name": connection.name,
+            "command": connection.command,
+            "args": connection.args,
+            "env": connection.env.iter().cloned().collect::<HashMap<_, _>>(),
+        })).collect::<Vec<_>>(),
+    })
+}
+
+/// A started run.
+pub(crate) struct Started {
+    /// The exit, when it ended at once.
+    pub exit: Option<Value>,
+    /// Connections the computer could not start, as name and reason.
+    pub unavailable: Vec<(String, String)>,
+    /// The tools the runner serves for the run, when it was asked to.
+    pub local_tools: Option<Vec<String>>,
 }
 
 /// One run's conversation with a computer's agent.
@@ -173,6 +255,17 @@ pub(crate) struct Session {
     transport: Box<dyn Transport>,
     pub name: String,
     canceled: AtomicBool,
+    /// What the computer's runner supports, from its last [`Session::status`].
+    pub capabilities: super::runner::RunnerCapabilities,
+    /// The run's workspace was checked out from a Git bundle, so its result
+    /// comes back as one (see [`super::sync`]).
+    pub synced: bool,
+}
+
+/// Whether a runner takes workspaces as Git bundles. Bundles travel as
+/// artifacts, so both are needed; anything else keeps the tar and patch.
+pub(crate) fn uses_git_sync(capabilities: &super::runner::RunnerCapabilities) -> bool {
+    capabilities.has(super::runner::GIT_SYNC) && capabilities.has(super::runner::ARTIFACTS)
 }
 
 /// Output since the previous read.
@@ -205,27 +298,36 @@ impl Session {
             transport,
             name,
             canceled: AtomicBool::new(false),
+            capabilities: Default::default(),
+            synced: false,
         }
     }
 
-    fn call(&mut self, mut payload: Value, timeout: Duration) -> Result<Value, String> {
+    pub(super) fn call(&mut self, mut payload: Value, timeout: Duration) -> Result<Value, String> {
         payload["run"] = json!(self.name);
         self.transport.call(&payload, timeout, &self.canceled)
     }
 
     /// Whether this run exists on the computer and how far it got, or `None`
-    /// when the computer's agent predates the bridge relay and recovery.
+    /// when the computer's agent predates the bridge relay and recovery. Also
+    /// records the runner's capabilities and whether the run was synced.
     pub fn status(&mut self) -> Result<Option<Value>, String> {
-        match self.call(json!({"action":"run_status"}), CALL_TIMEOUT) {
-            Ok(status) => Ok(Some(status)),
-            Err(error) if error.contains("Unsupported action") => Ok(None),
-            Err(error) => Err(error),
-        }
+        let status = match self.call(json!({"action":"run_status"}), CALL_TIMEOUT) {
+            Ok(status) => Some(status),
+            Err(error) if error.contains("Unsupported action") => None,
+            Err(error) => return Err(error),
+        };
+        self.capabilities = super::runner::RunnerCapabilities::from_status(status.as_ref());
+        self.synced = status
+            .as_ref()
+            .is_some_and(|status| status["synced"] == true);
+        Ok(status)
     }
 
     /// Uploads the workspace's files: tracked and untracked ones Git does not
     /// ignore, or for a folder that is not a repository, those its ignore files
-    /// allow, plus the copied `setup` files the local workspace was given.
+    /// allow, plus the copied `setup` files the local workspace was given and the
+    /// Jackalope context placed in it.
     pub fn upload(
         &mut self,
         workspace: &Path,
@@ -278,21 +380,52 @@ impl Session {
         }
     }
 
-    /// Starts the agent, with the bridge relay when `relay` is set. Returns its
-    /// exit when it ended at once.
+    /// Starts the agent, with the bridge relay when `relay` is set. `parts`
+    /// adds the optional parts of `run_start`, each only when the runner
+    /// supports it: `mcp`, the selected stdio connections (see
+    /// [`connections_request`]), and `local`, the tools the runner serves
+    /// itself (see [`super::runner::Access::local_request`]).
     pub fn start(
         &mut self,
         argv: &[String],
         env: &[(String, String)],
         stdin: &str,
         relay: bool,
-    ) -> Result<Option<Value>, String> {
+        parts: &serde_json::Map<String, Value>,
+    ) -> Result<Started, String> {
         let env: HashMap<&str, &str> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-        let result = self.call(
-            json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600,"relay":relay}),
-            CALL_TIMEOUT,
-        )?;
-        Ok((result["started"] != true).then(|| result["exit"].clone()))
+        let mut request = json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600,"relay":relay});
+        for (name, value) in parts {
+            request[name] = value.clone();
+        }
+        // Installing a connection's runtime can add a minute or two.
+        let timeout = if parts.contains_key("mcp") {
+            CALL_TIMEOUT * 3
+        } else {
+            CALL_TIMEOUT
+        };
+        let result = self.call(request, timeout)?;
+        Ok(Started {
+            local_tools: result["local"]["tools"].as_array().map(|tools| {
+                tools
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            }),
+            exit: (result["started"] != true).then(|| result["exit"].clone()),
+            unavailable: result["mcp"]["unavailable"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|item| {
+                    Some((
+                        item["name"].as_str()?.to_string(),
+                        item["reason"].as_str()?.to_string(),
+                    ))
+                })
+                .collect(),
+        })
     }
 
     /// Output after the cursors and new bridge requests. `reclaim` also returns
@@ -319,19 +452,24 @@ impl Session {
         Ok(page)
     }
 
-    /// Sends one bridge answer to the waiting agent.
+    /// Sends one bridge answer to the waiting agent. One above the relay's
+    /// answer limit is uploaded as an artifact first, when the runner has them.
     pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<(), String> {
-        self.call(
-            json!({
-                "action": "run_answer",
-                "call": answer.call,
-                "status": answer.status,
-                "contentType": answer.content_type,
-                "body": base64::engine::general_purpose::STANDARD.encode(&answer.body),
-            }),
-            CALL_TIMEOUT,
-        )
-        .map(|_| ())
+        let mut request = json!({
+            "action": "run_answer",
+            "call": answer.call,
+            "status": answer.status,
+            "contentType": answer.content_type,
+        });
+        if answer.body.len() > super::relay::ANSWER_LIMIT
+            && self.capabilities.has(super::runner::ARTIFACTS)
+        {
+            let digest = self.put_artifact(&mut std::io::Cursor::new(&answer.body), &|_, _| {})?;
+            request["artifact"] = json!(digest.sha256);
+        } else {
+            request["body"] = json!(base64::engine::general_purpose::STANDARD.encode(&answer.body));
+        }
+        self.call(request, CALL_TIMEOUT).map(|_| ())
     }
 
     pub fn stop(&mut self) -> Result<(), String> {
@@ -373,7 +511,14 @@ impl Session {
     /// Removes the run's files from the computer. The workspace is uploaded
     /// again for a continuation; the agent's own session history stays.
     pub fn remove(&mut self) {
-        let _ = self.call(json!({"action":"run_remove"}), CALL_TIMEOUT);
+        let _ = self.try_remove();
+    }
+
+    /// [`Session::remove`], saying whether the computer removed the run: its
+    /// folder, and for a Git-synced run its worktree, branch and refs.
+    pub fn try_remove(&mut self) -> Result<(), String> {
+        self.call(json!({"action":"run_remove"}), CALL_TIMEOUT)
+            .map(|_| ())
     }
 
     pub fn shutdown(&mut self) {
@@ -480,11 +625,50 @@ fn setup_files(
     Ok(files)
 }
 
-/// A tar of the workspace's files and its copied setup files in a temporary file.
+/// A tar of the workspace's files, its copied setup files and the Jackalope
+/// context placed in it, in a temporary file.
 pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::File, String> {
     let mut files = listed(workspace).unwrap_or_else(|| walked(workspace));
-    let known: HashSet<String> = files.iter().map(|(path, _)| path.clone()).collect();
-    files.extend(setup_files(workspace, setup, &known)?);
+    files.extend(ignored_inputs(workspace, setup, &files)?);
+    write_archive(workspace, files)
+}
+
+/// The copied setup files and Jackalope context that the listing left out
+/// because Git ignores them.
+fn ignored_inputs(
+    workspace: &Path,
+    setup: &[String],
+    listing: &[(String, bool)],
+) -> Result<Vec<(String, bool)>, String> {
+    let mut known: HashSet<String> = listing.iter().map(|(path, _)| path.clone()).collect();
+    let mut files = setup_files(workspace, setup, &known)?;
+    known.extend(files.iter().map(|(path, _)| path.clone()));
+    // Git ignores context in the workspace, so the listing leaves it out.
+    files.extend(
+        crate::commands::agent_context::present(workspace)
+            .into_iter()
+            .filter(|path| !known.contains(path))
+            .map(|path| (path, false)),
+    );
+    Ok(files)
+}
+
+/// The side tar of a Git-synced workspace: only the copied setup files and
+/// Jackalope context, which a bundle cannot carry because Git ignores them.
+/// `None` when there are none.
+pub(crate) fn extras_archive(
+    workspace: &Path,
+    setup: &[String],
+) -> Result<Option<std::fs::File>, String> {
+    let listing = listed(workspace).unwrap_or_default();
+    let files = ignored_inputs(workspace, setup, &listing)?;
+    if files.is_empty() {
+        return Ok(None);
+    }
+    write_archive(workspace, files).map(Some)
+}
+
+fn write_archive(workspace: &Path, files: Vec<(String, bool)>) -> Result<std::fs::File, String> {
     let file = tempfile_in_temp()?;
     let mut builder = tar::Builder::new(file);
     builder.follow_symlinks(false);
@@ -532,6 +716,14 @@ pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::Fil
 
 /// An anonymous read-write file, deleted as soon as it is created where the
 /// platform allows and otherwise when it is closed.
+/// A fresh path in the temporary folder for a downloaded file.
+pub(super) fn tempfile_path(extension: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "jackalope-download-{}.{extension}",
+        uuid::Uuid::new_v4().simple()
+    ))
+}
+
 fn tempfile_in_temp() -> Result<std::fs::File, String> {
     let path = std::env::temp_dir().join(format!(
         "jackalope-upload-{}.tar",
@@ -566,16 +758,18 @@ impl Temporary {
     }
 }
 
-/// Applies a run's patch to the local workspace.
+/// Applies a run's patch to the local workspace. Changes the agent made to
+/// Jackalope context are left out; new files it saved, such as screenshots under
+/// `.jackalope/artifacts`, come back like any other.
 pub(crate) fn apply(workspace: &Path, patch: &[u8]) -> Result<(), String> {
     if patch.is_empty() {
         return Ok(());
     }
-    let mut command = git_command::command(
-        workspace,
-        &["apply", "--binary", "--whitespace=nowarn", "-"],
-        git_command::Policy::Isolated,
-    );
+    let exclusions = crate::commands::agent_context::apply_exclusions();
+    let mut args = vec!["apply", "--binary", "--whitespace=nowarn"];
+    args.extend(exclusions.iter().map(String::as_str));
+    args.push("-");
+    let mut command = git_command::command(workspace, &args, git_command::Policy::Isolated);
     // A folder that is not its own repository must not apply paths relative
     // to an enclosing one.
     if !workspace.join(".git").exists() {
@@ -806,9 +1000,12 @@ mod tests {
         )
         .unwrap();
         let endpoint = "http://127.0.0.1:4321";
-        let config = format!(
-            "{{\"mcpServers\":{{\"jackalope\":{{\"url\":\"{endpoint}/mcp\",\"headers\":{{\"Authorization\":\"Bearer ${{JACKALOPE_BRIDGE_TOKEN}}\"}}}}}}}}"
-        );
+        let config = json!({"mcpServers": {
+            "jackalope": {"url": format!("{endpoint}/mcp"), "headers": {"Authorization": "Bearer ${JACKALOPE_BRIDGE_TOKEN}"}},
+            "docs": {"url": "https://docs.example/mcp", "headers": {"Authorization": "Bearer ${DOCS_TOKEN}"}},
+            "files": {"command": "local-files", "env": {"ROOT": "/home/me"}}
+        }})
+        .to_string();
         let mut command = Command::new("claude");
         command
             .args(["--print", "--mcp-config", &config])
@@ -823,6 +1020,16 @@ mod tests {
         assert_eq!(argv[2], "--mcp-config");
         assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
         assert!(!argv[3].contains(endpoint));
+        let delivered: Value = serde_json::from_str(&argv[3]).unwrap();
+        assert_eq!(
+            delivered["mcpServers"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["jackalope"]
+        );
+        assert!(!argv[3].contains("DOCS_TOKEN") && !argv[3].contains("local-files"));
         assert!(!argv.iter().any(|arg| arg == "--permission-prompt-tool"));
         assert_eq!(argv[4..], ["--allowedTools", "mcp__jackalope__peers"]);
         let value = |name: &str| env.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str());
@@ -834,13 +1041,61 @@ mod tests {
         command.args([
             "exec",
             "-c",
-            &format!("mcp_servers={{ jackalope = {{ url = \"{endpoint}/mcp\", bearer_token_env_var = \"JACKALOPE_BRIDGE_TOKEN\" }} }}"),
+            &format!("mcp_servers={{ jackalope = {{ url = \"{endpoint}/mcp\", bearer_token_env_var = \"JACKALOPE_BRIDGE_TOKEN\" }}, \"docs.server\" = {{ url = \"https://docs.example/mcp\", bearer_token_env_var = \"DOCS_TOKEN\" }} }}"),
             "-c",
             "mcp_servers.docs.command=\"x\"",
         ]);
         let (argv, _) = translate("codex", &command, root.path(), Some(endpoint)).unwrap();
         assert_eq!(argv.len(), 4);
         assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
+        assert!(!argv[3].contains("DOCS_TOKEN") && !argv[3].contains("docs.server"));
+        let parsed: toml::Table = toml::from_str(&argv[3]).unwrap();
+        assert_eq!(
+            parsed["mcp_servers"]["jackalope"]["bearer_token_env_var"].as_str(),
+            Some("JACKALOPE_BRIDGE_TOKEN")
+        );
+    }
+
+    #[test]
+    fn project_secrets_join_the_run_without_replacing_sign_ins() {
+        let mut env: Environment = vec![
+            ("GIT_AUTHOR_NAME".into(), "Claude".into()),
+            ("SHARED".into(), "from-command".into()),
+            ("CLAUDE_CODE_OAUTH_TOKEN".into(), "sign-in".into()),
+            ("JACKALOPE_BRIDGE_TOKEN".into(), RELAY_TOKEN.into()),
+        ];
+        add_secrets(
+            &mut env,
+            vec![
+                ("HIGGSFIELD_API_KEY".into(), "hf-value".into()),
+                ("KEY_FILE".into(), "C:\\keys\\service.json".into()),
+                ("SHARED".into(), "from-secret".into()),
+                ("CLAUDE_CODE_OAUTH_TOKEN".into(), "not-a-sign-in".into()),
+                ("JACKALOPE_BRIDGE_TOKEN".into(), "not-the-relay".into()),
+            ],
+        );
+        let value = |name: &str| {
+            let found: Vec<&str> = env
+                .iter()
+                .filter(|(k, _)| k == name)
+                .map(|(_, v)| v.as_str())
+                .collect();
+            assert!(found.len() <= 1, "{name} appears more than once");
+            found.first().copied()
+        };
+        assert_eq!(value("HIGGSFIELD_API_KEY"), Some("hf-value"));
+        assert_eq!(value("KEY_FILE"), Some("C:\\keys\\service.json"));
+        assert_eq!(value("SHARED"), Some("from-secret"));
+        assert_eq!(value("CLAUDE_CODE_OAUTH_TOKEN"), Some("sign-in"));
+        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(RELAY_TOKEN));
+        assert_eq!(value("GIT_AUTHOR_NAME"), Some("Claude"));
+    }
+
+    #[test]
+    fn unreadable_bridge_configuration_is_refused() {
+        let endpoint = "http://127.0.0.1:4321";
+        assert!(bridge_only("claude", &format!("{{\"x\":\"{endpoint}\"}}")).is_err());
+        assert!(bridge_only("codex", "mcp_servers=not toml {").is_err());
     }
 
     #[test]

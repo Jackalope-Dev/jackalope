@@ -71,6 +71,10 @@ pub struct ProjectRecord {
     /// Whether finished work runs the saved check automatically. Absent means off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_verify: Option<bool>,
+    /// Project instructions from Project settings, given to every task agent at
+    /// launch. Absent when none are saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
     /// The command that prepares a fresh workspace before work starts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prepare_command: Option<String>,

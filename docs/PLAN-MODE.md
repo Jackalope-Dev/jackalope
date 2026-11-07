@@ -137,16 +137,26 @@ link and deviations. Records are written atomically; an unreadable record is qua
 as `<id>.json.corrupt` and reported in the plan list rather than overwritten. Per-project
 settings are in `plans/settings.json`: `questionCap`, `plannerAgent`, `plannerModel`,
 `exportPath` (default `docs/plans/{slug}.md`), `maxRounds` (swarm rounds, default 5,
-1–20), `askBeforeRounds` (default false) and `orchestrators` (1–4, default 1). Missing
-fields take their defaults. They
-are edited under **Planning** in Project settings (the Plans page links there); the
-terminal's `/settings` changes the question limit and planning agent.
+1–20), `askBeforeRounds` (default false), `orchestrators` (1–4, default 1) and `decide`
+(see [agent decisions](#agent-decisions)). Missing fields take their defaults. They
+are edited under **Planning** and **Autonomy** in Project settings (the Plans page links
+there); the terminal's `/settings` changes the question limit and planning agent.
 
 **Save to repo** writes the current revision to the export path inside the project. The
 path must be relative, end in `.md` and stay inside the project; symbolic links are
 refused. Nothing is staged or committed.
 
 ## Approval and hand-off
+
+A project whose repository has no commits gets its first one when a plan starts or is
+approved, and a project folder that is in no repository becomes one, so worktrees have a
+commit to branch from. The commit uses the person's Git identity and the message
+"Initial commit", honors `.gitignore` and always leaves out `.env` files, `*.pem`, `*.key`
+and SSH keys. Without a Git identity nothing is changed and approval reports how to set
+one. An isolated task started in a repository without commits gets the same first commit;
+a plain folder stays a plain folder for ordinary tasks. The next attempt started in the
+project records the commit in its activity; the explicit **Create first commit** in
+project settings still works.
 
 Approval is one explicit call naming the revision number and hash the person reviewed;
 a changed plan, a running planner, a done plan, planned subtasks with more than 8 open
@@ -206,9 +216,13 @@ not merely when no gaps are open. Attempts that have a check keep every check ga
 
 A swarm runs in rounds. Each round is a managed task with the same checks, agent and
 independent review as planned subtasks. A round may run as many assignments as the
-slots where the project's agents run (local concurrency, or the computer's concurrency
-when the project's agents run on a computer), at least 8 and at most 24; other shapes
-keep their limits. A connected swarm Worker still mirrors attempts but is not required.
+hosts in the project's capacity pool can run at once, at least 8 and at most 24: its
+computers (the project's own and any added under **Swarms run on**, within the limit on
+agents on computers), plus local concurrency when the project has no computer of its own,
+or only local concurrency when its swarms run on this device only; other shapes keep their
+limits. Each assignment of every shape is placed on a host of that pool (see
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts)), and the Rounds section shows
+each host's load. A connected swarm Worker still mirrors attempts but is not required.
 
 When a round's combined result is merged, by the person in result review or by the
 autonomy policy, Jackalope starts a read-only orchestrator attempt on the target branch
@@ -250,6 +264,15 @@ A proposal is saved on the round, so it survives a restart and still waits for
 approval; approving starts the round without a separate resume. The terminal approves
 with `/rounds approve` or `jackalope plan rounds <id> approve`; editing happens in the
 app. The phone companion does not show proposals.
+
+With **Let agents approve swarm rounds** on, a proposal goes to a deciding agent instead
+(see [agent decisions](#agent-decisions)) once the round passed a validator: the plan has
+a check, the round's combined result is ready and merged, no assignment has an error, no
+recorded check failed and the combined review's check passed. The proposal is saved and
+the Rounds section says an agent is checking it; the person can still approve, edit or
+stop it. An approval starts the round as the person's would. A failed validator, a
+proposal that names protected paths or other escalated subjects, an unsure decider or the
+decision limit leaves the proposal waiting with the usual notification and the reason.
 
 ### Several orchestrators
 
@@ -300,6 +323,14 @@ The person chooses **Accept and amend** (the summary and amendment are appended 
 Decision log and Surprises as an amended revision, the approval moves to it and dispatch
 resumes), **Redo** (the attempt is continued with the plan as written) or **Re-plan**.
 
+With **Let agents handle plan deviations within scope** on, a deviation an agent declares
+goes to a deciding agent first when every path its summary and amendment name lies inside
+a task scope of the plan and the text is not about an escalated subject. Dispatch stays
+paused while it decides. Acceptance amends the plan exactly like **Accept and amend**, with
+the approval recorded as decided by that agent; otherwise the deviation waits for the
+person with the reason. Deviations Jackalope detects itself (files outside a scope, a
+result still failing after its repairs) always go to the person.
+
 A pending deviation needs the person wherever they are. The app raises "A plan needs your
 decision" as a desktop notification (when notifications are on and the window is not
 focused) and as a companion notice; both open the plan. The plan list marks the plan
@@ -317,16 +348,84 @@ status becomes `done`, and accepted deviations and
 criteria whose checks failed are sent once as reflection observations through the
 learned-lesson promotion gate.
 
+## Agent decisions
+
+**Autonomy** in Project settings lets agents decide for the person on approved plans, so a
+long build keeps moving. Each kind is off until turned on and is saved per project in
+`plans/settings.json` under `decide`: `questions`, `rounds` and `deviations` (booleans),
+`maxAgentDecisions` (default 50, 1–500, per plan execution) and `decider` (`auto` or an
+agent ID). Settings saved before Autonomy existed load with everything off.
+
+A committed `decide` section in `.jackalope/autonomy.json`, read from the target branch,
+can only make these stricter (see
+[orchestration](ORCHESTRATION-CAPABILITIES.md#ownership-and-interface-decisions)): `person` turns a
+kind off, a lower `maxAgentDecisions` wins, `escalate` adds categories and `decider` names
+the agent. A policy that cannot be read stops every agent decision and the plan view says
+why.
+
+Only work on an approved plan is eligible. A routine question from one of its attempts
+first passes a local classifier (`question_risk.rs`). The asking agent may give `category`;
+anything but `routine` goes to the person. The question, its options, header, rationale,
+recommendation and default are checked for secrets, payment, sign-ins, account creation,
+publishing and deploys, deleting or rewriting history, protected paths (the policy's,
+`.jackalope/**` and CI configuration) and changes to the plan's goal, scope or
+architecture; a question shorter than 8 or longer than 4,000 characters is unclear. Any
+match goes to the person with its category and reason.
+
+Everything else goes to a read-only decider attempt on the target branch, started like a
+swarm orchestrator and registered with no questions. `auto` picks an installed, enabled
+agent from another model family than the asking agent (Claude, Codex, Grok, Kimi,
+OpenCode, Gemini, Antigravity in that order), else any. It receives the approved plan,
+the question, the asking task's brief and decision trail, and earlier decisions on the
+plan, and returns one JSON object:
+
+```json
+{"decision": "answer", "answer": "Card grid", "rationale": "…", "confidence": 0.82,
+ "evidence": ["plan: Approach"]}
+```
+
+An answer stands only when `decision` is `answer`, `confidence` is at least 0.7 and the
+answer fits the question (one of the options when only options are allowed; a JSON array
+of options for several). Otherwise, or when the attempt fails, takes more than 3 minutes
+or waits more than 3 minutes for one of the three shared decider slots, the question goes
+to the person with the decider's reason. Elapsed time never answers anything.
+
+While the decider works the question is saved as `deciding`: it raises no notification,
+the task shows it with "An agent is deciding for you", and an answer the person sends
+first wins. The asking agent receives an agent's answer through the same channel as a
+person's, as `Answered by <agent> on your owner's behalf: <answer>`. The prompt records
+`answeredBy` (agent, answer, rationale, confidence, evidence, deciding attempt) or
+`escalation` (category and reason); prompts saved without them load unchanged. An answer
+is also added to the asking attempt's decision trail.
+
+Every decision, escalation and hand-off is kept on the plan record (`autonomy`, at most
+500, newest shown first). The plan view's **Autonomy** section counts decisions by agents
+and items waiting on the person, shows each decision with the deciding agent's mark,
+confidence and reason, and says why anything was sent to the person. **Override** on a
+question an agent answered, there or in the task's activity, records the person's answer
+and sends it to the asking task as a direct message, which arrives at its next tool
+response or with a continuation. A restart while an agent decides hands the item to the
+person as interrupted.
+
+Agents ask for what only the person can do (signing in, payment, creating an account,
+adding a secret) with `request_human_action`; it never goes to a decider. See
+[orchestration](ORCHESTRATION-CAPABILITIES.md#shared-tools-and-guidance).
+
 ## Verification
 
 ```sh
 cd apps/desktop/src-tauri
 cargo test --lib planning          # document, interview, store, hand-off, rounds and a fixture planner
+cargo test --lib agent_decider     # policy, decider replies, limits, round validator, human actions
+cargo test --lib question_risk     # question classifier
 cargo test --lib coordination::managed
+cargo test --lib computers::pool   # where each fork runs, limits, lost hosts
+cargo test --lib coordination::hosts # retrying a fork whose host was lost
 cargo test --bin jackalope plan    # terminal commands, panel and protocol
 cd .. && node --test scripts/plan-mode.test.mjs
 ```
 
 The fixture planner proves the session plumbing, read-only flags and storage, not real
-planning quality. Installed-provider interviews, approval to merge with real agents, and
-the swarm shape remain to be accepted in an installed app.
+planning quality. Decider tests use a canned launcher, not an agent. Installed-provider
+interviews, approval to merge with real agents, the swarm shape and decider runs with
+installed agents remain to be accepted in an installed app.

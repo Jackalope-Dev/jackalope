@@ -195,3 +195,32 @@ test('results the autonomy policy held wait for a person with its reason', () =>
   assert.equal(agent.phase, 'attention');
   assert.match(agent.detail, /Held for review/);
 });
+
+test('each agent names the host it runs on', () => {
+  const model = swarmMap({
+    projectId: 'p',
+    now,
+    queue: queue({
+      items: [
+        {
+          id: 'later',
+          projectId: 'p',
+          title: 'Later',
+          agent: 'codex',
+          scopes: ['src'],
+          dependencies: [],
+          runId: null,
+          canceled: false,
+          error: null,
+        },
+      ],
+    }),
+    runs: [
+      run('placed', { host: { id: 'lab', name: 'Lab', reason: 'Placed on Lab.' } }),
+      run('older', { remote: { computerId: 'box', computerName: 'Box' } }),
+      run('here'),
+    ],
+  });
+  const hosts = Object.fromEntries(model.agents.map((agent) => [agent.id, agent.host]));
+  assert.deepEqual(hosts, { placed: 'Lab', older: 'Box', here: null, 'item:later': null });
+});

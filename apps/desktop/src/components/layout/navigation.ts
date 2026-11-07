@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ChartNoAxesColumn,
   ClipboardList,
+  Cloud,
   FileCheck2,
   GitBranch,
   GitCommitHorizontal,
@@ -123,6 +124,14 @@ export const WORKSPACE_VIEWS = [
     label: 'Swarm',
     description: 'Project: every agent fork on Artifacts and the conflicts between them.',
     icon: GitFork,
+    group: 'project',
+    primary: false,
+  },
+  {
+    id: 'cloud-resources',
+    label: 'Cloud resources',
+    description: 'Project: Cloudflare storage, databases and queues for this project.',
+    icon: Cloud,
     group: 'project',
     primary: false,
   },
@@ -266,6 +275,11 @@ export function openProjectSettings(
       detail: { projectId, category },
     }),
   );
+}
+
+/** Opens a project's Cloud resources screen. */
+export function openCloudResources(projectId: string) {
+  window.dispatchEvent(new CustomEvent('jackalope:open-cloud-resources', { detail: projectId }));
 }
 
 export function openAgentConfiguration(agentId: string) {

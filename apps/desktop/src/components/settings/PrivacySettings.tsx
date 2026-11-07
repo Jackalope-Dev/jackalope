@@ -110,7 +110,7 @@ export function PrivacySettings() {
           </p>
           {noticeError && (
             <p role="alert" className="settings-row-description">
-              Could not open your browser. Visit jackalope.dev/privacy to read the privacy notice.
+              Could not open your browser. Visit jackalope.dev/privacy/ to read the privacy notice.
             </p>
           )}
           {community.settings && !community.settings.configured && (

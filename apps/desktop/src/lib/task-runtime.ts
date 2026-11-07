@@ -128,6 +128,34 @@ export interface TaskRun {
   verification?: Verification | null;
   /** The project computer the agent ran on, when it did not run on this device. */
   remote?: { computerId: string; computerName: string } | null;
+  /** Where the capacity pool placed the attempt and why; older attempts omit it. */
+  host?: {
+    /** `device` or a computer's id. */
+    id: string;
+    name: string;
+    /** Why the placer chose it. */
+    reason: string;
+    /** Why the host was lost during the attempt. */
+    lost?: string | null;
+    /** The lost host this attempt replaced. */
+    retriedFrom?: string | null;
+    /** What became of the attempt after its host was lost. */
+    retry?: string | null;
+    /** Changes the attempt left on its host when contact was lost. */
+    left?: {
+      /** They are still on the computer. */
+      onHost: boolean;
+      /** When they were fetched and saved on this device. */
+      recoveredAt?: string | null;
+      /** The saved patch; it is never applied to the workspace. */
+      patch?: string | null;
+      /** The folder of the agent's saved output. */
+      artifacts?: string | null;
+      files?: number;
+      /** What became of them when nothing was saved. */
+      note?: string | null;
+    } | null;
+  } | null;
   accountBinding?: {
     adapter: string;
     profileId: string | null;
@@ -238,14 +266,41 @@ export interface ArchivedRun {
   startedAt: string;
   endedAt: string | null;
 }
+/** An agent's answer given on the person's behalf. */
+interface AgentAnswer {
+  kind: 'agent';
+  agent: string;
+  model?: string;
+  /** The answer without the attribution the asking agent received. */
+  answer: string;
+  rationale: string;
+  confidence: number;
+  evidence?: string[];
+  runId?: string;
+}
+
+/** Something only the person can do; never routed to an agent. */
+interface HumanAction {
+  kind: 'secret' | 'sign_in' | 'payment' | 'account' | 'other';
+  instructions: string;
+  url?: string;
+  secretName?: string;
+}
+
 export interface PendingUserPrompt {
   id: string;
   runId: string;
   question: string;
-  inputType: 'text' | 'choice' | 'confirmation' | 'multiChoice';
+  inputType: 'text' | 'choice' | 'confirmation' | 'multiChoice' | 'humanAction';
   options: string[];
   defaultValue?: string | null;
-  status: 'pending' | 'answered';
+  /** `deciding`: an agent decides first; the person may still answer. */
+  status: 'pending' | 'deciding' | 'answered';
+  /** Set when an agent answered for the person. */
+  answeredBy?: AgentAnswer;
+  /** Why it reached the person although agents may decide. */
+  escalation?: { category: string; reason: string };
+  humanAction?: HumanAction;
   answer?: string | null;
   createdAt: string;
   answeredAt?: string | null;

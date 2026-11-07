@@ -7,6 +7,7 @@ import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectComputerSettings } from '../computers/BotComputerSettings';
+import { ProjectSwarmHosts } from '../computers/ProjectSwarmHosts';
 import { openProjectSettings } from '../layout/navigation';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
@@ -19,10 +20,12 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { BrowserProfileSettings } from './BrowserProfileSettings';
+import { CloudResourcesCard } from './CloudResourcesCard';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
+import { ProjectSecretsSettings } from './ProjectSecretsSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 
@@ -120,7 +123,7 @@ export function ProjectPreferences({
             <SettingBody>
               <FormField
                 label="Project instructions"
-                description="Appended to prompts launched from the task composer."
+                description="Given to every agent that works on this project."
               >
                 <Textarea
                   id="project-instructions"
@@ -285,10 +288,17 @@ export function ProjectPreferences({
               projectName={project.name}
             />
           )}
+          <CloudResourcesCard
+            key={`cloud-${project.path}`}
+            projectId={project.id}
+            projectPath={project.path}
+          />
           <ProjectComputerSettings
             key={`computer-${project.id}`}
             project={{ id: project.id, name: project.name }}
           />
+          <ProjectSwarmHosts key={`swarm-hosts-${project.id}`} projectId={project.id} />
+          <ProjectSecretsSettings key={`secrets-${project.id}`} projectId={project.id} />
           <SettingGroup title="Workspace">
             {!project.plainFolder && (
               <Setting

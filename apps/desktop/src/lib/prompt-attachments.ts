@@ -15,9 +15,10 @@ function isImagePath(path: string) {
 
 /**
  * The line added to a prompt for an attached file. Project files are written
- * relative to the project so isolated worktrees resolve their own copy; files
- * outside the project, and pasted images kept under the ignored `.jackalope`
- * folder, keep their absolute path because a worktree does not contain them.
+ * relative to the project so isolated worktrees resolve their own copy. Pasted
+ * images under `.jackalope/attachments` keep their absolute path here; Jackalope
+ * copies the ones a prompt names into the task workspace and gives the agent the
+ * relative path. Files outside the project keep their absolute path.
  */
 export function attachmentReference(path: string, projectPath?: string) {
   const file = normalize(path);

@@ -63,3 +63,22 @@ Quick facts that trip people up:
 
 Read docs/PARALLEL-WORKFLOWS.md for integration rules and docs/SELF-DEVELOPMENT.md for
 native testing. Repository skills point to these shared guides.
+
+## Worktrees and keeping master current
+
+- Start a task with `pnpm run worktree <task> [branch]` (`node scripts/worktree.mjs new`).
+  It fast-forwards the local `master` to origin, adds `.worktrees/<task>` on a new branch
+  from it, and copies the main checkout's small gitignored files (env files, generated
+  `cloudflare-env.d.ts` / `next-env.d.ts`, manifests) that a fresh checkout lacks.
+- Each worktree gets its own install (the script runs it). This is a workspace
+  monorepo: a shared `node_modules` links each workspace package to the main
+  checkout's copy, so the worktree would run the main checkout's code, not its own edits.
+- Run tools through package scripts or `node scripts/run-bin.mjs <package>`, never
+  a hard-coded `node_modules/...` path (missing in a worktree) or `npx` (it can pick up
+  an unrelated global install or download a different version: on the dev box `npx
+  biome` finds Biome 0.3.3).
+- After you push to `master`, or a PR of yours merges, run `pnpm run sync` so the local
+  `master` matches origin and the main checkout's `node_modules` match its lockfile. It only
+  fast-forwards: it never resets, stashes or overwrites local edits, and says so when it
+  leaves `master` alone.
+- `pnpm run worktrees` lists worktrees; `--remove-merged` removes clean, merged ones.

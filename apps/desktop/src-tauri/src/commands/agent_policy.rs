@@ -279,7 +279,7 @@ impl TaskRuntime {
             request.agent = policy.default_agent(&request.project_id).into();
         }
         let adapter = policy.adapter(&request.agent)?;
-        if !self.runs_remotely(&request.project_id, &adapter) {
+        if !self.runs_remotely(&request.id, &request.project_id, &adapter) {
             policy.resolve(&request.agent)?;
         }
         if let Some(project) = policy.projects.get(&request.project_id) {

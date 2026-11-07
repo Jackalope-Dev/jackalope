@@ -169,7 +169,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             <noscript>
               <p className="signup-consent">
                 Without JavaScript, this form joins the email list for launch news and product notes
-                through Sequenzy, rather than creating an access request. Unsubscribe anytime.
+                rather than creating an access request. Unsubscribe anytime.
               </p>
             </noscript>
           )}

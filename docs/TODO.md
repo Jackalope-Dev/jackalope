@@ -21,14 +21,48 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Extend agents on a computer: the browser tools on cloud and Agent37 computers,
-  project connections, `computer_verify` and `read_context` against the remote copy for
-  writing agents, and automatic routing that does not require the CLI here.
+- [ ] Extend agents on a computer: automatic routing that does not require the CLI here.
+- [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
+  local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and
+  Codex agent using `computer_verify`, `verification_output`, `read_context` and every
+  browser tool there (a dev server the agent starts reached at `localhost`, a site
+  question answered, declined and remembered, a sign-in page paused, a screenshot opened
+  by the agent and listed in the attempt and review after its changes come back), and a
+  protocol 3 image on the same app keeping its earlier tool list.
 - [ ] Accept agents on a computer end to end: real Claude Code and Codex runs on a local
   sandbox and on a live Agent37 account (template build under gVisor, auto sleep and
-  wake, spend), bridge tools through the relay, desktop control and the browser tools on
+  wake, spend), bridge tools, on-demand connections, stdio connections running on the
+  computer (npx and uvx servers, the uv install, Claude Code's approval hook and Codex's
+  `mcp_servers` overrides), `execute_tool` approvals and project
+  secrets through the relay, Jackalope context (cloud resources manifest and pasted
+  images) reaching the agent there, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.
+- [ ] Accept Git-synced workspaces on a built image from Windows and macOS hosts: a first
+  bundle with history, a retry and a post-checkpoint attempt sending only deltas, CRLF
+  checkouts under `core.autocrlf`, a task worktree of a large repository falling back
+  to the tar, copied setup files and context arriving and staying out of the result,
+  `.jackalope/artifacts` screenshots coming back, a conflicting result leaving the
+  workspace unchanged with its patch and output saved, two concurrent runs of one
+  project, and an on-demand tool result between 512 KB and 1 MB reaching the agent whole.
+- [ ] Accept swarms across hosts in the installed app on Windows and macOS: a swarm round
+  spread across this device, the project's computer and an added local sandbox, cloud
+  machine and Agent37 computer, with each fork's placement reason, the hosts' load on the
+  swarm board and round view, forks waiting when every host is full, a browser-checked
+  fork and one naming a device-only secret placed correctly, each **Swarms run on**
+  choice, a computer stopped mid-round (the fork retried once elsewhere and the lost host
+  skipped until it answers again), a restart mid-round, and the phone companion showing
+  the host.
+- [ ] Accept the lost-host follow-ups in the installed app on Windows and macOS: under
+  **Computers only**, an `auto` fork with only Claude Code or Codex signed in for computers
+  routed to one of them, and one with neither failing with the reason and nothing started
+  on this device; a computer stopped mid-run and started again after its fork was retried,
+  with the lost attempt showing **Changes recovered from** it, the patch opening from the
+  copied path and the workspace untouched, on a tar-synced and a Git-synced computer; a
+  later attempt of the same workspace placed back on that computer starting from its own
+  upload; a continuation of a lost attempt that was not retried bringing its changes back;
+  and Jackalope restarted within ten minutes of losing a computer still skipping it, then
+  using it once the ten minutes pass.
 - [ ] Publish the first computer image from `beta`, make its package public, and accept
   a local pull, a cloud machine started from it and an Agent37 registry import.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default
@@ -113,8 +147,13 @@ release dates.
 - [ ] Accept multi-round swarms with installed providers: orchestrator verdict accuracy
   (false done, missed criteria), rounds and cost to completion, round sizes on agents on a
   computer, recovery after a restart mid-review, how often people edit proposed rounds,
-  and whether parallel area orchestrators catch more than one. Consider making round
-  approval an autonomy-policy option and showing proposals in the phone companion.
+  and whether parallel area orchestrators catch more than one. Consider showing
+  proposals in the phone companion.
+- [ ] Accept agent decisions with installed agents on Windows and macOS: a swarm build
+  where a decider from another model family answers routine questions, approves checked
+  rounds and accepts in-scope deviations, with escalation rates by category, answers people
+  overrode, decider time and cost, restart while deciding, and `request_human_action`
+  steps for a sign-in and a secret.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.
@@ -122,6 +161,11 @@ release dates.
   the Workers scope (and its invalid-scope fallback), an API token with Workers Scripts: Edit, an
   account without a workers.dev subdomain, a first publish, and an in-place update that keeps
   the token working on a second computer.
+- [ ] Accept Cloud resources against a live Cloudflare account on Windows and macOS: each
+  resource created and then reused on retry, Connect Cloudflare's product scopes (and the
+  invalid-scope fallback to an API token), a token missing one permission, an account without
+  R2 turned on, a Hyperdrive origin and Turnstile domains, and deleting an empty and a
+  non-empty bucket.
 - [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
   worktree, provenance notes on integrated commits, push-event review and check triggers,
   and opening an existing Artifacts repository as a project. Keep the coordinator,

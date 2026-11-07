@@ -38,8 +38,8 @@
   border-radius: var(--radius-md);
 }
 .work-item .agent-avatar[data-size="sm"] svg {
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
 }
 .work-avatar-fallback {
   display: grid;
@@ -216,6 +216,9 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
+  }
+  .work-item-content {
+    width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

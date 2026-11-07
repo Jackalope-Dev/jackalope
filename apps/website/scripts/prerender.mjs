@@ -46,6 +46,15 @@ try {
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, html);
   }
+  // Static assets' auto-trailing-slash answers /page with a temporary 307; list a
+  // permanent redirect for every prerendered page so search engines keep one URL.
+  await writeFile(
+    resolve('dist/_redirects'),
+    `${routes
+      .filter((path) => path !== '/' && path.endsWith('/'))
+      .map((path) => `${path.slice(0, -1)} ${path} 301`)
+      .join('\n')}\n`,
+  );
   console.log(`Prerendered ${routes.length} routes and the not-found page.`);
   await verifySeo(resolve('dist'), pages, origin);
 } finally {

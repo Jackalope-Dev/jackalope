@@ -254,8 +254,7 @@ impl Coordinator {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
-        inner.remote_projects =
-            crate::commands::computers::runs::run_projects(&self.runtime.computers_root());
+        self.refresh_pool_locked(&mut inner);
         let _guard = crate::commands::integration::execution_guard()?;
         self.runtime.ensure_history_saved()?;
         let merged = crate::commands::integration::applied_run_ids(&self.runtime)?;
@@ -273,6 +272,9 @@ impl Coordinator {
             self.refresh_scopes_locked(&mut inner)?;
             *self.scope_checked.lock().unwrap() = Some(std::time::Instant::now());
         }
+        if self.retry_lost_hosts_locked(&mut inner, &runs, &merged, &url)? {
+            return Ok(());
+        }
         if self.deliver_managed_locked(&mut inner, &runs, &merged, &url)? {
             return Ok(());
         }
@@ -282,9 +284,26 @@ impl Coordinator {
         if self.assist_locked(&mut inner, &runs, &merged, &url)? {
             return Ok(());
         }
-        let reserved = ready_items(&inner, &runs, &merged);
-        for item in reserved {
+        let reserved = placed_items(&inner, &runs, &merged);
+        for (item, host) in reserved {
+            let host = match host {
+                Ok(host) => host,
+                Err(reason) => {
+                    // No host the work may use can take it: it waits for the
+                    // person, like any other dispatch error.
+                    if let Some(saved) = inner.ledger.items.iter_mut().find(|i| i.id == item.id) {
+                        saved.error = Some(reason);
+                    }
+                    inner.enabled.remove(&item.project_id);
+                    if let Some(id) = &item.feature_id {
+                        inner.enabled.remove(&managed::dispatch_key(id));
+                    }
+                    self.save(&inner.ledger)?;
+                    continue;
+                }
+            };
             let run_id = Uuid::new_v4().to_string();
+            let placed_id = run_id.clone();
             let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
             let mut ledger = inner.ledger.clone();
             managed_delivery::capture_interfaces(&mut ledger, &item, &run_id);
@@ -411,9 +430,11 @@ impl Coordinator {
                     .instructions
                     .push_str(&snapshot);
                 self.register_launch(&mut inner, &request.id)?;
+                crate::commands::computers::pool::assign(&request.id, host.clone());
                 self.runtime.start_locked(request)
             })();
             if let Err(error) = result {
+                crate::commands::computers::pool::take(&placed_id);
                 inner.grants.remove(&token);
                 inner
                     .ledger
@@ -457,6 +478,9 @@ impl Coordinator {
                         .route("/v1/bots/{tool}", post(bridge_bot_tool))
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))
+                        .route("/v1/tools/approve", post(bridge_tool_approve))
+                        .route("/v1/policy", post(bridge_policy))
+                        .route("/v1/runner/event", post(bridge_runner_event))
                         .route("/v1/tools/read", post(bridge_tool_read))
                         .route("/v1/tools/result", post(bridge_tool_result))
                         .route("/v1/messages", post(bridge_message))
@@ -484,6 +508,7 @@ impl Coordinator {
                         )
                         .route("/v1/user-prompt", post(bridge_user_prompt))
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
+                        .route("/v1/human-action", post(bridge_human_action))
                         .route("/v1/validation-step", post(bridge_validation_step))
                         .route("/v1/goal-restatement", post(bridge_goal_restatement))
                         .route(

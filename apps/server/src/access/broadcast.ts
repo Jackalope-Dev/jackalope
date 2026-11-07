@@ -6,11 +6,24 @@ import { providerJson } from './provider';
 
 const c = EMAIL_PALETTE;
 
-/** Shape of one entry in the website's published product-notes feed. */
+const releasePoint = z.object({
+  version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+/**
+ * Shape of one entry in the website's published product-notes feed. The site
+ * derives `status`, `state`, `version` and `release` from release tags; `kind`
+ * separates app changes from changes to the website itself.
+ */
 const entrySchema = z.object({
   id: z.string().max(120),
   date: z.string().max(40),
+  kind: z.enum(['app', 'website']).optional(),
+  state: z.enum(['website', 'coming-soon', 'beta', 'released']).optional(),
   status: z.string().max(60).optional(),
+  version: z.string().max(20).optional(),
+  release: z.object({ beta: releasePoint.optional(), stable: releasePoint.optional() }).optional(),
   title: z.string().max(200),
   description: z.string().max(1000),
   items: z.array(z.string().max(400)).max(30).optional(),
@@ -113,7 +126,7 @@ ${note ? `<p style="margin:14px 0 0;font-size:13px;line-height:1.7;color:${c.fai
 
 const entryHtml = (entry: ChangelogEntry) =>
   section({
-    stamp: entry.status,
+    stamp: entry.status && entry.version ? `${entry.status} · v${entry.version}` : entry.status,
     title: entry.title,
     body: entry.description,
     items: entry.items ?? [],

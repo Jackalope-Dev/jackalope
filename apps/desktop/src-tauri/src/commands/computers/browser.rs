@@ -32,12 +32,13 @@ struct ComputerGuard {
     runtime: TaskRuntime,
     run_id: String,
     computer: Computer,
-    endpoint: String,
+    /// The computer's DevTools endpoint, for a task browser on this device
+    /// that drives it; none when the runner asks through a policy callback.
+    endpoint: Option<String>,
     directory: PathBuf,
     state: Mutex<State>,
 }
 
-/// The browser guard for a run whose computer exposes its browser, if any.
 /// The browser guard for a run whose computer exposes its browser. Errors
 /// while that computer is starting so the agent retries rather than silently
 /// using a local browser.
@@ -67,9 +68,55 @@ pub(super) fn guard(
         run_id: run_id.into(),
         directory: root.join(&computer.id),
         computer,
-        endpoint,
+        endpoint: Some(endpoint),
         state: Mutex::default(),
     })))
+}
+
+type Guards = Mutex<std::collections::HashMap<String, Arc<ComputerGuard>>>;
+/// One guard per run whose runner asks about websites, so per-task answers and
+/// pending questions carry across its calls.
+static POLICY_GUARDS: std::sync::OnceLock<Guards> = std::sync::OnceLock::new();
+
+/// Decides whether the runner of a run's computer may let its agent read and
+/// act on the page at `url` (`login` reports a visible password field), with
+/// the same questions and saved decisions as a task browser driving that
+/// computer from here. A question to the person is asked once and answered
+/// on a later call, so the answer is a denial that says to call again.
+pub(crate) fn site_policy(
+    runtime: &TaskRuntime,
+    run_id: &str,
+    url: &str,
+    login: bool,
+) -> serde_json::Value {
+    let Some(computer) = super::for_run_id(runtime, run_id) else {
+        return super::policy::deny("This attempt has no computer.");
+    };
+    let guard = {
+        let mut guards = POLICY_GUARDS
+            .get_or_init(Default::default)
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        guards.retain(|id, _| id == run_id || runtime.is_running(id));
+        guards
+            .entry(run_id.to_string())
+            .or_insert_with(|| {
+                Arc::new(ComputerGuard {
+                    runtime: runtime.clone(),
+                    run_id: run_id.into(),
+                    directory: runtime.computers_root().join(&computer.id),
+                    computer,
+                    endpoint: None,
+                    state: Mutex::default(),
+                })
+            })
+            .clone()
+    };
+    match guard.before().and_then(|()| guard.page(url, login)) {
+        Ok(Verdict::Proceed) => super::policy::allow(),
+        Ok(Verdict::SignIn) => super::policy::deny(guard.sign_in(url)),
+        Err(message) => super::policy::deny(message),
+    }
 }
 
 fn options(host: &str, owner: &str) -> Vec<(String, (bool, bool))> {
@@ -109,6 +156,7 @@ impl ComputerGuard {
                 allow_other: Some(false),
                 ..Default::default()
             },
+            autonomy: Default::default(),
         };
         let mut pushed = false;
         self.runtime.update_checked(&self.run_id, |run| {
@@ -152,7 +200,7 @@ impl ProfileGuard for ComputerGuard {
     }
 
     fn remote_devtools(&self) -> Option<String> {
-        Some(self.endpoint.clone())
+        self.endpoint.clone()
     }
 
     fn before(&self) -> Result<(), String> {

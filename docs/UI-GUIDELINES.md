@@ -150,9 +150,10 @@ Sign-in, project setup and the workspace render `WindowGlass`, which turns on th
 material (Acrylic on Windows 11, vibrancy on macOS) and sets `data-window-glass` unless the
 Frosted window setting is off; other platforms and reduced transparency keep the opaque look.
 On glass, text and icons sit only on panes or title bar capsules tinted enough to keep 4.5:1
-over any backdrop: 85% where text is primary, secondary or accent, 90% where muted text appears
-(the workspace). Use the shared `--glass-*` values; screens without `WindowGlass` paint an
-opaque background.
+over any backdrop: at least 85% where text is primary, secondary or accent and 90% where muted
+text appears. The shared values sit a step above those floors (90% panes, 94% dense panes and
+pages) so busy windows behind stay quiet. Use the shared `--glass-*` values; screens without
+`WindowGlass` paint an opaque background.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
 for menu rows, segments and dense navigation; coarse pointers raise both to 44px. Prefer

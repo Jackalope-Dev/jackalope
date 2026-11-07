@@ -995,6 +995,7 @@ mod tests {
             concurrency: 3,
             remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
             remote_projects: HashSet::new(),
+            pool: Default::default(),
             grants: HashMap::new(),
             url: Some("fixture".into()),
             error: None,

@@ -240,6 +240,7 @@ impl TaskRuntime {
         self.timed(id, "workspace", || {
             self.prepare_workspace(id, req, previous.clone())
         })?;
+        self.provide_context(id, req);
         self.update(id, |run| run.progress = None);
         if req.agent == "auto" && !early.is_finished() && self.is_running(id) {
             self.stage(id, Some("routing"));
@@ -305,6 +306,35 @@ impl TaskRuntime {
             }
             request = self.handoff(req, &run)?;
         }
+    }
+
+    /// Places the project's Jackalope context into this attempt's workspace, every
+    /// attempt, so a continuation sees current files. A failure is reported and the
+    /// attempt goes on without them.
+    fn provide_context(&self, id: &str, req: &RunRequest) {
+        let Some(workspace) = self
+            .run_snapshot(id)
+            .map(|run| run.workspace)
+            .filter(|workspace| !workspace.is_empty())
+        else {
+            return;
+        };
+        let placed = crate::commands::agent_context::place(
+            Path::new(&req.project_path),
+            Path::new(&workspace),
+            &req.prompt,
+        );
+        self.update(id, |run| match &placed {
+            Ok(files) if !files.is_empty() => activity(
+                run,
+                &format!("Jackalope context for the agent: {}.", files.join(", ")),
+            ),
+            Ok(_) => {}
+            Err(error) => activity(
+                run,
+                &format!("Jackalope context could not be placed in the workspace: {error}"),
+            ),
+        });
     }
 
     pub(super) fn prepare_workspace(
@@ -548,6 +578,7 @@ impl TaskRuntime {
             created_at: Utc::now().to_rfc3339(),
             answered_at: None,
             presentation: Default::default(),
+            autonomy: Default::default(),
         };
         self.record_prompt(&prompt);
         self.update(id, |run| {
@@ -659,7 +690,7 @@ impl TaskRuntime {
         // An agent on the project's computer uses the CLI installed there.
         let adapter = policy.adapter(&req.agent)?;
         let remote = if EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
-            self.remote_target(id, req, &adapter)
+            self.placed_target(id, req, &adapter, previous.as_ref())?
         } else {
             None
         };
@@ -718,19 +749,6 @@ impl TaskRuntime {
         if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
             return Err(unimplemented_adapter(&adapter));
         }
-        // An agent on a project computer reaches the bridge through its relay,
-        // but this device's project connections are not delivered there.
-        let original = req;
-        let remote_request;
-        let req = if remote.is_some() {
-            remote_request = RunRequest {
-                connection_ids: Some(Vec::new()),
-                ..req.clone()
-            };
-            &remote_request
-        } else {
-            req
-        };
         let runner_lease = match remote {
             Some(_) => None,
             None => crate::commands::managed_runtime::acquire(&executable)?,
@@ -893,11 +911,71 @@ impl TaskRuntime {
         if let Some(settings) = &claude {
             super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
         }
-        let (mut project_mcp, discovered_mcp) = crate::commands::mcp::project_delivery(
+        let (mut project_mcp, mut discovered_mcp) = crate::commands::mcp::project_delivery(
             &req.project_id,
             req.connection_ids.as_deref(),
             &adapter,
         )?;
+        // An agent on a computer uses selected on-demand connections through the
+        // bridge relay; the broker, its credentials and OAuth stay on this
+        // device. A writing agent's stdio connections run on the computer, in
+        // the workspace it edits, and start with the run (see
+        // `runner::remote::RemoteRunner`).
+        let mut remote_connections = String::new();
+        let mut computer_mcp = Vec::new();
+        if let Some(computer) = &remote {
+            let secrets = if read_only {
+                Vec::new()
+            } else {
+                crate::commands::project_secrets::environment(
+                    &self.project_secrets_root(),
+                    &req.project_id,
+                    crate::commands::project_secrets::Place::Computer,
+                )
+                .map_err(|error| format!("Project secrets could not be read: {error}"))?
+            };
+            let roots = [Path::new(&workspace), Path::new(&req.project_path)];
+            let delivery = crate::commands::mcp::remote_delivery(
+                &project_mcp,
+                discovered_mcp,
+                &crate::commands::mcp::RemoteContext {
+                    read_only,
+                    roots: &roots,
+                    secrets: &secrets,
+                },
+            );
+            project_mcp.clear();
+            discovered_mcp = delivery.broker;
+            computer_mcp = delivery.computer;
+            if !delivery.on_device.is_empty() {
+                let summary = crate::commands::mcp::withheld_summary(&delivery.on_device);
+                self.update_checked(id, |run| {
+                    activity(
+                        run,
+                        &format!(
+                            "Connections that run on this device instead of {}: {summary}.",
+                            computer.name
+                        ),
+                    )
+                })?;
+            }
+            let withheld = delivery.withheld;
+            if !withheld.is_empty() {
+                let summary = crate::commands::mcp::withheld_summary(&withheld);
+                self.update_checked(id, |run| {
+                    activity(
+                        run,
+                        &format!("Connections not available on {}: {summary}.", computer.name),
+                    )
+                })?;
+                remote_connections.push_str(&format!("\nThese selected connections are not available to you on this computer: {summary}. Do not look for their tools.\n"));
+            }
+            if !discovered_mcp.is_empty() {
+                // The answer limit depends on the computer's runner and is
+                // added once the runner has reported its capabilities.
+                remote_connections.push_str("\nSelected connections' on-demand tools run on the person's device and reach you through Jackalope. A call's arguments can be at most 60 KB.\n");
+            }
+        }
         let has_discovery = !discovered_mcp.is_empty();
         if has_discovery && req.coordination.is_none() {
             return Err("Task tool discovery requires the native bridge. Start the task again when the bridge is available.".into());
@@ -909,8 +987,21 @@ impl TaskRuntime {
                     .as_ref()
                     .map(|binding| (name.to_string(), binding.directory.clone()))
             });
-            self.mcp_broker
-                .prepare(id, discovered_mcp, PathBuf::from(&workspace), account)?;
+            // Claude Code on a computer runs without its permission prompt, so
+            // the bridge asks before execute_tool the way that prompt would.
+            let delivery = crate::commands::mcp_broker::Delivery {
+                result_limit: remote
+                    .is_some()
+                    .then_some(crate::commands::mcp_broker::REMOTE_RESULT_LIMIT),
+                approve_executes: remote.is_some() && adapter == "claude",
+            };
+            self.mcp_broker.prepare_with(
+                id,
+                discovered_mcp,
+                PathBuf::from(&workspace),
+                account,
+                delivery,
+            )?;
             if crate::commands::experiments::is("JACKALOPE_INITIAL_TOOLS", "small") {
                 let started = std::time::Instant::now();
                 let result = tauri::async_runtime::block_on(async {
@@ -1005,6 +1096,26 @@ impl TaskRuntime {
         };
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
+        // Project secrets reach the agent process only; an agent on a computer
+        // receives its own set when its run starts there.
+        if remote.is_none() {
+            let secrets = crate::commands::project_secrets::environment(
+                &self.project_secrets_root(),
+                &req.project_id,
+                crate::commands::project_secrets::Place::Local,
+            )
+            .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+            if !secrets.is_empty() {
+                let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
+                self.update_checked(id, |run| {
+                    activity(
+                        run,
+                        &format!("Project secrets for the agent: {}.", names.join(", ")),
+                    )
+                })?;
+            }
+            cmd.envs(secrets);
+        }
         if req.previous_run_id.is_none() {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
             // run with and without it is otherwise identical and the difference is measurable.
@@ -1110,7 +1221,26 @@ impl TaskRuntime {
                 ]);
             }
         }
-        input.push_str(&format!("\nTask:\n{}\n", req.prompt));
+        input.push_str(&remote_connections);
+        // A resumed session already holds the project instructions; context files can
+        // change between attempts, so their summary is always current.
+        let instructions = previous
+            .is_none()
+            .then(|| crate::commands::project_registry::record(self, &req.project_id))
+            .flatten()
+            .and_then(|project| project.instructions);
+        input.push_str(&crate::commands::agent_context::launch_section(
+            Path::new(&workspace),
+            instructions.as_deref(),
+            &req.prompt,
+        ));
+        input.push_str(&format!(
+            "\nTask:\n{}\n",
+            crate::commands::agent_context::portable_prompt(
+                &req.prompt,
+                Path::new(&req.project_path)
+            )
+        ));
         if adapter == "grok" {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
@@ -1167,317 +1297,39 @@ impl TaskRuntime {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
                 .map_err(|e| e.to_string())?;
         }
-        if let Some(computer) = remote {
-            drop(runner_lease);
-            return self.run_remote(id, original, &adapter, cmd, input, &workspace, computer);
-        }
-        if persistent {
-            let outcome = self.run_claude_session(super::claude_session::Launch {
-                id,
-                request: req,
-                cmd,
-                input,
-                workspace: workspace.clone(),
-                previous_session: previous.and_then(|old| old.session_id),
-                settings: claude.unwrap_or_default(),
-                final_check,
-                context_by_hook: claude.is_some_and(|settings| settings.hooks.context),
+        let mut runner: Box<dyn super::runner::AttemptRunner> = match remote {
+            Some(computer) => {
+                drop(runner_lease);
+                Box::new(super::runner::remote::RemoteRunner::new(
+                    computer,
+                    computer_mcp,
+                    read_only,
+                ))
+            }
+            None => Box::new(super::runner::local::LocalRunner::new(
+                read_only,
+                previous.and_then(|old| old.session_id),
+                selected_model,
+                opencode_connection,
+                acp_servers,
+                persistent.then(|| super::runner::local::Persistent {
+                    settings: claude.unwrap_or_default(),
+                    final_check,
+                }),
                 runner_lease,
-            })?;
-            let Some(outcome) = outcome else {
-                return Ok(());
-            };
-            return self.complete_attempt(
+            )),
+        };
+        self.run_attempt(
+            runner.as_mut(),
+            super::runner::Launch {
                 id,
                 req,
-                outcome.success,
-                outcome.exit_code,
-                outcome.quota_stopped,
-            );
-        }
-        cmd.current_dir(&workspace)
-            .stdin(Stdio::piped())
-            .stdout(if opencode_connection.is_some() {
-                Stdio::null()
-            } else {
-                Stdio::piped()
-            })
-            .stderr(Stdio::piped());
-        let mut inner = self.inner.lock().unwrap();
-        if inner.canceled.contains(id) {
-            drop(inner);
-            self.update(id, |r| {
-                r.status = "stopped".into();
-                r.ended_at = Some(Utc::now().to_rfc3339());
-            });
-            return Ok(());
-        }
-        if inner.runs.values().any(|r| {
-            r.id != id
-                && r.workspace == workspace
-                && ["starting", "running", "stopping"].contains(&r.status.as_str())
-        }) {
-            return Err(
-                "Another attempt is using this workspace. Stop it or wait before continuing."
-                    .into(),
-            );
-        }
-        let launched = std::time::Instant::now();
-        if let Some(connection) = &mut opencode_connection {
-            connection.release_port();
-        }
-        let spawned = spawn_agent(&mut cmd, &req.agent);
-        let spawn_elapsed = launched.elapsed();
-        let (mut child, spawn_attempts) = spawned?;
-        let tree = match crate::commands::process_control::ProcessTree::attach(&child) {
-            Ok(tree) => tree,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(error);
-            }
-        };
-        let mut stdin = child.stdin.take().ok_or("Missing agent input")?;
-        let stdout = child.stdout.take();
-        if stdout.is_none() && opencode_connection.is_none() {
-            tree.terminate();
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("Missing agent output".into());
-        }
-        let stderr = child.stderr.take().ok_or("Missing agent diagnostics")?;
-        let process = Arc::new(Mutex::new(child));
-        inner.processes.insert(id.into(), process.clone());
-        drop(inner);
-        self.update_checked(id, |r| {
-            r.efficiency.timing("processSpawn", spawn_elapsed);
-            r.process_contained = cfg!(windows);
-            if r.status == "starting" {
-                r.status = "running".into();
-            }
-            // The agent is live now; its own activity replaces the startup step.
-            r.progress = None;
-            if spawn_attempts > 1 {
-                activity(
-                    r,
-                    &format!("The agent process started after {spawn_attempts} attempts."),
-                );
-            }
-        })?;
-        let server_transport = opencode_connection.is_some();
-        let input_result =
-            if adapter == "grok" || adapter == "kimi" || adapter == "acp" || server_transport {
-                Ok(())
-            } else {
-                stdin.write_all(input.as_bytes())
-            };
-        let mut acp_input = (adapter == "kimi" || adapter == "acp").then_some(stdin);
-        if let Err(error) = input_result {
-            let _ = self.stop(id);
-            return Err(format!("Could not deliver task: {error}"));
-        }
-        let runtime = self.clone();
-        let event_id = id.to_string();
-        let output_adapter = adapter.clone();
-        let resumed_session = previous.as_ref().and_then(|run| run.session_id.clone());
-        let acp_success = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let reader_success = acp_success.clone();
-        let usage_probe = Arc::new(Mutex::new(None));
-        let reader_probe = usage_probe.clone();
-        let acp_workspace = workspace.clone();
-        let task_effort = req.effort;
-        let reader = std::thread::spawn(move || {
-            if let Some(connection) = opencode_connection {
-                match connection.drive(
-                    &runtime,
-                    &event_id,
-                    &acp_workspace,
-                    resumed_session.as_deref(),
-                    selected_model.as_deref(),
-                    task_effort,
-                    &input,
-                    launched,
-                ) {
-                    Ok(()) => reader_success.store(true, std::sync::atomic::Ordering::SeqCst),
-                    Err(error) => runtime.update(&event_id, |run| {
-                        run.error.get_or_insert(error);
-                    }),
-                }
-                return;
-            }
-            let stdout = stdout.unwrap();
-            if output_adapter == "kimi" || output_adapter == "acp" {
-                let result = kimi::drive_with_servers(
-                    BufReader::new(stdout),
-                    &mut acp_input.take().unwrap(),
-                    &acp_workspace,
-                    resumed_session.as_deref(),
-                    selected_model.as_deref(),
-                    &input,
-                    &acp_servers,
-                    |update| {
-                        if update["sessionUpdate"] == "jackalope_usage_probe" {
-                            *reader_probe.lock().unwrap() = (update["active"] == true)
-                                .then(|| (std::time::Instant::now(), update["afterTurn"] == true));
-                        } else {
-                            let _ = runtime.update_output(&event_id, |run| {
-                                if matches!(
-                                    update["sessionUpdate"].as_str(),
-                                    Some("agent_message_chunk" | "tool_call")
-                                ) {
-                                    run.efficiency.first_activity(launched.elapsed());
-                                }
-                                kimi::consume(run, update);
-                            });
-                        }
-                    },
-                    |params| kimi::permission(&runtime, &event_id, params),
-                );
-                match result {
-                    Ok(()) => reader_success.store(true, std::sync::atomic::Ordering::SeqCst),
-                    Err(error) => runtime.update(&event_id, |run| {
-                        run.error.get_or_insert(error);
-                    }),
-                }
-                return;
-            }
-            let mut gemini_stream = gemini::Stream::new(resumed_session.clone());
-            let mut stream = antigravity::Stream::new(resumed_session);
-            let mut partials = super::claude_session::Partials::new(launched);
-            if let Err(error) = crate::commands::process_control::bounded_lines(
-                BufReader::new(stdout),
-                1_000_000,
-                |line, truncated| {
-                    if output_adapter == "claude"
-                        && !truncated
-                        && partials.consume(&runtime, &event_id, &line)
-                    {
-                        return;
-                    }
-                    let _ = runtime.update_output(&event_id, |r| {
-                    if !truncated && super::efficiency::useful_event(&line, &output_adapter) {
-                        r.efficiency.first_activity(launched.elapsed());
-                    }
-                    if truncated {
-                        activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
-                        if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
-                        if output_adapter == "gemini" { r.error.get_or_insert("Gemini CLI returned an oversized protocol event; the result could not be fully verified.".into()); }
-                    }
-                    else if output_adapter == "antigravity" { stream.consume(r, &line); }
-                    else if output_adapter == "gemini" { gemini_stream.consume(r, &line); }
-                    else { consume_adapter_event(r, &line, &output_adapter); }
-                });
-                },
-            ) {
-                let _ = runtime.update_output(&event_id, |r| {
-                    r.error = Some(format!("Agent output could not be read: {error}"))
-                });
-            }
-            if output_adapter == "claude" {
-                partials.complete(&runtime, &event_id);
-            }
-            if output_adapter == "antigravity" {
-                runtime.update(&event_id, |run| stream.finish(run));
-            }
-            if output_adapter == "gemini" {
-                runtime.update(&event_id, |run| gemini_stream.finish(run));
-            }
-        });
-        let runtime = self.clone();
-        let event_id = id.to_string();
-        let diagnostics_adapter = adapter.clone();
-        let diagnostics = std::thread::spawn(move || {
-            let _ = crate::commands::process_control::bounded_lines(
-                BufReader::new(stderr),
-                6000,
-                |mut line, truncated| {
-                    if truncated {
-                        line.push_str(" [truncated]");
-                    }
-                    let _ = runtime.update_output(&event_id, |r| {
-                        if diagnostics_adapter == "antigravity"
-                            && antigravity::permission_denied(&line)
-                        {
-                            antigravity::mark_permission_denied(r);
-                        }
-                        r.diagnostics.push(line);
-                    });
-                },
-            );
-        });
-        let started = std::time::Instant::now();
-        let mut timed_out = false;
-        let mut quota_stopped = false;
-        let exit = loop {
-            if let Some(exit) = process
-                .lock()
-                .unwrap()
-                .try_wait()
-                .map_err(|e| e.to_string())?
-            {
-                break exit;
-            }
-            if (adapter == "kimi" || adapter == "acp" || server_transport) && reader.is_finished() {
-                tree.terminate();
-                let mut child = process.lock().unwrap();
-                let _ = child.kill();
-                break child.wait().map_err(|error| error.to_string())?;
-            }
-            if let Some((began, after_turn)) = *usage_probe.lock().unwrap() {
-                if began.elapsed() > Duration::from_secs(15) {
-                    if !after_turn {
-                        self.update(id, |run| run.error = Some("Kimi's usage command timed out before the task started. Update the CLI and retry.".into()));
-                    }
-                    tree.terminate();
-                    let _ = process.lock().unwrap().kill();
-                }
-            }
-            if (matches!(adapter.as_str(), "antigravity" | "kimi" | "acp" | "gemini")
-                || server_transport)
-                && !timed_out
-                && started.elapsed() > antigravity::TIMEOUT
-            {
-                timed_out = true;
-                self.update(id, |run| run.error = Some(format!("{adapter} exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.")));
-                tree.terminate();
-                let _ = process.lock().unwrap().kill();
-            }
-            std::thread::sleep(Duration::from_millis(100));
-            if !quota_stopped
-                && self
-                    .inner
-                    .lock()
-                    .unwrap()
-                    .runs
-                    .get(id)
-                    .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some())
-            {
-                quota_stopped = true;
-                tree.terminate();
-                let _ = process.lock().unwrap().kill();
-            }
-        };
-        tree.terminate();
-        let _ = reader.join();
-        let _ = diagnostics.join();
-        if adapter == "gemini" && !exit.success() {
-            self.update(id, |run| {
-                for line in run.diagnostics.clone() {
-                    gemini::diagnostic(run, &line);
-                }
-            });
-        }
-        // ACP completion is the turn receipt; its persistent server is stopped by the owner.
-        let success = if adapter == "kimi" || adapter == "acp" || server_transport {
-            acp_success.load(std::sync::atomic::Ordering::SeqCst) && !timed_out
-        } else {
-            exit.success()
-        };
-        if adapter == "grok" {
-            let _ = std::fs::remove_file(self.directory.join(format!("{id}.prompt")));
-        }
-        self.inner.lock().unwrap().processes.remove(id);
-        self.complete_attempt(id, req, success, exit.code(), quota_stopped)
+                adapter: &adapter,
+                cmd,
+                input,
+                workspace: &workspace,
+            },
+        )
     }
 
     /// Checks, checkpoints and records the outcome of an agent turn that has ended.
@@ -1595,7 +1447,9 @@ impl TaskRuntime {
     ) {
         self.update(&prompt.run_id, |run| {
             if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
-                if existing.status != "answered" {
+                // A saved prompt only moves forward: a stale copy returned after the
+                // wait must not undo an escalation or an answer saved meanwhile.
+                if existing.status != "answered" && prompt.status == "answered" {
                     *existing = prompt.clone();
                 }
             } else {
@@ -1639,6 +1493,78 @@ impl TaskRuntime {
             *run = updated;
         }
         crate::commands::harness::resolve_user_prompt(prompt_id, answer.trim());
+        Ok(true)
+    }
+
+    /// Saves an agent's answer to a question still waiting on an agent and
+    /// delivers `delivered` to the asking agent like a person's answer. Returns
+    /// false when the person answered first or the attempt ended.
+    pub(in crate::commands) fn answer_for_person(
+        &self,
+        run_id: &str,
+        prompt_id: &str,
+        delivered: &str,
+        by: crate::commands::harness::AnsweredBy,
+    ) -> Result<bool, String> {
+        {
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            let Some(run) = inner.runs.get_mut(run_id) else {
+                return Ok(false);
+            };
+            if !["starting", "running"].contains(&run.status.as_str()) {
+                return Ok(false);
+            }
+            let mut updated = run.clone();
+            let Some(prompt) = updated
+                .prompts
+                .iter_mut()
+                .find(|p| p.id == prompt_id && p.status == "deciding")
+            else {
+                return Ok(false);
+            };
+            prompt.status = "answered".into();
+            prompt.answer = Some(delivered.chars().take(4000).collect());
+            prompt.answered_at = Some(Utc::now().to_rfc3339());
+            let agent = by.agent.clone();
+            prompt.autonomy.answered_by = Some(by);
+            activity(
+                &mut updated,
+                &format!("{agent} answered a question on your behalf."),
+            );
+            self.save(&updated)?;
+            updated.persistence_error = None;
+            *run = updated;
+        }
+        crate::commands::harness::resolve_user_prompt(prompt_id, delivered);
+        Ok(true)
+    }
+
+    /// Hands a question an agent was deciding to the person, with the reason.
+    /// Returns false when it was already answered.
+    pub(in crate::commands) fn escalate_prompt(
+        &self,
+        run_id: &str,
+        prompt_id: &str,
+        escalation: crate::commands::harness::Escalation,
+    ) -> Result<bool, String> {
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let Some(run) = inner.runs.get_mut(run_id) else {
+            return Ok(false);
+        };
+        let mut updated = run.clone();
+        let Some(prompt) = updated
+            .prompts
+            .iter_mut()
+            .find(|p| p.id == prompt_id && p.status == "deciding")
+        else {
+            return Ok(false);
+        };
+        prompt.status = "pending".into();
+        prompt.autonomy.escalation = Some(escalation);
+        activity(&mut updated, "A question was handed to you.");
+        self.save(&updated)?;
+        updated.persistence_error = None;
+        *run = updated;
         Ok(true)
     }
 
@@ -1767,6 +1693,10 @@ impl TaskRuntime {
     /// Bot and task computers; never synced or exported.
     pub fn computers_root(&self) -> PathBuf {
         self.directory.join("computers")
+    }
+    /// Project secrets in protected storage; never synced or exported.
+    pub fn project_secrets_root(&self) -> PathBuf {
+        self.directory.join("project-secrets")
     }
     pub fn preferences_directory(&self) -> PathBuf {
         self.directory.join("preferences")
@@ -1909,6 +1839,10 @@ impl TaskRuntime {
             self.refresh_knowledge(&request.project_id, &request.project_path, true)?;
         }
         self.apply_policy(&mut request)?;
+        // Isolated work needs a commit to branch from; a new repository gets its first one.
+        if request.isolated && request.previous_run_id.is_none() && request.retry_of.is_none() {
+            crate::commands::first_commit::ensure_first_commit(&request.project_path, false)?;
+        }
         let previous;
         let retried;
         if let Some(id) = &request.previous_run_id {
@@ -1928,7 +1862,7 @@ impl TaskRuntime {
                 .0
         } else {
             let adapter = policy.adapter(&request.agent)?;
-            if !self.runs_remotely(&request.project_id, &adapter) {
+            if !self.runs_remotely(&request.id, &request.project_id, &adapter) {
                 policy.resolve(&request.agent)?;
             }
             adapter
@@ -2119,6 +2053,15 @@ impl TaskRuntime {
                     &context_receipt,
                 )?
             };
+            // The host the capacity pool chose at dispatch, if it chose one.
+            let host = crate::commands::computers::pool::take(&request.id);
+            let mut notes: Vec<String> =
+                crate::commands::first_commit::take_note(&request.project_path)
+                    .into_iter()
+                    .collect();
+            if let Some(host) = &host {
+                notes.push(super::runner::host_activity(host));
+            }
             let run = TaskRun {
                 archived_at: None,
                 live_session_id: request.live_session_id.clone(),
@@ -2166,6 +2109,7 @@ impl TaskRuntime {
                 target_branch: request.target_branch.clone(),
                 process_contained: false,
                 remote: None,
+                host,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
                 setup_files: request.setup_files.clone(),
@@ -2182,7 +2126,7 @@ impl TaskRuntime {
                 result: String::new(),
                 streaming: String::new(),
                 details_omitted: false,
-                activity: vec![],
+                activity: notes,
                 diagnostics: vec![],
                 error: None,
                 persistence_error: None,

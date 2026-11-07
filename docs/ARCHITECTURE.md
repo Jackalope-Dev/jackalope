@@ -75,11 +75,15 @@ names; changes must preserve both sides and old saved records.
 | notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
 | agent_policy.rs, agent_profiles.rs, capacity/ | Allowlists, profile binding/sign-in and capacity |
 | mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
+| agent_decider.rs, question_risk.rs | Autonomy policy, question classification and read-only decider attempts that answer plan questions, rounds and deviations for the person |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
-| tasks/remote.rs | The attempt side of an agent on a project computer: upload, output relay, stop and quota, and applying its changes before the local completion path |
+| computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
+| computers/pool.rs, coordination/hosts.rs | The capacity pool of execution hosts (this device and the person's computers): per-project host choices, limits, health, the deterministic placer for planned and swarm forks, and the one retry of a fork whose host was lost |
+| computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
+| tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), one record of what workspace tools did, and the recovery of changes a lost attempt left on a computer, saved as a patch and never applied |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
@@ -101,6 +105,47 @@ owns the bundled agent-browser daemon, process tree and disposable profile. Nati
 MCP and HTTP handlers use the same seven tools and existing screenshot artifacts.
 The daemon is a pinned local implementation detail, not a hosted service or an
 agent-supplied executable. See [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
+
+An agent on a computer splits one attempt across two planes. This device is the
+control plane: it keeps identity and credentials, approvals and policy (including
+autonomy deciders), orchestration, history and review, and the final Git integration,
+and it never runs a tool against the computer's workspace. The computer's agent
+(`resources/computer/agent.py`) is the runner, the execution plane: it owns the
+uploaded workspace and everything that touches it. They speak one versioned run
+protocol (`runs` in `run_status`); from protocol 4 the runner lists `capabilities`,
+and each behaviour past protocol 3 is enabled only by a listed capability, so older
+images keep their earlier behaviour. `computers/runner.rs` places every bridge tool
+as Workspace (served by the runner's local bridge when it has the capability) or
+Control (forwarded to this device through the relay queue). The runner asks this
+device before anything a person or rule governs through `POST /v1/policy` (kinds
+`tool`, `site`, `secret`); anything but an explicit allow, including no answer, is a
+refusal. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+
+Placement is a parameter of every attempt, not a separate code path. The task runtime
+assembles the agent's command and prompt, then runs it through an `AttemptRunner`
+(`tasks/runner.rs`): `LocalRunner` uses this device's worktree as it is and owns the agent
+process, and `RemoteRunner` is the computer's runner seen from here. Both go through
+`TaskRuntime::run_attempt` (prepare, attach the placement, start, follow, collect) before
+the shared completion path, so checks, checkpoints, review, integration and the lock order
+are the same. The local runner reports the `device` capability and every workspace
+capability, so its tool list comes from the same `computers::runner::TOOLS` table, and the
+bridge applies each attempt's attached placement to `tools/list`. Tool events from the
+bridge's own handlers and from a runner's `/v1/runner/event` are recorded by one function.
+See [the runner](BOT-COMPUTERS.md#the-runner).
+
+Which runner an attempt gets is decided on this device. When the coordinator's dispatch
+reserves planned or swarm work, the capacity pool's placer (`computers/pool.rs`) picks one
+host from this device and the computers the project may use, by the fork's needs, the
+project's choice of hosts and free capacity, under the coordinator lock and before the
+execution guard; the choice reaches the attempt when it is created and is saved on it.
+Attempts the queue does not dispatch, continuations included, keep the project's computer
+rule or their earlier host. A fork whose host was lost is retried once on another host
+through the same dispatch path, so reservations, quota handoff and the lock order are
+unchanged. Recovering the changes a lost attempt left on its computer
+(`tasks/runner/recovery.rs`) takes neither the coordinator lock nor the execution guard:
+it writes only beside the attempt's history and on the computer, never to a workspace,
+and its own lock keeps it apart from a run preparing on that computer. See
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
 
 `desktop_control.rs` separately owns explicit window, app and desktop grants, the
 session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot

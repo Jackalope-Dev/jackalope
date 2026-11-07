@@ -36,7 +36,9 @@ representative benefit and installed-platform acceptance remain open.
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Plan mode interviews read-only, then runs an approved plan as one agent, planned
   subtasks or a swarm with an independent review against it. A swarm (beta) runs in
-  rounds until an orchestrator finds every acceptance criterion met.
+  rounds until an orchestrator finds every acceptance criterion met. Agents can decide
+  routine questions, checked rounds and in-scope deviations for the person, who is asked
+  only for sign-ins, payment, secrets and changes of direction.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and
   GitHub/Linear/Jira issue intake keep corrections and source work together.
@@ -164,7 +166,9 @@ person-only sign-in window. Bots can also have their own computer, a Linux sandb
 Docker, a paired cloud machine the person runs or a machine on their own Agent37
 account, where desktop and browser tools act instead of on the person's desktop; tasks
 get one only with the person's approval. A project can run its Claude Code and Codex
-task agents on such a computer while checks, review and merging stay local.
+task agents on such a computer while checks, review and merging stay local, and a
+swarm can spread its tasks across this device and the person's computers, each placed by
+what it needs and which host has room, with a lost host's task retried once elsewhere.
 Local sandboxes start when needed and stop when idle or when Jackalope quits.
 Jackalope-hosted computers are planned, not available. Installed and live-account
 acceptance remain open.

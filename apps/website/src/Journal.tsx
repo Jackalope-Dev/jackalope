@@ -7,6 +7,7 @@ import { type Author, authorPath, authors, findAuthor } from './authors';
 import type { BlogPost, BlogSection } from './blog-types';
 import { posts, updates } from './content';
 import { EditorialArt } from './EditorialArt';
+import { InlineLinks } from './InlineLinks';
 import { PublishedReleases } from './PublishedReleases';
 import './blog.css';
 
@@ -205,7 +206,9 @@ export function JournalPage({ path }: { path: string }) {
               </h2>
               {section.markdown && <BlogMarkdown>{section.markdown}</BlogMarkdown>}
               {section.paragraphs.map((text) => (
-                <p key={text}>{text}</p>
+                <p key={text}>
+                  <InlineLinks text={text} />
+                </p>
               ))}
               {section.bullets && (
                 <ul className="blog-checklist">
@@ -321,7 +324,10 @@ export function JournalPage({ path }: { path: string }) {
             <article id={update.id} key={update.id} className="change-entry">
               <div className="change-date">
                 <time dateTime={update.date}>{dateLabel(update.date)}</time>
-                <span>{update.status}</span>
+                <span className="change-status" data-state={update.state}>
+                  {update.status}
+                  {update.version && <small>v{update.version}</small>}
+                </span>
               </div>
               <div>
                 <h2>

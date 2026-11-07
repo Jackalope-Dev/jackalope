@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.33"
+version = "0.1.34"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -49,7 +49,7 @@ rmcp = { version = "=3.8.0", default-features = false, features = ["server", "ma
 
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
-base64 = "0.22"
+base64 = "0.23"
 reqwest = { version = "0.13", default-features = false }
 ignore = "0.4"
 tree-sitter = "0.27"
@@ -62,7 +62,7 @@ chrono-tz = "0.10"
 dunce = "1"
 oxc_resolver = "11"
 notify-debouncer-mini = "=0.7.0"
-gix = { version = "=0.87.1", default-features = false, features = ["sha1", "sha256"] }
+gix = { version = "=0.90.0", default-features = false, features = ["sha1", "sha256"] }
 flate2 = "1.1.10"
 tar = "0.4.46"
 # Terminal UI for the `jackalope` binary. Only the crossterm backend is used;

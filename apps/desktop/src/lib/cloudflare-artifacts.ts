@@ -72,9 +72,15 @@ export const cloudflareTokenAccounts = (token: string) =>
 
 export const disconnectArtifacts = () => nativeTask<void>('cloudflare_artifacts_disconnect');
 
-/** Prepares Connect Cloudflare and returns the consent page to open in the browser. */
-export const beginCloudflareSignIn = (options: { workers?: boolean } = {}) =>
-  nativeTask<string>('cloudflare_oauth_begin', { workers: options.workers ?? false });
+/**
+ * Prepares Connect Cloudflare and returns the consent page to open in the browser.
+ * `scopes` asks for extra product access, such as creating D1 databases.
+ */
+export const beginCloudflareSignIn = (options: { workers?: boolean; scopes?: string[] } = {}) =>
+  nativeTask<string>('cloudflare_oauth_begin', {
+    workers: options.workers ?? false,
+    scopes: options.scopes ?? null,
+  });
 /** Waits for the browser to return; resolves with the accounts the person shared. */
 export const completeCloudflareSignIn = () =>
   nativeTask<CloudflareAccount[]>('cloudflare_oauth_complete');

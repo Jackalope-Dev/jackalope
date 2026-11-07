@@ -50,3 +50,73 @@
 .pair-machine-command > button {
   flex-shrink: 0;
 }
+
+.host-capacity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.host-capacity-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.host-capacity-item > svg {
+  flex-shrink: 0;
+}
+
+.host-capacity-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-capacity-note {
+  color: var(--color-text-muted);
+}
+
+.host-capacity-load {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.host-capacity-item[data-lost] .host-capacity-load,
+.host-capacity-item[data-lost] > svg {
+  color: var(--color-warning);
+}
+
+.swarm-hosts-choices {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* The shared title is a flex row, so a long name truncates in its own span. */
+.swarm-hosts-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swarm-hosts-legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}

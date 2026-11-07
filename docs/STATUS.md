@@ -118,9 +118,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   each other and show status, time, check, changed lines and reported tokens side by side;
   keeping one archives the other finished attempts. Composers accept pasted images, dropped
   files and picked files as editable path lines. Pasted images are saved under the
-  project's Git-excluded `.jackalope/attachments`; project files are referenced relative
-  to the project so isolated worktrees read their own copy. Empty projects offer editable
-  starter requests.
+  project's Git-excluded `.jackalope/attachments` and copied into each task workspace that
+  names them, worktree or computer alike; project files are referenced relative to the
+  project so isolated worktrees read their own copy. Project instructions and the project's
+  Jackalope context (the cloud resources manifest) reach every agent at launch without
+  being committed; see [Jackalope context](CORE-WORKFLOW.md#jackalope-context). Empty
+  projects offer editable starter requests.
   Work rows show elapsed time while an attempt runs, changed lines from a bounded native
   Git count, and an unread marker for finished work not yet opened; work can be marked
   unread again. Sidebar rows keep their width for the title: they mark finished work whose
@@ -318,6 +321,20 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Claude Code; other agents are constrained by prompt and a discarded worktree.
   Installed-provider interviews, plan-to-merge and multi-round swarm acceptance remain
   open.
+- Autonomy in Project settings lets agents decide for the person on approved plans:
+  routine questions from plan work, proposed swarm rounds once the merged round passed its
+  check, and declared deviations inside the plan's scopes. A local classifier sends
+  secrets, payment, sign-ins, accounts, publishing, protected paths, changes of direction
+  and destructive actions to the person; everything else goes to a read-only decider
+  attempt from another model family, whose answer stands only at 70% confidence or more,
+  within a per-plan limit (default 50) and a 3-minute timeout. The asking agent receives
+  the answer marked as an agent's; the plan view and task activity show who decided, why
+  and how sure, with Override, and say why anything was sent to the person. A committed
+  `decide` section in `.jackalope/autonomy.json` can only make it stricter. Agents ask for
+  sign-ins, payment, accounts and secrets with `request_human_action`, which always reaches
+  the person. Isolated work in a repository without commits creates the first commit
+  (leaving out `.env` files and keys); plans also initialize a plain folder. Decider runs
+  with installed agents remain to be accepted on Windows and macOS.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.
@@ -388,19 +405,66 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   [bot computers](BOT-COMPUTERS.md).
 - A project can run its Claude Code and Codex task agents on a computer (**Agents run
   on** in Project settings; beta). The workspace's non-ignored files and copied setup
-  files are uploaded, the agent runs there with a Claude Code token or API key saved for
+  files are uploaded (to a current image as a Git bundle of only what the computer's
+  per-project repository lacks, with the project's history; otherwise, or for
+  repositories a bundle cannot carry such as LFS or shallow clones, as a tar), the
+  agent runs there with a Claude Code token or API key saved for
   computers and without the CLI installed on this device, its output feeds the usual
   parsers and its changes come back as a patch applied to the local workspace before
-  checks, checkpoint, review and integration, which stay on this device. Jackalope's
-  bridge tools reach it through a relay that keeps the bridge credential on this device;
-  desktop control acts on that computer, and the browser tools drive its Chromium on a
-  local sandbox with networking (unavailable on cloud and Agent37 computers). Tools that
-  read the local workspace work only for read-only attempts; `peer_adopt` and project
-  connections are unavailable. Plan-mode planners and swarm orchestrators run there
+  checks, checkpoint, review and integration, which stay on this device; saved output
+  and large bridge answers travel as resumable, hash-checked artifacts. This device is
+  the control plane and the computer's agent is the run's runner: from runs protocol 4
+  it reports capabilities and serves the tools that touch the workspace itself, so for
+  writing agents on every computer type `computer_verify`, `verification_output`,
+  `read_context` and the browser tools (agent-browser on the computer's Chromium) run
+  there, screenshots land in the computer's workspace and are listed with the attempt
+  when its changes come back, and each website is asked about on this device first.
+  `read_context` search there ranks paths and declarations found by line patterns
+  (Rust, TypeScript, JavaScript, Python and Go) the way this device ranks its symbol
+  map, then plain text matches.
+  Control tools reach this device through a relay that keeps the bridge credential here;
+  desktop control acts on that computer. An image on protocol 3 or older keeps the
+  earlier tools: browser tools only on a local sandbox with networking and
+  workspace-reading tools only for read-only attempts. `peer_adopt` and
+  `browser_open_profile` are unavailable. Selected on-demand HTTP connections, and every on-demand connection of a
+  read-only attempt, reach it through the broker on this device, with Claude Code's
+  `execute_tool` approved at the bridge. A writing attempt's on-demand stdio connections
+  run on the computer in the workspace the agent edits, with their command and
+  environment resolved here and sent like project secrets, a pinned, hash-checked uv
+  release installed when needed, and
+  Claude Code asking the bridge before each of their tools runs; one the computer cannot
+  run (Docker, a program on this device) falls back to this device only when it does not
+  use the workspace. Directly delivered connections are withheld; the attempt's activity
+  names where each connection runs or why it is withheld. Plan-mode planners and swarm orchestrators run there
   read-only and bring nothing back. Lost contact is retried for 30 minutes, and changes
-  left on the computer come back when the task continues. Such agents have their own
+  left on the computer come back when that attempt continues; once another attempt
+  replaces it, they are saved as a patch on the lost attempt when the computer answers
+  again, never applied, and removed from the computer. Such agents have their own
   concurrency limit (8 by default, up to 32, set in the project's queue); other agents
   stay local. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+- Planned and swarm work spreads across a capacity pool (beta): this device, the project's
+  computer and other computers the person adds under **Swarms run on** in Project
+  settings, which also chooses anywhere (the default), computers only or this device only.
+  A deterministic placer puts each fork on a host by its needs (agents that cannot run on a
+  computer, secrets available to only one place, selected connections that cannot reach a
+  computer, browser-checked criteria), the project's choice and free capacity, preferring
+  the project's computer, and records why in its activity. Each host has a concurrency
+  limit (the project's computer takes up to the shared limit on agents on computers; an
+  added computer takes the `slots` its runner derives from its CPUs and memory, 1 to 8,
+  or sets through `JACKALOPE_RUNNER_SLOTS`, and two on an earlier image) and health from its
+  runs, saved so a computer lost just before a restart stays skipped for the rest of its
+  ten minutes; a fork whose host was lost is retried once on another host. Under
+  computers only, a fork on a computer never runs on this device: automatic routing
+  offers only Claude Code and Codex, and the fork fails with the reason when neither can
+  run. Without added
+  computers, forks run where they did before. The swarm board, map, round view and task
+  details show each fork's host and each host's load, and task details show changes
+  recovered from a lost computer with their patch path; the phone companion shows the host.
+  See [swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
+- Project secrets (Project settings → Secrets) give a project's task agents environment
+  variables such as service API keys, on this device, on its computer or both. Values
+  stay in protected storage and reach only agent processes; the app shows names and
+  save times. See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
@@ -613,6 +677,15 @@ Swarm mirrors their snapshots to per-attempt forks, but hosted Artifacts, work r
 those forks and push-triggered automation are not implemented. Live
 Cloudflare account and installed acceptance remain open.
 
+Cloud resources (beta) set up R2, D1, KV, Queues, Hyperdrive and Turnstile in the connected
+Cloudflare account for a project, and declare Durable Objects and a Worker name, from Project
+settings or Project → Swarm. Each resource is found by name before it is created, with per-step
+progress and retry; the result is `.jackalope/cloudflare.json` (names, IDs and a wrangler
+bindings snippet, no secrets), which every task agent receives in its workspace and launch
+summary automatically. See [cloud resources](ORCHESTRATION-CAPABILITIES.md#cloud-resources).
+Which product scopes Connect Cloudflare grants, and provisioning against a live account, are
+not yet accepted.
+
 Trusted hosts and a responsive phone companion are implemented for native validation.
 Settings → Remote access scopes paired devices to selected projects. Before it is on, every
 project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
@@ -644,16 +717,22 @@ fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent p
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
-viewer or cloud machine has been accepted in an installed app on any platform. Cloud
-machines reach desktop control and commands but not the browser tools, and the
-in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
+viewer or cloud machine has been accepted in an installed app on any platform. A bot's
+or task's cloud machine reaches desktop control and commands but not the browser tools,
+and the in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
 stop are covered by unit tests only. Agents on a computer are covered by unit tests, the
-agent's POSIX run and relay tests and the opt-in Docker trial with a stand-in agent;
+agent's POSIX run, relay and runner tests and the opt-in Docker trial with a stand-in agent;
+attempts on this device and on a computer share one runner path, which a unit test drives
+with a real local agent process and a stand-in computer runner;
 real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
-agent, planning there, lost-contact
-recovery against a real computer, the template build and instances on a live Agent37
+agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
+recovery against a real computer, Git-synced workspaces and artifacts against a built
+image from Windows and macOS hosts, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37
 computers have no viewer. The image workflow has not run, so no image is published yet.
+Placing swarm forks across hosts is covered by unit tests of the placer, the dispatcher and
+the lost-host retry; no swarm has yet run across this device and real computers, and host
+health is learned only from runs and resets when the app restarts.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

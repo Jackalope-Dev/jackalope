@@ -15,7 +15,7 @@ import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { AgentStack } from '../agents/AgentAvatar';
+import { LatestAgent } from '../agents/AgentAvatar';
 import { ProjectIconDialog, ProjectMark } from '../projects/ProjectMark';
 import {
   changeSummary,
@@ -122,7 +122,7 @@ type ProjectActions = {
 };
 
 const projectViews = WORKSPACE_VIEWS.filter(
-  (view) => view.group === 'project' && view.id !== 'swarm',
+  (view) => view.group === 'project' && view.id !== 'swarm' && view.id !== 'cloud-resources',
 );
 
 /**
@@ -402,7 +402,7 @@ export function WorkSidebar({
                         title={tooltip}
                         onClick={() => open(item)}
                       >
-                        <AgentStack agents={presence.agents} state={presence.state} size="xs" />
+                        <LatestAgent agents={presence.agents} state={presence.state} size="xs" />
                         <span className="work-sidebar-title">
                           {item.title}
                           {status && <span className="sr-only">, {status}</span>}
