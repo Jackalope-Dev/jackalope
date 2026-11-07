@@ -774,9 +774,9 @@ impl Pool {
         if let Some((id, name)) = self.pinned(project, legacy_remote) {
             let computer = self.computers.iter().find(|computer| computer.id == id);
             hosts.push(Host {
-                limit: computer
-                    .and_then(|computer| computer.health.slots)
-                    .unwrap_or(limits.remote),
+                // The project's own computer takes up to the shared limit on
+                // agents on computers; reported `slots` size added computers only.
+                limit: limits.remote,
                 running: running(&id),
                 lost: computer.and_then(|computer| computer.health.lost.clone()),
                 browser: computer.and_then(|computer| computer.health.browser),

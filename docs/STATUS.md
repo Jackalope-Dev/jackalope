@@ -419,6 +419,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   `read_context` and the browser tools (agent-browser on the computer's Chromium) run
   there, screenshots land in the computer's workspace and are listed with the attempt
   when its changes come back, and each website is asked about on this device first.
+  `read_context` search there ranks paths and declarations found by line patterns
+  (Rust, TypeScript, JavaScript, Python and Go) the way this device ranks its symbol
+  map, then plain text matches.
   Control tools reach this device through a relay that keeps the bridge credential here;
   desktop control acts on that computer. An image on protocol 3 or older keeps the
   earlier tools: browser tools only on a local sandbox with networking and
@@ -427,7 +430,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   read-only attempt, reach it through the broker on this device, with Claude Code's
   `execute_tool` approved at the bridge. A writing attempt's on-demand stdio connections
   run on the computer in the workspace the agent edits, with their command and
-  environment resolved here and sent like project secrets, uv installed when needed, and
+  environment resolved here and sent like project secrets, a pinned, hash-checked uv
+  release installed when needed, and
   Claude Code asking the bridge before each of their tools runs; one the computer cannot
   run (Docker, a program on this device) falls back to this device only when it does not
   use the workspace. Directly delivered connections are withheld; the attempt's activity
@@ -445,7 +449,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   computer, secrets available to only one place, selected connections that cannot reach a
   computer, browser-checked criteria), the project's choice and free capacity, preferring
   the project's computer, and records why in its activity. Each host has a concurrency
-  limit (computers take two runs unless their runner reports more) and health from its
+  limit (the project's computer takes up to the shared limit on agents on computers; an
+  added computer takes the `slots` its runner derives from its CPUs and memory, 1 to 8,
+  or sets through `JACKALOPE_RUNNER_SLOTS`, and two on an earlier image) and health from its
   runs, saved so a computer lost just before a restart stays skipped for the rest of its
   ten minutes; a fork whose host was lost is retried once on another host. Under
   computers only, a fork on a computer never runs on this device: automatic routing

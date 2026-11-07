@@ -482,14 +482,19 @@ mod scheduling_tests {
     }
 
     fn pooled(items: Vec<QueueItem>, hosts: pool::SwarmHosts) -> Inner {
-        let computer = |id: &str, pinned_by: Option<&str>, slots| pool::PoolComputer {
+        let computer = |id: &str, pinned_by: Option<&str>, browser| pool::PoolComputer {
             id: id.into(),
             name: id.into(),
             pinned_by: pinned_by.map(str::to_string),
             health: pool::PoolHealth {
-                slots,
+                browser: Some(browser),
                 ..Default::default()
             },
+        };
+        let browser = || pool::Needs {
+            browser: true,
+            computer_only: Some("STAGING_KEY is available only to computers".into()),
+            ..Default::default()
         };
         Inner {
             ledger: Ledger {
@@ -502,9 +507,12 @@ mod scheduling_tests {
             remote_projects: ["p".to_string()].into(),
             pool: pool::Pool {
                 loaded: true,
+                // The project's computer has room but no browser tools, so
+                // browser-checked forks that must run on a computer spread to
+                // the added computer.
                 computers: vec![
-                    computer("Box", Some("p"), Some(1)),
-                    computer("Lab", None, None),
+                    computer("Box", Some("p"), false),
+                    computer("Lab", None, true),
                 ],
                 projects: [(
                     "p".to_string(),
@@ -514,13 +522,17 @@ mod scheduling_tests {
                     },
                 )]
                 .into(),
-                needs: [(
-                    "s3".to_string(),
-                    pool::Needs {
-                        device_only: Some("kimi cannot run on a computer".into()),
-                        ..Default::default()
-                    },
-                )]
+                needs: [
+                    ("s1".to_string(), browser()),
+                    ("s2".to_string(), browser()),
+                    (
+                        "s3".to_string(),
+                        pool::Needs {
+                            device_only: Some("kimi cannot run on a computer".into()),
+                            ..Default::default()
+                        },
+                    ),
+                ]
                 .into(),
             },
             grants: HashMap::new(),

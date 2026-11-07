@@ -284,9 +284,19 @@ computer when it has one, otherwise on this device. The choice is offered once t
 a computer to run on.
 
 Each host has a concurrency limit. This device keeps the queue's limit of one to six;
-computers together keep the queue's limit on agents on computers (8 by default); the
-project's computer may take up to that limit, and an added computer takes two runs at a
-time unless its runner reports `slots` (1 to 32) in `hello` or `run_status`. Health comes
+computers together keep the queue's limit on agents on computers (8 by default). The
+project's computer may take up to that shared limit whatever its runner reports. An
+added computer takes the `slots` (1 to 32) its runner reports in `hello` or
+`run_status`, or two when it reports none. The image's runner reports one run per two CPUs and per 4 GiB of
+memory (rounded to whole GiB), whichever allows fewer, from 1 to 8, counting the
+container's cgroup CPU and memory limits. A run is an agent CLI plus the builds, tests,
+dev servers and Chromium it starts, so an added 4-CPU, 8 GB machine takes two and an
+added local sandbox at its default 2 CPUs and 4 GB takes one; give the sandbox more CPUs
+and memory in its settings for more. A whole number from 1 to 32 in `JACKALOPE_RUNNER_SLOTS` in the
+agent's environment replaces the derived value, for example `-e JACKALOPE_RUNNER_SLOTS=4`
+on a cloud machine's `docker run`; any other value is ignored. Jackalope sets no such
+variable on the computers it creates. Runners from earlier images report no `slots`.
+Health comes
 from runs: a computer is last seen when a run's status or output read succeeds, and lost
 when it cannot be started or reached or contact is lost. A lost computer gets no new work
 for ten minutes unless it is reached again first. When each computer was last reached
@@ -518,9 +528,21 @@ unchanged. Its answer has the same shape as on this device, and the stored resul
 which `verification_output` pages by character, stays in the run folder outside the
 workspace. The attempt's activity records each check's outcome. The saved check still
 runs on this device after the changes come back, as for every attempt. `read_context`
-reads source blocks with the same path rules, limits and block hashes as here; its
-repository search ranks files by plain text matches in the computer's copy rather than
-by this device's symbol map. It is offered only when source context reads are enabled.
+reads source blocks with the same path rules, limits and block hashes as here. Its
+repository search ranks the computer's copy the way this device ranks its symbol map:
+BM25 over each file's path and declared names with the same word splitting, stop words,
+scoring and tie order, at most 12 locations in 16,000 bytes, over the same files (Git's
+non-ignored files without `.git`, `.worktrees`, `node_modules`, `target`, `vendor`,
+`dist`, `build`, `coverage`, `output`, `.next`, `.venv` or `__pycache__` folders, at
+most 6,000 files, 32 MiB of source read and 20 seconds, then marked `scanTruncated`).
+The runner has no parser: line patterns find functions, methods, classes, interfaces,
+types, enums, structs and bindings (up to 64 per file) in Rust, TypeScript and
+JavaScript, and also in Python and Go, which this device does not analyze. Declarations
+split over several lines or written inside strings can be missed or extra, and
+locations carry no `related` imports. Locations the ranking finds come first; when there
+is room, files that only contain the query's words follow with `match: "text"`, their
+first matching line and a preview, which this device does not add. It is offered only
+when source context reads are enabled.
 
 The browser tools on the computer start agent-browser (installed in the image at the
 version this app bundles) on the computer's own Chromium, so a server the agent starts
@@ -768,9 +790,19 @@ desktop bundles, checked in `build.rs`) from npm for agents on a computer.
 Claude Code's license does not allow redistributing it, so it is not in the image: the
 first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
 volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking. The
-first run with a connection that needs `uvx` or `uv` installs uv the same way, from
-uv's latest GitHub release for the computer's processor, checked against its published
-SHA-256. The image has no Docker.
+first run with a connection that needs `uvx` or `uv` installs uv the same way, from the
+uv release pinned in `agent.py` (`UV_VERSION`) for the computer's processor (x86_64 or
+aarch64 Linux, at most 128 MB). The archive must match the SHA-256 recorded beside the
+version (`UV_SHA256`, copied from that release's published `.sha256` assets and
+`dist-manifest.json`); any other download is refused and nothing is installed. Moving to
+a new uv release means updating the version and both hashes together. The image has no
+Docker.
+
+The image's definition hash covers `Dockerfile`, `start.sh` and `agent.py`, so any
+change to the runner or the image definition, including the uv pin, gives a new
+`<version>-<hash>` tag. A local sandbox pulls or builds the new image and is recreated
+from it at its next start, Agent37 gets a new template (see each provider above), and a
+cloud machine keeps its old image until its owner runs the new tag.
 
 `.github/workflows/computer-image.yml` publishes the image for linux/amd64 to
 `ghcr.io/jackalope-dev/jackalope-computer` on every push to `beta` or `stable` and on
@@ -810,7 +842,8 @@ the same table, and `tasks::runner::record` that both record the same tool event
 command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
 kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts
 and that every bridge tool has a placement; `computers::runner` covers capability
-negotiation, including the protocol 3 fallback, the device runner and attached placements,
+negotiation, including the protocol 3 fallback and reported `slots` and their bounds,
+the device runner and attached placements,
 and where each tool runs and which reach the
 tool list for each capability set; `computers::relay` also covers forwarding only control
 tools for a runner with the local bridge; `computers::policy` covers the policy kinds,
@@ -845,10 +878,14 @@ the template import body and its fallback.
 the on-demand CLI install and the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
 uploads, the bridge relay's hand-over and answers, a run whose supervisor died, stdio
 connections (private launch files, Claude Code and Codex configuration, values absent
-from the command line, run files and patch, request validation, uv install and the
-`python` stand-in), the approval hook, and the runner: capabilities, `local` validation,
+from the command line, run files and patch, request validation, uv install, the pinned
+uv download refusing an archive whose hash differs, and the `python` stand-in), the
+approval hook, and the runner: capabilities, `slots` from the machine size, container
+limits and the override, `local` validation,
 workspace tools answered on the computer while control tools are relayed, the saved check
-and its reuse, stall and stored output, source reads, policy callbacks that allow only an
+and its reuse, stall and stored output, source reads, declarations in each language and
+repository search ranked like this device's with plain text matches after them, policy
+callbacks that allow only an
 explicit allow (including no answer), site questions skipped for the computer's own pages,
 and screenshots saved in the workspace and returned even when ignored; artifact resume,
 deduplication and hash checks, the git-sync round trip (checkout, history, context and

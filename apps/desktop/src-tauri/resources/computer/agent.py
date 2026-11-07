@@ -41,7 +41,8 @@ into the bot's home; a connection whose program is still missing is reported
 and left out.
 
 From runs protocol 4 this agent is the run's runner and reports what it can
-do as `capabilities` (see CAPABILITIES). Jackalope stays the control plane:
+do as `capabilities` (see CAPABILITIES) and how many runs it takes at once as
+`slots` (see slots()). Jackalope stays the control plane:
 it owns credentials, approvals, orchestration, history and the final Git
 integration. A run started with `local` (local-bridge) has the tools that
 touch its workspace served here, next to the workspace, instead of on the
@@ -72,6 +73,7 @@ import hashlib
 import hmac
 import io
 import json
+import math
 import os
 import platform
 import re
@@ -80,6 +82,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tarfile
@@ -105,6 +108,11 @@ CAPABILITIES = [
     "git-sync",
     "artifacts",
 ]
+# Runs reported as `slots` with `runs`: Jackalope accepts 1 to SLOTS_MAX, and a
+# size-derived value stops at SLOTS_DERIVED_MAX (see slots_for()).
+SLOTS_MAX = 32
+SLOTS_DERIVED_MAX = 8
+CGROUP = "/sys/fs/cgroup"
 OUTPUT_LIMIT = 64 * 1024
 BODY_LIMIT = 1024 * 1024
 DEVTOOLS = "http://127.0.0.1:9222"
@@ -164,8 +172,16 @@ CONNECTION_LIMIT = 16
 CONNECTION_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
 PROGRAM = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
-UV_RELEASE = ("https://github.com/astral-sh/uv/releases/latest/download/"
+# uv for connections that start with uv or uvx, pinned to one release. Each
+# archive's SHA-256 is the one that release publishes (its .sha256 assets and
+# dist-manifest.json); a download that differs is refused.
+UV_VERSION = "0.13.5"
+UV_RELEASE = ("https://github.com/astral-sh/uv/releases/download/{version}/"
               "uv-{arch}-unknown-linux-gnu.tar.gz")
+UV_SHA256 = {
+    "x86_64": "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f",
+    "aarch64": "4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403",
+}
 UV_LIMIT = 128 * 1024 * 1024
 # Longer than Jackalope waits for the person to answer an approval.
 APPROVAL_SECONDS = 1900
@@ -205,6 +221,26 @@ SOURCE_EXTENSIONS = {
 }
 SOURCE_FILE_LIMIT = 512 * 1024
 SOURCE_BLOCK_LIMIT = 8000
+# read_context's repository search, within the limits of Jackalope's own scan
+# (commands/codebase.rs) and its candidates (codebase/map.rs).
+SEARCH_SKIP = {".git", ".worktrees", "node_modules", "target", "vendor", "dist", "build",
+               "coverage", "output", ".next", ".venv", "__pycache__"}
+SEARCH_FILES = 6000
+SEARCH_BYTES = 32 * 1024 * 1024
+SEARCH_SECONDS = 20
+SEARCH_RESULTS = 12
+SEARCH_RESULT_BYTES = 16000
+FILE_SYMBOLS = 64
+# The stop words of Jackalope's retrieval ranking (commands/retrieval.rs).
+SEARCH_STOP = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "for", "from", "how", "i",
+    "in", "is", "it", "my", "of", "on", "or", "the", "this", "to", "was", "what", "when",
+    "where", "with", "you", "your",
+}
+SYMBOL_LANGUAGES = {
+    "rs": "rust", "py": "python", "go": "go",
+    **{extension: "script" for extension in ("ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs")},
+}
 
 
 class Failure(Exception):
@@ -262,6 +298,61 @@ def agent_browser():
 
 def capabilities():
     return [name for name in CAPABILITIES if name != "browser" or agent_browser()]
+
+
+def slots_for(cpus, memory):
+    """Agent runs this machine takes at once: one per two CPUs and per 4 GiB of
+    memory, whichever allows fewer, from 1 to SLOTS_DERIVED_MAX. A run is an
+    agent CLI plus the builds, tests, dev servers and Chromium it starts.
+    Memory is rounded to whole GiB, since a VM sold as 8 GB reports a little
+    less; unknown memory limits nothing."""
+    limits = [cpus // 2, SLOTS_DERIVED_MAX]
+    if memory:
+        limits.append(round(memory / (1024 ** 3)) // 4)
+    return max(1, min(limits))
+
+
+def cgroup_value(*names):
+    """The whitespace-separated fields of this container's first readable cgroup
+    file among names, or None."""
+    for name in names:
+        try:
+            with open(os.path.join(CGROUP, name)) as handle:
+                return handle.read().split()
+        except OSError:
+            continue
+    return None
+
+
+def machine_size():
+    """CPUs and bytes of memory available here, within the container's cgroup
+    (v2, or v1 on older hosts) limits."""
+    try:
+        cpus = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        cpus = os.cpu_count() or 1
+    quota = cgroup_value("cpu.max")
+    if not quota:
+        quota = (cgroup_value("cpu/cpu.cfs_quota_us") or []) + (cgroup_value("cpu/cpu.cfs_period_us") or [])
+    if len(quota or ()) == 2 and quota[0].isdigit() and quota[1].isdigit() and int(quota[1]):
+        cpus = min(cpus, max(1, int(quota[0]) // int(quota[1])))
+    try:
+        memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (AttributeError, ValueError, OSError):
+        memory = 0
+    limit = cgroup_value("memory.max", "memory/memory.limit_in_bytes")
+    if limit and limit[0].isdigit():
+        memory = min(memory, int(limit[0])) if memory else int(limit[0])
+    return cpus, memory
+
+
+def slots():
+    """`slots` for hello and run_status: JACKALOPE_RUNNER_SLOTS when it is a whole
+    number from 1 to 32, otherwise derived from the machine."""
+    override = os.environ.get("JACKALOPE_RUNNER_SLOTS", "").strip()
+    if override.isdigit() and 1 <= int(override) <= SLOTS_MAX:
+        return int(override)
+    return slots_for(*machine_size())
 
 
 def start_browser(url=None):
@@ -714,22 +805,23 @@ def ensure_program(name):
 
 
 def install_uv():
-    """Installs uv and uvx into the home volume from uv's published release."""
+    """Installs uv and uvx into the home volume from the pinned uv release,
+    refusing an archive whose SHA-256 is not the one recorded here."""
     machine = platform.machine().lower()
     arch = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64",
             "arm64": "aarch64"}.get(machine)
     if not arch:
         raise Failure(f"uv has no build for this computer's {machine} processor.")
-    url = UV_RELEASE.format(arch=arch)
+    url = UV_RELEASE.format(version=UV_VERSION, arch=arch)
     try:
         with urllib.request.urlopen(url, timeout=INSTALL_SECONDS) as response:
             data = response.read(UV_LIMIT + 1)
-        with urllib.request.urlopen(url + ".sha256", timeout=30) as response:
-            expected = response.read(4096).decode("ascii", "replace").split()[0]
-    except (OSError, IndexError) as error:
+    except OSError as error:
         raise Failure(f"uv could not be downloaded to this computer: {error}"[:300])
-    if len(data) > UV_LIMIT or hashlib.sha256(data).hexdigest() != expected.lower():
-        raise Failure("The uv download was incomplete or corrupted.")
+    if len(data) > UV_LIMIT or not hmac.compare_digest(hashlib.sha256(data).hexdigest(),
+                                                       UV_SHA256[arch]):
+        raise Failure(f"The uv {UV_VERSION} download did not match its recorded SHA-256, "
+                      "so it was not installed.")
     directory = os.path.join(LOCAL_PREFIX, "bin")
     os.makedirs(directory, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as bundle:
@@ -1047,12 +1139,14 @@ def run_status(request):
         raise Failure("Name the run with letters, digits, - or _.")
     directory = os.path.join(RUNS, name)
     if not os.path.isdir(directory):
-        return {"exists": False, "runs": RUNS_PROTOCOL, "capabilities": capabilities()}
+        return {"exists": False, "runs": RUNS_PROTOCOL, "capabilities": capabilities(),
+                "slots": slots()}
     supervisor_gone(directory)
     started = any(os.path.exists(os.path.join(directory, f)) for f in ("pid", "exit.json"))
     return {
         "runs": RUNS_PROTOCOL,
         "capabilities": capabilities(),
+        "slots": slots(),
         "exists": True,
         "uploaded": os.path.isfile(os.path.join(directory, "base")),
         # Checked out from a bundle, so its result comes back with sync_result.
@@ -1433,6 +1527,169 @@ def sha256_hex(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+# -- repository search --
+#
+# Jackalope's symbol map takes declarations from a syntax tree; this runner has
+# no parser, so these line patterns find the same kinds of declaration (the
+# names in codebase/symbols.rs) in Rust, TypeScript and JavaScript, plus Python
+# and Go. Declarations split over lines, or inside strings, are missed or extra.
+
+_NAME = r"([A-Za-z_][A-Za-z0-9_]*)"
+_SCRIPT_NAME = r"([A-Za-z_$][A-Za-z0-9_$]*)"
+_RUST_VISIBILITY = r"^\s*(?:pub(?:\s*\([^)]*\))?\s+)?"
+_SCRIPT_PREFIX = r"^\s*(?:export\s+)?(?:default\s+)?(?:declare\s+)?"
+_SYMBOL_PATTERNS = {
+    "rust": [
+        (_RUST_VISIBILITY + r"(?:(?:const|async|unsafe|extern(?:\s+\"[^\"]*\")?)\s+)*fn\s+" + _NAME,
+         "function"),
+        (_RUST_VISIBILITY + r"struct\s+" + _NAME, "struct"),
+        (_RUST_VISIBILITY + r"enum\s+" + _NAME, "enum"),
+        (_RUST_VISIBILITY + r"(?:unsafe\s+)?trait\s+" + _NAME, "interface"),
+        (_RUST_VISIBILITY + r"type\s+" + _NAME, "type"),
+        (_RUST_VISIBILITY + r"(?:const|static(?:\s+mut)?)\s+" + _NAME + r"\s*:", "binding"),
+    ],
+    "script": [
+        (_SCRIPT_PREFIX + r"(?:async\s+)?function\s*\*?\s*" + _SCRIPT_NAME, "function"),
+        (_SCRIPT_PREFIX + r"(?:abstract\s+)?class\s+" + _SCRIPT_NAME, "class"),
+        (_SCRIPT_PREFIX + r"interface\s+" + _SCRIPT_NAME, "interface"),
+        (_SCRIPT_PREFIX + r"type\s+" + _SCRIPT_NAME + r"\s*(?:<[^=]*>\s*)?=", "type"),
+        (_SCRIPT_PREFIX + r"(?:const\s+)?enum\s+" + _SCRIPT_NAME, "enum"),
+        (_SCRIPT_PREFIX + r"(?:const|let|var)\s+" + _SCRIPT_NAME + r"\s*[=:;,]", "binding"),
+        (r"^\s+(?:(?:public|private|protected|static|async|readonly|override|abstract|get|set)\s+)*"
+         r"\*?\s*" + _SCRIPT_NAME + r"\s*(?:<[^<>()]*>)?\s*\([^()]*\)\s*(?::\s*[^={};]+)?\{\s*$",
+         "method"),
+    ],
+}
+_SYMBOL_PATTERNS = {language: [(re.compile(pattern), kind) for pattern, kind in patterns]
+                    for language, patterns in _SYMBOL_PATTERNS.items()}
+# Words a method pattern can match at the start of a block statement.
+_NOT_METHODS = {"if", "for", "while", "switch", "catch", "function", "return", "with", "else",
+                "do", "try", "constructor"}
+
+
+def _python_symbols(lines):
+    """Python declarations: def inside a class is a method; module-level
+    assignments are bindings."""
+    blocks = []  # (indent, is_class) of the enclosing def and class lines
+    for number, line in lines:
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(stripped)
+        while blocks and blocks[-1][0] >= indent:
+            blocks.pop()
+        match = re.match(r"(?:async\s+)?def\s+" + _NAME, stripped)
+        if match:
+            yield match.group(1), number, "method" if blocks and blocks[-1][1] else "function"
+            blocks.append((indent, False))
+            continue
+        match = re.match(r"class\s+" + _NAME, stripped)
+        if match:
+            yield match.group(1), number, "class"
+            blocks.append((indent, True))
+            continue
+        match = indent == 0 and re.match(_NAME + r"\s*(?::[^=]+)?=(?!=)", stripped)
+        if match:
+            yield match.group(1), number, "binding"
+
+
+def _go_symbols(lines):
+    """Go declarations, including those inside type, const and var groups."""
+    group = None
+    depth = 0  # braces open inside a group, so struct fields are not declarations
+    for number, line in lines:
+        if group:
+            if depth == 0 and line.strip().startswith(")"):
+                group = None
+                continue
+            match = depth == 0 and re.match(r"\s+" + _NAME + r"\b\s*(.*)", line)
+            if match:
+                rest = match.group(2)
+                kind = ("binding" if group != "type" else "struct" if rest.startswith("struct")
+                        else "interface" if rest.startswith("interface") else "type")
+                yield match.group(1), number, kind
+            depth = max(0, depth + line.count("{") - line.count("}"))
+            continue
+        match = re.match(r"(type|const|var)\s*\(\s*$", line)
+        if match:
+            group = match.group(1)
+            continue
+        match = re.match(r"func\s+(\([^)]*\)\s*)?" + _NAME, line)
+        if match:
+            yield match.group(2), number, "method" if match.group(1) else "function"
+            continue
+        match = re.match(r"type\s+" + _NAME + r"(?:\[[^\]]*\])?\s+(\w*)", line)
+        if match:
+            kind = {"struct": "struct", "interface": "interface"}.get(match.group(2), "type")
+            yield match.group(1), number, kind
+            continue
+        match = re.match(r"(?:const|var)\s+" + _NAME, line)
+        if match:
+            yield match.group(1), number, "binding"
+
+
+def _pattern_symbols(language, lines):
+    patterns = _SYMBOL_PATTERNS[language]
+    for number, line in lines:
+        stripped = line.lstrip()
+        if stripped.startswith(("//", "/*", "*")):
+            continue
+        for pattern, kind in patterns:
+            match = pattern.match(line)
+            if match and not (kind == "method" and match.group(1) in _NOT_METHODS):
+                yield match.group(1), number, kind
+                break
+
+
+def declarations(language, text):
+    """Up to FILE_SYMBOLS declarations as {name, line, kind}, like the symbols
+    of Jackalope's own scan."""
+    lines = enumerate(text.split("\n"), 1)
+    found = (_python_symbols(lines) if language == "python"
+             else _go_symbols(lines) if language == "go"
+             else _pattern_symbols(language, lines))
+    symbols = []
+    for name, line, kind in found:
+        if len(name) <= 120:
+            symbols.append({"name": name, "line": line, "kind": kind})
+            if len(symbols) >= FILE_SYMBOLS:
+                break
+    return symbols
+
+
+def search_terms(text):
+    """Lowercase words split on anything not a letter or digit, without stop
+    words or single characters, as Jackalope's retrieval ranking splits them."""
+    return [term for term in re.split(r"[\W_]+", text.lower())
+            if len(term) > 1 and term not in SEARCH_STOP]
+
+
+def search_rank(query, documents):
+    """(index, score) of the documents matching the query, best first: the
+    same BM25 scoring and tie order as Jackalope's retrieval ranking."""
+    terms = sorted(set(search_terms(query)[:64]))
+    if not terms or not documents:
+        return []
+    counts = []
+    for document in documents:
+        found = {}
+        for term in search_terms(document):
+            found[term] = found.get(term, 0) + 1
+        counts.append(found)
+    lengths = [sum(found.values()) for found in counts]
+    average = max(sum(lengths) / len(documents), 1.0)
+    scores = [0.0] * len(documents)
+    for term in terms:
+        frequency = sum(term in found for found in counts)
+        idf = math.log(1.0 + (len(documents) - frequency + 0.5) / (frequency + 0.5))
+        for index, found in enumerate(counts):
+            tf = found.get(term, 0)
+            scores[index] += idf * tf * 2.2 / (tf + 1.2 * (0.25 + 0.75 * lengths[index] / average))
+    ranked = [(index, score) for index, score in enumerate(scores) if score > 0]
+    ranked.sort(key=lambda item: (-item[1], item[0]))
+    return ranked
+
+
 def validate_url(url):
     if (not isinstance(url, str) or len(url) > 8000 or any(ord(c) < 32 or ord(c) == 127 for c in url)
             or not url.startswith(("http://", "https://", "file://"))):
@@ -1459,6 +1716,8 @@ class Runner:
         self.check_lock = threading.Lock()
         self.allowed_sites = set()
         self.browser = Browser(self) if self.tools & set(BROWSER_TOOLS) else None
+        # Repository search: path -> ((size, mtime), declarations).
+        self.symbols = {}
 
     def close(self):
         if self.browser:
@@ -1717,21 +1976,92 @@ class Runner:
                 "text": None if unchanged else content, "sourceBytes": len(data)}
 
     def candidates(self, query):
-        """Files matching the query's words, by path and by lines that contain
-        them; plain text ranking on this computer's copy."""
-        terms = list(dict.fromkeys(term.lower() for term in re.findall(r"[A-Za-z0-9_]{2,}", query)))[:12]
-        if not terms:
-            return {"items": [], "ranking": "text"}
-        scores = {}
+        """Ranked locations for a repository query, ordered like Jackalope's own
+        symbol map: BM25 over each file's path and declared names (search_rank),
+        then files that only contain the query's words, by matching lines."""
+        files, truncated = self.symbol_map()
+        ranked = search_rank(query, [path + " " + " ".join(s["name"] for s in symbols)
+                                     for path, symbols in files])
+        items = []
+        size = 0
+        for index, score in ranked[:SEARCH_RESULTS]:
+            path, symbols = files[index]
+            item = {"id": path, "path": path, "score": score, "symbols": symbols[:12]}
+            length = len(json.dumps(item))
+            if size + length > SEARCH_RESULT_BYTES:
+                break
+            size += length
+            items.append(item)
+        if len(items) < SEARCH_RESULTS and size < SEARCH_RESULT_BYTES:
+            listed = {item["path"] for item in items}
+            for item in self.text_matches(query, listed, {path for path, _ in files}):
+                length = len(json.dumps(item))
+                if len(items) >= SEARCH_RESULTS or size + length > SEARCH_RESULT_BYTES:
+                    break
+                size += length
+                items.append(item)
+        return {"items": items, "ranking": "symbols", "scanTruncated": truncated, "partial": True}
+
+    def symbol_map(self):
+        """(path, declarations) for the workspace's files under the device scan's
+        limits; declarations are cached by size and modification time."""
+        started = time.monotonic()
+        truncated = False
         try:
             listed = git(self.workspace, "ls-files", "-co", "--exclude-standard", "-z", timeout=60)
+            names = sorted(set(listed.decode("utf-8", "replace").split("\0")) - {""})
         except (Failure, subprocess.TimeoutExpired):
-            listed = b""
-        for name in listed.decode("utf-8", "replace").split("\0"):
-            lowered = name.lower()
-            hits = sum(term in lowered for term in terms)
-            if name and hits:
-                scores[name] = {"path": name, "line": None, "score": 3 * hits}
+            names = []
+            for top, directories, found in os.walk(self.workspace):
+                directories[:] = sorted(d for d in directories if d not in SEARCH_SKIP)
+                relative = os.path.relpath(top, self.workspace)
+                names += [name if relative == "." else f"{relative}/{name}".replace(os.sep, "/")
+                          for name in found]
+            names.sort()
+        files = []
+        read = 0
+        extracting = True
+        for name in names:
+            if any(part in SEARCH_SKIP for part in name.split("/")):
+                continue
+            path = os.path.join(self.workspace, name)
+            try:
+                info = os.lstat(path)
+            except OSError:
+                continue
+            if not stat.S_ISREG(info.st_mode):
+                continue
+            if len(files) >= SEARCH_FILES or time.monotonic() - started > SEARCH_SECONDS:
+                truncated = True
+                break
+            symbols = []
+            language = SYMBOL_LANGUAGES.get(os.path.splitext(name)[1][1:])
+            if language and extracting and info.st_size <= SOURCE_FILE_LIMIT:
+                if read + info.st_size > SEARCH_BYTES:
+                    truncated = True
+                    extracting = False
+                else:
+                    read += info.st_size
+                    key = (info.st_size, info.st_mtime_ns)
+                    cached = self.symbols.get(name)
+                    if cached and cached[0] == key:
+                        symbols = cached[1]
+                    else:
+                        try:
+                            with open(path, "rb") as handle:
+                                symbols = declarations(language, handle.read().decode("utf-8"))
+                        except (OSError, UnicodeDecodeError):
+                            symbols = []
+                        self.symbols[name] = (key, symbols)
+            files.append((name, symbols))
+        return files, truncated
+
+    def text_matches(self, query, listed, known):
+        """Files the map did not rank whose lines contain the query's words, by
+        how many lines match; each with its first matching line."""
+        terms = sorted(set(search_terms(query)[:64]))[:12]
+        if not terms:
+            return []
         arguments = ["git", "grep", "-I", "-n", "-i", "-F", "--untracked", "--max-count", "20"]
         for term in terms:
             arguments += ["-e", term]
@@ -1739,18 +2069,17 @@ class Runner:
             found = subprocess.run(arguments, cwd=self.workspace, capture_output=True, timeout=60).stdout
         except (OSError, subprocess.TimeoutExpired):
             found = b""
+        scores = {}
         for line in found[:4 * 1024 * 1024].decode("utf-8", "replace").split("\n"):
             name, _, rest = line.partition(":")
             number, _, preview = rest.partition(":")
-            if not name or not number.isdigit():
+            if not number.isdigit() or name in listed or name not in known:
                 continue
-            item = scores.setdefault(name, {"path": name, "line": None, "score": 0})
-            item["score"] += 1
-            if item["line"] is None:
-                item["line"] = int(number)
-                item["preview"] = preview.strip()[:200]
-        ranked = sorted(scores.values(), key=lambda item: (-item["score"], item["path"]))
-        return {"items": ranked[:20], "ranking": "text"}
+            item = scores.setdefault(name, {"id": name, "path": name, "match": "text",
+                                            "lines": 0, "line": int(number),
+                                            "preview": preview.strip()[:200]})
+            item["lines"] += 1
+        return sorted(scores.values(), key=lambda item: (-item["lines"], item["path"]))
 
 
 class Browser:
@@ -2592,7 +2921,7 @@ def handle(request):
         wait_for_display()
         width, height = screen_size()
         return {"protocol": PROTOCOL, "runs": RUNS_PROTOCOL, "capabilities": capabilities(),
-                "screen": [width, height], "browser": browser_running()}
+                "slots": slots(), "screen": [width, height], "browser": browser_running()}
     wait_for_display()
     if action in ("snapshot", "screenshot"):
         return observe(request, action)

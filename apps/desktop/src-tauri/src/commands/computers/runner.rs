@@ -500,6 +500,32 @@ mod tests {
     }
 
     #[test]
+    fn slots_count_from_protocol_four_within_bounds() {
+        let slots = |status: Value| RunnerCapabilities::from_status(Some(&status)).slots;
+        // What agent.py reports in `hello` and `run_status`.
+        let hello = json!({"protocol": 1, "runs": 4, "capabilities": [LOCAL_BRIDGE],
+            "slots": 3, "screen": [1280, 800], "browser": true});
+        assert_eq!(slots(hello), Some(3));
+        assert_eq!(
+            slots(json!({"exists": false, "runs": 4, "slots": 1})),
+            Some(1)
+        );
+        assert_eq!(slots(json!({"runs": 4, "slots": 32})), Some(32));
+        for ignored in [
+            json!({"runs": 3, "slots": 3}),
+            json!({"runs": 4, "slots": 0}),
+            json!({"runs": 4, "slots": 33}),
+            json!({"runs": 4, "slots": -1}),
+            json!({"runs": 4, "slots": "4"}),
+            json!({"runs": 4, "slots": 2.5}),
+            json!({"runs": 4}),
+        ] {
+            assert_eq!(slots(ignored.clone()), None, "{ignored}");
+        }
+        assert_eq!(RunnerCapabilities::device().slots, None);
+    }
+
+    #[test]
     fn a_protocol_three_runner_keeps_the_earlier_tool_list() {
         let writer = Access {
             runner: runner(3, ALL),
