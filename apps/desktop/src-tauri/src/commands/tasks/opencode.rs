@@ -265,14 +265,7 @@ impl Connection {
             };
             let stopped = async {
                 loop {
-                    let alive = {
-                        let inner = runtime.inner.lock().unwrap();
-                        !inner.canceled.contains(run_id)
-                            && inner.processes.get(run_id).is_some_and(|p| {
-                                p.lock().unwrap().try_wait().ok().flatten().is_none()
-                            })
-                    };
-                    if !alive {
+                    if !runtime.process_alive(run_id) {
                         break;
                     }
                     tokio::time::sleep(Duration::from_millis(100)).await;

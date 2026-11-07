@@ -1491,9 +1491,12 @@ fn old_task_records_do_not_opt_into_automatic_execution() {
 #[test]
 fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
     // A missing executable fails at once, without spending the retry budget.
-    let error =
-        super::runtime::spawn_agent(&mut command("jackalope-nonexistent-agent-binary"), "codex")
-            .unwrap_err();
+    let error = super::agent_process::AgentProcess::spawn(
+        &mut command("jackalope-nonexistent-agent-binary"),
+        "codex",
+    )
+    .err()
+    .unwrap();
     assert!(error.contains("Could not launch codex"));
     assert!(
         !error.contains("attempts"),
@@ -1508,9 +1511,10 @@ fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
     ok.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let (mut child, attempts) = super::runtime::spawn_agent(&mut ok, "codex").unwrap();
-    assert_eq!(attempts, 1);
-    let _ = child.wait();
+    let spawned = super::agent_process::AgentProcess::spawn(&mut ok, "codex")
+        .ok()
+        .unwrap();
+    assert_eq!(spawned.attempts, 1);
 }
 
 #[test]
@@ -1735,4 +1739,26 @@ fn recovery_exports_import_once_and_never_shadow_a_present_task() {
 
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn kimi_print_mode_keeps_assistant_answers_and_rejects_tool_calls() {
+    let mut run = TaskRun::default();
+    consume_adapter_event(
+        &mut run,
+        r#"{"role":"meta","content":"not an answer"}"#,
+        "kimi",
+    );
+    consume_adapter_event(
+        &mut run,
+        r#"{"role":"assistant","content":"answer"}"#,
+        "kimi",
+    );
+    assert_eq!(run.result, "answer");
+    consume_adapter_event(
+        &mut run,
+        r#"{"role":"assistant","tool_calls":[{"id":"unexpected"}]}"#,
+        "kimi",
+    );
+    assert!(run.error.is_some());
 }

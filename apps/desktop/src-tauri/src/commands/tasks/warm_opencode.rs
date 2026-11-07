@@ -1,5 +1,6 @@
+use super::agent_process::AgentProcess;
 use super::*;
-use crate::commands::{agent_profiles, process_control::ProcessTree};
+use crate::commands::agent_profiles;
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
@@ -38,19 +39,9 @@ struct Entry {
 }
 
 struct Server {
-    child: std::process::Child,
-    tree: ProcessTree,
+    process: Arc<AgentProcess>,
     url: String,
     password: String,
-    _runner_lease: Option<crate::commands::managed_runtime::UseGuard>,
-}
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        self.tree.terminate();
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
 }
 
 pub(super) struct Lease {
@@ -285,7 +276,7 @@ impl Pool {
         }
         let mut guard = entry.server.lock().unwrap();
         let server = guard.as_mut()?;
-        if interrupted() || server.child.try_wait().ok()?.is_some() {
+        if interrupted() || server.process.try_wait().ok()?.is_some() {
             return None;
         }
         let url = server.url.clone();
@@ -492,23 +483,10 @@ fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, Strin
     .stdout(Stdio::null())
     .stderr(Stdio::null());
     drop(listener);
-    let runner_lease =
-        crate::commands::managed_runtime::acquire(std::path::Path::new(cmd.get_program()))?;
-    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
-    let tree = match ProcessTree::attach(&child) {
-        Ok(tree) => tree,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(error);
-        }
-    };
-    let mut server = Server {
-        child,
-        tree,
+    let server = Server {
+        process: AgentProcess::spawn(&mut cmd, "opencode")?.process,
         url: format!("http://127.0.0.1:{port}"),
         password,
-        _runner_lease: runner_lease,
     };
     let client = reqwest::Client::builder()
         .no_proxy()
@@ -520,7 +498,7 @@ fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, Strin
     let started = std::time::Instant::now();
     while started.elapsed() < Duration::from_secs(8) && !canceled() {
         if server
-            .child
+            .process
             .try_wait()
             .map_err(|e| e.to_string())?
             .is_some()

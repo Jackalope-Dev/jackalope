@@ -499,6 +499,7 @@ impl Helper {
                 candidate.model.as_deref(),
                 prompt,
                 canceled,
+                super::tasks::helper_process::TURN_LIMIT,
             )
             .and_then(|response| accept(&response.result).map(|value| (value, response)));
             match attempt {

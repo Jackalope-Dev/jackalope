@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::process_control::ProcessTree;
 
 struct Fixture(PathBuf);
 impl Drop for Fixture {
@@ -202,7 +203,7 @@ http.createServer(async (req, res) => {
             .unwrap()
             .as_ref()
             .unwrap()
-            .child
+            .process
             .id();
         working_sets.push(working_set(pid));
         lease.complete();

@@ -366,7 +366,7 @@ fn agent_assessment(
         return Err("Task assessment stopped.".into());
     }
     *attempted = true;
-    let response = super::tasks::helper_process::run_bounded(
+    let response = super::tasks::helper_process::run(
         runtime,
         agent,
         &binding,

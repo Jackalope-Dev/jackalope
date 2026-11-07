@@ -572,15 +572,10 @@ fn wait_for_answer(
     runtime.record_prompt(&prompt);
     let started = std::time::Instant::now();
     while started.elapsed() < Duration::from_secs(600) {
-        let inner = runtime.inner.lock().unwrap();
-        if inner.canceled.contains(run_id)
-            || inner
-                .processes
-                .get(run_id)
-                .is_none_or(|child| child.lock().unwrap().try_wait().ok().flatten().is_some())
-        {
+        if !runtime.process_alive(run_id) {
             break;
         }
+        let inner = runtime.inner.lock().unwrap();
         if let Some(answer) = inner
             .runs
             .get(run_id)

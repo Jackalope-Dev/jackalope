@@ -126,16 +126,12 @@ impl AttemptRunner for RemoteRunner {
             &root,
             bridge.map(|b| b.endpoint.as_str()),
         )?;
+        if runtime
+            .register_process(id, Some(workspace), || Ok((None, ())))?
+            .is_none()
         {
-            let inner = runtime.inner.lock().unwrap();
-            if inner.canceled.contains(id) {
-                drop(inner);
-                runtime.mark_stopped(id);
-                return Ok(Step::Stopped);
-            }
-            if workspace_in_use(&inner, id, workspace) {
-                return Err(WORKSPACE_IN_USE.into());
-            }
+            runtime.mark_stopped(id);
+            return Ok(Step::Stopped);
         }
         runtime.update_checked(id, |run| {
             run.remote = Some(RemoteExecution {

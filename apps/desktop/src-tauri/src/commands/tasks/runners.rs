@@ -77,7 +77,7 @@ pub(super) fn discover_runner(
             match probe_auth(path, args, Some(&binding)) {
                 Ok(out) => {
                     if adapter == "claude" {
-                        if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
+                        if let Ok(auth) = serde_json::from_str::<Value>(&out.stdout) {
                             runner.signed_in = auth["loggedIn"] == true;
                             runner.account = auth["email"]
                                 .as_str()
@@ -85,7 +85,7 @@ pub(super) fn discover_runner(
                                 .into();
                         }
                     } else {
-                        runner.signed_in = out.status.success();
+                        runner.signed_in = out.success;
                     }
                     runner.detail = if runner.signed_in {
                         "Signed in and ready.".into()
@@ -97,7 +97,7 @@ pub(super) fn discover_runner(
                         "Sign in using the agent's CLI, then refresh.".into()
                     };
                 }
-                Err(error) => runner.detail = error.to_string(),
+                Err(error) => runner.detail = error,
             }
         }
     }

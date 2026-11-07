@@ -1,3 +1,4 @@
+mod agent_process;
 pub(super) mod antigravity;
 mod claude_session;
 mod delegation;
@@ -60,7 +61,7 @@ use tauri_plugin_dialog::DialogExt;
 struct Inner {
     runs: HashMap<String, TaskRun>,
     recovery: Vec<HistoryRecoveryEntry>,
-    processes: HashMap<String, Arc<Mutex<std::process::Child>>>,
+    processes: HashMap<String, Arc<agent_process::AgentProcess>>,
     canceled: std::collections::HashSet<String>,
 }
 
@@ -202,51 +203,26 @@ fn valid_id(id: &str) -> bool {
     (8..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 
+/// Runs an agent CLI's sign-in check for `binding`, for at most 10 seconds.
 pub(super) fn probe_auth(
     path: PathBuf,
     args: Vec<&str>,
     binding: Option<&crate::commands::agent_profiles::AccountBinding>,
-) -> Result<std::process::Output, std::io::Error> {
+) -> Result<super::process_control::CommandResult, String> {
     let mut cmd = command(path);
     cmd.args(args);
     if let Some(binding) = binding {
-        crate::commands::agent_sign_in::ensure_idle(binding).map_err(std::io::Error::other)?;
-        crate::commands::agent_profiles::apply_binding(&mut cmd, binding)
-            .map_err(std::io::Error::other)?;
+        crate::commands::agent_sign_in::ensure_idle(binding)?;
+        crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
     }
-    let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
-    let tree = match super::process_control::ProcessTree::attach(&child) {
-        Ok(tree) => tree,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(std::io::Error::other(error));
-        }
-    };
-    let stdout = child.stdout.take().unwrap();
-    let reader = std::thread::spawn(move || {
-        let mut data = Vec::new();
-        let _ = stdout.take(64_000).read_to_end(&mut data);
-        data
-    });
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
-    loop {
-        if let Some(status) = child.try_wait()? {
-            tree.terminate();
-            return Ok(std::process::Output {
-                status,
-                stdout: reader.join().unwrap_or_default(),
-                stderr: vec![],
-            });
-        }
-        if std::time::Instant::now() >= deadline {
-            tree.terminate();
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Sign-in check timed out. Open the agent CLI to check its configuration, then refresh."));
-        }
-        std::thread::sleep(Duration::from_millis(50));
+    let result = super::process_control::run(cmd, Duration::from_secs(10))?;
+    if result.timed_out {
+        return Err(
+            "Sign-in check timed out. Open the agent CLI to check its configuration, then refresh."
+                .into(),
+        );
     }
+    Ok(result)
 }
 
 #[tauri::command]

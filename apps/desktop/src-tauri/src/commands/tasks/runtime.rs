@@ -5,34 +5,6 @@ use super::*;
 const RECENT_TOUCHED_ATTEMPTS: usize = 3;
 const RECENT_TOUCHED_PATHS: usize = 60;
 
-/// Launch the agent, retrying a transient failure (an antivirus or indexer lock
-/// on the executable, `ETXTBSY` just after a write) a bounded number of times.
-/// A missing executable is not retried. Returns the child and the attempt count.
-pub(super) fn spawn_agent(
-    cmd: &mut Command,
-    agent: &str,
-) -> Result<(std::process::Child, u32), String> {
-    let mut last: Option<std::io::Error> = None;
-    for attempt in 1..=3u32 {
-        match cmd.spawn() {
-            Ok(child) => return Ok((child, attempt)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(format!("Could not launch {agent}: {error}"));
-            }
-            Err(error) => {
-                last = Some(error);
-                if attempt < 3 {
-                    std::thread::sleep(Duration::from_millis(150));
-                }
-            }
-        }
-    }
-    Err(format!(
-        "Could not launch {agent} after 3 attempts: {}",
-        last.map_or_else(String::new, |error| error.to_string())
-    ))
-}
-
 /// Explain a failed setup command in terms of what actually went wrong, so the next
 /// step is obvious: a command that was cut off needs different action than one that ran
 /// and reported a problem.
@@ -151,21 +123,7 @@ impl TaskRuntime {
         crate::commands::desktop_control::close(id);
         crate::commands::computers::release_run(id);
         if let Some(process) = process {
-            let mut child = process.lock().unwrap();
-            if child.try_wait().map_err(|e| e.to_string())?.is_none() {
-                #[cfg(windows)]
-                {
-                    command("taskkill.exe")
-                        .args(["/PID", &child.id().to_string(), "/T", "/F"])
-                        .output()
-                        .map_err(|e| e.to_string())?;
-                }
-                #[cfg(unix)]
-                {
-                    super::super::process_control::ProcessTree::attach(&child)?.terminate();
-                }
-                let _ = child.kill();
-            }
+            process.terminate();
         }
         Ok(())
     }

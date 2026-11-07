@@ -272,7 +272,7 @@ pub fn agent_reflection(
     if !policy.account_allowed(project_id, &agent, &binding) {
         return Err("The default agent's account is unavailable for this project.".into());
     }
-    let response = crate::commands::tasks::helper_process::run_bounded(
+    let response = crate::commands::tasks::helper_process::run(
         runtime,
         &agent,
         &binding,
