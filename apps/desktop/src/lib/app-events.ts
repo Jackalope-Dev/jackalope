@@ -5,7 +5,7 @@ import type {
   ProjectSettingsCategory,
 } from '../components/settings/categories';
 
-export interface ProjectSettingsDestination {
+interface ProjectSettingsDestination {
   projectId: string;
   category: ProjectSettingsCategory;
 }

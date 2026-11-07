@@ -31,7 +31,7 @@ export function agentShortName(agent: string) {
 }
 
 /** The catalog entry for the adapter `agent` runs on, if it is a catalog agent. */
-export function agentSpec(agent: string, customAgents?: CustomAgents): CatalogEntry | undefined {
+function agentSpec(agent: string, customAgents?: CustomAgents): CatalogEntry | undefined {
   return catalog[agentAdapter(agent, customAgents) as BuiltinAgentId];
 }
 
