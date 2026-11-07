@@ -161,36 +161,44 @@ fn citation(reference: &str) -> Option<(&str, usize)> {
     digits.parse().ok().map(|line| (path, line))
 }
 
-/// True when the cited file exists inside the workspace and has the cited line.
-fn cited_line_exists(workspace: &Path, path: &str, line: usize) -> bool {
+/// Files larger than this are not read to count their lines; existence is enough.
+pub(super) const LINE_CHECK_BYTES: u64 = 8 * 1024 * 1024;
+
+/// The file or folder a pointer names, when it resolves inside `workspace`.
+/// `..` is refused outright, and links or absolute paths that lead outside
+/// are refused once resolved, so a pointer cannot probe the rest of the disk.
+pub(super) fn workspace_path(workspace: &Path, path: &str) -> Option<std::path::PathBuf> {
     let candidate = Path::new(path);
     if candidate
         .components()
         .any(|part| matches!(part, Component::ParentDir))
     {
-        return false;
+        return None;
     }
     let joined = if candidate.is_absolute() {
         candidate.to_path_buf()
     } else {
         workspace.join(candidate)
     };
-    let Ok(resolved) = std::fs::canonicalize(joined) else {
+    let resolved = std::fs::canonicalize(joined).ok()?;
+    let root = std::fs::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf());
+    resolved.starts_with(root).then_some(resolved)
+}
+
+/// True when the cited file exists inside the workspace and has the cited line.
+fn cited_line_exists(workspace: &Path, path: &str, line: usize) -> bool {
+    let Some(resolved) = workspace_path(workspace, path).filter(|path| path.is_file()) else {
         return false;
     };
-    if !resolved.starts_with(workspace) || !resolved.is_file() {
-        return false;
-    }
     match std::fs::metadata(&resolved) {
-        Ok(meta) if meta.len() <= 8 * 1024 * 1024 => {}
-        // Large files are not read; existence is enough.
+        Ok(meta) if meta.len() <= LINE_CHECK_BYTES => {}
         Ok(_) => return line >= 1,
         Err(_) => return false,
     }
     std::fs::read(&resolved).is_ok_and(|bytes| line >= 1 && bytecount_lines(&bytes) >= line)
 }
 
-fn bytecount_lines(bytes: &[u8]) -> usize {
+pub(super) fn bytecount_lines(bytes: &[u8]) -> usize {
     if bytes.is_empty() {
         return 0;
     }

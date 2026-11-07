@@ -29,8 +29,6 @@ pub const CONTRACT: &str = "In long work, call record_decision (HTTP: POST /v1/d
 /// Entries one attempt may record. Retries and continuations start their own trail.
 const MAX_ENTRIES: usize = 100;
 const MAX_POINTERS: usize = 4;
-/// Files larger than this are only checked for existence, not line counts.
-const LINE_CHECK_BYTES: u64 = 8_000_000;
 
 pub const FOUND: &str = "found";
 pub const MISSING: &str = "missing";
@@ -457,12 +455,8 @@ fn check_file(root: &Path, path: &str, line: Option<usize>) -> Result<(), String
     if path.trim().is_empty() {
         return Err("No path given".into());
     }
-    let candidate = Path::new(path.trim());
-    let full = if candidate.is_absolute() {
-        candidate.to_path_buf()
-    } else {
-        root.join(candidate)
-    };
+    let full = super::evidence::workspace_path(root, path.trim())
+        .ok_or_else(|| "File not found in the workspace".to_owned())?;
     let metadata = std::fs::metadata(&full).map_err(|_| "File not found".to_owned())?;
     let Some(line) = line else {
         return Ok(());
@@ -473,14 +467,11 @@ fn check_file(root: &Path, path: &str, line: Option<usize>) -> Result<(), String
     if line == 0 {
         return Err("Lines start at 1".into());
     }
-    if metadata.len() > LINE_CHECK_BYTES {
+    if metadata.len() > super::evidence::LINE_CHECK_BYTES {
         return Ok(());
     }
     let bytes = std::fs::read(&full).map_err(|_| "File could not be read".to_owned())?;
-    let mut lines = bytes.iter().filter(|byte| **byte == b'\n').count();
-    if bytes.last().is_some_and(|byte| *byte != b'\n') {
-        lines += 1;
-    }
+    let lines = super::evidence::bytecount_lines(&bytes);
     if line > lines {
         return Err(format!("The file has {lines} lines"));
     }
@@ -701,5 +692,30 @@ mod tests {
             Some("The file has 3 lines")
         );
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn file_pointers_cannot_probe_outside_the_workspace() {
+        let parent = std::env::temp_dir().join(format!("jackalope-trail-{}", uuid::Uuid::new_v4()));
+        let root = parent.join("workspace");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("inside.txt"),
+            "one
+",
+        )
+        .unwrap();
+        std::fs::write(
+            parent.join("outside.txt"),
+            "secret
+",
+        )
+        .unwrap();
+        assert!(check_file(&root, "inside.txt", Some(1)).is_ok());
+        assert!(check_file(&root, &root.join("inside.txt").to_string_lossy(), None).is_ok());
+        assert!(check_file(&root, "../outside.txt", None).is_err());
+        let outside = parent.join("outside.txt");
+        assert!(check_file(&root, &outside.to_string_lossy(), None).is_err());
+        let _ = std::fs::remove_dir_all(&parent);
     }
 }
