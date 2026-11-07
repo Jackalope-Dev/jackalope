@@ -4,6 +4,7 @@
 use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
 use crate::host::{self, ColdStart};
+use crate::merge;
 use crate::protocol::{
     self, profile_root, AgentStatus, Project, Request, Response, SessionSummary,
 };
@@ -248,8 +249,7 @@ pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(
 }
 
 /// Merges a conversation's latest reviewed attempt into the project's target
-/// branch through the app's merge review, pausing the conversation first so no
-/// new message starts mid-merge. Shows the plan and asks before applying.
+/// branch through the app's merge review. Shows the plan and asks before applying.
 pub fn merge(
     preference: Option<ColdStart>,
     prefix: &str,
@@ -262,48 +262,14 @@ pub fn merge(
     if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Merge once it finishes.".into());
     }
-    if !view.paused {
-        connection.call(&Request::SessionAction {
-            session_id: id.clone(),
-            action: "pause".into(),
-            message_id: None,
-        })?;
+    let mut call = |request: Request| connection.call(&request);
+    let merge::Prepared { plan, paused_here } =
+        merge::prepare(&mut call, &id, view.paused, message)?;
+    if paused_here {
         eprintln!(
             "Paused {} so no new message starts during the merge.",
             view.title
         );
-    }
-    let prepared = connection.call(&Request::MergePrepare {
-        session_id: id.clone(),
-        message,
-    });
-    let plan = match prepared {
-        Ok(Response::Merge { plan }) => plan,
-        other => {
-            // Nothing was prepared, so the pause this command added is undone.
-            if !view.paused {
-                let _ = connection.call(&Request::SessionAction {
-                    session_id: id.clone(),
-                    action: "resume".into(),
-                    message_id: None,
-                });
-            }
-            return Err(match other {
-                Err(error) => error,
-                _ => unexpected(),
-            });
-        }
-    };
-    if !plan.conflicts.is_empty() {
-        return Err(format!(
-            "{} conflicts with {}: {}. Resolve them in the app's merge review.",
-            view.title,
-            plan.target_branch,
-            plan.conflicts.join(", ")
-        ));
-    }
-    if plan.files.is_empty() {
-        return Err("There are no changes to merge.".into());
     }
     let count = plan.files.len();
     eprintln!(
@@ -326,26 +292,16 @@ pub fn merge(
         eprintln!("The worktree is removed afterwards, as your commit settings ask.");
     }
     if !approved(yes, "Merge now?")? {
-        eprintln!(
-            "Not merged. {} stays paused; resume it with /unpause in jackalope attach {}.",
-            view.title,
-            short(&id)
-        );
+        merge::release(&mut call, &id, paused_here);
+        eprintln!("Not merged.");
         return Ok(());
     }
-    match connection.call(&Request::MergeApply {
-        plan_id: plan.id,
-        cleanup: plan.cleanup,
-    })? {
-        Response::Merge { plan } => {
-            println!("Merged {} into {}.", view.title, plan.target_branch);
-            for error in plan.cleanup_errors {
-                eprintln!("Could not remove the worktree: {error}");
-            }
-            Ok(())
-        }
-        _ => Err(unexpected()),
+    let merged = merge::apply(&mut call, &id, paused_here, plan.id, plan.cleanup)?;
+    println!("Merged {} into {}.", view.title, merged.target_branch);
+    for error in merged.cleanup_errors {
+        eprintln!("Could not remove the worktree: {error}");
     }
+    Ok(())
 }
 
 /// Commits a conversation's remaining changes with the project's commit
@@ -371,7 +327,7 @@ pub fn pull_request(
     if title.is_empty() || title.contains('\n') {
         return Err("Give the pull request a one-line title with --title.".into());
     }
-    let body: String = view.result.trim().chars().take(4000).collect();
+    let body = merge::pull_request_body(&view.result);
     let branch = view.branch.clone().unwrap_or_default();
     eprintln!(
         "Commit any remaining changes with your commit settings, push {} and open a {} pull request:",

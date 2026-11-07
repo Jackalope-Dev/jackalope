@@ -15,6 +15,7 @@ mod git;
 mod git_command;
 mod history;
 mod host;
+mod merge;
 mod once;
 mod planning;
 mod prefs;
