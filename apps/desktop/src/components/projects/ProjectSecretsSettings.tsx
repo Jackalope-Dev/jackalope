@@ -23,7 +23,7 @@ const AVAILABILITY: { value: SecretAvailability; title: string; description: str
   {
     value: 'computers',
     title: 'Agents on computers',
-    description: 'Only agents running on the project’s computer.',
+    description: 'Not given to agents on this device.',
   },
 ];
 
