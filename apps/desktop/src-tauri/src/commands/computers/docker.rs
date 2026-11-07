@@ -206,10 +206,7 @@ pub(crate) fn image_tag(directory: &Path) -> Result<String, String> {
         digest.update((bytes.len() as u64).to_le_bytes());
         digest.update(&bytes);
     }
-    let hex: String = digest.finalize()[..6]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let hex = super::artifacts::hex(&digest.finalize()[..6]);
     Ok(format!("jackalope-computer:{hex}"))
 }
 
@@ -237,10 +234,7 @@ pub(crate) fn config_digest(computer: &Computer, image: &str) -> String {
     })
     .unwrap_or_default();
     let digest = Sha256::digest(format!("{image}\n{settings}").as_bytes());
-    digest[..8]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    super::artifacts::hex(&digest[..8])
 }
 
 /// `docker create` arguments. The viewer password comes from the CLI's

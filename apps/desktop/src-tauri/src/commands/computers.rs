@@ -298,8 +298,6 @@ fn hosted_unavailable() -> String {
         .into()
 }
 
-// ---- secrets ----
-
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ComputerSecret {
@@ -323,7 +321,7 @@ pub(crate) fn secret(root: &Path, id: &str) -> Result<ComputerSecret, String> {
         }
     }
     let secret = ComputerSecret {
-        vnc_password: uuid::Uuid::new_v4().simple().to_string()[..8].to_string(),
+        vnc_password: vnc_password(),
     };
     std::fs::create_dir_all(root.join("secrets")).map_err(|e| e.to_string())?;
     account_storage::write(
@@ -333,7 +331,10 @@ pub(crate) fn secret(root: &Path, id: &str) -> Result<ComputerSecret, String> {
     Ok(secret)
 }
 
-// ---- providers ----
+/// A new viewer password. VNC's password authentication uses only 8 characters.
+pub(crate) fn vnc_password() -> String {
+    uuid::Uuid::new_v4().simple().to_string()[..8].to_string()
+}
 
 /// What a provider reports about a computer's machine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -444,8 +445,6 @@ pub(crate) fn provider(name: &str) -> Result<&'static dyn Provider, String> {
         _ => Err("This computer was made by a newer Jackalope. Update to use it.".into()),
     }
 }
-
-// ---- lifecycle and connections ----
 
 /// What a computer is doing right now, for computers starting or stopping in
 /// the background. Errors stay until the next lifecycle action.
@@ -605,8 +604,6 @@ pub(crate) fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> 
         started = true;
     }
 }
-
-// ---- runs ----
 
 /// A run's computer: the one its agent runs on, its bot's, or the one the
 /// person approved for its task. An agent on a computer acts on that same
@@ -852,8 +849,6 @@ pub fn release_run(run_id: &str) {
     }
     super::desktop_control::computer::close(run_id);
 }
-
-// ---- views and app commands ----
 
 fn state_name(state: MachineState) -> &'static str {
     match state {

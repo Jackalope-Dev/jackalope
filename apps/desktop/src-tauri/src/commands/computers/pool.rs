@@ -22,7 +22,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// The host id of this device.
 pub(crate) const DEVICE: &str = "device";
 pub(crate) const DEVICE_NAME: &str = "This device";
 /// Runs a computer the person added takes at once, unless its runner reports
@@ -128,8 +127,6 @@ pub(crate) fn save(root: &Path, project: &str, hosts: ProjectHosts) -> Result<()
     let bytes = serde_json::to_vec_pretty(&saved).map_err(|e| e.to_string())?;
     crate::commands::history::write_atomic(&root.join("pool.json"), &bytes)
 }
-
-// ---- health ----
 
 /// What this device knows of a computer from its runs.
 #[derive(Clone, Debug, Default)]
@@ -358,8 +355,6 @@ pub(crate) fn reported_slots(status: Option<&serde_json::Value>) -> Option<usize
         .filter(|slots| (1..=super::protocol::protocol().slots_max).contains(slots))
         .map(|slots| slots as usize)
 }
-
-// ---- placement ----
 
 /// One execution host as the placer sees it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -676,8 +671,6 @@ fn refusal(policy: SwarmHosts, hosts: &[Host], needs: &Needs, exclude: Option<&s
     "No host this project may use can take this work.".into()
 }
 
-// ---- the pool a dispatch tick works from ----
-
 /// A computer that supports runs, as one dispatch tick sees it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct PoolComputer {
@@ -839,8 +832,6 @@ pub(crate) struct Limits {
     /// Agents at once on computers, shared by all of them.
     pub remote: usize,
 }
-
-// ---- hosts chosen at dispatch, handed to the attempt ----
 
 fn assigned() -> &'static Mutex<HashMap<String, RunHost>> {
     static ASSIGNED: OnceLock<Mutex<HashMap<String, RunHost>>> = OnceLock::new();

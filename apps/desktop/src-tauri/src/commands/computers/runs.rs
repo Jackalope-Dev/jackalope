@@ -50,8 +50,7 @@ pub(crate) fn project_computer(root: &Path, project_id: &str) -> Option<Computer
 /// resume there.
 pub(crate) fn run_name(workspace: &str) -> String {
     let digest = Sha256::digest(workspace.as_bytes());
-    let hex: String = digest[..10].iter().map(|b| format!("{b:02x}")).collect();
-    format!("w{hex}")
+    format!("w{}", super::artifacts::hex(&digest[..10]))
 }
 
 /// A read-only (planning) attempt's run name. It never shares a folder with a
@@ -377,13 +376,7 @@ impl Session {
                 "final": last,
             });
             if last {
-                let hex: String = digest
-                    .clone()
-                    .finalize()
-                    .iter()
-                    .map(|b| format!("{b:02x}"))
-                    .collect();
-                request["sha256"] = json!(hex);
+                request["sha256"] = json!(super::artifacts::hex(&digest.clone().finalize()));
             }
             self.call(request, CALL_TIMEOUT)?;
             offset += filled as u64;
@@ -513,10 +506,7 @@ impl Session {
             }
             patch.extend_from_slice(&data);
         }
-        let hex: String = Sha256::digest(&patch)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let hex = super::artifacts::hex(&Sha256::digest(&patch));
         if summary["sha256"].as_str() != Some(hex.as_str()) {
             return Err("The computer's change set was corrupted in transfer.".into());
         }

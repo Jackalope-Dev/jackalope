@@ -127,7 +127,7 @@ fn repository(workspace: &Path) -> Result<(PathBuf, String), String> {
         name = name.to_lowercase();
     }
     let digest = Sha256::digest(name.as_bytes());
-    let key: String = digest[..12].iter().map(|b| format!("{b:02x}")).collect();
+    let key = super::artifacts::hex(&digest[..12]);
     Ok((common.join("objects"), format!("p{key}")))
 }
 

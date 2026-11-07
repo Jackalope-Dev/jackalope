@@ -146,7 +146,7 @@ fn secret(root: &Path, computer: &Computer) -> Result<InstanceSecret, String> {
             uuid::Uuid::new_v4().simple(),
             uuid::Uuid::new_v4().simple()
         ),
-        vnc_password: uuid::Uuid::new_v4().simple().to_string()[..8].to_string(),
+        vnc_password: super::vnc_password(),
     };
     std::fs::create_dir_all(root.join("secrets")).map_err(|e| e.to_string())?;
     account_storage::write(
