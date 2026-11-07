@@ -324,7 +324,6 @@ pub(super) async fn bridge_message(
             tauri::async_runtime::spawn_blocking(move || {
                 let _guard = crate::commands::integration::execution_guard()?;
                 let directory = runtime.integration_directory();
-                std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
                 crate::commands::integration::workspace_tree(&run, &directory)
             })
             .await

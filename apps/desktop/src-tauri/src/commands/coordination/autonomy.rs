@@ -8,9 +8,9 @@
 //! holds every change for review.
 
 use crate::commands::evidence::EvidenceLevel;
-use crate::commands::git_command::{self, Policy};
 use crate::commands::outcomes::{AssessmentStatus, OutcomeReceipt};
 use crate::commands::previews::features::glob_matches;
+use crate::commands::repo::{self, Policy};
 use crate::commands::tasks::{TaskRun, TaskRuntime};
 use serde::Deserialize;
 use std::path::Path;
@@ -264,21 +264,16 @@ pub fn always_protected() -> Vec<String> {
         .collect()
 }
 
-fn git(project: &Path, args: &[&str]) -> Result<std::process::Output, String> {
-    git_command::command(project, args, Policy::Isolated)
-        .output()
-        .map_err(|e| format!("Could not run Git: {e}"))
-}
-
 /// The commit a local branch points at.
 pub fn branch_head(project: &Path, branch: &str) -> Result<String, String> {
-    let output = git(
+    let output = repo::output(
         project,
         &[
             "rev-parse",
             "--verify",
             &format!("refs/heads/{branch}^{{commit}}"),
         ],
+        Policy::Isolated,
     )?;
     if !output.status.success() {
         return Err(format!("The target branch {branch} could not be read."));
@@ -289,11 +284,11 @@ pub fn branch_head(project: &Path, branch: &str) -> Result<String, String> {
 /// The policy committed at `commit`, or `None` when that commit has none.
 pub fn load(project: &Path, commit: &str) -> Result<Option<AutonomyPolicy>, String> {
     let spec = format!("{commit}:{POLICY_PATH}");
-    let exists = git(project, &["cat-file", "-e", &spec])?;
+    let exists = repo::output(project, &["cat-file", "-e", &spec], Policy::Isolated)?;
     if !exists.status.success() {
         return Ok(None);
     }
-    let output = git(project, &["cat-file", "blob", &spec])?;
+    let output = repo::output(project, &["cat-file", "blob", &spec], Policy::Isolated)?;
     if !output.status.success() {
         return Err(format!(
             "{POLICY_PATH} could not be read from the target branch."
@@ -405,27 +400,17 @@ pub fn accept_outcomes(
 
 /// Files and line counts between the target commit and the combined result.
 pub fn changed_files(project: &Path, base: &str, head: &str) -> Result<Vec<ChangedFile>, String> {
-    let output = git(
+    let numstat = repo::git_exact(
         project,
         &["diff", "--numstat", "-z", "--no-renames", base, head, "--"],
-    )?;
-    if !output.status.success() {
-        return Err("Could not measure the combined change.".into());
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    Ok(text
-        .split('\0')
-        .filter(|entry| !entry.is_empty())
-        .filter_map(|entry| {
-            let mut parts = entry.splitn(3, '\t');
-            let added = parts.next()?;
-            let removed = parts.next()?;
-            let path = parts.next()?.to_string();
-            let count = |n: &str| n.parse::<usize>().unwrap_or(0);
-            Some(ChangedFile {
-                path,
-                lines: count(added) + count(removed),
-            })
+        Policy::Isolated,
+    )
+    .map_err(|_| "Could not measure the combined change.".to_string())?;
+    Ok(repo::parse_numstat(&numstat)
+        .into_iter()
+        .map(|entry| ChangedFile {
+            lines: (entry.added.unwrap_or(0) + entry.removed.unwrap_or(0)) as usize,
+            path: entry.path,
         })
         .collect())
 }
@@ -634,7 +619,7 @@ mod tests {
         std::fs::create_dir(&dir).unwrap();
         let root = dir.as_path();
         let run = |args: &[&str]| {
-            let out = git_command::command(root, args, Policy::Isolated)
+            let out = repo::command(root, args, Policy::Isolated)
                 .output()
                 .unwrap();
             assert!(out.status.success(), "{args:?}: {out:?}");

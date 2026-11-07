@@ -130,14 +130,7 @@ fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
 }
 
 pub(super) fn git(path: &str, args: &[&str]) -> Result<String, String> {
-    let out =
-        super::git_command::command(Path::new(path), args, super::git_command::Policy::Inherited)
-            .output()
-            .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).trim_end().into())
+    super::repo::git(Path::new(path), args, super::repo::Policy::Inherited)
 }
 
 pub(super) fn resolve_target_branch(path: &str, requested: Option<&str>) -> Result<String, String> {
@@ -590,7 +583,6 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
                 return Err("Resolve active workspace ownership before completing review.".into());
             }
             let directory = state.integration_directory();
-            std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             let tree = super::integration::workspace_tree(current, &directory)?;
             current.contract.require_accepted(&tree)?;
         }

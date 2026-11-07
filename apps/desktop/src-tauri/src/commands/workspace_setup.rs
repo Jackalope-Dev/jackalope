@@ -81,8 +81,11 @@ pub(super) fn copy_files(
             ));
         }
         for checkout in [&root, &destination] {
-            let mut command =
-                super::worktree_cleanup::command(checkout, &["check-ignore", "--quiet", "--"]);
+            let mut command = super::repo::command(
+                checkout,
+                &["check-ignore", "--quiet", "--"],
+                super::repo::Policy::Inspection,
+            );
             command.arg(&file);
             let ignored = super::process_control::run(command, std::time::Duration::from_secs(5))?;
             if !ignored.success {

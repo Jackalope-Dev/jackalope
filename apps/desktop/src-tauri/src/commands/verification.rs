@@ -245,7 +245,6 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
             leases::check_slot(|| active && !runtime.is_running(&run.id))
         })?;
         let directory = runtime.integration_directory();
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let before = super::integration::workspace_tree(run, &directory)?;
         runtime.stage(&run.id, Some("verification"));
         let agent_active = run.status.is_running();

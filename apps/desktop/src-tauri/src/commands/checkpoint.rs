@@ -1,4 +1,8 @@
-use super::{integration, project_git, tasks::TaskRun};
+use super::{
+    integration, project_git,
+    repo::{self, Policy::Inspection, Seed},
+    tasks::TaskRun,
+};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
 
@@ -36,16 +40,6 @@ pub(super) fn suggested_message(run: &TaskRun) -> String {
     }
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = super::git_command::command(path, args, super::git_command::Policy::Inspection)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().into())
-}
-
 struct IndexLock(std::path::PathBuf);
 impl Drop for IndexLock {
     fn drop(&mut self) {
@@ -70,14 +64,16 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
         return Ok(None);
     }
     if !run.branch.starts_with("jackalope/")
-        || git(path, &["symbolic-ref", "--quiet", "HEAD"])? != format!("refs/heads/{}", run.branch)
+        || repo::git(path, &["symbolic-ref", "--quiet", "HEAD"], Inspection)?
+            != format!("refs/heads/{}", run.branch)
     {
         return Err("Automatic commits require the task's original Jackalope branch.".into());
     }
     let common = |path: &Path| -> Result<std::path::PathBuf, String> {
-        fs::canonicalize(git(
+        fs::canonicalize(repo::git(
             path,
             &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+            Inspection,
         )?)
         .map_err(|e| e.to_string())
     };
@@ -85,11 +81,11 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
         return Err("Task worktree no longer belongs to this project.".into());
     }
     super::previews::ensure_idle(&run.workspace)?;
-    if git(path, &["ls-files", "-v", "-z"])?
+    if repo::git(path, &["ls-files", "-v", "-z"], Inspection)?
         .split('\0')
         .filter(|s| !s.is_empty())
         .any(|s| !s.starts_with("H "))
-        || git(path, &["ls-files", "--stage", "-z"])?
+        || repo::git(path, &["ls-files", "--stage", "-z"], Inspection)?
             .split('\0')
             .any(|s| s.starts_with("160000 "))
     {
@@ -97,11 +93,11 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
     }
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
     let source = integration::snapshot(run, directory)?;
-    let parent_tree = git(path, &["rev-parse", "HEAD^{tree}"])?;
+    let parent_tree = repo::git(path, &["rev-parse", "HEAD^{tree}"], Inspection)?;
     if source.tree == parent_tree {
         return Ok(None);
     }
-    let staged = git(path, &["write-tree"])?;
+    let staged = repo::git(path, &["write-tree"], Inspection)?;
     if staged != parent_tree && staged != source.tree {
         return Err("Staged content differs from the working copy. Review the index before committing; all files are retained.".into());
     }
@@ -110,9 +106,10 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
         &format!("{}\n\nJackalope-Run: {}", suggested_message(run), run.id),
         &project_git::contributors(run),
     );
-    let index = git(
+    let index = repo::git(
         path,
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+        Inspection,
     )?;
     let index_before = fs::read(&index).map_err(|e| e.to_string())?;
     let lock_path = std::path::PathBuf::from(format!("{index}.lock"));
@@ -134,24 +131,16 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
             "Task files changed before the checkpoint. They are retained for review.".into(),
         );
     }
-    let temporary = IndexLock(directory.join(format!("{}.checkpoint-index", uuid::Uuid::new_v4())));
-    let output = super::git_command::command(
-        path,
-        &["read-tree", &source.tree],
-        super::git_command::Policy::Inspection,
-    )
-    .env("GIT_INDEX_FILE", &temporary.0)
-    .output()
-    .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err("Cannot prepare the checkpoint index.".into());
-    }
-    lock_file
-        .write_all(&fs::read(&temporary.0).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    let prepared = repo::with_temp_index(path, directory, Seed::Empty, Inspection, |scratch| {
+        scratch
+            .git(&["read-tree", &source.tree])
+            .map_err(|_| "Cannot prepare the checkpoint index.".to_string())?;
+        fs::read(scratch.file()).map_err(|e| e.to_string())
+    })?;
+    lock_file.write_all(&prepared).map_err(|e| e.to_string())?;
     lock_file.sync_all().map_err(|e| e.to_string())?;
     drop(lock_file);
-    let mut cmd = super::git_command::command(
+    let mut cmd = repo::command(
         path,
         &[
             "commit-tree",
@@ -161,7 +150,7 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
             "-m",
             &message,
         ],
-        super::git_command::Policy::Inspection,
+        Inspection,
     );
     policy.environment(&mut cmd, &project_git::contributors(run));
     let output = cmd.output().map_err(|e| e.to_string())?;
@@ -169,7 +158,7 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
         return Err("Cannot write the task checkpoint.".into());
     }
     let head = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    git(
+    repo::git(
         path,
         &[
             "update-ref",
@@ -177,6 +166,7 @@ pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoin
             &head,
             &source.head,
         ],
+        Inspection,
     )?;
     fs::rename(&lock.0, &index).map_err(|e| format!("Checkpoint {head} saved, but the index could not be refreshed: {e}. Files are unchanged; inspect Git status before continuing."))?;
     Ok(Some(Checkpoint { head, message }))

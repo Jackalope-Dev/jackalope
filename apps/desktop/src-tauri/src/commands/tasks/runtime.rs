@@ -1778,7 +1778,6 @@ impl TaskRuntime {
             crate::commands::previews::ensure_idle(&old.workspace)?;
             crate::commands::verification::ensure_idle(&old.workspace)?;
             let directory = self.integration_directory();
-            std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             let tree = crate::commands::integration::workspace_tree(old, &directory)?;
             Some(old.contract.advance(&tree)?)
         } else {

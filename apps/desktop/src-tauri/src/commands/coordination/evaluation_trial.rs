@@ -1,21 +1,8 @@
 use super::*;
+use crate::commands::repo::{self, Policy};
 use crate::commands::tasks::RunStatus;
 use serde_json::{json, Value};
 use std::{path::Path, time::Instant};
-
-pub(super) fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
-    let output = crate::commands::git_command::command(
-        repo,
-        args,
-        crate::commands::git_command::Policy::Inherited,
-    )
-    .output()
-    .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().into())
-}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Executes installed agents on disposable evaluation cases; requires JACKALOPE_EVAL_CASE and JACKALOPE_EVAL_MODE"]
@@ -54,15 +41,28 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     for (name, content) in case["files"].as_object().unwrap() {
         std::fs::write(repo.join(name), content.as_str().unwrap())?;
     }
-    git(&repo, &["init", "-b", "main"])?;
-    git(&repo, &["config", "user.name", "Evaluation fixture"])?;
-    git(
+    repo::git(&repo, &["init", "-b", "main"], Policy::Inherited)?;
+    repo::git(
+        &repo,
+        &["config", "user.name", "Evaluation fixture"],
+        Policy::Inherited,
+    )?;
+    repo::git(
         &repo,
         &["config", "user.email", "evaluation@example.invalid"],
+        Policy::Inherited,
     )?;
-    git(&repo, &["config", "commit.gpgsign", "false"])?;
-    git(&repo, &["add", "."])?;
-    git(&repo, &["commit", "-m", "Evaluation fixture"])?;
+    repo::git(
+        &repo,
+        &["config", "commit.gpgsign", "false"],
+        Policy::Inherited,
+    )?;
+    repo::git(&repo, &["add", "."], Policy::Inherited)?;
+    repo::git(
+        &repo,
+        &["commit", "-m", "Evaluation fixture"],
+        Policy::Inherited,
+    )?;
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
     let cleanup = EvaluationOwner {

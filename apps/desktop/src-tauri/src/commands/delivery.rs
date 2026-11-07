@@ -1,8 +1,7 @@
 use super::{
-    git_command::{command as git_command, Policy},
     integration, process_control,
+    repo::{self, Policy},
     tasks::TaskRuntime,
-    worktree_cleanup,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -23,9 +22,10 @@ pub struct DeliveryStatus {
     checked_at: String,
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
+/// Reads the checkout with a time limit, since delivery status is polled.
+fn read(path: &Path, args: &[&str]) -> Result<String, String> {
     let result = process_control::run(
-        worktree_cleanup::command(path, args),
+        repo::command(path, args, Policy::Inspection),
         Duration::from_secs(10),
     )?;
     if !result.success {
@@ -35,10 +35,10 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
 }
 
 fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
-    let head = git(path, &["rev-parse", "--verify", "HEAD"])?;
-    let branch = git(path, &["branch", "--show-current"])?;
-    let changed = !git(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty();
-    let upstream = git(
+    let head = read(path, &["rev-parse", "--verify", "HEAD"])?;
+    let branch = read(path, &["branch", "--show-current"])?;
+    let changed = !read(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty();
+    let upstream = read(
         path,
         &[
             "rev-parse",
@@ -49,7 +49,7 @@ fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
     )
     .ok();
     let counts = if upstream.is_some() {
-        git(
+        read(
             path,
             &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
         )
@@ -181,7 +181,7 @@ pub async fn task_pull_request_create(
             return Err("Wait for the agent to finish before opening a pull request.".into());
         }
         let path = Path::new(&run.workspace);
-        let branch = git(path, &["branch", "--show-current"])?;
+        let branch = read(path, &["branch", "--show-current"])?;
         if branch.is_empty() {
             return Err("Check out the task branch before opening a pull request.".into());
         }
@@ -220,7 +220,7 @@ pub async fn task_pull_request_create(
 
 /// Runs a Git command that changes the checkout, reporting Git's own message on failure.
 fn change(path: &Path, args: &[&str]) -> Result<String, String> {
-    let mut command = git_command(path, args, Policy::Isolated);
+    let mut command = repo::command(path, args, Policy::Isolated);
     command
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_MERGE_AUTOEDIT", "no");
@@ -239,16 +239,16 @@ fn change(path: &Path, args: &[&str]) -> Result<String, String> {
 /// `target` checked out. A conflicting or failed merge is undone and `branch` is checked
 /// out again, so the checkout ends where it started.
 fn merge_into(path: &Path, branch: &str, target: &str) -> Result<String, String> {
-    if git(path, &["branch", "--show-current"])? != branch {
+    if read(path, &["branch", "--show-current"])? != branch {
         return Err(format!(
             "Check out {branch} in the project before merging it."
         ));
     }
-    if !git(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty() {
+    if !read(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty() {
         return Err("Commit or discard the remaining changes before merging.".into());
     }
     let target_ref = format!("refs/heads/{target}");
-    if git(path, &["rev-parse", "--verify", "--quiet", &target_ref]).is_err() {
+    if read(path, &["rev-parse", "--verify", "--quiet", &target_ref]).is_err() {
         return Err(format!("There is no local {target} branch to merge into."));
     }
     change(path, &["switch", target])?;
@@ -259,7 +259,7 @@ fn merge_into(path: &Path, branch: &str, target: &str) -> Result<String, String>
             "{branch} could not be merged into {target}, so nothing changed. {error}"
         ));
     }
-    git(path, &["rev-parse", "--verify", "HEAD"])
+    read(path, &["rev-parse", "--verify", "HEAD"])
 }
 
 /// Merges a task that worked on its own branch in the project checkout into the project's
@@ -367,15 +367,15 @@ mod tests {
         change(path, &["switch", "-q", "task"]).unwrap();
         let error = merge_into(path, "task", "main").unwrap_err();
         assert!(error.contains("nothing changed"), "{error}");
-        assert_eq!(git(path, &["branch", "--show-current"]).unwrap(), "task");
-        assert!(git(path, &["status", "--porcelain"]).unwrap().is_empty());
+        assert_eq!(read(path, &["branch", "--show-current"]).unwrap(), "task");
+        assert!(read(path, &["status", "--porcelain"]).unwrap().is_empty());
 
         change(path, &["switch", "-q", "main"]).unwrap();
         change(path, &["reset", "-q", "--hard", "HEAD~1"]).unwrap();
         change(path, &["switch", "-q", "task"]).unwrap();
         let head = merge_into(path, "task", "main").unwrap();
-        assert_eq!(git(path, &["branch", "--show-current"]).unwrap(), "main");
-        assert_eq!(git(path, &["rev-parse", "main"]).unwrap(), head);
+        assert_eq!(read(path, &["branch", "--show-current"]).unwrap(), "main");
+        assert_eq!(read(path, &["rev-parse", "main"]).unwrap(), head);
         assert_eq!(
             std::fs::read_to_string(path.join("a.txt")).unwrap(),
             "task\n"
@@ -389,8 +389,8 @@ mod tests {
             std::env::temp_dir().join(format!("jackalope-delivery-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&temp).unwrap();
         let path = temp.as_path();
-        git(path, &["init"]).unwrap();
-        git(
+        read(path, &["init"]).unwrap();
+        read(
             path,
             &[
                 "-c",
@@ -411,7 +411,7 @@ mod tests {
         assert!(clean.pull_request.is_none());
         std::fs::write(path.join("work.txt"), "local work").unwrap();
         assert!(inspect(path, false).unwrap().changed);
-        assert_eq!(git(path, &["rev-parse", "HEAD"]).unwrap(), clean.head);
+        assert_eq!(read(path, &["rev-parse", "HEAD"]).unwrap(), clean.head);
         assert_eq!(temp.parent(), Some(std::env::temp_dir().as_path()));
         assert!(temp
             .file_name()

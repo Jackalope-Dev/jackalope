@@ -1,5 +1,9 @@
 use super::*;
-use crate::commands::{task_strategy, tasks::TaskRun};
+use crate::commands::{
+    repo::{self, Policy, Untracked},
+    task_strategy,
+    tasks::TaskRun,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -474,10 +478,14 @@ impl Coordinator {
         if !run.status.is_done() || run.error.is_some() || run.persistence_error.is_some() {
             return Err("The planning attempt needs attention before work can start.".into());
         }
-        let changed = crate::commands::tasks::git(&run.workspace, &["status", "--porcelain"])?;
-        let committed =
-            crate::commands::tasks::git(&run.workspace, &["diff", "--name-only", &run.base_head])?;
-        if !changed.is_empty() || !committed.is_empty() {
+        let workspace = std::path::Path::new(&run.workspace);
+        let changed = repo::is_dirty(workspace, Untracked::Normal, Policy::Inspection)?;
+        let committed = repo::git(
+            workspace,
+            &["diff", "--name-only", &run.base_head],
+            Policy::Inspection,
+        )?;
+        if changed || !committed.is_empty() {
             return Err("The planning agent changed files. Inspect its workspace before starting implementation.".into());
         }
         parse_plan(&run.result, &task.request, task.max_assignments)

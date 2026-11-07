@@ -5,9 +5,10 @@
 //! `--init`. Declining, or a non-interactive run without `--init`, edits the
 //! folder directly. A home directory or drive root is refused either way.
 
+use crate::repo::{self, Policy};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Output, Stdio};
 
 /// Written when a new repository has files and no ignore file of its own, so
 /// the initial commit does not absorb dependency trees or common secret files.
@@ -29,9 +30,7 @@ dist/
 
 /// The checked-out branch, or `None` outside a repository.
 pub fn branch(path: &str) -> Option<String> {
-    let output = git(Path::new(path), &["rev-parse", "--abbrev-ref", "HEAD"]).ok()?;
-    let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    (output.status.success() && !name.is_empty()).then_some(name)
+    value(Path::new(path), &["rev-parse", "--abbrev-ref", "HEAD"])
 }
 
 /// Shows `workspace`'s changes since it left `project`'s checked-out commit on
@@ -43,34 +42,27 @@ pub fn diff(workspace_path: &str, project: &str, stat: bool) -> Result<Vec<Strin
     if !workspace.is_dir() {
         return Err("This conversation's workspace no longer exists.".into());
     }
-    let read = |directory: &Path, args: &[&str]| -> Result<String, String> {
-        let output = git(directory, args)?;
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    };
     let base = base(workspace_path, project).ok_or("This workspace is not a Git repository.")?;
     let mut args = vec!["diff"];
     if stat {
         args.push("--stat");
     }
     args.push(&base);
-    // The pager reads keys from the terminal.
-    let status = git_command(workspace)
-        .args(&args)
+    let mut pager = repo::command(workspace, &args, Policy::Isolated);
+    // The pager reads keys from the terminal, so Git keeps this console.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        pager.creation_flags(0);
+    }
+    let status = pager
         .stdin(Stdio::inherit())
         .status()
         .map_err(|error| format!("Could not run Git: {error}"))?;
     if !status.success() {
         return Err("Git could not show the changes.".into());
     }
-    Ok(
-        read(workspace, &["ls-files", "--others", "--exclude-standard"])?
-            .lines()
-            .map(String::from)
-            .collect(),
-    )
+    repo::untracked_files(workspace, Policy::Isolated)
 }
 
 /// Makes sure the current directory can host a conversation. Creates a repository
@@ -308,29 +300,36 @@ pub fn changes(workspace: &str, project: &str) -> Option<Vec<FileChange>> {
     let directory = Path::new(workspace);
     let base = base(workspace, project)?;
     let text = |args: &[&str]| -> Option<String> {
-        let output = git(directory, args).ok()?;
-        output
-            .status
-            .success()
-            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+        repo::git_exact(directory, args, Policy::Isolated).ok()
     };
     let statuses = text(&["diff", "--name-status", "-M", "-z", &base])?;
     let counts = text(&["diff", "--numstat", "-M", "-z", &base])?;
-    let mut changes = parse_name_status(&statuses);
-    for (path, added, removed) in parse_numstat(&counts) {
-        if let Some(change) = changes.iter_mut().find(|change| change.path == path) {
-            change.added = added;
-            change.removed = removed;
+    let mut changes: Vec<FileChange> = repo::parse_name_status(&statuses)
+        .into_iter()
+        .map(|change| FileChange {
+            path: change.path,
+            status: if change.status == 'C' {
+                'A'
+            } else {
+                change.status
+            },
+            added: None,
+            removed: None,
+        })
+        .collect();
+    for counted in repo::parse_numstat(&counts) {
+        if let Some(change) = changes
+            .iter_mut()
+            .find(|change| change.path == counted.path)
+        {
+            change.added = counted.added.map(|lines| lines as usize);
+            change.removed = counted.removed.map(|lines| lines as usize);
         }
     }
-    let untracked = text(&["ls-files", "--others", "--exclude-standard", "-z"])?;
-    for path in untracked.split('\0').filter(|path| !path.is_empty()) {
-        let lines = std::fs::read(directory.join(path))
-            .ok()
-            .filter(|bytes| !bytes.contains(&0))
-            .map(|bytes| bytes.iter().filter(|byte| **byte == b'\n').count());
+    for path in repo::untracked_files(directory, Policy::Isolated).ok()? {
+        let lines = repo::untracked_lines(&directory.join(&path)).map(|lines| lines as usize);
         changes.push(FileChange {
-            path: path.to_string(),
+            path,
             status: '?',
             added: lines,
             removed: lines.map(|_| 0),
@@ -369,87 +368,27 @@ pub fn file_diff(workspace: &str, project: &str, change: &FileChange) -> Vec<Str
 /// The commit a checkout's changes are measured from.
 fn base(workspace: &str, project: &str) -> Option<String> {
     let directory = Path::new(workspace);
-    let head = |path: &Path| -> Option<String> {
-        let output = git(path, &["rev-parse", "HEAD"]).ok()?;
-        let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        (output.status.success() && !sha.is_empty()).then_some(sha)
-    };
-    let own = head(directory)?;
-    if Path::new(workspace) == Path::new(project) {
+    let own = value(directory, &["rev-parse", "HEAD"])?;
+    if directory == Path::new(project) {
         return Some(own);
     }
-    let Some(theirs) = head(Path::new(project)) else {
+    let Some(theirs) = value(Path::new(project), &["rev-parse", "HEAD"]) else {
         return Some(own);
     };
-    let output = git(directory, &["merge-base", &own, &theirs]).ok()?;
-    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Some(if output.status.success() && !sha.is_empty() {
-        sha
-    } else {
-        own
-    })
+    Some(value(directory, &["merge-base", &own, &theirs]).unwrap_or(own))
 }
 
-/// `git diff --name-status -z`: a status, then one path or, for renames and
-/// copies, the old path and the new.
-fn parse_name_status(text: &str) -> Vec<FileChange> {
-    let mut fields = text.split('\0').filter(|field| !field.is_empty());
-    let mut changes = Vec::new();
-    while let Some(code) = fields.next() {
-        let status = code.chars().next().unwrap_or('M');
-        let mut path = fields.next().unwrap_or_default().to_string();
-        if matches!(status, 'R' | 'C') {
-            path = fields.next().unwrap_or_default().to_string();
-        }
-        changes.push(FileChange {
-            path,
-            status: if status == 'C' { 'A' } else { status },
-            added: None,
-            removed: None,
-        });
-    }
-    changes
-}
-
-/// `git diff --numstat -z`: counts and a path, or for a rename counts, an
-/// empty path, then the old and new paths. Binary files count as `-`.
-fn parse_numstat(text: &str) -> Vec<(String, Option<usize>, Option<usize>)> {
-    let mut fields = text.split('\0');
-    let mut counts = Vec::new();
-    while let Some(record) = fields.next() {
-        let mut parts = record.splitn(3, '\t');
-        let (Some(added), Some(removed), Some(path)) = (parts.next(), parts.next(), parts.next())
-        else {
-            continue;
-        };
-        let path = if path.is_empty() {
-            fields.next();
-            fields.next().unwrap_or_default().to_string()
-        } else {
-            path.to_string()
-        };
-        counts.push((path, added.parse().ok(), removed.parse().ok()));
-    }
-    counts
-}
-
-/// Git in `directory`, ignoring repository overrides inherited from the shell.
-fn git_command(directory: &Path) -> Command {
-    let mut command = Command::new("git");
-    command
-        .current_dir(directory)
-        .stdin(Stdio::null())
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_OBJECT_DIRECTORY")
-        .env_remove("GIT_COMMON_DIR")
-        .env_remove("GIT_PREFIX");
-    command
+/// A one-line answer from Git, or `None` when it fails or prints nothing.
+fn value(directory: &Path, args: &[&str]) -> Option<String> {
+    repo::git(directory, args, Policy::Isolated)
+        .ok()
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
 }
 
 fn git(directory: &Path, args: &[&str]) -> Result<Output, String> {
-    git_command(directory).args(args).output().map_err(|error| {
+    let mut command = repo::command(directory, args, Policy::Isolated);
+    command.stdin(Stdio::null()).output().map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             "Git is not installed, so Jackalope cannot keep a separate copy of this work.".into()
         } else {

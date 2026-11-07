@@ -9,7 +9,11 @@
 
 use super::autonomy::{self, DeployPolicy};
 use super::Coordinator;
-use crate::commands::{cloudflare_artifacts, git_command, integration, verification};
+use crate::commands::{
+    cloudflare_artifacts, integration,
+    repo::{self, Policy},
+    verification,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -137,16 +141,6 @@ fn output(result: &crate::commands::process_control::CommandResult) -> String {
     ))
 }
 
-fn git(project: &Path, args: &[&str]) -> Result<String, String> {
-    let output = git_command::command(project, args, git_command::Policy::Isolated)
-        .output()
-        .map_err(|e| format!("Could not run Git: {e}"))?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
 /// A detached checkout of the deployed commit, removed however the deploy ends.
 struct Checkout {
     project: PathBuf,
@@ -157,9 +151,13 @@ impl Drop for Checkout {
     fn drop(&mut self) {
         let _guard = integration::execution_guard();
         let path = self.path.to_string_lossy().into_owned();
-        let _ = git(&self.project, &["worktree", "remove", "--force", &path]);
+        let _ = repo::git(
+            &self.project,
+            &["worktree", "remove", "--force", &path],
+            Policy::Isolated,
+        );
         let _ = std::fs::remove_dir_all(&self.path);
-        let _ = git(&self.project, &["worktree", "prune"]);
+        let _ = repo::git(&self.project, &["worktree", "prune"], Policy::Isolated);
     }
 }
 
@@ -185,7 +183,13 @@ fn run(directory: &Path, project: &Path, head: &str, deploy: &DeployPolicy) -> D
         };
         if let Err(error) = std::fs::create_dir_all(path.parent().unwrap_or(directory))
             .map_err(|e| e.to_string())
-            .and_then(|_| git(project, &["worktree", "add", "--detach", &workspace, head]))
+            .and_then(|_| {
+                repo::git(
+                    project,
+                    &["worktree", "add", "--detach", &workspace, head],
+                    Policy::Isolated,
+                )
+            })
         {
             return finish(
                 Outcome::Failed,
@@ -268,7 +272,12 @@ fn plan(project: &Path, branch: &str) -> Option<Plan> {
 /// The branch a project merges into: the deploy branch when the policy names
 /// one, otherwise the target of its most recent attempt.
 fn branch_for(project: &Path, latest_target: Option<&str>) -> Option<String> {
-    let current = git(project, &["symbolic-ref", "--quiet", "--short", "HEAD"]).ok();
+    let current = repo::git(
+        project,
+        &["symbolic-ref", "--quiet", "--short", "HEAD"],
+        Policy::Isolated,
+    )
+    .ok();
     let candidate = latest_target.map(str::to_string).or(current)?;
     let head = autonomy::branch_head(project, &candidate).ok()?;
     Some(
@@ -502,7 +511,7 @@ mod tests {
             std::env::temp_dir().join(format!("jackalope-deploy-{}", uuid::Uuid::new_v4()));
         let project = directory.join("project");
         std::fs::create_dir_all(&project).unwrap();
-        let git = |args: &[&str]| super::git(&project, args).unwrap();
+        let git = |args: &[&str]| repo::git(&project, args, Policy::Isolated).unwrap();
         git(&["init", "-q"]);
         git(&["config", "user.name", "Fixture"]);
         git(&["config", "user.email", "fixture@example.invalid"]);

@@ -1,6 +1,6 @@
+use super::repo::{self, Policy};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WorktreeEntry {
@@ -37,19 +37,12 @@ pub async fn git_list_worktrees(
 }
 
 pub(super) fn list_worktrees(repo_path: &str) -> Result<Vec<WorktreeEntry>, String> {
-    let output = super::worktree_cleanup::command(
+    let stdout = repo::git_exact(
         Path::new(repo_path),
         &["worktree", "list", "--porcelain", "-z"],
+        Policy::Inspection,
     )
-    .output()
-    .map_err(|e| format!("Failed to run git: {}", e))?;
-
-    if !output.status.success() {
-        let err = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Git worktree list error: {}", err));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    .map_err(|error| format!("Git worktree list error: {error}"))?;
     let mut worktrees = Vec::new();
     let mut current_path = String::new();
     let mut current_head = String::new();
@@ -125,6 +118,8 @@ fn relative_and_contained(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Adds a worktree on a new branch. Like every other worktree change it holds
+/// the execution guard, so it cannot race integration or cleanup.
 #[tauri::command]
 pub async fn git_create_worktree(
     repo_path: String,
@@ -133,71 +128,43 @@ pub async fn git_create_worktree(
     base_commit: Option<String>,
 ) -> Result<WorktreeEntry, String> {
     relative_and_contained(&worktree_path)?;
-    let mut args = vec!["worktree", "add", "-b", &branch_name, &worktree_path];
-    if let Some(ref base) = base_commit {
-        args.push(base);
-    }
-
-    let output = Command::new("git")
-        .args(&args)
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| format!("Failed to spawn git worktree add: {}", e))?;
-
-    if !output.status.success() {
-        let err = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Worktree creation failed: {}", err));
-    }
-
-    // `base_commit` (when given) is whatever ref the caller asked to branch
-    // from — a branch name, a tag, "HEAD", a short hash — not necessarily the
-    // worktree's actual resulting commit. Resolve the real HEAD of the new
-    // worktree directly instead of echoing that input back.
-    let full_worktree_path = Path::new(&repo_path).join(&worktree_path);
-    let head_output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(&full_worktree_path)
-        .output()
-        .map_err(|e| format!("Worktree created, but failed to resolve its HEAD: {}", e))?;
-
-    if !head_output.status.success() {
-        let err = String::from_utf8_lossy(&head_output.stderr);
-        return Err(format!(
-            "Worktree created, but `git rev-parse HEAD` failed: {}",
-            err
-        ));
-    }
-
-    let head = String::from_utf8_lossy(&head_output.stdout)
-        .trim()
-        .to_string();
-
-    Ok(WorktreeEntry {
-        path: worktree_path,
-        head,
-        branch: branch_name,
-        is_bare: false,
-        is_locked: false,
-        cleanup: None,
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        let repo_path = Path::new(&repo_path);
+        let mut args = vec!["worktree", "add", "-b", &branch_name, &worktree_path];
+        if let Some(base) = &base_commit {
+            args.push(base);
+        }
+        repo::git(repo_path, &args, Policy::Isolated)
+            .map_err(|error| format!("Worktree creation failed: {error}"))?;
+        // `base_commit` may be any ref, so report the commit the worktree resolved to.
+        let head = repo::git(
+            &repo_path.join(&worktree_path),
+            &["rev-parse", "HEAD"],
+            Policy::Isolated,
+        )
+        .map_err(|error| format!("Worktree created, but its HEAD could not be read: {error}"))?;
+        Ok(WorktreeEntry {
+            path: worktree_path,
+            head,
+            branch: branch_name,
+            is_bare: false,
+            is_locked: false,
+            cleanup: None,
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
 mod tests {
-    //! Exercises `git_create_worktree` against a real, disposable git repo —
-    //! proves the returned `head` is the worktree's actual resolved commit,
-    //! not an echo of whatever `base_commit` string was passed in (the bug
-    //! this module used to have: `head: base_commit.unwrap_or("HEAD")`).
     use super::*;
     use std::fs;
 
     fn run(dir: &Path, args: &[&str]) {
-        let status = Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .status()
-            .expect("failed to run git");
-        assert!(status.success(), "git {:?} failed in {:?}", args, dir);
+        repo::git(dir, args, Policy::Isolated)
+            .unwrap_or_else(|error| panic!("git {args:?} failed in {dir:?}: {error}"));
     }
 
     #[tokio::test]
@@ -224,28 +191,15 @@ mod tests {
             repo_path.clone(),
             ".worktrees/test-branch".to_string(),
             "feat/test-branch".to_string(),
-            // Deliberately pass a non-hash ref as base_commit: the exact old
-            // bug (`head: base_commit.unwrap_or_else(|| "HEAD".to_string())`)
-            // would return the literal string "HEAD" here instead of a real hash.
             Some("HEAD".to_string()),
         )
         .await
         .expect("git_create_worktree should succeed");
 
-        assert_ne!(
-            result.head, "HEAD",
-            "head must be the resolved commit, not the base_commit string echoed back"
-        );
         assert_eq!(
-            result.head.len(),
-            40,
-            "head should be a full git SHA-1 hex hash, got {:?}",
-            result.head
-        );
-        assert!(
-            result.head.chars().all(|c| c.is_ascii_hexdigit()),
-            "head should be hex, got {:?}",
-            result.head
+            result.head,
+            repo::git(&repo, &["rev-parse", "HEAD"], Policy::Isolated).unwrap(),
+            "head must be the resolved commit, not the base_commit string echoed back"
         );
 
         let _ = fs::remove_dir_all(&repo);

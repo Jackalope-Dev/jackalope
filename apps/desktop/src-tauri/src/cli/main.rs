@@ -10,12 +10,19 @@ mod clipboard;
 mod connection;
 mod files;
 mod git;
+#[path = "../commands/git_command.rs"]
+#[allow(dead_code)]
+mod git_command;
 mod history;
 mod host;
 mod once;
 mod planning;
 mod prefs;
 mod protocol;
+// Shared with the app so both measure a checkout's changes the same way.
+#[path = "../commands/repo.rs"]
+#[allow(dead_code)]
+mod repo;
 mod shell;
 mod subcommands;
 mod ui;

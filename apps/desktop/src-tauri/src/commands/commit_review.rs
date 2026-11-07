@@ -1,9 +1,9 @@
 //! Review and commit uncommitted work in a project checkout or one of its worktrees.
 
 use super::{
-    git_command::{command, Policy},
     helper::Helper,
     project_git::{self, Attribution},
+    repo::{self, command, git_exact as git, Policy},
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -46,16 +46,6 @@ pub struct CommitMessage {
     pub body: String,
 }
 
-fn git(path: &Path, args: &[&str], policy: Policy) -> Result<String, String> {
-    let output = command(path, args, policy)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into())
-}
-
 /// Only the project checkout itself or one of its registered worktrees.
 fn checkout(repo_path: &str, worktree_path: &str) -> Result<PathBuf, String> {
     let root = dunce::canonicalize(worktree_path).map_err(|e| e.to_string())?;
@@ -82,79 +72,42 @@ fn head(path: &Path) -> Option<String> {
 }
 
 fn parse_status(raw: &str) -> Vec<ChangedFile> {
-    let mut files = vec![];
-    let mut parts = raw.split('\0').filter(|s| !s.is_empty());
-    while let Some(entry) = parts.next() {
-        if entry.len() < 4 {
-            continue;
-        }
-        let (x, y) = (entry.as_bytes()[0] as char, entry.as_bytes()[1] as char);
-        let path = entry[3..].to_string();
-        let old_path = if matches!(x, 'R' | 'C') {
-            parts.next().map(str::to_string)
-        } else {
-            None
-        };
-        let status = match (x, y) {
-            ('?', '?') => "untracked",
-            ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D') => "conflicted",
-            ('R', _) => "renamed",
-            ('A', _) | ('C', _) => "added",
-            ('D', _) | (_, 'D') => "deleted",
-            _ => "modified",
-        };
-        files.push(ChangedFile {
-            path,
-            old_path,
-            status: status.into(),
-            staged: !matches!(x, ' ' | '?'),
-            additions: None,
-            deletions: None,
-        });
-    }
-    files
+    repo::parse_status(raw)
+        .into_iter()
+        .map(|entry| {
+            let status = match (entry.index, entry.worktree) {
+                ('?', '?') => "untracked",
+                ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D') => "conflicted",
+                ('R', _) => "renamed",
+                ('A', _) | ('C', _) => "added",
+                ('D', _) | (_, 'D') => "deleted",
+                _ => "modified",
+            };
+            ChangedFile {
+                path: entry.path,
+                old_path: entry.old_path,
+                status: status.into(),
+                staged: !matches!(entry.index, ' ' | '?'),
+                additions: None,
+                deletions: None,
+            }
+        })
+        .collect()
 }
 
 fn line_counts(path: &Path, base: &str) -> HashMap<String, (Option<u64>, Option<u64>)> {
-    let mut counts = HashMap::new();
-    let Ok(raw) = git(
+    git(
         path,
         &["diff", base, "--numstat", "-z", "-M"],
         Policy::Inspection,
-    ) else {
-        return counts;
-    };
-    let mut parts = raw.split('\0');
-    while let Some(entry) = parts.next() {
-        let mut fields = entry.splitn(3, '\t');
-        let (Some(added), Some(deleted), Some(name)) =
-            (fields.next(), fields.next(), fields.next())
-        else {
-            continue;
-        };
-        // Renames leave the name empty and list the old and new paths next.
-        let name = if name.is_empty() {
-            let _old = parts.next();
-            parts.next().unwrap_or_default().to_string()
-        } else {
-            name.to_string()
-        };
-        counts.insert(name, (added.parse().ok(), deleted.parse().ok()));
-    }
-    counts
-}
-
-fn untracked_lines(file: &Path) -> Option<u64> {
-    let metadata = std::fs::metadata(file).ok()?;
-    if !metadata.is_file() || metadata.len() > 2_000_000 {
-        return None;
-    }
-    let bytes = std::fs::read(file).ok()?;
-    if bytes.contains(&0) {
-        return None;
-    }
-    let lines = bytes.iter().filter(|b| **b == b'\n').count() as u64;
-    Some(lines + u64::from(!bytes.is_empty() && !bytes.ends_with(b"\n")))
+    )
+    .map(|raw| {
+        repo::parse_numstat(&raw)
+            .into_iter()
+            .map(|entry| (entry.path, (entry.added, entry.removed)))
+            .collect()
+    })
+    .unwrap_or_default()
 }
 
 fn changes(path: &Path) -> Result<WorkingChanges, String> {
@@ -168,7 +121,7 @@ fn changes(path: &Path) -> Result<WorkingChanges, String> {
     let mut files = parse_status(&raw);
     for file in &mut files {
         if file.status == "untracked" {
-            file.additions = untracked_lines(&path.join(&file.path));
+            file.additions = repo::untracked_lines(&path.join(&file.path));
             file.deletions = file.additions.map(|_| 0);
         } else if let Some((added, deleted)) = counts.get(&file.path) {
             file.additions = *added;
@@ -350,7 +303,7 @@ pub async fn git_generate_pull_request(
     tauri::async_runtime::spawn_blocking(move || {
         let root = checkout(&repo_path, &worktree_path)?;
         let base = base.trim();
-        if !(7..=64).contains(&base.len()) || !base.chars().all(|c| c.is_ascii_hexdigit()) {
+        if !repo::is_abbreviated_object_id(base) {
             return Err("This task has no starting commit to compare against.".into());
         }
         let mut patch = git(&root, &["diff", "-M", base, "--"], Policy::Inspection)?;

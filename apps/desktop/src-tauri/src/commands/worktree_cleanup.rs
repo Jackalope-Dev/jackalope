@@ -1,12 +1,10 @@
+use super::repo::{self, Identity, Policy::Inspection, Seed};
 use super::{
     git::{list_worktrees, WorktreeEntry},
     tasks::{TaskRun, TaskRuntime},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    path::{Path, PathBuf},
-    process::{Command, Output},
-};
+use std::path::{Path, PathBuf};
 use tauri::State;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -48,22 +46,6 @@ pub struct OrphanFolder {
 const ARCHIVE_MAX_BYTES: u64 = 512 * 1024 * 1024;
 const ARCHIVE_MAX_FILES: usize = 20_000;
 
-pub(super) fn command(path: &Path, args: &[&str]) -> Command {
-    super::git_command::command(path, args, super::git_command::Policy::Inspection)
-}
-
-fn output(path: &Path, args: &[&str]) -> Result<Output, String> {
-    command(path, args).output().map_err(|e| e.to_string())
-}
-
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let result = output(path, args)?;
-    if !result.status.success() {
-        return Err(String::from_utf8_lossy(&result.stderr).trim().to_string());
-    }
-    String::from_utf8(result.stdout).map_err(|e| e.to_string())
-}
-
 fn canonical(path: &str) -> Result<PathBuf, String> {
     std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
 }
@@ -94,13 +76,14 @@ fn target(repo: &Path, requested: Option<&str>) -> Result<(String, String), Stri
         None => vec!["main", "master"],
     };
     for branch in candidates {
-        if let Ok(head) = git(
+        if let Ok(head) = repo::git_exact(
             repo,
             &[
                 "rev-parse",
                 "--verify",
                 &format!("refs/heads/{branch}^{{commit}}"),
             ],
+            Inspection,
         ) {
             return Ok((branch.into(), head.trim().into()));
         }
@@ -151,15 +134,16 @@ fn hard_block(
             return Err("In use by an active or interrupted task.".into());
         }
     }
-    let root = git(&path, &["rev-parse", "--show-toplevel"])?;
+    let root = repo::git_exact(&path, &["rev-parse", "--show-toplevel"], Inspection)?;
     if canonical(root.trim())? != path {
         return Err("Worktree folder no longer matches its Git registration.".into());
     }
     let common = |dir: &Path| -> Result<PathBuf, String> {
         canonical(
-            git(
+            repo::git_exact(
                 dir,
                 &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+                Inspection,
             )?
             .trim(),
         )
@@ -167,7 +151,7 @@ fn hard_block(
     if common(repo)? != common(&path)? {
         return Err("Worktree belongs to a different repository.".into());
     }
-    let files = git(&path, &["ls-files", "-v", "-z"])?;
+    let files = repo::git_exact(&path, &["ls-files", "-v", "-z"], Inspection)?;
     if files
         .split('\0')
         .filter(|s| !s.is_empty())
@@ -175,7 +159,7 @@ fn hard_block(
     {
         return Err("Index has hidden or unresolved changes; review it before cleanup.".into());
     }
-    let index = git(&path, &["ls-files", "--stage", "-z"])?;
+    let index = repo::git_exact(&path, &["ls-files", "--stage", "-z"], Inspection)?;
     if index.split('\0').any(|s| s.starts_with("160000 ")) {
         return Err("Contains submodules; review and remove this worktree manually.".into());
     }
@@ -360,7 +344,7 @@ fn preserved_content(
 }
 
 fn local_content(path: &Path) -> Result<LocalContent, String> {
-    let status = git(
+    let status = repo::git_exact(
         path,
         &[
             "status",
@@ -369,8 +353,9 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
             "--untracked-files=normal",
             "--ignore-submodules=none",
         ],
+        Inspection,
     )?;
-    let ignored = git(
+    let ignored = repo::git_exact(
         path,
         &[
             "ls-files",
@@ -381,6 +366,7 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
             "--no-empty-directory",
             "-z",
         ],
+        Inspection,
     )?;
     let mut content = LocalContent {
         changes: !status.is_empty(),
@@ -407,78 +393,70 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
     Ok(content)
 }
 
-struct ScratchIndex(PathBuf);
-impl Drop for ScratchIndex {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
-    }
-}
+const CLEANUP_IDENTITY: Identity = Identity {
+    name: "Jackalope",
+    email: "cleanup@jackalope.invalid",
+};
 
 // Require a no-op three-way merge for both the index and working copy. Comparing
 // whole trees would reject older worktrees; checking only HEAD would lose edits.
 fn content_in_target(path: &Path, head: &str, target: &str) -> Result<bool, String> {
-    let temp = ScratchIndex(
-        std::env::temp_dir().join(format!("jackalope-cleanup-{}.index", uuid::Uuid::new_v4())),
-    );
-    let index = git(
+    let index = repo::git_exact(
         path,
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+        Inspection,
     )?;
     let before = std::fs::read(index.trim()).map_err(|e| e.to_string())?;
-    std::fs::write(&temp.0, &before).map_err(|e| e.to_string())?;
-    let indexed = |args: &[&str]| -> Result<String, String> {
-        let result = command(path, args)
-            .env("GIT_INDEX_FILE", &temp.0)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !result.status.success() {
-            return Err(String::from_utf8_lossy(&result.stderr).trim().into());
-        }
-        Ok(String::from_utf8_lossy(&result.stdout).trim().into())
-    };
-    let staged = indexed(&["write-tree"])?;
-    indexed(&["add", "--all", "--", "."])?;
-    let working = indexed(&["write-tree"])?;
-    let target_tree = git(path, &["rev-parse", &format!("{target}^{{tree}}")])?;
-    for tree in [&staged, &working] {
-        let result = command(
-            path,
-            &[
-                "commit-tree",
-                tree,
-                "-p",
-                head,
-                "-m",
-                "Cleanup content check",
-            ],
-        )
-        .env("GIT_AUTHOR_NAME", "Jackalope")
-        .env("GIT_AUTHOR_EMAIL", "cleanup@jackalope.invalid")
-        .env("GIT_COMMITTER_NAME", "Jackalope")
-        .env("GIT_COMMITTER_EMAIL", "cleanup@jackalope.invalid")
-        .output()
-        .map_err(|e| e.to_string())?;
-        if !result.status.success() {
-            return Err("Cannot inspect local content safely.".into());
-        }
-        let commit = String::from_utf8_lossy(&result.stdout);
-        let result = output(path, &["merge-tree", "--write-tree", target, commit.trim()])?;
-        if !result.status.success()
-            || String::from_utf8_lossy(&result.stdout).lines().next() != Some(target_tree.trim())
-        {
-            return Ok(false);
-        }
-    }
-    if git(path, &["rev-parse", "HEAD"])?.trim() != head
-        || std::fs::read(index.trim()).map_err(|e| e.to_string())? != before
-    {
-        return Err("The worktree changed during inspection. Refresh before cleanup.".into());
-    }
-    indexed(&["add", "--all", "--", "."])?;
-    if indexed(&["write-tree"])? != working {
-        return Err("Local files changed during inspection.".into());
-    }
-    Ok(true)
+    repo::with_temp_index(
+        path,
+        &std::env::temp_dir(),
+        Seed::CurrentIndex,
+        Inspection,
+        |scratch| {
+            let staged = scratch.git(&["write-tree"])?;
+            scratch.git(&["add", "--all", "--", "."])?;
+            let working = scratch.git(&["write-tree"])?;
+            let target_tree = repo::git_exact(
+                path,
+                &["rev-parse", &format!("{target}^{{tree}}")],
+                Inspection,
+            )?;
+            for tree in [&staged, &working] {
+                let commit = repo::synthetic_commit(
+                    path,
+                    tree,
+                    &[head],
+                    "Cleanup content check",
+                    CLEANUP_IDENTITY,
+                    Inspection,
+                )
+                .map_err(|_| "Cannot inspect local content safely.".to_string())?;
+                let result = repo::output(
+                    path,
+                    &["merge-tree", "--write-tree", target, &commit],
+                    Inspection,
+                )?;
+                if !result.status.success()
+                    || String::from_utf8_lossy(&result.stdout).lines().next()
+                        != Some(target_tree.trim())
+                {
+                    return Ok(false);
+                }
+            }
+            if repo::git_exact(path, &["rev-parse", "HEAD"], Inspection)?.trim() != head
+                || std::fs::read(index.trim()).map_err(|e| e.to_string())? != before
+            {
+                return Err(
+                    "The worktree changed during inspection. Refresh before cleanup.".into(),
+                );
+            }
+            scratch.git(&["add", "--all", "--", "."])?;
+            if scratch.git(&["write-tree"])? != working {
+                return Err("Local files changed during inspection.".into());
+            }
+            Ok(true)
+        },
+    )
 }
 
 pub(super) fn inspect(
@@ -518,9 +496,10 @@ fn inspect_entries(
             Ok((branch, head)) => {
                 status.target_branch = Some(branch.clone());
                 status.target_head = Some(head.clone());
-                match output(
+                match repo::output(
                     &repo,
                     &["merge-base", "--is-ancestor", &entries[index].head, head],
+                    Inspection,
                 ) {
                     Ok(result) if result.status.success() => status.merged = Some(true),
                     Ok(result) if result.status.code() == Some(1) => {
@@ -605,7 +584,8 @@ pub(super) fn remove(
     if status.merged != Some(true) && !status.content_merged {
         return Err("All commits must be merged before cleanup.".into());
     }
-    if git(Path::new(worktree_path), &["rev-parse", "HEAD"])?.trim() != expected_head
+    if repo::git_exact(Path::new(worktree_path), &["rev-parse", "HEAD"], Inspection)?.trim()
+        != expected_head
         || target(Path::new(repo_path), Some(target_branch))?.1 != expected_target_head
     {
         return Err(
@@ -651,7 +631,7 @@ pub(super) fn remove(
     } else {
         vec!["worktree", "remove", "--", worktree_path]
     };
-    git(Path::new(repo_path), &args).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
+    repo::git_exact(Path::new(repo_path), &args, Inspection).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
     if delete_branch && !wt.branch.is_empty() {
         delete_merged_branch(
             repo_path,
@@ -682,7 +662,7 @@ pub(super) fn delete_merged_branch(
         );
     }
     use std::io::Write;
-    let mut child = command(Path::new(repo), &["update-ref", "--stdin"])
+    let mut child = repo::command(Path::new(repo), &["update-ref", "--stdin"], Inspection)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -699,7 +679,7 @@ pub(super) fn delete_merged_branch(
     if !output.status.success() {
         return Err("Worktree removed; branch kept because its reference or the target changed. Refresh before removing the branch.".into());
     }
-    let _ = git(
+    let _ = repo::git_exact(
         Path::new(repo),
         &[
             "config",
@@ -707,6 +687,7 @@ pub(super) fn delete_merged_branch(
             "--remove-section",
             &format!("branch.{branch}"),
         ],
+        Inspection,
     );
     Ok(())
 }
@@ -768,11 +749,12 @@ fn archive(
     // on Windows for the bundle output.
     let repo = Path::new(repo_path);
     let path = Path::new(worktree_path);
-    if canonical(worktree_path)? != canonical(git(path, &["rev-parse", "--show-toplevel"])?.trim())?
+    if canonical(worktree_path)?
+        != canonical(repo::git_exact(path, &["rev-parse", "--show-toplevel"], Inspection)?.trim())?
     {
         return Err("The worktree folder moved. Refresh the list.".into());
     }
-    if git(path, &["rev-parse", "HEAD"])?.trim() != expected_head {
+    if repo::git_exact(path, &["rev-parse", "HEAD"], Inspection)?.trim() != expected_head {
         return Err("The worktree changed. Refresh and review its status again.".into());
     }
     let branch = wt.branch.clone();
@@ -790,7 +772,7 @@ fn archive(
     }
     std::fs::create_dir_all(&archive_root).map_err(|e| e.to_string())?;
     // Keep the archive folder out of the parent repository's status.
-    if let Ok(exclude) = git(
+    if let Ok(exclude) = repo::git_exact(
         repo,
         &[
             "rev-parse",
@@ -798,6 +780,7 @@ fn archive(
             "--git-path",
             "info/exclude",
         ],
+        Inspection,
     ) {
         if let Ok(existing) = std::fs::read_to_string(exclude.trim()) {
             if !existing.contains("/.worktrees/.archive/") {
@@ -816,7 +799,7 @@ fn archive(
     let bundle = archive_root.join("branch.bundle");
     let bundle_str = bundle.to_str().ok_or("Invalid archive path")?;
     let thin = (!expected_target_head.is_empty())
-        && command(
+        && repo::command(
             path,
             &[
                 "bundle",
@@ -825,12 +808,15 @@ fn archive(
                 &format!("^{expected_target_head}"),
                 "HEAD",
             ],
+            Inspection,
         )
         .output()
         .map(|out| out.status.success())
         .unwrap_or(false);
     if !thin {
-        if let Err(error) = git(path, &["bundle", "create", bundle_str, "HEAD"]) {
+        if let Err(error) =
+            repo::git_exact(path, &["bundle", "create", bundle_str, "HEAD"], Inspection)
+        {
             return Err(abandon(
                 &archive_root,
                 &format!("could not bundle commits: {error}"),
@@ -847,7 +833,7 @@ fn archive(
             "the commit history is larger than 512 MB",
         ));
     }
-    git(path, &["bundle", "verify", bundle_str]).map_err(|error| {
+    repo::git_exact(path, &["bundle", "verify", bundle_str], Inspection).map_err(|error| {
         abandon(
             &archive_root,
             &format!("bundle verification failed: {error}"),
@@ -855,7 +841,7 @@ fn archive(
     })?;
 
     // Uncommitted tracked changes.
-    let diff = output(path, &["diff", "--binary", "HEAD"])?;
+    let diff = repo::output(path, &["diff", "--binary", "HEAD"], Inspection)?;
     if !diff.status.success() {
         return Err(abandon(
             &archive_root,
@@ -866,7 +852,11 @@ fn archive(
         .map_err(|e| e.to_string())?;
 
     // Untracked, non-ignored files.
-    let listing = git(path, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+    let listing = repo::git_exact(
+        path,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+        Inspection,
+    )?;
     let mut copied: Vec<String> = Vec::new();
     let mut bytes = bundle_bytes;
     for name in listing.split('\0').filter(|s| !s.is_empty()) {
@@ -923,12 +913,13 @@ fn archive(
         ));
     }
     // Nothing else can be recovered from disk now — take the worktree down.
-    git(
+    repo::git_exact(
         repo,
         &["worktree", "remove", "--force", "--", worktree_path],
+        Inspection,
     )?;
     if branch.starts_with("jackalope/") {
-        let _ = git(repo, &["branch", "-D", &branch]);
+        let _ = repo::git_exact(repo, &["branch", "-D", &branch], Inspection);
     }
     Ok(archive_root.to_string_lossy().into_owned())
 }
@@ -1018,9 +1009,10 @@ fn remove_orphan(repo_path: &str, folder_path: &str, runs: &[TaskRun]) -> Result
 /// Drop Git's registration for worktrees whose folder is already gone.
 fn prune(repo_path: &str) -> Result<usize, String> {
     let before = list_worktrees(repo_path)?.len();
-    git(
+    repo::git_exact(
         &canonical(repo_path)?,
         &["worktree", "prune", "--expire=now"],
+        Inspection,
     )?;
     Ok(before.saturating_sub(list_worktrees(repo_path)?.len()))
 }
@@ -1145,14 +1137,19 @@ mod tests {
             let repo = root.join("project");
             let worktree = root.join("finished work");
             fs::create_dir_all(&repo).unwrap();
-            git(&repo, &["init", "--initial-branch", branch]).unwrap();
-            git(&repo, &["config", "user.name", "Cleanup Test"]).unwrap();
-            git(&repo, &["config", "user.email", "cleanup@example.test"]).unwrap();
+            repo::git_exact(&repo, &["init", "--initial-branch", branch], Inspection).unwrap();
+            repo::git_exact(&repo, &["config", "user.name", "Cleanup Test"], Inspection).unwrap();
+            repo::git_exact(
+                &repo,
+                &["config", "user.email", "cleanup@example.test"],
+                Inspection,
+            )
+            .unwrap();
             fs::write(repo.join("file.txt"), "initial\n").unwrap();
             fs::write(repo.join(".gitignore"), ".env\nignored/\n").unwrap();
-            git(&repo, &["add", "."]).unwrap();
-            git(&repo, &["commit", "-m", "fixture"]).unwrap();
-            git(
+            repo::git_exact(&repo, &["add", "."], Inspection).unwrap();
+            repo::git_exact(&repo, &["commit", "-m", "fixture"], Inspection).unwrap();
+            repo::git_exact(
                 &repo,
                 &[
                     "worktree",
@@ -1161,6 +1158,7 @@ mod tests {
                     "feature",
                     worktree.to_str().unwrap(),
                 ],
+                Inspection,
             )
             .unwrap();
             Self {
@@ -1190,8 +1188,8 @@ mod tests {
         }
         fn commit(&self, path: &Path, text: &str) {
             fs::write(path.join("file.txt"), text).unwrap();
-            git(path, &["add", "."]).unwrap();
-            git(path, &["commit", "-m", "change"]).unwrap();
+            repo::git_exact(path, &["add", "."], Inspection).unwrap();
+            repo::git_exact(path, &["commit", "-m", "change"], Inspection).unwrap();
         }
         fn run(&self, status: &str) -> TaskRun {
             serde_json::from_value(serde_json::json!({
@@ -1223,7 +1221,7 @@ mod tests {
         for branch in ["main", "master"] {
             let f = Fixture::new(branch);
             f.commit(&f.worktree, "merged\n");
-            git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+            repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
             let entries = f.entries(&[]);
             assert!(entries[0]
                 .cleanup
@@ -1240,7 +1238,12 @@ mod tests {
             f.remove(wt, &[]).unwrap();
             assert!(!f.worktree.exists());
             assert!(f.repo.exists());
-            git(&f.repo, &["show-ref", "--verify", "refs/heads/feature"]).unwrap();
+            repo::git_exact(
+                &f.repo,
+                &["show-ref", "--verify", "refs/heads/feature"],
+                Inspection,
+            )
+            .unwrap();
             assert_eq!(f.entries(&[]).len(), 1);
         }
     }
@@ -1256,12 +1259,14 @@ mod tests {
         assert!(entry.cleanup.as_ref().unwrap().content_merged);
         assert!(entry.cleanup.as_ref().unwrap().blocked_reason.is_none());
         fs::write(f.worktree.join("file.txt"), "staged unique\n").unwrap();
-        git(&f.worktree, &["add", "file.txt"]).unwrap();
+        repo::git_exact(&f.worktree, &["add", "file.txt"], Inspection).unwrap();
         fs::write(f.worktree.join("file.txt"), "integrated\n").unwrap();
         assert!(!f.entry().cleanup.as_ref().unwrap().content_merged);
         assert!(f.remove(&entry, &[]).is_err());
         assert_eq!(
-            git(&f.worktree, &["show", ":file.txt"]).unwrap().trim(),
+            repo::git_exact(&f.worktree, &["show", ":file.txt"], Inspection)
+                .unwrap()
+                .trim(),
             "staged unique"
         );
     }
@@ -1270,7 +1275,12 @@ mod tests {
     fn branch_switch_at_the_same_commit_invalidates_cleanup() {
         let f = Fixture::new("main");
         let entry = f.entry();
-        git(&f.worktree, &["checkout", "-b", "different-work"]).unwrap();
+        repo::git_exact(
+            &f.worktree,
+            &["checkout", "-b", "different-work"],
+            Inspection,
+        )
+        .unwrap();
         assert!(f.remove(&entry, &[]).unwrap_err().contains("changed"));
         assert!(f.worktree.exists());
     }
@@ -1296,8 +1306,18 @@ mod tests {
             Some(&entry.branch),
         )
         .unwrap();
-        assert!(git(&f.repo, &["show-ref", "--verify", "refs/heads/feature"]).is_err());
-        assert!(git(&f.repo, &["show-ref", "--verify", "refs/heads/master"]).is_ok());
+        assert!(repo::git_exact(
+            &f.repo,
+            &["show-ref", "--verify", "refs/heads/feature"],
+            Inspection
+        )
+        .is_err());
+        assert!(repo::git_exact(
+            &f.repo,
+            &["show-ref", "--verify", "refs/heads/master"],
+            Inspection
+        )
+        .is_ok());
     }
 
     #[test]
@@ -1307,7 +1327,12 @@ mod tests {
         assert_eq!(f.entry().cleanup.as_ref().unwrap().merged, Some(false));
         assert!(f.remove(&f.entry(), &[]).is_err());
         f.commit(&f.repo, "unmerged\n");
-        git(&f.repo, &["commit", "--amend", "-m", "squash merge"]).unwrap();
+        repo::git_exact(
+            &f.repo,
+            &["commit", "--amend", "-m", "squash merge"],
+            Inspection,
+        )
+        .unwrap();
         assert!(f.entry().cleanup.as_ref().unwrap().content_merged);
         f.remove(&f.entry(), &[]).unwrap();
         assert!(!f.worktree.exists());
@@ -1324,7 +1349,7 @@ mod tests {
         fs::write(f.worktree.join("package.json"), "{}").unwrap();
         fs::write(f.worktree.join("Cargo.toml"), "[workspace]\n").unwrap();
         f.commit(&f.worktree, "configured project\n");
-        git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
         for folder in ["node_modules", "dist", "target"] {
             fs::create_dir_all(f.worktree.join(folder)).unwrap();
             fs::write(f.worktree.join(folder).join("generated.js"), "generated").unwrap();
@@ -1336,7 +1361,12 @@ mod tests {
         assert!(!status.recoverable);
         f.remove(&entry, &[]).unwrap();
         assert!(!f.worktree.exists());
-        git(&f.repo, &["show-ref", "--verify", "refs/heads/feature"]).unwrap();
+        repo::git_exact(
+            &f.repo,
+            &["show-ref", "--verify", "refs/heads/feature"],
+            Inspection,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1357,7 +1387,7 @@ mod tests {
             fs::write(f.worktree.join(".gitignore"), ".env\nignored/\ndist/\n").unwrap();
             fs::write(f.worktree.join("package.json"), "{}").unwrap();
             f.commit(&f.worktree, "configured project\n");
-            git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+            repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
             let before = f.entry();
             let file = f.worktree.join(name);
             fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -1397,7 +1427,7 @@ mod tests {
         let f = Fixture::new("main");
         fs::write(f.worktree.join(".gitignore"), "ignored/\nout/\n*.log\n").unwrap();
         f.commit(&f.worktree, "ignore output\n");
-        git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
         fs::create_dir_all(f.worktree.join("ignored/nested")).unwrap();
         fs::write(f.worktree.join("ignored/nested/keep.txt"), "generated").unwrap();
         // A placeholder template, and a third-party fixture inside a dependency
@@ -1444,9 +1474,14 @@ mod tests {
         fs::write(f.worktree.join("package.json"), "{}").unwrap();
         fs::create_dir(f.worktree.join("dist")).unwrap();
         fs::write(f.worktree.join("dist/tracked.js"), "original").unwrap();
-        git(&f.worktree, &["add", "--force", "dist/tracked.js"]).unwrap();
+        repo::git_exact(
+            &f.worktree,
+            &["add", "--force", "dist/tracked.js"],
+            Inspection,
+        )
+        .unwrap();
         f.commit(&f.worktree, "configured project\n");
-        git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
         fs::write(f.worktree.join("dist/tracked.js"), "local edit").unwrap();
         fs::write(f.worktree.join("dist/generated.js"), "generated").unwrap();
         let entry = f.entry();
@@ -1483,19 +1518,21 @@ mod tests {
                     fs::write(f.worktree.join("file.txt"), "keep").unwrap();
                     match kind {
                         "staged" => {
-                            git(&f.worktree, &["add", "file.txt"]).unwrap();
+                            repo::git_exact(&f.worktree, &["add", "file.txt"], Inspection).unwrap();
                         }
                         "assume-unchanged" => {
-                            git(
+                            repo::git_exact(
                                 &f.worktree,
                                 &["update-index", "--assume-unchanged", "file.txt"],
+                                Inspection,
                             )
                             .unwrap();
                         }
                         "skip-worktree" => {
-                            git(
+                            repo::git_exact(
                                 &f.worktree,
                                 &["update-index", "--skip-worktree", "file.txt"],
+                                Inspection,
                             )
                             .unwrap();
                         }
@@ -1522,7 +1559,7 @@ mod tests {
         fs::write(parent.join("leftover/bundle.js"), "generated").unwrap();
         fs::write(parent.join("holds-secrets/.env"), "TOKEN=1").unwrap();
         fs::create_dir(parent.join("checkout/.git")).unwrap();
-        git(
+        repo::git_exact(
             &f.repo,
             &[
                 "worktree",
@@ -1531,6 +1568,7 @@ mod tests {
                 "live",
                 parent.join("live").to_str().unwrap(),
             ],
+            Inspection,
         )
         .unwrap();
         let repo = f.repo.to_str().unwrap();
@@ -1561,11 +1599,17 @@ mod tests {
     fn locks_missing_paths_and_foreign_paths_are_kept() {
         let f = Fixture::new("main");
         let before = f.entry();
-        git(&f.repo, &["worktree", "lock", f.worktree.to_str().unwrap()]).unwrap();
+        repo::git_exact(
+            &f.repo,
+            &["worktree", "lock", f.worktree.to_str().unwrap()],
+            Inspection,
+        )
+        .unwrap();
         assert!(f.remove(&before, &[]).unwrap_err().contains("Locked"));
-        git(
+        repo::git_exact(
             &f.repo,
             &["worktree", "unlock", f.worktree.to_str().unwrap()],
+            Inspection,
         )
         .unwrap();
         let moved = f.root.join("moved");
@@ -1627,13 +1671,19 @@ mod tests {
     #[test]
     fn missing_worktrees_have_actionable_status_and_locked_entries_survive_prune() {
         let f = Fixture::new("main");
-        git(&f.repo, &["worktree", "lock", f.worktree.to_str().unwrap()]).unwrap();
+        repo::git_exact(
+            &f.repo,
+            &["worktree", "lock", f.worktree.to_str().unwrap()],
+            Inspection,
+        )
+        .unwrap();
         fs::rename(&f.worktree, f.root.join("moved")).unwrap();
         assert!(f.entry().cleanup.as_ref().unwrap().missing);
         assert_eq!(prune(f.repo.to_str().unwrap()).unwrap(), 0);
-        git(
+        repo::git_exact(
             &f.repo,
             &["worktree", "unlock", f.worktree.to_str().unwrap()],
+            Inspection,
         )
         .unwrap();
         let entry = f.entry();
@@ -1657,9 +1707,9 @@ mod tests {
         f.commit(&f.repo, "target advanced\n");
         assert!(f.remove(&before, &[]).unwrap_err().contains("changed"));
         let before = f.entry();
-        git(&f.worktree, &["merge", "--ff-only", "main"]).unwrap();
+        repo::git_exact(&f.worktree, &["merge", "--ff-only", "main"], Inspection).unwrap();
         assert!(f.remove(&before, &[]).unwrap_err().contains("changed"));
-        git(&f.repo, &["branch", "-m", "trunk"]).unwrap();
+        repo::git_exact(&f.repo, &["branch", "-m", "trunk"], Inspection).unwrap();
         assert_eq!(f.entry().cleanup.as_ref().unwrap().merged, None);
         assert!(f.remove(&before, &[]).is_err());
     }
@@ -1667,8 +1717,8 @@ mod tests {
     #[test]
     fn detached_worktrees_and_explicit_target_selection() {
         let f = Fixture::new("master");
-        git(&f.worktree, &["checkout", "--detach"]).unwrap();
-        git(&f.repo, &["branch", "main"]).unwrap();
+        repo::git_exact(&f.worktree, &["checkout", "--detach"], Inspection).unwrap();
+        repo::git_exact(&f.repo, &["branch", "main"], Inspection).unwrap();
         let wt = f.entry();
         assert!(wt.branch.is_empty());
         assert_eq!(
@@ -1716,7 +1766,12 @@ mod tests {
     #[test]
     fn archive_saves_recoverable_content_then_force_removes_a_dirty_unmerged_worktree() {
         let f = Fixture::new("main");
-        git(&f.worktree, &["branch", "-m", "jackalope/task-1"]).unwrap();
+        repo::git_exact(
+            &f.worktree,
+            &["branch", "-m", "jackalope/task-1"],
+            Inspection,
+        )
+        .unwrap();
         fs::write(f.worktree.join(".gitignore"), "node_modules/\n").unwrap();
         fs::write(f.worktree.join("package.json"), "{}").unwrap();
         f.commit(&f.worktree, "branch work\n");
@@ -1744,9 +1799,10 @@ mod tests {
         assert!(!f.worktree.exists());
         assert_eq!(f.entries(&[]).len(), 1);
         assert!(
-            git(
+            repo::git_exact(
                 &f.repo,
-                &["show-ref", "--verify", "refs/heads/jackalope/task-1"]
+                &["show-ref", "--verify", "refs/heads/jackalope/task-1"],
+                Inspection
             )
             .is_err(),
             "the jackalope branch is deleted (preserved in the bundle)"
@@ -1768,19 +1824,24 @@ mod tests {
             .contains("untracked note"));
         assert!(!fs::read(dir.join("uncommitted.patch")).unwrap().is_empty());
 
-        git(
+        repo::git_exact(
             &f.repo,
             &[
                 "fetch",
                 dir.join("branch.bundle").to_str().unwrap(),
                 "HEAD:refs/heads/recovered",
             ],
+            Inspection,
         )
         .unwrap();
         assert_eq!(
-            git(&f.repo, &["log", "-1", "--format=%s", "recovered"])
-                .unwrap()
-                .trim(),
+            repo::git_exact(
+                &f.repo,
+                &["log", "-1", "--format=%s", "recovered"],
+                Inspection
+            )
+            .unwrap()
+            .trim(),
             "change"
         );
     }

@@ -7,9 +7,9 @@
 
 use super::{
     coordination::Coordinator,
-    git_command::{command as git_command, Policy},
     integration,
     process_control::CommandResult,
+    repo::{self, Policy},
     tasks::{RunRequest, TaskRun, TaskRuntime, WorkspaceMode},
     verification,
 };
@@ -195,16 +195,6 @@ fn findings_block(reply: &str) -> Option<&str> {
     Some(&body[..body.find("```").unwrap_or(body.len())])
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = git_command(path, args, Policy::Isolated)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
 /// Starts one reviewer for a finished attempt. `request` carries the reviewer's agent,
 /// account and project settings; its prompt and workspace are replaced here.
 pub(super) fn start(
@@ -232,7 +222,6 @@ pub(super) fn start(
             return Err("This result has no workspace to review.".into());
         }
         let directory = runtime.integration_directory();
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let (tree, base) =
             integration::snapshot_commit(author, &directory, "Jackalope review snapshot")?;
         request.prompt = match kind {
@@ -277,9 +266,13 @@ struct Disposable {
 impl Drop for Disposable {
     fn drop(&mut self) {
         let path = self.path.to_string_lossy().into_owned();
-        let _ = git(&self.project, &["worktree", "remove", "--force", &path]);
+        let _ = repo::git(
+            &self.project,
+            &["worktree", "remove", "--force", &path],
+            Policy::Isolated,
+        );
         let _ = std::fs::remove_dir_all(&self.path);
-        let _ = git(&self.project, &["worktree", "prune"]);
+        let _ = repo::git(&self.project, &["worktree", "prune"], Policy::Isolated);
     }
 }
 
@@ -324,9 +317,10 @@ pub(super) fn rerun(
         .join("challenge")
         .join(uuid::Uuid::new_v4().simple().to_string());
     let workspace = path.to_string_lossy().into_owned();
-    git(
+    repo::git(
         &project,
         &["worktree", "add", "--detach", &workspace, &commit],
+        Policy::Isolated,
     )?;
     let disposable = Disposable { project, path };
     let lease = verification::reserve_workspace(&workspace)?;
