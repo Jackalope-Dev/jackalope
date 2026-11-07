@@ -8,7 +8,7 @@ import {
 } from '../../lib/helper-actions';
 import { invokeNative } from '../../lib/native/transport';
 import { stopTask } from '../../lib/task-client';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
   type HelperAction as Action,
@@ -177,7 +177,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           throw new Error('This agent is no longer available or enabled.');
         config.setDefaultMetaAgent(agent);
         try {
-          await syncAgentConfig();
+          await agentPolicySaved();
         } catch (cause) {
           if (useAgentConfigStore.getState().defaultMetaAgent === agent)
             config.setDefaultMetaAgent(config.defaultMetaAgent);

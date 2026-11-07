@@ -11,7 +11,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunRequest } from '../../lib/run-types';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingGroup } from './Setting';
@@ -212,7 +211,6 @@ export function RemoteAccess() {
     }
   };
   const configure = async (allow: boolean) => {
-    await syncAgentConfig();
     const templates: RunRequest[] = projects
       .filter((p) => selected.includes(p.id))
       .map((project) => {

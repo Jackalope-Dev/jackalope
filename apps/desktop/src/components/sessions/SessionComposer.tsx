@@ -6,6 +6,7 @@ import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
 import { stopAndSettle, stopPreview } from '../../lib/task-client';
+import { windowKind } from '../../lib/window-kind';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { AttachButton } from '../tasks/AttachButton';
 import { DictationButton } from '../tasks/DictationButton';
@@ -27,7 +28,7 @@ export function SessionComposer({
   latestRun?: TaskRun;
   addition?: { text: string; revision: number; applied: (error?: string) => void };
 }) {
-  const key = `jackalope-live-draft:${location.search.includes('liveSession=') ? 'window' : 'main'}:${session.id}`;
+  const key = `jackalope-live-draft:${windowKind().kind === 'liveSession' ? 'window' : 'main'}:${session.id}`;
   const previewRunning = useManagedPreview(latestRun?.id, !active);
   const [text, setText] = useState(() => {
     try {

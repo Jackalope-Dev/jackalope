@@ -22,7 +22,7 @@ import {
   profileId,
   useAgentAccountsStore,
 } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
@@ -202,7 +202,7 @@ export function AgentAccounts({
     const before = project.preferences;
     change();
     try {
-      await syncAgentConfig();
+      await agentPolicySaved();
     } catch (cause) {
       useProjectStore.getState().updateProject(project.id, { preferences: before });
       throw cause;
@@ -448,7 +448,7 @@ export function AgentAccounts({
                           },
                         });
                         try {
-                          await syncAgentConfig();
+                          await agentPolicySaved();
                         } catch (cause) {
                           useAgentConfigStore.setState({ disabledAccounts: before });
                           throw cause;

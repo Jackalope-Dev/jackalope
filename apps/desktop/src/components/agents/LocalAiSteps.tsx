@@ -32,7 +32,7 @@ import { useManagedRuntime } from '../../lib/managed-runtime';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -180,7 +180,6 @@ export function LocalAiSteps({
         ...options,
         models: [...new Set([...options.models, id])],
       });
-      await syncAgentConfig();
       await useExecutionStore.getState().discover();
       if (
         !projectId &&
@@ -191,7 +190,7 @@ export function LocalAiSteps({
       ) {
         config.setDefaultMetaAgent('opencode');
       }
-      await syncAgentConfig();
+      await agentPolicySaved();
       await useAgentAccountsStore.getState().load('opencode', true);
       if (active.current) {
         await onConnected?.(profile.id);

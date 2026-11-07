@@ -13,7 +13,6 @@ import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
 import { isActive, isFinished } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -69,7 +68,6 @@ export function ChallengeDialog({
     setError('');
     const failures: string[] = [];
     try {
-      await syncAgentConfig();
       for (const agent of agents)
         try {
           await invokeNative<string>('task_start_challenge', {

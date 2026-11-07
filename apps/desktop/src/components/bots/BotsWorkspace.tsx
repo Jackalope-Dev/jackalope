@@ -46,7 +46,7 @@ import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/l
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import {
   BOT_STYLES,
   type Bot,
@@ -689,7 +689,6 @@ function BotProfile({
           text: value,
         });
       else {
-        await syncAgentConfig();
         await sessionCommand('create', {
           id: attempt.id,
           request: botRequest(bot, project, attempt.id, value, true, profileFor(bot, project)),

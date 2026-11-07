@@ -19,7 +19,7 @@ import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { isActive } from '../../lib/run-status';
 import type { Runner, TaskRun } from '../../lib/run-types';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -163,11 +163,9 @@ export function RunnerConnections({
   useEffect(() => {
     if (!desktop) return;
     let active = true;
-    void syncAgentConfig()
-      .then(() => discover(false))
-      .catch((cause) => {
-        if (active) setCheckError(String(cause));
-      });
+    void discover(false).catch((cause) => {
+      if (active) setCheckError(String(cause));
+    });
     return () => {
       active = false;
     };
@@ -176,7 +174,6 @@ export function RunnerConnections({
     setChecking(true);
     setCheckError('');
     try {
-      await syncAgentConfig();
       await discover();
       for (const agent of JSON.parse(accountAgents) as string[])
         void useAgentAccountsStore.getState().load(agent, true);
@@ -401,7 +398,7 @@ export function RunnerConnections({
               onCheckedChange={(value) => {
                 setCheckError('');
                 config.toggleAgent(runner.id, value, scoped?.id);
-                void syncAgentConfig().catch((cause) => setCheckError(String(cause)));
+                void agentPolicySaved().catch((cause) => setCheckError(String(cause)));
               }}
               label={`Enable ${custom?.name ?? runner.name}${scoped ? ` for ${scoped.name}` : ' app-wide'}`}
             />

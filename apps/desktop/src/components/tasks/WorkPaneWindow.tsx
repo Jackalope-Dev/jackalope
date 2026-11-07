@@ -1,12 +1,10 @@
-import { applyThemeTokens, startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { saveWorkFeedback } from '../../lib/work-feedback';
 import { observeExecution, useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useThemeStore } from '../../stores/themeStore';
+import { bootstrapWindow, useWindowTheme } from '../../window-bootstrap';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { ResultReview } from './ResultReview';
@@ -22,26 +20,12 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
   const loading = useExecutionStore((state) => state.loading);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const appTheme = useThemeStore((state) => state.appTheme);
-  const theme = useProjectStore(
-    (state) => state.projects.find((project) => project.id === run?.projectId)?.preferences?.theme,
-  );
-  useEffect(startThemeClock, []);
+  useEffect(bootstrapWindow, []);
+  useWindowTheme(run?.projectId);
   useEffect(() => {
     useExecutionStore.getState().select(id);
     return observeExecution();
   }, [id]);
-  useEffect(() => {
-    applyThemeTokens(theme ?? appTheme);
-  }, [theme, appTheme]);
-  useEffect(() => {
-    const sync = (event: StorageEvent) => {
-      if (event.key === 'jackalope-theme') void useThemeStore.persist.rehydrate();
-      if (event.key === 'jackalope-projects') void useProjectStore.persist.rehydrate();
-    };
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, []);
   const feedback = async (text: string) => {
     if (!run) throw new Error('Task unavailable');
     saveWorkFeedback(run.taskId, run.id, text);

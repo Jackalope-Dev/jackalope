@@ -6,7 +6,7 @@ import {
 } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
@@ -81,7 +81,7 @@ export function OnboardingAgentAccount({
     if (!before[agentId]?.length) return;
     useAgentConfigStore.setState({ disabledAccounts: { ...before, [agentId]: [] } });
     try {
-      await syncAgentConfig();
+      await agentPolicySaved();
     } catch (cause) {
       useAgentConfigStore.setState({ disabledAccounts: before });
       setFailure(String(cause));

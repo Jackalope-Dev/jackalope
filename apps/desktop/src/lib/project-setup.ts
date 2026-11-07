@@ -1,4 +1,3 @@
-import { syncAgentConfig } from '../stores/agentConfigStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
 import { missingProjectDefaults } from './context/project-defaults';
@@ -19,7 +18,6 @@ export async function openProject(
   path: string,
   options: { provisional?: boolean; pending?: Project | null } = {},
 ) {
-  await syncAgentConfig();
   const info = await validateProject(path.trim());
   const project = projectFromInfo(info, options.pending);
   return options.provisional ? project : commitProjectSetup(project);
@@ -30,7 +28,6 @@ export async function createProject(
   parentPath: string | null,
   options: { provisional?: boolean } = {},
 ) {
-  await syncAgentConfig();
   const info = await invokeNative<ProjectInfo>('task_create_project', {
     name: name.trim(),
     parentPath,

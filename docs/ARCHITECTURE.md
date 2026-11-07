@@ -53,8 +53,11 @@ Composer / saved idea / queue / native schedule
   → prepared integration receipt → explicit application
 ~~~
 
-executionStore.start synchronizes agent policy and invokes task_start. Clients in
-lib/queue.ts synchronize policy before queue creation/dispatch. Native commands
+The webview owns the agent policy (stores/agentConfigStore.ts). The main window
+saves it to the native side on every change, and the transport saves it again
+before each command that reads it (task starts, discovery, queue creation and
+dispatch, schedules, Chat and others listed there), so no caller syncs by hand.
+Native commands
 are registered in src-tauri/src/lib.rs, the authoritative command inventory.
 Every webview call goes through invokeNative in lib/native/transport.ts, which
 rejects in the browser preview and reports operation telemetry and timing;

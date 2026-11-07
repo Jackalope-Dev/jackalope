@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
 import { Setting, SettingActions, SettingGroup } from '../settings/Setting';
@@ -35,7 +35,7 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
     setError('');
     try {
       change();
-      if (isTauriEnvironment()) await syncAgentConfig();
+      if (isTauriEnvironment()) await agentPolicySaved();
     } catch (cause) {
       useAgentConfigStore.setState(beforeAgents);
       useProjectStore.setState({ projects: beforeProjects });

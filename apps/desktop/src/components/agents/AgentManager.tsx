@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -89,7 +89,6 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
     setError('');
     setSaved(false);
     try {
-      await syncAgentConfig();
       await discover();
       setSaved(true);
       setDirty(false);

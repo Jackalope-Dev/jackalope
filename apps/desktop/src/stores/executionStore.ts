@@ -9,7 +9,7 @@ import { isActive } from '../lib/run-status';
 import type { Runner, RunRequest, TaskRun } from '../lib/run-types';
 import { mergeTaskChanges, type TaskChanges } from '../lib/task-changes';
 import type { TaskEffort } from '../lib/task-effort';
-import { syncAgentConfig } from './agentConfigStore';
+import { windowKind } from '../lib/window-kind';
 import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
 
@@ -52,10 +52,7 @@ let revision: number | undefined;
 let previousDetailId: string | null = null;
 let refreshing: Promise<void> | undefined;
 let discovering: Promise<void> | undefined;
-const windowParameters = new URLSearchParams(
-  typeof window === 'undefined' ? '' : window.location.search,
-);
-const workPane = windowParameters.get('workPane');
+const root = windowKind();
 export const useExecutionStore = create<ExecutionState>()(
   persist(
     (set, get) => ({
@@ -135,7 +132,6 @@ export const useExecutionStore = create<ExecutionState>()(
         if (get().submitting) throw new Error('A task is already being submitted.');
         set({ submitting: true });
         try {
-          await syncAgentConfig();
           const id = await invokeNative<string>('task_start', {
             request: { ...request, id: crypto.randomUUID() },
           });
@@ -148,9 +144,10 @@ export const useExecutionStore = create<ExecutionState>()(
       },
     }),
     {
-      name: workPane
-        ? `jackalope-execution-ui-v1:work-pane:${workPane}:${windowParameters.get('pane') ?? 'result'}`
-        : 'jackalope-execution-ui-v1',
+      name:
+        root.kind === 'workPane'
+          ? `jackalope-execution-ui-v1:work-pane:${root.id}:${root.pane}`
+          : 'jackalope-execution-ui-v1',
       partialize: (state) => ({ drafts: state.drafts, selectedId: state.selectedId }),
     },
   ),

@@ -16,7 +16,6 @@ import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
 import { durationLabel, elapsedLabel } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -73,7 +72,6 @@ export function AgentReview({
     setError('');
     setOpen(true);
     try {
-      await syncAgentConfig();
       await invokeNative<string>('task_start_agent_review', {
         sourceRunId: run.id,
         request: {

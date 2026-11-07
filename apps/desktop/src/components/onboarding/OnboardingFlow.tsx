@@ -9,7 +9,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { WindowGlass } from '../../lib/window-glass';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
@@ -249,7 +249,6 @@ export function OnboardingFlow({
   };
   const refresh = () =>
     attempt(async () => {
-      await syncAgentConfig();
       await execution.discover();
     });
   // Agents are usually installed or signed in from a terminal, so returning to the window re-scans.

@@ -5,28 +5,25 @@ import './index.css';
 import { DesktopExperience } from './components/layout/DesktopExperience';
 import { AppErrorBoundary } from './components/ui/AppErrorBoundary';
 import { suppressNativeContextMenu } from './lib/native-context-menu';
+import { windowKind } from './lib/window-kind';
 
 suppressNativeContextMenu();
 
 const LiveSessionWindow = React.lazy(() => import('./components/sessions/LiveSessionWindow'));
-const liveSessionId = new URLSearchParams(window.location.search).get('liveSession');
 const WorkPaneWindow = React.lazy(() => import('./components/tasks/WorkPaneWindow'));
-const workPaneId = new URLSearchParams(window.location.search).get('workPane');
+const root = windowKind();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <DesktopExperience />
-      {workPaneId ? (
+      {root.kind === 'workPane' ? (
         <React.Suspense fallback={<p>Loading task…</p>}>
-          <WorkPaneWindow
-            id={workPaneId}
-            pane={new URLSearchParams(window.location.search).get('pane') ?? 'result'}
-          />
+          <WorkPaneWindow id={root.id} pane={root.pane} />
         </React.Suspense>
-      ) : liveSessionId ? (
+      ) : root.kind === 'liveSession' ? (
         <React.Suspense fallback={<p>Loading session…</p>}>
-          <LiveSessionWindow id={liveSessionId} />
+          <LiveSessionWindow id={root.id} />
         </React.Suspense>
       ) : (
         <App />

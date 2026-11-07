@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { telemetry } from '../lib/telemetry-client';
+import { isMainWindow } from '../lib/window-kind';
 import { useSettingsStore } from './settingsStore';
 
 export interface CommunitySettings {
@@ -28,7 +29,7 @@ let revision = 0;
 function activate(settings: CommunitySettings) {
   const enabled = settings.configured && settings.reviewed && settings.telemetry;
   telemetry.configure(enabled, settings.errors);
-  if (enabled && !opened && !new URLSearchParams(window.location.search).has('liveSession')) {
+  if (enabled && !opened && isMainWindow()) {
     opened = true;
     telemetry.track({ name: 'app_opened' });
   }

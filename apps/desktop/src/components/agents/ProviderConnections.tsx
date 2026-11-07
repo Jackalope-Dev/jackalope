@@ -15,7 +15,7 @@ import { useManagedRuntime } from '../../lib/managed-runtime';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -134,7 +134,7 @@ function ConnectProvider({
                     },
                   });
                 }
-                await syncAgentConfig();
+                await agentPolicySaved();
               }
               await useAgentAccountsStore.getState().load('opencode', true);
               await useExecutionStore.getState().discover();

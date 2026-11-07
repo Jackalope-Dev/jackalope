@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { type BuiltinAgentId, builtinAgents } from '../lib/agent-catalog.ts';
-import { invokeNative } from '../lib/native/transport.ts';
+import { isTauriEnvironment } from '../lib/native/env.ts';
+import { awaitBeforeNative, invokeNative } from '../lib/native/transport.ts';
 import { createPersistStorage } from '../lib/persist-storage.ts';
+import { isMainWindow } from '../lib/window-kind.ts';
 import { isAgentAllowedForProject, useProjectStore } from './projectStore.ts';
 
 interface CustomAgentConfig {
@@ -169,13 +171,27 @@ export const useAgentConfigStore = create<AgentConfigState>()(
   ),
 );
 
-let policySync: Promise<void> = Promise.resolve();
-export function syncAgentConfig() {
-  policySync = policySync.catch(() => {}).then(syncAgentConfigNow);
-  return policySync;
-}
+/** Commands whose native side reads the agent policy; each waits until it holds the latest. */
+const POLICY_COMMANDS = [
+  'task_start',
+  'task_start_agent_review',
+  'task_start_challenge',
+  'task_runners',
+  'task_validate_project',
+  'task_create_project',
+  'task_strategy_assess',
+  'task_plan_create',
+  'queue_dispatch',
+  'queue_add',
+  'queue_import',
+  'schedule_save',
+  'live_session_create',
+  'helper_send',
+  'remote_configure',
+  'cloudflare_artifacts_create_project',
+];
 
-async function syncAgentConfigNow() {
+function agentPolicy() {
   const {
     enabledAgents,
     allowedModels,
@@ -208,26 +224,64 @@ async function syncAgentConfigNow() {
       },
     ]),
   );
-  await invokeNative('agent_save_policy', {
-    policy: {
-      enabledAgents,
-      allowedModels,
-      defaultMetaAgent,
-      automaticQuotaHandoff,
-      disabledAccounts,
-      customAgents,
-      runnerOptions: normalizedOptions,
-      projects: Object.fromEntries(
-        useProjectStore.getState().projects.map((project) => [
-          project.id,
-          {
-            allowedAgents: project.preferences?.allowedAgents,
-            disabledAccounts: project.preferences?.disabledAccounts ?? {},
-            agentAccounts: project.preferences?.agentAccounts ?? {},
-            preferredRunner: project.preferences?.preferredRunner,
-          },
-        ]),
-      ),
-    },
-  });
+  return {
+    enabledAgents,
+    allowedModels,
+    defaultMetaAgent,
+    automaticQuotaHandoff,
+    disabledAccounts,
+    customAgents,
+    runnerOptions: normalizedOptions,
+    projects: Object.fromEntries(
+      useProjectStore.getState().projects.map((project) => [
+        project.id,
+        {
+          allowedAgents: project.preferences?.allowedAgents,
+          disabledAccounts: project.preferences?.disabledAccounts ?? {},
+          agentAccounts: project.preferences?.agentAccounts ?? {},
+          preferredRunner: project.preferences?.preferredRunner,
+        },
+      ]),
+    ),
+  };
+}
+
+let saved: string | null = null;
+let saving: Promise<void> = Promise.resolve();
+/** Queues a save of the current policy; `always` saves even when it matches the last save. */
+function saveAgentPolicy(always: boolean) {
+  saving = saving
+    .catch(() => {})
+    .then(async () => {
+      const policy = agentPolicy();
+      const encoded = JSON.stringify(policy);
+      if (!always && encoded === saved) return;
+      await invokeNative('agent_save_policy', { policy });
+      saved = encoded;
+    });
+  return saving;
+}
+
+/**
+ * Resolves once the native side holds the current agent policy, rejecting with
+ * the save's error. Settings screens await it to report or roll back a change.
+ */
+export const agentPolicySaved = () => saveAgentPolicy(false);
+
+// A terminal or another window can also write the policy, so every command that
+// reads it saves this window's copy again rather than trusting the last save.
+awaitBeforeNative(POLICY_COMMANDS, () => saveAgentPolicy(true));
+
+// The main window also saves each change, so background work such as schedules
+// sees it; secondary windows save only before their own commands.
+if (isMainWindow()) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const changed = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (isTauriEnvironment()) void saveAgentPolicy(false).catch(() => {});
+    }, 300);
+  };
+  useAgentConfigStore.subscribe(changed);
+  useProjectStore.subscribe(changed);
 }

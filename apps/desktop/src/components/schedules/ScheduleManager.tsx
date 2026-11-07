@@ -15,7 +15,7 @@ import {
   savedPlanDraft,
 } from '../../lib/schedules';
 import { stopTask } from '../../lib/task-client';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
   agentAccountFor,
@@ -220,7 +220,6 @@ export function ScheduleManager(props: {
       if (!editing || !project) return;
       if (!monitorOnly && agent !== 'auto' && !isAgentAllowedForProject(project, agent))
         throw new Error('This agent is not allowed for the selected project.');
-      await syncAgentConfig();
       const adapter =
         useAgentConfigStore.getState().customAgents.find((a) => a.id === agent)?.adapter ?? agent;
       await invokeNative('schedule_save', {

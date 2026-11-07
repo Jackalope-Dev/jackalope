@@ -1,4 +1,3 @@
-import { syncAgentConfig } from '../stores/agentConfigStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
 import { invokeNative } from './native/transport';
 import { commitProjectSetup, projectGitState } from './project-setup';
@@ -122,7 +121,6 @@ export async function createArtifactsProject(
   repoName: string,
   options: { provisional?: boolean } = {},
 ): Promise<{ project: Project; pushError?: string }> {
-  await syncAgentConfig();
   const created = await invokeNative<CreatedProject>('cloudflare_artifacts_create_project', {
     name: name.trim(),
     parentPath,

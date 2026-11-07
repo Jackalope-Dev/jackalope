@@ -14,7 +14,6 @@ import { isQuestionOnly } from '../../lib/question-intent';
 import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { workspaceRequest } from '../../lib/workspace-mode';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { usePlanStore } from '../../stores/planStore';
@@ -240,7 +239,6 @@ ${incoming}`
     setBusy(true);
     setError('');
     try {
-      await syncAgentConfig();
       if (comparing && choice !== 'interview') {
         const comparison = await startComparison({
           project,

@@ -1,4 +1,3 @@
-import { syncAgentConfig } from '../stores/agentConfigStore.ts';
 import { invokeNative } from './native/transport.ts';
 
 export interface QueueItem {
@@ -131,8 +130,6 @@ export async function queueCommand<T>(
   command: QueueCommand,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  if (command === 'queue_dispatch' || command === 'queue_add' || command === 'queue_import')
-    await syncAgentConfig();
   return invokeNative<T>(command, args);
 }
 export const queueSnapshot = () => queueCommand<QueueView>('queue_snapshot');

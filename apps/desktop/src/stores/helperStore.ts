@@ -4,7 +4,7 @@ import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { observeRefresh } from '../lib/observe-refresh';
 import type { RunUsage } from '../lib/run-types';
-import { syncAgentConfig, useAgentConfigStore } from './agentConfigStore';
+import { useAgentConfigStore } from './agentConfigStore';
 import { useExecutionStore } from './executionStore';
 import { useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
@@ -98,7 +98,6 @@ export const useHelperStore = create<HelperState>()(
         if (!prompt) return;
         set({ sending: true, error: null });
         try {
-          await syncAgentConfig();
           await syncHelperContext(true);
           const view = await invokeNative<HelperView>('helper_send', { prompt });
           set({ view, draft: '', error: null });
