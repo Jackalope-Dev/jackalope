@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '../../lib/errors.ts';
 import { prepareRemoteRequest } from '../../lib/remote-request.ts';
 import type { PendingUserPrompt, Review } from '../../lib/run-types';
 
