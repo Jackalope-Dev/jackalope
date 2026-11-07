@@ -1,3 +1,6 @@
+//! A JSON-RPC (or Claude Code control-protocol) session with an agent CLI over
+//! its stdio, as quota readers, model discovery and sign-in checks use it.
+
 use serde_json::Value;
 use std::process::Stdio;
 use tokio::{
@@ -5,6 +8,43 @@ use tokio::{
     process::{Child, ChildStdin, ChildStdout, Command},
     time::{timeout, Duration},
 };
+
+/// Why a CLI request failed. The CLI's own error text is never surfaced: it
+/// can echo credentials.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum RpcError {
+    Start,
+    Send,
+    Read,
+    TooLarge,
+    Closed,
+    Invalid,
+    Rejected,
+    Missing,
+}
+
+impl RpcError {
+    pub(crate) fn message(self) -> &'static str {
+        match self {
+            Self::Start => "Could not start the agent CLI.",
+            Self::Send => "Could not send the request to the agent CLI.",
+            Self::Read => "Could not read the agent CLI's response.",
+            Self::TooLarge => "The agent CLI's output exceeded the response limit.",
+            Self::Closed => "The agent CLI closed before answering.",
+            Self::Invalid => "The agent CLI returned an invalid response.",
+            Self::Rejected => {
+                "The agent CLI rejected the request. Update the CLI and check its sign-in."
+            }
+            Self::Missing => "The agent CLI returned no result.",
+        }
+    }
+}
+
+impl From<RpcError> for String {
+    fn from(error: RpcError) -> Self {
+        error.message().into()
+    }
+}
 
 pub(crate) struct Client {
     child: Child,
@@ -15,18 +55,14 @@ pub(crate) struct Client {
 
 impl Client {
     pub(crate) fn spawn_bound(
-        binding: &super::super::agent_profiles::AccountBinding,
+        binding: &super::agent_profiles::AccountBinding,
         args: &[&str],
     ) -> Result<Self, String> {
-        Self::spawn_executable(
-            binding,
-            &super::super::tasks::executable(&binding.adapter)?,
-            args,
-        )
+        Self::spawn_executable(binding, &super::tasks::executable(&binding.adapter)?, args)
     }
 
     pub(crate) fn spawn_executable(
-        binding: &super::super::agent_profiles::AccountBinding,
+        binding: &super::agent_profiles::AccountBinding,
         executable: &std::path::Path,
         args: &[&str],
     ) -> Result<Self, String> {
@@ -38,13 +74,11 @@ impl Client {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
-        super::super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-        crate::commands::process_control::hidden(command.as_std_mut());
-        let mut child = command
-            .spawn()
-            .map_err(|_| "Could not start the quota reader")?;
-        let input = child.stdin.take().ok_or("Quota input unavailable")?;
-        let output = BufReader::new(child.stdout.take().ok_or("Quota output unavailable")?);
+        super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
+        super::process_control::hidden(command.as_std_mut());
+        let mut child = command.spawn().map_err(|_| RpcError::Start)?;
+        let input = child.stdin.take().ok_or(RpcError::Start)?;
+        let output = BufReader::new(child.stdout.take().ok_or(RpcError::Start)?);
         Ok(Self {
             child,
             input,
@@ -53,18 +87,17 @@ impl Client {
         })
     }
 
-    pub(crate) async fn notify(&mut self, value: Value) -> Result<(), String> {
+    pub(crate) async fn notify(&mut self, value: Value) -> Result<(), RpcError> {
         self.input
             .write_all(format!("{value}\n").as_bytes())
             .await
-            .map_err(|_| "Could not notify the CLI".into())
+            .map_err(|_| RpcError::Send)
     }
 
-    pub(crate) async fn request(&mut self, request: Value) -> Result<Value, String> {
-        self.input
-            .write_all(format!("{request}\n").as_bytes())
-            .await
-            .map_err(|_| "Could not send the quota request")?;
+    /// Sends `request` and waits for the response with its `id` (or control
+    /// `request_id`), skipping anything else the CLI writes meanwhile.
+    pub(crate) async fn request(&mut self, request: Value) -> Result<Value, RpcError> {
+        self.notify(request.clone()).await?;
         read_response(&mut self.output, &request, &mut self.bytes).await
     }
 
@@ -78,32 +111,29 @@ async fn read_response<R: AsyncRead + Unpin>(
     reader: &mut BufReader<R>,
     request: &Value,
     bytes: &mut usize,
-) -> Result<Value, String> {
+) -> Result<Value, RpcError> {
     loop {
         let mut line = vec![];
         let size = (&mut *reader)
             .take(262_145)
             .read_until(b'\n', &mut line)
             .await
-            .map_err(|_| "Could not read the quota response")?;
+            .map_err(|_| RpcError::Read)?;
         *bytes += size;
         if size > 262_144 || *bytes > 1_048_576 {
-            return Err("Quota output exceeded the response limit".into());
+            return Err(RpcError::TooLarge);
         }
         if size == 0 {
-            return Err("The CLI closed before returning quota information".into());
+            return Err(RpcError::Closed);
         }
-        let value: Value = serde_json::from_slice(&line).map_err(|_| "Invalid quota response")?;
+        let value: Value = serde_json::from_slice(&line).map_err(|_| RpcError::Invalid)?;
         let response = if let Some(id) = request.get("request_id") {
             if value["type"] != "control_response" || value["response"]["request_id"] != *id {
                 continue;
             }
             let response = &value["response"];
             if response["subtype"] != "success" {
-                return Err(
-                    "The CLI rejected the quota request. Update the CLI and check its sign-in."
-                        .into(),
-                );
+                return Err(RpcError::Rejected);
             }
             response.get("response")
         } else {
@@ -111,17 +141,14 @@ async fn read_response<R: AsyncRead + Unpin>(
                 continue;
             }
             if value.get("error").is_some() {
-                return Err(
-                    "The CLI rejected the quota request. Update the CLI and check its sign-in."
-                        .into(),
-                );
+                return Err(RpcError::Rejected);
             }
             value.get("result")
         };
         return response
             .filter(|v| v.is_object())
             .cloned()
-            .ok_or_else(|| "Missing quota result".into());
+            .ok_or(RpcError::Missing);
     }
 }
 
@@ -145,7 +172,8 @@ mod tests {
             (json!({"id":2}), "{\"id\":2,\"error\":{\"message\":\"secret\"}}\n"),
         ] {
             let error = read_response(&mut BufReader::new(data.as_bytes()), &request, &mut 0).await.unwrap_err();
-            assert!(!error.contains("secret"));
+            assert_eq!(error, RpcError::Rejected);
+            assert!(!error.message().contains("secret"));
         }
         let data = b"{\"id\":1,\"result\":{}}\n{\"id\":2,\"result\":{\"config\":{}}}\n";
         assert!(

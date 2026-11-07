@@ -6,15 +6,9 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::State;
-use tokio::{
-    io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader},
-    process::Command,
-    sync::Mutex,
-    time::timeout,
-};
+use tokio::{process::Command, sync::Mutex, time::timeout};
 
 pub(in crate::commands) mod antigravity;
-pub(crate) mod client;
 mod connected;
 pub(in crate::commands) mod kimi;
 mod routing_cache;
@@ -124,40 +118,6 @@ fn parse_codex(value: &Value) -> Result<CapacityRecord, String> {
     })
 }
 
-async fn response<R: AsyncRead + Unpin>(
-    reader: &mut BufReader<R>,
-    expected: u64,
-    bytes: &mut usize,
-) -> Result<Value, String> {
-    loop {
-        let mut line = vec![];
-        let size = (&mut *reader)
-            .take(262_145)
-            .read_until(b'\n', &mut line)
-            .await
-            .map_err(|_| "Could not read the Codex quota response".to_string())?;
-        *bytes += size;
-        if size > 262_144 || *bytes > 1_048_576 {
-            return Err("Codex quota output exceeded the response limit".into());
-        }
-        if size == 0 {
-            return Err("Codex closed before returning quota information".into());
-        }
-        let value: Value = serde_json::from_slice(&line)
-            .map_err(|_| "Codex returned an invalid quota response".to_string())?;
-        if value["id"].as_u64() != Some(expected) {
-            continue;
-        }
-        if value.get("error").is_some() {
-            return Err("Codex could not read subscription limits. Check its sign-in and network connection, then refresh.".into());
-        }
-        return value
-            .get("result")
-            .cloned()
-            .ok_or_else(|| "Codex returned no quota result".into());
-    }
-}
-
 #[cfg(test)]
 async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
     let binding = super::agent_profiles::bind_account(profiles_root, "codex", None)?;
@@ -167,31 +127,22 @@ async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, S
 async fn read_codex_bound(
     binding: &super::agent_profiles::AccountBinding,
 ) -> Result<CapacityRecord, String> {
-    let executable = super::tasks::executable("codex")?;
-    let mut command = Command::new(executable);
-    command
-        .args(["app-server", "--listen", "stdio://"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-    super::process_control::hidden(command.as_std_mut());
-    let mut child = command
-        .spawn()
-        .map_err(|_| "Could not start Codex to read its quota".to_string())?;
+    let mut client =
+        super::cli_rpc::Client::spawn_bound(binding, &["app-server", "--listen", "stdio://"])?;
     let result = timeout(Duration::from_secs(15), async {
-        let mut input = child.stdin.take().ok_or("Codex quota input unavailable")?;
-        let mut output = BufReader::new(child.stdout.take().ok_or("Codex quota output unavailable")?);
-        let mut bytes = 0;
         let initialize = json!({"id":0,"method":"initialize","params":{"clientInfo":{"name":"jackalope","title":"Jackalope","version":"0.1.0"}}});
-        input.write_all(format!("{initialize}\n").as_bytes()).await.map_err(|_| "Could not initialize Codex quota reader")?;
-        response(&mut output, 0, &mut bytes).await?;
-        input.write_all(b"{\"method\":\"initialized\",\"params\":{}}\n{\"id\":1,\"method\":\"account/rateLimits/read\"}\n").await.map_err(|_| "Could not request Codex quota")?;
-        parse_codex(&response(&mut output, 1, &mut bytes).await?)
+        client.request(initialize).await?;
+        client.notify(json!({"method":"initialized","params":{}})).await?;
+        let limits = client
+            .request(json!({"id":1,"method":"account/rateLimits/read"}))
+            .await
+            .map_err(|error| match error {
+                super::cli_rpc::RpcError::Rejected => "Codex could not read subscription limits. Check its sign-in and network connection, then refresh.".to_string(),
+                error => error.into(),
+            })?;
+        parse_codex(&limits)
     }).await.unwrap_or_else(|_| Err("Codex quota refresh timed out after 15 seconds. Check its sign-in and network connection.".into()));
-    let _ = child.start_kill();
-    let _ = timeout(Duration::from_secs(2), child.wait()).await;
+    client.close().await;
     result
 }
 
@@ -456,22 +407,5 @@ mod tests {
             current_snapshot(record, Utc::now().timestamp()).status,
             "stale"
         );
-    }
-
-    #[tokio::test]
-    async fn protocol_bounds_and_error_payload_are_safe() {
-        let mut bytes = 0;
-        let mut reader =
-            BufReader::new(&b"{\"id\":1,\"error\":{\"message\":\"secret upstream data\"}}\n"[..]);
-        assert!(!response(&mut reader, 1, &mut bytes)
-            .await
-            .unwrap_err()
-            .contains("secret"));
-        let oversized = vec![b'x'; 262_145];
-        let mut reader = BufReader::new(oversized.as_slice());
-        assert!(response(&mut reader, 1, &mut 0)
-            .await
-            .unwrap_err()
-            .contains("limit"));
     }
 }

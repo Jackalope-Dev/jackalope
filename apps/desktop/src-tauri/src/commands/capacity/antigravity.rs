@@ -4,6 +4,7 @@ use crate::commands::{
     process_control::ProcessTree,
 };
 use std::path::Path;
+use tokio::io::AsyncReadExt;
 
 pub(in crate::commands) async fn output(
     binding: &AccountBinding,

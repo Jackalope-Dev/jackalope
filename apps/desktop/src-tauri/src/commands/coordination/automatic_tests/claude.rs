@@ -1,5 +1,5 @@
 use super::*;
-use crate::commands::{agent_profiles, capacity::client::Client};
+use crate::commands::{agent_profiles, cli_rpc::Client};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "Connects installed Claude to a disposable native MCP bridge without model inference"]

@@ -5,6 +5,7 @@ pub mod challenge_review;
 pub mod change_stats;
 pub mod cli_host;
 pub mod cli_install;
+pub(crate) mod cli_rpc;
 pub mod cli_terminal;
 pub mod codebase;
 pub mod codebase_watch;

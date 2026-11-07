@@ -1,4 +1,4 @@
-use super::{agent_profiles, capacity::client::Client, tasks::TaskRuntime};
+use super::{agent_profiles, cli_rpc::Client, tasks::TaskRuntime};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
