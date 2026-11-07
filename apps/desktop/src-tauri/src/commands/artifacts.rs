@@ -1,8 +1,59 @@
-use std::{io::Read, path::Path};
+//! An agent's saved output in its workspace, and the screenshot evidence every
+//! browser and desktop tool saves there.
+
+use super::{computers::protocol::protocol, harness::ScreenshotArtifact};
+use std::{
+    io::Read,
+    path::{Path, PathBuf},
+};
+
+/// Where an agent's saved output lives in a workspace.
+pub(crate) const FOLDER: &str = ".jackalope/artifacts/";
+
+/// The screenshot evidence folder, relative to the workspace.
+pub(crate) fn screenshot_folder() -> &'static str {
+    &protocol().screenshots.folder
+}
+
+/// The largest screenshot saved or previewed.
+pub(crate) fn screenshot_limit() -> u64 {
+    protocol().screenshots.limit
+}
+
+fn screenshots(workspace: &Path) -> PathBuf {
+    workspace.join(screenshot_folder())
+}
+
+/// Saves a PNG capture as screenshot evidence in the workspace. `url` names
+/// what was captured, such as a page address or `desktop://granted`.
+pub(crate) fn save_screenshot(
+    workspace: &Path,
+    bytes: &[u8],
+    name: &str,
+    url: &str,
+) -> Result<ScreenshotArtifact, String> {
+    if bytes.len() as u64 > screenshot_limit() {
+        return Err("The capture exceeds the 8 MiB preview limit.".into());
+    }
+    let (width, height) = super::harness::png_dimensions(bytes)?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let directory = screenshots(workspace);
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let file = directory.join(format!("{id}.png"));
+    std::fs::write(&file, bytes).map_err(|e| e.to_string())?;
+    Ok(ScreenshotArtifact {
+        id,
+        name: name.into(),
+        url: url.into(),
+        file_path: file.to_string_lossy().into_owned(),
+        width,
+        height,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    })
+}
 
 pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, String> {
-    let root = workspace
-        .join(".jackalope/artifacts/screenshots")
+    let root = screenshots(workspace)
         .canonicalize()
         .map_err(|_| "The screenshot folder is no longer available".to_string())?;
     let path = path
@@ -13,11 +64,10 @@ pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, 
     }
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mut bytes = Vec::new();
-    const LIMIT: u64 = 8 * 1024 * 1024;
-    file.take(LIMIT + 1)
+    file.take(screenshot_limit() + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > LIMIT {
+    if bytes.len() as u64 > screenshot_limit() {
         return Err("This screenshot is too large to preview (8 MB maximum)".into());
     }
     if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[12..16] != b"IHDR" {

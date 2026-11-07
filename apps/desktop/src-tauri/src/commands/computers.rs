@@ -39,7 +39,7 @@ pub use usage::{launch as launch_idle_stop, shutdown, ComputerPreferences};
 
 use super::{
     account_storage,
-    harness::{PendingUserPrompt, QuestionPresentation},
+    harness::PendingUserPrompt,
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
@@ -785,32 +785,13 @@ fn request_blocking(
                 )
             })
             .unwrap_or_default();
-        let prompt = PendingUserPrompt {
-            id: uuid::Uuid::new_v4().to_string(),
-            run_id: run.id.clone(),
-            question: format!("The agent asks for its own sandbox computer: a separate Linux desktop with a browser, running in Docker on this device. It cannot see your desktop or files unless you share this project read-only.{reason}"),
-            input_type: "choice".into(),
-            options: vec![DECLINE.into(), ALLOW.into(), ALLOW_PROJECT.into()],
-            default_value: None,
-            status: "pending".into(),
-            answer: None,
-            created_at: chrono::Utc::now().to_rfc3339(),
-            answered_at: None,
-            presentation: QuestionPresentation {
-                header: Some("Sandbox computer".into()),
-                allow_other: Some(false),
-                ..Default::default()
-            },
-            autonomy: Default::default(),
-        };
-        let mut pushed = false;
-        runtime.update_checked(&run.id, |r| {
-            if r.status.is_running() {
-                r.prompts.push(prompt.clone());
-                pushed = true;
-            }
-        })?;
-        if !pushed {
+        let prompt = PendingUserPrompt::choice(
+            &run.id,
+            "Sandbox computer",
+            format!("The agent asks for its own sandbox computer: a separate Linux desktop with a browser, running in Docker on this device. It cannot see your desktop or files unless you share this project read-only.{reason}"),
+            vec![DECLINE.into(), ALLOW.into(), ALLOW_PROJECT.into()],
+        );
+        if !super::site_gate::push_if_running(runtime, &run.id, &prompt)? {
             return Err("This attempt has ended.".into());
         }
         pending_requests()

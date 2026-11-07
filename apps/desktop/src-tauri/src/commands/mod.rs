@@ -73,6 +73,7 @@ pub mod previews;
 pub mod question_risk;
 pub mod readiness;
 pub mod schedules;
+mod site_gate;
 
 pub mod agent_screen;
 pub mod browser;

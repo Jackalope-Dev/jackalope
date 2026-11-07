@@ -620,41 +620,30 @@ async fn screenshot(
             .as_str()
             .ok_or("Browser URL was missing")?
             .to_owned();
-        let id = uuid::Uuid::new_v4().to_string();
-        let capture = engine.directory.join(format!("{id}.png"));
+        let capture = engine
+            .directory
+            .join(format!("{}.png", uuid::Uuid::new_v4()));
         let mut request = json!({"action":"screenshot", "path":capture, "format":"png", "fullPage":selector.is_none()});
         if let Some(selector) = selector { request["selector"] = json!(selector); }
         engine.call(request)?;
         if std::fs::metadata(&capture)
             .map_err(|e| e.to_string())?
             .len()
-            > 8 * 1024 * 1024
+            > super::artifacts::screenshot_limit()
         {
             let _ = std::fs::remove_file(capture);
             return Err(
                 "Screenshot exceeds the 8 MiB preview limit. Use a smaller viewport.".into(),
             );
         }
-        let bytes = std::fs::read(&capture).map_err(|e| e.to_string())?;
-        let (width, height) = super::harness::png_dimensions(&bytes)?;
-        let directory = workspace.join(".jackalope/artifacts/screenshots");
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        let path = directory.join(format!("{id}.png"));
-        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+        let bytes = std::fs::read(&capture).map_err(|e| e.to_string());
         let _ = std::fs::remove_file(capture);
-        Ok(ScreenshotArtifact {
-            id,
-            name: name
-                .unwrap_or_else(|| "Browser capture".into())
-                .chars()
-                .take(160)
-                .collect(),
-            url,
-            file_path: path.to_string_lossy().into_owned(),
-            width,
-            height,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        })
+        let name: String = name
+            .unwrap_or_else(|| "Browser capture".into())
+            .chars()
+            .take(160)
+            .collect();
+        super::artifacts::save_screenshot(&workspace, &bytes?, &name, &url)
     })
     .await
 }

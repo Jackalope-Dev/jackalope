@@ -119,9 +119,60 @@ pub fn initialize_environment() {
 #[cfg(not(unix))]
 pub fn initialize_environment() {}
 
+/// Calls `attempt` every `interval` until it returns `Some`, it fails, or
+/// `deadline` passes. The last attempt runs at or after the deadline, so a slow
+/// condition still gets a final check; `Ok(None)` means it never held.
+pub fn poll_until<T, E>(
+    deadline: std::time::Instant,
+    interval: std::time::Duration,
+    mut attempt: impl FnMut() -> Result<Option<T>, E>,
+) -> Result<Option<T>, E> {
+    loop {
+        if let Some(value) = attempt()? {
+            return Ok(Some(value));
+        }
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            return Ok(None);
+        }
+        std::thread::sleep(interval.min(deadline - now));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn polling_stops_when_the_condition_holds_or_the_deadline_passes() {
+        use std::time::{Duration, Instant};
+        let mut calls = 0;
+        let found = poll_until(
+            Instant::now() + Duration::from_secs(5),
+            Duration::from_millis(1),
+            || -> Result<_, ()> {
+                calls += 1;
+                Ok((calls == 3).then_some(calls))
+            },
+        );
+        assert_eq!(found, Ok(Some(3)));
+        let mut calls = 0;
+        let never = poll_until(
+            Instant::now(),
+            Duration::from_secs(60),
+            || -> Result<Option<()>, ()> {
+                calls += 1;
+                Ok(None)
+            },
+        );
+        assert_eq!((never, calls), (Ok(None), 1));
+        assert_eq!(
+            poll_until(Instant::now(), Duration::ZERO, || Err::<Option<()>, _>(
+                "stop"
+            )),
+            Err("stop")
+        );
+    }
 
     #[test]
     fn directories_are_not_executables() {

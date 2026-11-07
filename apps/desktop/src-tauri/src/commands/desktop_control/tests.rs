@@ -63,9 +63,10 @@ fn desktop_permission_requires_an_explicit_answer_for_this_attempt() {
         Some(Choice::Window(window()))
     );
     question.answer = Some("Do not allow".into());
-    assert!(selected_answer("run", &question, "question", &choices)
-        .unwrap_err()
-        .contains("declined"));
+    assert!(matches!(
+        selected_answer("run", &question, "question", &choices),
+        Err(Failure::Ended(message)) if message.contains("declined")
+    ));
     question.answer = Some("123".into());
     assert!(selected_answer("run", &question, "question", &choices).is_err());
 }
@@ -140,7 +141,7 @@ fn grant_levels_scope_windows_apps_and_the_desktop() {
         .chain(&apps)
         .map(|(label, _)| label.clone())
         .collect();
-    let unique: HashSet<_> = labels.iter().collect();
+    let unique: std::collections::HashSet<_> = labels.iter().collect();
     assert_eq!(
         unique.len(),
         labels.len(),
@@ -318,10 +319,6 @@ fn browser_sites_are_recognized_and_decided_per_host() {
     let id = grant::sites(&path, "p")[0].id.clone();
     grant::forget(&path, "p", &id).unwrap();
     assert_eq!(grant::sites(&path, "p").len(), 1);
-    let options = site_options("github.com", "Site");
-    assert_eq!(options.len(), 4);
-    assert_eq!(options[1].1, (true, true));
-    assert_eq!(options[3].1, (false, true));
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
 

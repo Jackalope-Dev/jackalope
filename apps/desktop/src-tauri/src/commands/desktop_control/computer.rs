@@ -5,16 +5,21 @@
 //! Snapshot IDs, element refs, key validation, the action log and per-site
 //! questions for the computer's browser work as on the person's desktop.
 
-use super::{actions, elements, summarize, DesktopActionRecord, DesktopRequest, ACTION_LOG_LIMIT};
+use super::{
+    actions, elements, record_action, settle, summarize, DesktopActionRecord, DesktopRequest,
+    SNAPSHOT_TTL, WAIT_INTERVAL,
+};
 use crate::commands::{
     computers::{self, Computer},
-    harness::{PendingUserPrompt, QuestionPresentation, ScreenshotArtifact},
+    harness::ScreenshotArtifact,
+    platform::poll_until,
+    site_gate::{self, Check, Refused, SiteGate},
     tasks::{TaskRun, TaskRuntime},
 };
 use base64::Engine as _;
 use serde_json::{json, Value};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::PathBuf,
     sync::{atomic::AtomicBool, Arc, Mutex, OnceLock},
     time::{Duration, Instant},
@@ -32,9 +37,8 @@ struct Shot {
 #[derive(Default)]
 struct Session {
     snapshot: Option<Shot>,
-    allowed: HashSet<String>,
-    denied: HashSet<String>,
-    site_prompt: Option<(String, String)>,
+    /// Created on the first page, for the run's computer.
+    sites: Option<SiteGate>,
     site: Option<String>,
 }
 
@@ -65,15 +69,6 @@ fn host_of(value: &Value) -> Option<String> {
         .and_then(super::grant::site_host)
 }
 
-fn site_options(host: &str, owner: &str) -> Vec<(String, (bool, bool))> {
-    vec![
-        (format!("Allow {host} for this task"), (true, false)),
-        (format!("Always allow {host} for {owner}"), (true, true)),
-        (format!("Not {host}"), (false, false)),
-        (format!("Never allow {host} for {owner}"), (false, true)),
-    ]
-}
-
 struct Call<'a> {
     runtime: &'a TaskRuntime,
     run: &'a TaskRun,
@@ -93,18 +88,20 @@ impl Call<'_> {
         )
     }
 
-    fn store(&self) -> PathBuf {
-        super::grant::store_path(&self.runtime.preferences_directory())
+    fn sites(&mut self) -> &mut SiteGate {
+        let (runtime, computer) = (self.runtime, self.computer);
+        self.state.sites.get_or_insert_with(|| {
+            SiteGate::new(
+                runtime,
+                &computer.decisions,
+                format!("for {}", computer.name),
+            )
+        })
     }
 
     fn record(&self, record: DesktopActionRecord) -> Result<(), String> {
         let line = format!("{}: {}", self.computer.name, record.summary);
-        self.runtime.update_checked(&self.run.id, |r| {
-            r.activity.push(line.clone());
-            r.desktop_actions.push(record.clone());
-            let excess = r.desktop_actions.len().saturating_sub(ACTION_LOG_LIMIT);
-            r.desktop_actions.drain(..excess);
-        })
+        record_action(self.runtime, &self.run.id, line, record)
     }
 
     /// Saves a capture into the task's evidence folder.
@@ -117,68 +114,43 @@ impl Call<'_> {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(png)
             .map_err(|_| "The computer returned an invalid capture.")?;
-        if bytes.len() > 8 * 1024 * 1024 {
-            return Err("The capture exceeds the 8 MiB preview limit.".into());
-        }
-        let (width, height) = crate::commands::harness::png_dimensions(&bytes)?;
-        let id = uuid::Uuid::new_v4().to_string();
-        let directory =
-            std::path::Path::new(&self.run.workspace).join(".jackalope/artifacts/screenshots");
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        let file = directory.join(format!("{id}.png"));
-        std::fs::write(&file, bytes).map_err(|e| e.to_string())?;
-        Ok(ScreenshotArtifact {
-            id,
-            name: name.into(),
-            url: "computer://screen".into(),
-            file_path: file.to_string_lossy().into_owned(),
-            width,
-            height,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        })
+        crate::commands::artifacts::save_screenshot(
+            std::path::Path::new(&self.run.workspace),
+            &bytes,
+            name,
+            "computer://screen",
+        )
     }
 
     fn ask_site(&mut self, host: &str) -> Result<Value, String> {
         let owner = self.computer.name.clone();
-        let prompt = PendingUserPrompt {
-            id: uuid::Uuid::new_v4().to_string(),
-            run_id: self.run.id.clone(),
-            question: format!("The agent reached {host} in the browser of {owner}. Allow it to read and act on this site there?"),
-            input_type: "choice".into(),
-            options: site_options(host, &owner).into_iter().map(|(label, _)| label).collect(),
-            default_value: None,
-            status: "pending".into(),
-            answer: None,
-            created_at: chrono::Utc::now().to_rfc3339(),
-            answered_at: None,
-            presentation: QuestionPresentation {
-                header: Some("Website access".into()),
-                allow_other: Some(false),
-                ..Default::default()
+        let (runtime, run_id) = (self.runtime, self.run.id.clone());
+        let id = self.sites().ask(
+            &run_id,
+            host,
+            format!("The agent reached {host} in the browser of {owner}. Allow it to read and act on this site there?"),
+            |prompt| {
+                if site_gate::push_if_running(runtime, &run_id, prompt)? {
+                    Ok(())
+                } else {
+                    Err("This attempt has ended.".into())
+                }
             },
-            autonomy: Default::default(),
-        };
-        let mut pushed = false;
-        self.runtime.update_checked(&self.run.id, |r| {
-            if r.status.is_running() {
-                r.prompts.push(prompt.clone());
-                pushed = true;
-            }
-        })?;
-        if !pushed {
-            return Err("This attempt has ended.".into());
-        }
-        self.state.site_prompt = Some((prompt.id.clone(), host.into()));
+        )?;
         self.state.snapshot = None;
-        Ok(
-            json!({"status":"pending","questionId":prompt.id,"site":host,
-            "instruction":"The person is deciding whether you may use this site. Wait, then take a new snapshot."}),
-        )
+        Ok(json!({"status":"pending","questionId":id,"site":host,
+            "instruction":"The person is deciding whether you may use this site. Wait, then take a new snapshot."}))
     }
 
     /// Settles an open website question. Returns a pending response while open.
     fn site_answer(&mut self) -> Result<Option<Value>, String> {
-        let Some((prompt_id, host)) = self.state.site_prompt.clone() else {
+        let Some((prompt_id, host)) = self
+            .state
+            .sites
+            .as_ref()
+            .and_then(SiteGate::pending)
+            .map(|(id, host)| (id.to_owned(), host.to_owned()))
+        else {
             return Ok(None);
         };
         let fresh = self
@@ -190,26 +162,15 @@ impl Call<'_> {
             .iter()
             .find(|prompt| prompt.id == prompt_id)
             .ok_or("The website question is no longer available.")?;
-        if prompt.status == "pending" {
-            return Ok(Some(
+        match self.sites().settle(prompt)? {
+            None => Ok(Some(
                 json!({"status":"pending","questionId":prompt_id,"site":host}),
-            ));
-        }
-        self.state.site_prompt = None;
-        let answer = prompt.answer.clone().unwrap_or_default();
-        let (allow, remember) = site_options(&host, &self.computer.name)
-            .into_iter()
-            .find(|(label, _)| *label == answer)
-            .map_or((false, false), |(_, choice)| choice);
-        if remember {
-            super::grant::decide_site(&self.store(), &self.computer.decisions, &host, allow)?;
-        }
-        if allow {
-            self.state.allowed.insert(host);
-            Ok(None)
-        } else {
-            self.state.denied.insert(host.clone());
-            Err(format!("The person declined {host}. Do not use this site."))
+            )),
+            Some(decision) if decision.allow => Ok(None),
+            Some(decision) => Err(format!(
+                "The person declined {}. Do not use this site.",
+                decision.host
+            )),
         }
     }
 
@@ -219,40 +180,28 @@ impl Call<'_> {
             return Ok(None);
         };
         self.state.site = Some(host.clone());
-        if matches!(host.as_str(), "localhost" | "127.0.0.1") || self.state.allowed.contains(&host)
-        {
-            return Ok(None);
-        }
-        if self.state.denied.contains(&host) {
-            return Err(format!(
+        match self.sites().check(&host) {
+            Ok(Check::Allowed) => Ok(None),
+            Ok(Check::Ask) => self.ask_site(&host).map(Some),
+            Err(Refused::Declined) => Err(format!(
                 "The person declined {host} for this task. Navigate elsewhere only if they ask."
-            ));
-        }
-        let decisions = super::grant::sites(&self.store(), &self.computer.decisions);
-        match super::grant::site_decision(&decisions, &host) {
-            Some(true) => {
-                self.state.allowed.insert(host);
-                Ok(None)
-            }
-            Some(false) => {
-                self.state.denied.insert(host.clone());
-                Err(format!(
-                    "{host} is blocked for {} in its settings.",
-                    self.computer.name
-                ))
-            }
-            None => self.ask_site(&host).map(Some),
+            )),
+            Err(Refused::Blocked) => Err(format!(
+                "{host} is blocked for {} in its settings.",
+                self.computer.name
+            )),
         }
     }
 
     fn observe(&mut self, request: &DesktopRequest) -> Result<Value, String> {
         let deadline = Instant::now() + Duration::from_millis(request.timeout_ms.unwrap_or(5000));
-        loop {
-            let action = if request.action == "screenshot" {
-                "screenshot"
-            } else {
-                "snapshot"
-            };
+        let action = if request.action == "screenshot" {
+            "screenshot"
+        } else {
+            "snapshot"
+        };
+        let text = (request.action == "wait_for").then(|| request.text.clone().unwrap_or_default());
+        let seen = poll_until(deadline, WAIT_INTERVAL, || {
             let mut value = self.agent(json!({"action": action}))?;
             let artifact = if action == "screenshot" {
                 Some(self.artifact(&mut value, &format!("{} screen", self.computer.name))?)
@@ -260,7 +209,7 @@ impl Call<'_> {
                 None
             };
             if let Some(pending) = self.gate(&value)? {
-                return Ok(pending);
+                return Ok(Some(Err(pending)));
             }
             let refs = elements::normalize(&mut value);
             if let Some(artifact) = artifact {
@@ -268,38 +217,39 @@ impl Call<'_> {
                     .update_checked(&self.run.id, |r| r.screenshots.push(artifact.clone()))?;
                 value["artifact"] = json!(artifact);
             }
-            if request.action == "wait_for" {
-                let text = request.text.clone().unwrap_or_default();
-                match elements::RefTable::find_text(&value, &text) {
-                    Some(found) => value["found"] = found,
-                    None if Instant::now() >= deadline => {
-                        return Err(format!("\u{201c}{text}\u{201d} did not appear before the timeout. Take a snapshot to inspect the screen."));
-                    }
-                    None => {
-                        std::thread::sleep(Duration::from_millis(250));
-                        continue;
-                    }
-                }
+            if let Some(text) = &text {
+                let Some(found) = elements::RefTable::find_text(&value, text) else {
+                    return Ok(None);
+                };
+                value["found"] = found;
             }
-            let id = uuid::Uuid::new_v4().to_string();
-            self.state.snapshot = Some(Shot {
-                id: id.clone(),
-                bounds: value["bounds"].clone(),
-                refs,
-                taken: Instant::now(),
-            });
-            value["snapshotId"] = json!(id);
-            value["untrustedContent"] = json!(true);
-            self.record(DesktopActionRecord {
-                at: chrono::Utc::now().to_rfc3339(),
-                action: request.action.clone(),
-                summary: summarize(request, None),
-                site: self.state.site.clone(),
-                capture: serde_json::from_value(value["artifact"].clone()).ok(),
-                ..Default::default()
-            })?;
-            return Ok(value);
-        }
+            Ok::<_, String>(Some(Ok((value, refs))))
+        })?;
+        let (mut value, refs) = match seen {
+            Some(Ok(seen)) => seen,
+            Some(Err(pending)) => return Ok(pending),
+            None => {
+                return Err(format!("\u{201c}{}\u{201d} did not appear before the timeout. Take a snapshot to inspect the screen.", text.unwrap_or_default()));
+            }
+        };
+        let id = uuid::Uuid::new_v4().to_string();
+        self.state.snapshot = Some(Shot {
+            id: id.clone(),
+            bounds: value["bounds"].clone(),
+            refs,
+            taken: Instant::now(),
+        });
+        value["snapshotId"] = json!(id);
+        value["untrustedContent"] = json!(true);
+        self.record(DesktopActionRecord {
+            at: chrono::Utc::now().to_rfc3339(),
+            action: request.action.clone(),
+            summary: summarize(request, None),
+            site: self.state.site.clone(),
+            capture: serde_json::from_value(value["artifact"].clone()).ok(),
+            ..Default::default()
+        })?;
+        Ok(value)
     }
 
     fn input(&mut self, request: &DesktopRequest) -> Result<Value, String> {
@@ -309,7 +259,7 @@ impl Call<'_> {
             .take()
             .ok_or("Take a fresh snapshot or screenshot before input.")?;
         if Some(shot.id.as_str()) != request.snapshot_id.as_deref()
-            || shot.taken.elapsed() > Duration::from_secs(60)
+            || shot.taken.elapsed() > SNAPSHOT_TTL
         {
             return Err("The snapshot is stale. Take a new snapshot before input.".into());
         }
@@ -351,7 +301,7 @@ impl Call<'_> {
         }
         let mut value = self.agent(payload)?;
         let summary = summarize(request, target.as_deref());
-        std::thread::sleep(Duration::from_millis(120));
+        settle();
         let capture = self
             .agent(json!({"action":"screenshot","thumb":480}))
             .ok()

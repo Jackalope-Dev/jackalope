@@ -247,6 +247,18 @@ impl Indicator {
         }
     }
 
+    /// Whether the person closed the bar, which ends control.
+    pub fn closed(&mut self) -> bool {
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+        {
+            self.exited().unwrap_or(false)
+        }
+        #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+        {
+            false
+        }
+    }
+
     pub fn state(&mut self) -> Result<State, String> {
         match &mut self.kind {
             Kind::Process {

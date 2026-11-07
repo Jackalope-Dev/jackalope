@@ -190,8 +190,9 @@ fn parse_event(event: &Value) -> Result<ToolEvent, String> {
 }
 
 /// New screenshots in a patch brought back from the computer: files added
-/// under `.jackalope/artifacts/screenshots`.
+/// directly in the screenshot evidence folder.
 pub(crate) fn patch_screenshots(patch: &[u8]) -> Vec<String> {
+    let folder = format!("{}/", crate::commands::artifacts::screenshot_folder());
     let text = String::from_utf8_lossy(patch);
     let mut found = Vec::new();
     let mut current: Option<String> = None;
@@ -201,10 +202,9 @@ pub(crate) fn patch_screenshots(patch: &[u8]) -> Vec<String> {
                 .split_once(" b/")
                 .map(|(path, _)| path.to_string())
                 .filter(|path| {
-                    path.starts_with(".jackalope/artifacts/screenshots/")
-                        && path.ends_with(".png")
-                        && !path.contains("..")
-                        && path.matches('/').count() == 3
+                    path.strip_prefix(&folder).is_some_and(|name| {
+                        name.ends_with(".png") && !name.contains('/') && !name.contains("..")
+                    })
                 });
         } else if line.starts_with("new file mode") {
             if let Some(path) = current.take() {

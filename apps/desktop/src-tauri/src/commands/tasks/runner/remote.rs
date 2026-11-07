@@ -729,13 +729,13 @@ impl TaskRuntime {
             let line = match session.fetch_artifacts(Path::new(workspace), &collected.artifacts) {
                 Ok(written) if collected.truncated => format!(
                     "Brought back {written} saved output file(s) from {source}; it listed only part of the output under {}.",
-                    computers::sync::ARTIFACT_FOLDER
+                    crate::commands::artifacts::FOLDER
                 ),
                 Ok(0) => String::new(),
                 Ok(written) => format!(
                     "Brought back {written} saved output file{} from {source} under {}.",
                     if written == 1 { "" } else { "s" },
-                    computers::sync::ARTIFACT_FOLDER
+                    crate::commands::artifacts::FOLDER
                 ),
                 Err(error) => {
                     format!("The agent's saved output from {source} could not be brought back: {error}")

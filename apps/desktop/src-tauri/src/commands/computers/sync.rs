@@ -37,8 +37,6 @@ use std::{
 
 const GIT_TIMEOUT: Duration = Duration::from_secs(600);
 const SYNC_TIMEOUT: Duration = Duration::from_secs(660);
-/// Where an agent's saved output lives in a workspace.
-pub(crate) const ARTIFACT_FOLDER: &str = ".jackalope/artifacts/";
 /// The commit identity the runner also uses, as Git environment variables.
 fn identity() -> [(&'static str, &'static str); 4] {
     let identity = &protocol().git_identity;
@@ -467,13 +465,14 @@ impl Collected {
 
 /// Whether a returned artifact path is a plain file under the artifact folder.
 fn safe_artifact_path(path: &str) -> bool {
-    path.strip_prefix(ARTIFACT_FOLDER).is_some_and(|rest| {
-        !rest.is_empty()
-            && !path.contains(['\\', ':', '\0'])
-            && rest
-                .split('/')
-                .all(|part| !part.is_empty() && part != "." && part != "..")
-    })
+    path.strip_prefix(crate::commands::artifacts::FOLDER)
+        .is_some_and(|rest| {
+            !rest.is_empty()
+                && !path.contains(['\\', ':', '\0'])
+                && rest
+                    .split('/')
+                    .all(|part| !part.is_empty() && part != "." && part != "..")
+        })
 }
 
 pub(crate) fn parse_artifacts(value: &Value) -> Result<Vec<Artifact>, String> {

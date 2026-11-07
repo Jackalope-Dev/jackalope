@@ -21,6 +21,7 @@ pub(crate) struct Protocol {
     pub sync: GitSync,
     pub search: Search,
     pub browser: Browser,
+    pub screenshots: Screenshots,
     /// Keys an action may name, beside single characters and punctuation.
     pub named_keys: Vec<String>,
 }
@@ -78,12 +79,21 @@ pub(crate) struct Search {
 }
 
 #[derive(Deserialize)]
+pub(crate) struct Screenshots {
+    /// Where screenshot evidence is saved, relative to the workspace.
+    pub folder: String,
+    pub limit: u64,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Browser {
     /// Characters of page text returned at once.
     pub text_limit: usize,
     /// Script that reads the current address and whether a password field is visible.
     pub page_state: String,
+    /// Hosts that address this machine.
+    pub loopback_hosts: Vec<String>,
 }
 
 pub(crate) fn protocol() -> &'static Protocol {
