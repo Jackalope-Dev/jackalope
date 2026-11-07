@@ -178,7 +178,15 @@ impl AttemptRunner for RemoteRunner {
             Some(&runner::RunnerCapabilities::from_status(status.as_ref())),
         );
         if let Some(status) = status.as_ref().filter(|status| status["exists"] == true) {
-            runtime.recover_remote(id, &mut session, status, workspace, &computer, read_only);
+            runtime.recover_remote(
+                id,
+                req.previous_run_id.as_deref(),
+                &mut session,
+                status,
+                workspace,
+                &computer,
+                read_only,
+            );
         }
         let relayed = bridge.filter(|_| status.is_some());
         self.relayed = relayed.is_some();
@@ -538,6 +546,9 @@ impl RemoteRunner {
                             &computer.name,
                             &format!("Lost contact with {}: {error}", computer.name),
                         );
+                        if !self.read_only {
+                            runtime.changes_left(id);
+                        }
                         runtime.update(id, |run| {
                             run.error.get_or_insert(format!(
                                 "Lost contact with {}: {error}. The agent there stops on its own after ten minutes; its changes stay there and come back when this task is continued.",
@@ -782,38 +793,49 @@ impl TaskRuntime {
     }
 
     /// Brings back what an earlier run of this workspace left on the computer,
-    /// for example after Jackalope lost contact or restarted, before the
-    /// workspace is uploaded again over it. An earlier read-only run brings
-    /// nothing back.
+    /// for example after Jackalope restarted, before the workspace is
+    /// uploaded again over it. An earlier read-only run brings nothing back.
+    /// Changes a lost attempt left there come back only into a continuation
+    /// of that attempt (`previous`); for any other attempt they are saved for
+    /// the lost one instead (see [`super::recovery`]).
+    #[allow(clippy::too_many_arguments)]
     fn recover_remote(
         &self,
         id: &str,
+        previous: Option<&str>,
         session: &mut runs::Session,
         status: &serde_json::Value,
         workspace: &str,
         computer: &Computer,
         read_only: bool,
     ) {
-        if status["started"] == true && status["exit"].is_null() {
-            let _ = session.stop();
-            let deadline = std::time::Instant::now() + Duration::from_secs(20);
-            while std::time::Instant::now() < deadline {
-                std::thread::sleep(Duration::from_millis(500));
-                if session
-                    .status()
-                    .ok()
-                    .flatten()
-                    .is_some_and(|status| !status["exit"].is_null())
-                {
-                    break;
-                }
+        let _guard = super::recovery::lock().lock().unwrap();
+        if !read_only {
+            if let Some(lost) = self.left_by_other(id, previous, &computer.id, workspace) {
+                // The sweep may have recovered them while this run waited.
+                let status = session.status().ok().flatten().unwrap_or(status.clone());
+                self.recover_left(&lost, session, &status, computer, true);
+                self.update(id, |run| {
+                    activity(
+                        run,
+                        &format!(
+                            "Changes attempt {} left on {} after losing contact were saved for it, not brought into this workspace.",
+                            lost.id, computer.name
+                        ),
+                    )
+                });
+                return;
             }
         }
-        if status["started"] != true
-            || read_only
-            || self.bring_back(id, session, workspace, computer, true)
-        {
+        super::recovery::stop_leftover(session, status);
+        let brought_back = status["started"] == true
+            && !read_only
+            && self.bring_back(id, session, workspace, computer, true);
+        if status["started"] != true || read_only || brought_back {
             session.remove();
+        }
+        if let Some(previous) = previous.filter(|_| brought_back) {
+            self.left_brought_back(previous, id);
         }
     }
 
@@ -964,7 +986,7 @@ fn megabytes(bytes: u64) -> String {
 }
 
 /// Files a Git patch touches.
-fn patch_files(patch: &[u8]) -> usize {
+pub(super) fn patch_files(patch: &[u8]) -> usize {
     patch
         .split(|byte| *byte == b'\n')
         .filter(|line| line.starts_with(b"diff --git "))

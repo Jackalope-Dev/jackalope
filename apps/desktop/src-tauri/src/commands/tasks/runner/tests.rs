@@ -577,3 +577,255 @@ fn a_computer_that_does_not_answer_is_a_lost_host() {
     drop(runtime);
     let _ = std::fs::remove_dir_all(folder);
 }
+
+const LEFT_PATCH: &str = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-fixture\n+changed on the computer\n";
+
+/// A computer still holding the run a lost attempt left there, finished,
+/// with [`LEFT_PATCH`] as its changes. Records the actions it was asked.
+#[derive(Clone, Default)]
+struct Leftover {
+    calls: Arc<Mutex<Vec<String>>>,
+    removed: Arc<AtomicBool>,
+}
+
+impl computers::Transport for Leftover {
+    fn call(
+        &mut self,
+        payload: &serde_json::Value,
+        _: Duration,
+        _: &AtomicBool,
+    ) -> Result<serde_json::Value, String> {
+        use sha2::Digest;
+        let action = payload["action"].as_str().unwrap().to_string();
+        self.calls.lock().unwrap().push(action.clone());
+        let removed = self.removed.load(std::sync::atomic::Ordering::SeqCst);
+        Ok(match action.as_str() {
+            "run_status" if removed => json!({"exists": false, "runs": 4}),
+            "run_status" => json!({
+                "exists": true, "runs": 4, "started": true, "exit": {"code": 0},
+            }),
+            "workspace_diff" => {
+                let digest: String = sha2::Sha256::digest(LEFT_PATCH.as_bytes())
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect();
+                json!({"size": LEFT_PATCH.len(), "sha256": digest})
+            }
+            "workspace_get" => json!({
+                "data": base64::engine::general_purpose::STANDARD.encode(LEFT_PATCH),
+            }),
+            "run_remove" => {
+                self.removed
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                json!({})
+            }
+            "workspace_put" => json!({}),
+            other => return Err(format!("Unsupported action {other}")),
+        })
+    }
+}
+
+/// A failed attempt that lost `computer` mid-run, leaving its changes there.
+fn lost_attempt(runtime: &TaskRuntime, workspace: &Path, computer: &Computer) -> String {
+    let id = placed_on(runtime, workspace, computer);
+    runtime.update(&id, |run| run.status = "failed".into());
+    runtime.host_lost(&id, &computer.id, &computer.name, "Lost contact with Box");
+    runtime.changes_left(&id);
+    id
+}
+
+fn left_changes(runtime: &TaskRuntime, id: &str) -> pool::LeftChanges {
+    runtime
+        .run_snapshot(id)
+        .unwrap()
+        .host
+        .unwrap()
+        .left
+        .unwrap()
+}
+
+#[test]
+fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
+    let root = std::env::temp_dir().join(format!("jackalope-left-{}", uuid::Uuid::new_v4()));
+    let folder = root.join("work");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let computer = fixture_computer(&format!("left{}", uuid::Uuid::new_v4().simple()));
+    let lost = lost_attempt(&runtime, &folder, &computer);
+    let all = |runtime: &TaskRuntime| -> Vec<TaskRun> {
+        runtime
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .values()
+            .cloned()
+            .collect()
+    };
+
+    // Recovery waits for another attempt to replace the lost one; until
+    // then a continuation can still bring the changes back.
+    assert!(recovery::waiting(&all(&runtime)).is_empty());
+    let retry = insert_run(&runtime, &folder);
+    runtime.update(&retry, |run| {
+        run.retry_of = Some(lost.clone());
+        run.status = "review".into();
+    });
+    let runs = all(&runtime);
+    let due: Vec<&str> = recovery::waiting(&runs)
+        .iter()
+        .map(|run| run.id.as_str())
+        .collect();
+    assert_eq!(due, [lost.as_str()]);
+    // Not while a run of the same workspace is active on that computer.
+    let busy = placed_on(&runtime, &folder, &computer);
+    runtime.update(&busy, |run| run.status = "running".into());
+    assert!(recovery::waiting(&all(&runtime)).is_empty());
+    runtime.update(&busy, |run| run.status = "review".into());
+
+    let transport = Leftover::default();
+    let mut session = runs::Session::with_transport(
+        Box::new(transport.clone()),
+        runs::run_name(&folder.to_string_lossy()),
+    );
+    let status = session.status().unwrap().unwrap();
+    let saved = runtime.run_snapshot(&lost).unwrap();
+    assert!(runtime.recover_left(&saved, &mut session, &status, &computer, false));
+
+    // Saved beside the history as a failed apply would be, never applied,
+    // and the run removed from the computer.
+    let left = left_changes(&runtime, &lost);
+    let patch = root.join("history").join(format!("{lost}.remote.patch"));
+    assert_eq!(
+        left.patch.as_deref(),
+        Some(patch.to_string_lossy().as_ref())
+    );
+    assert_eq!(std::fs::read_to_string(&patch).unwrap(), LEFT_PATCH);
+    assert_eq!((left.files, left.on_host), (1, false));
+    assert!(left.recovered_at.is_some() && left.note.is_none());
+    assert_eq!(
+        std::fs::read_to_string(folder.join("README.md")).unwrap(),
+        "fixture\n"
+    );
+    assert!(transport.removed.load(std::sync::atomic::Ordering::SeqCst));
+    // Task details read it under these names.
+    let shown = serde_json::to_value(runtime.run_snapshot(&lost).unwrap().host).unwrap();
+    assert_eq!(shown["left"]["onHost"], false);
+    assert_eq!(shown["left"]["files"], 1);
+    assert!(shown["left"]["recoveredAt"].is_string() && shown["left"]["patch"].is_string());
+    let activity = runtime.run_snapshot(&lost).unwrap().activity;
+    assert!(
+        activity.iter().any(
+            |line| line.starts_with("Changes recovered from Box: 1 file saved at")
+                && line.contains("not applied")
+        ),
+        "{activity:?}"
+    );
+    assert!(recovery::waiting(&all(&runtime)).is_empty());
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// Prepares attempt `id` on `computer` through `transport`, as a launch would.
+fn prepare_on(
+    runtime: &TaskRuntime,
+    computer: &Computer,
+    transport: &Leftover,
+    req: &RunRequest,
+    workspace: &Path,
+) {
+    let session = runs::Session::with_transport(
+        Box::new(transport.clone()),
+        runs::run_name(&workspace.to_string_lossy()),
+    );
+    let mut remote = remote::RemoteRunner::with_session(computer.clone(), false, session);
+    let mut codex = Command::new("codex");
+    codex.args(["exec", "--json", "-"]);
+    let text = workspace.to_string_lossy().into_owned();
+    let mut launch = Launch {
+        id: &req.id,
+        req,
+        adapter: "codex",
+        cmd: codex,
+        input: String::new(),
+        workspace: &text,
+    };
+    assert_eq!(remote.prepare(runtime, &mut launch).unwrap(), Step::Ready);
+}
+
+#[test]
+fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
+    let root = std::env::temp_dir().join(format!("jackalope-stale-{}", uuid::Uuid::new_v4()));
+    let folder = root.join("work");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    credentials::set(
+        &runtime.computers_root(),
+        "openai-key",
+        Some("sk-fixture-0123456789abcdef"),
+    )
+    .unwrap();
+    let computer = fixture_computer(&format!("stale{}", uuid::Uuid::new_v4().simple()));
+
+    // A retry of the same workspace placed back on the computer saves the
+    // lost attempt's changes for it before its own upload replaces them.
+    let lost = lost_attempt(&runtime, &folder, &computer);
+    let retry = placed_on(&runtime, &folder, &computer);
+    runtime.update(&retry, |run| run.retry_of = Some(lost.clone()));
+    let transport = Leftover::default();
+    prepare_on(
+        &runtime,
+        &computer,
+        &transport,
+        &request(&retry, &folder),
+        &folder,
+    );
+    assert_eq!(
+        std::fs::read_to_string(folder.join("README.md")).unwrap(),
+        "fixture\n"
+    );
+    let left = left_changes(&runtime, &lost);
+    assert!(left.patch.is_some() && !left.on_host, "{left:?}");
+    let calls = transport.calls.lock().unwrap().clone();
+    let removed = calls.iter().position(|call| call == "run_remove").unwrap();
+    let uploaded = calls
+        .iter()
+        .position(|call| call == "workspace_put")
+        .unwrap();
+    assert!(removed < uploaded, "{calls:?}");
+    assert!(runtime
+        .run_snapshot(&retry)
+        .unwrap()
+        .activity
+        .iter()
+        .any(|line| line.contains(&format!("Changes attempt {lost} left on Box"))));
+
+    // A continuation of the lost attempt still brings them back, as before.
+    let other = root.join("continued");
+    std::fs::create_dir_all(&other).unwrap();
+    std::fs::write(other.join("README.md"), "fixture\n").unwrap();
+    let lost = lost_attempt(&runtime, &other, &computer);
+    let next = placed_on(&runtime, &other, &computer);
+    let continued = RunRequest {
+        previous_run_id: Some(lost.clone()),
+        ..request(&next, &other)
+    };
+    prepare_on(
+        &runtime,
+        &computer,
+        &Leftover::default(),
+        &continued,
+        &other,
+    );
+    assert_eq!(
+        std::fs::read_to_string(other.join("README.md")).unwrap(),
+        "changed on the computer\n"
+    );
+    let left = left_changes(&runtime, &lost);
+    assert!(!left.on_host && left.patch.is_none(), "{left:?}");
+    assert!(left.note.unwrap().contains(&next));
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+}

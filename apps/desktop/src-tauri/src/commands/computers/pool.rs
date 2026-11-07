@@ -439,6 +439,38 @@ pub struct RunHost {
     /// What became of a lost host's attempt: retried elsewhere, or why not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<String>,
+    /// Changes the attempt left on its host when contact was lost, and what
+    /// became of them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left: Option<LeftChanges>,
+}
+
+/// Changes a lost attempt left on its computer. Once another attempt has
+/// replaced it they are never applied to the workspace: recovery saves them
+/// beside the attempt's history (see `tasks::runner::recovery`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LeftChanges {
+    /// They, or the run that holds them, are still on the computer.
+    pub on_host: bool,
+    /// When they were fetched from the computer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovered_at: Option<String>,
+    /// The saved patch, when the agent changed files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch: Option<String>,
+    /// The folder of the agent's saved output, when it had any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifacts: Option<String>,
+    /// Files the patch changes.
+    #[serde(default)]
+    pub files: usize,
+    /// What became of them, when nothing was saved or fetching failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    /// Failed attempts to fetch them.
+    #[serde(default)]
+    pub tries: u32,
 }
 
 impl RunHost {

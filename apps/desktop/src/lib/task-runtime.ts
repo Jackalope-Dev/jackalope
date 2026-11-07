@@ -141,6 +141,20 @@ export interface TaskRun {
     retriedFrom?: string | null;
     /** What became of the attempt after its host was lost. */
     retry?: string | null;
+    /** Changes the attempt left on its host when contact was lost. */
+    left?: {
+      /** They are still on the computer. */
+      onHost: boolean;
+      /** When they were fetched and saved on this device. */
+      recoveredAt?: string | null;
+      /** The saved patch; it is never applied to the workspace. */
+      patch?: string | null;
+      /** The folder of the agent's saved output. */
+      artifacts?: string | null;
+      files?: number;
+      /** What became of them when nothing was saved. */
+      note?: string | null;
+    } | null;
   } | null;
   accountBinding?: {
     adapter: string;

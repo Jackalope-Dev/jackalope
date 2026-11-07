@@ -36,6 +36,7 @@ use crate::commands::computers::{
 
 pub(super) mod local;
 pub(in crate::commands) mod record;
+mod recovery;
 pub(super) mod remote;
 
 /// What the launch assembled for the agent, whatever runs it.

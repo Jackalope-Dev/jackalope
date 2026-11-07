@@ -1,10 +1,47 @@
-import { Badge, DefinitionList, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Badge, CopyButton, DefinitionList, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { runHostName } from '../../lib/computers';
 import type { TaskRun } from '../../lib/task-runtime';
 import { describeRunUsage } from '../../lib/usage-insights';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { TaskTiming } from './TaskTiming';
 import { UserPromptCard } from './UserPromptCard';
+
+type Left = NonNullable<NonNullable<TaskRun['host']>['left']>;
+
+/** What became of changes an attempt left on a computer it lost contact with. */
+function LeftChanges({ host, left }: { host: string; left: Left }) {
+  if (left.patch || left.artifacts) {
+    const files = left.files ?? 0;
+    return (
+      <span className="task-run-left">
+        <strong>Changes recovered from {host}</strong>
+        <small className="task-muted">
+          {left.patch && `${files} ${files === 1 ? 'file' : 'files'} saved as a patch. `}
+          Not applied to the workspace, because another attempt replaced this one.
+        </small>
+        {left.patch && (
+          <span className="task-run-left-file">
+            <code>{left.patch}</code>
+            <CopyButton size="sm" text={left.patch} label="Copy patch path" />
+          </span>
+        )}
+        {left.artifacts && (
+          <span className="task-run-left-file">
+            <code>{left.artifacts}</code>
+            <CopyButton size="sm" text={left.artifacts} label="Copy output path" />
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (left.note) return <small className="task-muted">{left.note}</small>;
+  return left.onHost ? (
+    <small className="task-muted">
+      Its changes are still on {host}. Continuing this attempt brings them back; once another
+      attempt replaces it, they are saved here when {host} answers again.
+    </small>
+  ) : null;
+}
 
 /** Agent, routing, usage and diagnostic records for one attempt. */
 export function TaskRunDetails({
@@ -41,6 +78,7 @@ export function TaskRunDetails({
                       {run.host?.reason && <small className="task-muted">{run.host.reason}</small>}
                       {run.host?.lost && <small className="task-muted">{run.host.lost}</small>}
                       {run.host?.retry && <small className="task-muted">{run.host.retry}</small>}
+                      {run.host?.left && <LeftChanges host={run.host.name} left={run.host.left} />}
                     </span>
                   ),
                 },

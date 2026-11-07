@@ -511,7 +511,14 @@ impl Session {
     /// Removes the run's files from the computer. The workspace is uploaded
     /// again for a continuation; the agent's own session history stays.
     pub fn remove(&mut self) {
-        let _ = self.call(json!({"action":"run_remove"}), CALL_TIMEOUT);
+        let _ = self.try_remove();
+    }
+
+    /// [`Session::remove`], saying whether the computer removed the run: its
+    /// folder, and for a Git-synced run its worktree, branch and refs.
+    pub fn try_remove(&mut self) -> Result<(), String> {
+        self.call(json!({"action":"run_remove"}), CALL_TIMEOUT)
+            .map(|_| ())
     }
 
     pub fn shutdown(&mut self) {
