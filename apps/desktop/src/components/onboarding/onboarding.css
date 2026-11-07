@@ -601,11 +601,9 @@
 }
 /* Peer choices fill the card as one segmented track, like "Keep it on" below. */
 :is(.onboarding-project-options, .onboarding-project-storage) .ui-segmented {
+  --ui-segment-flex: 1;
   display: flex;
   width: 100%;
-}
-:is(.onboarding-project-options, .onboarding-project-storage) .ui-segmented > button {
-  flex: 1;
 }
 /* A local overview of the chosen folder. It keeps one footprint while empty, loading and
    loaded so choosing a folder never reflows the card. */
