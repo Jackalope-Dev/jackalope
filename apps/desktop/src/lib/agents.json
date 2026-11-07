@@ -25,7 +25,11 @@
     "direct": ["stdio", "http"],
     "discovery": true,
     "accounts": true,
-    "capacity": true
+    "capacity": true,
+    "tasksInDevelopment": false,
+    "browserEvidence": "partial",
+    "accountsNote": null,
+    "supportNote": null
   },
   "claude": {
     "name": "Claude Code",
@@ -53,7 +57,11 @@
     "direct": ["stdio", "http", "sse"],
     "discovery": true,
     "accounts": true,
-    "capacity": true
+    "capacity": true,
+    "tasksInDevelopment": false,
+    "browserEvidence": "full",
+    "accountsNote": null,
+    "supportNote": null
   },
   "grok": {
     "name": "Grok",
@@ -81,7 +89,11 @@
     "direct": [],
     "discovery": true,
     "accounts": true,
-    "capacity": true
+    "capacity": true,
+    "tasksInDevelopment": false,
+    "browserEvidence": "full",
+    "accountsNote": null,
+    "supportNote": null
   },
   "kimi": {
     "name": "Kimi Code",
@@ -117,7 +129,11 @@
     "direct": ["stdio", "http", "sse"],
     "discovery": true,
     "accounts": true,
-    "capacity": true
+    "capacity": true,
+    "tasksInDevelopment": false,
+    "browserEvidence": "full",
+    "accountsNote": null,
+    "supportNote": "Legacy Python kimi-cli accounts need migration through the Kimi Code CLI."
   },
   "opencode": {
     "name": "OpenCode",
@@ -165,7 +181,11 @@
     "direct": ["stdio", "http", "sse"],
     "discovery": true,
     "accounts": true,
-    "capacity": false
+    "capacity": false,
+    "tasksInDevelopment": false,
+    "browserEvidence": "full",
+    "accountsNote": null,
+    "supportNote": null
   },
   "antigravity": {
     "name": "Antigravity",
@@ -201,7 +221,11 @@
     "direct": [],
     "discovery": true,
     "accounts": true,
-    "capacity": true
+    "capacity": true,
+    "tasksInDevelopment": false,
+    "browserEvidence": "full",
+    "accountsNote": "Gemini API keys; current CLI subscription login.",
+    "supportNote": null
   },
   "gemini": {
     "name": "Gemini CLI",
@@ -237,7 +261,11 @@
     "direct": [],
     "discovery": true,
     "accounts": true,
-    "capacity": false
+    "capacity": false,
+    "tasksInDevelopment": true,
+    "browserEvidence": "full",
+    "accountsNote": null,
+    "supportNote": null
   },
   "acp": {
     "name": "ACP (Generic)",
@@ -265,6 +293,10 @@
     "direct": ["stdio", "http"],
     "discovery": false,
     "accounts": false,
-    "capacity": false
+    "capacity": false,
+    "tasksInDevelopment": false,
+    "browserEvidence": "full",
+    "accountsNote": null,
+    "supportNote": null
   }
 }

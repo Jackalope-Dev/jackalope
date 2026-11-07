@@ -1,6 +1,7 @@
 import { Button, InlineNotice, Tooltip } from '@jackalope/ui';
 import { Sparkles, Square, Undo2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { agentAdapter } from '../../lib/agents';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   canUndoSharpen,
@@ -45,7 +46,7 @@ export function useSharpen({
   const reason = sharpenUnavailableReason({
     desktop: isTauriEnvironment(),
     runners,
-    adapterFor: (id) => customAgents.find((agent) => agent.id === id)?.adapter ?? id,
+    adapterFor: (id) => agentAdapter(id, customAgents),
     isEnabled,
   });
   const sharpen = async () => {

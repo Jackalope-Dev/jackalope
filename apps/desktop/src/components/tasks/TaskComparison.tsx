@@ -38,6 +38,7 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import { DismissButton } from '../ui/DismissButton';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
+import { agentAdapter } from '../../lib/agents';
 import { taskChangeStats } from '../../lib/task-client';
 import { ActionError } from '../ui/ActionError';
 
@@ -79,8 +80,7 @@ export function TaskComparison({ run }: { run: TaskRun }) {
     .map((taskId) => latestAttempt(runs, taskId))
     .filter((member): member is TaskRun => !!member);
   if (members.length < 2 && !comparison.failures?.length) return null;
-  const adapter = (agent: string) =>
-    customAgents.find((custom) => custom.id === agent)?.adapter ?? agent;
+  const adapter = (agent: string) => agentAdapter(agent, customAgents);
   const name = (agent: string) =>
     runners.find((runner) => runner.id === agent)?.name ??
     customAgents.find((custom) => custom.id === agent)?.name ??

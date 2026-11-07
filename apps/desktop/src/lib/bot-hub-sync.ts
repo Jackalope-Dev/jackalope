@@ -1,6 +1,7 @@
 import { useAgentConfigStore } from '../stores/agentConfigStore.ts';
 import { useBotStore } from '../stores/botStore.ts';
 import { agentAccountFor, useProjectStore } from '../stores/projectStore.ts';
+import { agentAdapter } from './agents.ts';
 import { hubDirectory, observeBotHub } from './bot-hub.ts';
 import { isTauriEnvironment } from './native/env.ts';
 import { invokeNative } from './native/transport.ts';
@@ -41,7 +42,7 @@ export function observeBots() {
           (bot, project) =>
             agentAccountFor(
               useProjectStore.getState().projects.find((item) => item.id === project.id),
-              customAgents.find((agent) => agent.id === bot.agent)?.adapter ?? bot.agent,
+              agentAdapter(bot.agent, customAgents),
             ),
         );
         await invokeNative('bot_hub_sync', { bots });

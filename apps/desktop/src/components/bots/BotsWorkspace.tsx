@@ -51,7 +51,6 @@ import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/l
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import {
   BOT_STYLES,
   type Bot,
@@ -74,6 +73,7 @@ import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
+import { agentAdapter } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
 import { ActionError } from '../ui/ActionError';
@@ -137,10 +137,7 @@ function proposalDraft(proposal: BotProposal, projectId: string): BotDraft {
 }
 
 function profileFor(bot: Bot, project: Project) {
-  const adapter =
-    useAgentConfigStore.getState().customAgents.find((agent) => agent.id === bot.agent)?.adapter ??
-    bot.agent;
-  return agentAccountFor(project, adapter);
+  return agentAccountFor(project, agentAdapter(bot.agent));
 }
 
 /** How a conversation started when the person did not start it. */

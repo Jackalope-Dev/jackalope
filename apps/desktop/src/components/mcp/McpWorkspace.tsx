@@ -33,6 +33,7 @@ import { McpAddCustomModal } from './McpAddCustomModal';
 import { McpMarketplaceCard } from './McpMarketplaceCard';
 import { McpServerPage } from './McpServerPage';
 import './mcp.css';
+import { agentName, agentShortName, MCP_CONFIG_AGENTS, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
 
 const CATEGORIES = [
   { id: 'all', label: 'All' },
@@ -370,14 +371,10 @@ export function McpWorkspace({
                           },
                         ]
                       : []),
-                    ...(
-                      [
-                        ['global', 'Global'],
-                        ['claude', 'Claude Code'],
-                        ['codex', 'Codex'],
-                        ['grok', 'Grok'],
-                      ] as const
-                    ).map(([id, label]) => ({
+                    ...[
+                      ['global', 'Global'],
+                      ...MCP_CONFIG_AGENTS.map((id) => [id, agentName(id)]),
+                    ].map(([id, label]) => ({
                       id,
                       label,
                       count: servers.filter((s) => s.scope === id).length,
@@ -421,17 +418,16 @@ export function McpWorkspace({
                     const key = `${server.scope}:${server.id}`;
                     const probe = probeResults[key];
                     const isProbing = !!probingIds[key];
+                    const agentScope = MCP_SIGN_IN_AGENTS.includes(server.scope);
                     const signInAgents =
                       !server.discovery &&
                       server.transport === 'http' &&
-                      (server.scope === 'codex' ||
-                        server.scope === 'claude' ||
+                      (agentScope ||
                         server.scope.startsWith('project:') ||
                         server.scope === 'global')
-                        ? (server.scope === 'codex' || server.scope === 'claude'
-                            ? [server.scope]
-                            : ['codex', 'claude']
-                          ).filter((agent) => !server.agents || server.agents.includes(agent))
+                        ? (agentScope ? [server.scope] : MCP_SIGN_IN_AGENTS).filter(
+                            (agent) => !server.agents || server.agents.includes(agent),
+                          )
                         : [];
 
                     return (
@@ -552,7 +548,7 @@ export function McpWorkspace({
                                     className="workspace-menu-item"
                                     onSelect={() => signIn(server, agent)}
                                   >
-                                    Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
+                                    Sign in with {agentShortName(agent)}
                                   </Menu.Item>
                                 ))}
                                 <Menu.Item

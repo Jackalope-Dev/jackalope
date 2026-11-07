@@ -11,6 +11,7 @@ import {
 } from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { agentAdapter } from '../../lib/agents';
 import { runHostName } from '../../lib/computers';
 import {
   type AutonomyEntry,
@@ -44,7 +45,6 @@ import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { EscalationNote } from '../tasks/AgentDecision';
 import { AgentQuestion } from '../tasks/AgentQuestion';
-import { agentAdapter } from '../tasks/CrossModelReviewPanel';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';

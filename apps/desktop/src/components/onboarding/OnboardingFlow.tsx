@@ -26,6 +26,7 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
 import './onboarding.css';
+import { agentAdapter, runsTasks } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 import { projectReadiness } from '../../lib/readiness';
 import { ActionError } from '../ui/ActionError';
@@ -138,13 +139,11 @@ export function OnboardingFlow({
     };
   }, [previewProjectId, preview]);
   const runner = execution.runners.find((item) => item.id === agent);
-  const runnerAdapter = config.customAgents.find((custom) => custom.id === agent)?.adapter ?? agent;
+  const runnerAdapter = agentAdapter(agent, config.customAgents);
   const available = (id: string) => {
     const options = config.runnerOptions[id];
     return (
-      ['codex', 'claude', 'grok', 'opencode', 'antigravity', 'kimi'].includes(
-        config.customAgents.find((custom) => custom.id === id)?.adapter ?? id,
-      ) &&
+      runsTasks(id, config.customAgents) &&
       config.isAgentEnabled(id) &&
       !(options?.restrictModels && !options.models.some((model) => model.trim()))
     );
@@ -171,7 +170,7 @@ export function OnboardingFlow({
   );
   const invalidAccounts = detectedAgents.some((item) => {
     if (!projectEnabled(item.id)) return false;
-    const adapter = config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
+    const adapter = agentAdapter(item.id, config.customAgents);
     const entry = accounts[adapter];
     if (!entry?.view) return false;
     const enabled = accountProfiles(entry.view, entry.statuses).filter(
@@ -376,8 +375,7 @@ export function OnboardingFlow({
               </p>
               {(() => {
                 const renderAgentCard = (item: (typeof detectedAgents)[number]) => {
-                  const adapter =
-                    config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
+                  const adapter = agentAdapter(item.id, config.customAgents);
                   const meta = getAgentMetadata(item.id);
                   return (
                     <div
@@ -502,9 +500,7 @@ export function OnboardingFlow({
                         agents={detectedAgents
                           .filter((item) => projectEnabled(item.id))
                           .map((item) => ({
-                            adapter:
-                              config.customAgents.find((custom) => custom.id === item.id)
-                                ?.adapter ?? item.id,
+                            adapter: agentAdapter(item.id, config.customAgents),
                             name: item.name,
                           }))}
                         onUse={(adapter, profileId) => {

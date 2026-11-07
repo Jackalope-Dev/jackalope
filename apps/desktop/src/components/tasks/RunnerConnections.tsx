@@ -46,6 +46,7 @@ import { openAgentConfiguration } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import '../agents/agents-workspace.css';
+import { agentAdapter } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 
 function SetupCommandBox({
@@ -147,10 +148,7 @@ export function RunnerConnections({
     ...new Set(
       runners
         .filter((runner) => runner.available)
-        .map(
-          (runner) =>
-            config.customAgents.find((agent) => agent.id === runner.id)?.adapter ?? runner.id,
-        ),
+        .map((runner) => agentAdapter(runner.id, config.customAgents)),
     ),
   ]);
   const [adding, setAdding] = useState(false);

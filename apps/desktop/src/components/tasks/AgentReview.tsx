@@ -26,6 +26,7 @@ import {
   reviewState,
   taskReviews,
 } from '../../lib/agent-review';
+import { agentAdapter } from '../../lib/agents';
 import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
 import { durationLabel, elapsedLabel } from '../../lib/run-status';
@@ -33,7 +34,6 @@ import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { agentAdapter } from './CrossModelReviewPanel';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';
 import { describeError } from '../../lib/errors';

@@ -26,6 +26,7 @@ import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import { ProviderMark } from './ProviderMark';
 import './agents-workspace.css';
 import './agent-manager.css';
+import { agentNames, canOrchestrate, ORCHESTRATING_AGENTS } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 import { ActionError } from '../ui/ActionError';
 
@@ -74,14 +75,10 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const selectedRunner = runners.find((r) => r.id === selected?.id);
   const selectedEnabled = selected ? config.isAgentEnabled(selected.id, project?.id) : false;
   const isDefault = !!selected && defaultAgent === selected.id;
-  const orchestrates =
-    !!selected &&
-    ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
-      ('adapter' in selected ? selected.adapter : undefined) ?? selected.id,
-    );
+  const orchestrates = !!selected && canOrchestrate(selected.id, config.customAgents);
   const defaultBlockedReason =
     !project && !orchestrates
-      ? `${selected?.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
+      ? `${selected?.name} cannot orchestrate routing. Choose ${agentNames(ORCHESTRATING_AGENTS)}.`
       : !selectedEnabled
         ? `Enable ${selected?.name} before making it the default.`
         : !selectedRunner?.available

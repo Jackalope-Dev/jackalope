@@ -13,6 +13,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { agentName } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -323,12 +324,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
                     {index + 1}. {item.title}
                   </p>
                   <p className="task-muted text-xs mt-1 break-words">
-                    {item.agent === 'claude'
-                      ? 'Claude Code'
-                      : item.agent === 'codex'
-                        ? 'Codex'
-                        : 'Grok'}{' '}
-                    · {item.scopes.join(', ')}
+                    {agentName(item.agent)} · {item.scopes.join(', ')}
                   </p>
                   <p className="task-muted text-xs mt-1">
                     {item.dependsOn.length

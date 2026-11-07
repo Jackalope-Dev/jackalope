@@ -14,6 +14,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { agentNames, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-connection';
 import { mcpEndpointError } from '../../lib/mcp-endpoint';
@@ -52,7 +53,7 @@ export function McpConnectionForm({
     initial?.scope ?? (project ? `project:${project.id}` : 'global'),
   );
   const [agents, setAgents] = useState<string[] | null>(
-    initial?.agents ?? (defaultsToAgentSignIn ? ['codex', 'claude'] : null),
+    initial?.agents ?? (defaultsToAgentSignIn ? [...MCP_SIGN_IN_AGENTS] : null),
   );
   const [transport, setTransport] = useState(initial?.transport ?? 'http');
   const [authentication, setAuthentication] = useState(
@@ -113,10 +114,10 @@ export function McpConnectionForm({
       const agentSignIn = transport === 'http' && authentication === 'oauth';
       if (
         agentSignIn &&
-        (discovery || !agents || agents.some((agent) => !['codex', 'claude'].includes(agent)))
+        (discovery || !agents || agents.some((agent) => !MCP_SIGN_IN_AGENTS.includes(agent)))
       )
         throw new Error(
-          'For agent sign-in, turn off on-demand tools and select Codex, Claude, or both.',
+          `For agent sign-in, turn off on-demand tools and select from ${agentNames(MCP_SIGN_IN_AGENTS, 'and')}.`,
         );
       if (
         !legacy &&
@@ -323,7 +324,7 @@ export function McpConnectionForm({
                     setAuthentication(next);
                     if (next === 'oauth') {
                       setDiscovery(false);
-                      setAgents(['codex', 'claude']);
+                      setAgents([...MCP_SIGN_IN_AGENTS]);
                     } else if (authentication === 'oauth') {
                       setDiscovery(true);
                       setAgents(null);
@@ -504,7 +505,7 @@ export function McpConnectionForm({
                   type="button"
                   variant={agents !== null ? 'secondary' : 'outline'}
                   aria-pressed={agents !== null}
-                  onClick={() => setAgents(agents ?? ['codex', 'claude'])}
+                  onClick={() => setAgents(agents ?? [...MCP_SIGN_IN_AGENTS])}
                 >
                   Specific agents
                 </Button>
@@ -518,7 +519,7 @@ export function McpConnectionForm({
                         disabled={
                           authentication === 'oauth' &&
                           transport === 'http' &&
-                          !['codex', 'claude'].includes(agent.id)
+                          !MCP_SIGN_IN_AGENTS.includes(agent.id)
                         }
                         onChange={(event) =>
                           setAgents(

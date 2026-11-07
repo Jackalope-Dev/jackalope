@@ -11,6 +11,7 @@ import {
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { agentAdapter } from '../../lib/agents';
 import { describeWake } from '../../lib/bot-hub';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -27,7 +28,6 @@ import { stopTask } from '../../lib/task-client';
 import { useAction } from '../../lib/useAction';
 import { useNativeResource } from '../../lib/useNativeResource';
 import { openRun } from '../../lib/work-selection';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
   agentAccountFor,
@@ -197,8 +197,7 @@ export function ScheduleManager(props: {
       if (!editing || !project) return;
       if (!monitorOnly && agent !== 'auto' && !isAgentAllowedForProject(project, agent))
         throw new Error('This agent is not allowed for the selected project.');
-      const adapter =
-        useAgentConfigStore.getState().customAgents.find((a) => a.id === agent)?.adapter ?? agent;
+      const adapter = agentAdapter(agent);
       await invokeNative('schedule_save', {
         definition: {
           ...editing,

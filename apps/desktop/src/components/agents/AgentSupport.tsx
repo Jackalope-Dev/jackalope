@@ -8,7 +8,7 @@ export function AgentSupport({ adapter }: { adapter: string }) {
   const support = agentCapabilities(adapter);
   if (!support)
     return <p className="task-muted">Choose a supported adapter to see its capabilities.</p>;
-  if (adapter === 'gemini')
+  if (support.tasksInDevelopment)
     return (
       <p className="task-muted mt-4">
         Separate account setup is available. Running tasks with this agent is still in development.
@@ -26,8 +26,8 @@ export function AgentSupport({ adapter }: { adapter: string }) {
     ],
     [
       'Browser evidence',
-      adapter === 'codex' ? 'partial' : 'yes',
-      adapter === 'codex'
+      support.browserEvidence === 'partial' ? 'partial' : 'yes',
+      support.browserEvidence === 'partial'
         ? 'Read tools; browser actions may require permission.'
         : 'Browser evidence and interaction, subject to CLI permissions.',
     ],
@@ -42,11 +42,10 @@ export function AgentSupport({ adapter }: { adapter: string }) {
     [
       'Separate accounts',
       support.accounts ? 'yes' : 'no',
-      adapter === 'antigravity'
-        ? 'Gemini API keys; current CLI subscription login.'
-        : support.accounts
+      support.accountsNote ??
+        (support.accounts
           ? 'Separate accounts can be connected.'
-          : 'Uses the current CLI account only.',
+          : 'Uses the current CLI account only.'),
     ],
     [
       'Quota reporting',
@@ -74,11 +73,7 @@ export function AgentSupport({ adapter }: { adapter: string }) {
           );
         })}
       </ul>
-      {adapter === 'kimi' && (
-        <p className="task-muted">
-          Legacy Python kimi-cli accounts need migration through the Kimi Code CLI.
-        </p>
-      )}
+      {support.supportNote && <p className="task-muted">{support.supportNote}</p>}
     </section>
   );
 }

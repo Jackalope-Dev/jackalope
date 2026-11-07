@@ -3,6 +3,7 @@ import { ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAgentModels } from '../../lib/agent-models';
+import { agentAdapter } from '../../lib/agents';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { MAX_COMPARED_AGENTS } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -31,7 +32,7 @@ function useRosterAgents(project: Project | undefined) {
   );
   return runners.map((runner) => ({
     ...runner,
-    adapter: config.customAgents.find((agent) => agent.id === runner.id)?.adapter ?? runner.id,
+    adapter: agentAdapter(runner.id, config.customAgents),
     unavailable: !runner.available
       ? runner.detail || 'Not installed or not signed in.'
       : !config.isAgentEnabled(runner.id)

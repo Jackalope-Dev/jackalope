@@ -15,6 +15,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { agentAdapter } from '../../lib/agents';
 import {
   authorFollowUp,
   type MergedFinding,
@@ -28,7 +29,6 @@ import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { agentAdapter } from './CrossModelReviewPanel';
 import './challenge-review.css';
 import { describeError } from '../../lib/errors';
 import { ActionError } from '../ui/ActionError';

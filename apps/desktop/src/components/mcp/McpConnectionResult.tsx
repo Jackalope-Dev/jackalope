@@ -1,6 +1,7 @@
 import { Button, InlineNotice } from '@jackalope/ui';
 import { CheckCircle, CircleAlert, KeyRound, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { agentShortName, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure } from '../../lib/mcp-connection';
 import { invokeNative } from '../../lib/native/transport';
@@ -73,8 +74,8 @@ export function McpConnectionResult({
             selected for the current project. Other accounts need their own sign-in.
           </p>
           <div className="mcp-result-actions">
-            {(server.agents ?? ['codex', 'claude'])
-              .filter((agent) => ['codex', 'claude'].includes(agent))
+            {(server.agents ?? MCP_SIGN_IN_AGENTS)
+              .filter((agent) => MCP_SIGN_IN_AGENTS.includes(agent))
               .map((agent) => (
                 <Button
                   key={agent}
@@ -100,7 +101,7 @@ export function McpConnectionResult({
                     }
                   }}
                 >
-                  Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
+                  Sign in with {agentShortName(agent)}
                 </Button>
               ))}
           </div>

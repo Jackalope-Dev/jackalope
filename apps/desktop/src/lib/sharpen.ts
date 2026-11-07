@@ -1,8 +1,6 @@
+import { ORCHESTRATING_AGENTS } from './agents.ts';
 import { invokeNative } from './native/transport.ts';
 import type { Runner } from './run-types.ts';
-
-/** Agents that can answer a tool-free helper request, as the native helper picks them. */
-const HELPER_ADAPTERS = ['claude', 'codex', 'opencode', 'grok', 'kimi'];
 
 /** Why Sharpen cannot run now, or undefined when it can. */
 export function sharpenUnavailableReason({
@@ -19,7 +17,9 @@ export function sharpenUnavailableReason({
   if (!desktop) return 'Sharpen needs the desktop app.';
   const ready = runners.some(
     (runner) =>
-      runner.available && isEnabled(runner.id) && HELPER_ADAPTERS.includes(adapterFor(runner.id)),
+      runner.available &&
+      isEnabled(runner.id) &&
+      ORCHESTRATING_AGENTS.includes(adapterFor(runner.id)),
   );
   return ready
     ? undefined

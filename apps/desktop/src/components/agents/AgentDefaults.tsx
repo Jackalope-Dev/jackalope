@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { canOrchestrate } from '../../lib/agents';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -96,13 +97,7 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
               )
             )}
             {available
-              .filter(
-                (agent) =>
-                  project ||
-                  ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
-                    'adapter' in agent ? (agent.adapter ?? agent.id) : agent.id,
-                  ),
-              )
+              .filter((agent) => project || canOrchestrate(agent.id, agents.customAgents))
               .map((agent) => (
                 <SelectItem key={agent.id} value={agent.id} disabled={!enabled(agent.id)}>
                   {agent.name}
