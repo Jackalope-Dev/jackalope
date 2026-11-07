@@ -169,6 +169,10 @@
   .cloud-resources-row-text {
     flex-wrap: wrap;
   }
+  .cloud-resources-row .cloud-resources-actions {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .cloud-resources-pane {

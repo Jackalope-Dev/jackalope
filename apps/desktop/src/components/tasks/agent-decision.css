@@ -11,12 +11,18 @@
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .agent-decision-chip .provider-mark {
   flex-shrink: 0;
 }
-.agent-decision-confidence {
+/* The chip is a flex row, so the name truncates in its own span. */
+.agent-decision-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-decision-chip > .agent-decision-confidence {
+  flex-shrink: 0;
   color: var(--color-text-secondary);
   font-weight: 400;
 }

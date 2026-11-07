@@ -217,6 +217,9 @@
     flex-direction: column;
     gap: 8px;
   }
+  .work-item-content {
+    width: 100%;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .work-item {
