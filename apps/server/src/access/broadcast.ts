@@ -1,5 +1,6 @@
 import { EMAIL_PALETTE } from '@jackalope/brand/email';
 import { z } from 'zod';
+import { ServiceError } from '../errors';
 import { MANAGED_TAGS } from './audience';
 import { button, emailShell, escapeHtml } from './mail-templates';
 import { providerJson } from './provider';
@@ -74,13 +75,13 @@ export async function changelogEntries(
       signal: AbortSignal.timeout(10000),
       headers: { accept: 'application/json' },
     });
-    if (!response.ok) throw new Error('changelog_unavailable');
+    if (!response.ok) throw new Error(`changelog ${response.status}`);
     return z
       .array(entrySchema)
       .max(400)
       .parse(await response.json());
   } catch {
-    throw new Error('changelog_unavailable');
+    throw new ServiceError(503, 'changelog_unavailable');
   }
 }
 

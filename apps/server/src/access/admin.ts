@@ -1,6 +1,7 @@
 import { PLATFORMS } from '@jackalope/contracts/platform';
 import { z } from 'zod';
 import { adminPage } from '../admin-page';
+import { ADMIN_HEADERS, adminCsp, errorResponse, json as respondJson } from '../respond';
 import { MANAGED_TAGS } from './audience';
 import {
   broadcastEmail,
@@ -15,7 +16,7 @@ import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import type { Mail } from './mail-templates';
 import { markAudienceStale } from './newsletter';
-import { AccessError, approve, requestLink } from './service';
+import { approve, requestLink } from './service';
 import { openSignup, waitlistRankSql } from './waitlist';
 
 function mailConfigured(env: Env) {
@@ -79,20 +80,15 @@ export async function accessAdmin(
   readJson: (request: Request) => Promise<unknown>,
 ) {
   const url = new URL(request.url);
-  const headers = {
-    'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff',
-    'referrer-policy': 'no-referrer',
-    'x-frame-options': 'DENY',
-  };
-  const json = (value: unknown, status = 200) => Response.json(value, { status, headers });
+  const headers = ADMIN_HEADERS;
+  const json = (value: unknown, status = 200) => respondJson(value, status, headers);
   if (request.method === 'GET' && url.pathname === '/admin/access') {
     const nonce = crypto.randomUUID();
     return new Response(adminPage(nonce), {
       headers: {
         ...headers,
         'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; font-src data:; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+        'content-security-policy': adminCsp(nonce),
       },
     });
   }
@@ -332,10 +328,6 @@ export async function accessAdmin(
     }
     return json({ error: 'not_found' }, 404);
   } catch (error) {
-    if (error instanceof AccessError) return json({ error: error.code }, error.status);
-    if (error instanceof z.ZodError) return json({ error: 'invalid_request' }, 400);
-    if (error instanceof Error && error.message === 'changelog_unavailable')
-      return json({ error: 'changelog_unavailable' }, 503);
-    return json({ error: 'access_unavailable' }, 503);
+    return errorResponse(error, { headers, fallback: 'access_unavailable' });
   }
 }

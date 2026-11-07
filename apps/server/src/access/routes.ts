@@ -6,7 +6,10 @@ import {
   type ReleaseDownload,
 } from '@jackalope/contracts/release';
 import { z } from 'zod';
+import { ServiceError } from '../errors';
 import { deliverFeedback } from '../feedback-mail';
+import type { RateGroup } from '../rate-limit';
+import { ACCESS_HEADERS, errorResponse, json as respondJson } from '../respond';
 import { randomToken } from './crypto';
 import { browserDeviceAction, connectedDevices } from './devices';
 import { downloadChannels, installerKey, memberBuilds, storeUrl } from './downloads';
@@ -15,7 +18,6 @@ import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
 import { syncNewsletter } from './newsletter';
 import {
-  AccessError,
   acceptToken,
   changeInvite,
   emailSchema,
@@ -41,16 +43,11 @@ import {
   waitlistStatus,
 } from './waitlist';
 
-const headers = {
-  'cache-control': 'no-store',
-  'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
-};
 export async function accessRoutes(
   request: Request,
   env: Env,
   readJson: (request: Request) => Promise<unknown>,
-  limit: (mail: boolean) => Promise<void>,
+  limit: (group: RateGroup) => Promise<void>,
   ctx?: ExecutionContext,
 ) {
   const origin = request.headers.get('origin');
@@ -62,29 +59,29 @@ export async function accessRoutes(
         vary: 'Origin',
       }
     : {};
+  const headers = { ...ACCESS_HEADERS, ...cors };
   const json = (data: unknown, status = 200, extra: Record<string, string> = {}) =>
-    Response.json(data, { status, headers: { ...headers, ...cors, ...extra } });
+    respondJson(data, status, { ...headers, ...extra });
   try {
     const site = new URL(env.ACCESS_WEB_ORIGIN);
     if (
       site.origin !== env.ACCESS_WEB_ORIGIN ||
       (site.protocol !== 'https:' && env.ENVIRONMENT !== 'local')
     )
-      throw new AccessError(503, 'access_not_configured');
-    if (origin && !allowed) throw new AccessError(403, 'origin_not_allowed');
+      throw new ServiceError(503, 'access_not_configured');
+    if (origin && !allowed) throw new ServiceError(403, 'origin_not_allowed');
     if (request.method === 'OPTIONS')
       return new Response(null, {
         status: 204,
         headers: {
           ...headers,
-          ...cors,
           'access-control-allow-methods': 'GET, HEAD, POST, OPTIONS',
           'access-control-allow-headers': 'content-type',
           'access-control-max-age': '600',
         },
       });
     const url = new URL(request.url);
-    if (url.search) throw new AccessError(400, 'query_not_allowed');
+    if (url.search) throw new ServiceError(400, 'query_not_allowed');
     if (request.method === 'GET' && url.pathname === '/v1/access/status')
       return json({ enabled: env.EARLY_ACCESS_ENABLED === 'true', openSignup: openSignup(env) });
     if (
@@ -94,9 +91,9 @@ export async function accessRoutes(
       !env.SEQUENZY_API_KEY ||
       !env.ACCESS_EMAIL_FROM
     )
-      throw new AccessError(503, 'access_not_available');
+      throw new ServiceError(503, 'access_not_available');
     const path = url.pathname;
-    if (request.method === 'POST' && !allowed) throw new AccessError(403, 'origin_required');
+    if (request.method === 'POST' && !allowed) throw new ServiceError(403, 'origin_required');
     await limit(
       request.method === 'POST' &&
         [
@@ -104,7 +101,9 @@ export async function accessRoutes(
           '/v1/access/link',
           '/v1/access/waitlist/link',
           '/v1/access/feedback',
-        ].includes(path),
+        ].includes(path)
+        ? 'access-mail'
+        : 'access-session',
     );
     if (request.method === 'POST' && path === '/v1/access/feedback') {
       const result = await feedbackResponse(env, await readJson(request));
@@ -215,7 +214,7 @@ export async function accessRoutes(
     }
     if (request.method === 'POST' && path.startsWith('/v1/access/waitlist/desktop/')) {
       const waiting = await waitingMember(request, env);
-      if (!waiting) throw new AccessError(401, 'access_sign_in_required');
+      if (!waiting) throw new ServiceError(401, 'access_sign_in_required');
       return json(
         await browserDeviceAction(
           env,
@@ -228,11 +227,11 @@ export async function accessRoutes(
     }
     if (request.method === 'GET' && path === '/v1/access/waitlist/devices') {
       const waiting = await waitingMember(request, env);
-      if (!waiting) throw new AccessError(401, 'access_sign_in_required');
+      if (!waiting) throw new ServiceError(401, 'access_sign_in_required');
       return json(await connectedDevices(env, waiting.id));
     }
     const member = await sessionMember(request, env);
-    if (!member) throw new AccessError(401, 'access_sign_in_required');
+    if (!member) throw new ServiceError(401, 'access_sign_in_required');
     if (request.method === 'POST' && path.startsWith('/v1/access/desktop/'))
       return json(
         await browserDeviceAction(
@@ -270,7 +269,7 @@ export async function accessRoutes(
       const id = releasePath[1] as ReleaseDownload;
       const channel = releasePath[2] as ReleaseChannel;
       const channels = downloadChannels(env, id);
-      if (!channels.includes(channel)) throw new AccessError(404, 'download_not_ready');
+      if (!channels.includes(channel)) throw new ServiceError(404, 'download_not_ready');
       if (request.method === 'GET')
         await env.DB.prepare(
           'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
@@ -279,7 +278,7 @@ export async function accessRoutes(
           .run();
       return new Response(null, {
         status: 302,
-        headers: { ...headers, ...cors, location: cloudDownloadUrl(id, channel) },
+        headers: { ...headers, location: cloudDownloadUrl(id, channel) },
       });
     }
     if (['GET', 'HEAD'].includes(request.method) && path === '/v1/access/download') {
@@ -293,13 +292,13 @@ export async function accessRoutes(
             .run();
         return new Response(null, {
           status: 302,
-          headers: { ...headers, ...cors, location: store },
+          headers: { ...headers, location: store },
         });
       }
       const key = installerKey(env);
-      if (!key) throw new AccessError(404, 'download_not_ready');
+      if (!key) throw new ServiceError(404, 'download_not_ready');
       const object = await env.RELEASES.get(key);
-      if (!object) throw new AccessError(404, 'download_not_ready');
+      if (!object) throw new ServiceError(404, 'download_not_ready');
       if (request.method === 'GET')
         await env.DB.prepare(
           'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
@@ -310,7 +309,6 @@ export async function accessRoutes(
       return new Response(request.method === 'HEAD' ? null : object.body, {
         headers: {
           ...headers,
-          ...cors,
           'content-type': 'application/octet-stream',
           'content-length': String(object.size),
           'content-disposition': `attachment; filename="${key.split('/').at(-1)}"`,
@@ -333,16 +331,12 @@ export async function accessRoutes(
       if (ctx && body.action === 'resend') ctx.waitUntil(deliverAccessMail(env));
       return json({ success: true, ...(await invitations(env, member)) });
     }
-    throw new AccessError(404, 'not_found');
+    throw new ServiceError(404, 'not_found');
   } catch (error) {
-    const code =
-      error instanceof AccessError
-        ? error.code
-        : error instanceof z.ZodError
-          ? 'invalid_request'
-          : 'access_unavailable';
-    const status =
-      error instanceof AccessError ? error.status : error instanceof z.ZodError ? 400 : 503;
-    return json({ error: code }, status, status === 429 ? { 'retry-after': '60' } : {});
+    return errorResponse(error, {
+      headers,
+      fallback: 'access_unavailable',
+      retryAfter: { 429: '60' },
+    });
   }
 }

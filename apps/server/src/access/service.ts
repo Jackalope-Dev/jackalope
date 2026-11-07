@@ -1,11 +1,10 @@
 import type { Invitation, InvitationSummary } from '@jackalope/contracts/access';
 import { z } from 'zod';
-import { ServiceError as AccessError } from '../errors';
+import { ServiceError, triggerError } from '../errors';
 import { randomToken, tokenHash } from './crypto';
 import { mailStatements } from './mail';
 import { waitlistMailStatements } from './waitlist';
 
-export { ServiceError as AccessError } from '../errors';
 export const emailSchema = z.string().trim().toLowerCase().max(254).email();
 export const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export interface Member {
@@ -114,7 +113,7 @@ export async function approve(env: Env, id: string, now = Date.now()) {
   const member = await env.DB.prepare('SELECT * FROM access_members WHERE id=?')
     .bind(id)
     .first<Member>();
-  if (!member) throw new AccessError(404, 'member_not_found');
+  if (!member) throw new ServiceError(404, 'member_not_found');
   if (member.status !== 'waiting') return;
   const guard = "EXISTS(SELECT 1 FROM access_members WHERE id=? AND status='waiting')";
   const results = await env.DB.batch([
@@ -162,11 +161,11 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
   )
     .bind(hash, now)
     .first<{ email: string; invite_id: string | null; share_code: string | null }>();
-  if (!token) throw new AccessError(410, 'link_expired');
+  if (!token) throw new ServiceError(410, 'link_expired');
   const member = await env.DB.prepare('SELECT * FROM access_members WHERE email=?')
     .bind(token.email)
     .first<Member>();
-  if (!member || member.status === 'revoked') throw new AccessError(410, 'link_expired');
+  if (!member || member.status === 'revoked') throw new ServiceError(410, 'link_expired');
   const active =
     'EXISTS(SELECT 1 FROM access_tokens WHERE hash=? AND used_at IS NULL AND expires_at>?)';
   const waiting = "EXISTS(SELECT 1 FROM access_members WHERE email=? AND status='waiting')";
@@ -197,7 +196,7 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
           token.email,
         ),
       );
-    } else throw new AccessError(410, 'link_expired');
+    } else throw new ServiceError(410, 'link_expired');
     statements.push(
       env.DB.prepare(
         `UPDATE access_members SET status='approved',approved_at=?,invited_by=(SELECT owner_id FROM access_invites WHERE email=? AND status='accepted') WHERE email=? AND status='waiting' AND EXISTS(SELECT 1 FROM access_invites WHERE email=? AND id=? AND status='accepted' AND accepted_at=?) AND ${active}`,
@@ -226,16 +225,14 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
   try {
     await env.DB.batch(statements);
   } catch (error) {
-    if (String(error).includes('invite_capacity')) throw new AccessError(409, 'invitation_full');
-    if (String(error).includes('invite_rate')) throw new AccessError(429, 'rate_limited');
-    throw error;
+    throw triggerError(error) ?? error;
   }
   if (
     !(await env.DB.prepare('SELECT hash FROM access_sessions WHERE hash=?')
       .bind(sessionHash)
       .first())
   )
-    throw new AccessError(410, 'link_expired');
+    throw new ServiceError(410, 'link_expired');
   return session;
 }
 export async function invitations(
@@ -293,9 +290,7 @@ export async function inviteEmails(env: Env, member: Member, emails: string[], n
   try {
     await env.DB.batch(statements);
   } catch (error) {
-    if (String(error).includes('invite_capacity')) throw new AccessError(409, 'invitation_full');
-    if (String(error).includes('invite_rate')) throw new AccessError(429, 'rate_limited');
-    throw error;
+    throw triggerError(error) ?? error;
   }
 }
 export async function changeInvite(
@@ -318,7 +313,7 @@ export async function changeInvite(
   )
     .bind(id, member.id, now, now - 60000)
     .first<{ email: string }>();
-  if (!invite) throw new AccessError(409, 'invitation_not_resendable');
+  if (!invite) throw new ServiceError(409, 'invitation_not_resendable');
   const guard =
     "EXISTS(SELECT 1 FROM access_invites WHERE id=? AND owner_id=? AND status='pending' AND expires_at>? AND last_sent<=?)";
   await env.DB.batch([

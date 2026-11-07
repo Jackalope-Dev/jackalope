@@ -3,6 +3,7 @@ import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from 'jose';
 import { accessAdmin } from './access/admin';
 import { adminBetaRequests, resolveBetaRequest } from './access/beta';
 import { adminPage } from './admin-page';
+import { ADMIN_HEADERS, adminCsp } from './respond';
 
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 function remoteKeys(issuer: string) {
@@ -39,12 +40,7 @@ export async function authorizeAdmin(request: Request, env: Env, keys?: JWTVerif
     return false;
   }
 }
-const headers = {
-  'cache-control': 'no-store',
-  'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
-  'x-frame-options': 'DENY',
-};
+const headers = ADMIN_HEADERS;
 export async function admin(
   request: Request,
   env: Env,
@@ -73,7 +69,7 @@ export async function adminRoutes(
       headers: {
         ...headers,
         'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; font-src data:; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+        'content-security-policy': adminCsp(nonce),
       },
     });
   }
