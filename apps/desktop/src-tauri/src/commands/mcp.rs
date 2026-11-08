@@ -662,433 +662,6 @@ pub(super) async fn connect(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_agent_with_connection_sign_in_has_its_arguments() {
-        for agent in crate::commands::agents::all() {
-            assert_eq!(
-                sign_in_args(&agent.id, "docs", &serde_json::Map::new()).is_ok(),
-                agent.mcp_sign_in,
-                "{}",
-                agent.id
-            );
-        }
-    }
-
-    #[test]
-    fn endpoint_validation_requires_tls_outside_loopback() {
-        for value in [
-            "https://example.invalid/mcp",
-            "http://localhost:8787/mcp",
-            "http://127.0.0.1:8080",
-            "http://[::1]:8080",
-            "http://127.2.3.4",
-        ] {
-            assert!(validate_endpoint(value).is_ok(), "{value}");
-        }
-        for value in [
-            "http://example.invalid",
-            "http://192.168.1.1",
-            "http://localhost.example.invalid",
-            "http://0.0.0.0",
-            "https://user:secret@example.invalid",
-            "https://example.invalid/#token",
-            "file:///mcp",
-            "not a url",
-        ] {
-            assert!(validate_endpoint(value).is_err(), "{value}");
-        }
-    }
-    #[test]
-    fn managed_connections_preserve_location_agent_selection_and_legacy_clients() {
-        let global = json!({"mcpServers": {
-            "shared": {"command":"unused", "jackalopeManaged":true, "jackalopeDiscovery":true},
-            "codex-only": {"command":"unused", "jackalopeManaged":true, "jackalopeAgents":["codex"], "jackalopeDiscovery":true},
-            "legacy": {"command":"unused"}
-        }});
-        let project = json!({"mcpServers": {"local": {"command":"unused", "jackalopeAgents":["claude"], "jackalopeDiscovery":true}}});
-        let (_, mut codex) =
-            delivery_from_configs("project:test", &global, &project, None, "codex").unwrap();
-        codex.sort_by(|a, b| a.id.cmp(&b.id));
-        assert_eq!(
-            codex
-                .iter()
-                .map(|server| server.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["codex-only", "shared"]
-        );
-        let (_, claude) =
-            delivery_from_configs("project:test", &global, &project, None, "claude").unwrap();
-        assert_eq!(claude.len(), 2);
-        assert!(claude.iter().any(|server| server.id == "local"));
-        let (_, selected) =
-            delivery_from_configs("project:test", &global, &project, Some(&[]), "claude").unwrap();
-        assert_eq!(selected.len(), 1);
-        assert_eq!(selected[0].id, "shared");
-        assert!(delivery_from_configs(
-            "project:test",
-            &global,
-            &project,
-            Some(&["local".into()]),
-            "codex"
-        )
-        .is_err());
-        let spec = spec(&codex[0], "global");
-        assert_eq!(
-            parse_server_spec("codex-only", &spec, "global").agents,
-            Some(vec!["codex".into()])
-        );
-        assert!(spec.get("jackalopeManaged").is_some());
-        assert!(super::spec(&codex[0], "codex")
-            .get("jackalopeAgents")
-            .is_none());
-    }
-    #[test]
-    fn project_delivery_preserves_selection_and_adapter_authentication() {
-        let global = json!({});
-        let project = json!({"mcpServers": {
-            "test.server": {"url":"https://example.invalid/mcp", "bearer_token_env_var":"TEST_TOKEN"},
-            "off": {"command":"unused", "enabled":false}
-        }});
-        let servers = |selected: &[String], adapter: &str| {
-            delivery_from_configs("project:test", &global, &project, Some(selected), adapter)
-                .map(|(direct, _)| direct)
-        };
-        let selected = vec!["test.server".to_string()];
-        let codex = servers(&selected, "codex").unwrap();
-        assert_eq!(codex["test.server"]["bearer_token_env_var"], "TEST_TOKEN");
-        let overrides = codex_overrides(&codex).unwrap();
-        assert_eq!(overrides.len(), 1);
-        assert_eq!(overrides[0].split_once('=').unwrap().0, "mcp_servers");
-        let parsed: toml::Value = toml::from_str(&overrides.join("\n")).unwrap();
-        assert_eq!(
-            parsed["mcp_servers"]["test.server"]["url"].as_str(),
-            Some("https://example.invalid/mcp")
-        );
-        let claude = servers(&selected, "claude").unwrap();
-        assert_eq!(
-            claude["test.server"]["headers"]["Authorization"],
-            "Bearer ${TEST_TOKEN}"
-        );
-        assert!(servers(&[], "grok").unwrap().is_empty());
-        assert!(servers(&selected, "grok").is_err());
-        assert!(servers(&selected, "antigravity")
-            .unwrap_err()
-            .contains("on-demand discovery"));
-        assert!(servers(&[], "antigravity").unwrap().is_empty());
-        assert!(servers(&selected, "gemini")
-            .unwrap_err()
-            .contains("on-demand discovery"));
-        assert!(servers(&[], "gemini").unwrap().is_empty());
-        assert!(servers(&["off".into()], "codex").is_err());
-        assert!(config_path("project:../escape").is_err());
-        let invalid = parse_server_spec(
-            "x",
-            &json!({"url":"https://example.invalid", "bearer_token_env_var":"BAD}TOKEN"}),
-            "codex",
-        );
-        assert!(validate(&invalid).is_err());
-    }
-
-    #[test]
-    fn computers_receive_only_on_demand_connections_they_can_use() {
-        let global = json!({"mcpServers": {
-            "composio": {"url":"https://backend.composio.dev/mcp", "jackalopeManaged":true, "jackalopeDiscovery":true},
-            "managed-direct": {"command":"local-tool", "jackalopeManaged":true}
-        }});
-        let project = json!({"mcpServers": {
-            "remote-docs": {"name":"Docs", "url":"https://example.invalid/mcp", "jackalopeDiscovery":true},
-            "local-files": {"name":"Files", "command":"node", "jackalopeDiscovery":true},
-            "direct": {"url":"https://example.invalid/direct", "bearer_token_env_var":"DIRECT_TOKEN"}
-        }});
-        let selected: Vec<String> = ["remote-docs", "local-files", "direct"]
-            .map(String::from)
-            .to_vec();
-        let (direct, on_demand) =
-            delivery_from_configs("project:test", &global, &project, Some(&selected), "claude")
-                .unwrap();
-        let ids = |servers: &[McpServerConfig]| {
-            let mut ids: Vec<String> = servers.iter().map(|s| s.id.clone()).collect();
-            ids.sort();
-            ids
-        };
-        let names = |withheld: &[Withheld]| {
-            let mut names: Vec<String> = withheld.iter().map(|w| w.name.clone()).collect();
-            names.sort();
-            names
-        };
-
-        let workspace = std::env::temp_dir().join("jackalope-remote-delivery");
-        let roots = [workspace.as_path()];
-        let writer = RemoteContext {
-            read_only: false,
-            roots: &roots,
-            secrets: &[],
-        };
-        let delivery = remote_delivery(&direct, on_demand.clone(), &writer);
-        assert_eq!(ids(&delivery.broker), ["composio", "remote-docs"]);
-        assert_eq!(delivery.computer.len(), 1);
-        assert_eq!(delivery.computer[0].name, "Files");
-        assert_eq!(delivery.computer[0].command, "node");
-        assert_eq!(names(&delivery.withheld), ["direct", "managed-direct"]);
-        assert!(delivery
-            .withheld
-            .iter()
-            .all(|w| w.reason == WITHHELD_DIRECT));
-
-        let reader = RemoteContext {
-            read_only: true,
-            ..writer
-        };
-        let delivery = remote_delivery(&direct, on_demand, &reader);
-        assert_eq!(
-            ids(&delivery.broker),
-            ["composio", "local-files", "remote-docs"]
-        );
-        assert!(delivery.computer.is_empty() && delivery.on_device.is_empty());
-        assert_eq!(names(&delivery.withheld), ["direct", "managed-direct"]);
-        let summary = withheld_summary(&delivery.withheld);
-        assert!(summary.contains("direct (it is delivered directly"));
-        assert!(!summary.contains("DIRECT_TOKEN"));
-    }
-
-    fn stdio(id: &str, command: &str, args: &[&str], env: &[(&str, &str)]) -> McpServerConfig {
-        parse_server_spec(
-            id,
-            &json!({
-                "name": id,
-                "command": command,
-                "args": args,
-                "env": env.iter().cloned().collect::<HashMap<_, _>>(),
-                "jackalopeDiscovery": true
-            }),
-            "project:test",
-        )
-    }
-
-    #[test]
-    fn writers_run_stdio_connections_on_the_computer_or_fall_back_precisely() {
-        let workspace = std::env::temp_dir().join(format!("jackalope-ws-{}", uuid::Uuid::new_v4()));
-        let project = if cfg!(windows) {
-            PathBuf::from("C:\\Projects\\Site")
-        } else {
-            PathBuf::from("/projects/site")
-        };
-        let roots = [workspace.as_path(), project.as_path()];
-        let secrets = vec![("LINEAR_KEY".to_string(), "lin-secret-value".to_string())];
-        let context = RemoteContext {
-            read_only: false,
-            roots: &roots,
-            secrets: &secrets,
-        };
-        let inside = project.join("docs").to_string_lossy().into_owned();
-        let windows_key = "C:\\keys\\service.json";
-        let on_demand = vec![
-            stdio(
-                "linear",
-                "npx.cmd",
-                &["-y", "@linear/mcp"],
-                &[("API_KEY", "${LINEAR_KEY}"), ("PLAIN", "saved-credential")],
-            ),
-            stdio(
-                "files",
-                "npx",
-                &["@modelcontextprotocol/server-filesystem", &inside],
-                &[],
-            ),
-            stdio("fetch", "UVX.EXE", &["mcp-server-fetch"], &[]),
-            stdio("search", "docker", &["run", "-i", "search-mcp"], &[]),
-            stdio("git", "docker", &["run", "-i", "mcp/git"], &[]),
-            stdio("tool.x", "my-local-tool", &[], &[]),
-            stdio("keyfile", "npx", &["gcp-mcp"], &[("KEY_FILE", windows_key)]),
-            stdio(
-                "missing",
-                "npx",
-                &["needs-secret"],
-                &[("TOKEN", "${NOT_SAVED}")],
-            ),
-            stdio("jackalope-like", "node", &["server.js"], &[]),
-        ];
-        let delivery = remote_delivery(&serde_json::Map::new(), on_demand, &context);
-        let computer: HashMap<&str, &ComputerConnection> = delivery
-            .computer
-            .iter()
-            .map(|c| (c.name.as_str(), c))
-            .collect();
-        let mut on_computer: Vec<&str> = computer.keys().copied().collect();
-        on_computer.sort();
-        assert_eq!(on_computer, ["fetch", "files", "jackalope-like", "linear"]);
-        let linear = computer["linear"];
-        assert_eq!(linear.command, "npx");
-        assert_eq!(
-            linear.env,
-            [
-                ("API_KEY".to_string(), "lin-secret-value".to_string()),
-                ("PLAIN".to_string(), "saved-credential".to_string())
-            ]
-        );
-        assert_eq!(computer["fetch"].command, "uvx");
-        assert_eq!(
-            computer["files"].args,
-            ["@modelcontextprotocol/server-filesystem", "./docs"]
-        );
-        // Debug output, which logs can carry, never shows values.
-        let debug = format!("{:?}", delivery);
-        assert!(!debug.contains("lin-secret-value") && !debug.contains("saved-credential"));
-        assert!(debug.contains("API_KEY"));
-
-        // Docker is not on computers: a server without the workspace runs on
-        // this device, one with a repository is withheld.
-        assert_eq!(
-            ids_of(&delivery.broker),
-            ["keyfile", "missing", "search", "tool.x"]
-        );
-        let reason = |list: &[Withheld], name: &str| {
-            list.iter()
-                .find(|w| w.name == name)
-                .map(|w| w.reason.clone())
-                .unwrap_or_default()
-        };
-        assert!(reason(&delivery.on_device, "search").starts_with("Docker is not available"));
-        assert!(reason(&delivery.on_device, "search").ends_with(RUNS_HERE));
-        assert!(reason(&delivery.on_device, "tool.x").contains("my-local-tool is not installed"));
-        assert!(reason(&delivery.on_device, "keyfile").contains("a file on this device"));
-        assert!(reason(&delivery.withheld, "git").starts_with("Docker is not available"));
-        assert!(reason(&delivery.withheld, "git").ends_with(USES_WORKSPACE));
-        // An unresolved secret falls back like any other connection that
-        // cannot run there, and names only the missing secret.
-        assert!(reason(&delivery.on_device, "missing")
-            .contains("NOT_SAVED, which is not a project secret available to computers"));
-        let lines = format!(
-            "{} {}",
-            withheld_summary(&delivery.on_device),
-            withheld_summary(&delivery.withheld)
-        );
-        assert!(!lines.contains("lin-secret-value") && !lines.contains("saved-credential"));
-    }
-
-    fn ids_of(servers: &[McpServerConfig]) -> Vec<String> {
-        let mut ids: Vec<String> = servers.iter().map(|s| s.id.clone()).collect();
-        ids.sort();
-        ids
-    }
-
-    #[test]
-    fn computer_names_and_values_are_safe_for_the_agent_configuration() {
-        let mut keys = std::collections::HashSet::new();
-        assert_eq!(connection_key("docs.server", &mut keys), "docs_server");
-        assert_eq!(connection_key("docs server", &mut keys), "docs_server_2");
-        assert_eq!(
-            connection_key("jackalope", &mut keys),
-            "connection_jackalope"
-        );
-        assert_eq!(connection_key("", &mut keys), "connection_");
-        assert!(computer_command("C:\\tools\\server.exe").is_err());
-        assert!(computer_command("/usr/local/bin/server").is_err());
-        assert_eq!(computer_command("Python.EXE").unwrap(), "python");
-        assert!(computer_command("pwsh").unwrap_err().contains("PowerShell"));
-        let secrets = vec![("A".to_string(), "${A}".to_string())];
-        let context = RemoteContext {
-            read_only: false,
-            roots: &[],
-            secrets: &secrets,
-        };
-        // A secret whose value looks like a reference is not expanded again.
-        assert_eq!(computer_value("x-${A}-y", &context).unwrap(), "x-${A}-y");
-        assert!(computer_value("${A", &context).is_err());
-        assert!(environment_name("API_KEY") && !environment_name("1X") && !environment_name("A-B"));
-    }
-
-    #[test]
-    fn discovery_is_native_only_and_rejects_unsupported_adapters() {
-        let scope = "project:test";
-        let server = parse_server_spec(
-            "tools",
-            &json!({"command":"node","jackalopeDiscovery":true}),
-            scope,
-        );
-        assert!(server.discovery);
-        assert_eq!(spec(&server, scope)["jackalopeDiscovery"], true);
-        assert!(spec(&server, "codex").get("jackalopeDiscovery").is_none());
-        let global = json!({});
-        let project = json!({"mcpServers":{"tools":spec(&server,scope)}});
-        for adapter in [
-            "codex",
-            "claude",
-            "grok",
-            "antigravity",
-            "gemini",
-            "opencode",
-        ] {
-            let (direct, optimized) =
-                delivery_from_configs(scope, &global, &project, Some(&["tools".into()]), adapter)
-                    .unwrap();
-            assert!(direct.is_empty());
-            assert_eq!(optimized.len(), 1);
-            assert!(
-                delivery_from_configs(scope, &global, &project, Some(&[]), adapter)
-                    .unwrap()
-                    .1
-                    .is_empty()
-            );
-        }
-    }
-
-    #[test]
-    fn preserves_toml_settings_and_exact_ids() {
-        let dir = std::env::temp_dir().join(format!("jackalope-mcp-{}", uuid::Uuid::new_v4()));
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("config.toml");
-        fs::write(&path, "# keep this\nmodel = 'my-model'\n[mcp_servers.existing]\nurl = 'https://example.com/mcp'\n").unwrap();
-        let edited = edit_config(
-            &path,
-            "new.server",
-            Some(json!({"command":"test","args":["path with spaces"]})),
-        )
-        .unwrap();
-        assert!(edited.contains("# keep this"));
-        fs::write(&path, edited).unwrap();
-        let (_, parsed) = read_config(&path).unwrap();
-        assert_eq!(parsed["model"], "my-model");
-        assert!(parsed["mcp_servers"]["existing"].is_object());
-        assert_eq!(
-            parsed["mcp_servers"]["new.server"]["args"][0],
-            "path with spaces"
-        );
-        fs::write(&path, "invalid toml = [").unwrap();
-        assert!(edit_config(&path, "x", None).is_err());
-        assert_eq!(fs::read_to_string(&path).unwrap(), "invalid toml = [");
-        fs::remove_dir_all(dir).unwrap();
-    }
-    #[tokio::test]
-    async fn stdio_requires_handshake_and_lists_real_tools() {
-        let script = r#"require('readline').createInterface({input:process.stdin}).on('line', line => { const q=JSON.parse(line); if(q.method==='initialize') console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result:{protocolVersion:q.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}}})); if(q.method==='tools/list') console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result:{tools:[{name:'fixture_tool',description:'Fixture',inputSchema:{type:'object'}}]}})); });"#;
-        let server = parse_server_spec(
-            "fixture",
-            &json!({"command":"node", "args":["-e", script]}),
-            "global",
-        );
-        let result = mcp_probe_server(server).await.unwrap();
-        assert!(result.ok, "{:?}", result.error);
-        assert_eq!(result.tools[0].name, "fixture_tool");
-        let bad = parse_server_spec(
-            "fixture",
-            &json!({"command":"node", "args":["-e", "process.exit(0)"]}),
-            "global",
-        );
-        assert!(!mcp_probe_server(bad).await.unwrap().ok);
-    }
-
-    #[tokio::test]
-    async fn unreachable_http_is_not_connected() {
-        let server = parse_server_spec("test", &json!({"url":"http://127.0.0.1:1/mcp"}), "global");
-        assert!(!mcp_probe_server(server).await.unwrap().ok);
-    }
-}
-
 pub(super) fn project_delivery(
     project_id: &str,
     selection: Option<&[String]>,
@@ -1707,5 +1280,432 @@ pub async fn mcp_authenticate(
     #[cfg(not(windows))]
     {
         Err("Open your agent CLI's MCP sign-in flow in a terminal on this platform.".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_agent_with_connection_sign_in_has_its_arguments() {
+        for agent in crate::commands::agents::all() {
+            assert_eq!(
+                sign_in_args(&agent.id, "docs", &serde_json::Map::new()).is_ok(),
+                agent.mcp_sign_in,
+                "{}",
+                agent.id
+            );
+        }
+    }
+
+    #[test]
+    fn endpoint_validation_requires_tls_outside_loopback() {
+        for value in [
+            "https://example.invalid/mcp",
+            "http://localhost:8787/mcp",
+            "http://127.0.0.1:8080",
+            "http://[::1]:8080",
+            "http://127.2.3.4",
+        ] {
+            assert!(validate_endpoint(value).is_ok(), "{value}");
+        }
+        for value in [
+            "http://example.invalid",
+            "http://192.168.1.1",
+            "http://localhost.example.invalid",
+            "http://0.0.0.0",
+            "https://user:secret@example.invalid",
+            "https://example.invalid/#token",
+            "file:///mcp",
+            "not a url",
+        ] {
+            assert!(validate_endpoint(value).is_err(), "{value}");
+        }
+    }
+    #[test]
+    fn managed_connections_preserve_location_agent_selection_and_legacy_clients() {
+        let global = json!({"mcpServers": {
+            "shared": {"command":"unused", "jackalopeManaged":true, "jackalopeDiscovery":true},
+            "codex-only": {"command":"unused", "jackalopeManaged":true, "jackalopeAgents":["codex"], "jackalopeDiscovery":true},
+            "legacy": {"command":"unused"}
+        }});
+        let project = json!({"mcpServers": {"local": {"command":"unused", "jackalopeAgents":["claude"], "jackalopeDiscovery":true}}});
+        let (_, mut codex) =
+            delivery_from_configs("project:test", &global, &project, None, "codex").unwrap();
+        codex.sort_by(|a, b| a.id.cmp(&b.id));
+        assert_eq!(
+            codex
+                .iter()
+                .map(|server| server.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["codex-only", "shared"]
+        );
+        let (_, claude) =
+            delivery_from_configs("project:test", &global, &project, None, "claude").unwrap();
+        assert_eq!(claude.len(), 2);
+        assert!(claude.iter().any(|server| server.id == "local"));
+        let (_, selected) =
+            delivery_from_configs("project:test", &global, &project, Some(&[]), "claude").unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].id, "shared");
+        assert!(delivery_from_configs(
+            "project:test",
+            &global,
+            &project,
+            Some(&["local".into()]),
+            "codex"
+        )
+        .is_err());
+        let spec = spec(&codex[0], "global");
+        assert_eq!(
+            parse_server_spec("codex-only", &spec, "global").agents,
+            Some(vec!["codex".into()])
+        );
+        assert!(spec.get("jackalopeManaged").is_some());
+        assert!(super::spec(&codex[0], "codex")
+            .get("jackalopeAgents")
+            .is_none());
+    }
+    #[test]
+    fn project_delivery_preserves_selection_and_adapter_authentication() {
+        let global = json!({});
+        let project = json!({"mcpServers": {
+            "test.server": {"url":"https://example.invalid/mcp", "bearer_token_env_var":"TEST_TOKEN"},
+            "off": {"command":"unused", "enabled":false}
+        }});
+        let servers = |selected: &[String], adapter: &str| {
+            delivery_from_configs("project:test", &global, &project, Some(selected), adapter)
+                .map(|(direct, _)| direct)
+        };
+        let selected = vec!["test.server".to_string()];
+        let codex = servers(&selected, "codex").unwrap();
+        assert_eq!(codex["test.server"]["bearer_token_env_var"], "TEST_TOKEN");
+        let overrides = codex_overrides(&codex).unwrap();
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides[0].split_once('=').unwrap().0, "mcp_servers");
+        let parsed: toml::Value = toml::from_str(&overrides.join("\n")).unwrap();
+        assert_eq!(
+            parsed["mcp_servers"]["test.server"]["url"].as_str(),
+            Some("https://example.invalid/mcp")
+        );
+        let claude = servers(&selected, "claude").unwrap();
+        assert_eq!(
+            claude["test.server"]["headers"]["Authorization"],
+            "Bearer ${TEST_TOKEN}"
+        );
+        assert!(servers(&[], "grok").unwrap().is_empty());
+        assert!(servers(&selected, "grok").is_err());
+        assert!(servers(&selected, "antigravity")
+            .unwrap_err()
+            .contains("on-demand discovery"));
+        assert!(servers(&[], "antigravity").unwrap().is_empty());
+        assert!(servers(&selected, "gemini")
+            .unwrap_err()
+            .contains("on-demand discovery"));
+        assert!(servers(&[], "gemini").unwrap().is_empty());
+        assert!(servers(&["off".into()], "codex").is_err());
+        assert!(config_path("project:../escape").is_err());
+        let invalid = parse_server_spec(
+            "x",
+            &json!({"url":"https://example.invalid", "bearer_token_env_var":"BAD}TOKEN"}),
+            "codex",
+        );
+        assert!(validate(&invalid).is_err());
+    }
+
+    #[test]
+    fn computers_receive_only_on_demand_connections_they_can_use() {
+        let global = json!({"mcpServers": {
+            "composio": {"url":"https://backend.composio.dev/mcp", "jackalopeManaged":true, "jackalopeDiscovery":true},
+            "managed-direct": {"command":"local-tool", "jackalopeManaged":true}
+        }});
+        let project = json!({"mcpServers": {
+            "remote-docs": {"name":"Docs", "url":"https://example.invalid/mcp", "jackalopeDiscovery":true},
+            "local-files": {"name":"Files", "command":"node", "jackalopeDiscovery":true},
+            "direct": {"url":"https://example.invalid/direct", "bearer_token_env_var":"DIRECT_TOKEN"}
+        }});
+        let selected: Vec<String> = ["remote-docs", "local-files", "direct"]
+            .map(String::from)
+            .to_vec();
+        let (direct, on_demand) =
+            delivery_from_configs("project:test", &global, &project, Some(&selected), "claude")
+                .unwrap();
+        let ids = |servers: &[McpServerConfig]| {
+            let mut ids: Vec<String> = servers.iter().map(|s| s.id.clone()).collect();
+            ids.sort();
+            ids
+        };
+        let names = |withheld: &[Withheld]| {
+            let mut names: Vec<String> = withheld.iter().map(|w| w.name.clone()).collect();
+            names.sort();
+            names
+        };
+
+        let workspace = std::env::temp_dir().join("jackalope-remote-delivery");
+        let roots = [workspace.as_path()];
+        let writer = RemoteContext {
+            read_only: false,
+            roots: &roots,
+            secrets: &[],
+        };
+        let delivery = remote_delivery(&direct, on_demand.clone(), &writer);
+        assert_eq!(ids(&delivery.broker), ["composio", "remote-docs"]);
+        assert_eq!(delivery.computer.len(), 1);
+        assert_eq!(delivery.computer[0].name, "Files");
+        assert_eq!(delivery.computer[0].command, "node");
+        assert_eq!(names(&delivery.withheld), ["direct", "managed-direct"]);
+        assert!(delivery
+            .withheld
+            .iter()
+            .all(|w| w.reason == WITHHELD_DIRECT));
+
+        let reader = RemoteContext {
+            read_only: true,
+            ..writer
+        };
+        let delivery = remote_delivery(&direct, on_demand, &reader);
+        assert_eq!(
+            ids(&delivery.broker),
+            ["composio", "local-files", "remote-docs"]
+        );
+        assert!(delivery.computer.is_empty() && delivery.on_device.is_empty());
+        assert_eq!(names(&delivery.withheld), ["direct", "managed-direct"]);
+        let summary = withheld_summary(&delivery.withheld);
+        assert!(summary.contains("direct (it is delivered directly"));
+        assert!(!summary.contains("DIRECT_TOKEN"));
+    }
+
+    fn stdio(id: &str, command: &str, args: &[&str], env: &[(&str, &str)]) -> McpServerConfig {
+        parse_server_spec(
+            id,
+            &json!({
+                "name": id,
+                "command": command,
+                "args": args,
+                "env": env.iter().cloned().collect::<HashMap<_, _>>(),
+                "jackalopeDiscovery": true
+            }),
+            "project:test",
+        )
+    }
+
+    #[test]
+    fn writers_run_stdio_connections_on_the_computer_or_fall_back_precisely() {
+        let workspace = std::env::temp_dir().join(format!("jackalope-ws-{}", uuid::Uuid::new_v4()));
+        let project = if cfg!(windows) {
+            PathBuf::from("C:\\Projects\\Site")
+        } else {
+            PathBuf::from("/projects/site")
+        };
+        let roots = [workspace.as_path(), project.as_path()];
+        let secrets = vec![("LINEAR_KEY".to_string(), "lin-secret-value".to_string())];
+        let context = RemoteContext {
+            read_only: false,
+            roots: &roots,
+            secrets: &secrets,
+        };
+        let inside = project.join("docs").to_string_lossy().into_owned();
+        let windows_key = "C:\\keys\\service.json";
+        let on_demand = vec![
+            stdio(
+                "linear",
+                "npx.cmd",
+                &["-y", "@linear/mcp"],
+                &[("API_KEY", "${LINEAR_KEY}"), ("PLAIN", "saved-credential")],
+            ),
+            stdio(
+                "files",
+                "npx",
+                &["@modelcontextprotocol/server-filesystem", &inside],
+                &[],
+            ),
+            stdio("fetch", "UVX.EXE", &["mcp-server-fetch"], &[]),
+            stdio("search", "docker", &["run", "-i", "search-mcp"], &[]),
+            stdio("git", "docker", &["run", "-i", "mcp/git"], &[]),
+            stdio("tool.x", "my-local-tool", &[], &[]),
+            stdio("keyfile", "npx", &["gcp-mcp"], &[("KEY_FILE", windows_key)]),
+            stdio(
+                "missing",
+                "npx",
+                &["needs-secret"],
+                &[("TOKEN", "${NOT_SAVED}")],
+            ),
+            stdio("jackalope-like", "node", &["server.js"], &[]),
+        ];
+        let delivery = remote_delivery(&serde_json::Map::new(), on_demand, &context);
+        let computer: HashMap<&str, &ComputerConnection> = delivery
+            .computer
+            .iter()
+            .map(|c| (c.name.as_str(), c))
+            .collect();
+        let mut on_computer: Vec<&str> = computer.keys().copied().collect();
+        on_computer.sort();
+        assert_eq!(on_computer, ["fetch", "files", "jackalope-like", "linear"]);
+        let linear = computer["linear"];
+        assert_eq!(linear.command, "npx");
+        assert_eq!(
+            linear.env,
+            [
+                ("API_KEY".to_string(), "lin-secret-value".to_string()),
+                ("PLAIN".to_string(), "saved-credential".to_string())
+            ]
+        );
+        assert_eq!(computer["fetch"].command, "uvx");
+        assert_eq!(
+            computer["files"].args,
+            ["@modelcontextprotocol/server-filesystem", "./docs"]
+        );
+        // Debug output, which logs can carry, never shows values.
+        let debug = format!("{:?}", delivery);
+        assert!(!debug.contains("lin-secret-value") && !debug.contains("saved-credential"));
+        assert!(debug.contains("API_KEY"));
+
+        // Docker is not on computers: a server without the workspace runs on
+        // this device, one with a repository is withheld.
+        assert_eq!(
+            ids_of(&delivery.broker),
+            ["keyfile", "missing", "search", "tool.x"]
+        );
+        let reason = |list: &[Withheld], name: &str| {
+            list.iter()
+                .find(|w| w.name == name)
+                .map(|w| w.reason.clone())
+                .unwrap_or_default()
+        };
+        assert!(reason(&delivery.on_device, "search").starts_with("Docker is not available"));
+        assert!(reason(&delivery.on_device, "search").ends_with(RUNS_HERE));
+        assert!(reason(&delivery.on_device, "tool.x").contains("my-local-tool is not installed"));
+        assert!(reason(&delivery.on_device, "keyfile").contains("a file on this device"));
+        assert!(reason(&delivery.withheld, "git").starts_with("Docker is not available"));
+        assert!(reason(&delivery.withheld, "git").ends_with(USES_WORKSPACE));
+        // An unresolved secret falls back like any other connection that
+        // cannot run there, and names only the missing secret.
+        assert!(reason(&delivery.on_device, "missing")
+            .contains("NOT_SAVED, which is not a project secret available to computers"));
+        let lines = format!(
+            "{} {}",
+            withheld_summary(&delivery.on_device),
+            withheld_summary(&delivery.withheld)
+        );
+        assert!(!lines.contains("lin-secret-value") && !lines.contains("saved-credential"));
+    }
+
+    fn ids_of(servers: &[McpServerConfig]) -> Vec<String> {
+        let mut ids: Vec<String> = servers.iter().map(|s| s.id.clone()).collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn computer_names_and_values_are_safe_for_the_agent_configuration() {
+        let mut keys = std::collections::HashSet::new();
+        assert_eq!(connection_key("docs.server", &mut keys), "docs_server");
+        assert_eq!(connection_key("docs server", &mut keys), "docs_server_2");
+        assert_eq!(
+            connection_key("jackalope", &mut keys),
+            "connection_jackalope"
+        );
+        assert_eq!(connection_key("", &mut keys), "connection_");
+        assert!(computer_command("C:\\tools\\server.exe").is_err());
+        assert!(computer_command("/usr/local/bin/server").is_err());
+        assert_eq!(computer_command("Python.EXE").unwrap(), "python");
+        assert!(computer_command("pwsh").unwrap_err().contains("PowerShell"));
+        let secrets = vec![("A".to_string(), "${A}".to_string())];
+        let context = RemoteContext {
+            read_only: false,
+            roots: &[],
+            secrets: &secrets,
+        };
+        // A secret whose value looks like a reference is not expanded again.
+        assert_eq!(computer_value("x-${A}-y", &context).unwrap(), "x-${A}-y");
+        assert!(computer_value("${A", &context).is_err());
+        assert!(environment_name("API_KEY") && !environment_name("1X") && !environment_name("A-B"));
+    }
+
+    #[test]
+    fn discovery_is_native_only_and_rejects_unsupported_adapters() {
+        let scope = "project:test";
+        let server = parse_server_spec(
+            "tools",
+            &json!({"command":"node","jackalopeDiscovery":true}),
+            scope,
+        );
+        assert!(server.discovery);
+        assert_eq!(spec(&server, scope)["jackalopeDiscovery"], true);
+        assert!(spec(&server, "codex").get("jackalopeDiscovery").is_none());
+        let global = json!({});
+        let project = json!({"mcpServers":{"tools":spec(&server,scope)}});
+        for adapter in [
+            "codex",
+            "claude",
+            "grok",
+            "antigravity",
+            "gemini",
+            "opencode",
+        ] {
+            let (direct, optimized) =
+                delivery_from_configs(scope, &global, &project, Some(&["tools".into()]), adapter)
+                    .unwrap();
+            assert!(direct.is_empty());
+            assert_eq!(optimized.len(), 1);
+            assert!(
+                delivery_from_configs(scope, &global, &project, Some(&[]), adapter)
+                    .unwrap()
+                    .1
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_toml_settings_and_exact_ids() {
+        let dir = std::env::temp_dir().join(format!("jackalope-mcp-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.toml");
+        fs::write(&path, "# keep this\nmodel = 'my-model'\n[mcp_servers.existing]\nurl = 'https://example.com/mcp'\n").unwrap();
+        let edited = edit_config(
+            &path,
+            "new.server",
+            Some(json!({"command":"test","args":["path with spaces"]})),
+        )
+        .unwrap();
+        assert!(edited.contains("# keep this"));
+        fs::write(&path, edited).unwrap();
+        let (_, parsed) = read_config(&path).unwrap();
+        assert_eq!(parsed["model"], "my-model");
+        assert!(parsed["mcp_servers"]["existing"].is_object());
+        assert_eq!(
+            parsed["mcp_servers"]["new.server"]["args"][0],
+            "path with spaces"
+        );
+        fs::write(&path, "invalid toml = [").unwrap();
+        assert!(edit_config(&path, "x", None).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "invalid toml = [");
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[tokio::test]
+    async fn stdio_requires_handshake_and_lists_real_tools() {
+        let script = r#"require('readline').createInterface({input:process.stdin}).on('line', line => { const q=JSON.parse(line); if(q.method==='initialize') console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result:{protocolVersion:q.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}}})); if(q.method==='tools/list') console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result:{tools:[{name:'fixture_tool',description:'Fixture',inputSchema:{type:'object'}}]}})); });"#;
+        let server = parse_server_spec(
+            "fixture",
+            &json!({"command":"node", "args":["-e", script]}),
+            "global",
+        );
+        let result = mcp_probe_server(server).await.unwrap();
+        assert!(result.ok, "{:?}", result.error);
+        assert_eq!(result.tools[0].name, "fixture_tool");
+        let bad = parse_server_spec(
+            "fixture",
+            &json!({"command":"node", "args":["-e", "process.exit(0)"]}),
+            "global",
+        );
+        assert!(!mcp_probe_server(bad).await.unwrap().ok);
+    }
+
+    #[tokio::test]
+    async fn unreachable_http_is_not_connected() {
+        let server = parse_server_spec("test", &json!({"url":"http://127.0.0.1:1/mcp"}), "global");
+        assert!(!mcp_probe_server(server).await.unwrap().ok);
     }
 }
