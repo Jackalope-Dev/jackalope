@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useNativeResource } from '../../hooks/useNativeResource';
 
 interface DesktopSettings {
   closeToTray: boolean;

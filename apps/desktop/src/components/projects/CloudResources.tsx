@@ -53,7 +53,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';
 import { describeError, errorCode } from '../../lib/errors';
-import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
 
 interface Run {
   kinds: CloudResourceKind[];

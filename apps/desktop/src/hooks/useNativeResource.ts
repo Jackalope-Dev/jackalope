@@ -1,5 +1,5 @@
 import { type DependencyList, useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from './errors';
+import { describeError } from '../lib/errors';
 
 interface Options {
   /** Reload on this interval while mounted. */

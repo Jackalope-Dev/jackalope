@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { describeError } from './errors';
+import { describeError } from '../lib/errors';
 
 /**
  * Runs one user action at a time: ignores re-entry while busy, clears the previous error,

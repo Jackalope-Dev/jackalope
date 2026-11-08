@@ -32,7 +32,7 @@ import { openExternalUrl } from '../../lib/native/env';
 import { SwarmConnection } from './SwarmConnection';
 import './artifacts-connection.css';
 import { describeError } from '../../lib/errors';
-import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
 import { ActionError } from '../ui/ActionError';
 
 export function ArtifactsTitle() {

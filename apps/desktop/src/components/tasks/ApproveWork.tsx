@@ -14,7 +14,7 @@ import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import { markReviewed } from '../../lib/task-client';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
 import { ActionError } from '../ui/ActionError';
 

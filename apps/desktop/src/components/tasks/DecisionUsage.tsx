@@ -7,7 +7,7 @@ import {
 } from '../../lib/decision-usage';
 import { decisionLabels } from '../../lib/decisions';
 import { summarizeUsage } from '../../lib/usage-insights';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 const NO_RECORDS: TaskDecisionUsage[] = [];

@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';

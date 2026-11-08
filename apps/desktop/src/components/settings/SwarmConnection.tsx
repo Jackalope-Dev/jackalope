@@ -26,7 +26,7 @@ import {
 } from '../../lib/swarm';
 import './swarm-connection.css';
 import { describeError } from '../../lib/errors';
-import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
 
 type Phase = 'allow' | SwarmSetupStep;
 

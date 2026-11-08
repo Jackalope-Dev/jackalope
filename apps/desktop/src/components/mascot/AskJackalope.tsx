@@ -9,7 +9,7 @@ import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice'
 import { HelperAction } from './HelperAction';
 import './helper.css';
 import { describeError } from '../../lib/errors';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 
 const Markdown = lazy(() => import('../tasks/TaskMarkdown'));
 async function openLink(url: string) {

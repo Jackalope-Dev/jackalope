@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 import { openHelp } from '../../lib/navigation';
 import { FeedbackForm } from './FeedbackForm';
 import { UpdateSettings } from './UpdateSettings';

@@ -13,7 +13,7 @@ import {
 import { useEffect, useId, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 

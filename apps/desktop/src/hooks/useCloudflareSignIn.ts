@@ -3,9 +3,9 @@ import {
   beginCloudflareSignIn,
   cancelCloudflareSignIn,
   completeCloudflareSignIn,
-} from './cloudflare-artifacts';
-import { errorCode } from './errors';
-import { openExternalUrl } from './native/env';
+} from '../lib/cloudflare-artifacts';
+import { errorCode } from '../lib/errors';
+import { openExternalUrl } from '../lib/native/env';
 
 /**
  * Connect Cloudflare in the browser: open the consent page and wait for it to return the

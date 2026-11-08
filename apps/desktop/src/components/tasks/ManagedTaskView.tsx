@@ -28,7 +28,7 @@ import { queueCommand } from '../../lib/queue';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
 import { stopPreview } from '../../lib/task-client';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';

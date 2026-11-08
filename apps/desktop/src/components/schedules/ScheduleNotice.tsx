@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { navigateWorkspace } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { listSchedules, needsAction } from '../../lib/schedules';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useCompanionNotices } from '../mascot/useCompanionNotices';

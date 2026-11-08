@@ -53,8 +53,8 @@ import { WorkspaceTabs } from '../ui/WorkspaceTabs';
 import { PlanAutonomyPanel } from './PlanAutonomy';
 import './plan-page.css';
 import { describeError } from '../../lib/errors';
-import { useAction } from '../../lib/useAction';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useAction } from '../../hooks/useAction';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { ActionError } from '../ui/ActionError';
 
 type Tab = 'plan' | 'progress' | 'revisions';

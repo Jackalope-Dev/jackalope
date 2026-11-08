@@ -25,8 +25,8 @@ import {
   savedPlanDraft,
 } from '../../lib/schedules';
 import { stopTask } from '../../lib/task-client';
-import { useAction } from '../../lib/useAction';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useAction } from '../../hooks/useAction';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { openRun } from '../../lib/work-selection';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';

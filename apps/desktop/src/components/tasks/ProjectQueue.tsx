@@ -50,7 +50,7 @@ import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
 import { describeError } from '../../lib/errors';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 import { ActionError } from '../ui/ActionError';
 
 const emptyQueue: QueueView = {
