@@ -329,7 +329,8 @@ impl AttemptRunner for LocalRunner {
                 && started.elapsed() > crate::commands::agents::ATTEMPT_LIMIT
             {
                 timed_out = true;
-                runtime.update(id, |run| run.error = Some(format!("{adapter} exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.")));
+                let minutes = crate::commands::agents::ATTEMPT_LIMIT.as_secs() / 60;
+                runtime.update(id, |run| run.error = Some(format!("{} exceeded the {minutes}-minute attempt limit. Inspect the saved work and continue the task.", spec.name)));
                 self.stop()?;
             }
             std::thread::sleep(Duration::from_millis(100));
