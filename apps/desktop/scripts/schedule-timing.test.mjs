@@ -24,6 +24,9 @@ test('complex or invalid saved cron remains custom instead of being rewritten', 
     '60 */6 * * *',
     '0 1-23/6 * * *',
     '0 */6 * * 1-5',
+    '60 * * * *',
+    '0 25 * * *',
+    '0 9 * * 8',
   ]) {
     assert.equal(parseScheduleTiming(expression), null);
   }
@@ -54,4 +57,6 @@ test('hourly presets preserve the selected minute and valid clock-aligned cadenc
     assert.equal(scheduleTimingExpression('hourly', '00:00', '1', hours), null);
   }
   assert.equal(scheduleTimingExpression('hourly', '00:60', '1', '6'), null);
+  assert.equal(scheduleTimingExpression('hourly', '24:00', '1', '1'), null);
+  assert.equal(scheduleTimingExpression('hourly', '00:00', '7', '1'), null);
 });
