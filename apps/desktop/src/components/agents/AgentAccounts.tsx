@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   ConfirmDialog,
@@ -30,7 +31,6 @@ import {
   setAgentProfileTag,
   setConfigDir,
 } from '../../lib/agent-profiles';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   accountProfiles,

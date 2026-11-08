@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import {
   deleteMcpServer,
@@ -10,7 +11,6 @@ import {
 import { createReadCache } from '../lib/read-cache.ts';
 import { useProjectStore } from './projectStore.ts';
 import { useSettingsStore } from './settingsStore.ts';
-import { describeError } from '@jackalope/contracts/errors';
 
 export interface AllMcpsServer {
   id: string;

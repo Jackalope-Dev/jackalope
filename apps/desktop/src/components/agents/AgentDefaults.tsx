@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Select,
@@ -15,7 +16,6 @@ import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigS
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
 import { ActionError } from '../ui/ActionError';
-import { describeError } from '@jackalope/contracts/errors';
 
 /**
  * Choices that apply across agents: which one starts new work, quota handoff and,

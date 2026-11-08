@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 
 interface BetaRequest {

@@ -1,22 +1,22 @@
 pub(super) mod agreements;
-pub(super) mod autonomy;
-pub mod cloud;
-pub mod deploy;
-pub mod peers;
-pub(crate) mod reconciliation;
-pub(crate) mod scope_audit;
-pub mod subtasks;
-pub mod swarm_setup;
 pub(super) mod automatic;
 #[cfg(test)]
 mod automatic_tests;
 #[cfg(test)]
 mod automatic_trial;
+pub(super) mod autonomy;
+pub mod cloud;
+pub mod deploy;
 pub(super) mod inbox;
 pub mod managed;
 pub(super) mod managed_delivery;
 mod models;
+pub mod peers;
 pub(super) mod planned;
+pub(crate) mod reconciliation;
+pub(crate) mod scope_audit;
+pub mod subtasks;
+pub mod swarm_setup;
 use models::Ledger;
 pub use models::{
     CoordinationMessage, PlanEntry, PlanRequest, QueueItem, QueueRequest, QueueView, WorkReport,

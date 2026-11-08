@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { statusLabel } from '@jackalope/contracts/runs';
 import {
   Button,
@@ -9,7 +10,6 @@ import {
 } from '@jackalope/ui';
 import { Archive, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { ArchivedRun } from '../../lib/run-types';

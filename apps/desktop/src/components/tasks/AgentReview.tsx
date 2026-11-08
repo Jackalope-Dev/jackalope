@@ -18,6 +18,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, CircleCheck, Loader2, ScanSearch, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { agentAdapter } from '../../lib/agent-catalog';
 import {
   type AgentReviewReport,
   findingLocation,
@@ -27,7 +28,6 @@ import {
   reviewState,
   taskReviews,
 } from '../../lib/agent-review';
-import { agentAdapter } from '../../lib/agent-catalog';
 import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
 import type { TaskRun } from '../../lib/run-types';
@@ -71,7 +71,13 @@ export function AgentReview({
     () => taskReviews(runs, run.taskId).find((review) => review.challengeOf?.runId === run.id),
     [runs, run.taskId, run.id],
   );
-  const ranked = useMemo(() => rankReviewers(runners, authorOf(run), agentAdapter), [runners, run]);
+  const ranked = useMemo(
+    () =>
+      rankReviewers(runners, authorOf(run), (id) =>
+        agentAdapter(id, useAgentConfigStore.getState().customAgents),
+      ),
+    [runners, run],
+  );
   const [choice, setChoice] = useState('');
   const agent = ranked.some((runner) => runner.id === choice) ? choice : (ranked[0]?.id ?? '');
   const [open, setOpen] = useState(false);
@@ -93,7 +99,10 @@ export function AgentReview({
           projectName: run.projectName,
           projectPath: run.projectPath,
           agent,
-          agentProfileId: agentAccountFor(project, agentAdapter(agent, useAgentConfigStore.getState().customAgents)),
+          agentProfileId: agentAccountFor(
+            project,
+            agentAdapter(agent, useAgentConfigStore.getState().customAgents),
+          ),
           prompt: '',
           isolated: true,
           targetBranch: run.targetBranch ?? project?.preferences?.baseBranch,

@@ -3,6 +3,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   EmptyState,
@@ -13,7 +14,6 @@ import {
 } from '@jackalope/ui';
 import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
 import { invokeNative } from '../../lib/native/transport';
@@ -28,7 +28,6 @@ import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { ActionError } from '../ui/ActionError';
 import { WorkCatchUp } from './WorkCatchUp';
-import { describeError } from '@jackalope/contracts/errors';
 
 const ManagedTaskView = lazy(() =>
   import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),

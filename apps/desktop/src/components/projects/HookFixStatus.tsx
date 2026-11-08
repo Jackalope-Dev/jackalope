@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { isActive, isDone } from '@jackalope/contracts/runs';
 import { Button, InlineNotice } from '@jackalope/ui';
 import type { TaskRun } from '../../lib/run-types';
-import { describeError } from '@jackalope/contracts/errors';
 
 /** A commit refused by a hook, with the output needed to fix it. */
 export interface HookFailure {

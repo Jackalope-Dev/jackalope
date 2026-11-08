@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import type { RemoteAction } from '@jackalope/contracts/remote';
 import {
   Button,
@@ -10,7 +11,6 @@ import {
   SelectItem,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import {
   pairRemoteHost,

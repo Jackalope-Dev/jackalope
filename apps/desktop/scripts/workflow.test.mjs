@@ -124,8 +124,14 @@ test('unified work includes live sessions once and respects project scope and ar
   assert.equal(items[0].session.id, 'live');
   assert.equal(items[0].stage, 'attention');
   assert.equal(collectWorkspaceWork('b', [run, liveRun], { sessions: [session] }).length, 0);
-  assert.equal(collectWorkspaceWork('a', [run, liveRun], { sessions: [session], archived: true }).length, 0);
-  assert.equal(collectWorkspaceWork('a', [], { sessions: [{ ...session, batches: [] }] })[0].stage, 'ideas');
+  assert.equal(
+    collectWorkspaceWork('a', [run, liveRun], { sessions: [session], archived: true }).length,
+    0,
+  );
+  assert.equal(
+    collectWorkspaceWork('a', [], { sessions: [{ ...session, batches: [] }] })[0].stage,
+    'ideas',
+  );
 });
 
 test('global work prioritizes decisions, review, running work and saved projectless ideas', () => {

@@ -1,8 +1,8 @@
 import { Button, InlineNotice, LoadingState } from '@jackalope/ui';
 import { useState } from 'react';
 import { accountGroupChoices } from '../../lib/account-groups';
-import { listAgentProfiles } from '../../lib/agent-profiles';
 import { ORCHESTRATING_AGENTS } from '../../lib/agent-catalog';
+import { listAgentProfiles } from '../../lib/agent-profiles';
 export function ProjectAccountGroup({
   agents,
   value,

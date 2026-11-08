@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun, Verification } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';

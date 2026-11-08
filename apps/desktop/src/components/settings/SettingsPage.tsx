@@ -38,9 +38,8 @@ import { RoutingPreferences } from './RoutingSetup';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
+import { describeError } from '@jackalope/contracts/errors';
 import { useShallow } from 'zustand/react/shallow';
-import { ArtifactsConnection } from './ArtifactsConnection';
-import { ComputersSettings } from './ComputersSettings';
 import {
   SETTINGS_CATEGORIES,
   SETTINGS_GROUPS,
@@ -48,11 +47,12 @@ import {
   settingsCategory,
   sidebarCategory,
 } from '../../lib/settings-categories';
+import { ArtifactsConnection } from './ArtifactsConnection';
+import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
 import { SavedActions } from './SavedActions';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface SettingsPageProps {
   onClose: () => void;

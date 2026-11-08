@@ -6,9 +6,9 @@ import {
   knowledgeFiles,
   knowledgeGuides,
 } from '../../../packages/knowledge/src/index.ts';
-import { helperView, WORKSPACE_VIEWS } from '../src/lib/navigation.ts';
 import { helperPreferencePatch, helperTheme, sameHelperValue } from '../src/lib/helper-actions.ts';
 import destinations from '../src/lib/helper-destinations.json' with { type: 'json' };
+import { helperView, WORKSPACE_VIEWS } from '../src/lib/navigation.ts';
 
 test('helper theme changes preserve saved palette and automatic appearance', () => {
   const base = { ...DEFAULT_THEME, appearance: 'automatic', harmony: 'trio', atmosphere: 31 };

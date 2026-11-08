@@ -1,8 +1,9 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ActiveTab } from '../lib/navigation';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
+import type { ActiveTab } from '../lib/navigation';
 import { observeRefresh } from '../lib/observe-refresh';
 import type { RunUsage } from '../lib/run-types';
 import { useAgentConfigStore } from './agentConfigStore';
@@ -10,7 +11,6 @@ import { useExecutionStore } from './executionStore';
 import { useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface HelperTurn {
   id: string;

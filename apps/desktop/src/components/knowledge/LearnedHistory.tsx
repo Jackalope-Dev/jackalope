@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { type LedgerRecord, ledgerActionLabel } from '../../lib/learning';
 import { invokeNative } from '../../lib/native/transport';
 

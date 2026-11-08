@@ -15,7 +15,7 @@ export function CoordinationDecisions({
   projectId: string;
   runs: TaskRun[];
   busy: boolean;
-  act: (command: QueueCommand, args: Record<string, unknown>) => Promise<void>;
+  act: (command: QueueCommand, args: Record<string, unknown>) => Promise<unknown>;
 }) {
   const title = (id: string) => queue.items.find((item) => item.id === id)?.title ?? 'Manual task';
   const agreements = (queue.agreements ?? []).filter((a) => a.projectId === projectId);

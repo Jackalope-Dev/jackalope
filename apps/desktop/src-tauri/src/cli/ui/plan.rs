@@ -456,10 +456,7 @@ fn editor_command(path: &std::path::Path) -> std::process::Command {
     command_for_editor(configured, path)
 }
 
-fn command_for_editor(
-    configured: Option<String>,
-    path: &std::path::Path,
-) -> std::process::Command {
+fn command_for_editor(configured: Option<String>, path: &std::path::Path) -> std::process::Command {
     let editor = configured
         .filter(|editor| !editor.trim().is_empty())
         .unwrap_or_else(|| {
@@ -510,6 +507,9 @@ mod tests {
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args, ["--wait", "plan.md"]);
         let fallback = if cfg!(windows) { "notepad" } else { "vi" };
-        assert_eq!(command_for_editor(Some("  ".into()), path).get_program(), fallback);
+        assert_eq!(
+            command_for_editor(Some("  ".into()), path).get_program(),
+            fallback
+        );
     }
 }

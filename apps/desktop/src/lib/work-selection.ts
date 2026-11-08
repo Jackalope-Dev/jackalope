@@ -111,8 +111,7 @@ export function useWorkspaceWork({
   const savedIdeas = useTaskStore((state) => state.tasks);
   const ideas = withoutDrafts ? noIdeas : savedIdeas;
   return useMemo(
-    () =>
-      collectWorkspaceWork(projectId, runs, { ideas, sessions, queue, archived, nested }),
+    () => collectWorkspaceWork(projectId, runs, { ideas, sessions, queue, archived, nested }),
     [projectId, ideas, runs, sessions, queue, archived, nested],
   );
 }

@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { isActive } from '@jackalope/contracts/runs';
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { Ellipsis, ListTodo, Megaphone, Monitor, PauseCircle, SquareTerminal } from 'lucide-react';
@@ -16,7 +17,6 @@ import { BranchIndicator, useFocusedWork } from './BranchIndicator';
 import { InvitationsMenuItem } from './InvitationsMenuItem';
 import { StatusBarChanges } from './StatusBarChanges';
 import { StatusBarUsage } from './StatusBarUsage';
-import { describeError } from '@jackalope/contracts/errors';
 
 export function WorkspaceStatusBar({
   onSearch,
@@ -77,9 +77,7 @@ export function WorkspaceStatusBar({
           type="button"
           onClick={() => {
             setTerminalError('');
-            void openCliTerminal(checkout).catch((cause) =>
-              setTerminalError(describeError(cause)),
-            );
+            void openCliTerminal(checkout).catch((cause) => setTerminalError(describeError(cause)));
           }}
           aria-describedby={terminalError ? 'statusbar-terminal-error' : undefined}
         >

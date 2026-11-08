@@ -1,9 +1,9 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { EMPTY_LESSON_SYNC, type LessonSyncView, parseLessonSyncView } from '../lib/lesson-sync';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { useSettingsSyncStore } from './settingsSyncStore';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface LessonSyncState {
   view: LessonSyncView;

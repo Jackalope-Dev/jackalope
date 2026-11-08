@@ -34,7 +34,10 @@ test('helper choices require an installed catalog model distinct from the coding
     localHelperModels({ ...inspection, installedModels: ['small', 'uncatalogued'] }, 'small'),
     [],
   );
-  assert.deepEqual(localHelperModels(inspection, 'medium').map((entry) => entry.id), ['small']);
+  assert.deepEqual(
+    localHelperModels(inspection, 'medium').map((entry) => entry.id),
+    ['small'],
+  );
 });
 
 test('hardware advice distinguishes unknown memory from insufficient memory', () => {

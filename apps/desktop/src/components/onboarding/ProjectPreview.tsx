@@ -1,9 +1,9 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { FolderSearch, GitBranch, GitCommitHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { type CodebaseSnapshot, scanCodebase } from '../../lib/codebase';
 import { invokeNative } from '../../lib/native/transport';
 import { type ProjectInfo, validateProject } from '../../lib/project-setup';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface Commit {
   subject: string;

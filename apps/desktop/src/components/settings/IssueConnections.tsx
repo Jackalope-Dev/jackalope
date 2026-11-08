@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   FormField,
@@ -9,7 +10,6 @@ import {
   SettingRow,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 

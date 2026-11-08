@@ -153,15 +153,13 @@ pub(crate) fn chord(text: &str) -> Result<Chord, String> {
         && key.starts_with('F')
         && key[1..].parse::<u8>().is_ok_and(|n| (1..=12).contains(&n));
     let character = key.chars().count() == 1
-        && key
-            .chars()
-            .all(|c| {
-                c.is_ascii_lowercase()
-                    || c.is_ascii_digit()
-                    || crate::commands::computers::protocol::protocol()
-                        .punctuation
-                        .contains_key(c.to_string().as_str())
-            });
+        && key.chars().all(|c| {
+            c.is_ascii_lowercase()
+                || c.is_ascii_digit()
+                || crate::commands::computers::protocol::protocol()
+                    .punctuation
+                    .contains_key(c.to_string().as_str())
+        });
     if !(named || function || character) {
         return Err(unsupported());
     }

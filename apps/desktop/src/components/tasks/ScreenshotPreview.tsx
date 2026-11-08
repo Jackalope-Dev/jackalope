@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 

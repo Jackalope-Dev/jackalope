@@ -1,8 +1,8 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
+import { describeError } from '@jackalope/contracts/errors';
 import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { navigateWorkspace, openHelperDraft } from '../../lib/app-events';
-import { describeError } from '@jackalope/contracts/errors';
 import {
   helperPreferencePatch,
   helperTheme,
@@ -10,6 +10,7 @@ import {
   type ThemeChange,
 } from '../../lib/helper-actions';
 import { invokeNative } from '../../lib/native/transport';
+import { helperView } from '../../lib/navigation';
 import { stopTask } from '../../lib/task-client';
 import { openRun } from '../../lib/work-selection';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -22,7 +23,6 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { helperView } from '../../lib/navigation';
 import { ActionError } from '../ui/ActionError';
 
 const labels: Record<string, string> = {

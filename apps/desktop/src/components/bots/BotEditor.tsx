@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Checkbox,
@@ -32,7 +33,6 @@ import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
 import { ActionError } from '../ui/ActionError';
 import { BotAppearancePicker } from './BotAppearancePicker';
 import { BotWakes } from './BotWakes';
-import { describeError } from '@jackalope/contracts/errors';
 
 const STEPS = [
   {

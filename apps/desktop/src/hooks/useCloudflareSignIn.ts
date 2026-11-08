@@ -1,10 +1,10 @@
+import { errorCode } from '@jackalope/contracts/errors';
 import { useEffect, useRef } from 'react';
 import {
   beginCloudflareSignIn,
   cancelCloudflareSignIn,
   completeCloudflareSignIn,
 } from '../lib/cloudflare-artifacts';
-import { errorCode } from '@jackalope/contracts/errors';
 import { openExternalUrl } from '../lib/native/env';
 
 /**

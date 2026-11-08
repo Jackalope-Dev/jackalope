@@ -8,10 +8,10 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { useAction } from '../../hooks/useAction';
 import { sessionCommand } from '../../lib/live-session';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
-import { useAction } from '../../hooks/useAction';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { ActionError } from '../ui/ActionError';
 

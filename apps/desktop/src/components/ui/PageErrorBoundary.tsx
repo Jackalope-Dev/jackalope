@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import type { Feature } from '@jackalope/contracts/telemetry';
 import { Button, ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { telemetry } from '../../lib/telemetry-client';
 import { WorkspacePage } from './WorkspacePage';
 

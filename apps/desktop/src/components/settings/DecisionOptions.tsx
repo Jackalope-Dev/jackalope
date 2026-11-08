@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Disclosure,
@@ -16,7 +17,6 @@ import type {
   ModelEvidence,
   DecisionOptions as Options,
 } from '../../lib/decisions';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 
 const helpers = [

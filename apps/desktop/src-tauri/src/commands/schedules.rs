@@ -77,7 +77,10 @@ impl OutcomeKind {
             ("Skipped: three tasks", OutcomeKind::Busy),
             ("Skipped: missed", OutcomeKind::Missed),
             ("Skipped: schedule is paused", OutcomeKind::Paused),
-            ("Skipped: Jackalope is still starting", OutcomeKind::Starting),
+            (
+                "Skipped: Jackalope is still starting",
+                OutcomeKind::Starting,
+            ),
             ("Paused: this schedule is invalid", OutcomeKind::Invalid),
             (ATTENTION, OutcomeKind::MonitorAttention),
             ("Unrelated change", OutcomeKind::Unrelated),

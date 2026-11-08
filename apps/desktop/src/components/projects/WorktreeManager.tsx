@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Badge,
   type BadgeProps,
@@ -29,7 +30,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
-import { describeError } from '@jackalope/contracts/errors';
 import {
   archiveWorktree,
   cleanupWorktree,
@@ -227,8 +227,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       await cleanupWorktree(project.path, worktree);
       if (projectId.current === id) setFeedback(`Removed ${name}.`);
     } catch (cause) {
-      if (projectId.current === id)
-        setError(describeError(cause));
+      if (projectId.current === id) setError(describeError(cause));
     } finally {
       if (projectId.current === id) {
         setProgress('Rechecking the other worktrees…');
@@ -281,8 +280,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       }
       if (failures.length && projectId.current === id) setError(failures.join('\n'));
     } catch (cause) {
-      if (projectId.current === id)
-        setError(`Cleanup stopped. ${describeError(cause)}`);
+      if (projectId.current === id) setError(`Cleanup stopped. ${describeError(cause)}`);
     } finally {
       if (projectId.current === id) {
         setFeedback(`Removed ${removed} of ${candidates.length} worktrees.`);
@@ -308,8 +306,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             : 'No missing entries to remove.',
         );
     } catch (cause) {
-      if (projectId.current === id)
-        setError(describeError(cause));
+      if (projectId.current === id) setError(describeError(cause));
     } finally {
       if (projectId.current === id) await refresh();
       setBusy(false);

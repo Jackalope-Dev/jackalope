@@ -1,9 +1,9 @@
 import { Button, SettingGroup } from '@jackalope/ui';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { openCloudResources, openSettings } from '../../lib/app-events';
 import { resourceOption } from '../../lib/cloud-resources-plan';
 import { cloudResourcesStatus } from '../../lib/cloudflare-resources';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { useNativeResource } from '../../hooks/useNativeResource';
 
 /** Project settings entry to the Cloud resources screen, or to connecting Cloudflare first. */
 export function CloudResourcesCard({

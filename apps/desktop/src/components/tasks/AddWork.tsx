@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Checkbox,
@@ -15,7 +16,6 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { describeError } from '@jackalope/contracts/errors';
 import type { QueueItem } from '../../lib/queue';
 import { queueCommand } from '../../lib/queue';
 import { useExecutionStore } from '../../stores/executionStore';

@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface ReferralInvite {
   id: string;

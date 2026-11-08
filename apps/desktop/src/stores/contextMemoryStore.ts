@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { discoverCodebaseContext } from '../lib/context/discovery';
@@ -6,7 +7,6 @@ import type { DiscoveredCodebaseMemory } from '../lib/context/types';
 import { useAuditStore } from './auditStore';
 import { useMascotStore } from './mascotStore';
 import { useProjectStore } from './projectStore';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface ContextMemoryState {
   memories: Record<string, DiscoveredCodebaseMemory>;

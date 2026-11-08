@@ -144,8 +144,8 @@ async fn read_catalog(
     executable: &Path,
     binding: &agent_profiles::AccountBinding,
 ) -> Result<Vec<AgentModel>, String> {
-    let reader = Reader::of(adapter)
-        .ok_or("This agent does not expose a supported model catalog.")?;
+    let reader =
+        Reader::of(adapter).ok_or("This agent does not expose a supported model catalog.")?;
     let _runner_lease = super::managed_runtime::acquire(executable)?;
     if reader == Reader::Antigravity {
         super::capacity::antigravity::require_commands(binding, executable).await?;

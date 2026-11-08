@@ -28,5 +28,7 @@ export type Trigger = keyof typeof TRIGGERS;
 export function triggerError(error: unknown, triggers: readonly Trigger[]): ServiceError | null {
   const message = error instanceof Error ? error.message : String(error);
   const raised = triggers.find((trigger) => message.includes(trigger));
-  return raised ? new ServiceError(...TRIGGERS[raised]) : null;
+  if (!raised) return null;
+  const [status, code] = TRIGGERS[raised];
+  return new ServiceError(status, code);
 }

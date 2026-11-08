@@ -1,6 +1,6 @@
 import {
-  type Metric,
   TELEMETRY_AGENTS as agents,
+  type Metric,
   type TaskState,
   type TelemetryAgent,
 } from '@jackalope/contracts/telemetry';

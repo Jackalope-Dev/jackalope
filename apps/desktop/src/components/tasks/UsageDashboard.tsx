@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Disclosure,
@@ -15,7 +16,6 @@ import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { countedTaskDecisions } from '../../lib/decision-usage';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { taskTitle } from '../../lib/task-title';

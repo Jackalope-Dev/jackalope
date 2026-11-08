@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ActiveTab } from './navigation';
-import type {
-  AppSettingsCategory,
-  ProjectSettingsCategory,
-} from './settings-categories';
+import type { AppSettingsCategory, ProjectSettingsCategory } from './settings-categories';
 
 interface ProjectSettingsDestination {
   projectId: string;

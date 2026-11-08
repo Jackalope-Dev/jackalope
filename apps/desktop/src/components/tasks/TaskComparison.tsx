@@ -38,9 +38,9 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import { DismissButton } from '../ui/DismissButton';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
+import { describeError } from '@jackalope/contracts/errors';
 import { taskChangeStats } from '../../lib/task-client';
 import { ActionError } from '../ui/ActionError';
-import { describeError } from '@jackalope/contracts/errors';
 
 function duration(run: TaskRun) {
   if (run.durationMs != null) return durationLabel(run.durationMs / 1000);

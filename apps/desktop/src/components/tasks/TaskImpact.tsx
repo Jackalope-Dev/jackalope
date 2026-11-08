@@ -1,8 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { scanCodebase } from '../../lib/codebase';
 import { affectedFiles } from '../../lib/codebase-impact';
-import { describeError } from '@jackalope/contracts/errors';
 import type { TaskRun } from '../../lib/run-types';
 import { ActionError } from '../ui/ActionError';
 

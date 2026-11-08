@@ -259,7 +259,10 @@ mod registry_tests {
             }
         }
         let mut names = Vec::new();
-        visit(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut names);
+        visit(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut names,
+        );
         assert!(names.iter().any(|(name, _)| name == "swarm.bin"));
         for (name, file) in names {
             assert!(

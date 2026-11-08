@@ -321,8 +321,10 @@ fn menu_action(item: &str) -> Option<&'static str> {
         std::sync::OnceLock::new();
     ACTIONS
         .get_or_init(|| {
-            serde_json::from_str(include_str!("../../src/components/layout/menu-actions.json"))
-                .expect("src/components/layout/menu-actions.json maps menu items to commands")
+            serde_json::from_str(include_str!(
+                "../../src/components/layout/menu-actions.json"
+            ))
+            .expect("src/components/layout/menu-actions.json maps menu items to commands")
         })
         .get(item)
         .map(String::as_str)

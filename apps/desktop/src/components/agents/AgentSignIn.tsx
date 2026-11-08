@@ -11,6 +11,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
+import { catalogEntry } from '../../lib/agent-catalog';
 import {
   type AccountStatus,
   accountStatusLabel,
@@ -21,7 +22,6 @@ import {
   stopSignIn,
   writeSignIn,
 } from '../../lib/agent-profiles';
-import { catalogEntry } from '../../lib/agent-catalog';
 import { openInBrowser } from '../../lib/native/env';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
 import '@xterm/xterm/css/xterm.css';

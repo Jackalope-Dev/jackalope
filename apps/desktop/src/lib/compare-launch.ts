@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { type Comparison, useCompareStore } from '../stores/compareStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { agentAccountFor, type Project } from '../stores/projectStore';
@@ -7,7 +8,6 @@ import type { ContextSelection } from './knowledge-types';
 import type { RunRequest, TaskRun } from './run-types';
 import { taskReview } from './task-client';
 import { taskTitle } from './task-title';
-import { describeError } from '@jackalope/contracts/errors';
 
 /**
  * Starts the same prompt once per agent, each as an ordinary isolated task, and

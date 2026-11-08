@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, Disclosure, DisclosureSummary, Input, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import {
   type RecipeId,

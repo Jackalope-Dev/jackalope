@@ -1,4 +1,5 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice } from '@jackalope/ui';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -10,7 +11,6 @@ import { Pairing } from './Pairing';
 import { Splash } from './Splash';
 import { useComputers } from './useComputers';
 import { Work } from './Work';
-import { describeError } from '@jackalope/contracts/errors';
 import '../../desktop/src/index.css';
 import '@jackalope/ui/styles.css';
 import '../../desktop/src/components/tasks/task-workspace.css';

@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, CopyButton, InlineNotice, SettingRow } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 

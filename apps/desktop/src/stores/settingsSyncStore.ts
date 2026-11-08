@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isTauriEnvironment } from '../lib/native/env';
@@ -12,7 +13,6 @@ import {
 } from '../lib/settings-sync';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface SyncState {
   available: boolean;

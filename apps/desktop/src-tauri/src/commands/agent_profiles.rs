@@ -1419,7 +1419,9 @@ mod tests {
         save(&root, &manifest).unwrap();
 
         assert_eq!(
-            bind_account(&root, "codex", Some("work")).unwrap().directory,
+            bind_account(&root, "codex", Some("work"))
+                .unwrap()
+                .directory,
             dir_for(&root, "codex", "work")
         );
         assert_eq!(

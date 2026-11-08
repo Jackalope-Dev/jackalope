@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import type { ReviewComment } from '../lib/review-feedback';
-import { describeError } from '@jackalope/contracts/errors';
 
 const key = 'jackalope-review-feedback';
 type Threads = Record<string, ReviewComment[]>;

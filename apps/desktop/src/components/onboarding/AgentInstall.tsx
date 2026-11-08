@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, CopyButton, InlineNotice, LinkButton } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -11,7 +12,6 @@ import { pollSignIn, stopSignIn } from '../../lib/agent-profiles';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { openExternalUrl } from '../../lib/native/env';
 import { ManagedRuntimeProgress } from '../agents/ManagedRuntimeProgress';
-import { describeError } from '@jackalope/contracts/errors';
 
 type Run =
   | { kind: 'idle' }

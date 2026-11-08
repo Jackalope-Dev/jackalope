@@ -33,8 +33,8 @@ import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './Co
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
-import { selectWork } from '../../lib/work-selection';
 import { describeError } from '@jackalope/contracts/errors';
+import { selectWork } from '../../lib/work-selection';
 
 /** Saved work handed to the composer: a draft, an idea or an agent choice. */
 export interface ComposerSeed {

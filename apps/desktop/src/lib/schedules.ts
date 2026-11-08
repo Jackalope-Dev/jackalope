@@ -90,7 +90,7 @@ interface ScheduleOccurrence {
   change?: { before: string; after: string; path: string; branch: string } | null;
 }
 
-export interface SavedSchedule {
+interface SavedSchedule {
   localChecks?: number;
   quietChecks?: number;
   webhook?: { createdAt: string } | null;

@@ -1,8 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModelEvidence } from './decisions';
 import { isTauriEnvironment } from './native/env';
 import { invokeNative } from './native/transport';
-import { describeError } from '@jackalope/contracts/errors';
 
 export interface ModelCatalog {
   models: { id: string; name: string; isDefault: boolean; metadata?: ModelEvidence }[];

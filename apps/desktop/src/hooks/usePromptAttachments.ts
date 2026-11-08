@@ -1,8 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { type ClipboardEvent, type RefObject, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { attachmentReference } from '../lib/prompt-attachments';
-import { describeError } from '@jackalope/contracts/errors';
 
 const PASTE_TYPES: Record<string, string> = {
   'image/png': 'png',

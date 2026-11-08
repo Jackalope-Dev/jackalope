@@ -2,8 +2,8 @@ import { Badge, Button, Choice, LoadingState, Popover, Tabs, Tooltip } from '@ja
 import { ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAgentModels } from '../../lib/agent-models';
 import { agentAdapter } from '../../lib/agent-catalog';
+import { useAgentModels } from '../../lib/agent-models';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { MAX_COMPARED_AGENTS } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';

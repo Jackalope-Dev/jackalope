@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import {
@@ -5,7 +6,6 @@ import {
   accountStatusLabel,
   checkAgentProfile,
 } from '../../lib/agent-profiles';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';

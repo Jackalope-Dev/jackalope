@@ -13,7 +13,7 @@ export function CoordinationAutomation({
   project: Project;
   queue: QueueView;
   busy: boolean;
-  act: (command: QueueCommand, args: Record<string, unknown>) => Promise<void>;
+  act: (command: QueueCommand, args: Record<string, unknown>) => Promise<unknown>;
   onSelect: (id: string) => void;
 }) {
   const policy = queue.assistPolicies?.find((p) => p.projectId === project.id);

@@ -263,10 +263,7 @@ pub async fn revoke(grant: &Grant) {
 
 /// Prepares a sign-in and returns the Cloudflare consent URL to open. `extra` adds
 /// product scopes, and `invalid_scope` is the message shown when Cloudflare refuses one.
-pub async fn begin(
-    extra: &[String],
-    invalid_scope: Option<String>,
-) -> Result<String, SignInError> {
+pub async fn begin(extra: &[String], invalid_scope: Option<String>) -> Result<String, SignInError> {
     let mut bound = None;
     for port in PORTS {
         if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)).await {

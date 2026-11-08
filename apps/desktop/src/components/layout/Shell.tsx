@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { InlineNotice, LoadingState, SearchIcon, Tooltip } from '@jackalope/ui';
 import { PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import {
@@ -15,7 +16,6 @@ import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
-import { describeError } from '@jackalope/contracts/errors';
 import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -56,21 +56,6 @@ import { WorkspaceStatusBar } from './WorkspaceStatusBar';
 import { WorkTabs } from './WorkTabs';
 import './workspace-shell.css';
 import { useShallow } from 'zustand/react/shallow';
-import { CompanionSources } from '../mascot/CompanionSources';
-import { ScheduleNotice } from '../schedules/ScheduleNotice';
-import type { ComposerSeed } from '../sessions/SessionStart';
-import type { SettingsCategory } from '../../lib/settings-categories';
-import { UpdateNotice } from '../settings/UpdateNotice';
-import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
-
-import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
-import { DismissButton } from '../ui/DismissButton';
-import { PageErrorBoundary } from '../ui/PageErrorBoundary';
-import { ResizeHandle } from '../ui/ResizeHandle';
-import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import { WorkspacePage } from '../ui/WorkspacePage';
-import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
-import { COMMANDS, type Command, type CommandContext, findCommand } from './commands';
 import {
   type ActiveTab,
   DEFAULT_WORKSPACE_TAB,
@@ -81,10 +66,23 @@ import {
   viewLabel,
   workspaceView,
 } from '../../lib/navigation';
+import type { SettingsCategory } from '../../lib/settings-categories';
+import { CompanionSources } from '../mascot/CompanionSources';
+import { ScheduleNotice } from '../schedules/ScheduleNotice';
+import type { ComposerSeed } from '../sessions/SessionStart';
+import { UpdateNotice } from '../settings/UpdateNotice';
+import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
+import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
+import { DismissButton } from '../ui/DismissButton';
+import { PageErrorBoundary } from '../ui/PageErrorBoundary';
+import { ResizeHandle } from '../ui/ResizeHandle';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
+import { COMMANDS, type Command, type CommandContext, findCommand } from './commands';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 import { VIEW_PAGES, type ViewContext } from './workspace-views';
-
 
 // The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
 const SIDEBAR_WIDTH = 248;

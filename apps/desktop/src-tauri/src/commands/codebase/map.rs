@@ -204,7 +204,11 @@ pub(super) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value, 
             .filter(|r| r.source == file.path || r.target.as_ref() == Some(&file.path))
             .take(4)
             .collect();
-        let symbols: Vec<_> = file.symbols.iter().take(super::search().item_symbols).collect();
+        let symbols: Vec<_> = file
+            .symbols
+            .iter()
+            .take(super::search().item_symbols)
+            .collect();
         let item = serde_json::json!({"id":file.path,"path":file.path,"score":score,"symbols":symbols,"related":related});
         let size = item.to_string().len();
         if bytes + size > super::search().result_bytes {

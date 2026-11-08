@@ -567,20 +567,21 @@ fn collect(runtime: &TaskRuntime, run: &TaskRun, settings: &Settings) -> ReviewC
             })
         })
         .collect();
-    let pass = match crate::commands::artifacts::evidence_folder(std::path::Path::new(&run.workspace)) {
-        Ok(folder) => Pass {
-            runtime,
-            id: &run.id,
-            folder,
-            deadline,
-        },
-        Err(error) => {
-            result
-                .notes
-                .push(format!("Review screenshots could not be saved: {error}"));
-            return result;
-        }
-    };
+    let pass =
+        match crate::commands::artifacts::evidence_folder(std::path::Path::new(&run.workspace)) {
+            Ok(folder) => Pass {
+                runtime,
+                id: &run.id,
+                folder,
+                deadline,
+            },
+            Err(error) => {
+                result
+                    .notes
+                    .push(format!("Review screenshots could not be saved: {error}"));
+                return result;
+            }
+        };
     let first = pages.first().map_or("/", |page| page.path.as_str());
     match serve(
         runtime,

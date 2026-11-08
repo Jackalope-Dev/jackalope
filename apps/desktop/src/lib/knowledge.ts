@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useExecutionStore } from '../stores/executionStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
@@ -10,7 +11,6 @@ import { createReadCache } from './read-cache';
 import { restoreArchivedTask } from './task-client';
 import { selectWork } from './work-selection';
 import { workspaceModeFor } from './workspace-mode';
-import { describeError } from '@jackalope/contracts/errors';
 
 const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);
 

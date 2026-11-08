@@ -1,10 +1,66 @@
 {
-  "starting": { "isActive": true, "isRunning": true, "isLive": true, "isDone": false, "isTerminal": false, "isRetryable": false },
-  "running": { "isActive": true, "isRunning": true, "isLive": true, "isDone": false, "isTerminal": false, "isRetryable": false },
-  "stopping": { "isActive": true, "isRunning": false, "isLive": true, "isDone": false, "isTerminal": false, "isRetryable": false },
-  "stopped": { "isActive": false, "isRunning": false, "isLive": false, "isDone": false, "isTerminal": true, "isRetryable": true },
-  "interrupted": { "isActive": false, "isRunning": false, "isLive": true, "isDone": false, "isTerminal": false, "isRetryable": true },
-  "failed": { "isActive": false, "isRunning": false, "isLive": false, "isDone": false, "isTerminal": true, "isRetryable": true },
-  "review": { "isActive": false, "isRunning": false, "isLive": false, "isDone": true, "isTerminal": true, "isRetryable": false },
-  "reviewed": { "isActive": false, "isRunning": false, "isLive": false, "isDone": true, "isTerminal": true, "isRetryable": false }
+  "starting": {
+    "isActive": true,
+    "isRunning": true,
+    "isLive": true,
+    "isDone": false,
+    "isTerminal": false,
+    "isRetryable": false
+  },
+  "running": {
+    "isActive": true,
+    "isRunning": true,
+    "isLive": true,
+    "isDone": false,
+    "isTerminal": false,
+    "isRetryable": false
+  },
+  "stopping": {
+    "isActive": true,
+    "isRunning": false,
+    "isLive": true,
+    "isDone": false,
+    "isTerminal": false,
+    "isRetryable": false
+  },
+  "stopped": {
+    "isActive": false,
+    "isRunning": false,
+    "isLive": false,
+    "isDone": false,
+    "isTerminal": true,
+    "isRetryable": true
+  },
+  "interrupted": {
+    "isActive": false,
+    "isRunning": false,
+    "isLive": true,
+    "isDone": false,
+    "isTerminal": false,
+    "isRetryable": true
+  },
+  "failed": {
+    "isActive": false,
+    "isRunning": false,
+    "isLive": false,
+    "isDone": false,
+    "isTerminal": true,
+    "isRetryable": true
+  },
+  "review": {
+    "isActive": false,
+    "isRunning": false,
+    "isLive": false,
+    "isDone": true,
+    "isTerminal": true,
+    "isRetryable": false
+  },
+  "reviewed": {
+    "isActive": false,
+    "isRunning": false,
+    "isLive": false,
+    "isDone": true,
+    "isTerminal": true,
+    "isRetryable": false
+  }
 }

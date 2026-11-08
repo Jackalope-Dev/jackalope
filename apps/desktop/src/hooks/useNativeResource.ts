@@ -1,5 +1,5 @@
-import { type DependencyList, useCallback, useEffect, useRef, useState } from 'react';
 import { describeError } from '@jackalope/contracts/errors';
+import { type DependencyList, useCallback, useEffect, useRef, useState } from 'react';
 
 interface Options {
   /** Reload on this interval while mounted. */

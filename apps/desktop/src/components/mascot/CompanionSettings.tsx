@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Disclosure,
@@ -8,10 +9,9 @@ import {
   Switch,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useAction } from '../../hooks/useAction';
 import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';

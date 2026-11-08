@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Checkbox,
@@ -25,7 +26,6 @@ import { useMcpStore } from '../../stores/mcpStore';
 import { useActiveProject } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import type { SavedMcpConnection } from './McpConnectionResult';
-import { describeError } from '@jackalope/contracts/errors';
 
 export function McpConnectionForm({
   initial,

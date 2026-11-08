@@ -444,7 +444,7 @@ it('keeps older clients on the temporary waiting response', async () => {
   );
 });
 it('waitlist device management is owner-scoped and supports disconnect, expiry and revocation', async () => {
-  const { owner, session, flow } = await waitlistDevice();
+  const { session, flow } = await waitlistDevice();
   const stranger = await waitlistDevice();
   const view = await (await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).json<{
     id: string;

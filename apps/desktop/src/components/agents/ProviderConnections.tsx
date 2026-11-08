@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Checkbox,
@@ -22,7 +23,6 @@ import {
   saveAgentProfileKey,
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
-import { describeError } from '@jackalope/contracts/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';

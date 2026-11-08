@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   DialogCloseButton,
@@ -10,11 +11,10 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import { markReviewed } from '../../lib/task-client';
-import { useNativeResource } from '../../hooks/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
 import { ActionError } from '../ui/ActionError';
 

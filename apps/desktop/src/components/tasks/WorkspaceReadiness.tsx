@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { projectReadiness, type Readiness } from '../../lib/readiness';
 import { type Project, useProjectStore } from '../../stores/projectStore';

@@ -53,8 +53,7 @@ export async function admin(
   env: Env,
   readJson: (request: Request) => Promise<unknown>,
 ) {
-  if (!(await authorizeAdmin(request, env)))
-    return json({ error: 'admin_access_required' }, 403);
+  if (!(await authorizeAdmin(request, env))) return json({ error: 'admin_access_required' }, 403);
   return adminRoutes(request, env, readJson);
 }
 export async function adminRoutes(

@@ -1284,11 +1284,8 @@ mod tests {
                 .map(|span| span.content.to_string())
                 .collect()
         };
-        let weights = |tick| -> Vec<_> {
-            (0..40)
-                .map(|column| band(column, 40, tick, 10))
-                .collect()
-        };
+        let weights =
+            |tick| -> Vec<_> { (0..40).map(|column| band(column, 40, tick, 10)).collect() };
         assert_eq!(text(5).chars().count(), 40);
         assert_eq!(text(5), text(15), "only colour moves");
         assert_ne!(weights(5), weights(15), "the band advances between frames");

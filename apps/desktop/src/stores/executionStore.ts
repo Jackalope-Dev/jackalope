@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { isActive } from '@jackalope/contracts/runs';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
@@ -12,7 +13,6 @@ import type { TaskEffort } from '../lib/task-effort';
 import { windowKind } from '../lib/window-kind';
 import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
-import { describeError } from '@jackalope/contracts/errors';
 
 interface TaskDraft {
   effort?: TaskEffort;
@@ -118,7 +118,11 @@ export const useExecutionStore = create<ExecutionState>()(
               set({ runs, loading: false, error: null, historyError: null });
             useMascotStore.getState().setActivity('runs', runs.some(isActive));
           } catch (error) {
-            set({ error: describeError(error), historyError: describeError(error), loading: false });
+            set({
+              error: describeError(error),
+              historyError: describeError(error),
+              loading: false,
+            });
           } finally {
             refreshing = undefined;
             if (get().selectedId !== detailId) queueMicrotask(() => void get().refresh());

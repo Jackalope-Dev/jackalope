@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Badge,
   InlineNotice,
@@ -11,7 +12,6 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DecideSettings,

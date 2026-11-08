@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { type DetectedKey, detectEnvKeys, importDetectedKey } from '../../lib/local-detection';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { ActionError } from '../ui/ActionError';

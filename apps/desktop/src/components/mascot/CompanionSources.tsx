@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { useEffect, useMemo, useState } from 'react';
 import { navigateWorkspace, openSettings } from '../../lib/app-events';
 import { taskNotices } from '../../lib/companion-tasks';
@@ -14,7 +15,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { useCompanionNotices } from './useCompanionNotices';
-import { describeError } from '@jackalope/contracts/errors';
 
 export function openCompanionTask(run: TaskRun) {
   openRun(run.id);

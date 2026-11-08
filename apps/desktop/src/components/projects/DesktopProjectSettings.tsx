@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice, SettingBody, SettingGroup, SettingRow } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import {
@@ -6,7 +7,6 @@ import {
   forgetDesktopPermission,
   type RememberedDesktopGrant,
 } from '../../lib/agent-screen';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 
 /** Remembered desktop-control grants and website decisions for one project, each removable. */

@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { describeError } from '@jackalope/contracts/errors';
 import { sessionCommand } from '../../lib/live-session';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 

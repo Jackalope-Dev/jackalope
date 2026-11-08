@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Badge,
   Button,
@@ -8,7 +9,6 @@ import {
 } from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { openKnowledgeTask, prepareLessonCheck, useKnowledge } from '../../lib/knowledge';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import {

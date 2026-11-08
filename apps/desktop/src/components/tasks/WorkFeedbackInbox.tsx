@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useAppEvent } from '../../lib/app-events';
-import { describeError } from '@jackalope/contracts/errors';
 import { pendingWorkFeedback, type WorkFeedback } from '../../lib/work-feedback';
 import { ActionError } from '../ui/ActionError';
 

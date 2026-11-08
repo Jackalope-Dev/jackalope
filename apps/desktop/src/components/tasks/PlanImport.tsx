@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   DialogCloseButton,
@@ -13,7 +14,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { describeError } from '@jackalope/contracts/errors';
 import { queueCommand } from '../../lib/queue';
 import { agentName, useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';

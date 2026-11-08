@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { isActive } from '@jackalope/contracts/runs';
 import {
   Button,
@@ -9,7 +10,6 @@ import {
 } from '@jackalope/ui';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';

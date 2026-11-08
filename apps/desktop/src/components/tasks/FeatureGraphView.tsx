@@ -57,8 +57,7 @@ export function FeatureGraphView({
       const original = runs.find((r) => r.id === item.runId);
       const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
       if (item.runId && mergedRunIds.includes(item.runId)) return 'merged';
-      if (item.error || run?.dependencyInvalidated || (run && isRetryable(run)))
-        return 'attention';
+      if (item.error || run?.dependencyInvalidated || (run && isRetryable(run))) return 'attention';
       if (run && isActive(run)) return 'active';
       if (run && isDone(run)) return 'review';
       if (item.runId) return 'attention';

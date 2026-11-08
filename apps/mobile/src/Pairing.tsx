@@ -1,4 +1,5 @@
 import { AsciiMark } from '@jackalope/brand/ascii-mark';
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Disclosure,
@@ -11,7 +12,6 @@ import {
 import { ChevronLeft, QrCode } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { type Host, pair, scanPairingCode } from './native';
-import { describeError } from '@jackalope/contracts/errors';
 
 /** A starting name the person can keep: phones rarely need telling apart beyond their kind. */
 function defaultName() {

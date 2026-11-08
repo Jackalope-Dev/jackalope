@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { isActive, isDone } from '@jackalope/contracts/runs';
 import {
   Button,
@@ -12,9 +13,9 @@ import {
 import { Activity, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useAction } from '../../hooks/useAction';
 import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import { describeError } from '@jackalope/contracts/errors';
 import {
   type FeatureStep,
   type ManagedTask,
@@ -28,7 +29,6 @@ import { queueCommand } from '../../lib/queue';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
 import { stopPreview } from '../../lib/task-client';
-import { useAction } from '../../hooks/useAction';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -480,9 +480,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             );
                         }}
                       >
-                        {work.planner && isDone(work.planner)
-                          ? 'Reload plan'
-                          : 'Retry planning'}
+                        {work.planner && isDone(work.planner) ? 'Reload plan' : 'Retry planning'}
                       </Button>
                       {work.planner && (
                         <Button

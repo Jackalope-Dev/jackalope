@@ -1,8 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { type QueueView, queueSnapshot } from '../lib/queue';
-import { describeError } from '@jackalope/contracts/errors';
 
 const empty: QueueView = {
   items: [],

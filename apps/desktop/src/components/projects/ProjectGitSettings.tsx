@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   InlineNotice,
@@ -10,7 +11,6 @@ import {
 } from '@jackalope/ui';
 import { Bot, Check, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { ActionError } from '../ui/ActionError';
 

@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitCommitHorizontal, GitMerge } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';

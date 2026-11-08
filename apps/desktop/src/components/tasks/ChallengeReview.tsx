@@ -66,7 +66,13 @@ export function ChallengeDialog({
 }) {
   const runners = useExecutionStore((state) => state.runners);
   const project = useProjectStore((state) => state.projects.find((p) => p.id === run.projectId));
-  const ranked = useMemo(() => rankReviewers(runners, authorOf(run), agentAdapter), [runners, run]);
+  const ranked = useMemo(
+    () =>
+      rankReviewers(runners, authorOf(run), (id) =>
+        agentAdapter(id, useAgentConfigStore.getState().customAgents),
+      ),
+    [runners, run],
+  );
   const [first, setFirst] = useState(ranked[0]?.id ?? '');
   const [second, setSecond] = useState(NONE);
   const [busy, setBusy] = useState(false);
@@ -89,7 +95,10 @@ export function ChallengeDialog({
               projectName: run.projectName,
               projectPath: run.projectPath,
               agent,
-              agentProfileId: agentAccountFor(project, agentAdapter(agent, useAgentConfigStore.getState().customAgents)),
+              agentProfileId: agentAccountFor(
+                project,
+                agentAdapter(agent, useAgentConfigStore.getState().customAgents),
+              ),
               prompt: '',
               isolated: true,
               targetBranch: run.targetBranch ?? project?.preferences?.baseBranch,

@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button } from '@jackalope/ui';
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { workSource } from '../../lib/issues';
 import { openExternalUrl } from '../../lib/native/env';
 import { ActionError } from '../ui/ActionError';

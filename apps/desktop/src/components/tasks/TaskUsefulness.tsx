@@ -1,6 +1,6 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { ActionError } from '../ui/ActionError';
 

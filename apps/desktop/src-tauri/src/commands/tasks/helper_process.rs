@@ -374,8 +374,8 @@ mod tests {
     #[test]
     fn every_orchestrating_agent_can_answer_a_helper_turn() {
         for agent in crate::commands::agents::all() {
-            let path = std::env::temp_dir()
-                .join(format!("jackalope-helper-{}.txt", uuid::Uuid::new_v4()));
+            let path =
+                std::env::temp_dir().join(format!("jackalope-helper-{}.txt", uuid::Uuid::new_v4()));
             let configured = configure(&mut Command::new("fixture"), &agent.id, &path, "prompt");
             assert_eq!(configured.is_ok(), agent.orchestrates, "{}", agent.id);
         }

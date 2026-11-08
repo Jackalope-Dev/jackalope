@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   InlineNotice,
@@ -11,7 +12,6 @@ import {
 } from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';

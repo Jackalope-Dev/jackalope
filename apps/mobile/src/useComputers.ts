@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import type { Snapshot } from '@jackalope/contracts/remote';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type Host, request } from './native';
-import { describeError } from '@jackalope/contracts/errors';
 
 export interface ComputerState {
   /** The last list this computer returned; kept while it is unreachable. */

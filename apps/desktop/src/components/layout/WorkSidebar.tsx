@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { type ActiveTab, groupViews, viewLabel, workspaceView } from '../../lib/navigation';
 import { type WorkItem, workPresence } from '../../lib/task-collection';
 import { openWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -24,7 +25,6 @@ import {
   useWorkSignals,
   WorkSignals,
 } from '../tasks/WorkSignals';
-import { type ActiveTab, groupViews, viewLabel, workspaceView } from '../../lib/navigation';
 
 /** Finished rows shown per project before the rest are left to the Work page. */
 const RECENT_PER_PROJECT = 3;

@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   InlineNotice,
@@ -11,7 +12,6 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { navigateWorkspace } from '../../lib/app-events';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import {

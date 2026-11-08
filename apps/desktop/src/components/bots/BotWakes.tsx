@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Disclosure,
@@ -14,7 +15,6 @@ import {
 import { CalendarClock, GitCommitHorizontal, Plug } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { connectionTools, describeWake } from '../../lib/bot-hub';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   parseScheduleTiming,

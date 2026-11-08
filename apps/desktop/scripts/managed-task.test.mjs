@@ -55,7 +55,11 @@ test('saved ideas join the parent without duplicate rows or manufactured attempt
     createdAt: '2026-09-16',
     updatedAt: '2026-09-16',
   };
-  const items = collectWorkspaceWork('project', runs, { ideas: [idea], integratedRunIds: [], queue });
+  const items = collectWorkspaceWork('project', runs, {
+    ideas: [idea],
+    integratedRunIds: [],
+    queue,
+  });
   assert.equal(items.length, 1);
   assert.equal(items[0].idea, idea);
   assert.equal(items[0].managed, task);
@@ -108,7 +112,10 @@ test('a completed worker does not hide a managed task blocker in its list badge'
     { ...runs[2], status: 'review', verification: { tree: 'tree', result: { success: true } } },
   ];
   const blocked = { ...queue, managedTasks: [{ ...task, error: 'The target branch changed.' }] };
-  const item = collectWorkspaceWork('project', completed, { integratedRunIds: [], queue: blocked })[0];
+  const item = collectWorkspaceWork('project', completed, {
+    integratedRunIds: [],
+    queue: blocked,
+  })[0];
   assert.equal(item.stage, 'attention');
   assert.equal(item.statusLabel, 'Needs attention');
   const ready = collectWorkspaceWork('project', completed, { integratedRunIds: [], queue })[0];
@@ -415,9 +422,7 @@ test('command search lists worker runs, agent reviews and bot conversations on t
       integratedRunIds: [],
       queue,
       nested,
-    }).map(
-      (item) => item.id,
-    );
+    }).map((item) => item.id);
   assert.deepEqual(listed(false), ['managed:parent']);
   const everything = listed(true);
   for (const id of ['managed:parent', 'old', 'new', 'review', 'session:bot'])

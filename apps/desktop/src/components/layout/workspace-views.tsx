@@ -1,11 +1,11 @@
 import { lazy, type ReactNode } from 'react';
+import type { ActiveTab, PageTab } from '../../lib/navigation';
+import type { SettingsCategory } from '../../lib/settings-categories';
 import { openRun, selectWork } from '../../lib/work-selection';
 import type { Project } from '../../stores/projectStore';
 import type { ComposerSeed } from '../sessions/SessionStart';
-import type { SettingsCategory } from '../../lib/settings-categories';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { WorkspacePage } from '../ui/WorkspacePage';
-import type { ActiveTab, PageTab } from '../../lib/navigation';
 
 /** What Shell hands every page: the focused project and the cross-page actions. */
 export interface ViewContext {

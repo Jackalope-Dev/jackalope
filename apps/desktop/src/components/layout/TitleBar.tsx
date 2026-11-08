@@ -2,11 +2,11 @@ import { Tooltip } from '@jackalope/ui';
 import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
+import { openHelp } from '../../lib/navigation';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { openHelp } from '../../lib/navigation';
 
 const isMac = isMacPlatform();
 

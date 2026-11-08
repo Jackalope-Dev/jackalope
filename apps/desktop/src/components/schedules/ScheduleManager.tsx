@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { isRunning } from '@jackalope/contracts/runs';
 import {
   Button,
@@ -12,9 +13,10 @@ import {
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useAction } from '../../hooks/useAction';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { agentAdapter } from '../../lib/agent-catalog';
 import { describeWake } from '../../lib/bot-hub';
-import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunRequest } from '../../lib/run-types';
@@ -25,8 +27,6 @@ import {
   savedPlanDraft,
 } from '../../lib/schedules';
 import { stopTask } from '../../lib/task-client';
-import { useAction } from '../../hooks/useAction';
-import { useNativeResource } from '../../hooks/useNativeResource';
 import { openRun } from '../../lib/work-selection';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';

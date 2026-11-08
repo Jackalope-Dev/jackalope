@@ -1,7 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { MousePointer2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 import { ScreenshotPreview } from './ScreenshotPreview';

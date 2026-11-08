@@ -1,10 +1,10 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
+import { describeError } from '@jackalope/contracts/errors';
 import type { RemoteAction } from '@jackalope/contracts/remote';
 import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RemoteWorkspace } from './components/remote/RemoteWorkspace';
-import { describeError } from '@jackalope/contracts/errors';
 import './index.css';
 import '@jackalope/ui/styles.css';
 import './components/tasks/task-workspace.css';

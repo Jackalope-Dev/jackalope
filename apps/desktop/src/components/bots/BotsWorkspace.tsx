@@ -51,6 +51,7 @@ import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/l
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import {
   BOT_STYLES,
   type Bot,
@@ -60,7 +61,6 @@ import {
   rosterOrder,
   useBotStore,
 } from '../../stores/botStore';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { LiveSessionView } from '../sessions/LiveSessionView';
@@ -74,8 +74,8 @@ import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
-import { agentAdapter } from '../../lib/agent-catalog';
 import { describeError } from '@jackalope/contracts/errors';
+import { agentAdapter } from '../../lib/agent-catalog';
 import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
 import { ActionError } from '../ui/ActionError';
 
@@ -138,7 +138,10 @@ function proposalDraft(proposal: BotProposal, projectId: string): BotDraft {
 }
 
 function profileFor(bot: Bot, project: Project) {
-  return agentAccountFor(project, agentAdapter(bot.agent, useAgentConfigStore.getState().customAgents));
+  return agentAccountFor(
+    project,
+    agentAdapter(bot.agent, useAgentConfigStore.getState().customAgents),
+  );
 }
 
 /** How a conversation started when the person did not start it. */

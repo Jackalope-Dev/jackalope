@@ -3,12 +3,7 @@ import { Button, InlineNotice, RefreshIcon, Switch, Textarea } from '@jackalope/
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import {
-  agentAdapter,
-  builtinAgents,
-  getAgentMetadata,
-  runsTasks,
-} from '../../lib/agent-catalog';
+import { agentAdapter, builtinAgents, getAgentMetadata, runsTasks } from '../../lib/agent-catalog';
 import { missingProjectDefaults } from '../../lib/context/project-defaults';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';

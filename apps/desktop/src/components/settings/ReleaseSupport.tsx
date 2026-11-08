@@ -10,10 +10,10 @@ import {
 } from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
+import { useAction } from '../../hooks/useAction';
 import { DISCORD_URL } from '../../lib/community';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useAction } from '../../hooks/useAction';
 import { openHelp } from '../../lib/navigation';
 import { FeedbackForm } from './FeedbackForm';
 import { UpdateSettings } from './UpdateSettings';

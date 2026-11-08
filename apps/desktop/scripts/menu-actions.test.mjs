@@ -5,5 +5,8 @@ import { defaultShortcuts } from '../src/lib/shortcuts.ts';
 
 test('every tray and app menu action names a shortcut command', () => {
   for (const [item, command] of Object.entries(actions))
-    assert.ok(Object.hasOwn(defaultShortcuts, command), `${item} runs ${command}, which is not a command`);
+    assert.ok(
+      Object.hasOwn(defaultShortcuts, command),
+      `${item} runs ${command}, which is not a command`,
+    );
 });
