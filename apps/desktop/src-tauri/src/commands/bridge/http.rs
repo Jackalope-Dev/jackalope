@@ -73,7 +73,9 @@ async fn serve(
     match run(tool, &service, &headers, Transport::Http, args).await {
         Ok(reply) => {
             let mut value = reply.into_json();
-            attach_updates(&mut value, &service, &headers);
+            if !tool.client {
+                attach_updates(&mut value, &service, &headers);
+            }
             Json(value).into_response()
         }
         Err(error) => error.into_http(),

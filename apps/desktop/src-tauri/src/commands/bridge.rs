@@ -65,6 +65,9 @@ pub(crate) struct Tool {
     /// The optional group a deferred tool surface loads the tool with.
     group: Option<Group>,
     offer: Offer,
+    /// Called by the agent's client rather than the agent, which never reads
+    /// the result, so coordination updates wait for the agent's next call.
+    client: bool,
     /// The tool's part of the HTTP contract in `GET /v1/help`.
     help: Option<Cow<'static, str>>,
     schema: Arc<JsonObject>,
@@ -199,6 +202,7 @@ impl Tool {
             route: None,
             group: None,
             offer: Offer::Always,
+            client: false,
             help: None,
             schema,
             handler,
@@ -247,6 +251,11 @@ impl Tool {
 
     fn offered(mut self, offer: Offer) -> Self {
         self.offer = offer;
+        self
+    }
+
+    fn for_client(mut self) -> Self {
+        self.client = true;
         self
     }
 
@@ -546,7 +555,8 @@ async fn run(
     (tool.handler)(call, args).await
 }
 
-/// Runs the tool `name` as over HTTP, without delivering coordination updates.
+/// Runs the tool `name` as over HTTP. Coordination updates are left for the
+/// next transport call, which attaches them.
 #[cfg(test)]
 pub(in crate::commands) async fn call(
     service: &Coordinator,
