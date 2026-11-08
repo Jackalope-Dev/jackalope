@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
+import { markReviewed } from '../../lib/task-client';
 import { useNativeResource } from '../../lib/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
 import { ActionError } from '../ui/ActionError';
@@ -51,7 +52,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
           },
         });
       }
-      await invokeNative('task_mark_reviewed', { id: run.id });
+      await markReviewed(run.id);
       await useExecutionStore.getState().refresh();
       setOpen(false);
       onApproved();

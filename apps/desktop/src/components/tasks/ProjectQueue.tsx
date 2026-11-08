@@ -29,7 +29,6 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ownerComputer } from '../../lib/computers';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
 import {
   type QueueCommand,
   type QueueItem,
@@ -37,6 +36,7 @@ import {
   queueCommand,
   queueSnapshot,
 } from '../../lib/queue';
+import { stopTask } from '../../lib/task-client';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
@@ -128,11 +128,8 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   }, [desktop, setError]);
   const items = queue.items.filter((i) => i.projectId === project.id && !i.canceled);
   const enabled = queue.enabledProjects.includes(project.id);
-  const act = async (command: QueueCommand | 'task_stop', args: Record<string, unknown>) => {
-    await runAction(() =>
-      command === 'task_stop' ? invokeNative(command, args) : queueCommand(command, args),
-    );
-  };
+  const act = (command: QueueCommand, args: Record<string, unknown>) =>
+    runAction(() => queueCommand(command, args));
   const state = (item: QueueItem) => {
     const original = runs.find((r) => r.id === item.runId);
     const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
@@ -474,7 +471,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                                 {run && isActive(run) ? (
                                   <Menu.Item
                                     className="workspace-menu-item"
-                                    onSelect={() => void act('task_stop', { id: run.id })}
+                                    onSelect={() => void runAction(() => stopTask(run.id))}
                                   >
                                     Stop agent
                                   </Menu.Item>

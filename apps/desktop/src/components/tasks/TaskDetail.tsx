@@ -29,11 +29,16 @@ import { useShallow } from 'zustand/react/shallow';
 import { listMcpServers, type McpServerConfig } from '../../lib/mcp-client';
 import { projectConnections } from '../../lib/mcp-connection';
 import { openInBrowser } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
 import { recoveryHandoff } from '../../lib/project-return';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { PROMPT_MAX_CHARS, type TaskRun } from '../../lib/run-types';
-import { retryTask, stopAndSettle, stopPreview as stopPreviewTask } from '../../lib/task-client';
+import {
+  markReviewed,
+  retryTask,
+  stopAndSettle,
+  stopPreview as stopPreviewTask,
+  stopTask,
+} from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt, taskDecision } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -263,12 +268,12 @@ export function TaskDetail({
       alive = false;
     };
   }, [tab, detailsOpen, isLatest, connections, run.projectId]);
-  const act = async (command: string) => {
+  const act = async (work: () => Promise<unknown>) => {
     if (acting) return;
     setActing(true);
     setError('');
     try {
-      await invokeNative(command, { id: run.id });
+      await work();
       await refresh();
     } catch (cause) {
       setError(describeError(cause));
@@ -506,7 +511,7 @@ export function TaskDetail({
                   <Menu.Item
                     className="workspace-menu-item"
                     disabled={acting || !!run.persistenceError}
-                    onSelect={() => void act('task_mark_reviewed')}
+                    onSelect={() => void act(() => markReviewed(run.id))}
                   >
                     <Check size={16} /> Mark reviewed
                   </Menu.Item>
@@ -607,7 +612,7 @@ export function TaskDetail({
                   <Button
                     variant="outline"
                     disabled={acting || run.status === 'stopping'}
-                    onClick={() => void act('task_stop')}
+                    onClick={() => void act(() => stopTask(run.id))}
                   >
                     <Square size={14} />
                     Stop

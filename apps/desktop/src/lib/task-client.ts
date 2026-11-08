@@ -4,6 +4,7 @@ import { invokeNative } from './native/transport.ts';
 import type { ChangeStats, TaskRun } from './run-types.ts';
 
 export const stopTask = (id: string) => invokeNative<void>('task_stop', { id });
+export const markReviewed = (id: string) => invokeNative<void>('task_mark_reviewed', { id });
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });
 /** Start a fresh attempt at a task whose last attempt did not finish. */
 export const retryTask = (id: string) => invokeNative<string>('task_retry', { id });
