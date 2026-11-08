@@ -852,20 +852,24 @@ fn archive(
         .map_err(|e| e.to_string())?;
 
     // Untracked, non-ignored files.
-    let listing = repo::git_exact(
-        path,
-        &["ls-files", "--others", "--exclude-standard", "-z"],
-        Inspection,
-    )?;
     let mut copied: Vec<String> = Vec::new();
     let mut bytes = bundle_bytes;
-    for name in listing.split('\0').filter(|s| !s.is_empty()) {
+    for name in
+        repo::untracked_paths(path, Inspection).map_err(|error| abandon(&archive_root, &error))?
+    {
         if copied.len() >= ARCHIVE_MAX_FILES {
             return Err(abandon(&archive_root, "there are too many untracked files"));
         }
-        let src = path.join(name);
-        let Ok(meta) = std::fs::symlink_metadata(&src) else {
-            continue;
+        let src = path.join(&name);
+        let meta = match std::fs::symlink_metadata(&src) {
+            Ok(meta) => meta,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(abandon(
+                    &archive_root,
+                    &format!("could not read {}: {error}", name.display()),
+                ));
+            }
         };
         if !meta.is_file() {
             continue;
@@ -877,12 +881,12 @@ fn archive(
                 "the untracked content is larger than 512 MB",
             ));
         }
-        let dest = archive_root.join("untracked").join(name);
+        let dest = archive_root.join("untracked").join(&name);
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
-        copied.push(name.to_string());
+        copied.push(name.to_string_lossy().into_owned());
     }
 
     let manifest = serde_json::json!({

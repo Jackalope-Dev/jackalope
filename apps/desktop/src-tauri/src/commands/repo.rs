@@ -47,8 +47,12 @@ fn spawn(mut command: Command) -> Result<Output, String> {
 }
 
 fn checked(output: Output) -> Result<String, String> {
+    checked_bytes(output).map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn checked_bytes(output: Output) -> Result<Vec<u8>, String> {
     if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+        return Ok(output.stdout);
     }
     let error = String::from_utf8_lossy(&output.stderr).trim().to_string();
     Err(if error.is_empty() {
@@ -321,6 +325,37 @@ pub(super) fn untracked_files(path: &Path, policy: Policy) -> Result<Vec<String>
     .filter(|name| !name.is_empty())
     .map(str::to_string)
     .collect())
+}
+
+/// Untracked files that are not ignored, relative to `path`, named exactly as
+/// on disk. Git writes names as raw bytes; on Windows they are UTF-8, and a name
+/// that is not is refused rather than guessed.
+pub(super) fn untracked_paths(path: &Path, policy: Policy) -> Result<Vec<PathBuf>, String> {
+    checked_bytes(output(
+        path,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+        policy,
+    )?)?
+    .split(|byte| *byte == 0)
+    .filter(|name| !name.is_empty())
+    .map(path_from_bytes)
+    .collect()
+}
+
+#[cfg(unix)]
+fn path_from_bytes(bytes: &[u8]) -> Result<PathBuf, String> {
+    use std::os::unix::ffi::OsStrExt;
+    Ok(PathBuf::from(std::ffi::OsStr::from_bytes(bytes)))
+}
+
+#[cfg(not(unix))]
+fn path_from_bytes(bytes: &[u8]) -> Result<PathBuf, String> {
+    std::str::from_utf8(bytes).map(PathBuf::from).map_err(|_| {
+        format!(
+            "Git listed a file name that is not UTF-8: {}",
+            String::from_utf8_lossy(bytes)
+        )
+    })
 }
 
 /// Larger untracked files are not read to count their lines.
