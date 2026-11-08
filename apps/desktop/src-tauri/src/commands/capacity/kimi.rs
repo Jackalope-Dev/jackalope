@@ -166,12 +166,8 @@ pub(super) async fn read_bound(binding: &AccountBinding) -> Result<CapacityRecor
             "Kimi's access token expired. Refresh its sign-in before reading quota.".into(),
         );
     }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|_| "Could not start the Kimi quota reader.")?;
-    let mut response = client
+    let mut response = crate::commands::http::client(Duration::from_secs(15))
+        .map_err(|_| "Could not start the Kimi quota reader.")?
         .get(url)
         .bearer_auth(token)
         .send()
@@ -182,17 +178,14 @@ pub(super) async fn read_bound(binding: &AccountBinding) -> Result<CapacityRecor
             "Kimi rejected the quota request. Refresh the selected profile's sign-in.".into(),
         );
     }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
+    let bytes = crate::commands::http::read_bounded(&mut response, 1_048_576)
         .await
-        .map_err(|_| "Could not read Kimi quota.")?
-    {
-        if bytes.len() + chunk.len() > 1_048_576 {
-            return Err("Kimi quota response exceeded its size limit.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
+        .map_err(|error| match error {
+            crate::commands::http::BodyError::Interrupted => "Could not read Kimi quota.",
+            crate::commands::http::BodyError::TooLarge => {
+                "Kimi quota response exceeded its size limit."
+            }
+        })?;
     let value: Value =
         serde_json::from_slice(&bytes).map_err(|_| "Kimi returned an invalid quota response.")?;
     Ok(parse(&value, &binding.label))
