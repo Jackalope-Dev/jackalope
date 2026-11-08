@@ -162,17 +162,17 @@ impl Turn<'_> {
         started: impl FnOnce(&Answer) -> Result<(), String>,
     ) -> Result<Answer, String> {
         let mut cmd = command(&self.executable);
-        let _configuration = configure(&mut cmd, self.adapter, &self.prompt_path, self.prompt)?;
+        let configuration = configure(&mut cmd, self.adapter, &self.prompt_path, self.prompt)?;
         crate::commands::agent_profiles::apply_binding(&mut cmd, self.binding)?;
         if let Some(model) = self.model {
             cmd.args(["--model", model]);
         }
         arguments(&mut cmd);
-        let file_input = self.adapter == "grok";
+        let file_input = configuration.input == Input::File;
         if file_input {
             std::fs::write(&self.prompt_path, self.prompt).map_err(|e| e.to_string())?;
         }
-        let answer = self.answer(runtime, cmd, canceled, started);
+        let answer = self.answer(runtime, cmd, configuration.input, canceled, started);
         if file_input {
             let _ = std::fs::remove_file(&self.prompt_path);
         }
@@ -183,6 +183,7 @@ impl Turn<'_> {
         &self,
         runtime: &TaskRuntime,
         mut cmd: Command,
+        input: Input,
         canceled: &dyn Fn() -> bool,
         started: impl FnOnce(&Answer) -> Result<(), String>,
     ) -> Result<Answer, String> {
@@ -219,6 +220,10 @@ impl Turn<'_> {
         let Some(spawned) = spawned else {
             return Ok(answer);
         };
+        let registration = Registration {
+            runtime,
+            attempt: self.attempt,
+        };
         let process = spawned.process;
         let (Some(mut stdin), Some(stdout), Some(stderr)) =
             (spawned.stdin, spawned.stdout, spawned.stderr)
@@ -227,14 +232,10 @@ impl Turn<'_> {
         };
         answer.ran = true;
         started(&answer)?;
-        let input = self.prompt.as_bytes().to_vec();
-        let prompt_on_stdin = !matches!(self.adapter, "grok" | "kimi");
-        let writer = std::thread::spawn(move || {
-            if prompt_on_stdin {
-                stdin.write_all(&input)
-            } else {
-                Ok(())
-            }
+        let prompt = (input == Input::Stdin).then(|| self.prompt.as_bytes().to_vec());
+        let writer = std::thread::spawn(move || match prompt {
+            Some(prompt) => stdin.write_all(&prompt),
+            None => Ok(()),
         });
         let reader = std::thread::spawn(move || read_bounded(stdout, OUTPUT_LIMIT));
         let diagnostics = std::thread::spawn(move || read_bounded(stderr, DIAGNOSTICS_LIMIT));
@@ -254,9 +255,7 @@ impl Turn<'_> {
             std::thread::sleep(Duration::from_millis(50));
         };
         let _ = process.finish();
-        if let Some(id) = self.attempt {
-            runtime.unregister_process(id);
-        }
+        drop(registration);
         answer.written = writer.join().map_err(|_| "Agent input stopped")?;
         answer.output = reader
             .join()
@@ -272,11 +271,39 @@ impl Turn<'_> {
     }
 }
 
-pub(in crate::commands::tasks) struct Configuration(Option<PathBuf>);
+/// Unregisters a turn's process from its attempt however the turn ends.
+struct Registration<'a> {
+    runtime: &'a TaskRuntime,
+    attempt: Option<&'a str>,
+}
+
+impl Drop for Registration<'_> {
+    fn drop(&mut self) {
+        if let Some(id) = self.attempt {
+            self.runtime.unregister_process(id);
+        }
+    }
+}
+
+/// How a helper turn's prompt reaches the agent.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::commands::tasks) enum Input {
+    Stdin,
+    /// The turn's prompt path, written before the agent starts.
+    File,
+    /// Already in the agent's arguments or configuration.
+    Arguments,
+}
+
+pub(in crate::commands::tasks) struct Configuration {
+    /// A file the configuration wrote, removed when it is dropped.
+    file: Option<PathBuf>,
+    pub input: Input,
+}
 
 impl Drop for Configuration {
     fn drop(&mut self) {
-        if let Some(path) = &self.0 {
+        if let Some(path) = &self.file {
             let _ = std::fs::remove_file(path);
         }
     }
@@ -290,7 +317,13 @@ pub(in crate::commands::tasks) fn configure(
     prompt_path: &Path,
     prompt: &str,
 ) -> Result<Configuration, String> {
-    let mut configuration = Configuration(None);
+    let mut configuration = Configuration {
+        file: None,
+        input: match crate::commands::agents::find(adapter).map(|agent| agent.prompt) {
+            Some(crate::commands::agents::Prompt::File) => Input::File,
+            _ => Input::Stdin,
+        },
+    };
     match adapter {
         "codex" => { cmd.args(["exec", "--disable", "shell_tool", "--disable", "apps", "--disable", "plugins", "--disable", "multi_agent", "--json", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}", "-c", "web_search=\"disabled\"", "-"]); }
         "claude" => { cmd.args(["--print", "--verbose", "--output-format", "stream-json", "--no-session-persistence", "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}", "--max-turns", "1"]); }
@@ -305,7 +338,8 @@ pub(in crate::commands::tasks) fn configure(
             options.write(true).create_new(true);
             #[cfg(unix)] { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
             let mut file = options.open(&path).map_err(|_| "Could not create the Kimi helper configuration.")?;
-            configuration.0 = Some(path.clone());
+            configuration.file = Some(path.clone());
+            configuration.input = Input::Arguments;
             file.write_all(format!("---\nname: jackalope-helper\ndescription: Answer the supplied Jackalope request without tools.\ntools: []\nsubagents: []\n---\n{prompt}\n").as_bytes()).map_err(|_| "Could not write the Kimi helper configuration.")?;
             cmd.args(["--agent-file"]).arg(path).args(["--output-format", "stream-json", "--prompt", "Answer the supplied Jackalope request. Follow its output format."]);
         }
@@ -324,6 +358,7 @@ mod tests {
         let mut command = Command::new("fixture");
         let context = "Private task context with `commands` and \"quotes\"";
         let configuration = configure(&mut command, "kimi", &path, context).unwrap();
+        assert!(configuration.input == Input::Arguments);
         let args: Vec<_> = command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
@@ -334,6 +369,16 @@ mod tests {
         assert!(definition.contains(context));
         drop(configuration);
         assert!(!path.with_extension("agent.md").exists());
+    }
+
+    #[test]
+    fn every_orchestrating_agent_can_answer_a_helper_turn() {
+        for agent in crate::commands::agents::all() {
+            let path = std::env::temp_dir()
+                .join(format!("jackalope-helper-{}.txt", uuid::Uuid::new_v4()));
+            let configured = configure(&mut Command::new("fixture"), &agent.id, &path, "prompt");
+            assert_eq!(configured.is_ok(), agent.orchestrates, "{}", agent.id);
+        }
     }
 
     #[test]
