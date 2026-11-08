@@ -1,5 +1,4 @@
 use super::*;
-use axum::extract::Query;
 use rmcp::schemars;
 
 pub(super) fn visible(message: &CoordinationMessage, item: &QueueItem) -> bool {
@@ -18,27 +17,22 @@ pub(in crate::commands) struct InboxQuery {
     pub limit: Option<usize>,
 }
 
-pub(in crate::commands) async fn bridge_inbox(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Query(query): Query<InboxQuery>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
+/// `inbox`: the messages visible to the caller's task, waiting up to `wait_ms`
+/// for a new one.
+pub(in crate::commands) async fn read_inbox(
+    call: Call,
+    query: InboxQuery,
+) -> Result<serde_json::Value, ToolError> {
     let deadline =
         tokio::time::Instant::now() + Duration::from_millis(query.wait_ms.unwrap_or(0).min(30_000));
     loop {
-        let item = service.authorized(&headers)?;
-        let result = {
-            let inner = service
-                .inner
-                .lock()
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            page(&inner.ledger.messages, &item, &query)
-        };
+        let item = call.service.assignment(&call.caller)?;
+        let result = page(&call.service.state().ledger.messages, &item, &query);
         if result["messages"].as_array().is_some_and(|m| !m.is_empty())
             || result["cursorExpired"] == true
             || tokio::time::Instant::now() >= deadline
         {
-            return Ok(Json(result));
+            return Ok(result);
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
@@ -65,35 +59,42 @@ pub(in crate::commands) struct AckInput {
     pub id: String,
 }
 
-pub(in crate::commands) async fn bridge_ack(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<AckInput>,
-) -> Result<Json<CoordinationMessage>, StatusCode> {
-    let item = service.authorized(&headers)?;
-    let mut inner = service.state();
-    service
-        .commit(&mut inner, |ledger| {
-            let message = ledger
-                .messages
-                .iter_mut()
-                .find(|m| m.id == input.id && visible(m, &item))
-                .ok_or(StatusCode::NOT_FOUND)?;
-            if !message.acknowledged_by.contains(&item.id) {
-                if message.acknowledged_by.len() >= 256 {
-                    return Err(StatusCode::CONFLICT);
-                }
-                message.acknowledged_by.push(item.id.clone());
+/// `acknowledge_message`: records that the caller's task read a message.
+pub(in crate::commands) async fn acknowledge(
+    call: Call,
+    input: AckInput,
+) -> Result<serde_json::Value, ToolError> {
+    let item = call.service.assignment(&call.caller)?;
+    let mut inner = call.service.state();
+    let message = call.service.commit(&mut inner, |ledger| {
+        let message = ledger
+            .messages
+            .iter_mut()
+            .find(|m| m.id == input.id && visible(m, &item))
+            .ok_or_else(|| {
+                ToolError::status(
+                    StatusCode::NOT_FOUND,
+                    "No message with that ID is visible to your task.",
+                )
+            })?;
+        if !message.acknowledged_by.contains(&item.id) {
+            if message.acknowledged_by.len() >= 256 {
+                return Err(ToolError::status(
+                    StatusCode::CONFLICT,
+                    "This message cannot take more acknowledgments.",
+                ));
             }
-            Ok(message.clone())
-        })
-        .map(Json)
+            message.acknowledged_by.push(item.id.clone());
+        }
+        Ok(message.clone())
+    })?;
+    json(message)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::tasks::RunStatus;
+    use crate::commands::{bridge, tasks::RunStatus};
     fn item() -> QueueItem {
         serde_json::from_value(serde_json::json!({"id":"reader","projectId":"p","projectName":"P","projectPath":"/fixture","title":"Reader","prompt":"Read","agent":"codex","scopes":[],"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
     }
@@ -197,137 +198,99 @@ mod tests {
             headers.insert("authorization", format!("Bearer {id}").parse().unwrap());
             headers
         };
-        let Json(project) = bridge_project(WebState(service.clone()), headers("sender-run"))
+        let call = |id: &str, tool: &'static str, input: serde_json::Value| {
+            let credential = headers(id);
+            let service = service.clone();
+            async move { bridge::call(&service, &credential, tool, input).await }
+        };
+        let project = call("sender-run", "project", serde_json::json!({}))
             .await
             .unwrap();
         assert_eq!(project["assignedTaskId"], "sender-run-task");
         assert_eq!(project["tasks"].as_array().unwrap().len(), 2);
         assert_eq!(project["tasks"][0]["scopeKnown"], false);
-        let request = |recipient: &str| MessageRequest {
-            report: None,
-            resolves: None,
-            kind: "handoff".into(),
-            text: "Please inspect the result".into(),
-            recipient_task_id: Some(recipient.into()),
-        };
+        let request = |recipient: &str| serde_json::json!({"kind":"handoff","text":"Please inspect the result","recipientTaskId":recipient});
+        let status = |result: Result<serde_json::Value, ToolError>| result.err().map(|e| e.code());
         assert_eq!(
-            bridge_message(
-                WebState(service.clone()),
-                headers("sender-run"),
-                Json(request("foreign-run-task"))
-            )
-            .await
-            .err(),
+            status(call("sender-run", "message", request("foreign-run-task")).await),
             Some(StatusCode::BAD_REQUEST)
         );
-        let Json(message) = bridge_message(
-            WebState(service.clone()),
-            headers("sender-run"),
-            Json(request("reader-run-task")),
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            bridge_ack(
-                WebState(service.clone()),
-                headers("foreign-run"),
-                Json(AckInput {
-                    id: message.id.clone()
-                })
-            )
+        let message = call("sender-run", "message", request("reader-run-task"))
             .await
-            .err(),
+            .unwrap();
+        let id = message["id"].as_str().unwrap().to_owned();
+        assert_eq!(
+            status(
+                call(
+                    "foreign-run",
+                    "acknowledge_message",
+                    serde_json::json!({"id":id})
+                )
+                .await
+            ),
             Some(StatusCode::NOT_FOUND)
         );
         for _ in 0..2 {
-            let Json(ack) = bridge_ack(
-                WebState(service.clone()),
-                headers("reader-run"),
-                Json(AckInput {
-                    id: message.id.clone(),
-                }),
+            let ack = call(
+                "reader-run",
+                "acknowledge_message",
+                serde_json::json!({"id":id}),
             )
             .await
             .unwrap();
-            assert_eq!(ack.acknowledged_by, ["reader-run-task"]);
+            assert_eq!(
+                ack["acknowledgedBy"],
+                serde_json::json!(["reader-run-task"])
+            );
         }
         let mut resolution = request("sender-run-task");
-        resolution.kind = "progress".into();
-        resolution.resolves = Some(message.id.clone());
-        let Json(reply) = bridge_message(
-            WebState(service.clone()),
-            headers("reader-run"),
-            Json(resolution),
-        )
-        .await
-        .unwrap();
+        resolution["kind"] = "progress".into();
+        resolution["resolves"] = id.clone().into();
+        let reply = call("reader-run", "message", resolution).await.unwrap();
+        let reply_id = reply["id"].as_str().unwrap().to_owned();
         assert_eq!(
             service
                 .view()
                 .unwrap()
                 .messages
                 .iter()
-                .find(|m| m.id == message.id)
+                .find(|m| m.id == id)
                 .unwrap()
                 .resolved_by
                 .as_ref(),
-            Some(&reply.id)
+            Some(&reply_id)
         );
-        let Json(empty) = bridge_inbox(
-            WebState(service.clone()),
-            headers("reader-run"),
-            Query(InboxQuery {
-                after: Some(reply.id.clone()),
-                limit: None,
-                wait_ms: Some(1),
-            }),
+        let empty = call(
+            "reader-run",
+            "inbox",
+            serde_json::json!({"after":reply_id,"wait_ms":1}),
         )
         .await
         .unwrap();
-        assert_eq!(empty["nextCursor"], reply.id);
+        assert_eq!(empty["nextCursor"], reply_id.as_str());
         assert!(empty["messages"].as_array().unwrap().is_empty());
-        let waiting = bridge_inbox(
-            WebState(service.clone()),
-            headers("reader-run"),
-            Query(InboxQuery {
-                after: Some(reply.id),
-                limit: None,
-                wait_ms: Some(1000),
-            }),
+        let waiting = call(
+            "reader-run",
+            "inbox",
+            serde_json::json!({"after":reply_id,"wait_ms":1000}),
         );
         let sending = async {
             tokio::time::sleep(Duration::from_millis(10)).await;
-            bridge_message(
-                WebState(service.clone()),
-                headers("sender-run"),
-                Json(request("reader-run-task")),
-            )
-            .await
-            .unwrap()
+            call("sender-run", "message", request("reader-run-task"))
+                .await
+                .unwrap()
         };
         let (received, sent) = tokio::join!(waiting, sending);
-        assert_eq!(received.unwrap().0["messages"][0]["id"], sent.0.id);
+        assert_eq!(received.unwrap()["messages"][0]["id"], sent["id"]);
         let mut origin = headers("reader-run");
         origin.insert("origin", "https://example.invalid".parse().unwrap());
         assert_eq!(
-            bridge_inbox(
-                WebState(service.clone()),
-                origin,
-                Query(InboxQuery::default())
-            )
-            .await
-            .err(),
+            status(bridge::call(&service, &origin, "inbox", serde_json::json!({})).await),
             Some(StatusCode::FORBIDDEN)
         );
         runtime.update("reader-run", |run| run.status = RunStatus::Review);
         assert_eq!(
-            bridge_inbox(
-                WebState(service.clone()),
-                headers("reader-run"),
-                Query(InboxQuery::default())
-            )
-            .await
-            .err(),
+            status(call("reader-run", "inbox", serde_json::json!({})).await),
             Some(StatusCode::UNAUTHORIZED)
         );
         drop(service);

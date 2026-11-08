@@ -319,18 +319,14 @@ fn attach_to_review(
     Ok(())
 }
 
-pub(in crate::commands) async fn bridge_propose_subtask(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<SubtaskInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let item = service
-        .authorized(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let caller = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let worker = service.clone();
+/// `propose_subtask`: hands part of the caller's paths to a new parallel worker.
+pub(in crate::commands) async fn propose_subtask(
+    call: Call,
+    input: SubtaskInput,
+) -> Result<serde_json::Value, ToolError> {
+    let item = call.service.assignment(&call.caller)?;
+    let caller = call.caller.run;
+    let worker = call.service;
     tauri::async_runtime::spawn_blocking(move || {
         worker.transact(|inner, _guard| {
         let (_, changed) = scope_audit::changed_paths(&caller)?;
@@ -360,9 +356,8 @@ pub(in crate::commands) async fn bridge_propose_subtask(
         })
     })
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .map(Json)
-    .map_err(|error| (StatusCode::BAD_REQUEST, error))
+    .map_err(|e| ToolError::failed(e.to_string()))?
+    .map_err(ToolError::refused)
 }
 
 /// The user asks a running isolated task to split off separable work.

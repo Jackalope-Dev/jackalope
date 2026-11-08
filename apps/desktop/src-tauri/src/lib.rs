@@ -146,7 +146,6 @@ pub fn run(launch: Launch) {
             runtime.observe_changes(app.handle().clone());
             commands::computers::pool::restore_health(&runtime.computers_root());
             runtime.launch_lost_host_recovery();
-            commands::computers::install_browser_routing(runtime.clone());
             commands::computers::launch_idle_stop(runtime.clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
             helper.launch();

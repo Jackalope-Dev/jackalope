@@ -22,11 +22,6 @@ use super::{
     harness::AskUserInput,
     tasks::{RunRequest, TaskRun},
 };
-use axum::{
-    extract::State as WebState,
-    http::{HeaderMap, StatusCode},
-    Json,
-};
 use rmcp::schemars;
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Mutex};
@@ -120,28 +115,25 @@ pub struct DeviationInput {
     pub amendment: String,
 }
 
-/// POST /v1/plan-deviation: an agent working on an approved plan reports a
-/// material departure. Agents never edit the plan; the person decides.
-pub(in crate::commands) async fn bridge_plan_deviation(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<DeviationInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let run = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let worker = service.clone();
+/// `plan_deviation`: an agent working on an approved plan reports a material
+/// departure. Agents never edit the plan; the person decides.
+pub(in crate::commands) async fn plan_deviation(
+    call: super::bridge::Call,
+    input: DeviationInput,
+) -> Result<serde_json::Value, super::bridge::ToolError> {
+    let worker = call.service;
+    let run = call.caller.run;
     let deviation = tauri::async_runtime::spawn_blocking(move || {
         session::declare_deviation(&worker, &run, &input.summary, &input.amendment)
     })
     .await
-    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-    .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
-    Ok(Json(serde_json::json!({
+    .map_err(|error| super::bridge::ToolError::failed(error.to_string()))?
+    .map_err(super::bridge::ToolError::refused)?;
+    Ok(serde_json::json!({
         "deviationId": deviation,
         "status": "pending",
         "message": "Recorded. Work that depends on this plan is paused until the person accepts the amendment, asks for a redo or re-plans. Finish only work the deviation does not affect, then end with a report; do not edit the plan."
-    })))
+    }))
 }
 
 async fn blocking<T: Send + 'static>(

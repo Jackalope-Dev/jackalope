@@ -7,6 +7,15 @@ use std::sync::Mutex;
 use std::time::Duration;
 use uuid::Uuid;
 
+/// Questions one attempt may ask; later ones are refused.
+const QUESTION_LIMIT: usize = 100;
+pub(crate) const QUESTION_LIMIT_REACHED: &str = "This attempt has reached its question limit.";
+
+/// Whether `run` may still ask the person a question.
+pub(crate) fn can_ask(run: &super::tasks::TaskRun) -> bool {
+    run.prompts.len() < QUESTION_LIMIT
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingUserPrompt {

@@ -9,9 +9,10 @@
 //! beyond protocol 3 is enabled only by a listed capability, so a runner on an
 //! older image keeps the earlier behaviour exactly.
 //!
-//! [`TOOLS`] is where each bridge tool executes. [`Access`] combines it with
-//! the runner's capabilities to decide, per run, which tools the runner
-//! serves, which are forwarded to this device through the relay
+//! Each bridge tool's [`Placement`] (in the bridge's tool table,
+//! [`crate::commands::bridge::tools`]) says where it executes. [`Access`]
+//! combines it with the runner's capabilities to decide, per run, which tools
+//! the runner serves, which are forwarded to this device through the relay
 //! ([`super::relay`]), and which are unavailable.
 //!
 //! An attempt whose agent runs on this device has a runner too: the task
@@ -130,123 +131,14 @@ pub(crate) enum Placement {
     DeviceOnly,
 }
 
-/// One bridge tool, with its REST route when it has one.
-pub(crate) struct Tool {
-    pub name: &'static str,
-    pub placement: Placement,
-    pub route: Option<&'static str>,
-}
-
-const fn tool(name: &'static str, placement: Placement, route: Option<&'static str>) -> Tool {
-    Tool {
-        name,
-        placement,
-        route,
-    }
-}
-
 use Placement::{Control, DeviceOnly, Workspace};
-
-/// Every bridge tool and where it executes. A tool missing here is treated as
-/// [`Placement::Control`]; `coordination_mcp`'s tests keep the table complete.
-pub(crate) const TOOLS: &[Tool] = &[
-    tool(
-        "computer_verify",
-        Workspace(WORKSPACE_TOOLS),
-        Some("/v1/computer/verify"),
-    ),
-    tool(
-        "verification_output",
-        Workspace(WORKSPACE_TOOLS),
-        Some("/v1/computer/output"),
-    ),
-    tool("read_context", Workspace(WORKSPACE_TOOLS), None),
-    tool(
-        "browser_navigate",
-        Workspace(BROWSER),
-        Some("/v1/browser/navigate"),
-    ),
-    tool(
-        "browser_screenshot",
-        Workspace(BROWSER),
-        Some("/v1/browser/screenshot"),
-    ),
-    tool(
-        "browser_snapshot",
-        Workspace(BROWSER),
-        Some("/v1/browser/snapshot"),
-    ),
-    tool(
-        "browser_interact",
-        Workspace(BROWSER),
-        Some("/v1/browser/interact"),
-    ),
-    tool(
-        "browser_configure",
-        Workspace(BROWSER),
-        Some("/v1/browser/configure"),
-    ),
-    tool(
-        "browser_inspect",
-        Workspace(BROWSER),
-        Some("/v1/browser/inspect"),
-    ),
-    tool("browser_tabs", Workspace(BROWSER), Some("/v1/browser/tabs")),
-    tool(
-        "browser_open_profile",
-        DeviceOnly,
-        Some("/v1/browser/profile"),
-    ),
-    tool("peer_adopt", DeviceOnly, Some("/v1/peers/adopt")),
-    tool("permission_prompt", DeviceOnly, None),
-    tool("desktop_control", Control, Some("/v1/desktop/control")),
-    tool(
-        "computer_request",
-        Control,
-        Some("/v1/bot-computer/request"),
-    ),
-    tool("computer_exec", Control, Some("/v1/bot-computer/exec")),
-    tool("ask_jev", Control, Some("/v1/jev/questions")),
-    tool("discover_harness_tools", Control, None),
-    tool("inbox", Control, None),
-    tool("acknowledge_message", Control, Some("/v1/messages/ack")),
-    tool("message", Control, Some("/v1/messages")),
-    tool("search_tools", Control, Some("/v1/tools/search")),
-    tool("read_tool", Control, Some("/v1/tools/read")),
-    tool("read_tool_result", Control, Some("/v1/tools/result")),
-    tool("execute_tool", Control, Some("/v1/tools/execute")),
-    tool("project", Control, Some("/v1/project")),
-    tool("peers", Control, Some("/v1/peers")),
-    tool("peer_read", Control, Some("/v1/peers/read")),
-    tool("propose_subtask", Control, Some("/v1/subtasks")),
-    tool("plan_deviation", Control, Some("/v1/plan-deviation")),
-    tool("agreement", Control, Some("/v1/agreements")),
-    tool("bots", Control, None),
-    tool("bot_message", Control, None),
-    tool("present", Control, None),
-    tool("suggest_bot", Control, None),
-    tool("remember", Control, None),
-    tool("recall", Control, None),
-    tool("ask_user", Control, Some("/v1/user-prompt")),
-    tool("user_response", Control, Some("/v1/user-prompt/poll")),
-    tool("request_human_action", Control, Some("/v1/human-action")),
-    tool(
-        "record_validation_step",
-        Control,
-        Some("/v1/validation-step"),
-    ),
-    tool("restate_goal", Control, Some("/v1/goal-restatement")),
-    tool("record_decision", Control, Some("/v1/decisions")),
-];
 
 /// Bridge routes without a tool that belong to a local agent process.
 const DEVICE_ONLY_ROUTES: &[&str] = &["/v1/native/output"];
 
+/// Where the bridge tool `name` executes. An unknown tool needs this device.
 fn placement(name: &str) -> Placement {
-    TOOLS
-        .iter()
-        .find(|tool| tool.name == name)
-        .map_or(Control, |tool| tool.placement)
+    crate::commands::bridge::find(name).map_or(Control, |tool| tool.placement)
 }
 
 /// Where a tool runs for one run.
@@ -336,9 +228,9 @@ impl Access {
                 Where::Unavailable
             };
         }
-        TOOLS
+        crate::commands::bridge::tools()
             .iter()
-            .filter_map(|tool| Some((tool.route?, tool.name)))
+            .filter_map(|tool| Some((tool.route?.path, tool.name)))
             .filter(|(prefix, _)| under(prefix))
             .max_by_key(|(prefix, _)| prefix.len())
             .map_or(Where::Device, |(_, name)| self.tool(name))
@@ -350,7 +242,7 @@ impl Access {
 
     /// Tools the runner serves, in table order.
     pub fn local_tools(&self) -> Vec<&'static str> {
-        TOOLS
+        crate::commands::bridge::tools()
             .iter()
             .filter(|tool| self.tool(tool.name) == Where::Runner)
             .map(|tool| tool.name)
@@ -406,7 +298,7 @@ impl Access {
                 local.join(", ")
             )
         };
-        let unavailable: Vec<&str> = TOOLS
+        let unavailable: Vec<&str> = crate::commands::bridge::tools()
             .iter()
             .filter(|tool| {
                 matches!(tool.placement, Workspace(_)) && self.tool_unavailable(tool.name)
@@ -674,7 +566,7 @@ mod tests {
         for read_only in [false, true] {
             let device = Access::device(read_only);
             assert!(device.on_device());
-            for tool in TOOLS {
+            for tool in crate::commands::bridge::tools() {
                 assert!(!device.tool_unavailable(tool.name), "{}", tool.name);
             }
             for name in ["browser_open_profile", "peer_adopt", "permission_prompt"] {
@@ -705,14 +597,5 @@ mod tests {
         assert!(for_run(&id).tool_unavailable("browser_navigate"));
         detach(&id);
         assert!(for_run(&id).on_device());
-    }
-
-    #[test]
-    fn the_table_names_each_tool_once() {
-        let mut names: Vec<&str> = TOOLS.iter().map(|tool| tool.name).collect();
-        let count = names.len();
-        names.sort_unstable();
-        names.dedup();
-        assert_eq!(names.len(), count);
     }
 }

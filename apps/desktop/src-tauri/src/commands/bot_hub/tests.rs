@@ -717,7 +717,7 @@ fn edits_reach_open_conversations_and_new_ones_recall_recent_work() {
 }
 
 #[test]
-fn bridge_agents_reach_the_same_bot_tools_by_name() {
+fn bot_tools_act_for_the_calling_bot_only() {
     let fixture = fixture();
     let scout = bot(&fixture, "Scout");
     let helper = bot(&fixture, "Helper");
@@ -726,41 +726,29 @@ fn bridge_agents_reach_the_same_bot_tools_by_name() {
         .sync(vec![scout.clone(), helper.clone()])
         .unwrap();
     let run = conversation(&fixture, &scout);
-    let listed = fixture
-        .hub
-        .call(&run, "bots", serde_json::json!({}))
-        .unwrap();
+    let directory = || serde_json::from_value::<DirectoryInput>(serde_json::json!({})).unwrap();
+    let listed = fixture.hub.directory(&run, directory()).unwrap();
     assert_eq!(listed["bots"][0]["name"], "Helper");
     fixture
         .hub
-        .call(
+        .remember(
             &run,
-            "remember",
-            serde_json::json!({"note": "Ship on Fridays."}),
+            serde_json::from_value(serde_json::json!({"note": "Ship on Fridays."})).unwrap(),
         )
         .unwrap();
     assert!(fixture
         .hub
         .notes_prompt(&scout.id)
         .contains("Ship on Fridays."));
-    let error = fixture
-        .hub
-        .call(&run, "remember", serde_json::json!({"text": "wrong field"}))
-        .unwrap_err();
-    assert!(error.starts_with("Invalid arguments"));
-    assert!(fixture
-        .hub
-        .call(&run, "delete_everything", serde_json::json!({}))
-        .unwrap_err()
-        .contains("remember"));
+    assert!(
+        serde_json::from_value::<RememberInput>(serde_json::json!({"text": "wrong field"}))
+            .is_err()
+    );
     let outsider = TaskRun {
         id: Uuid::new_v4().to_string(),
         ..Default::default()
     };
-    assert!(fixture
-        .hub
-        .call(&outsider, "bots", serde_json::json!({}))
-        .is_err());
+    assert!(fixture.hub.directory(&outsider, directory()).is_err());
 }
 
 fn recall(query: &str, conversation: Option<&str>) -> RecallInput {

@@ -372,8 +372,12 @@ pub(super) fn adopt(
         .ok_or(
             "That task has no unintegrated isolated work in this project. Use peers for task IDs.",
         )?;
-    let peer_tree = tree_of(view, peer)
-        .ok_or("No snapshot yet. Jackalope records one about every ten seconds.")?;
+    let peer_tree = tree_of(view, peer).ok_or_else(|| {
+        format!(
+            "No snapshot yet. Jackalope records one {}.",
+            snapshot_cadence()
+        )
+    })?;
     let workspace = Path::new(&caller.workspace);
     let previously_adopted = unchanged_adoptions(&view.adoptions, caller, caller_tree);
     for path in &paths {
@@ -584,8 +588,10 @@ pub(super) fn peers(view: &QueueView, runs: &[TaskRun], caller: &TaskRun) -> Vec
         };
         match &tree {
             None => {
-                peer.error =
-                    Some("No snapshot yet. Jackalope records one about every ten seconds.".into())
+                peer.error = Some(format!(
+                    "No snapshot yet. Jackalope records one {}.",
+                    snapshot_cadence()
+                ))
             }
             Some(tree) => {
                 peer.changed_since_last_read = seen.get(&run.id) != Some(tree);
@@ -644,8 +650,12 @@ pub(super) fn read(
         .ok_or(
             "That task has no unintegrated isolated work in this project. Use peers for task IDs.",
         )?;
-    let tree = tree_of(view, run)
-        .ok_or("No snapshot yet. Jackalope records one about every ten seconds.")?;
+    let tree = tree_of(view, run).ok_or_else(|| {
+        format!(
+            "No snapshot yet. Jackalope records one {}.",
+            snapshot_cadence()
+        )
+    })?;
     let workspace = Path::new(&run.workspace);
     let text = if input.diff {
         repo::git_exact(
@@ -762,58 +772,49 @@ pub(super) fn combination(
     }
 }
 
-pub(in crate::commands) async fn bridge_peers(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    let caller = service.authorized_run(&headers)?;
-    let view = service
-        .view()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let runs = service
+/// `peers`: other tasks' live, unintegrated work in the caller's project.
+pub(in crate::commands) async fn list_peers(call: Call) -> Result<serde_json::Value, ToolError> {
+    let view = call.service.view().map_err(ToolError::failed)?;
+    let runs = call
+        .service
         .runtime
         .integration_runs()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ToolError::failed)?;
+    let caller = call.caller.run;
     let peers = tauri::async_runtime::spawn_blocking(move || peers(&view, &runs, &caller))
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(serde_json::json!({
+        .map_err(|e| ToolError::failed(e.to_string()))?;
+    Ok(serde_json::json!({
         "peers": peers,
-        "note": "Snapshots refresh about every ten seconds. Read peers' files to build against their interfaces; edit only your own paths and use agreement or message to change shared contracts. conflicts lists files Git cannot merge with your current work.",
-    })))
+        "note": format!("Snapshots refresh {}. Read peers' files to build against their interfaces; edit only your own paths and use agreement or message to change shared contracts. conflicts lists files Git cannot merge with your current work.", snapshot_cadence()),
+    }))
 }
 
-pub(in crate::commands) async fn bridge_peer_read(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<PeerReadInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let caller = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let view = service
-        .view()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-    let runs = service
+/// `peer_read`: a file or diff from another task's latest snapshot.
+pub(in crate::commands) async fn peer_read(
+    call: Call,
+    input: PeerReadInput,
+) -> Result<serde_json::Value, ToolError> {
+    let view = call.service.view().map_err(ToolError::failed)?;
+    let runs = call
+        .service
         .runtime
         .integration_runs()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+        .map_err(ToolError::failed)?;
+    let caller = call.caller.run;
     tauri::async_runtime::spawn_blocking(move || read(&view, &runs, &caller, &input))
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .map(Json)
-        .map_err(|error| (StatusCode::BAD_REQUEST, error))
+        .map_err(|e| ToolError::failed(e.to_string()))?
+        .map_err(ToolError::refused)
 }
 
-pub(in crate::commands) async fn bridge_peer_adopt(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<PeerAdoptInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let caller = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let worker = service.clone();
+/// `peer_adopt`: copies files a peer changed into the caller's worktree.
+pub(in crate::commands) async fn peer_adopt(
+    call: Call,
+    input: PeerAdoptInput,
+) -> Result<serde_json::Value, ToolError> {
+    let worker = call.service;
+    let caller = call.caller.run;
     tauri::async_runtime::spawn_blocking(move || {
         worker.transact(|inner, _guard| {
         crate::commands::verification::ensure_idle(&caller.workspace)?;
@@ -844,9 +845,8 @@ pub(in crate::commands) async fn bridge_peer_adopt(
         })
     })
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .map(Json)
-    .map_err(|error| (StatusCode::BAD_REQUEST, error))
+    .map_err(|e| ToolError::failed(e.to_string()))?
+    .map_err(ToolError::refused)
 }
 
 #[tauri::command]

@@ -152,14 +152,14 @@ mod tests {
 
     #[test]
     fn the_runner_serves_exactly_the_tools_placed_in_its_workspace() {
-        use super::super::runner::{Placement, TOOLS};
+        use super::super::runner::Placement;
         let mut placed: BTreeMap<String, BTreeMap<String, Option<String>>> = BTreeMap::new();
-        for tool in TOOLS {
+        for tool in crate::commands::bridge::tools() {
             if let Placement::Workspace(capability) = tool.placement {
-                placed
-                    .entry(capability.to_owned())
-                    .or_default()
-                    .insert(tool.name.to_owned(), tool.route.map(str::to_owned));
+                placed.entry(capability.to_owned()).or_default().insert(
+                    tool.name.to_owned(),
+                    tool.route.map(|route| route.path.to_owned()),
+                );
             }
         }
         let served: BTreeMap<String, BTreeMap<String, Option<String>>> =

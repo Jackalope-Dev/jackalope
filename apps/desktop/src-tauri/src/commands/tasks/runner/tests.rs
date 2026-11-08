@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::commands::computers::runner::{
-    Access, Placement, Where, BROWSER, LOCAL_BRIDGE, POLICY_CALLBACKS, TOOLS, WORKSPACE_TOOLS,
+    Access, Placement, Where, BROWSER, LOCAL_BRIDGE, POLICY_CALLBACKS, WORKSPACE_TOOLS,
 };
 use base64::Engine;
 use serde_json::json;
@@ -141,7 +141,8 @@ fn both_runners_place_tools_from_one_table() {
         devtools: false,
         read_only: false,
     };
-    for tool in TOOLS {
+    let tools = crate::commands::bridge::tools();
+    for tool in tools {
         let (here, there) = (local.access().tool(tool.name), remote.tool(tool.name));
         match tool.placement {
             // Only tools that need this device's own workspace or sign-ins differ.
@@ -171,7 +172,7 @@ fn both_runners_place_tools_from_one_table() {
             }
         }
     }
-    let names = TOOLS.iter().map(|tool| tool.name);
+    let names = tools.iter().map(|tool| tool.name);
     assert_eq!(
         computers::runner::offered(local.access(), names.clone()),
         names.clone().collect::<Vec<_>>()

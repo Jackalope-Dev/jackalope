@@ -1,5 +1,6 @@
 use super::automatic::*;
 use super::*;
+use crate::commands::bridge;
 use crate::commands::tasks::RunStatus;
 use serde_json::{json, Value};
 
@@ -44,20 +45,15 @@ impl Fixture {
     }
 
     async fn message(&self, text: &str, recipient: Option<&str>) -> CoordinationMessage {
-        bridge_message(
-            WebState(self.service.clone()),
-            headers("writer-run"),
-            Json(MessageRequest {
-                report: None,
-                resolves: None,
-                kind: "blocker".into(),
-                text: text.into(),
-                recipient_task_id: recipient.map(str::to_string),
-            }),
+        let sent = bridge::call(
+            &self.service,
+            &headers("writer-run"),
+            "message",
+            json!({"kind":"blocker","text":text,"recipient_task_id":recipient}),
         )
         .await
-        .unwrap()
-        .0
+        .unwrap();
+        serde_json::from_value(sent).unwrap()
     }
 }
 
@@ -77,24 +73,16 @@ fn headers(id: &str) -> HeaderMap {
 async fn jev_questions_require_the_attempt_credential_and_explicit_opt_in() {
     let f = Fixture::new();
     f.running("reader-run");
-    let input = || {
-        Json(serde_json::from_value(json!({"state":{"ready":true},"questions":{"ready":{"type":"noul","instructions":"Is input.ready true?"}}})).unwrap())
-    };
-    assert!(
-        bridge_jev_questions(WebState(f.service.clone()), HeaderMap::new(), input())
+    let input = || json!({"state":{"ready":true},"questions":{"ready":{"type":"noul","instructions":"Is input.ready true?"}}});
+    for credential in [
+        HeaderMap::new(),
+        headers("foreign-run"),
+        headers("reader-run"),
+    ] {
+        assert!(bridge::call(&f.service, &credential, "ask_jev", input())
             .await
-            .is_err()
-    );
-    assert!(
-        bridge_jev_questions(WebState(f.service.clone()), headers("foreign-run"), input())
-            .await
-            .is_err()
-    );
-    assert!(
-        bridge_jev_questions(WebState(f.service.clone()), headers("reader-run"), input())
-            .await
-            .is_err()
-    );
+            .is_err());
+    }
     assert!(crate::commands::decisions::evaluation::records(&f.runtime)
         .unwrap()
         .is_empty());
@@ -115,49 +103,29 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
             .unwrap(),
         );
     });
-    let state = || WebState(f.service.clone());
-    let input = || {
-        Json(super::super::verification::output::OutputRequest {
-            check_id: Some("check-1".into()),
-            stream: "stdout".into(),
-            offset: 0,
-            limit: None,
-        })
+    let service = &f.service;
+    let output = |credential: HeaderMap| async move {
+        bridge::call(
+            service,
+            &credential,
+            "verification_output",
+            json!({"check_id":"check-1","stream":"stdout","offset":0}),
+        )
+        .await
     };
-    assert!(
-        bridge_help(state(), headers("reader-run"), Query(HelpQuery::default()))
-            .await
-            .is_ok()
-    );
-    assert!(
-        bridge_help(state(), headers("invalid"), Query(HelpQuery::default()))
-            .await
-            .is_err()
-    );
+    assert!(bridge::help(&f.service, &headers("reader-run"), false).is_ok());
+    assert!(bridge::help(&f.service, &headers("invalid"), false).is_err());
     assert_eq!(
-        bridge_verification_output(state(), headers("reader-run"), input())
-            .await
-            .unwrap()
-            .0["text"],
+        output(headers("reader-run")).await.unwrap()["text"],
         "reader output"
     );
-    assert!(
-        bridge_verification_output(state(), headers("writer-run"), input())
-            .await
-            .is_err()
-    );
+    assert!(output(headers("writer-run")).await.is_err());
     let mut browser = headers("reader-run");
     browser.insert("origin", "https://example.invalid".parse().unwrap());
-    assert!(bridge_help(state(), browser, Query(HelpQuery::default()))
-        .await
-        .is_err());
+    assert!(bridge::help(&f.service, &browser, false).is_err());
     f.runtime
         .update("reader-run", |run| run.status = RunStatus::Review);
-    assert!(
-        bridge_verification_output(state(), headers("reader-run"), input())
-            .await
-            .is_err()
-    );
+    assert!(output(headers("reader-run")).await.is_err());
 }
 
 #[tokio::test]
@@ -168,7 +136,7 @@ async fn agent_verification_cannot_add_or_replace_a_saved_command() {
         command: "node".into(),
         args: vec!["--test".into(), "unexpected-argument".into()],
     };
-    let run = || f.service.authorized_run(&headers("reader-run")).unwrap();
+    let run = || f.service.caller(&headers("reader-run")).unwrap().run;
     assert!(
         super::super::verification::agent_verify(f.runtime.clone(), run(), input())
             .await
@@ -198,35 +166,27 @@ async fn project_exposes_only_the_authorized_attempts_verification_command() {
     f.runtime.update("writer-run", |run| {
         run.verify_command = Some("different saved command".into());
     });
-    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
-        .await
-        .unwrap()
-        .0;
+    let service = &f.service;
+    let project =
+        || async move { bridge::call(service, &headers("reader-run"), "project", json!({})).await };
+    let snapshot = project().await.unwrap();
     assert_eq!(
-        project["verification"]["command"],
+        snapshot["verification"]["command"],
         "node --check one.mjs && node --check two.mjs"
     );
-    assert_eq!(project["verification"]["automatic"], true);
-    assert_eq!(project["verification"]["arguments"], json!({}));
+    assert_eq!(snapshot["verification"]["automatic"], true);
+    assert_eq!(snapshot["verification"]["arguments"], json!({}));
     f.runtime
         .update("reader-run", |run| run.verify_command = None);
-    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
-        .await
-        .unwrap()
-        .0;
-    assert!(project["verification"]["command"].is_null());
+    assert!(project().await.unwrap()["verification"]["command"].is_null());
     assert!(
-        bridge_project(WebState(f.service.clone()), headers("invalid"))
+        bridge::call(&f.service, &headers("invalid"), "project", json!({}))
             .await
             .is_err()
     );
     f.runtime
         .update("reader-run", |run| run.status = RunStatus::Review);
-    assert!(
-        bridge_project(WebState(f.service.clone()), headers("reader-run"))
-            .await
-            .is_err()
-    );
+    assert!(project().await.is_err());
 }
 
 fn request(previous: Option<&str>) -> RunRequest {
@@ -519,14 +479,9 @@ async fn checkpoint_deduplicates_delivery_without_acknowledging_and_respects_sco
         .messages
         .iter()
         .all(|m| m.acknowledged_by.is_empty()));
-    let inbox = inbox::bridge_inbox(
-        WebState(fixture.service.clone()),
-        headers("reader-run"),
-        axum::extract::Query(inbox::InboxQuery::default()),
-    )
-    .await
-    .unwrap()
-    .0;
+    let inbox = bridge::call(&fixture.service, &headers("reader-run"), "inbox", json!({}))
+        .await
+        .unwrap();
     assert!(inbox["messages"]
         .as_array()
         .unwrap()
@@ -578,16 +533,7 @@ async fn http_and_native_mcp_responses_deliver_updates_and_preserve_tool_results
     fixture.running("reader-run");
     fixture.running("writer-run");
     fixture.service.checkpoint(&headers("reader-run")).unwrap();
-    let router = Router::new()
-        .route("/v1/validation-step", post(bridge_validation_step))
-        .with_state(fixture.service.clone())
-        .merge(crate::commands::coordination_mcp::router(
-            fixture.service.clone(),
-        ))
-        .layer(axum::middleware::from_fn_with_state(
-            fixture.service.clone(),
-            deliver,
-        ));
+    let router = bridge::router(fixture.service.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = format!("http://{}", listener.local_addr().unwrap());
     let server = tokio::spawn(async move {

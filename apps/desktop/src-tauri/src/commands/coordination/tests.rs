@@ -1,28 +1,6 @@
 use super::*;
 
 #[test]
-fn lean_help_keeps_tool_recovery_and_full_contracts_discoverable() {
-    let full = help_response(false, true);
-    let lean = help_response(true, true);
-    assert!(lean.to_string().len() < full.to_string().len() / 2);
-    for contract in [
-        "/v1/help?full=true",
-        "never switch transports",
-        "agreement gates",
-        "/v1/user-prompt/poll",
-        "elapsed time is not an answer",
-    ] {
-        assert!(lean["instructions"].as_str().unwrap().contains(contract));
-    }
-    assert_eq!(lean["verification"], full["verification"]);
-    assert_eq!(lean["discovery"], full["discovery"]);
-    assert!(lean["discovery"]
-        .as_str()
-        .unwrap()
-        .contains("structuredContent.selected.rows"));
-}
-
-#[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     let folder = std::env::temp_dir().join(format!("jackalope-queue-recovery-{}", Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
@@ -94,18 +72,6 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
     assert!(text.contains("record_decision"));
     assert!(text.len() < 1900);
     assert!(!text.contains("/v1/browser/navigate"));
-    assert!(http_bootstrap().contains("/v1/help"));
-    let help = http_instructions();
-    for endpoint in [
-        "/v1/project",
-        "/v1/browser/navigate",
-        "/v1/user-prompt",
-        "/v1/validation-step",
-        "/v1/goal-restatement",
-        "/v1/decisions",
-    ] {
-        assert!(help.contains(endpoint));
-    }
 }
 
 #[test]
@@ -192,7 +158,7 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
     let restored = Coordinator::new(dir.join("queue"), runtime).unwrap();
     assert!(restored.state().enabled.is_empty());
     assert_eq!(restored.state().ledger.items[0].id, id);
-    assert!(restored.authorized(&HeaderMap::new()).is_err());
+    assert!(restored.caller(&HeaderMap::new()).is_err());
     drop(restored);
     assert!(dir.starts_with(std::env::temp_dir()));
     std::fs::remove_dir_all(dir).unwrap();

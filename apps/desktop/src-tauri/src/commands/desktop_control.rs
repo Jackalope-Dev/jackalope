@@ -562,8 +562,8 @@ impl Call<'_> {
         fresh: &TaskRun,
     ) -> Result<Option<Value>, Failure> {
         if self.access.prompt_id.is_empty() {
-            if fresh.prompts.len() >= 100 {
-                return Err("This task has reached its question limit.".into());
+            if !super::harness::can_ask(fresh) {
+                return Err(super::harness::QUESTION_LIMIT_REACHED.into());
             }
             let scope = Scope::parse(request.scope.as_deref())?;
             platform::capabilities().scope(scope)?;
@@ -1363,28 +1363,6 @@ pub fn desktop_control_forget(
         &project_id,
         &id,
     )
-}
-
-pub(super) async fn bridge(
-    axum::extract::State(service): axum::extract::State<super::coordination::Coordinator>,
-    headers: axum::http::HeaderMap,
-    axum::Json(input): axum::Json<DesktopRequest>,
-) -> Result<axum::Json<Value>, (axum::http::StatusCode, axum::Json<Value>)> {
-    let run = service.authorized_run(&headers).map_err(|status| {
-        (
-            status,
-            axum::Json(json!({"error":"Task authorization required"})),
-        )
-    })?;
-    execute(service.runtime.clone(), run, input)
-        .await
-        .map(axum::Json)
-        .map_err(|error| {
-            (
-                axum::http::StatusCode::BAD_REQUEST,
-                axum::Json(json!({"error":error})),
-            )
-        })
 }
 
 #[cfg(test)]

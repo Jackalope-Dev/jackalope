@@ -5,14 +5,8 @@
 //! ones it cannot find so a reviewer can see which claims lack backing.
 
 use super::{
-    coordination::Coordinator,
     git_command::{command as git, Policy},
     tasks::{TaskRun, TaskRuntime},
-};
-use axum::{
-    extract::State as WebState,
-    http::{HeaderMap, StatusCode},
-    Json,
 };
 use rmcp::schemars;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -195,23 +189,6 @@ fn early_checks(run: &TaskRun, entry: &DecisionEntry) -> Vec<PointerCheck> {
     let mut probe = run.clone();
     probe.decisions = vec![entry.clone()];
     review(&probe).remove(&entry.id).unwrap_or_default()
-}
-
-/// POST /v1/decisions: the HTTP form of the record_decision tool.
-pub(in crate::commands) async fn bridge_record(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<RecordDecisionInput>,
-) -> Result<Json<DecisionEntry>, (StatusCode, String)> {
-    let run = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let runtime = service.runtime.clone();
-    tauri::async_runtime::spawn_blocking(move || record(&runtime, &run, input))
-        .await
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-        .map(Json)
-        .map_err(|error| (StatusCode::BAD_REQUEST, error))
 }
 
 /// Checks every evidence pointer of an attempt that has just ended and saves the results.
