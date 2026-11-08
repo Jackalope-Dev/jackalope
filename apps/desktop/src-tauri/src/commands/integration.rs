@@ -465,7 +465,7 @@ pub(in crate::commands) fn prepare_with_message(
             require_verification(run, &source.tree)?;
             if run.id == resolver.id {
                 dependencies::verified(run, &source.tree)?;
-                let output = repo::command(
+                let output = repo::output(
                     &project,
                     &[
                         "grep",
@@ -477,9 +477,7 @@ pub(in crate::commands) fn prepare_with_message(
                         "--",
                     ],
                     Snapshot,
-                )
-                .output()
-                .map_err(|e| e.to_string())?;
+                )?;
                 if output.status.code() != Some(1) {
                     return Err("Resolve remaining conflict markers before integration.".into());
                 }
@@ -507,7 +505,7 @@ pub(in crate::commands) fn prepare_with_message(
             &format!("feat: integrate completed task {}", run.id),
         )?;
         plan.sources.push(source);
-        let output = repo::command(
+        let output = repo::output(
             &project,
             &[
                 "merge-tree",
@@ -517,9 +515,7 @@ pub(in crate::commands) fn prepare_with_message(
                 &source_commit,
             ],
             Snapshot,
-        )
-        .output()
-        .map_err(|e| e.to_string())?;
+        )?;
         if !output.status.success() && output.status.code() != Some(1) {
             return Err(String::from_utf8_lossy(&output.stderr).trim().into());
         }
@@ -644,13 +640,12 @@ pub(in crate::commands) fn apply(
     let reference = format!("refs/heads/{}", plan.target_branch);
     let current = repo::git(&project, &["rev-parse", &reference], Snapshot)?;
     if plan.status == "applying"
-        && repo::command(
+        && repo::output(
             &project,
             &["merge-base", "--is-ancestor", &head, &current],
             Snapshot,
-        )
-        .status()
-        .map_err(|e| e.to_string())?
+        )?
+        .status
         .success()
     {
         plan.status = "applied".into();
@@ -759,7 +754,7 @@ fn cleanup_sources(
                 .integration_head
                 .as_deref()
                 .ok_or("Missing integration commit.")?;
-            if !repo::command(
+            if !repo::output(
                 project,
                 &[
                     "merge-base",
@@ -768,9 +763,7 @@ fn cleanup_sources(
                     &format!("refs/heads/{}", plan.target_branch),
                 ],
                 Snapshot,
-            )
-            .output()
-            .map_err(|e| e.to_string())?
+            )?
             .status
             .success()
             {
@@ -896,11 +889,11 @@ pub fn plans(runtime: &TaskRuntime) -> Result<Vec<IntegrationPlan>, String> {
 
 /// What [`applied_run_ids`] last read from one integration directory: the
 /// plan files it saw, the target branch heads the applied plans were checked
-/// against, and the outcome.
+/// against, and the attempts they merged.
 struct AppliedCheck {
     files: Vec<(String, u64, Option<std::time::SystemTime>)>,
     targets: Vec<(String, String, Option<String>)>,
-    sources: Result<Vec<Vec<String>>, String>,
+    sources: Vec<Vec<String>>,
 }
 
 static APPLIED: Mutex<Vec<(PathBuf, AppliedCheck)>> = Mutex::new(Vec::new());
@@ -954,7 +947,9 @@ pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
                     ));
                 }
             }
-            let sources = reachable_sources(applied);
+            // A failure may be transient (Git could not start, or a lock), so
+            // only a successful check is reused.
+            let sources = reachable_sources(applied)?;
             cache.retain(|(path, _)| path != &directory);
             if cache.len() >= 16 {
                 cache.remove(0);
@@ -971,10 +966,7 @@ pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
         }
     };
     drop(cache);
-    Ok(with_earlier_attempts(
-        sources?,
-        &runtime.integration_runs()?,
-    ))
+    Ok(with_earlier_attempts(sources, &runtime.integration_runs()?))
 }
 
 /// The attempts each applied plan merged, provided its target branch still contains it.
@@ -985,7 +977,7 @@ fn reachable_sources(plans: Vec<IntegrationPlan>) -> Result<Vec<Vec<String>>, St
             .integration_head
             .as_deref()
             .ok_or("An applied integration is missing its Git reference.")?;
-        let result = repo::command(
+        let result = repo::output(
             Path::new(&plan.project_path),
             &[
                 "merge-base",
@@ -994,9 +986,7 @@ fn reachable_sources(plans: Vec<IntegrationPlan>) -> Result<Vec<Vec<String>>, St
                 &format!("refs/heads/{}", plan.target_branch),
             ],
             Snapshot,
-        )
-        .output()
-        .map_err(|e| e.to_string())?;
+        )?;
         if !result.status.success() {
             return Err(format!("Dispatch paused: the target branch in {} no longer contains integration {}. Restore that integration before running dependent work.", plan.project_path, plan.id));
         }
