@@ -293,7 +293,11 @@ export async function deviceRoutes(
     if (!connected) throw new ServiceError(410, 'device_link_expired');
     return json(await accountView(env, connected));
   } catch (error) {
-    return errorResponse(error, { fallback: 'access_unavailable', retryAfter: { 429: '5' } });
+    return errorResponse(error, {
+      fallback: 'access_unavailable',
+      triggers: ['device_capacity'],
+      retryAfter: { 429: '5' },
+    });
   }
 }
 

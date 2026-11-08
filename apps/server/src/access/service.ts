@@ -6,6 +6,9 @@ import { randomToken, tokenHash } from './crypto';
 import { mailStatements } from './mail';
 import { waitlistMailStatements } from './waitlist';
 
+/** Invitation limits the website explains; the access routes report other trigger failures generically. */
+const INVITE_TRIGGERS = ['invite_capacity', 'invite_rate'] as const;
+
 export const emailSchema = z.string().trim().toLowerCase().max(254).email();
 export const tokenSchema = z.string().regex(ACCESS_TOKEN);
 export interface Member {
@@ -226,7 +229,7 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
   try {
     await env.DB.batch(statements);
   } catch (error) {
-    throw triggerError(error) ?? error;
+    throw triggerError(error, INVITE_TRIGGERS) ?? error;
   }
   if (
     !(await env.DB.prepare('SELECT hash FROM access_sessions WHERE hash=?')
@@ -293,7 +296,7 @@ export async function inviteEmails(env: Env, member: Member, emails: string[], n
   try {
     await env.DB.batch(statements);
   } catch (error) {
-    throw triggerError(error) ?? error;
+    throw triggerError(error, INVITE_TRIGGERS) ?? error;
   }
 }
 export async function changeInvite(

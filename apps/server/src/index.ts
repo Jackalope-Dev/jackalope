@@ -184,6 +184,7 @@ export default {
           pathname.startsWith('/updates/') && ['GET', 'HEAD'].includes(request.method)
             ? { ...API_HEADERS, 'access-control-allow-origin': '*' }
             : API_HEADERS,
+        triggers: ['id_conflict', 'storage_capacity'],
         retryAfter: { 429: '60', 503: '300' },
         log: true,
       });
