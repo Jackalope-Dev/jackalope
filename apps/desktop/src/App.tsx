@@ -16,6 +16,7 @@ const WorkspaceTransition = lazy(() =>
 
 import { invokeNative } from './lib/native/transport';
 import { commitProjectSetup } from './lib/project-setup';
+import { observeCommunity } from './stores/communityStore';
 import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
 import { observeLessonSync } from './stores/lessonSyncStore';
@@ -35,7 +36,8 @@ export default function App() {
   useEffect(observeLessonSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
-  useEffect(() => (ready ? bootstrapWindow() : undefined), [ready]);
+  useEffect(() => bootstrapWindow({ community: false }), []);
+  useEffect(() => (ready ? observeCommunity() : undefined), [ready]);
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
   const [entry, setEntry] = useState<{
