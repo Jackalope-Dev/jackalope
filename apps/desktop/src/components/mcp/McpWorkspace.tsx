@@ -13,7 +13,7 @@ import {
 import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents } from '../../lib/agent-catalog';
+import { builtinAgents, MCP_CONFIG_AGENTS, MCP_SIGN_IN_AGENTS } from '../../lib/agent-catalog';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure, redactConnection } from '../../lib/mcp-connection';
 import { invokeNative } from '../../lib/native/transport';
@@ -33,7 +33,7 @@ import { McpAddCustomModal } from './McpAddCustomModal';
 import { McpMarketplaceCard } from './McpMarketplaceCard';
 import { McpServerPage } from './McpServerPage';
 import './mcp.css';
-import { agentName, agentShortName, MCP_CONFIG_AGENTS, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
+import { agentName, agentShortName } from '../../stores/agentConfigStore';
 
 const CATEGORIES = [
   { id: 'all', label: 'All' },

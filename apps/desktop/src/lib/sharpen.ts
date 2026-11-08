@@ -1,4 +1,4 @@
-import { ORCHESTRATING_AGENTS } from './agents.ts';
+import { ORCHESTRATING_AGENTS } from './agent-catalog.ts';
 import { invokeNative } from './native/transport.ts';
 import type { Runner } from './run-types.ts';
 

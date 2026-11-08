@@ -17,7 +17,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Columns2, Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { getAgentMetadata } from '../../lib/agent-catalog';
+import { agentAdapter, getAgentMetadata } from '../../lib/agent-catalog';
 import {
   attemptLabel,
   buildCombinePrompt,
@@ -38,7 +38,6 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import { DismissButton } from '../ui/DismissButton';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
-import { agentAdapter } from '../../lib/agents';
 import { taskChangeStats } from '../../lib/task-client';
 import { ActionError } from '../ui/ActionError';
 import { describeError } from '../../lib/errors';

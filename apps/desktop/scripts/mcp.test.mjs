@@ -6,7 +6,7 @@ import {
   recommendedServers,
 } from '../src/components/mcp/curated-servers.ts';
 import { marketplaceSetup, safeMarketplaceUrl } from '../src/components/mcp/marketplace-info.ts';
-import { agentCapabilities, connectionSupport } from '../src/lib/agent-capabilities.ts';
+import { catalogEntry, connectionSupport } from '../src/lib/agent-catalog.ts';
 import {
   deleteMcpServer,
   listMcpServers,
@@ -35,8 +35,8 @@ test('all built-in agents share discovery with explicit transport and account li
   assert.notEqual(connectionSupport('antigravity', 'http', false), null);
   assert.notEqual(connectionSupport('gemini', 'stdio', false), null);
   assert.notEqual(connectionSupport('unknown', 'http', true), null);
-  assert.equal(agentCapabilities('antigravity').accounts, true);
-  assert.equal(agentCapabilities('opencode').capacity, false);
+  assert.equal(catalogEntry('antigravity').accounts, true);
+  assert.equal(catalogEntry('opencode').capacity, false);
 });
 
 test('marketplace opt-out blocks search and detail fetches and discards in-flight results', async () => {

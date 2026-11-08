@@ -1,4 +1,5 @@
 import { latestTaskRuns, recordedOutcome } from './agent-analytics.ts';
+import { catalogEntry } from './agent-catalog.ts';
 import type { RunUsage, TaskRun } from './run-types.ts';
 import type { usageEntries } from './usage-entries.ts';
 
@@ -49,7 +50,9 @@ export function summarizeUsage(items: { usage: RunUsage }[]) {
  */
 export function describeRunUsage(run: TaskRun) {
   const { usage } = run;
-  const cacheless = run.accountBinding?.adapter === 'kimi' || run.agent === 'kimi';
+  const cacheless = [run.accountBinding?.adapter, run.agent].some(
+    (id) => !!id && catalogEntry(id)?.reportsCache === false,
+  );
   const calls = run.usageObservations?.length ?? 0;
   const parts: string[] = [];
   parts.push(

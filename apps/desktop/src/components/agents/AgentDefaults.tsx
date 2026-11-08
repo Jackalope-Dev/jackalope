@@ -9,8 +9,7 @@ import {
 } from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents } from '../../lib/agent-catalog';
-import { canOrchestrate } from '../../lib/agents';
+import { builtinAgents, canOrchestrate } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';

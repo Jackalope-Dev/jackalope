@@ -12,9 +12,12 @@ import {
 } from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { connectionSupport } from '../../lib/agent-capabilities';
-import { builtinAgents } from '../../lib/agent-catalog';
-import { agentNames, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
+import {
+  agentNames,
+  builtinAgents,
+  connectionSupport,
+  MCP_SIGN_IN_AGENTS,
+} from '../../lib/agent-catalog';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-connection';
 import { mcpEndpointError } from '../../lib/mcp-endpoint';

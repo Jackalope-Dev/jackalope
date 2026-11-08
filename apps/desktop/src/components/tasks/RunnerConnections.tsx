@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents } from '../../lib/agent-catalog';
+import { agentAdapter, builtinAgents } from '../../lib/agent-catalog';
 import { openAgentConfiguration } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
@@ -46,7 +46,6 @@ import { ProviderMark } from '../agents/ProviderMark';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import '../agents/agents-workspace.css';
-import { agentAdapter } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 
 function SetupCommandBox({

@@ -11,7 +11,7 @@ import {
 } from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { agentAdapter } from '../../lib/agents';
+import { agentAdapter } from '../../lib/agent-catalog';
 import { navigateWorkspace, openProjectSettings } from '../../lib/app-events';
 import { runHostName } from '../../lib/computers';
 import {
@@ -39,6 +39,7 @@ import {
 import { planReviewer } from '../../lib/reviewer-choice';
 import { respondToPrompt } from '../../lib/task-client';
 import { selectWork } from '../../lib/work-selection';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
@@ -390,9 +391,13 @@ function PlanReview({
   const planner = useExecutionStore(
     (state) => state.runs.find((candidate) => candidate.id === view.plannerRunId)?.agent,
   );
+  const customAgents = useAgentConfigStore((state) => state.customAgents);
   const reviewer = useMemo(
-    () => planReviewer(runners, { agent: view.agent, model: view.model }, planner, agentAdapter),
-    [runners, view.agent, view.model, planner],
+    () =>
+      planReviewer(runners, { agent: view.agent, model: view.model }, planner, (agent) =>
+        agentAdapter(agent, customAgents),
+      ),
+    [runners, view.agent, view.model, planner, customAgents],
   );
   const [shape, setShape] = useState<PlanShape>(view.shape);
   const [comments, setComments] = useState('');

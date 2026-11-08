@@ -3,6 +3,7 @@ import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { useMcpStore } from '../stores/mcpStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
+import { catalogEntry } from './agent-catalog';
 import { agentModels } from './agent-models';
 import { prepareCodebase } from './codebase';
 import { isTauriEnvironment } from './native/env';
@@ -64,9 +65,7 @@ export function prepareWorkspace(
         await useExecutionStore.getState().discover(false);
         const runners = useExecutionStore
           .getState()
-          .runners.filter(
-            (runner) => runner.available && ['codex', 'claude', 'opencode'].includes(runner.id),
-          );
+          .runners.filter((runner) => runner.available && catalogEntry(runner.id)?.prewarmModels);
         const results = await Promise.allSettled(
           runners.map((runner) => agentModels(runner.id, { refresh: false })),
         );

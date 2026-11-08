@@ -21,6 +21,7 @@ import {
   stopSignIn,
   writeSignIn,
 } from '../../lib/agent-profiles';
+import { catalogEntry } from '../../lib/agent-catalog';
 import { openInBrowser } from '../../lib/native/env';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
 import '@xterm/xterm/css/xterm.css';
@@ -397,7 +398,7 @@ export function AgentSignIn({
         )}
         <div className="agent-sign-in-terminal" ref={setHost} />
         <div className="flex flex-wrap justify-end gap-3 mt-4">
-          {running && ['gemini', 'opencode'].includes(agentId) && (
+          {running && catalogEntry(agentId)?.finishSetupInTerminal && (
             <Button disabled={saving || checking} onClick={() => void completeSetup.current?.()}>
               Finish setup
             </Button>

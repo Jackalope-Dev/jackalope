@@ -9,9 +9,8 @@ globalThis.window = {
     removeItem: (key) => values.delete(key),
   },
 };
-const { builtinAgents, getAgentMetadata } = await import('../src/lib/agent-catalog.ts');
-const { agentAdapter, agentName } = await import('../src/lib/agents.ts');
-const { useAgentConfigStore } = await import('../src/stores/agentConfigStore.ts');
+const { agentAdapter, builtinAgents, getAgentMetadata } = await import('../src/lib/agent-catalog.ts');
+const { agentName, useAgentConfigStore } = await import('../src/stores/agentConfigStore.ts');
 
 test('install and sign-in commands come from the catalog entries', () => {
   assert.equal(
@@ -41,9 +40,10 @@ test('custom agents resolve to their adapter and their own name', () => {
       },
     ],
   });
-  assert.equal(agentAdapter('review-bot'), 'claude');
+  const { customAgents } = useAgentConfigStore.getState();
+  assert.equal(agentAdapter('review-bot', customAgents), 'claude');
   assert.equal(agentName('review-bot'), 'Review bot');
-  assert.equal(agentAdapter('kimi'), 'kimi');
+  assert.equal(agentAdapter('kimi', customAgents), 'kimi');
   assert.equal(agentName('kimi'), 'Kimi Code');
   assert.equal(agentName('unknown'), 'unknown');
 });

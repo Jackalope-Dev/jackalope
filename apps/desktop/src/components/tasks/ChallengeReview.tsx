@@ -16,7 +16,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { agentAdapter } from '../../lib/agents';
+import { agentAdapter } from '../../lib/agent-catalog';
 import {
   authorFollowUp,
   type MergedFinding,
@@ -27,6 +27,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
 import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import './challenge-review.css';
@@ -88,7 +89,7 @@ export function ChallengeDialog({
               projectName: run.projectName,
               projectPath: run.projectPath,
               agent,
-              agentProfileId: agentAccountFor(project, agentAdapter(agent)),
+              agentProfileId: agentAccountFor(project, agentAdapter(agent, useAgentConfigStore.getState().customAgents)),
               prompt: '',
               isolated: true,
               targetBranch: run.targetBranch ?? project?.preferences?.baseBranch,

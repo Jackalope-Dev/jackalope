@@ -3,7 +3,12 @@ import { Button, InlineNotice, RefreshIcon, Switch, Textarea } from '@jackalope/
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
+import {
+  agentAdapter,
+  builtinAgents,
+  getAgentMetadata,
+  runsTasks,
+} from '../../lib/agent-catalog';
 import { missingProjectDefaults } from '../../lib/context/project-defaults';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
@@ -26,7 +31,6 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
 import './onboarding.css';
-import { agentAdapter, runsTasks } from '../../lib/agents';
 import { describeError } from '../../lib/errors';
 import { projectReadiness } from '../../lib/readiness';
 import { ActionError } from '../ui/ActionError';

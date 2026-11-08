@@ -60,6 +60,7 @@ import {
   rosterOrder,
   useBotStore,
 } from '../../stores/botStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { LiveSessionView } from '../sessions/LiveSessionView';
@@ -73,7 +74,7 @@ import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
-import { agentAdapter } from '../../lib/agents';
+import { agentAdapter } from '../../lib/agent-catalog';
 import { describeError } from '../../lib/errors';
 import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
 import { ActionError } from '../ui/ActionError';
@@ -137,7 +138,7 @@ function proposalDraft(proposal: BotProposal, projectId: string): BotDraft {
 }
 
 function profileFor(bot: Bot, project: Project) {
-  return agentAccountFor(project, agentAdapter(bot.agent));
+  return agentAccountFor(project, agentAdapter(bot.agent, useAgentConfigStore.getState().customAgents));
 }
 
 /** How a conversation started when the person did not start it. */

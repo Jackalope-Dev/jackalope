@@ -1,11 +1,11 @@
 import { Check, Minus, X } from 'lucide-react';
-import { agentCapabilities } from '../../lib/agent-capabilities';
+import { catalogEntry } from '../../lib/agent-catalog';
 
 type SupportState = 'yes' | 'partial' | 'no';
 const icons = { yes: Check, partial: Minus, no: X };
 
 export function AgentSupport({ adapter }: { adapter: string }) {
-  const support = agentCapabilities(adapter);
+  const support = catalogEntry(adapter);
   if (!support)
     return <p className="task-muted">Choose a supported adapter to see its capabilities.</p>;
   if (support.tasksInDevelopment)

@@ -1,7 +1,8 @@
 import { Button, InlineNotice } from '@jackalope/ui';
 import { CheckCircle, CircleAlert, KeyRound, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { agentShortName, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
+import { MCP_SIGN_IN_AGENTS } from '../../lib/agent-catalog';
+import { agentShortName } from '../../stores/agentConfigStore';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure } from '../../lib/mcp-connection';
 import { invokeNative } from '../../lib/native/transport';

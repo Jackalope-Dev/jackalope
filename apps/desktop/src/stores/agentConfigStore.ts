@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type BuiltinAgentId, builtinAgents } from '../lib/agent-catalog.ts';
+import {
+  type BuiltinAgentId,
+  builtinAgents,
+  catalogEntry,
+  getAgentMetadata,
+} from '../lib/agent-catalog.ts';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { awaitBeforeNative, invokeNative } from '../lib/native/transport.ts';
 import { createPersistStorage } from '../lib/persist-storage.ts';
@@ -260,6 +265,20 @@ function saveAgentPolicy(always: boolean) {
       saved = encoded;
     });
   return saving;
+}
+
+/** An agent's display name: a saved custom agent's own name, the catalog name, or its id. */
+export function agentName(agent: string) {
+  return (
+    useAgentConfigStore.getState().customAgents.find((a) => a.id === agent)?.name ??
+    getAgentMetadata(agent)?.name ??
+    agent
+  );
+}
+
+/** The brand name alone, as in "Sign in with Claude". */
+export function agentShortName(agent: string) {
+  return catalogEntry(agent)?.shortName ?? agentName(agent);
 }
 
 /**
