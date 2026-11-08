@@ -1,4 +1,4 @@
-import { isActive } from '@jackalope/contracts/runs';
+import { isActive, needsAttention } from '@jackalope/contracts/runs';
 import type { CompanionNotice } from '../stores/companionStore.ts';
 import { getAgentMetadata } from './agent-catalog.ts';
 import type { TaskRun } from './run-types.ts';
@@ -42,7 +42,7 @@ export function taskNotices(
           onOpen,
         },
       ];
-    if (run.status === 'failed' || run.status === 'interrupted')
+    if (needsAttention(run))
       return [
         {
           id: `task:${run.id}:${run.status}`,

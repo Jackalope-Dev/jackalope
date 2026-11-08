@@ -1,4 +1,4 @@
-import { isActive } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import { Button, InlineNotice } from '@jackalope/ui';
 import type { TaskRun } from '../../lib/run-types';
 
@@ -67,7 +67,7 @@ export function HookFixStatus({
       </InlineNotice>
     );
   }
-  if (run.status === 'review' || run.status === 'reviewed')
+  if (isDone(run))
     return (
       <InlineNotice
         tone="success"

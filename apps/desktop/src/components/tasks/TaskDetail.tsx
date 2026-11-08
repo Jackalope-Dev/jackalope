@@ -1,4 +1,4 @@
-import { canRetry, isActive, isFinished, isWorking, statusLabel } from '@jackalope/contracts/runs';
+import { isActive, isDone, isRetryable, isRunning, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -204,7 +204,7 @@ export function TaskDetail({
     !!run.workspace &&
     run.workspace.replaceAll('\\', '/').toLowerCase() !==
       run.projectPath.replaceAll('\\', '/').toLowerCase();
-  const finished = !active && isFinished(run);
+  const finished = !active && isDone(run);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
   const changes = useChangeStats([run])[run.id]?.value;
   const changedFiles = changes?.files;
@@ -646,7 +646,7 @@ export function TaskDetail({
           message={run.error}
           preparation={run.preparation}
           retrying={retrying}
-          onRetry={isLatest && canRetry(run) && !integrated ? () => void retry() : undefined}
+          onRetry={isLatest && isRetryable(run) && !integrated ? () => void retry() : undefined}
           onInspect={() => setTab('activity')}
         />
       )}
@@ -658,7 +658,7 @@ export function TaskDetail({
               key={p.id}
               runId={run.id}
               prompt={p}
-              active={isWorking(run)}
+              active={isRunning(run)}
               accountShown={active}
               onContinue={
                 canContinue && !active

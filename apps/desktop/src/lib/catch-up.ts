@@ -1,5 +1,5 @@
 import type { PendingUserPrompt } from '@jackalope/contracts/runs';
-import { isUnfinished } from '@jackalope/contracts/runs';
+import { isRetryable } from '@jackalope/contracts/runs';
 import { sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
@@ -268,7 +268,7 @@ function decisionFor(
         : undefined,
     };
   }
-  if (checksFailed(run) && run && !isUnfinished(run))
+  if (checksFailed(run) && run && !isRetryable(run))
     return {
       kind: 'failed-check',
       decision: 'The project checks fail. Ask for a fix, or inspect the changes yourself.',
@@ -288,7 +288,7 @@ function decisionFor(
       risk: { level: 'low', reason: 'Nothing runs while it is paused.' },
     };
   const stopped =
-    (run && isUnfinished(run)) ||
+    (run && isRetryable(run)) ||
     !!item.session?.error ||
     !!managed?.error ||
     item.statusLabel === 'Needs attention';
@@ -387,7 +387,7 @@ function eventFor(
   if (pendingQuestions(item, runs, queue).length) return undefined;
   if (run?.persistenceError)
     return { ...base, outcome: 'Finished, but its history did not save', tone: 'warning' };
-  if (checksFailed(run) && run && !isUnfinished(run))
+  if (checksFailed(run) && run && !isRetryable(run))
     return {
       ...base,
       outcome: run.verificationError

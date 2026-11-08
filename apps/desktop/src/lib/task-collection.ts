@@ -1,4 +1,4 @@
-import { isActive, isSettled } from '@jackalope/contracts/runs';
+import { isActive, isTerminal } from '@jackalope/contracts/runs';
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { taskAgents } from './agent-provider.ts';
 import { isAgentReview } from './agent-review.ts';
@@ -212,7 +212,7 @@ export function collectWork(
   const original = new Map<string, TaskRun>();
   const blocked = new Set<string>();
   for (const run of projectRuns) {
-    if (!isSettled(run) || run.finishing || run.liveSessionId || run.persistenceError)
+    if (!isTerminal(run) || run.finishing || run.liveSessionId || run.persistenceError)
       blocked.add(run.taskId);
     const newest = latest.get(run.taskId);
     const oldest = original.get(run.taskId);

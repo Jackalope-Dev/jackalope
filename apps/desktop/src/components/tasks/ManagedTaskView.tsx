@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import {
   Button,
   FormField,
@@ -136,7 +136,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
     setPlan([]);
     setPlanRunId('');
     setPlanPending(false);
-    if (task.started || !plannerId || !plannerStatus || !isFinished(plannerStatus)) return;
+    if (task.started || !plannerId || !plannerStatus || !isDone(plannerStatus)) return;
     let alive = true;
     setPlanPending(true);
     void previewTaskPlan(task.id)
@@ -472,7 +472,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                       <Button
                         disabled={busy}
                         onClick={() => {
-                          if (work.planner && isFinished(work.planner))
+                          if (work.planner && isDone(work.planner))
                             setPreviewRevision((value) => value + 1);
                           else
                             void act(() =>
@@ -480,7 +480,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             );
                         }}
                       >
-                        {work.planner && isFinished(work.planner)
+                        {work.planner && isDone(work.planner)
                           ? 'Reload plan'
                           : 'Retry planning'}
                       </Button>
@@ -678,7 +678,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             Retry planning
                           </Button>
                         )}
-                      {isFinished(detail) &&
+                      {isDone(detail) &&
                         (detail.id === work.planner?.id ||
                           work.steps.some(({ run }) => run?.id === detail.id)) &&
                         (!task.started ||

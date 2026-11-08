@@ -1,5 +1,5 @@
 import { PRESET_THEMES, withPreset } from '@jackalope/brand/theme';
-import { isSettled } from '@jackalope/contracts/runs';
+import { isTerminal } from '@jackalope/contracts/runs';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
@@ -97,7 +97,7 @@ export function CommandPalette({
         { label: taskDecision(current).action, section: taskDecision(current).section },
         { label: 'Open conversation', section: 'result' },
         { label: 'Open task terminal and workspace tools', section: 'terminal' },
-        ...(isSettled(current)
+        ...(isTerminal(current)
           ? [
               { label: 'Try result', section: 'preview' },
               { label: 'Review changes and checks', section: 'changes' },

@@ -1,4 +1,4 @@
-import { isWorking } from '@jackalope/contracts/runs';
+import { isRunning } from '@jackalope/contracts/runs';
 import {
   Button,
   ConfirmDialog,
@@ -352,7 +352,7 @@ export function ScheduleManager(props: {
                           View run
                         </Button>
                       )}
-                      {run && isWorking(run) && (
+                      {run && isRunning(run) && (
                         <Button
                           variant="ghost"
                           disabled={busy}

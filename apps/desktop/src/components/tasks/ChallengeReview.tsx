@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import {
   Button,
   Checkbox,
@@ -339,7 +339,7 @@ export function ChallengeFindings({
     };
   }, [finishedKey]);
   const agentName = (agent: string) => runners.find((runner) => runner.id === agent)?.name ?? agent;
-  const finished = reviewers.filter((reviewer) => !isActive(reviewer) && isFinished(reviewer));
+  const finished = reviewers.filter((reviewer) => !isActive(reviewer) && isDone(reviewer));
   const reports = finished.map((reviewer) => ({
     run: reviewer,
     report: reviewerReport(reviewer, replies[reviewer.id]),
@@ -391,7 +391,7 @@ export function ChallengeFindings({
                 {' · '}
                 {isActive(reviewer)
                   ? 'Reviewing…'
-                  : isFinished(reviewer)
+                  : isDone(reviewer)
                     ? 'Finished'
                     : `Did not finish${reviewer.error ? `: ${reviewer.error}` : ''}`}
               </span>

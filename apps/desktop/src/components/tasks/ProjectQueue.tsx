@@ -1,4 +1,4 @@
-import { isActive, isFinished, isUnfinished, statusLabel } from '@jackalope/contracts/runs';
+import { isActive, isDone, isRetryable, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -137,9 +137,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     const original = runs.find((r) => r.id === item.runId);
     const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
     if (item.runId && queue.mergedRunIds.includes(item.runId)) return 'merged';
-    if (item.error || run?.dependencyInvalidated || (run && isUnfinished(run))) return 'attention';
+    if (item.error || run?.dependencyInvalidated || (run && isRetryable(run))) return 'attention';
     if (run && isActive(run)) return 'active';
-    if (run && isFinished(run)) return 'review';
+    if (run && isDone(run)) return 'review';
     if (item.runId) return 'attention';
     return 'queued';
   };

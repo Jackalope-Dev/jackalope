@@ -2,7 +2,7 @@ import {
   durationLabel,
   elapsedLabel,
   isActive,
-  isFinished,
+  isDone,
   statusLabel,
 } from '@jackalope/contracts/runs';
 import {
@@ -173,7 +173,7 @@ function ComparisonDialog({
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === comparison.projectId),
   );
-  const finished = members.filter(isFinished);
+  const finished = members.filter(isDone);
   const judgeOptions = runners
     .filter((runner) => runner.available)
     .map((runner) => ({ id: runner.id, name: runner.name, adapter: adapter(runner.id) }));
@@ -191,7 +191,7 @@ function ComparisonDialog({
     .filter((attempt): attempt is LabelledAttempt => !!attempt);
   const labelFor = (taskId: string) =>
     attempts.find((attempt) => attempt.run.taskId === taskId)?.label;
-  const judgeDone = judgeRun && isFinished(judgeRun) ? judgeRun.id : '';
+  const judgeDone = judgeRun && isDone(judgeRun) ? judgeRun.id : '';
   const [fetched, setFetched] = useState<{ id: string; result: string }>();
   // Run summaries omit the final answer, so read the finished judge's full record once.
   useEffect(() => {
@@ -434,13 +434,13 @@ function ComparisonDialog({
                 >
                   Open
                 </Button>
-                <Button disabled={busy || !isFinished(member)} onClick={() => void keep(member)}>
+                <Button disabled={busy || !isDone(member)} onClick={() => void keep(member)}>
                   Keep this one
                 </Button>
                 {ports.length > 0 && (
                   <Button
                     variant="outline"
-                    disabled={busy || !isFinished(member)}
+                    disabled={busy || !isDone(member)}
                     onClick={() => void keep(member, ports)}
                   >
                     Keep and combine
