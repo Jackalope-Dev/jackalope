@@ -10,15 +10,9 @@ impl From<SaveFailed> for String {
     }
 }
 
-impl From<SaveFailed> for StatusCode {
-    fn from(_: SaveFailed) -> Self {
-        StatusCode::INTERNAL_SERVER_ERROR
-    }
-}
-
-impl From<SaveFailed> for (StatusCode, String) {
+impl From<SaveFailed> for ToolError {
     fn from(failed: SaveFailed) -> Self {
-        (StatusCode::INTERNAL_SERVER_ERROR, failed.0)
+        ToolError::failed(failed.0)
     }
 }
 
@@ -31,9 +25,9 @@ impl From<Busy> for String {
     }
 }
 
-impl From<Busy> for (StatusCode, String) {
+impl From<Busy> for ToolError {
     fn from(busy: Busy) -> Self {
-        (StatusCode::CONFLICT, busy.0)
+        ToolError::status(StatusCode::CONFLICT, busy.0)
     }
 }
 

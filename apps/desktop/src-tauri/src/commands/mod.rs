@@ -1,5 +1,6 @@
 pub mod attachments;
 pub mod bot_hub;
+pub mod bridge;
 pub mod capacity;
 pub mod challenge_review;
 pub mod change_stats;
@@ -11,7 +12,6 @@ pub mod codebase;
 pub mod codebase_watch;
 pub mod commit_graph;
 pub mod coordination;
-pub mod coordination_mcp;
 pub mod desktop_integration;
 pub mod dictation;
 pub mod git;

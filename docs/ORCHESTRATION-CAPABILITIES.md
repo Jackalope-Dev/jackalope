@@ -23,6 +23,14 @@ use permitted HTTP calls. The same bridge implements project awareness, messages
 user questions and saved answers, browser evidence, validation and selected
 on-demand connection discovery. No transport bypasses a denied permission.
 
+Each tool is defined once, so the MCP tool and its HTTP route take the same input,
+run the same handler and fail the same way. An HTTP error is a status with a JSON
+`{"error": ...}` body. A question (`ask_user`, `request_human_action`) waits up to a
+minute for an answer over MCP before it returns pending; over HTTP it returns at once,
+since an agent's shell command may time out sooner and a retried command would ask
+again, and the agent polls `user_response`. `GET /v1/help` lists each tool's HTTP
+contract; a lean attempt gets a short form unless it asks for `?full=true`.
+
 Project awareness includes manual tasks, queued assignments, latest attempts,
 declared scopes and dependencies. Manual scopes are explicitly unknown. Inventory
 covers loaded history; archived runs are excluded. Agents read it before editing
@@ -54,9 +62,10 @@ their existing APIs.
 If another launch owns the coordinator, optional delivery defers to the next
 checkpoint without consuming messages or delaying the completed tool result.
 
-This is delivery at Jackalope tool-response boundaries, not arbitrary shell or
-provider-tool calls. Non-JSON, streaming and responses over 8 MB remain unchanged;
-no polling model turns, automatic follow-ups or interruptions are introduced.
+This is delivery at Jackalope tool-response boundaries (and `GET /v1/help`), not
+arbitrary shell or provider-tool calls, and it does not depend on whether the MCP
+response streams. A computer runner's callbacks never carry updates, since no agent
+reads them. No polling model turns, automatic follow-ups or interruptions are introduced.
 Agents should still check the inbox before shared-interface changes when they have
 not used the harness recently. A transport interruption can lose a delivered excerpt;
 the durable inbox remains authoritative. Bridge unavailability blocks new launches
@@ -125,8 +134,9 @@ restatement once at the start. See [task outcomes](TASK-OUTCOMES.md#evidence-lev
 `plan_deviation` is accepted only from attempts working on an approved plan, records the
 departure for the person and pauses that plan's dispatch; agents never edit the plan.
 
-HTTP messages use recipientTaskId; the MCP schema uses recipient_task_id. Omit it
-for broadcasts. Agents can see project broadcasts, their received messages and
+Messages name a recipient with `recipient_task_id` (`recipientTaskId` is also
+accepted); omit it for broadcasts. A message kind is `progress`, `blocker`, `handoff`,
+`dependency`, `interface`, `completion` or `waiting`. Agents can see project broadcasts, their received messages and
 their own sent messages. The user sees all project messages and acknowledgment
 counts. The retained journal is bounded to 2,000 messages; expired cursors require
 rereading and deduplicating retained messages. There is no infinite audit archive.

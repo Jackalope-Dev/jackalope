@@ -325,16 +325,31 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
         h.insert("authorization", format!("Bearer {id}").parse().unwrap());
         h
     };
+    let claim = |id: &str, input: AgreementInput| {
+        let service = service.clone();
+        let credential = headers(id);
+        async move {
+            let caller = service.caller(&credential).map_err(ToolError::from)?;
+            let transport = crate::commands::bridge::Transport::Http;
+            agreements::agreement(
+                Call {
+                    service,
+                    caller,
+                    transport,
+                },
+                input,
+            )
+            .await
+        }
+    };
     let (a, b) = tokio::join!(
-        agreements::bridge_agreement(
-            WebState(service.clone()),
-            headers("grok-run"),
-            Json(request(Action::Claim, &Uuid::new_v4().to_string()))
+        claim(
+            "grok-run",
+            request(Action::Claim, &Uuid::new_v4().to_string())
         ),
-        agreements::bridge_agreement(
-            WebState(service.clone()),
-            headers("claude-run"),
-            Json(request(Action::Claim, &Uuid::new_v4().to_string()))
+        claim(
+            "claude-run",
+            request(Action::Claim, &Uuid::new_v4().to_string())
         )
     );
     assert_eq!(usize::from(a.is_ok()) + usize::from(b.is_ok()), 1);
@@ -346,19 +361,12 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
     std::fs::create_dir(repo.root.join("queue/queue.json")).unwrap();
     let mut input = request(Action::Claim, &Uuid::new_v4().to_string());
     input.resource = "other responsibility".into();
-    assert!(agreements::bridge_agreement(
-        WebState(service.clone()),
-        headers("grok-run"),
-        Json(input)
-    )
-    .await
-    .is_err());
+    assert!(claim("grok-run", input).await.is_err());
     assert_eq!(service.state().ledger.agreements.len(), 1);
     runtime.update("grok-run", |r| r.status = RunStatus::Review);
-    assert!(agreements::bridge_agreement(
-        WebState(service.clone()),
-        headers("grok-run"),
-        Json(request(Action::Claim, &Uuid::new_v4().to_string()))
+    assert!(claim(
+        "grok-run",
+        request(Action::Claim, &Uuid::new_v4().to_string())
     )
     .await
     .is_err());

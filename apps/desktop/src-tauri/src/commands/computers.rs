@@ -628,9 +628,13 @@ pub(crate) fn for_run_id(runtime: &TaskRuntime, run_id: &str) -> Option<Computer
     for_run(runtime, &runtime.run_snapshot(run_id)?)
 }
 
-/// Lets the browser tools drive the computer's own browser for runs that have one.
-pub fn install_browser_routing(runtime: TaskRuntime) {
-    super::browser::set_router(Box::new(move |run_id| browser::guard(&runtime, run_id)));
+/// The guard a task browser uses to drive the attempt's computer's own
+/// browser, for runs that have one.
+pub(super) fn browser_guard(
+    runtime: &TaskRuntime,
+    run_id: &str,
+) -> Result<Option<std::sync::Arc<dyn super::browser::ProfileGuard>>, String> {
+    browser::guard(runtime, run_id)
 }
 
 #[derive(Clone, Debug, Default, Deserialize, schemars::JsonSchema)]
@@ -716,8 +720,8 @@ fn request_blocking(
         .get(&run.id)
         .cloned();
     let Some(prompt_id) = pending else {
-        if run.prompts.len() >= 100 {
-            return Err("This task has reached its question limit.".into());
+        if !super::harness::can_ask(&run) {
+            return Err(super::harness::QUESTION_LIMIT_REACHED.into());
         }
         let reason = input
             .reason
@@ -1325,49 +1329,4 @@ pub async fn computer_agent37_usage(
 ) -> Result<agent37::Agent37Usage, String> {
     let root = state.computers_root();
     blocking(move || agent37::usage(&root)).await
-}
-
-type BridgeError = (axum::http::StatusCode, axum::Json<Value>);
-
-fn bridge_failure(error: String) -> BridgeError {
-    (
-        axum::http::StatusCode::BAD_REQUEST,
-        axum::Json(json!({"error": error})),
-    )
-}
-
-fn bridge_run(
-    service: &super::coordination::Coordinator,
-    headers: &axum::http::HeaderMap,
-) -> Result<TaskRun, BridgeError> {
-    service.authorized_run(headers).map_err(|status| {
-        (
-            status,
-            axum::Json(json!({"error":"Task authorization required"})),
-        )
-    })
-}
-
-pub(super) async fn bridge_request(
-    axum::extract::State(service): axum::extract::State<super::coordination::Coordinator>,
-    headers: axum::http::HeaderMap,
-    axum::Json(input): axum::Json<ComputerRequestInput>,
-) -> Result<axum::Json<Value>, BridgeError> {
-    let run = bridge_run(&service, &headers)?;
-    request_for_run(service.runtime.clone(), run, input)
-        .await
-        .map(axum::Json)
-        .map_err(bridge_failure)
-}
-
-pub(super) async fn bridge_exec(
-    axum::extract::State(service): axum::extract::State<super::coordination::Coordinator>,
-    headers: axum::http::HeaderMap,
-    axum::Json(input): axum::Json<ComputerExecInput>,
-) -> Result<axum::Json<Value>, BridgeError> {
-    let run = bridge_run(&service, &headers)?;
-    exec_for_run(service.runtime.clone(), run, input)
-        .await
-        .map(axum::Json)
-        .map_err(bridge_failure)
 }

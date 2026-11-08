@@ -383,52 +383,54 @@ pub(super) fn interface_block(ledger: &Ledger, project: &str, task: &str) -> Opt
         .map(|a| format!("Interface agreement '{}' is {}. Ask its participants to respond, or cancel it explicitly in Coordination & handoffs.", a.resource, a.status))
 }
 
-pub(in crate::commands) async fn bridge_agreement(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<AgreementInput>,
-) -> Result<Json<Agreement>, (StatusCode, String)> {
-    let actor = service
-        .authorized(&headers)
-        .map_err(|s| (s, "This task cannot access coordination.".into()))?;
+/// `agreement`: claims a responsibility, proposes an interface or answers a
+/// handoff for the caller's task.
+pub(in crate::commands) async fn agreement(
+    call: Call,
+    input: AgreementInput,
+) -> Result<serde_json::Value, ToolError> {
+    let actor = call
+        .service
+        .assignment(&call.caller)
+        .map_err(|s| ToolError::status(s, "This task cannot access coordination."))?;
+    let Call {
+        service, caller, ..
+    } = call;
     tauri::async_runtime::spawn_blocking(move || {
         service.transact(|inner, _guard| {
             service
-                .authorized_locked(&inner, &headers)
-                .map_err(|s| (s, "This task is no longer active.".into()))?;
+                .authorized_locked(inner, &caller)
+                .map_err(|s| ToolError::status(s, "This task is no longer active."))?;
             let runs = service
                 .runtime
                 .integration_runs()
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+                .map_err(ToolError::failed)?;
             let merged = crate::commands::integration::applied_run_ids(&service.runtime)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+                .map_err(ToolError::failed)?;
             let mut ledger = inner.ledger.clone();
             let result = change(&mut ledger, &runs, &actor, input, &merged)
-                .map_err(|e| (StatusCode::CONFLICT, e))?;
+                .map_err(|e| ToolError::status(StatusCode::CONFLICT, e))?;
             if serde_json::to_vec(&inner.ledger.agreements).ok()
                 != serde_json::to_vec(&ledger.agreements).ok()
             {
                 service.commit(inner, |saved| {
                     *saved = ledger;
                     announce(saved, &result, &actor.id);
-                    Ok::<_, (StatusCode, String)>(())
+                    Ok::<_, ToolError>(())
                 })?;
             }
-            Ok(Json(result))
+            json(result)
         })
     })
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map_err(|e| ToolError::failed(e.to_string()))?
 }
 
 impl Coordinator {
-    fn authorized_locked(&self, inner: &Inner, headers: &HeaderMap) -> Result<(), StatusCode> {
-        let token = headers
-            .get("authorization")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-        let token = crate::commands::tasks::bridge_token(token);
+    /// Whether `caller` still has an active, unfinished attempt, checked with
+    /// the coordinator state held.
+    fn authorized_locked(&self, inner: &Inner, caller: &Caller) -> Result<(), StatusCode> {
+        let token = crate::commands::tasks::bridge_token(caller.token());
         let (_, run_id) = inner.grants.get(&token).ok_or(StatusCode::UNAUTHORIZED)?;
         if self
             .runtime

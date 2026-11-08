@@ -99,7 +99,8 @@ changes must preserve both sides and old saved records.
 | notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
 | agents.rs | The agent catalog read from src/lib/agents.json: names, executables, sign-in directories and variables, protocols and capabilities |
 | agent_policy.rs, agent_profiles.rs, capacity/ | Allowlists, profile binding/sign-in and capacity |
-| mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
+| mcp.rs, mcp_broker.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped questions |
+| bridge.rs, bridge/ | The attempt bridge: one table defines every tool (input, description, hints, placement, HTTP route, optional group, who is offered it, handler); the MCP server, HTTP routes and help, runner placement, Codex approvals and deferred loading are derived from it, and each handler serves both transports after one authorization |
 | agent_decider.rs, question_risk.rs | Autonomy policy, question classification and read-only decider attempts that answer plan questions, rounds and deviations for the person |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
@@ -147,7 +148,7 @@ and it never runs a tool against the computer's workspace. The computer's agent
 uploaded workspace and everything that touches it. They speak one versioned run
 protocol (`runs` in `run_status`); from protocol 4 the runner lists `capabilities`,
 and each behaviour past protocol 3 is enabled only by a listed capability, so older
-images keep their earlier behaviour. `computers/runner.rs` places every bridge tool
+images keep their earlier behaviour. Each bridge tool's entry in the bridge's table places it
 as Workspace (served by the runner's local bridge when it has the capability) or
 Control (forwarded to this device through the relay queue). The runner asks this
 device before anything a person or rule governs through `POST /v1/policy` (kinds
@@ -161,7 +162,7 @@ process, and `RemoteRunner` is the computer's runner seen from here. Both go thr
 `TaskRuntime::run_attempt` (prepare, attach the placement, start, follow, collect) before
 the shared completion path, so checks, checkpoints, review, integration and the lock order
 are the same. The local runner reports the `device` capability and every workspace
-capability, so its tool list comes from the same `computers::runner::TOOLS` table, and the
+capability, so its tool list comes from the same bridge tool table, and the
 bridge applies each attempt's attached placement to `tools/list`. Tool events from the
 bridge's own handlers and from a runner's `/v1/runner/event` are recorded by one function.
 See [the runner](BOT-COMPUTERS.md#the-runner).

@@ -13,25 +13,6 @@ use super::{
 };
 pub(super) use persistent::{cookie_sites, ProfileWindow};
 
-pub(super) fn codex_tool_policy() -> serde_json::Value {
-    let tools: serde_json::Map<String, serde_json::Value> = [
-        "browser_navigate",
-        "browser_snapshot",
-        "browser_interact",
-        "browser_screenshot",
-        "browser_configure",
-        "browser_inspect",
-        "browser_tabs",
-        "browser_open_profile",
-        "desktop_control",
-        "computer_request",
-        "computer_exec",
-    ]
-    .into_iter()
-    .map(|name| (name.into(), serde_json::json!({"approval_mode":"approve"})))
-    .collect();
-    serde_json::Value::Object(tools)
-}
 use engine::Engine;
 use serde_json::{json, Value};
 use std::{
@@ -66,29 +47,22 @@ pub(super) trait ProfileGuard: Send + Sync {
     }
 }
 
-type Router = dyn Fn(&str) -> Result<Option<Arc<dyn ProfileGuard>>, String> + Send + Sync;
-static ROUTER: OnceLock<Box<Router>> = OnceLock::new();
-
-/// Decides, once per task browser, whether it should drive another machine's
-/// browser (a bot computer) instead of a disposable local one.
-pub(super) fn set_router(router: Box<Router>) {
-    let _ = ROUTER.set(router);
-}
-
-/// Attaches the routed guard before a task browser first starts.
-/// An error (such as a computer still starting) leaves the browser unrouted
-/// so a later command decides again.
-fn route(run_id: &str, slot: &Arc<Slot>) -> Result<(), String> {
-    let Some(router) = ROUTER.get() else {
-        return Ok(());
-    };
+/// Attaches the guard `decide` names before a task browser first starts, so
+/// it drives another machine's browser (a bot computer) instead of a
+/// disposable local one. An error, such as a computer still starting, leaves
+/// the browser undecided so a later command decides again.
+pub(super) fn route(
+    run_id: &str,
+    decide: impl FnOnce() -> Result<Option<Arc<dyn ProfileGuard>>, String>,
+) -> Result<(), String> {
+    let slot = session_slot(run_id)?;
     let engine = slot.engine.lock().map_err(|e| e.to_string())?;
     if engine.is_some() || slot.routed.load(Ordering::SeqCst) {
         return Ok(());
     }
     let mut profile = slot.profile.lock().map_err(|e| e.to_string())?;
     if profile.is_none() {
-        *profile = router(run_id)?;
+        *profile = decide()?;
     }
     slot.routed.store(true, Ordering::SeqCst);
     Ok(())
@@ -107,7 +81,7 @@ struct Slot {
     trees: Mutex<Vec<Arc<ProcessTree>>>,
     /// Set when the task switched to a persistent profile.
     profile: Mutex<Option<Arc<dyn ProfileGuard>>>,
-    /// Whether the router has been consulted for this browser.
+    /// Whether [`route`] has decided which browser this one drives.
     routed: AtomicBool,
 }
 
@@ -389,13 +363,9 @@ async fn with_target<T: Send + 'static>(
     work: impl FnOnce(&Engine) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     let slot = session_slot(run_id)?;
-    let run_id = run_id.to_string();
-    tauri::async_runtime::spawn_blocking(move || {
-        route(&run_id, &slot)?;
-        run_guarded(&slot, target.as_deref(), work)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || run_guarded(&slot, target.as_deref(), work))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn run_session<T>(

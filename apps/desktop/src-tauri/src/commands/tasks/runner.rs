@@ -9,7 +9,7 @@
 //!
 //! 1. [`AttemptRunner::prepare`] makes the workspace ready on the host;
 //! 2. the runner's placement ([`AttemptRunner::access`]) is attached, so the
-//!    bridge offers the agent the tools [`computers::runner::TOOLS`] places
+//!    bridge offers the agent the tools its [`bridge::tools`] table places
 //!    where it runs;
 //! 3. [`AttemptRunner::start`] starts the agent, [`AttemptRunner::follow`]
 //!    feeds its events to the adapter's parser until it ends, stopping it
@@ -24,7 +24,7 @@
 //! both, and the runner's policy callbacks reach
 //! [`computers::policy`] over the bridge.
 //!
-//! [`computers::runner::TOOLS`]: crate::commands::computers::runner::TOOLS
+//! [`bridge::tools`]: crate::commands::bridge::tools
 //! [`computers::policy`]: crate::commands::computers::policy
 
 use super::*;

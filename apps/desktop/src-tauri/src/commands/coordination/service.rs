@@ -267,7 +267,7 @@ impl Coordinator {
                 .scope_checked
                 .lock()
                 .unwrap()
-                .is_none_or(|last| last.elapsed() >= Duration::from_secs(10));
+                .is_none_or(|last| last.elapsed() >= SNAPSHOT_INTERVAL);
             if due || !ready_items(inner, &runs, &merged).is_empty() {
                 self.refresh_scopes_locked(inner)?;
                 *self.scope_checked.lock().unwrap() = Some(std::time::Instant::now());
@@ -484,70 +484,7 @@ impl Coordinator {
                 Ok(listener) => {
                     service.state().url =
                         Some(format!("http://{}", listener.local_addr().unwrap()));
-                    let router = Router::new()
-                        .route("/v1/help", get(bridge_help))
-                        .route("/v1/jev/questions", post(bridge_jev_questions))
-                        .route("/v1/computer/output", post(bridge_verification_output))
-                        .route("/v1/project", get(bridge_project))
-                        .route("/v1/peers", get(peers::bridge_peers))
-                        .route("/v1/peers/read", post(peers::bridge_peer_read))
-                        .route("/v1/peers/adopt", post(peers::bridge_peer_adopt))
-                        .route("/v1/subtasks", post(subtasks::bridge_propose_subtask))
-                        .route(
-                            "/v1/plan-deviation",
-                            post(crate::commands::planning::bridge_plan_deviation),
-                        )
-                        .route("/v1/agreements", post(agreements::bridge_agreement))
-                        .route("/v1/bots/{tool}", post(bridge_bot_tool))
-                        .route("/v1/tools/search", post(bridge_tool_search))
-                        .route("/v1/tools/execute", post(bridge_tool_execute))
-                        .route("/v1/tools/approve", post(bridge_tool_approve))
-                        .route("/v1/policy", post(bridge_policy))
-                        .route("/v1/runner/event", post(bridge_runner_event))
-                        .route("/v1/tools/read", post(bridge_tool_read))
-                        .route("/v1/tools/result", post(bridge_tool_result))
-                        .route("/v1/messages", post(bridge_message))
-                        .route("/v1/messages", get(inbox::bridge_inbox))
-                        .route("/v1/messages/ack", post(inbox::bridge_ack))
-                        .route("/v1/browser/navigate", post(bridge_browser_navigate))
-                        .route("/v1/browser/screenshot", post(bridge_browser_screenshot))
-                        .route("/v1/browser/snapshot", post(bridge_browser_snapshot))
-                        .route("/v1/browser/interact", post(bridge_browser_interact))
-                        .route("/v1/browser/configure", post(bridge_browser_configure))
-                        .route("/v1/browser/inspect", post(bridge_browser_inspect))
-                        .route("/v1/browser/tabs", post(bridge_browser_tabs))
-                        .route("/v1/browser/profile", post(bridge_browser_profile))
-                        .route(
-                            "/v1/desktop/control",
-                            post(crate::commands::desktop_control::bridge),
-                        )
-                        .route(
-                            "/v1/bot-computer/request",
-                            post(crate::commands::computers::bridge_request),
-                        )
-                        .route(
-                            "/v1/bot-computer/exec",
-                            post(crate::commands::computers::bridge_exec),
-                        )
-                        .route("/v1/user-prompt", post(bridge_user_prompt))
-                        .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
-                        .route("/v1/human-action", post(bridge_human_action))
-                        .route("/v1/validation-step", post(bridge_validation_step))
-                        .route("/v1/goal-restatement", post(bridge_goal_restatement))
-                        .route(
-                            "/v1/decisions",
-                            post(crate::commands::decision_trail::bridge_record),
-                        )
-                        .route("/v1/computer/verify", post(bridge_computer_verify))
-                        .route("/v1/native/output", post(bridge_native_output))
-                        .layer(DefaultBodyLimit::max(65_536))
-                        .with_state(service.clone());
-                    let router = router
-                        .merge(crate::commands::coordination_mcp::router(service.clone()))
-                        .layer(axum::middleware::from_fn_with_state(
-                            service.clone(),
-                            automatic::deliver,
-                        ));
+                    let router = crate::commands::bridge::router(service.clone());
                     let alive = service.alive.clone();
                     if let Err(error) = axum::serve(listener, router)
                         .with_graceful_shutdown(async move {
@@ -746,115 +683,104 @@ impl Coordinator {
         self.state().enabled.clear();
     }
 
-    pub(in crate::commands) fn authorized(
-        &self,
-        headers: &HeaderMap,
-    ) -> Result<QueueItem, StatusCode> {
-        if headers.contains_key("origin") {
-            return Err(StatusCode::FORBIDDEN);
-        }
-        let token = headers
-            .get("authorization")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+    /// The grant a bridge token was issued for: its task and attempt.
+    fn grant(&self, token: &str) -> Result<(String, String), StatusCode> {
         let token = crate::commands::tasks::bridge_token(token);
-        let inner = self.state();
-        let (id, run_id) = inner
+        self.state()
             .grants
             .get(&token)
             .cloned()
+            .ok_or(StatusCode::UNAUTHORIZED)
+    }
+
+    /// The attempt a bridge request speaks for, while it is still active.
+    pub(in crate::commands) fn caller(&self, headers: &HeaderMap) -> Result<Caller, StatusCode> {
+        let token = bearer(headers)?.to_owned();
+        let (_, run_id) = self.grant(&token)?;
+        let run = self
+            .runtime
+            .integration_runs()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .into_iter()
+            .find(|r| r.id == run_id && r.status.is_active())
             .ok_or(StatusCode::UNAUTHORIZED)?;
-        let item = inner
+        Ok(Caller { token, run })
+    }
+
+    /// The assignment `caller` works on, checked again against its grant and
+    /// attempt. A manual attempt has no queued item, so it stands in with the
+    /// whole repository as its scope.
+    pub(in crate::commands) fn assignment(&self, caller: &Caller) -> Result<QueueItem, StatusCode> {
+        let (id, run_id) = self.grant(&caller.token)?;
+        let item = self
+            .state()
             .ledger
             .items
             .iter()
             .find(|i| i.id == id && !i.canceled)
             .cloned();
-        drop(inner);
-        if !self
+        let run = self
             .runtime
             .integration_runs()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .iter()
-            .any(|r| r.id == run_id && r.status.is_active())
-        {
-            return Err(StatusCode::UNAUTHORIZED);
-        }
-        let item = match item {
-            Some(item) => item,
-            None => {
-                let runs = self
-                    .runtime
-                    .integration_runs()
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                let run = runs
-                    .into_iter()
-                    .find(|r| r.id == run_id)
-                    .ok_or(StatusCode::UNAUTHORIZED)?;
-                QueueItem {
-                    excluded_scopes: vec![],
-                    parent_task_id: None,
-                    staged_dependencies: false,
-                    feature: None,
-                    feature_id: None,
-                    context_selection: Default::default(),
-                    id: run.task_id.clone(),
-                    project_id: run.project_id.clone(),
-                    project_name: run.project_name.clone(),
-                    project_path: run.project_path.clone(),
-                    target_branch: run.target_branch.clone(),
-                    agent_profile_id: run
-                        .account_binding
-                        .as_ref()
-                        .and_then(|b| b.profile_id.clone()),
-                    verify_command: run.verify_command.clone(),
-                    prepare_command: run.prepare_command.clone(),
-                    setup_files: run.setup_files.clone(),
-                    auto_verify: run.auto_verify,
-                    title: run.prompt.chars().take(50).collect(),
-                    prompt: run.prompt.clone(),
-                    agent: run.agent.clone(),
-                    scopes: vec![".".into()],
-                    dependencies: vec![],
-                    created_at: run.started_at.clone(),
-                    run_id: Some(run.id.clone()),
-                    canceled: false,
-                    error: None,
-                }
-            }
-        };
-        Ok(item)
-    }
-
-    pub(in crate::commands) fn authorized_run(
-        &self,
-        headers: &HeaderMap,
-    ) -> Result<crate::commands::tasks::TaskRun, StatusCode> {
-        if headers.contains_key("origin") {
-            return Err(StatusCode::FORBIDDEN);
-        }
-        let token = headers
-            .get("authorization")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-        let token = crate::commands::tasks::bridge_token(token);
-        let inner = self.state();
-        let (_id, run_id) = inner
-            .grants
-            .get(&token)
-            .cloned()
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-        drop(inner);
-        let runs = self
-            .runtime
-            .integration_runs()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        let run = runs
             .into_iter()
             .find(|r| r.id == run_id && r.status.is_active())
             .ok_or(StatusCode::UNAUTHORIZED)?;
-        Ok(run)
+        Ok(item.unwrap_or_else(|| QueueItem {
+            excluded_scopes: vec![],
+            parent_task_id: None,
+            staged_dependencies: false,
+            feature: None,
+            feature_id: None,
+            context_selection: Default::default(),
+            id: run.task_id.clone(),
+            project_id: run.project_id.clone(),
+            project_name: run.project_name.clone(),
+            project_path: run.project_path.clone(),
+            target_branch: run.target_branch.clone(),
+            agent_profile_id: run
+                .account_binding
+                .as_ref()
+                .and_then(|b| b.profile_id.clone()),
+            verify_command: run.verify_command.clone(),
+            prepare_command: run.prepare_command.clone(),
+            setup_files: run.setup_files.clone(),
+            auto_verify: run.auto_verify,
+            title: run.prompt.chars().take(50).collect(),
+            prompt: run.prompt.clone(),
+            agent: run.agent.clone(),
+            scopes: vec![".".into()],
+            dependencies: vec![],
+            created_at: run.started_at.clone(),
+            run_id: Some(run.id.clone()),
+            canceled: false,
+            error: None,
+        }))
     }
+}
+
+/// An authenticated bridge request: the attempt its token speaks for.
+#[derive(Clone)]
+pub(crate) struct Caller {
+    /// The bearer token as sent; a warm process's alias resolves at each check.
+    token: String,
+    pub run: crate::commands::tasks::TaskRun,
+}
+
+impl Caller {
+    pub(super) fn token(&self) -> &str {
+        &self.token
+    }
+}
+
+/// The bearer token of a bridge request. Browser pages never reach the bridge.
+pub(super) fn bearer(headers: &HeaderMap) -> Result<&str, StatusCode> {
+    if headers.contains_key("origin") {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    headers
+        .get("authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .ok_or(StatusCode::UNAUTHORIZED)
 }

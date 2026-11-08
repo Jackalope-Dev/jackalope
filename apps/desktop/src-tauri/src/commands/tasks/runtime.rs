@@ -965,7 +965,7 @@ impl TaskRuntime {
         }
         if adapter == "codex" && req.coordination.is_some() {
             let context = req.coordination.as_ref().unwrap();
-            let mut tools = crate::commands::browser::codex_tool_policy();
+            let mut tools = crate::commands::bridge::codex_tool_policy();
             if req
                 .verify_command
                 .as_ref()
@@ -1130,7 +1130,7 @@ impl TaskRuntime {
                 ));
             }
             if spec.bridge() == Bridge::Http {
-                input.push_str(crate::commands::coordination::http_bootstrap());
+                input.push_str(crate::commands::bridge::http_bootstrap());
             }
             if has_discovery {
                 if let Some(tools) = &initial_tools {

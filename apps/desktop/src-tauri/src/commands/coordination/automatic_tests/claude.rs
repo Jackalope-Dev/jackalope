@@ -9,7 +9,7 @@ async fn installed_claude_connects_without_inference() {
     fixture
         .runtime
         .update("reader-run", |run| run.agent = "claude".into());
-    let router = crate::commands::coordination_mcp::router(fixture.service.clone());
+    let router = crate::commands::bridge::router(fixture.service.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });

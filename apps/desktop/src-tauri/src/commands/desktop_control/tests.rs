@@ -716,13 +716,17 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
     let service =
         super::super::coordination::Coordinator::new(directory.join("queue"), runtime.clone())
             .unwrap();
-    let result = bridge(
-        axum::extract::State(service),
-        axum::http::HeaderMap::new(),
-        axum::Json(request("request_access")),
+    let result = crate::commands::bridge::call(
+        &service,
+        &axum::http::HeaderMap::new(),
+        "desktop_control",
+        serde_json::json!({"action": "request_access"}),
     )
     .await;
-    assert_eq!(result.unwrap_err().0, axum::http::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        result.unwrap_err().code(),
+        axum::http::StatusCode::UNAUTHORIZED
+    );
     drop(runtime);
     std::fs::remove_dir_all(directory).unwrap();
 }
