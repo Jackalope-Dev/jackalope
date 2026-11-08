@@ -1,3 +1,4 @@
+import { isActive } from '@jackalope/contracts/runs';
 import {
   Button,
   DialogCloseButton,
@@ -29,7 +30,6 @@ import { builtinAgents } from '../../lib/agent-catalog';
 import { openAgentConfiguration } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
-import { isActive } from '../../lib/run-status';
 import type { Runner, TaskRun } from '../../lib/run-types';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';

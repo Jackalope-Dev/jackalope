@@ -1,4 +1,4 @@
-import { isActive, isFinished } from './run-status.ts';
+import { isActive, isFinished } from '@jackalope/contracts/runs';
 import type { TaskRun } from './run-types.ts';
 
 /**

@@ -1,4 +1,13 @@
 import {
+  askedText,
+  type RemoteAction,
+  requestText,
+  sessionStatus,
+  taskStatus,
+  workTitle,
+} from '@jackalope/contracts/remote';
+import { isActive } from '@jackalope/contracts/runs';
+import {
   Badge,
   Button,
   FormField,
@@ -12,17 +21,12 @@ import { ArrowUp, Ellipsis, Pause, Play, Square } from 'lucide-react';
 import { useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {
-  type RemoteAction,
-  useRemoteWorkspace,
-} from '../../desktop/src/components/remote/useRemoteWorkspace';
+import { useRemoteWorkspace } from '../../desktop/src/components/remote/useRemoteWorkspace';
 import { AgentQuestion } from '../../desktop/src/components/tasks/AgentQuestion';
 import { ChangedFiles } from '../../desktop/src/components/tasks/ChangedFiles';
-import { isActive } from '../../desktop/src/lib/run-status';
 import { Avatar, Bar } from './Bar';
 import { workspaceKey } from './drafts';
 import { type Host, request as nativeRequest } from './native';
-import { requestText, sessionStatus, taskStatus, workTitle } from './status';
 
 type Workspace = ReturnType<typeof useRemoteWorkspace>;
 
@@ -127,7 +131,7 @@ function Conversation({
   const context = [task?.projectName, showComputer && host.label].filter(Boolean).join(' · ');
   // Detail carries the whole request; until it loads, or from hosts that send only the
   // list's short title, the bubble shows that title.
-  const asked = requestText(detail?.title ?? task?.title ?? session?.title ?? '');
+  const asked = detail ? askedText(detail) : requestText(task?.title ?? session?.title ?? '');
   return (
     <main className="mobile-screen mobile-conversation">
       <Bar

@@ -1,9 +1,10 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
+import { isUnfinished } from '@jackalope/contracts/runs';
 import { sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
 import { capturedPages } from './review-captures.ts';
-import { isUnfinished } from './run-status.ts';
-import type { PendingUserPrompt, ScreenshotArtifact, TaskRun } from './run-types.ts';
+import type { ScreenshotArtifact, TaskRun } from './run-types.ts';
 import type { WorkItem } from './task-collection.ts';
 import { requirementAssessment } from './task-outcomes.ts';
 import { looksLikePlan, taskDecision } from './task-workflow.ts';

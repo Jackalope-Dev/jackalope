@@ -1,4 +1,4 @@
-import { isActive } from './run-status.ts';
+import { isActive } from '@jackalope/contracts/runs';
 import type { TaskRun } from './run-types.ts';
 
 const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, 'g');

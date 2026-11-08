@@ -1,3 +1,5 @@
+import { type RemoteRequest, sessionStatus } from '@jackalope/contracts/remote';
+import { isActive as active } from '@jackalope/contracts/runs';
 import {
   Button,
   Disclosure,
@@ -10,14 +12,11 @@ import {
 } from '@jackalope/ui';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { isActive as active } from '../../lib/run-status';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { ChangedFiles } from '../tasks/ChangedFiles';
-import { type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
+import { useRemoteWorkspace } from './useRemoteWorkspace';
 import './remote.css';
 import { ActionError } from '../ui/ActionError';
-
-export type { RemoteAction, RemoteRequest } from './useRemoteWorkspace';
 
 export function RemoteWorkspace({
   request,
@@ -83,9 +82,7 @@ export function RemoteWorkspace({
               onClick={() => choose(session.id)}
             >
               <strong>{session.title}</strong>
-              <small>
-                {session.error ? 'Needs attention' : session.paused ? 'Paused' : 'Queued'}
-              </small>
+              <small>{sessionStatus(session).label}</small>
             </button>
           ))}
           {latestTasks.map((task) => (

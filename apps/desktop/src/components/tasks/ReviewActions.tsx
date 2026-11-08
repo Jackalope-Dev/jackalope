@@ -1,3 +1,4 @@
+import type { Review } from '@jackalope/contracts/runs';
 import {
   DialogCloseButton,
   DialogContent,
@@ -8,7 +9,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { MoreHorizontal } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { Review, TaskRun } from '../../lib/run-types';
+import type { TaskRun } from '../../lib/run-types';
 import { ChallengeDialog } from './ChallengeReview';
 import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';

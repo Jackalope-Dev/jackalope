@@ -1,6 +1,6 @@
+import { isLive } from '@jackalope/contracts/runs';
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
-import { isLive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { ActionError } from '../ui/ActionError';
 

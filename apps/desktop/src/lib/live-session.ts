@@ -1,5 +1,5 @@
+import { isActive, isFinished } from '@jackalope/contracts/runs';
 import { invokeNative } from './native/transport.ts';
-import { isActive, isFinished } from './run-status.ts';
 import type { RunRequest, TaskRun } from './run-types.ts';
 
 export interface SessionMessage {

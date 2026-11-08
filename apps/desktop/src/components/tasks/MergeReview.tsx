@@ -21,8 +21,8 @@ import type { Project } from '../../stores/projectStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';
+import { isFinished } from '@jackalope/contracts/runs';
 import { describeError } from '../../lib/errors';
-import { isFinished } from '../../lib/run-status';
 import { ActionError } from '../ui/ActionError';
 export function MergeReview({
   project,

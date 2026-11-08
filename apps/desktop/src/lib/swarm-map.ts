@@ -1,5 +1,5 @@
+import { isActive } from '@jackalope/contracts/runs';
 import type { QueueView } from './queue';
-import { isActive } from './run-status.ts';
 import type { TaskRun } from './run-types';
 import type { SwarmConflict, SwarmFile } from './swarm';
 import { taskTitle } from './task-title.ts';

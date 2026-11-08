@@ -1,8 +1,8 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isTauriEnvironment } from '../lib/native/env';
-import { isActive } from '../lib/run-status';
 import type { ChangeStats, TaskRun } from '../lib/run-types';
 import { taskChangeStats } from '../lib/task-client';
 

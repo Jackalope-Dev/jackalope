@@ -1,3 +1,4 @@
+import { durationLabel, elapsedLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -29,7 +30,6 @@ import {
 import { agentAdapter } from '../../lib/agents';
 import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
-import { durationLabel, elapsedLabel } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
 import { useExecutionStore } from '../../stores/executionStore';

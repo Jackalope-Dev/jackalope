@@ -1,66 +1,17 @@
+import {
+  draftKey as itemDraftKey,
+  latestTasks,
+  prepareRemoteRequest,
+  type RemoteAction,
+  type RemoteRequest,
+  type RemoteTask,
+  requestKey,
+  type Snapshot,
+  waitingSessions,
+} from '@jackalope/contracts/remote';
+import type { Review } from '@jackalope/contracts/runs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError } from '../../lib/errors.ts';
-import { prepareRemoteRequest } from '../../lib/remote-request.ts';
-import type { PendingUserPrompt, Review } from '../../lib/run-types';
-
-export interface RemoteAction {
-  action: string;
-  id?: string;
-  projectId?: string;
-  runId?: string;
-  sessionId?: string;
-  promptId?: string;
-  text?: string;
-}
-export type RemoteRequest = <T>(action: RemoteAction) => Promise<T>;
-export interface RemoteTask {
-  id: string;
-  taskId: string;
-  sessionId: string | null;
-  projectId: string;
-  projectName: string;
-  /** Hosts before this field was added omit it. */
-  agent?: string;
-  title: string;
-  status: string;
-  result: string;
-  error: string | null;
-  /** Where the agent runs, in a task's detail; older hosts omit it. */
-  host?: string | null;
-  startedAt: string;
-  prompts: PendingUserPrompt[];
-  activity: string[];
-}
-export interface RemoteSession {
-  id: string;
-  title: string;
-  projectId: string;
-  paused: boolean;
-  error: string | null;
-  pending: number;
-}
-export interface Snapshot {
-  projects: { id: string; name: string }[];
-  tasks: RemoteTask[];
-  sessions: RemoteSession[];
-}
-
-/** One row per conversation or task: the latest attempt stands for its thread. */
-export function latestTasks(snapshot: Snapshot | null) {
-  return [
-    ...new Map(
-      [...(snapshot?.tasks ?? [])].reverse().map((task) => [task.sessionId || task.taskId, task]),
-    ).values(),
-  ].reverse();
-}
-
-/** Conversations with nothing run yet have no task row of their own. */
-export function waitingSessions(snapshot: Snapshot | null, latest = latestTasks(snapshot)) {
-  return (
-    snapshot?.sessions.filter((session) => !latest.some((task) => task.sessionId === session.id)) ??
-    []
-  );
-}
 
 /**
  * A paired host's work as the companion screens show it: the polled snapshot, the
@@ -90,10 +41,10 @@ export function useRemoteWorkspace(
   const latest = latestTasks(snapshot);
   const selectedTask = snapshot?.tasks.find((task) => (task.sessionId || task.taskId) === selected);
   const review = loadedReview?.runId === selectedTask?.id ? loadedReview?.value : null;
-  const draftKey = `${storageKey}:draft:${composing ? 'new' : selected}`;
+  const draftKey = itemDraftKey(storageKey, composing ? { newWork: true } : selected);
   const legacyDraftKey =
     selectedTask && !selectedTask.sessionId && !composing
-      ? `${storageKey}:draft:${selectedTask.id}`
+      ? itemDraftKey(storageKey, selectedTask.id)
       : undefined;
   useEffect(() => {
     try {
@@ -103,10 +54,10 @@ export function useRemoteWorkspace(
         saved = localStorage.getItem(legacy);
         if (saved !== null && legacy !== draftKey) {
           localStorage.setItem(draftKey, saved);
-          const receipt = localStorage.getItem(`${legacy}:request`);
-          if (receipt) localStorage.setItem(`${draftKey}:request`, receipt);
+          const receipt = localStorage.getItem(requestKey(legacy));
+          if (receipt) localStorage.setItem(requestKey(draftKey), receipt);
           localStorage.removeItem(legacy);
-          localStorage.removeItem(`${legacy}:request`);
+          localStorage.removeItem(requestKey(legacy));
         }
       }
       setDraft(saved ?? '');
@@ -187,7 +138,7 @@ export function useRemoteWorkspace(
           text,
         };
     try {
-      action = prepareRemoteRequest(localStorage, `${draftKey}:request`, action);
+      action = prepareRemoteRequest(localStorage, requestKey(draftKey), action);
     } catch {
       setError(
         'Could not save this send request. Free browser storage before retrying; nothing was sent.',
@@ -201,7 +152,7 @@ export function useRemoteWorkspace(
       const response = await request<{ sessionId?: string }>(action);
       editDraft('');
       try {
-        localStorage.removeItem(`${draftKey}:request`);
+        localStorage.removeItem(requestKey(draftKey));
       } catch {
         setError('Message sent. This browser could not clear its saved request.');
       }

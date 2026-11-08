@@ -1,10 +1,10 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { Ellipsis, ListTodo, Megaphone, Monitor, PauseCircle, SquareTerminal } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { navigateWorkspace } from '../../lib/app-events';
 import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
-import { isActive } from '../../lib/run-status';
 import { selectWork, useWorkspaceWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';

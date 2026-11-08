@@ -16,13 +16,15 @@ Saved history and running tasks remain accessible when access expires.
 | `packages/ui` | Browser-safe React controls shared by desktop, website and admin |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
-| `packages/contracts` | Cross-application shapes: telemetry, account and download responses, platforms, and release distribution (targets, CDN URLs, installer names, R2 layout, Store links) |
+| `packages/contracts` | Cross-application shapes: telemetry, account and download responses, platforms, release distribution (targets, CDN URLs, installer names, R2 layout, Store links), run statuses and agent questions, and the remote companion protocol (snapshot, actions, status labels, draft keys) |
 | `scripts/release` | Cross-application build, signing, release receipts and publication orchestration |
 | `scripts/verification` | Browser regression fixtures and local acceptance helpers |
 | `docs` | Public architecture, feature contracts, verification and release guidance |
 
 Application runtime imports share code through `packages/ui`, `packages/brand`, `packages/knowledge` and
-`packages/contracts`; applications do not import each other's runtime modules. Release scripts import
+`packages/contracts`; applications do not import each other's runtime modules, except that the mobile
+companion renders the desktop's remote workspace hook and a few task components (questions, changed
+files, provider marks) from `apps/desktop/src`. Release scripts import
 `packages/contracts` for release names and URLs. Release tooling intentionally spans
 applications. The website generates its monochrome SVG and PNG icons directly
 from shared character geometry during development and builds. The server bundles

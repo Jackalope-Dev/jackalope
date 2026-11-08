@@ -2,9 +2,13 @@
 //! companion screens' actions to it. Requests leave from here, not the webview, so the
 //! host sees an ordinary authenticated client rather than a cross-site browser request.
 
+#[path = "../../../desktop/src-tauri/src/commands/remote/pairing.rs"]
+mod pairing;
+
+use pairing::pairing_code;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+use std::{path::PathBuf, sync::Mutex};
 use tauri::{Manager, State};
 
 /// A paired host: where it is, the token it issued and how the app names it.
@@ -53,13 +57,20 @@ impl Companion {
         }
     }
 
-    /// Writes the host list. The app's data folder is private to it on Android and iOS.
+    /// Writes the host list through a temporary file, so an interrupted write never leaves
+    /// a partial list. The app's data folder is private to it on Android and iOS, which
+    /// keeps the tokens from other apps; the companion has no keychain plugin.
     fn save(&self, hosts: &[Host]) -> Result<(), String> {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         let bytes = serde_json::to_vec(hosts).map_err(|e| e.to_string())?;
-        std::fs::write(&self.path, bytes).map_err(|e| e.to_string())
+        let temporary = self.path.with_extension("json.tmp");
+        std::fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&temporary, &self.path).map_err(|e| {
+            let _ = std::fs::remove_file(&temporary);
+            e.to_string()
+        })
     }
 
     fn host(&self, id: &str) -> Result<Host, String> {
@@ -100,30 +111,6 @@ fn pairing_target(address: &str, code: Option<&str>) -> Result<(String, String),
     Ok((url.origin().ascii_serialization(), code))
 }
 
-/// A link's 64-hex code, or the short code a computer shows for typing (Crockford base32,
-/// grouped as ABCDE-FGHJK), read without dashes, spaces or case and with look-alike
-/// letters as digits. The computer applies the same reading.
-fn pairing_code(value: &str) -> Option<String> {
-    const ALPHABET: &str = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-    let compact: String = value
-        .chars()
-        .filter(|c| !c.is_whitespace() && *c != '-')
-        .collect();
-    if compact.len() == 64 && compact.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Some(compact.to_ascii_lowercase());
-    }
-    let short: String = compact
-        .to_ascii_uppercase()
-        .chars()
-        .map(|c| match c {
-            'O' => '0',
-            'I' | 'L' => '1',
-            other => other,
-        })
-        .collect();
-    (short.len() == 10 && short.chars().all(|c| ALPHABET.contains(c))).then_some(short)
-}
-
 async fn post(
     origin: &str,
     route: &str,
@@ -131,7 +118,7 @@ async fn post(
     body: &Value,
 ) -> Result<Value, String> {
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(pairing::TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| e.to_string())?;
@@ -139,9 +126,7 @@ async fn post(
     if let Some(token) = token {
         request = request.bearer_auth(token);
     }
-    let mut response = request.send().await.map_err(|_| {
-        "The host is unreachable. Work continues there; reconnect to check whether your last action completed."
-    })?;
+    let mut response = request.send().await.map_err(|_| pairing::UNREACHABLE)?;
     let status = response.status();
     let mut bytes = Vec::new();
     while let Some(chunk) = response
@@ -149,20 +134,12 @@ async fn post(
         .await
         .map_err(|_| "Connection interrupted. Try again.")?
     {
-        if bytes.len() + chunk.len() > 4_000_000 {
-            return Err("The host response is too large.".into());
+        if bytes.len() + chunk.len() > pairing::RESPONSE_LIMIT {
+            return Err(pairing::TOO_LARGE.into());
         }
         bytes.extend_from_slice(&chunk);
     }
-    let value: Value =
-        serde_json::from_slice(&bytes).map_err(|_| "The host returned an unreadable response.")?;
-    if !status.is_success() {
-        return Err(value["error"]
-            .as_str()
-            .unwrap_or("The host declined this request.")
-            .into());
-    }
-    Ok(value)
+    pairing::reply(status.is_success(), &bytes)
 }
 
 #[tauri::command]
@@ -223,10 +200,7 @@ async fn companion_pair(
         &json!({"code": code, "name": name}),
     )
     .await?;
-    let token = response["token"]
-        .as_str()
-        .filter(|token| token.len() == 64)
-        .ok_or("The host did not return a device token.")?;
+    let token = pairing::device_token(&response)?;
     let label = host_label(&origin, response["computer"].as_str());
     let host = Host {
         id: response["id"]

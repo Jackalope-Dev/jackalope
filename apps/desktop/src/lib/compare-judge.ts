@@ -1,6 +1,6 @@
+import { isLive } from '@jackalope/contracts/runs';
 import type { Comparison } from '../stores/compareStore.ts';
 import { getAgentMetadata } from './agent-catalog.ts';
-import { isLive } from './run-status.ts';
 
 /** One finished attempt as the judge sees it, labelled A, B, C… in launch order. */
 export interface JudgedAttempt {

@@ -1,4 +1,66 @@
-import type { RunStatus } from './run-types.ts';
+export type RunStatus =
+  | 'starting'
+  | 'running'
+  | 'stopping'
+  | 'stopped'
+  | 'interrupted'
+  | 'failed'
+  | 'review'
+  | 'reviewed';
+
+/** An agent's answer given on the person's behalf. */
+export interface AgentAnswer {
+  kind: 'agent';
+  agent: string;
+  model?: string;
+  /** The answer without the attribution the asking agent received. */
+  answer: string;
+  rationale: string;
+  confidence: number;
+  evidence?: string[];
+  runId?: string;
+}
+
+/** Something only the person can do; never routed to an agent. */
+export interface HumanAction {
+  kind: 'secret' | 'sign_in' | 'payment' | 'account' | 'other';
+  instructions: string;
+  url?: string;
+  secretName?: string;
+}
+
+export interface PendingUserPrompt {
+  id: string;
+  runId: string;
+  question: string;
+  inputType: 'text' | 'choice' | 'confirmation' | 'multiChoice' | 'humanAction';
+  options: string[];
+  defaultValue?: string | null;
+  /** `deciding`: an agent decides first; the person may still answer. */
+  status: 'pending' | 'deciding' | 'answered';
+  /** Set when an agent answered for the person. */
+  answeredBy?: AgentAnswer;
+  /** Why it reached the person although agents may decide. */
+  escalation?: { category: string; reason: string };
+  humanAction?: HumanAction;
+  answer?: string | null;
+  createdAt: string;
+  answeredAt?: string | null;
+  /** Optional card structure; absent on older questions. */
+  header?: string;
+  recommended?: string;
+  multiSelect?: boolean;
+  allowOther?: boolean;
+  rationale?: string;
+  /** Why checking the code cannot answer it; plan questions carry one. */
+  whyAsk?: string;
+}
+
+export interface Review {
+  files: string[];
+  diff: string;
+  note: string;
+}
 
 type HasStatus = string | { status: string };
 const statusOf = (value: HasStatus) => (typeof value === 'string' ? value : value.status);

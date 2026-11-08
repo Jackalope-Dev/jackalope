@@ -148,6 +148,9 @@ importers:
       '@jackalope/brand':
         specifier: workspace:*
         version: link:../../packages/brand
+      '@jackalope/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@jackalope/ui':
         specifier: workspace:*
         version: link:../../packages/ui

@@ -1,3 +1,4 @@
+import { isActive, isFinished, isUnfinished, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -36,7 +37,6 @@ import {
   queueCommand,
   queueSnapshot,
 } from '../../lib/queue';
-import { isActive, isFinished, isUnfinished, statusLabel } from '../../lib/run-status';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';

@@ -1,3 +1,4 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -5,7 +6,6 @@ import type { ContextSelection } from '../lib/knowledge-types';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { observeRefresh } from '../lib/observe-refresh';
-import { isActive } from '../lib/run-status';
 import type { Runner, RunRequest, TaskRun } from '../lib/run-types';
 import { mergeTaskChanges, type TaskChanges } from '../lib/task-changes';
 import type { TaskEffort } from '../lib/task-effort';

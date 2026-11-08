@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@jackalope/brand": "workspace:*",
+    "@jackalope/contracts": "workspace:*",
     "@jackalope/ui": "workspace:*",
     "@tauri-apps/api": "~2.12.4",
     "@tauri-apps/plugin-barcode-scanner": "~2.5.3",

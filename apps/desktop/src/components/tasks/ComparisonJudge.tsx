@@ -1,3 +1,4 @@
+import { isActive, isFinished } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -10,7 +11,6 @@ import {
 } from '@jackalope/ui';
 import { Scale } from 'lucide-react';
 import type { Verdict } from '../../lib/compare-judge';
-import { isActive, isFinished } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 
 /** An attempt as the verdict refers to it: its judge label and display name. */

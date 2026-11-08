@@ -1,7 +1,7 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
 import { Button, Textarea } from '@jackalope/ui';
 import { Check, MessageCircle, Send } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { PendingUserPrompt } from '../../lib/run-types';
 import {
   AgentDecisionChip,
   AgentDecisionReason,

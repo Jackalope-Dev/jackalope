@@ -1,5 +1,6 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
 import { invokeNative } from './native/transport.ts';
-import type { PendingUserPrompt, RunRequest } from './run-types';
+import type { RunRequest } from './run-types';
 
 export type PlanShape = 'single' | 'subtasks' | 'swarm';
 export type PlanStatus = 'planning' | 'draft' | 'approved' | 'running' | 'done';

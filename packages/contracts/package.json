@@ -13,6 +13,8 @@
     "./links": "./src/links.ts",
     "./platform": "./src/platform.ts",
     "./release": "./src/release.ts",
+    "./remote": "./src/remote.ts",
+    "./runs": "./src/runs.ts",
     "./telemetry": "./src/telemetry.ts"
   },
   "devDependencies": {
