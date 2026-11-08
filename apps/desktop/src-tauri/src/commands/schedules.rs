@@ -221,7 +221,8 @@ impl Scheduler {
                     let mut updated = ledger.clone();
                     let current = &mut updated.schedules[index];
                     current.definition.enabled = false;
-                    record(current, None, None, Outcome::Invalid(error));
+                    let due_at = current.next_at;
+                    record(current, due_at, None, None, Outcome::Invalid(error));
                     self.persist(&updated)?;
                     *ledger = updated;
                     continue;
@@ -756,6 +757,7 @@ impl Scheduler {
         }
         let mut request = saved.definition.request.clone();
         request.id = uuid::Uuid::new_v4().to_string();
+        let due = matches!(trigger, Trigger::Due { .. });
         let (change, observation, next, due_at) = match trigger {
             Trigger::Due {
                 next,
@@ -783,11 +785,11 @@ impl Scheduler {
         let run_id = skip.is_none().then(|| request.id.clone());
         record(
             current,
+            due_at,
             change,
             run_id,
             skip.clone().unwrap_or(Outcome::Reserved),
         );
-        current.history.last_mut().unwrap().due_at = due_at;
         self.persist(&updated)?;
         **ledger = updated;
         if let Some(skip) = skip {
@@ -821,7 +823,7 @@ impl Scheduler {
         };
         let current = &mut ledger.schedules[index];
         current.history.last_mut().unwrap().outcome = outcome.text();
-        if current.definition.monitor.is_some() {
+        if due && current.definition.monitor.is_some() {
             current.last_notice = current.history.last().cloned();
         }
         self.persist(ledger)?;
@@ -893,16 +895,17 @@ impl Outcome {
     }
 }
 
-/// Appends an occurrence due now, keeping the latest 200.
+/// Appends an occurrence, keeping the latest 200.
 fn record(
     current: &mut SavedSchedule,
+    due_at: DateTime<Utc>,
     change: Option<super::monitors::MonitorChange>,
     run_id: Option<String>,
     outcome: Outcome,
 ) {
     let event = Occurrence {
         change,
-        due_at: current.next_at,
+        due_at,
         run_id,
         outcome: outcome.text(),
     };
