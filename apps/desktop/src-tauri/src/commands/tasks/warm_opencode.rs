@@ -466,13 +466,7 @@ fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, Strin
         process: AgentProcess::spawn(&mut cmd, "opencode")?.process,
         endpoint,
     };
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .redirect(reqwest::redirect::Policy::none())
-        .connect_timeout(Duration::from_millis(300))
-        .timeout(HELPER_STARTUP.probe())
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = Endpoint::client(&HELPER_STARTUP)?;
     let exited = || !matches!(server.process.try_wait(), Ok(None));
     if tauri::async_runtime::block_on(server.endpoint.wait_ready(
         &client,

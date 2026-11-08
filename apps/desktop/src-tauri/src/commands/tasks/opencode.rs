@@ -82,12 +82,7 @@ impl Connection {
         launched: std::time::Instant,
     ) -> Result<(), String> {
         tauri::async_runtime::block_on(async {
-            let client = reqwest::Client::builder()
-                .no_proxy()
-                .redirect(reqwest::redirect::Policy::none())
-                .connect_timeout(Duration::from_secs(2))
-                .build()
-                .map_err(|e| e.to_string())?;
+            let client = Endpoint::client(&server::TASK_STARTUP)?;
             let api = Api {
                 connection: &self,
                 client,

@@ -9,11 +9,13 @@ use std::time::{Duration, Instant};
 const USERNAME: &str = "jackalope";
 const HEALTH_LIMIT: usize = 4096;
 
-/// How long a starting server may take to answer its health check.
+/// How long a starting server may take to answer its health check, and how
+/// long a client waits for a connection to it.
 pub(in crate::commands::tasks) struct Readiness {
     budget: Duration,
     interval: Duration,
     probe: Duration,
+    connect: Duration,
 }
 
 /// A task server: a cold start can install plugins and dependencies first.
@@ -21,6 +23,7 @@ pub(in crate::commands::tasks) const TASK_STARTUP: Readiness = Readiness {
     budget: Duration::from_secs(20),
     interval: Duration::from_millis(100),
     probe: Duration::from_secs(1),
+    connect: Duration::from_secs(2),
 };
 
 /// A warm helper server, given up on quickly so the helper runs without it.
@@ -28,13 +31,8 @@ pub(in crate::commands::tasks) const HELPER_STARTUP: Readiness = Readiness {
     budget: Duration::from_secs(8),
     interval: Duration::from_millis(50),
     probe: Duration::from_millis(500),
+    connect: Duration::from_millis(300),
 };
-
-impl Readiness {
-    pub fn probe(&self) -> Duration {
-        self.probe
-    }
-}
 
 #[derive(Clone)]
 pub(in crate::commands::tasks) struct Endpoint {
@@ -76,6 +74,18 @@ impl Endpoint {
         command
             .env("OPENCODE_SERVER_PASSWORD", &self.password)
             .env("OPENCODE_SERVER_USERNAME", USERNAME);
+    }
+
+    /// A client for a server started with `readiness`. It bypasses proxies,
+    /// as the server is on loopback, and refuses redirects so the password
+    /// stays with it.
+    pub fn client(readiness: &Readiness) -> Result<reqwest::Client, String> {
+        reqwest::Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(readiness.connect)
+            .build()
+            .map_err(|e| e.to_string())
     }
 
     pub fn url(&self, route: &str) -> reqwest::Url {
