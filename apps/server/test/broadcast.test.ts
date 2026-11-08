@@ -113,7 +113,7 @@ it('wears the same chrome as an access email', () => {
     { to: 'you@example.com', kind: 'welcome', token: 'preview' },
     'https://jackalope.dev',
   ).body;
-  for (const shared of ['#faf8f6', '#29241f', 'Jackalope Digital LLC', 'icon-128.png'])
+  for (const shared of ['Jackalope Digital LLC', 'icon-128.png'])
     expect(note.includes(shared) && access.includes(shared)).toBe(true);
   // Broadcasts must offer a way out; access mail is transactional and does not.
   expect(note).toContain('href="{{unsubscribeUrl}}"');

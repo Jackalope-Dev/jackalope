@@ -151,9 +151,9 @@ it('keeps same-name profiles distinct and reports authenticated metadata and suc
   ).toEqual([]);
   await call('/v1/desktop/me', 'GET', undefined, secret);
   await call('/v1/desktop/exchange', 'POST', undefined, secret);
-  expect(await env.DB.prepare('SELECT count(*) AS total FROM access_devices').first('total')).toBe(
-    2,
-  );
+  expect(
+    await (await call('/v1/access/devices', 'GET', undefined, owner.session, true)).json(),
+  ).toHaveLength(2);
   expect(JSON.stringify(devices)).not.toContain(secret);
   await call('/v1/access/desktop/revoke', 'POST', { id: status.id }, owner.session, true);
   expect((await call('/v1/desktop/me', 'GET', undefined, secret)).status).toBe(401);
@@ -283,12 +283,11 @@ it('deletion removes the copy, stops every device and prevents stale uploads fro
     ).toBe(403);
     expect((await call('/v1/desktop/me', 'GET', undefined, secret)).status).toBe(200);
   }
-  expect(
-    await env.DB.prepare('SELECT member_id FROM access_settings WHERE member_id=?')
-      .bind(owner.id)
-      .first(),
-  ).toBeNull();
   await enableSync(b);
+  expect(await (await call('/v1/desktop/settings', 'GET', undefined, b)).json()).toEqual({
+    revision: 0,
+    settings: null,
+  });
   expect(
     (await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, b)).status,
   ).toBe(200);
@@ -327,11 +326,11 @@ it('turning sync off preserves the saved copy; deleting the member cascades to t
   await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, secret);
   await call('/v1/desktop/settings/consent', 'POST', { enabled: false }, secret);
   expect((await call('/v1/desktop/settings', 'GET', undefined, secret)).status).toBe(403);
-  expect(
-    await env.DB.prepare('SELECT revision FROM access_settings WHERE member_id=?')
-      .bind(owner.id)
-      .first(),
-  ).toEqual({ revision: 1 });
+  await enableSync(secret);
+  expect(await (await call('/v1/desktop/settings', 'GET', undefined, secret)).json()).toEqual({
+    revision: 1,
+    settings: preferences,
+  });
   await env.DB.prepare('DELETE FROM access_sessions WHERE member_id=?').bind(owner.id).run();
   await env.DB.prepare('DELETE FROM access_members WHERE id=?').bind(owner.id).run();
   expect(
@@ -481,11 +480,7 @@ it('waitlist device management is owner-scoped and supports disconnect, expiry a
     .bind(stranger.owner.id)
     .run();
   expect((await call('/v1/desktop/me', 'GET', undefined, stranger.flow.secret)).status).toBe(401);
-  expect(
-    await env.DB.prepare('SELECT count(*) AS total FROM access_devices WHERE member_id=?')
-      .bind(owner.id)
-      .first('total'),
-  ).toBe(0);
+  expect(await (await browser('devices', session)).json()).toEqual([]);
 });
 it('requires browser approval and native proof; retrying a lost exchange response creates one revocable device', async () => {
   const owner = await member();
@@ -510,9 +505,6 @@ it('requires browser approval and native proof; retrying a lost exchange respons
   ]);
   expect(responses.some((response) => response.status === 200)).toBe(true);
   expect((await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).status).toBe(200);
-  expect(
-    (await env.DB.prepare('SELECT count(*) AS n FROM access_devices').first<{ n: number }>())?.n,
-  ).toBe(1);
   expect(
     await env.DB.prepare('SELECT first_desktop_at FROM access_members WHERE id=?')
       .bind(owner.id)

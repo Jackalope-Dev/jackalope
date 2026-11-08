@@ -277,11 +277,10 @@ it('deleting synced lessons starts a new epoch that stops stale devices', async 
   ).toBe(200);
   // Deleting synced settings removes synced lessons too.
   expect((await call('/v1/desktop/settings', 'DELETE', undefined, a)).status).toBe(200);
-  expect(
-    await env.DB.prepare('SELECT count(*) AS total FROM access_lessons WHERE member_id=?')
-      .bind(owner.id)
-      .first('total'),
-  ).toBe(0);
+  expect((await call('/v1/desktop/settings/consent', 'POST', { enabled: true }, a)).status).toBe(
+    200,
+  );
+  expect((await pull(a)).lessons).toEqual([]);
 });
 
 it('bounds the lessons an account can store', async () => {
