@@ -21,7 +21,6 @@
     "release:cut": "node scripts/release/cut-release.mjs",
     "release:prepare": "node scripts/release/prepare-release.mjs",
     "release:setup": "node scripts/security/github.mjs --repo Jackalope-Dev/jackalope --reviewer Ghosts",
-    "test:hooks": "node --test scripts/git-hooks.test.mjs",
     "dev:website": "pnpm --filter @jackalope/website dev",
     "build:website": "pnpm --filter @jackalope/website build",
     "verify": "node scripts/verify.mjs",
