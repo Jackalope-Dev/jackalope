@@ -839,7 +839,6 @@ pub async fn cloudflare_artifacts_share(
     let (token, _, expires_at) = loop {
         match mint_token(&connection, &fork_name, "read", hours * 3600).await {
             Ok(minted) => break minted,
-            // Forks become readable asynchronously.
             Err(refusal) if attempt < 5 && STILL_PREPARING.contains(&refusal.code) => {
                 attempt += 1;
                 tokio::time::sleep(Duration::from_secs(2)).await;
