@@ -1,9 +1,16 @@
-import { isPlatform, isReleaseChannel } from '@jackalope/contracts/platform';
+import { isPlatform, isReleaseChannel, SEMVER } from '@jackalope/contracts/platform';
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from 'jose';
 import { accessAdmin } from './access/admin';
 import { adminBetaRequests, resolveBetaRequest } from './access/beta';
 import { adminPage } from './admin-page';
-import { ADMIN_HEADERS, adminCsp } from './respond';
+import { ServiceError } from './errors';
+import {
+  ADMIN_HEADERS,
+  adminCsp,
+  errorResponse,
+  json as respondJson,
+  SERVICE_ERRORS,
+} from './respond';
 
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 function remoteKeys(issuer: string) {
@@ -40,14 +47,14 @@ export async function authorizeAdmin(request: Request, env: Env, keys?: JWTVerif
     return false;
   }
 }
-const headers = ADMIN_HEADERS;
+const json = (value: unknown, status = 200) => respondJson(value, status, ADMIN_HEADERS);
 export async function admin(
   request: Request,
   env: Env,
   readJson: (request: Request) => Promise<unknown>,
 ) {
   if (!(await authorizeAdmin(request, env)))
-    return Response.json({ error: 'admin_access_required' }, { status: 403, headers });
+    return json({ error: 'admin_access_required' }, 403);
   return adminRoutes(request, env, readJson);
 }
 export async function adminRoutes(
@@ -63,11 +70,23 @@ export async function adminRoutes(
     url.pathname.startsWith('/admin/api/access/')
   )
     return accessAdmin(request, env, readJson);
+  try {
+    return await consoleRoutes(request, url, env, readJson);
+  } catch (error) {
+    return errorResponse(error, { ...SERVICE_ERRORS, headers: ADMIN_HEADERS });
+  }
+}
+async function consoleRoutes(
+  request: Request,
+  url: URL,
+  env: Env,
+  readJson: (request: Request) => Promise<unknown>,
+) {
   if (request.method === 'GET' && url.pathname === '/admin') {
     const nonce = crypto.randomUUID();
     return new Response(adminPage(nonce), {
       headers: {
-        ...headers,
+        ...ADMIN_HEADERS,
         'content-type': 'text/html; charset=utf-8',
         'content-security-policy': adminCsp(nonce),
       },
@@ -82,10 +101,10 @@ export async function adminRoutes(
       ![7, 30].includes(days) ||
       !(channel === 'all' || isReleaseChannel(channel)) ||
       !(os === 'all' || isPlatform(os)) ||
-      !/^$|^\d+\.\d+\.\d+$/.test(version) ||
+      !(version === '' || SEMVER.test(version)) ||
       version.length > 32
     )
-      return Response.json({ error: 'invalid_filter' }, { status: 400, headers });
+      throw new ServiceError(400, 'invalid_filter');
     const since = new Date(Date.now() - (days - 1) * 86400000).toISOString().slice(0, 10);
     const metrics = await env.DB.prepare(
       "SELECT day,version,channel,os,name,dimension,count FROM metrics WHERE day>=? AND (?='all' OR channel=?) AND (?='' OR version=?) AND (?='all' OR os=?) ORDER BY day DESC,version LIMIT 10001",
@@ -95,19 +114,16 @@ export async function adminRoutes(
     const versions = await env.DB.prepare(
       'SELECT DISTINCT version FROM metrics ORDER BY version DESC LIMIT 100',
     ).all();
-    return Response.json(
-      {
-        metrics: metrics.results.slice(0, 10000),
-        truncated: metrics.results.length > 10000,
-        versions: versions.results,
-        ingestionEnabled: env.INGESTION_ENABLED === 'true',
-        emailEnabled: env.FEEDBACK_EMAIL_ENABLED === 'true',
-        retentionDays: env.TELEMETRY_DAYS,
-        coverage:
-          'Best-effort event counts from participating installations, not unique users, retention, or all crashes. Views are visits; accepted operations are native acknowledgements, not proof of completed agent work. Failed checks and rejected operations are not necessarily app defects. Error categories require separate consent. Public ingestion cannot prove authentic clients.',
-      },
-      { headers },
-    );
+    return json({
+      metrics: metrics.results.slice(0, 10000),
+      truncated: metrics.results.length > 10000,
+      versions: versions.results,
+      ingestionEnabled: env.INGESTION_ENABLED === 'true',
+      emailEnabled: env.FEEDBACK_EMAIL_ENABLED === 'true',
+      retentionDays: env.TELEMETRY_DAYS,
+      coverage:
+        'Best-effort event counts from participating installations, not unique users, retention, or all crashes. Views are visits; accepted operations are native acknowledgements, not proof of completed agent work. Failed checks and rejected operations are not necessarily app defects. Error categories require separate consent. Public ingestion cannot prove authentic clients.',
+    });
   }
   if (request.method === 'GET' && url.pathname === '/admin/api/summary') {
     const [people, feedback, mail] = await Promise.all([
@@ -123,7 +139,7 @@ export async function adminRoutes(
         "SELECT count(*) AS needsAttention FROM access_members m JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE a.state='failed' OR a.delivery_status IN ('bounced','failed','complained')",
       ).first(),
     ]);
-    return Response.json({ people, feedback: feedback.results, mail }, { headers });
+    return json({ people, feedback: feedback.results, mail });
   }
   if (request.method === 'GET' && url.pathname === '/admin/api/feedback') {
     const status = url.searchParams.get('status') ?? 'new';
@@ -133,17 +149,17 @@ export async function adminRoutes(
       !Number.isSafeInteger(before) ||
       before < 0
     )
-      return Response.json({ error: 'invalid_filter' }, { status: 400, headers });
+      throw new ServiceError(400, 'invalid_filter');
     const rows = await env.DB.prepare(
       "SELECT rowid AS cursor,id,received_at,payload,status,email_state,email_attempts FROM feedback WHERE expires_at>? AND rowid<? AND (?='all' OR status=?) ORDER BY rowid DESC LIMIT 50",
     )
       .bind(Date.now(), before, status, status)
       .all();
-    return Response.json({ reports: rows.results }, { headers });
+    return json({ reports: rows.results });
   }
   if (request.method === 'POST' && url.pathname === '/admin/api/feedback') {
     if (request.headers.get('origin') !== url.origin)
-      return Response.json({ error: 'origin_required' }, { status: 403, headers });
+      throw new ServiceError(403, 'origin_required');
     const body = await readJson(request);
     if (
       !body ||
@@ -155,21 +171,21 @@ export async function adminRoutes(
       typeof body.status !== 'string' ||
       !['new', 'reviewing', 'planned', 'closed'].includes(body.status)
     )
-      return Response.json({ error: 'invalid_request' }, { status: 400, headers });
+      throw new ServiceError(400, 'invalid_request');
     const result = await env.DB.prepare('UPDATE feedback SET status=? WHERE id=? AND expires_at>?')
       .bind(body.status, body.id, Date.now())
       .run();
-    return Response.json({ updated: result.meta.changes === 1 }, { headers });
+    return json({ updated: result.meta.changes === 1 });
   }
   if (request.method === 'GET' && url.pathname === '/admin/api/beta') {
     const status = url.searchParams.get('status') ?? 'pending';
     if (!['pending', 'done', 'declined', 'withdrawn', 'all'].includes(status))
-      return Response.json({ error: 'invalid_filter' }, { status: 400, headers });
-    return Response.json(await adminBetaRequests(env, status), { headers });
+      throw new ServiceError(400, 'invalid_filter');
+    return json(await adminBetaRequests(env, status));
   }
   if (request.method === 'POST' && url.pathname === '/admin/api/beta') {
     if (request.headers.get('origin') !== url.origin)
-      return Response.json({ error: 'origin_required' }, { status: 403, headers });
+      throw new ServiceError(403, 'origin_required');
     const body = await readJson(request);
     if (
       !body ||
@@ -180,8 +196,8 @@ export async function adminRoutes(
       !/^[a-f0-9-]{36}$/.test(body.id) ||
       (body.status !== 'done' && body.status !== 'declined')
     )
-      return Response.json({ error: 'invalid_request' }, { status: 400, headers });
-    return Response.json(await resolveBetaRequest(env, body.id, body.status), { headers });
+      throw new ServiceError(400, 'invalid_request');
+    return json(await resolveBetaRequest(env, body.id, body.status));
   }
-  return Response.json({ error: 'not_found' }, { status: 404, headers });
+  throw new ServiceError(404, 'not_found');
 }

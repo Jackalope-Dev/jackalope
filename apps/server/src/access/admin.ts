@@ -80,13 +80,12 @@ export async function accessAdmin(
   readJson: (request: Request) => Promise<unknown>,
 ) {
   const url = new URL(request.url);
-  const headers = ADMIN_HEADERS;
-  const json = (value: unknown, status = 200) => respondJson(value, status, headers);
+  const json = (value: unknown, status = 200) => respondJson(value, status, ADMIN_HEADERS);
   if (request.method === 'GET' && url.pathname === '/admin/access') {
     const nonce = crypto.randomUUID();
     return new Response(adminPage(nonce), {
       headers: {
-        ...headers,
+        ...ADMIN_HEADERS,
         'content-type': 'text/html; charset=utf-8',
         'content-security-policy': adminCsp(nonce),
       },
@@ -98,7 +97,7 @@ export async function accessAdmin(
       accessEmail(mail, env.ACCESS_WEB_ORIGIN, stableDownloads(env), openSignup(env)).body,
       {
         headers: {
-          ...headers,
+          ...ADMIN_HEADERS,
           'content-type': 'text/html; charset=utf-8',
           'content-security-policy':
             "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
@@ -129,12 +128,12 @@ export async function accessAdmin(
     if (!draft.success)
       return new Response('This preview link is incomplete. Compose the note again.', {
         status: 400,
-        headers: { ...headers, 'content-type': 'text/plain; charset=utf-8' },
+        headers: { ...ADMIN_HEADERS, 'content-type': 'text/plain; charset=utf-8' },
       });
     const entries = await changelogEntries(env).catch(() => []);
     return new Response(broadcastEmail(draft.data, entries, env.ACCESS_WEB_ORIGIN).html, {
       headers: {
-        ...headers,
+        ...ADMIN_HEADERS,
         'content-type': 'text/html; charset=utf-8',
         'content-security-policy':
           "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
@@ -328,6 +327,6 @@ export async function accessAdmin(
     }
     return json({ error: 'not_found' }, 404);
   } catch (error) {
-    return errorResponse(error, { headers, fallback: 'access_unavailable' });
+    return errorResponse(error, { headers: ADMIN_HEADERS, fallback: 'access_unavailable' });
   }
 }

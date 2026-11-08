@@ -32,6 +32,13 @@ interface ErrorOptions {
   log?: boolean;
 }
 
+/** How the public API and the admin console report failures outside the access routes. */
+export const SERVICE_ERRORS = {
+  triggers: ['id_conflict', 'storage_capacity'],
+  retryAfter: { 429: '60', 503: '300' },
+  log: true,
+} as const satisfies ErrorOptions;
+
 /** The `{ error }` response for anything a route throws. */
 export function errorResponse(
   error: unknown,
