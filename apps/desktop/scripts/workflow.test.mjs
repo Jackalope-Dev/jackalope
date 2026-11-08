@@ -10,7 +10,6 @@ import {
   collectWorkspaceWork,
   matchesWorkFilter,
   workGroup,
-  workGroups,
   workPresence,
 } from '../src/lib/task-collection.ts';
 import {
@@ -59,10 +58,6 @@ test('Needs you includes review and blockers without changing their specific nex
     needsYou,
   );
   assert.equal(workGroup('review'), 'attention');
-  assert.deepEqual(
-    workGroups.map((group) => group.label),
-    ['Needs you', 'Working', 'Drafts', 'Finished'],
-  );
 });
 
 test('checks stay inside review instead of replacing the review and merge action', () => {

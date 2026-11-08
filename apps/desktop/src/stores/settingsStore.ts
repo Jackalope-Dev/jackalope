@@ -56,7 +56,7 @@ export interface SettingsState {
   exportSettings: () => string;
 }
 
-export const DEFAULT_SETTINGS: Omit<
+const DEFAULT_SETTINGS: Omit<
   SettingsState,
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {

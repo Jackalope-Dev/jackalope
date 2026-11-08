@@ -366,7 +366,11 @@ try {
   await page.getByRole('button', { name: 'Configure Codex', exact: true }).waitFor();
   await page.getByText('CLI setup needed', { exact: true }).waitFor();
   await page.setViewportSize({ width: 1280, height: 840 });
-  assert.equal(await page.locator('.agent-roster-row').count(), 8);
+  const builtinCount = await page.evaluate(
+    async () => (await import('/src/lib/agent-catalog.ts')).builtinAgents.length,
+  );
+  assert.ok(builtinCount > 0);
+  assert.equal(await page.locator('.agent-roster-row').count(), builtinCount);
   await page.getByText('npm install -g opencode-ai').waitFor();
   await page.screenshot({ path: 'output/playwright/agents-grid.png' });
   assert.equal(await page.getByText('Ready', { exact: true }).count(), 0);

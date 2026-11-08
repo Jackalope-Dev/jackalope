@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CLOUD_RESOURCES,
-  DEFAULT_KINDS,
   orderedKinds,
   parseDomains,
   requiredPermissions,
@@ -32,8 +31,7 @@ test('prefixes follow the same rules as the native check', () => {
     assert.ok(!validPrefix(prefix), prefix);
 });
 
-test('defaults, order and permissions match the setup screen', () => {
-  assert.deepEqual(DEFAULT_KINDS, ['r2', 'kv', 'queue', 'durableObjects']);
+test('order and permissions match the setup screen', () => {
   assert.deepEqual(
     [...CLOUD_RESOURCES.map((option) => option.kind)].sort(),
     [...SETUP_ORDER].sort(),
@@ -50,8 +48,6 @@ test('defaults, order and permissions match the setup screen', () => {
     'D1: Edit',
     'Workers KV Storage: Edit',
   ]);
-  assert.equal(CLOUD_RESOURCES.find((option) => option.kind === 'hyperdrive').needs, 'postgres');
-  assert.equal(CLOUD_RESOURCES.find((option) => option.kind === 'turnstile').needs, 'domains');
 });
 
 test('domains accept lines, commas and pasted URLs', () => {

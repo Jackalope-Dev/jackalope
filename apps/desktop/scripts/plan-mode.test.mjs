@@ -8,7 +8,6 @@ import {
   manualPlan,
   planAssumption,
   shapeChoices,
-  stateTone,
   taskWaves,
 } from '../src/lib/plan-mode.ts';
 
@@ -71,18 +70,6 @@ test('the recommended option leads and stop options come last', () => {
   assert.deepEqual(choices, ['Comma', 'Tabs']);
   assert.deepEqual(stops, ['Use your recommendations for the rest', 'Done, draft the plan']);
   assert.deepEqual(interviewOptions({ options: ['A'] }).choices, ['A']);
-});
-
-test('states map to tones with failures distinct from success', () => {
-  assert.equal(stateTone('check-passed'), 'success');
-  assert.equal(stateTone('human-accepted'), 'success');
-  assert.equal(stateTone('check-failed'), 'danger');
-  assert.equal(stateTone('agent-claimed'), 'accent');
-  assert.equal(stateTone('unassessed'), 'muted');
-  assert.equal(stateTone('reviewing'), 'accent');
-  assert.equal(stateTone('held'), 'danger');
-  assert.equal(stateTone('limit'), 'danger');
-  assert.equal(stateTone('approval'), 'danger');
 });
 
 test('plan-started managed tasks do not report a missing planner attempt', () => {

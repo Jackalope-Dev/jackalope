@@ -1,33 +1,50 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { localAiFixture } from '../src/design-lab/local-ai-fixture.ts';
 import { downloadPercent, formatSize, localHelperModels, modelFit } from '../src/lib/local-ai.ts';
+
+const model = (id, recommendedMemoryGb) => ({
+  id,
+  name: id,
+  downloadBytes: 1e9,
+  recommendedMemoryGb,
+  description: '',
+});
+
+const inspection = {
+  hardware: {
+    os: 'windows',
+    arch: 'x86_64',
+    memoryBytes: 32 * 1024 ** 3,
+    availableMemoryBytes: null,
+    freeDiskBytes: null,
+    gpu: null,
+    diskLocation: null,
+  },
+  models: [model('small', 16), model('medium', 24), model('large', 48)],
+  installedModels: ['small', 'medium'],
+  ollamaOnline: true,
+  opencodeInstalled: true,
+  canInstall: false,
+  runtimeDiskBytes: 0,
+  catalogCheckedAt: '2026-01-01',
+};
 
 test('helper choices require an installed catalog model distinct from the coding model', () => {
   assert.deepEqual(
-    localHelperModels(
-      { ...localAiFixture, installedModels: ['qwen3.5:4b', 'uncatalogued'] },
-      'qwen3.5:4b',
-    ),
+    localHelperModels({ ...inspection, installedModels: ['small', 'uncatalogued'] }, 'small'),
     [],
   );
-  assert.deepEqual(
-    localHelperModels(localAiFixture, 'qwen3.5:9b').map((model) => model.id),
-    ['qwen3.5:4b'],
-  );
+  assert.deepEqual(localHelperModels(inspection, 'medium').map((entry) => entry.id), ['small']);
 });
 
 test('hardware advice distinguishes unknown memory from insufficient memory', () => {
-  const model = localAiFixture.models[2];
-  assert.equal(modelFit(model, localAiFixture), 'limited');
+  const large = inspection.models[2];
+  assert.equal(modelFit(large, inspection), 'limited');
   assert.equal(
-    modelFit(model, {
-      ...localAiFixture,
-      hardware: { ...localAiFixture.hardware, memoryBytes: null },
-    }),
+    modelFit(large, { ...inspection, hardware: { ...inspection.hardware, memoryBytes: null } }),
     'unknown',
   );
-  assert.equal(modelFit(localAiFixture.models[0], localAiFixture), 'fits');
+  assert.equal(modelFit(inspection.models[0], inspection), 'fits');
   assert.equal(formatSize(null), 'Not detected');
 });
 

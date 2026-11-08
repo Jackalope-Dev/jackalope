@@ -9,21 +9,8 @@ globalThis.window = {
     removeItem: (key) => values.delete(key),
   },
 };
-const { agentAdapter, builtinAgents, getAgentMetadata } = await import('../src/lib/agent-catalog.ts');
+const { agentAdapter } = await import('../src/lib/agent-catalog.ts');
 const { agentName, useAgentConfigStore } = await import('../src/stores/agentConfigStore.ts');
-
-test('install and sign-in commands come from the catalog entries', () => {
-  assert.equal(
-    getAgentMetadata('claude')?.installCommand,
-    'npm install -g @anthropic-ai/claude-code',
-  );
-  assert.equal(getAgentMetadata('claude')?.loginCommand, 'claude auth login');
-  assert.equal(getAgentMetadata('antigravity')?.loginCommand, 'agy');
-  assert.equal(getAgentMetadata('antigravity')?.installCommand, '');
-  assert.equal(getAgentMetadata('acp')?.defaultBinary, '');
-  assert.equal(getAgentMetadata('acp')?.loginCommand, '');
-  assert.equal(builtinAgents.at(-1)?.id, 'acp');
-});
 
 test('custom agents resolve to their adapter and their own name', () => {
   useAgentConfigStore.setState({

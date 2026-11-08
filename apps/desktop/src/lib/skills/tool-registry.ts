@@ -13,7 +13,7 @@ export interface McpToolDefinition {
   isAvailable: boolean;
 }
 
-export const VETTED_TOOLS: McpToolDefinition[] = [
+const VETTED_TOOLS: McpToolDefinition[] = [
   {
     id: 'filesystem',
     name: 'Scoped Filesystem MCP',
