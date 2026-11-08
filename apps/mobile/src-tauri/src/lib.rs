@@ -195,7 +195,7 @@ async fn companion_pair(
     }
     let response = post(
         &origin,
-        "/api/pair",
+        pairing::PAIR_ROUTE,
         None,
         &json!({"code": code, "name": name}),
     )
@@ -232,7 +232,7 @@ async fn companion_request(
     state: State<'_, Companion>,
 ) -> Result<Value, String> {
     let host = state.host(&host)?;
-    post(&host.origin, "/api/request", Some(&host.token), &action).await
+    post(&host.origin, pairing::REQUEST_ROUTE, Some(&host.token), &action).await
 }
 
 /// Forgets a host on this phone. The host keeps the device until it is removed there.

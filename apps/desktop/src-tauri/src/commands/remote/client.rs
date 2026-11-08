@@ -125,7 +125,7 @@ pub async fn remote_host_pair(
         .collect::<String>();
     let response = match request(
         &host,
-        super::api::PAIR_ROUTE,
+        super::pairing::PAIR_ROUTE,
         json!({"code":code,"name":device}),
     )
     .await
@@ -167,7 +167,7 @@ pub async fn remote_host_request(
         .ok_or("Connect this host again.")?;
     request(
         &host,
-        super::api::REQUEST_ROUTE,
+        super::pairing::REQUEST_ROUTE,
         serde_json::to_value(action).map_err(|e| e.to_string())?,
     )
     .await

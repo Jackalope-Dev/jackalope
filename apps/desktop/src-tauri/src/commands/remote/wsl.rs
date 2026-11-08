@@ -78,7 +78,7 @@ pub async fn request(
     body: Value,
 ) -> Result<Value, String> {
     distribution(&distro)?;
-    if ![super::api::PAIR_ROUTE, super::api::REQUEST_ROUTE].contains(&route.as_str()) || port < 1024
+    if ![super::pairing::PAIR_ROUTE, super::pairing::REQUEST_ROUTE].contains(&route.as_str()) || port < 1024
     {
         return Err("Invalid WSL host request.".into());
     }

@@ -15,6 +15,8 @@ pub const RESPONSE_LIMIT: usize = 4_000_000;
 pub const UNREACHABLE: &str =
     "The host is unreachable. Work continues there; reconnect to check whether your last action completed.";
 pub const TOO_LARGE: &str = "The host response is too large.";
+pub const PAIR_ROUTE: &str = "/api/pair";
+pub const REQUEST_ROUTE: &str = "/api/request";
 
 /// The code as the host compares it: a link's 64-hex code, or a short code with its
 /// dashes, spaces and case removed and look-alike letters read as digits.
