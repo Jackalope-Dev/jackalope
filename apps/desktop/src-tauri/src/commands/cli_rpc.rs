@@ -24,29 +24,44 @@ pub(crate) enum RpcError {
 }
 
 impl RpcError {
-    pub(crate) fn message(self) -> &'static str {
+    /// The failure as a sentence that names `agent`.
+    pub(crate) fn message(self, agent: &str) -> String {
         match self {
-            Self::Start => "Could not start the agent CLI.",
-            Self::Send => "Could not send the request to the agent CLI.",
-            Self::Read => "Could not read the agent CLI's response.",
-            Self::TooLarge => "The agent CLI's output exceeded the response limit.",
-            Self::Closed => "The agent CLI closed before answering.",
-            Self::Invalid => "The agent CLI returned an invalid response.",
+            Self::Start => format!("{agent} could not be started."),
+            Self::Send => format!("{agent} could not receive the request."),
+            Self::Read => format!("{agent}'s response could not be read."),
+            Self::TooLarge => format!("{agent}'s output exceeded the response limit."),
+            Self::Closed => format!("{agent} closed before answering."),
+            Self::Invalid => format!("{agent} returned an invalid response."),
             Self::Rejected => {
-                "The agent CLI rejected the request. Update the CLI and check its sign-in."
+                format!("{agent} rejected the request. Update the CLI and check its sign-in.")
             }
-            Self::Missing => "The agent CLI returned no result.",
+            Self::Missing => format!("{agent} returned no result."),
         }
     }
 }
 
-impl From<RpcError> for String {
-    fn from(error: RpcError) -> Self {
-        error.message().into()
+/// An [`RpcError`] from a [`Client`], with the agent it talked to.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Failure {
+    pub(crate) error: RpcError,
+    agent: &'static str,
+}
+
+impl Failure {
+    pub(crate) fn message(self) -> String {
+        self.error.message(self.agent)
+    }
+}
+
+impl From<Failure> for String {
+    fn from(failure: Failure) -> Self {
+        failure.message()
     }
 }
 
 pub(crate) struct Client {
+    agent: &'static str,
     child: Child,
     input: ChildStdin,
     output: BufReader<ChildStdout>,
@@ -76,10 +91,14 @@ impl Client {
             .kill_on_drop(true);
         super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
         super::process_control::hidden(command.as_std_mut());
-        let mut child = command.spawn().map_err(|_| RpcError::Start)?;
-        let input = child.stdin.take().ok_or(RpcError::Start)?;
-        let output = BufReader::new(child.stdout.take().ok_or(RpcError::Start)?);
+        let agent = super::agents::find(&binding.adapter)
+            .map_or("The agent CLI", |agent| agent.short_name.as_str());
+        let start = || RpcError::Start.message(agent);
+        let mut child = command.spawn().map_err(|_| start())?;
+        let input = child.stdin.take().ok_or_else(start)?;
+        let output = BufReader::new(child.stdout.take().ok_or_else(start)?);
         Ok(Self {
+            agent,
             child,
             input,
             output,
@@ -87,18 +106,25 @@ impl Client {
         })
     }
 
-    pub(crate) async fn notify(&mut self, value: Value) -> Result<(), RpcError> {
+    pub(crate) async fn notify(&mut self, value: Value) -> Result<(), Failure> {
+        let agent = self.agent;
         self.input
             .write_all(format!("{value}\n").as_bytes())
             .await
-            .map_err(|_| RpcError::Send)
+            .map_err(|_| Failure {
+                error: RpcError::Send,
+                agent,
+            })
     }
 
     /// Sends `request` and waits for the response with its `id` (or control
     /// `request_id`), skipping anything else the CLI writes meanwhile.
-    pub(crate) async fn request(&mut self, request: Value) -> Result<Value, RpcError> {
+    pub(crate) async fn request(&mut self, request: Value) -> Result<Value, Failure> {
         self.notify(request.clone()).await?;
-        read_response(&mut self.output, &request, &mut self.bytes).await
+        let agent = self.agent;
+        read_response(&mut self.output, &request, &mut self.bytes)
+            .await
+            .map_err(|error| Failure { error, agent })
     }
 
     pub(crate) async fn close(mut self) {
@@ -173,7 +199,7 @@ mod tests {
         ] {
             let error = read_response(&mut BufReader::new(data.as_bytes()), &request, &mut 0).await.unwrap_err();
             assert_eq!(error, RpcError::Rejected);
-            assert!(!error.message().contains("secret"));
+            assert!(!error.message("Claude").contains("secret"));
         }
         let data = b"{\"id\":1,\"result\":{}}\n{\"id\":2,\"result\":{\"config\":{}}}\n";
         assert!(

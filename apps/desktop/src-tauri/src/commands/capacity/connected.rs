@@ -191,7 +191,7 @@ pub(super) async fn read_claude_bound(
         let usage = client.request(json!({"type":"control_request","request_id":"usage","request":{"subtype":"get_usage","skip_behaviors":true}})).await;
         Ok(match usage {
             Ok(value) => parse_claude(&value, account),
-            Err(error) => unavailable("claude", "unavailable", error.message(), account),
+            Err(failure) => unavailable("claude", "unavailable", &failure.message(), account),
         })
     }).await.unwrap_or_else(|_| Err("Claude quota refresh timed out. Check its sign-in and connection.".into()));
     client.close().await;
@@ -215,7 +215,7 @@ pub(super) async fn read_grok_bound(
         let billing = client.request(json!({"jsonrpc":"2.0","id":2,"method":"_x.ai/billing","params":{}})).await;
         Ok(match billing {
             Ok(value) => parse_grok(&value, account),
-            Err(error) => unavailable("grok", "unavailable", error.message(), account),
+            Err(failure) => unavailable("grok", "unavailable", &failure.message(), account),
         })
     }).await.unwrap_or_else(|_| Err("Grok quota refresh timed out. Check its sign-in and connection.".into()));
     client.close().await;

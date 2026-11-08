@@ -136,9 +136,9 @@ async fn read_codex_bound(
         let limits = client
             .request(json!({"id":1,"method":"account/rateLimits/read"}))
             .await
-            .map_err(|error| match error {
+            .map_err(|failure| match failure.error {
                 super::cli_rpc::RpcError::Rejected => "Codex could not read subscription limits. Check its sign-in and network connection, then refresh.".to_string(),
-                error => error.into(),
+                _ => failure.message(),
             })?;
         parse_codex(&limits)
     }).await.unwrap_or_else(|_| Err("Codex quota refresh timed out after 15 seconds. Check its sign-in and network connection.".into()));
