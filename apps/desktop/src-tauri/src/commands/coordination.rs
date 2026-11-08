@@ -7,8 +7,6 @@ pub(crate) mod reconciliation;
 pub(crate) mod scope_audit;
 pub mod subtasks;
 pub mod swarm_setup;
-pub use reconciliation::{queue_assist_policy, queue_retry_reconciliation};
-pub use scope_audit::{queue_cancel_agreement, queue_reconcile_scope};
 pub(super) mod automatic;
 #[cfg(test)]
 mod automatic_tests;
@@ -41,7 +39,7 @@ mod quality_direct;
 #[cfg(test)]
 mod quality_trial;
 mod service;
-pub(crate) use service::Caller;
+pub(crate) use service::{Caller, SessionStart};
 mod storage;
 #[cfg(test)]
 mod swarm_trial;
@@ -96,8 +94,8 @@ pub(super) struct LaunchSpec<'a> {
     /// Whether the attempt works for a queued or managed assignment.
     pub managed: bool,
     pub instructions: String,
-    /// The task the bridge token speaks for.
-    pub grant: String,
+    /// The queued item the attempt works on. The bridge token speaks for it,
+    /// or for the attempt itself when there is none.
     pub assigned: Option<&'a QueueItem>,
     pub host: Option<super::computers::pool::RunHost>,
 }

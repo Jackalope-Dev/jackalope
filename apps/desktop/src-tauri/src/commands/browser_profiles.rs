@@ -367,7 +367,8 @@ pub struct OpenProfileRequest {
     pub reason: Option<String>,
 }
 
-/// Loopback pages were never asked about in a saved profile (local development).
+/// A saved profile's loopback pages are local development servers: they are
+/// neither asked about nor prompted to sign in.
 const SITE_LOOPBACK: Loopback = Loopback::Exempt;
 
 struct AgentState {
@@ -513,6 +514,9 @@ impl ProfileGuard for AgentGuard {
         else {
             return Ok(Verdict::Proceed);
         };
+        if site_gate::loopback(&host) {
+            return Ok(Verdict::Proceed);
+        }
         let mut state = self.lock();
         match state.sites.check(&host) {
             Ok(Check::Allowed) => {}

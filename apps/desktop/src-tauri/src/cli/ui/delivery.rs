@@ -31,10 +31,24 @@ impl App {
                 }
                 prepared.plan
             }
-            Err(error) => {
+            Err(merge::Refusal::Failed(error)) => {
                 if !error.is_empty() {
                     self.note(error);
                 }
+                return;
+            }
+            Err(merge::Refusal::Conflicts {
+                target_branch,
+                files,
+            }) => {
+                self.note(format!(
+                    "This work conflicts with {target_branch}: {}. Resolve them in the app's merge review (/review).",
+                    files.join(", ")
+                ));
+                return;
+            }
+            Err(merge::Refusal::Empty) => {
+                self.flash("There are no changes to merge", Tone::Muted);
                 return;
             }
         };

@@ -8,6 +8,7 @@
 //! Spawning requires the user's consent: an automatic plan, or Split this task.
 
 use super::*;
+use crate::commands::scope_path::any_contains;
 use crate::commands::tasks::TaskRun;
 use rmcp::schemars;
 

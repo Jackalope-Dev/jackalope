@@ -7,7 +7,8 @@
 //! placement table (`computers::runner`), Codex's approval list and the
 //! deferred surface's groups all read this table. A handler runs the same way
 //! for both transports: [`run`] authorizes the request once, applies the
-//! tool's call-time gate and hands the handler a [`Call`].
+//! tool's call-time gate, points a task-browser tool at the attempt's computer
+//! and hands the handler a [`Call`].
 
 mod handlers;
 mod http;
@@ -22,7 +23,7 @@ pub(in crate::commands) use http::help;
 pub(crate) use http::{http_bootstrap, router};
 pub(in crate::commands) use permission::{approve_computer_tool, approve_remote_execute};
 
-use super::computers::runner::Placement;
+use super::computers::runner::{Placement, BROWSER};
 use super::coordination::{Caller, Coordinator};
 use super::experiments::{self, Experiment};
 use super::tasks::{TaskRun, TaskRuntime};
@@ -64,6 +65,9 @@ pub(crate) struct Tool {
     /// The optional group a deferred tool surface loads the tool with.
     group: Option<Group>,
     offer: Offer,
+    /// Called by the agent's client rather than the agent, which never reads
+    /// the result, so coordination updates wait for the agent's next call.
+    client: bool,
     /// The tool's part of the HTTP contract in `GET /v1/help`.
     help: Option<Cow<'static, str>>,
     schema: Arc<JsonObject>,
@@ -198,6 +202,7 @@ impl Tool {
             route: None,
             group: None,
             offer: Offer::Always,
+            client: false,
             help: None,
             schema,
             handler,
@@ -246,6 +251,11 @@ impl Tool {
 
     fn offered(mut self, offer: Offer) -> Self {
         self.offer = offer;
+        self
+    }
+
+    fn for_client(mut self) -> Self {
+        self.client = true;
         self
     }
 
@@ -539,10 +549,14 @@ async fn run(
         caller,
         transport,
     };
+    if matches!(tool.placement, Placement::Workspace(BROWSER)) {
+        handlers::route_browser(&call).await?;
+    }
     (tool.handler)(call, args).await
 }
 
-/// Runs the tool `name` as over HTTP, without delivering coordination updates.
+/// Runs the tool `name` as over HTTP. Coordination updates are left for the
+/// next transport call, which attaches them.
 #[cfg(test)]
 pub(in crate::commands) async fn call(
     service: &Coordinator,

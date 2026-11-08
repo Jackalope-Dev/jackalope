@@ -1038,14 +1038,19 @@ impl AgentState {
     }
 }
 
-/// Who commits are attributed to in a repository.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum Attribution {
-    Agent,
-    CoAuthor,
-    #[default]
-    User,
+wire_enum! {
+    /// Who commits are attributed to in a repository.
+    pub enum Attribution {
+        Agent = "agent",
+        CoAuthor = "coAuthor",
+        User = "user",
+    }
+}
+
+impl Default for Attribution {
+    fn default() -> Self {
+        Self::User
+    }
 }
 
 pub fn working(status: Option<&RunStatus>) -> bool {

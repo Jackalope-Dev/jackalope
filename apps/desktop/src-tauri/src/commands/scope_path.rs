@@ -1,6 +1,5 @@
 //! Repository-relative paths that tasks own, touch or name: queue scopes,
-//! subtask handoffs, round assignments, peer reads, monitored paths and
-//! worktree folders.
+//! subtask handoffs, round assignments, peer reads and worktree folders.
 //!
 //! A path is `/`-separated (a `\` is read as `/`), relative, and has no empty,
 //! `.` or `..` segment, drive letter or control character. `.` alone is the

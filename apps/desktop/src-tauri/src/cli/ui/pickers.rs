@@ -178,7 +178,7 @@ fn attribution_label(attribution: Option<&Attribution>) -> &'static str {
         Some(Attribution::User) => "You",
         Some(Attribution::CoAuthor) => "You, with agents as co-authors",
         Some(Attribution::Agent) => "The agents",
-        None => "Loading…",
+        Some(Attribution::Unknown(_)) | None => "Loading…",
     }
 }
 

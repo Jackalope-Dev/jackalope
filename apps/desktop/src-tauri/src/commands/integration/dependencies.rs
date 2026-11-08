@@ -136,13 +136,11 @@ pub fn prepare_dependencies(
             &[&run.base_head],
             &format!("feat: integrate completed task {}", run.id),
         )?;
-        let output = repo::command(
+        let output = repo::output(
             &project,
             &["merge-tree", "--write-tree", &combined, &commit],
             Snapshot,
-        )
-        .output()
-        .map_err(|e| e.to_string())?;
+        )?;
         if !output.status.success() {
             return Err("Feature predecessor snapshots conflict. Review and correct the sources before retrying.".into());
         }
@@ -242,13 +240,11 @@ pub(in crate::commands) fn reconciliation_input(
             &[&run.base_head],
             "Jackalope reconciliation input",
         )?;
-        let output = repo::command(
+        let output = repo::output(
             &project,
             &["merge-tree", "--write-tree", &combined, &commit],
             Snapshot,
-        )
-        .output()
-        .map_err(|e| e.to_string())?;
+        )?;
         if !output.status.success() && output.status.code() != Some(1) {
             return Err("Git could not construct a reconciliation input.".into());
         }

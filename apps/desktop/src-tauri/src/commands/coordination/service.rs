@@ -404,7 +404,6 @@ impl Coordinator {
                 endpoint: url,
                 managed: true,
                 instructions,
-                grant: item.id.clone(),
                 assigned: Some(item),
                 host: Some(host),
             },
@@ -446,12 +445,12 @@ impl Coordinator {
             endpoint,
             managed,
             instructions,
-            grant,
             assigned,
             host,
         } = spec;
         let token = bridge_token();
         let id = request.id.clone();
+        let grant = assigned.map_or_else(|| id.clone(), |item| item.id.clone());
         inner.grants.insert(token.clone(), (grant, id.clone()));
         let placed = host.is_some();
         if let Some(host) = host {
@@ -522,6 +521,37 @@ impl Coordinator {
         self.transact(|inner, guard| self.start_manual_locked(inner, guard, request))
     }
 
+    /// Starts a live session's next attempt, or reports that it waits for a
+    /// free execution slot.
+    pub(crate) fn start_session(&self, request: RunRequest) -> Result<SessionStart, String> {
+        self.runtime.access.ensure()?;
+        self.ensure_storage_loaded()?;
+        self.transact(|inner, guard| {
+            if self.awaits_capacity(inner, &request)? {
+                return Ok(SessionStart::Waiting);
+            }
+            self.start_manual_locked(inner, guard, request)
+                .map(|_| SessionStart::Started)
+        })
+    }
+
+    /// Whether a session or planner attempt that has not started would exceed
+    /// the execution limit.
+    fn awaits_capacity(&self, inner: &Inner, request: &RunRequest) -> Result<bool, String> {
+        if request.live_session_id.is_none()
+            && !inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .any(|task| task.planner_run_id == request.id)
+        {
+            return Ok(false);
+        }
+        let runs = self.runtime.integration_runs()?;
+        Ok(!runs.iter().any(|run| run.id == request.id)
+            && runs.iter().filter(|run| run.status.is_active()).count() >= inner.concurrency)
+    }
+
     pub(super) fn start_manual_locked(
         &self,
         inner: &mut Inner,
@@ -536,27 +566,16 @@ impl Coordinator {
                 &mut request,
             )?;
         }
-        if request.live_session_id.is_some()
-            || inner
-                .ledger
-                .managed_tasks
-                .iter()
-                .any(|task| task.planner_run_id == request.id)
-        {
-            let runs = self.runtime.integration_runs()?;
-            if !runs.iter().any(|run| run.id == request.id)
-                && runs.iter().filter(|run| run.status.is_active()).count() >= inner.concurrency
-            {
-                return Err("Session is waiting for execution capacity.".into());
-            }
+        if self.awaits_capacity(inner, &request)? {
+            return Err("Session is waiting for execution capacity.".into());
         }
         let endpoint = inner
             .url
             .clone()
             .ok_or("The coordination bridge is starting or unavailable. Retry when it is ready.")?;
         let assigned = self.followed_assignment(inner, &request)?;
-        let (grant, managed, instructions) = match &assigned {
-            Some(item) => (item.id.clone(), true, instructions(item)),
+        let (managed, instructions) = match &assigned {
+            Some(item) => (true, instructions(item)),
             None => {
                 let managed = inner
                     .ledger
@@ -568,7 +587,7 @@ impl Coordinator {
                 } else {
                     focused_instructions()
                 };
-                (request.id.clone(), managed, instructions)
+                (managed, instructions)
             }
         };
         if let Some(item) = &assigned {
@@ -585,7 +604,6 @@ impl Coordinator {
                 endpoint: &endpoint,
                 managed,
                 instructions,
-                grant,
                 assigned: assigned.as_ref(),
                 host: None,
             },
@@ -697,14 +715,15 @@ impl Coordinator {
     pub(in crate::commands) fn caller(&self, headers: &HeaderMap) -> Result<Caller, StatusCode> {
         let token = bearer(headers)?.to_owned();
         let (_, run_id) = self.grant(&token)?;
-        let run = self
-            .runtime
-            .integration_runs()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .into_iter()
-            .find(|r| r.id == run_id && r.status.is_active())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+        let run = self.active_run(&run_id)?;
         Ok(Caller { token, run })
+    }
+
+    fn active_run(&self, run_id: &str) -> Result<crate::commands::tasks::TaskRun, StatusCode> {
+        self.runtime
+            .run_snapshot(run_id)
+            .filter(|run| run.status.is_active())
+            .ok_or(StatusCode::UNAUTHORIZED)
     }
 
     /// The assignment `caller` works on, checked again against its grant and
@@ -719,13 +738,7 @@ impl Coordinator {
             .iter()
             .find(|i| i.id == id && !i.canceled)
             .cloned();
-        let run = self
-            .runtime
-            .integration_runs()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .into_iter()
-            .find(|r| r.id == run_id && r.status.is_active())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+        let run = self.active_run(&run_id)?;
         Ok(item.unwrap_or_else(|| QueueItem {
             excluded_scopes: vec![],
             parent_task_id: None,
@@ -757,6 +770,13 @@ impl Coordinator {
             error: None,
         }))
     }
+}
+
+/// How [`Coordinator::start_session`] ended.
+pub(crate) enum SessionStart {
+    Started,
+    /// Every execution slot is in use; the session tries again later.
+    Waiting,
 }
 
 /// An authenticated bridge request: the attempt its token speaks for.

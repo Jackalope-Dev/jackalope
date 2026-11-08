@@ -21,7 +21,10 @@ pub(crate) struct Protocol {
     pub sync: GitSync,
     pub search: Search,
     pub browser: Browser,
+    pub artifacts: Artifacts,
     pub screenshots: Screenshots,
+    /// Punctuation keys an action may press, with their X keysym names.
+    pub punctuation: std::collections::BTreeMap<String, String>,
     /// Keys an action may name, beside single characters and punctuation.
     pub named_keys: Vec<String>,
 }
@@ -43,6 +46,8 @@ pub(crate) struct Relay {
     pub url: String,
     pub token: String,
     pub request_limit: usize,
+    /// Bridge calls one run may have waiting at once: queued on the computer,
+    /// and forwarded from here.
     pub pending_limit: usize,
     /// Told to an agent whose call is too large to relay; nothing was forwarded.
     pub too_large: String,
@@ -74,14 +79,30 @@ pub(crate) struct Search {
     pub files: usize,
     pub bytes: u64,
     pub seconds: u64,
+    /// The largest source file read.
+    pub file_bytes: u64,
+    /// Bytes of one source block `read_context` returns.
+    pub block_bytes: usize,
+    /// Files one search returns, and their bytes together.
+    pub results: usize,
+    pub result_bytes: usize,
+    /// Declarations kept per file, and listed per search result.
+    pub file_symbols: usize,
+    pub item_symbols: usize,
     /// Words retrieval ranking ignores.
     pub stop_words: Vec<String>,
 }
 
 #[derive(Deserialize)]
-pub(crate) struct Screenshots {
-    /// Where screenshot evidence is saved, relative to the workspace.
+pub(crate) struct Artifacts {
+    /// Where an agent's saved output lives, relative to the workspace.
     pub folder: String,
+    /// Where screenshot evidence is saved, relative to `folder`.
+    pub screenshots: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Screenshots {
     pub limit: u64,
 }
 
@@ -148,6 +169,10 @@ mod tests {
         ];
         known.sort();
         assert_eq!(capabilities, known);
+        assert_eq!(
+            format!("{}/", source["artifacts"]["folder"].as_str().unwrap()),
+            crate::commands::artifacts::FOLDER
+        );
     }
 
     #[test]

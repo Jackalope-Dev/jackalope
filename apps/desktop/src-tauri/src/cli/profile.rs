@@ -57,12 +57,17 @@ impl ProfilePaths {
     /// `JACKALOPE_TEST_DATA_DIR` replace the data directory, so native tests
     /// run against an isolated profile.
     pub fn new(root: &Path) -> Self {
-        let data = root.join("task-runs-v1");
         #[cfg(debug_assertions)]
-        let data = std::env::var_os("JACKALOPE_TEST_DATA_DIR")
-            .map(PathBuf::from)
-            .unwrap_or(data);
-        Self { data }
+        let test_data = std::env::var_os("JACKALOPE_TEST_DATA_DIR").map(PathBuf::from);
+        #[cfg(not(debug_assertions))]
+        let test_data = None;
+        Self::with_test_data(root, test_data)
+    }
+
+    fn with_test_data(root: &Path, test_data: Option<PathBuf>) -> Self {
+        Self {
+            data: test_data.unwrap_or_else(|| root.join("task-runs-v1")),
+        }
     }
 
     /// The layout of an existing data directory.
@@ -113,23 +118,16 @@ mod tests {
     #[test]
     fn host_and_command_share_the_test_data_override() {
         let root = std::env::temp_dir().join("jackalope-profile-root");
-        let plain = ProfilePaths::new(&root);
-        if std::env::var_os("JACKALOPE_TEST_DATA_DIR").is_none() {
-            assert_eq!(plain.data(), root.join("task-runs-v1"));
-        }
+        let plain = ProfilePaths::with_test_data(&root, None);
+        assert_eq!(plain.data(), root.join("task-runs-v1"));
         assert_eq!(
             plain.handshake(),
             plain.data().join("preferences").join("host.json")
         );
         assert_eq!(plain.runtime_lock(), plain.data().join(RUNTIME_LOCK));
-        #[cfg(debug_assertions)]
-        {
-            let isolated = std::env::temp_dir().join("jackalope-isolated-data");
-            std::env::set_var("JACKALOPE_TEST_DATA_DIR", &isolated);
-            let paths = ProfilePaths::new(&root);
-            std::env::remove_var("JACKALOPE_TEST_DATA_DIR");
-            assert_eq!(paths.data(), isolated);
-            assert_eq!(paths.handshake(), isolated.join("preferences/host.json"));
-        }
+        let isolated = std::env::temp_dir().join("jackalope-isolated-data");
+        let paths = ProfilePaths::with_test_data(&root, Some(isolated.clone()));
+        assert_eq!(paths.data(), isolated);
+        assert_eq!(paths.handshake(), isolated.join("preferences/host.json"));
     }
 }

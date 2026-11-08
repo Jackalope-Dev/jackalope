@@ -502,6 +502,9 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             project_path,
             attribution,
         } => {
+            if matches!(attribution, protocol::Attribution::Unknown(_)) {
+                return Err("Choose user, coAuthor or agent.".to_string());
+            }
             let project = ensure_project(app, &project_path)?;
             let policy = super::project_git::CommitPolicy {
                 attribution,

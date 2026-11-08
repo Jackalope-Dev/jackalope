@@ -1,8 +1,9 @@
 //! Review and commit uncommitted work in a project checkout or one of its worktrees.
 
+use crate::cli_protocol::Attribution;
 use super::{
     helper::Helper,
-    project_git::{self, Attribution},
+    project_git,
     repo::{self, command, git_exact as git, Policy},
 };
 use serde::Serialize;

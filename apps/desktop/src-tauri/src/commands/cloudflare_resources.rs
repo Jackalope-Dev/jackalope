@@ -230,8 +230,10 @@ fn permission_failure(step: Step, kinds: &[Kind], oauth: bool) -> Failure {
     let mut permissions: Vec<&str> = kinds.iter().map(|kind| kind.permission()).collect();
     permissions.dedup();
     let labels: Vec<&str> = kinds.iter().map(|kind| kind.label()).collect();
+    // Kinds the Worker deploy creates have no scope Connect Cloudflare can ask for.
     let scopes: Vec<String> = kinds
         .iter()
+        .filter(|kind| kind.provisioned())
         .map(|kind| kind.scope().name.to_owned())
         .collect();
     if oauth && !scopes.is_empty() {

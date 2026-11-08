@@ -17,7 +17,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-/// The computer's own pages are its services, not the person's.
+/// The computer's own pages are its services, not the person's: they are
+/// neither asked about nor prompted to sign in.
 const SITE_LOOPBACK: Loopback = Loopback::Exempt;
 const SIGNED_IN: &str = "I signed in";
 const SKIP: &str = "Skip sign-in";
@@ -214,6 +215,9 @@ impl ProfileGuard for ComputerGuard {
         else {
             return Ok(Verdict::Proceed);
         };
+        if site_gate::loopback(&host) {
+            return Ok(Verdict::Proceed);
+        }
         let mut state = self.lock();
         match state.sites.check(&host) {
             Ok(Check::Allowed) => {}

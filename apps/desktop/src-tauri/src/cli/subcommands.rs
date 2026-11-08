@@ -264,7 +264,18 @@ pub fn merge(
     }
     let mut call = |request: Request| connection.call(&request);
     let merge::Prepared { plan, paused_here } =
-        merge::prepare(&mut call, &id, view.paused, message)?;
+        merge::prepare(&mut call, &id, view.paused, message).map_err(|refusal| match refusal {
+            merge::Refusal::Failed(error) => error,
+            merge::Refusal::Conflicts {
+                target_branch,
+                files,
+            } => format!(
+                "{} conflicts with {target_branch}: {}. Resolve them in the app's merge review.",
+                view.title,
+                files.join(", ")
+            ),
+            merge::Refusal::Empty => "There are no changes to merge.".into(),
+        })?;
     if paused_here {
         eprintln!(
             "Paused {} so no new message starts during the merge.",

@@ -42,8 +42,7 @@ pub(super) fn ordered_plan(items: Vec<PlanEntry>) -> Result<Vec<PlanEntry>, Stri
     Ok(ordered)
 }
 
-use crate::commands::scope_path::{self, ScopePath};
-pub(super) use crate::commands::scope_path::{any_contains, any_overlap};
+use crate::commands::scope_path::{self, any_contains, ScopePath};
 
 /// Whether two items own a common path that neither handed to a subtask.
 pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> bool {

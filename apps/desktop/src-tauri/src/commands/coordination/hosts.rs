@@ -221,7 +221,6 @@ impl Coordinator {
                 endpoint: url,
                 managed: true,
                 instructions: instructions(item),
-                grant: item.id.clone(),
                 assigned: Some(item),
                 host: Some(host),
             },

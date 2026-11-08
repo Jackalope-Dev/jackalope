@@ -7,7 +7,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tree_sitter::{Node, ParseOptions, Parser, Tree};
 
-const MAX_FILE_BYTES: u64 = 512 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
 
@@ -124,7 +123,7 @@ fn normalized(path: &Path) -> Option<String> {
 }
 
 fn read_bounded(path: &Path) -> Result<String, String> {
-    let bytes = match super::platform::read_capped(path, MAX_FILE_BYTES) {
+    let bytes = match super::platform::read_capped(path, search().file_bytes) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return Err("File no longer exists.".into()),
         Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
@@ -189,7 +188,7 @@ fn analyze(
     let mut cursor = tree.walk();
     loop {
         let node = cursor.node();
-        if symbols.len() < 64 {
+        if symbols.len() < search().file_symbols {
             if let Some(symbol) = symbols::declaration(node, text) {
                 symbols.push(symbol);
             }
@@ -604,7 +603,7 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
             "Rust" => "rs",
             _ => continue,
         };
-        if started.elapsed() > Duration::from_secs(20)
+        if started.elapsed() > Duration::from_secs(search().seconds)
             || total_bytes + file.bytes > search().bytes
             || result.references.len() >= MAX_REFERENCES
         {
@@ -830,7 +829,7 @@ mod tests {
         f.write(".worktrees/task/a.ts", "export {}");
         f.write("target/a.rs", "");
         f.write("visible.ts", "import x from './missing'; const = ;");
-        f.write("large.ts", &" ".repeat(MAX_FILE_BYTES as usize + 1));
+        f.write("large.ts", &" ".repeat(search().file_bytes as usize + 1));
         f.write("notes.md", "# Context");
         let snapshot = scan(&f.0).unwrap();
         assert_eq!(snapshot.files.len(), 4);

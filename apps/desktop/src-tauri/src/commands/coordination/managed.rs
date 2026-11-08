@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_overlap;
 use crate::commands::{
     repo::{self, Policy, Untracked},
     task_strategy,

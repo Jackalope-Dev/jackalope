@@ -2,14 +2,22 @@
 //! browser and desktop tool saves there.
 
 use super::{computers::protocol::protocol, harness::ScreenshotArtifact};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
-/// Where an agent's saved output lives in a workspace.
+/// Where an agent's saved output lives in a workspace: the protocol's
+/// `artifacts.folder`, which a test keeps in step.
 pub(crate) const FOLDER: &str = ".jackalope/artifacts/";
 
 /// The screenshot evidence folder, relative to the workspace.
 pub(crate) fn screenshot_folder() -> &'static str {
-    &protocol().screenshots.folder
+    static SCREENSHOTS: OnceLock<String> = OnceLock::new();
+    SCREENSHOTS.get_or_init(|| {
+        let artifacts = &protocol().artifacts;
+        format!("{}/{}", artifacts.folder, artifacts.screenshots)
+    })
 }
 
 /// The largest screenshot saved or previewed.
@@ -47,6 +55,21 @@ pub(crate) fn save_screenshot(
         height,
         timestamp: chrono::Utc::now().to_rfc3339(),
     })
+}
+
+/// The workspace's screenshot evidence folder, created when missing and
+/// confirmed to resolve inside the workspace, for captures saved by hand.
+pub(crate) fn evidence_folder(workspace: &Path) -> Result<PathBuf, String> {
+    let workspace = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
+    let directory = screenshots(&workspace);
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    if !dunce::canonicalize(&directory)
+        .map_err(|e| e.to_string())?
+        .starts_with(&workspace)
+    {
+        return Err("The artifact folder resolves outside this workspace.".into());
+    }
+    Ok(directory)
 }
 
 pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, String> {

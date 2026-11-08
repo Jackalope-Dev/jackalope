@@ -462,19 +462,6 @@ enum Side {
     After,
 }
 
-fn evidence_folder(workspace: &str) -> Result<PathBuf, String> {
-    let workspace = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
-    let directory = workspace.join(".jackalope/artifacts/screenshots");
-    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    if !dunce::canonicalize(&directory)
-        .map_err(|e| e.to_string())?
-        .starts_with(&workspace)
-    {
-        return Err("The artifact folder resolves outside this workspace.".into());
-    }
-    Ok(directory)
-}
-
 /// What one capture pass shares across both sides.
 struct Pass<'a> {
     runtime: &'a TaskRuntime,
@@ -580,7 +567,7 @@ fn collect(runtime: &TaskRuntime, run: &TaskRun, settings: &Settings) -> ReviewC
             })
         })
         .collect();
-    let pass = match evidence_folder(&run.workspace) {
+    let pass = match crate::commands::artifacts::evidence_folder(std::path::Path::new(&run.workspace)) {
         Ok(folder) => Pass {
             runtime,
             id: &run.id,

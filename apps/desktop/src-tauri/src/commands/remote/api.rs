@@ -2,6 +2,7 @@ use super::super::{
     live_sessions::{FirstMessage, SessionLimits},
     tasks::{review_run, TaskRun},
 };
+use super::pairing::{PAIR_ROUTE, REQUEST_ROUTE};
 use super::*;
 use axum::{
     body::Body,
@@ -12,9 +13,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-
-pub(super) const PAIR_ROUTE: &str = "/api/pair";
-pub(super) const REQUEST_ROUTE: &str = "/api/request";
 
 pub(super) fn router(service: RemoteAccess) -> Router {
     Router::new()
@@ -225,8 +223,13 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
             let run = run(&runs, config, action.run_id.as_deref())?;
             let mut view = task(run, true);
             if let Some(session_id) = &run.live_session_id {
-                let snapshot = service.sessions.snapshot(Some(session_id))?;
-                if let Some(session) = snapshot.sessions.iter().find(|s| &s.id == session_id) {
+                // The messages are extra detail: a failed session read leaves them out.
+                let snapshot = service.sessions.snapshot(Some(session_id)).ok();
+                if let Some(session) = snapshot
+                    .iter()
+                    .flat_map(|snapshot| &snapshot.sessions)
+                    .find(|s| &s.id == session_id)
+                {
                     view["messages"] = json!(session
                         .messages
                         .iter()

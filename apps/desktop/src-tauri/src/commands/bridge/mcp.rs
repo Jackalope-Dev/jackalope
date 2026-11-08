@@ -80,7 +80,10 @@ fn call(context: ToolCallContext<'_, Server>) -> Called<'_> {
             Ok(reply) => reply.into_mcp(),
             Err(error) => error.into_mcp()?,
         };
-        if let Some(update) = updates(&service, &headers) {
+        if let Some(update) = (!tool.client)
+            .then(|| updates(&service, &headers))
+            .flatten()
+        {
             result
                 .content
                 .push(ContentBlock::text(update_text(&update)));

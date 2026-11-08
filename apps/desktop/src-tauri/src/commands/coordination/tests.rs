@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_overlap;
 
 #[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
@@ -286,17 +287,9 @@ fn process_is_alive(pid: u32) -> bool {
 
 #[tokio::test]
 async fn computer_verify_command_execution_is_bounded_and_non_blocking() {
-    // Exercises the exact mechanism bridge_computer_verify uses (tokio::
-    // process::Command wrapped in tokio::time::timeout, kill_on_drop),
-    // the fix for a real bug: it used to run std::process::Command's
-    // blocking output() directly inside an async handler with no
-    // timeout at all, so a command that hangs (waits on stdin, starts a
-    // long-lived server) would permanently occupy a tokio worker thread
-    // - and even with a timeout, without kill_on_drop the process would
-    // keep running as an undetected orphan instead of actually stopping.
-    // Testing through the full authorized HTTP path would need a
-    // running agent process to produce an "active" TaskRun; this
-    // isolates the part that actually changed.
+    // Guards how computer_verify runs a saved check: tokio::process::Command
+    // under tokio::time::timeout with kill_on_drop, so a hanging command
+    // neither occupies a runtime worker thread nor outlives its timeout.
     #[cfg(windows)]
     let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) = (
         "cmd.exe",

@@ -86,6 +86,12 @@
     "files": 6000,
     "bytes": 33554432,
     "seconds": 20,
+    "fileBytes": 524288,
+    "blockBytes": 8000,
+    "results": 12,
+    "resultBytes": 16000,
+    "fileSymbols": 64,
+    "itemSymbols": 12,
     "stopWords": [
       "a",
       "an",
@@ -125,9 +131,25 @@
     "pageState": "(()=>({url:location.href,login:[...document.querySelectorAll('input[type=password]')].some(e=>!e.disabled&&e.getClientRects().length>0)}))()",
     "loopbackHosts": ["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"]
   },
+  "artifacts": {
+    "folder": ".jackalope/artifacts",
+    "screenshots": "screenshots"
+  },
   "screenshots": {
-    "folder": ".jackalope/artifacts/screenshots",
     "limit": 8388608
+  },
+  "punctuation": {
+    "-": "minus",
+    "=": "equal",
+    ",": "comma",
+    ".": "period",
+    "/": "slash",
+    ";": "semicolon",
+    "'": "apostrophe",
+    "[": "bracketleft",
+    "]": "bracketright",
+    "\\": "backslash",
+    "`": "grave"
   },
   "namedKeys": [
     "Tab",

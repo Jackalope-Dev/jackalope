@@ -153,6 +153,7 @@ INSTALL_SECONDS = 100
 # Bridge calls handed over per read, and their total size.
 RELAY_READ_CALLS = 8
 RELAY_READ_LIMIT = 256 * 1024
+# Calls one run may have waiting; each keeps about two files in the queue.
 RELAY_PENDING_LIMIT = SHARED["relay"]["pendingLimit"]
 # Longer than the bridge's own longest call (a queued saved check).
 RELAY_TIMEOUT = int(os.environ.get("JACKALOPE_RELAY_TIMEOUT") or 2400)
@@ -182,8 +183,9 @@ GIT_IDENTITY = [
     "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false",
 ]
 # Bridge tools a runner serves itself for a run started with `local`, by the
-# capability each needs, with their bridge REST routes. Jackalope's placement
-# table (computers/runner.rs) decides which of them a run gets.
+# capability each needs, with their bridge REST routes. Jackalope's tool table
+# (commands/bridge/table.rs) places them, and computers/runner.rs decides which
+# of them a run gets.
 WORKSPACE_TOOLS = tuple(SHARED["localTools"]["workspace-tools"])
 BROWSER_TOOLS = tuple(SHARED["localTools"]["browser"])
 LOCAL_ROUTES = {
@@ -201,7 +203,8 @@ AGENT_BROWSER_HOME = os.environ.get("JACKALOPE_AGENT_BROWSER_HOME") or "/usr/loc
 BROWSER_COMMAND_SECONDS = 30
 BROWSER_TEXT_LIMIT = SHARED["browser"]["textLimit"]
 SCREENSHOT_LIMIT = SHARED["screenshots"]["limit"]
-SCREENSHOTS = os.path.join(*SHARED["screenshots"]["folder"].split("/"))
+WORKSPACE_ARTIFACTS = os.path.join(*SHARED["artifacts"]["folder"].split("/"))
+SCREENSHOTS = os.path.join(WORKSPACE_ARTIFACTS, SHARED["artifacts"]["screenshots"])
 PAGE_STATE = SHARED["browser"]["pageState"]
 LOOPBACK_HOSTS = tuple(SHARED["browser"]["loopbackHosts"])
 # Source reads (read_context), bounded like Jackalope's own.
@@ -209,17 +212,18 @@ SOURCE_EXTENSIONS = {
     "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "rs", "py", "go", "java", "kt", "cs",
     "c", "h", "cpp", "hpp", "php", "css", "scss", "md", "txt", "mdx", "json", "toml", "yaml", "yml",
 }
-SOURCE_FILE_LIMIT = 512 * 1024
-SOURCE_BLOCK_LIMIT = 8000
+SOURCE_FILE_LIMIT = SHARED["search"]["fileBytes"]
+SOURCE_BLOCK_LIMIT = SHARED["search"]["blockBytes"]
 # read_context's repository search, within the limits of Jackalope's own scan
 # (commands/codebase.rs) and its candidates (codebase/map.rs).
 SEARCH_SKIP = set(SHARED["search"]["skip"])
 SEARCH_FILES = SHARED["search"]["files"]
 SEARCH_BYTES = SHARED["search"]["bytes"]
 SEARCH_SECONDS = SHARED["search"]["seconds"]
-SEARCH_RESULTS = 12
-SEARCH_RESULT_BYTES = 16000
-FILE_SYMBOLS = 64
+SEARCH_RESULTS = SHARED["search"]["results"]
+SEARCH_RESULT_BYTES = SHARED["search"]["resultBytes"]
+FILE_SYMBOLS = SHARED["search"]["fileSymbols"]
+ITEM_SYMBOLS = SHARED["search"]["itemSymbols"]
 SEARCH_STOP = set(SHARED["search"]["stopWords"])
 SYMBOL_LANGUAGES = {
     "rs": "rust", "py": "python", "go": "go",
@@ -549,11 +553,7 @@ KEYS = {
     "Home": "Home", "End": "End", "PageUp": "Prior", "PageDown": "Next",
 }
 MODIFIERS = {"Control": "ctrl", "Primary": "ctrl", "Shift": "shift", "Alt": "alt"}
-PUNCTUATION = {
-    "-": "minus", "=": "equal", ",": "comma", ".": "period", "/": "slash",
-    ";": "semicolon", "'": "apostrophe", "[": "bracketleft", "]": "bracketright",
-    "\\": "backslash", "`": "grave",
-}
+PUNCTUATION = SHARED["punctuation"]
 
 
 def keysym(chord):
@@ -1980,7 +1980,7 @@ class Runner:
         size = 0
         for index, score in ranked[:SEARCH_RESULTS]:
             path, symbols = files[index]
-            item = {"id": path, "path": path, "score": score, "symbols": symbols[:12]}
+            item = {"id": path, "path": path, "score": score, "symbols": symbols[:ITEM_SYMBOLS]}
             length = len(json.dumps(item))
             if size + length > SEARCH_RESULT_BYTES:
                 break
@@ -2720,9 +2720,9 @@ def sync_checkout(request):
 def collect_artifacts(workspace):
     """Stores the run's .jackalope/artifacts output and lists it for Jackalope,
     without following links."""
-    root = os.path.join(workspace, ".jackalope", "artifacts")
+    root = os.path.join(workspace, WORKSPACE_ARTIFACTS)
     found, total, truncated = [], 0, False
-    if (os.path.islink(os.path.join(workspace, ".jackalope")) or os.path.islink(root)
+    if (os.path.islink(os.path.dirname(root)) or os.path.islink(root)
             or not os.path.isdir(root)):
         return found, truncated
     for folder, directories, files in os.walk(root):

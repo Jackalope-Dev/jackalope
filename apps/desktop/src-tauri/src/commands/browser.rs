@@ -212,7 +212,7 @@ pub(super) fn peek(run_id: &str) -> Result<Peek, String> {
     let bytes = taken.and_then(|_| std::fs::read(&capture).map_err(|e| e.to_string()));
     let _ = std::fs::remove_file(&capture);
     let png = bytes?;
-    if png.len() > 8 * 1024 * 1024 {
+    if png.len() as u64 > super::artifacts::screenshot_limit() {
         return Err("The browser view exceeds the 8 MiB preview limit.".into());
     }
     Ok(Peek::Frame { url, png })
