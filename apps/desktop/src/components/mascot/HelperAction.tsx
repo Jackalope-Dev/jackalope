@@ -22,7 +22,7 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { helperView } from '../layout/navigation';
+import { helperView } from '../../lib/navigation';
 import { ActionError } from '../ui/ActionError';
 
 const labels: Record<string, string> = {

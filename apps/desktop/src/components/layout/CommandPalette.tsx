@@ -21,7 +21,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type Command, type CommandContext, matchingCommands } from './commands';
-import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
+import { type ActiveTab, WORKSPACE_VIEWS } from '../../lib/navigation';
 
 const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
 

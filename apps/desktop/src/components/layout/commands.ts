@@ -12,7 +12,7 @@ import { openShortcuts } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import type { ShortcutAction } from '../../lib/shortcuts';
 import type { Project } from '../../stores/projectStore';
-import { openHelp } from './navigation';
+import { openHelp } from '../../lib/navigation';
 
 /** What commands act on; Shell provides it. */
 export interface CommandContext {

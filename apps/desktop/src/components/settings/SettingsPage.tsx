@@ -47,7 +47,7 @@ import {
   type SettingsCategory,
   settingsCategory,
   sidebarCategory,
-} from './categories';
+} from '../../lib/settings-categories';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';

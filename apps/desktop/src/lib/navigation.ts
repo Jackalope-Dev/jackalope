@@ -19,9 +19,9 @@ import {
   Settings2,
   Share2,
 } from 'lucide-react';
-import { openExternalUrl } from '../../lib/native/env.ts';
-import type { Feature } from '../../lib/telemetry';
-import type { SettingsCategory } from '../settings/categories';
+import { openExternalUrl } from './native/env.ts';
+import type { Feature } from './telemetry';
+import type { SettingsCategory } from './settings-categories';
 export type ViewGroup = 'tasks' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
 
 /**

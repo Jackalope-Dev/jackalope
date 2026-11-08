@@ -59,7 +59,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { ComposerSeed } from '../sessions/SessionStart';
-import type { SettingsCategory } from '../settings/categories';
+import type { SettingsCategory } from '../../lib/settings-categories';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 
@@ -80,12 +80,11 @@ import {
   PRIMARY_VIEWS,
   viewLabel,
   workspaceView,
-} from './navigation';
+} from '../../lib/navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 import { VIEW_PAGES, type ViewContext } from './workspace-views';
 
-export type { ActiveTab } from './navigation';
 
 // The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
 const SIDEBAR_WIDTH = 248;

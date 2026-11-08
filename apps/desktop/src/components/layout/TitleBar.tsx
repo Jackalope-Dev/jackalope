@@ -6,7 +6,7 @@ import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { openHelp } from './navigation';
+import { openHelp } from '../../lib/navigation';
 
 const isMac = isMacPlatform();
 
