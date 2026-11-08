@@ -1139,7 +1139,6 @@ pub async fn git_cleanup_worktree(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::tasks::RunStatus;
     use std::fs;
 
     struct Fixture {
@@ -1648,9 +1647,8 @@ mod tests {
                 .unwrap_err()
                 .contains("active or interrupted"));
         }
-        let runs = [f.run("review")];
-        f.remove(&before, &runs).unwrap();
-        assert_eq!(runs[0].status, RunStatus::Review);
+        f.remove(&before, &[f.run("review")]).unwrap();
+        assert!(!f.worktree.exists());
     }
 
     #[test]

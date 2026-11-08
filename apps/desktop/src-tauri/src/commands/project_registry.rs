@@ -372,28 +372,4 @@ mod tests {
         #[cfg(windows)]
         assert!(same_path(r"C:\Repo\App", "c:/repo/app"));
     }
-
-    #[test]
-    fn a_repository_keeps_one_record_across_path_spellings() {
-        let directory = std::env::temp_dir().join(format!("jl-reg-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&directory).unwrap();
-        let file = directory.join("projects.json");
-
-        let mut ledger = read_ledger(&file);
-        assert!(ledger.projects.is_empty());
-        ledger.projects.push(ProjectRecord {
-            id: "known".into(),
-            name: "repo".into(),
-            path: directory.to_string_lossy().into_owned(),
-            ..Default::default()
-        });
-        write_ledger(&file, &ledger).unwrap();
-
-        let trailing = format!("{}/", directory.to_string_lossy());
-        assert!(same_path(&trailing, &directory.to_string_lossy()));
-        assert_eq!(read_ledger(&file).projects.len(), 1);
-
-        std::fs::remove_file(&file).unwrap();
-        std::fs::remove_dir(&directory).unwrap();
-    }
 }

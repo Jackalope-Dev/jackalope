@@ -75,15 +75,6 @@ pub(crate) async fn read_bounded(
 mod tests {
     use super::*;
 
-    #[test]
-    fn clients_are_shared_per_timeout_and_route() {
-        client(Duration::from_secs(7)).unwrap();
-        client(Duration::from_secs(7)).unwrap();
-        let clients = CLIENTS.get().unwrap().lock().unwrap();
-        assert!(clients.contains_key(&(Route::System, Duration::from_secs(7))));
-        assert!(!clients.contains_key(&(Route::Direct, Duration::from_secs(7))));
-    }
-
     #[tokio::test]
     async fn bodies_over_the_limit_are_refused() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

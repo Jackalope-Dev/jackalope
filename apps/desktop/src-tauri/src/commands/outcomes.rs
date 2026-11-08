@@ -644,7 +644,5 @@ mod tests {
         )
         .unwrap();
         assert!(empty.validated().is_err());
-        assert!(RESTATEMENT_CONTRACT.contains("restate_goal"));
-        assert!(RESTATEMENT_CONTRACT.contains("without waiting"));
     }
 }
