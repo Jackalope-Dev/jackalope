@@ -50,8 +50,6 @@ pub(crate) fn is_input(request: &DesktopRequest) -> bool {
         || (request.action == "focus" && request.element.is_some())
 }
 
-const PUNCTUATION: &str = "-=,./;'[]\\`";
-
 /// Keys the original helpers understand; platforms without chord support accept only these.
 pub(crate) const LEGACY_KEYS: &[&str] = &[
     "Tab",
@@ -157,7 +155,13 @@ pub(crate) fn chord(text: &str) -> Result<Chord, String> {
     let character = key.chars().count() == 1
         && key
             .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || PUNCTUATION.contains(c));
+            .all(|c| {
+                c.is_ascii_lowercase()
+                    || c.is_ascii_digit()
+                    || crate::commands::computers::protocol::protocol()
+                        .punctuation
+                        .contains_key(c.to_string().as_str())
+            });
     if !(named || function || character) {
         return Err(unsupported());
     }

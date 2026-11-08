@@ -8,8 +8,9 @@
 //! stalls output, and the answers go back through `run_answer`. The credential
 //! stays on this device: the computer only holds the stand-in's own secret.
 //!
-//! Only control-plane calls belong here. Where each tool runs follows the
-//! placement table in [`super::runner`]: a runner with the local bridge
+//! Only control-plane calls belong here. Where each tool runs follows its
+//! placement in the bridge's tool table ([`crate::commands::bridge::tools`]),
+//! resolved for a run by [`super::runner`]: a runner with the local bridge
 //! answers workspace tools itself, so they never arrive; desktop control acts
 //! on the run's own computer (see [`crate::commands::computers::for_run`]).
 //! Tools that would act on this device's copy of the workspace or use its

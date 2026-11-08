@@ -2,14 +2,22 @@
 //! browser and desktop tool saves there.
 
 use super::{computers::protocol::protocol, harness::ScreenshotArtifact};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
-/// Where an agent's saved output lives in a workspace.
+/// Where an agent's saved output lives in a workspace: the protocol's
+/// `artifacts.folder`, which a test keeps in step.
 pub(crate) const FOLDER: &str = ".jackalope/artifacts/";
 
 /// The screenshot evidence folder, relative to the workspace.
 pub(crate) fn screenshot_folder() -> &'static str {
-    &protocol().screenshots.folder
+    static FOLDER: OnceLock<String> = OnceLock::new();
+    FOLDER.get_or_init(|| {
+        let artifacts = &protocol().artifacts;
+        format!("{}/{}", artifacts.folder, artifacts.screenshots)
+    })
 }
 
 /// The largest screenshot saved or previewed.

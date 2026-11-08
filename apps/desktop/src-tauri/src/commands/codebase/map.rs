@@ -196,7 +196,7 @@ pub(super) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value, 
     let ranked = crate::commands::retrieval::rank(query, &documents);
     let mut items = Vec::new();
     let mut bytes = 0;
-    for (index, score) in ranked.into_iter().take(12) {
+    for (index, score) in ranked.into_iter().take(super::search().results) {
         let file = &snapshot.files[index];
         let related: Vec<_> = snapshot
             .references
@@ -204,10 +204,10 @@ pub(super) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value, 
             .filter(|r| r.source == file.path || r.target.as_ref() == Some(&file.path))
             .take(4)
             .collect();
-        let symbols: Vec<_> = file.symbols.iter().take(12).collect();
+        let symbols: Vec<_> = file.symbols.iter().take(super::search().item_symbols).collect();
         let item = serde_json::json!({"id":file.path,"path":file.path,"score":score,"symbols":symbols,"related":related});
         let size = item.to_string().len();
-        if bytes + size > 16_000 {
+        if bytes + size > super::search().result_bytes {
             break;
         }
         bytes += size;
