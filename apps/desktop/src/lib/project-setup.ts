@@ -52,7 +52,6 @@ function projectFromInfo(info: ProjectInfo, pending?: Project | null): Project {
         name: info.name,
         path: info.path,
         ...git,
-        agentProvider: 'codex' as const,
         worktrees: [],
       };
 }
