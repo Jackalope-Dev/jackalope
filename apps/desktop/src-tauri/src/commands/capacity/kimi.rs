@@ -3,7 +3,7 @@ use crate::commands::agent_profiles::AccountBinding;
 use std::path::Path;
 
 fn read_private(path: &Path) -> Result<String, String> {
-    let bytes = match crate::commands::history::read_capped(path, 1_048_576) {
+    let bytes = match crate::commands::platform::read_capped(path, 1_048_576) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return Err("Kimi account configuration is unavailable.".into()),
         Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {

@@ -124,7 +124,7 @@ fn normalized(path: &Path) -> Option<String> {
 }
 
 fn read_bounded(path: &Path) -> Result<String, String> {
-    let bytes = match super::history::read_capped(path, MAX_FILE_BYTES) {
+    let bytes = match super::platform::read_capped(path, MAX_FILE_BYTES) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return Err("File no longer exists.".into()),
         Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {

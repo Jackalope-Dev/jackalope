@@ -2,6 +2,35 @@ use std::path::{Path, PathBuf};
 
 pub use crate::cli_protocol::profile::home_dir;
 
+/// Reads `path` when it holds at most `limit` bytes, without reading further.
+/// `None` when it does not exist; an `InvalidData` error when it is larger.
+pub(crate) fn read_capped(path: &Path, limit: u64) -> std::io::Result<Option<Vec<u8>>> {
+    use std::io::Read;
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("The file exceeds its {limit}-byte limit."),
+        ));
+    }
+    Ok(Some(bytes))
+}
+
+/// The contents of `path`, which must exist and hold at most `limit` bytes.
+pub(crate) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
+    match read_capped(path, limit) {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) => Err(std::io::Error::from(std::io::ErrorKind::NotFound).to_string()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
 pub fn is_executable(path: &Path) -> bool {
     let Ok(metadata) = path.metadata() else {
         return false;

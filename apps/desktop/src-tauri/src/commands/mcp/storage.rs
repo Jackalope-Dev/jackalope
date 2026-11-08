@@ -30,7 +30,7 @@ pub(super) fn read(path: &Path) -> Result<String, String> {
 }
 
 fn read_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    crate::commands::history::read_capped(path, 1024 * 1024 + 4096).map_err(|error| {
+    crate::commands::platform::read_capped(path, 1024 * 1024 + 4096).map_err(|error| {
         if error.kind() == std::io::ErrorKind::InvalidData {
             "MCP configuration exceeds its size limit.".to_string()
         } else {

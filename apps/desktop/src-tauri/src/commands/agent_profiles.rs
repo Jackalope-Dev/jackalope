@@ -377,7 +377,7 @@ pub fn apply_binding(
 ) -> Result<(), String> {
     if binding.profile_id.is_some() {
         if binding.adapter == "antigravity" {
-            let config: serde_json::Value = serde_json::from_slice(&super::history::read_bounded(
+            let config: serde_json::Value = serde_json::from_slice(&super::platform::read_bounded(
                 &binding
                     .directory
                     .join(".gemini/antigravity-cli/settings.json"),
@@ -523,7 +523,7 @@ fn local_verification(
         return Ok(None);
     }
     let verification: super::local_ai::Verification =
-        serde_json::from_slice(&super::history::read_bounded(&path, 4096)?)
+        serde_json::from_slice(&super::platform::read_bounded(&path, 4096)?)
             .map_err(|_| "Local model settings are unreadable. Run local setup again.")?;
     Ok(Some(verification))
 }

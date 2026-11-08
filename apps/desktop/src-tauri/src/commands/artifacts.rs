@@ -59,7 +59,7 @@ pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, 
     if !path.starts_with(root) {
         return Err("This screenshot is outside the task's evidence folder".into());
     }
-    let bytes = match super::history::read_capped(&path, screenshot_limit()) {
+    let bytes = match super::platform::read_capped(&path, screenshot_limit()) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return Err("This screenshot is no longer available on disk".into()),
         Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {

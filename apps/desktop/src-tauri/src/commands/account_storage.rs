@@ -42,7 +42,7 @@ pub(super) fn is_record(path: &Path) -> bool {
 /// The record file's own bytes, unprotected: an encrypted blob, a keyring
 /// reference, or plaintext an older version wrote.
 fn read_file(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    super::history::read_capped(path, MAX_RECORD_FILE).map_err(|error| {
+    super::platform::read_capped(path, MAX_RECORD_FILE).map_err(|error| {
         if error.kind() == std::io::ErrorKind::InvalidData {
             "The secure account record is invalid.".to_string()
         } else {

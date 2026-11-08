@@ -113,7 +113,7 @@ fn read_regular(path: &Path, limit: u64) -> Option<Vec<u8>> {
     if !metadata.is_file() || metadata.len() > limit {
         return None;
     }
-    super::history::read_capped(path, limit).ok().flatten()
+    super::platform::read_capped(path, limit).ok().flatten()
 }
 
 fn write_replacing(target: &Path, bytes: &[u8]) -> Result<(), String> {
