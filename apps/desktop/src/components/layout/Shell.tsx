@@ -345,7 +345,7 @@ export function Shell({
     } else openRun(run.id);
     setActiveTab('kanban');
   }, [workRequest, selectProject]);
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   const swarmConfigured = useSwarmConfigured();
   const navigate = useCallback((tab: ActiveTab) => {
     const settings = workspaceView(tab).settings;
@@ -376,7 +376,6 @@ export function Shell({
   const navWidth = useWorkViewStore((state) => state.sizes.sidebar);
   const workScope = useWorkViewStore((state) => state.scope);
   const shortcut = displayShortcut(shortcuts.search);
-  const terminalProject = useActiveProject();
   const remoteHost = useHostContextStore((state) => state.host);
   const toggleSettings = () =>
     activeTab === 'preferences' ? setActiveTab(previousView.current) : navigate('preferences');
@@ -386,7 +385,7 @@ export function Shell({
     openSettings: () => navigate('preferences'),
     toggleSettings,
     toggleSidebar: () => useWorkViewStore.getState().toggleNav(),
-    terminalProject: remoteHost ? undefined : terminalProject,
+    terminalProject: remoteHost ? undefined : project,
   };
   const [commandError, setCommandError] = useState('');
   const runCommand = (command: Command, shortcut = false) => {

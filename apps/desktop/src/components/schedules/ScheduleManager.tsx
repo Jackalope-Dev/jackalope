@@ -33,6 +33,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import {
   agentAccountFor,
   isAgentAllowedForProject,
+  useActiveProject,
   useProjectStore,
 } from '../../stores/projectStore';
 import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
@@ -69,6 +70,7 @@ export function ScheduleManager(props: {
       activeProjectId: s.activeProjectId,
     })),
   );
+  const activeProject = useActiveProject();
   const runners = useExecutionStore((s) => s.runners);
   const runs = useExecutionStore((s) => s.runs);
   const legacy = useScheduleStore((s) => s.schedules);
@@ -133,9 +135,7 @@ export function ScheduleManager(props: {
     );
   };
   const chooseTemplate = (selected: ScheduleTemplate) => {
-    const target =
-      projects.find((item) => item.id === activeProjectId) ??
-      (projects.length === 1 ? projects[0] : undefined);
+    const target = activeProject ?? (projects.length === 1 ? projects[0] : undefined);
     open(
       scheduleTemplateDraft(selected, {
         id: crypto.randomUUID(),

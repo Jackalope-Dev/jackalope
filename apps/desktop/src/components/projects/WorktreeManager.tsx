@@ -44,7 +44,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -94,7 +94,6 @@ function displayPath(path: string, root?: string) {
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
   const {
-    projects,
     activeProjectId,
     loadWorktreesForActiveProject,
     spawnTaskWorktree,
@@ -103,7 +102,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     worktreesError,
   } = useProjectStore(
     useShallow((s) => ({
-      projects: s.projects,
       activeProjectId: s.activeProjectId,
       loadWorktreesForActiveProject: s.loadWorktreesForActiveProject,
       spawnTaskWorktree: s.spawnTaskWorktree,
@@ -112,7 +110,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       worktreesError: s.worktreesError,
     })),
   );
-  const project = projects.find((p) => p.id === activeProjectId);
+  const project = useActiveProject();
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');
   const [branch, setBranch] = useState<string | null>(null);
