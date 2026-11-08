@@ -491,9 +491,8 @@ that the call ran and to ask for less (for an answer), not as a timeout or trans
 failure. Answers of tools the runner serves do not pass through the relay, so its limits
 do not apply to them.
 
-Each bridge tool declares in one table (`computers::runner::TOOLS`) whether it executes
-with the workspace or on the control plane; `coordination_mcp`'s tests keep the table
-complete. With the runner's capabilities it gives the agent's tool list, what the relay
+Each bridge tool declares in the bridge's one tool table (`bridge::tools`) whether it
+executes with the workspace or on the control plane. With the runner's capabilities it gives the agent's tool list, what the relay
 refuses, the agent's instructions and the attempt's activity line, which names the
 runner's protocol and capabilities, the tools that run on the computer and those that
 are unavailable there. Unavailable tools are left out of the tool list and refused when
@@ -735,8 +734,8 @@ of `git-sync`, `computers/artifacts.rs` the artifact transfers,
 `tasks/runner/remote.rs` the attempt side of an agent on a computer, one of the two
 runners behind `tasks/runner.rs` (see [the runner](#the-runner)).
 `desktop_control/computer.rs` runs desktop actions on a computer and
-`computers/browser.rs` attaches the computer's browser to the task browser through
-`browser::set_router`, gated by the same site questions, which also answer a runner's
+`computers/browser.rs` attaches the computer's browser to the task browser before the
+bridge's browser tools first start it (`browser::route`), gated by the same site questions, which also answer a runner's
 `site` callbacks.
 
 `protocol.json` holds the values both sides of the protocol read: protocol numbers,
@@ -848,8 +847,7 @@ deliver the same input apart from the placement instructions and place every too
 the same table, and `tasks::runner::record` that both record the same tool events;
 `mcp::tests` covers the connection policy for computers (where each connection runs,
 command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
-kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts
-and that every bridge tool has a placement; `computers::runner` covers capability
+kept out of `Debug`); `bridge::permission` covers which tools the approval route accepts; `computers::runner` covers capability
 negotiation, including the protocol 3 fallback and reported `slots` and their bounds,
 the device runner and attached placements,
 and where each tool runs and which reach the
