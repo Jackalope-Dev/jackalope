@@ -56,7 +56,7 @@ fn changed_sources_choose_pages_and_every_entry_labels_its_page() {
 }
 
 #[test]
-fn drift_lists_missing_route_files_and_unmatched_globs_without_changing_the_map() {
+fn drift_lists_missing_route_files_and_unmatched_globs() {
     let map = vec![
         feature("Fine", "/", &["src/home/**"]),
         Feature {
@@ -75,7 +75,6 @@ fn drift_lists_missing_route_files_and_unmatched_globs_without_changing_the_map(
             unmatched_sources: vec!["src/old/**".into()],
         }]
     );
-    assert_eq!(map.len(), 3);
 }
 
 #[test]

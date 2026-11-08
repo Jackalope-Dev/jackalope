@@ -58,11 +58,9 @@ mod tests {
 
     #[test]
     fn only_product_scopes_are_known() {
-        assert_eq!(find("workers-scripts.write"), Some(&WORKERS));
-        assert_eq!(
-            find("d1.write").map(|scope| scope.permission),
-            Some("D1: Edit")
-        );
+        for scope in ALL {
+            assert_eq!(find(scope.name), Some(scope));
+        }
         assert_eq!(find("account-settings.read"), None);
         assert!(granted("artifacts.write d1.write", &D1));
         assert!(!granted("artifacts.write d1.read", &D1));

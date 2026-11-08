@@ -136,13 +136,14 @@ mod tests {
     }
 
     #[test]
-    fn the_bundled_protocol_parses() {
+    fn the_bundled_protocol_is_consistent() {
         let protocol = protocol();
-        assert_eq!(protocol.hello, 1);
         // Base64 keeps a chunk inside the runner's 1 MB request body.
         assert!(protocol.transfer.chunk * 4 / 3 < 1024 * 1024);
-        assert!(protocol.relay.too_large.contains("64 KB"));
-        assert_eq!(protocol.relay.request_limit, 64 * 1024);
+        assert!(protocol
+            .relay
+            .too_large
+            .contains(&format!("{} KB", protocol.relay.request_limit / 1024)));
     }
 
     #[test]

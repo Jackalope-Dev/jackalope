@@ -680,16 +680,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Manual real-repository map; set JACKALOPE_MAP_ROOT and JACKALOPE_MAP_TASK"]
-    fn print_repository_map() {
-        let root = std::env::var("JACKALOPE_MAP_ROOT").unwrap();
-        let task = std::env::var("JACKALOPE_MAP_TASK").unwrap();
-        let map = task_map(Path::new(&root), &task, &[], DEFAULT_BUDGET).expect("map");
-        println!("{map}");
-        println!("--- {} bytes ---", map.len());
-    }
-
-    #[test]
     fn a_task_matching_nothing_produces_no_map() {
         let empty = BTreeSet::new();
         assert_eq!(score("src/a.ts", &[], &empty), 0);

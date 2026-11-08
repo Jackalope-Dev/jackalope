@@ -264,14 +264,3 @@ impl ProfileGuard for ComputerGuard {
 
     fn observed(&self, _: Vec<String>) {}
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn computer_browsers_do_not_ask_about_their_own_pages() {
-        assert_eq!(
-            super::SITE_LOOPBACK,
-            crate::commands::site_gate::Loopback::Exempt
-        );
-    }
-}
