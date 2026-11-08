@@ -49,7 +49,10 @@ impl WindowBehavior {
             }
             read => read
                 .map_err(|error| error.to_string())
-                .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|error| error.to_string()))
+                .and_then(|bytes| {
+                    serde_json::from_slice::<DesktopPreferences>(&bytes)
+                        .map_err(|error| error.to_string())
+                })
                 .unwrap_or_else(|error| {
                     eprintln!("Could not read desktop preferences: {error}");
                     DesktopPreferences {
