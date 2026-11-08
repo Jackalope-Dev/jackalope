@@ -83,10 +83,13 @@ pub struct AgentProfilesView {
     pub env_var: Option<String>,
 }
 
+/// The catalog's account variable for `adapter`; agent facts belong in
+/// `agents.json`, not in tables here.
 pub fn env_var_for(adapter: &str) -> Option<&'static str> {
     super::agents::find(adapter)?.account_env()
 }
 
+/// The catalog's sign-in arguments for `adapter`.
 pub(super) fn login_args(adapter: &str) -> &'static [String] {
     super::agents::find(adapter).map_or(&[], |agent| &agent.login_args)
 }
@@ -969,6 +972,7 @@ pub fn agent_profile_set_active(
     save(&root, &manifest)
 }
 
+/// The catalog's credential variables for `adapter`.
 pub fn credential_env_vars(adapter: &str) -> &'static [String] {
     super::agents::find(adapter).map_or(&[], |agent| &agent.credential_env)
 }
