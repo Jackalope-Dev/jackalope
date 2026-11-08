@@ -7,7 +7,8 @@
 //! placement table (`computers::runner`), Codex's approval list and the
 //! deferred surface's groups all read this table. A handler runs the same way
 //! for both transports: [`run`] authorizes the request once, applies the
-//! tool's call-time gate and hands the handler a [`Call`].
+//! tool's call-time gate, points a task-browser tool at the attempt's computer
+//! and hands the handler a [`Call`].
 
 mod handlers;
 mod http;
@@ -22,7 +23,7 @@ pub(in crate::commands) use http::help;
 pub(crate) use http::{http_bootstrap, router};
 pub(in crate::commands) use permission::{approve_computer_tool, approve_remote_execute};
 
-use super::computers::runner::Placement;
+use super::computers::runner::{Placement, BROWSER};
 use super::coordination::{Caller, Coordinator};
 use super::experiments::{self, Experiment};
 use super::tasks::{TaskRun, TaskRuntime};
@@ -539,6 +540,9 @@ async fn run(
         caller,
         transport,
     };
+    if matches!(tool.placement, Placement::Workspace(BROWSER)) {
+        handlers::route_browser(&call).await?;
+    }
     (tool.handler)(call, args).await
 }
 

@@ -207,7 +207,7 @@ pub(super) async fn bot<I: Send + 'static>(
 
 /// Lets the task browser drive the attempt's computer's own browser, when it
 /// has one, before the browser first starts.
-async fn route_browser(call: &Call) -> Result<(), ToolError> {
+pub(super) async fn route_browser(call: &Call) -> Result<(), ToolError> {
     let runtime = call.runtime().clone();
     let run_id = call.run().id.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -224,7 +224,6 @@ pub(super) async fn browser_navigate(
     call: Call,
     input: BrowserNavigateRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     let result = crate::commands::browser::browser_navigate(&call.run().id, &input.url)
         .await
         .map_err(ToolError::refused)?;
@@ -241,7 +240,6 @@ pub(super) async fn browser_screenshot(
     call: Call,
     input: BrowserScreenshotRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     let workspace = std::path::PathBuf::from(&call.run().workspace);
     let artifact = crate::commands::browser::browser_screenshot(
         &call.run().id,
@@ -264,7 +262,6 @@ pub(super) async fn browser_snapshot(
     call: Call,
     input: BrowserSnapshotRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     crate::commands::browser::browser_snapshot(&call.run().id, input)
         .await
         .map_err(ToolError::refused)
@@ -274,7 +271,6 @@ pub(super) async fn browser_interact(
     call: Call,
     input: BrowserInteractRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     let summary = format!("{} on {}", input.action, input.selector);
     let result = crate::commands::browser::browser_interact(&call.run().id, input)
         .await
@@ -295,7 +291,6 @@ pub(super) async fn browser_configure(
     call: Call,
     input: BrowserConfigureRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     crate::commands::browser::browser_configure(&call.run().id, input)
         .await
         .map_err(ToolError::refused)
@@ -305,7 +300,6 @@ pub(super) async fn browser_inspect(
     call: Call,
     input: BrowserInspectRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     let value = crate::commands::browser::browser_inspect(&call.run().id, input)
         .await
         .map_err(ToolError::refused)?;
@@ -322,7 +316,6 @@ pub(super) async fn browser_tabs(
     call: Call,
     input: BrowserTabsRequest,
 ) -> Result<Value, ToolError> {
-    route_browser(&call).await?;
     let value = crate::commands::browser::browser_tabs(&call.run().id, input)
         .await
         .map_err(ToolError::refused)?;
