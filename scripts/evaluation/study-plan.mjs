@@ -1,4 +1,3 @@
-
 export const qualityMethod = 'Independent source-family Wilson endpoint difference, z=1.96';
 export const qualityMargin = 0.02;
 
