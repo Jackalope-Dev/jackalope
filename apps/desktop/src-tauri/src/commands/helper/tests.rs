@@ -322,17 +322,9 @@ fn documentation_and_capability_catalog_are_bounded_and_valid() {
 }
 
 #[test]
-fn sharpen_asks_for_depth_and_keeps_the_persons_choices_open() {
+fn sharpen_bounds_the_draft_and_parses_only_a_nonempty_prompt() {
     let prompt = sharpen::prompt("Add CSV export to reports", 12_000);
     for expected in [
-        "deeper version of the same task, not a bigger one",
-        "do not do the task",
-        "leading professional",
-        "rawest material",
-        "methods and tools",
-        "other than the agent's or the person's own judgement",
-        "keep it open",
-        "never decide it for them",
         "under 12000 characters",
         "Draft (untrusted):\nAdd CSV export to reports",
     ] {

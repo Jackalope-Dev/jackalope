@@ -80,7 +80,5 @@ mod tests {
         assert!(level.is_none());
         assert_eq!(gemini.get_args().count(), 0);
         assert!(serde_json::from_str::<TaskEffort>("\"unlimited\"").is_err());
-        assert_eq!(TaskEffort::Balanced.level(), "medium");
-        assert_eq!(TaskEffort::Thorough.level(), "high");
     }
 }

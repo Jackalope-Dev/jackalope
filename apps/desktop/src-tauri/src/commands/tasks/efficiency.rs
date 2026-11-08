@@ -422,6 +422,7 @@ mod tests {
         assert!(!saved.contains("seen_tools"));
         let restored: Efficiency = serde_json::from_str("{}").unwrap();
         assert_eq!(restored.launches, 0);
+        assert_eq!(restored.verification_reuses, None);
     }
 
     #[test]

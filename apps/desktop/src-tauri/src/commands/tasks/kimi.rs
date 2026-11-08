@@ -21,30 +21,6 @@ fn send(input: &mut impl Write, value: &Value) -> Result<(), String> {
         .map_err(|_| "Could not send a request to Kimi.".into())
 }
 
-#[cfg(test)]
-fn drive(
-    output: impl BufRead,
-    input: &mut impl Write,
-    workspace: &str,
-    previous: Option<&str>,
-    model: Option<&str>,
-    prompt: &str,
-    observe: impl FnMut(&Value),
-    permission: impl FnMut(&Value) -> Value,
-) -> Result<(), String> {
-    drive_with_servers(
-        output,
-        input,
-        workspace,
-        previous,
-        model,
-        prompt,
-        &[],
-        observe,
-        permission,
-    )
-}
-
 fn prompt_request(id: u64, session: &str, prompt: &str) -> Value {
     json!({"jsonrpc":"2.0","id":id,"method":"session/prompt","params":{"sessionId":session,"prompt":[{"type":"text","text":prompt}]}})
 }
@@ -593,6 +569,29 @@ fn wait_for_answer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn drive(
+        output: impl BufRead,
+        input: &mut impl Write,
+        workspace: &str,
+        previous: Option<&str>,
+        model: Option<&str>,
+        prompt: &str,
+        observe: impl FnMut(&Value),
+        permission: impl FnMut(&Value) -> Value,
+    ) -> Result<(), String> {
+        drive_with_servers(
+            output,
+            input,
+            workspace,
+            previous,
+            model,
+            prompt,
+            &[],
+            observe,
+            permission,
+        )
+    }
 
     fn transcript(events: &[Value]) -> std::io::Cursor<Vec<u8>> {
         std::io::Cursor::new(

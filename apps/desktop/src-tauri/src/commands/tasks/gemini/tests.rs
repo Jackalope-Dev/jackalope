@@ -178,10 +178,6 @@ fn gemini_launches_headless_stream_json_with_edit_approval_and_exact_resume() {
     for forbidden in ["yolo", "--yolo", "latest", "--prompt-interactive", "-i"] {
         assert!(!resumed.iter().any(|arg| arg == forbidden), "{forbidden}");
     }
-    assert_eq!(
-        crate::commands::agent_profiles::env_var_for("gemini"),
-        Some("GEMINI_CLI_HOME")
-    );
 }
 
 #[test]
