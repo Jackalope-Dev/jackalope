@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process';
-import { isMain } from '../lib/cli.mjs';
 import { root } from '../lib/paths.mjs';
 
 export const changelogPath = 'apps/website/src/changelog.json';
@@ -132,7 +131,7 @@ export function changelogReleases({
   return result.releases;
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const releases = changelogReleases({
     fetch: process.argv.includes('--fetch'),
     required: process.argv.includes('--require'),

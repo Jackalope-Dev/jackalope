@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
-import { isMain } from '../lib/cli.mjs';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 
 export function storePlan(env, inputs, notes) {
@@ -55,7 +54,7 @@ async function main() {
   );
 }
 
-if (isMain(import.meta))
+if (import.meta.main)
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

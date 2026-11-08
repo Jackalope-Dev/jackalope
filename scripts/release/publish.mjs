@@ -3,7 +3,6 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { RELEASE_CHANNELS } from '../../packages/contracts/src/platform.ts';
 import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
-import { isMain } from '../lib/cli.mjs';
 import { parseJsonc } from '../lib/jsonc.mjs';
 import { channel, origin, readNotes, releasePlan, root, sha256, version } from './catalog.mjs';
 
@@ -45,7 +44,7 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   await store.put(`${c}/latest.json`, encode(plan.manifest));
   return plan;
 }
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const base = origin(process.env.UPDATE_BASE_URL);
   const environment = process.env.DEPLOY_ENV;
   if (!['staging', 'production'].includes(environment))

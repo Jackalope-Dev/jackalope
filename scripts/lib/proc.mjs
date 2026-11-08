@@ -21,7 +21,7 @@ export function run(command, args = [], options = {}) {
 }
 
 /** A command's trimmed stdout. */
-export function capture(command, args = [], options = {}) {
+function capture(command, args = [], options = {}) {
   return run(command, args, { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', ...options })
     .toString()
     .trim();

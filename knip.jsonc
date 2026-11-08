@@ -3,7 +3,8 @@
   "workspaces": {
     ".": {
       // Release, evaluation and verification scripts are run by hand or from workflows.
-      "entry": ["scripts/**/*.{js,mjs}"],
+      // The shared helpers in scripts/lib are not, so their unused exports are reported.
+      "entry": ["scripts/**/*.{js,mjs}", "!scripts/lib/**"],
       "project": ["scripts/**/*.{js,mjs}"]
     },
     "apps/desktop": {

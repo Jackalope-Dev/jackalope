@@ -1,5 +1,4 @@
 import { writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 import { sanitizeForCode } from './repository-cases.mjs';
 
 export const toolResultCases = ['deliveries', 'builds', 'packages'].map((category, index) => {
@@ -35,7 +34,7 @@ export const toolResultCases = ['deliveries', 'builds', 'packages'].map((categor
   };
 });
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   if (!process.argv[2]) throw new Error('Supply an output suite JSON path.');
   await writeFile(process.argv[2], `${JSON.stringify({ cases: toolResultCases }, null, 2)}\n`);
 }

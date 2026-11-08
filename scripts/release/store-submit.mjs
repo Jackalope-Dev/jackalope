@@ -4,7 +4,6 @@ import { createReadStream } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
-import { isMain } from '../lib/cli.mjs';
 import { assertVersions, readNotes } from './catalog.mjs';
 import { waitForSourceChecks } from './source-checks.mjs';
 import { storePlan } from './store-plan.mjs';
@@ -278,7 +277,7 @@ async function main() {
   );
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

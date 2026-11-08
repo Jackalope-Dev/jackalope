@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 import { measured, reduction, seededRandom, sum } from '../lib/stats.mjs';
 
 function interval(groups, baseline, candidate, metric) {
@@ -243,7 +242,7 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
   };
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [input, output, baseline = 'direct', candidate = 'after'] = process.argv.slice(2);
   if (!input || !output)
     throw new Error(

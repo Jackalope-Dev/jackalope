@@ -4,7 +4,6 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { CLOUD_ORIGIN, cloudUpdateUrl } from '../../packages/contracts/src/release.ts';
-import { isMain } from '../lib/cli.mjs';
 import { compare, root, sha256 } from './catalog.mjs';
 import { validateCloudFiles } from './cloud-artifacts.mjs';
 import { targets } from './cloud-targets.mjs';
@@ -252,7 +251,7 @@ export async function verifyUpdateFeeds(
   }
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const directory = resolve(process.argv[2] ?? '');
   const publishing = process.argv[3] === 'publish';
   if (!process.argv[2] || !['draft', 'publish'].includes(process.argv[3]))

@@ -3,7 +3,6 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { httpsUrl, isReleaseChannel, SEMVER } from '../../packages/contracts/src/platform.ts';
 import { releasePrefix } from '../../packages/contracts/src/release.ts';
-import { isMain } from '../lib/cli.mjs';
 import { root } from '../lib/paths.mjs';
 
 export { root };
@@ -147,7 +146,7 @@ export function releasePlan({ receipt, notes, previous = [], base, current }) {
   if (manifest.version !== v) throw new Error('Manifest version mismatch');
   return { releases, manifest, feed: feed(releases, base, c), directory: prefix(v, c) };
 }
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [command, v] = process.argv.slice(2);
   if (command === 'prepare') await prepare(v);
   else if (command === 'check') {

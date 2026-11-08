@@ -1,6 +1,5 @@
 import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { cloudUpdateEndpoint, PUBLIC_SERVICE_ORIGIN } from '../../packages/contracts/src/release.ts';
-import { isMain } from '../lib/cli.mjs';
 
 export const ACCOUNT_WEB_URL = 'https://jackalope.dev';
 const endpointKeys = ['stableEndpoint', 'betaEndpoint'];
@@ -62,4 +61,4 @@ export function environmentChannelConfig(environment = process.env) {
   });
 }
 
-if (isMain(import.meta)) console.log(JSON.stringify(environmentChannelConfig()));
+if (import.meta.main) console.log(JSON.stringify(environmentChannelConfig()));

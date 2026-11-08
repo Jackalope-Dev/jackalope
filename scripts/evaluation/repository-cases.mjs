@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { isMain } from '../lib/cli.mjs';
 import { root } from '../lib/paths.mjs';
 
 const charMap = {
@@ -231,7 +230,7 @@ export async function repositoryCases(revision = 'HEAD') {
   );
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   if (!process.argv[2]) throw new Error('Supply an output suite path.');
   await writeFile(
     process.argv[2],

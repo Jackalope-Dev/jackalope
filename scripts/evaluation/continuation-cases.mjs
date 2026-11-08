@@ -1,5 +1,4 @@
 import { writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 import { qualityCases } from './quality-cases.mjs';
 
 const extensions = [
@@ -34,7 +33,7 @@ export const continuationCases = extensions.map(([id, request, checks]) => {
       `\n(async()=>{const {solve}=await import(require('node:url').pathToFileURL(require('node:path').join(root,'index.mjs')));${checks}})().catch(e=>{console.error(e);process.exitCode=1});`,
   };
 });
-if (isMain(import.meta)) {
+if (import.meta.main) {
   if (!process.argv[2]) throw new Error('Supply an output suite path.');
   await writeFile(process.argv[2], JSON.stringify({ cases: continuationCases }, null, 2));
 }
