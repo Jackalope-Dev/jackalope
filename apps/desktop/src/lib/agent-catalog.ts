@@ -6,7 +6,7 @@ import catalog from './agents.json' with { type: 'json' };
  * agents with the saved custom agents.
  */
 export type BuiltinAgentId = keyof typeof catalog;
-export type CatalogEntry = (typeof catalog)[BuiltinAgentId];
+type CatalogEntry = (typeof catalog)[BuiltinAgentId];
 type CustomAgents = readonly { id: string; adapter?: string }[];
 
 export interface AgentMetadata {
