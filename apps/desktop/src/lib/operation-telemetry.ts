@@ -1,4 +1,9 @@
-import { type Metric, type Operation, type OperationOutcome, operations } from './telemetry.ts';
+import {
+  type Metric,
+  type Operation,
+  type OperationOutcome,
+  OPERATIONS as operations,
+} from '@jackalope/contracts/telemetry';
 
 const allowed = new Set<string>(operations);
 export function telemetryOperation(
