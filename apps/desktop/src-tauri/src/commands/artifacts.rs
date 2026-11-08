@@ -13,8 +13,8 @@ pub(crate) const FOLDER: &str = ".jackalope/artifacts/";
 
 /// The screenshot evidence folder, relative to the workspace.
 pub(crate) fn screenshot_folder() -> &'static str {
-    static FOLDER: OnceLock<String> = OnceLock::new();
-    FOLDER.get_or_init(|| {
+    static SCREENSHOTS: OnceLock<String> = OnceLock::new();
+    SCREENSHOTS.get_or_init(|| {
         let artifacts = &protocol().artifacts;
         format!("{}/{}", artifacts.folder, artifacts.screenshots)
     })
