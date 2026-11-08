@@ -11,10 +11,10 @@ pub mod transcript;
 
 use super::commands::slash_matches;
 use super::editor::Layout as InputLayout;
-use super::pickers::{agent_glyph, usable, PickerKind};
+use super::pickers::{agent_glyph, PickerKind};
 use super::{App, Click};
 use crate::brand::{self, Surface};
-use crate::protocol::{self, SessionSummary};
+use crate::protocol::{self, AgentState, SessionSummary};
 use markdown::inline;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -327,8 +327,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
     frame.buffer_mut().set_string(
         input_area.x + 2,
         inner.y,
-        if prompt == "❯" && !brand::unicode() {
-            ">"
+        if prompt == "❯" {
+            brand::mark_glyph(brand::Mark::Prompt)
         } else {
             prompt
         },
@@ -748,10 +748,14 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
         None => agents.push(Span::styled("checking agents…", muted)),
         Some(Err(_)) => agents.push(Span::styled("agents unavailable · /agents", muted)),
         Some(Ok(overview)) => {
-            for agent in overview.agents.iter().filter(|agent| usable(agent)) {
-                let color = match agent.state.as_str() {
-                    "ready" => brand::success(),
-                    "sign-in" => brand::warning(),
+            for agent in overview
+                .agents
+                .iter()
+                .filter(|agent| agent.state.is_usable())
+            {
+                let color = match agent.state {
+                    AgentState::Ready => brand::success(),
+                    AgentState::SignIn => brand::warning(),
                     _ => brand::muted(),
                 };
                 agents.push(Span::styled(
@@ -854,9 +858,13 @@ fn welcome(app: &App, width: u16, height: u16) -> (Vec<Line<'static>>, Vec<trans
         Some(Err(error)) => group.push(Line::styled(error.clone(), muted).centered()),
         Some(Ok(overview)) => {
             let mut chips = Vec::new();
-            let dot = if brand::unicode() { "●" } else { "*" };
-            for agent in overview.agents.iter().filter(|agent| usable(agent)) {
-                let ready = agent.state == "ready";
+            let dot = brand::mark_glyph(brand::Mark::Dot);
+            for agent in overview
+                .agents
+                .iter()
+                .filter(|agent| agent.state.is_usable())
+            {
+                let ready = agent.state == AgentState::Ready;
                 if !chips.is_empty() {
                     chips.push(Span::raw(" "));
                 }

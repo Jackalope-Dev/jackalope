@@ -1,8 +1,9 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
+import type { RemoteAction } from '@jackalope/contracts/remote';
 import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { type RemoteAction, RemoteWorkspace } from './components/remote/RemoteWorkspace';
+import { RemoteWorkspace } from './components/remote/RemoteWorkspace';
 import './index.css';
 import '@jackalope/ui/styles.css';
 import './components/tasks/task-workspace.css';

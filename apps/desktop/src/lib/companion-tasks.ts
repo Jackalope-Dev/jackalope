@@ -1,6 +1,6 @@
+import { isActive } from '@jackalope/contracts/runs';
 import type { CompanionNotice } from '../stores/companionStore.ts';
 import { getAgentMetadata } from './agent-catalog.ts';
-import { isActive } from './run-status.ts';
 import type { TaskRun } from './run-types.ts';
 import { taskTitle } from './task-title.ts';
 

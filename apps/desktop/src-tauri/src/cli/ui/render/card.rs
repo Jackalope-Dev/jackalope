@@ -68,7 +68,7 @@ pub fn card(
         }
         if phase == Phase::Live {
             let cursor = Span::styled(
-                if brand::unicode() { "▍" } else { "_" },
+                brand::mark_glyph(brand::Mark::Caret),
                 Style::default().fg(brand::accent()),
             );
             match body.last_mut() {
@@ -128,7 +128,7 @@ pub fn card(
 
     let mut lines = vec![Line::raw(""), top(app, view, run, phase, tone, width)];
     let edge = Style::default().fg(brand::hairline());
-    let side = if brand::unicode() { "│" } else { "|" };
+    let side = brand::mark_glyph(brand::Mark::Side);
     for line in body {
         let used = line.width();
         let mut spans = vec![Span::styled(format!("{side} "), edge)];
@@ -204,34 +204,16 @@ fn top(
 ) -> Line<'static> {
     let edge = Style::default().fg(brand::hairline());
     let muted = Style::default().fg(brand::muted());
-    let (corner, dash, end) = if brand::unicode() {
-        ("╭─ ", "─", " ─╮")
-    } else {
-        ("+- ", "-", " -+")
-    };
+    let (corner, dash, end) = (
+        brand::mark_glyph(brand::Mark::TopOpen),
+        brand::mark_glyph(brand::Mark::Edge),
+        brand::mark_glyph(brand::Mark::TopClose),
+    );
     let glyph = match phase {
         Phase::Live if view.questions.is_empty() => brand::spinner(app.tick),
-        _ if !view.questions.is_empty() => {
-            if brand::unicode() {
-                "◆"
-            } else {
-                "!"
-            }
-        }
-        _ if tone == brand::danger() => {
-            if brand::unicode() {
-                "✗"
-            } else {
-                "x"
-            }
-        }
-        _ => {
-            if brand::unicode() {
-                "✓"
-            } else {
-                "+"
-            }
-        }
+        _ if !view.questions.is_empty() => brand::mark_glyph(brand::Mark::Question),
+        _ if tone == brand::danger() => brand::mark_glyph(brand::Mark::Failed),
+        _ => brand::mark_glyph(brand::Mark::Done),
     };
     let mut left = vec![
         Span::styled(corner, edge),
@@ -290,11 +272,11 @@ fn bottom(
     let edge = Style::default().fg(brand::hairline());
     let key = Style::default().fg(brand::command());
     let muted = Style::default().fg(brand::muted());
-    let (corner, dash, end) = if brand::unicode() {
-        ("╰─", "─", "─╯")
-    } else {
-        ("+-", "-", "-+")
-    };
+    let (corner, dash, end) = (
+        brand::mark_glyph(brand::Mark::BottomOpen),
+        brand::mark_glyph(brand::Mark::Edge),
+        brand::mark_glyph(brand::Mark::BottomClose),
+    );
     let actions: Vec<(&'static str, &'static str)> = if !view.questions.is_empty() {
         vec![("/answer", "choose"), ("", "or type a reply")]
     } else if phase == Phase::Live {
@@ -360,7 +342,7 @@ fn bottom(
 /// A dotted divider between the reply and the record of the work.
 fn rule(room: usize) -> Line<'static> {
     Line::styled(
-        (if brand::unicode() { "╌" } else { "-" }).repeat(room),
+        brand::mark_glyph(brand::Mark::Dashed).repeat(room),
         Style::default().fg(brand::hairline()),
     )
 }
@@ -397,7 +379,7 @@ fn rail(
     room: usize,
     tick: usize,
 ) -> Vec<Line<'static>> {
-    let bar = if brand::unicode() { "━" } else { "=" };
+    let bar = brand::mark_glyph(brand::Mark::Gauge);
     let running = |stage: &RunStage| stage.duration_ms.is_none() && phase == Phase::Live;
     let gaps = stages.len().saturating_sub(1);
     let columns = room.saturating_sub(gaps).max(stages.len());
@@ -489,20 +471,15 @@ fn rail(
 }
 
 fn step_glyph(kind: &str) -> &'static str {
-    let (unicode, plain) = match kind {
-        "read" => ("◇", "r"),
-        "edit" => ("✎", "e"),
-        "search" => ("⌕", "?"),
-        "command" => ("▸", ">"),
-        "check" => ("◈", "c"),
-        "failure" => ("✗", "x"),
-        _ => ("·", "-"),
-    };
-    if brand::unicode() {
-        unicode
-    } else {
-        plain
-    }
+    brand::mark_glyph(match kind {
+        "read" => brand::Mark::Read,
+        "edit" => brand::Mark::Edit,
+        "search" => brand::Mark::Search,
+        "command" => brand::Mark::Command,
+        "check" => brand::Mark::Check,
+        "failure" => brand::Mark::Failed,
+        _ => brand::Mark::Step,
+    })
 }
 
 fn step_color(kind: &str) -> Color {
@@ -631,7 +608,7 @@ fn tally(app: &App, run: &RunSummary) -> Option<Line<'static>> {
             Style::default().fg(brand::success()),
         ));
         spans.push(Span::styled(
-            format!(" {}{removed}", if brand::unicode() { "−" } else { "-" }),
+            format!(" {}{removed}", brand::mark_glyph(brand::Mark::Minus)),
             Style::default().fg(brand::danger()),
         ));
     }
@@ -642,13 +619,13 @@ fn tally(app: &App, run: &RunSummary) -> Option<Line<'static>> {
 fn check_line(check: &protocol::RunCheck) -> Line<'static> {
     let (glyph, color, verdict) = if check.passed {
         (
-            if brand::unicode() { "✓" } else { "+" },
+            brand::mark_glyph(brand::Mark::Done),
             brand::success(),
             "passed",
         )
     } else {
         (
-            if brand::unicode() { "✗" } else { "x" },
+            brand::mark_glyph(brand::Mark::Failed),
             brand::danger(),
             "failed",
         )
@@ -678,7 +655,7 @@ fn files(app: &App, room: usize) -> Vec<Line<'static>> {
     let counts_width = 12;
     let bar_width = BAR_WIDTH.min(room / 4);
     let path_width = room.saturating_sub(counts_width + bar_width + 4).max(8);
-    let bar = if brand::unicode() { "■" } else { "#" };
+    let bar = brand::mark_glyph(brand::Mark::Cell);
     let mut lines = vec![Line::raw("")];
     for change in app.changes.iter().take(FILES_SHOWN) {
         let added = change.added.unwrap_or(0);
@@ -691,20 +668,8 @@ fn files(app: &App, room: usize) -> Vec<Line<'static>> {
         };
         let glyph = match change.status {
             'A' | '?' => "+",
-            'D' => {
-                if brand::unicode() {
-                    "−"
-                } else {
-                    "-"
-                }
-            }
-            'R' => {
-                if brand::unicode() {
-                    "→"
-                } else {
-                    ">"
-                }
-            }
+            'D' => brand::mark_glyph(brand::Mark::Minus),
+            'R' => brand::mark_glyph(brand::Mark::Renamed),
             _ => step_glyph("edit"),
         };
         let path = fit(&change.path, path_width);
@@ -712,7 +677,7 @@ fn files(app: &App, room: usize) -> Vec<Line<'static>> {
             (None, None) => "binary".to_string(),
             _ => format!(
                 "+{added} {}{removed}",
-                if brand::unicode() { "−" } else { "-" }
+                brand::mark_glyph(brand::Mark::Minus)
             ),
         };
         lines.push(Line::from(vec![

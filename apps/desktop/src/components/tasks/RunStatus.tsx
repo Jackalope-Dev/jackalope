@@ -1,6 +1,6 @@
+import { isActive, statusLabel } from '@jackalope/contracts/runs';
 import { Badge, type BadgeProps, LoadingIcon } from '@jackalope/ui';
 import { Check, CircleAlert, CircleCheck, Clock3, LoaderCircle, Square } from 'lucide-react';
-import { isActive, statusLabel } from '../../lib/run-status';
 import type { StepProgress, TaskRun } from '../../lib/run-types';
 
 const icons = {

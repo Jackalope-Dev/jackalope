@@ -1,4 +1,5 @@
 use super::agent_process::AgentProcess;
+use super::opencode::{valid_id, Endpoint, HELPER_STARTUP};
 use super::*;
 use crate::commands::agent_profiles;
 use sha2::{Digest, Sha256};
@@ -40,8 +41,7 @@ struct Entry {
 
 struct Server {
     process: Arc<AgentProcess>,
-    url: String,
-    password: String,
+    endpoint: Endpoint,
 }
 
 pub(super) struct Lease {
@@ -57,14 +57,13 @@ impl Lease {
     }
 
     pub fn output(&self, canceled: impl Fn() -> bool) -> Result<String, String> {
-        let (url, password) = {
+        let endpoint = {
             let guard = self.entry.server.lock().unwrap();
             let server = guard.as_ref().ok_or("The helper server stopped.")?;
-            (server.url.clone(), server.password.clone())
+            server.endpoint.clone()
         };
         let messages = api(
-            &url,
-            &password,
+            &endpoint,
             reqwest::Method::GET,
             &format!("/session/{}/message", self.session),
             None,
@@ -285,26 +284,18 @@ impl Pool {
         if interrupted() || server.process.try_wait().ok()?.is_some() {
             return None;
         }
-        let url = server.url.clone();
-        let password = server.password.clone();
+        let endpoint = server.endpoint.clone();
         drop(guard);
-        let session = api(&url, &password, reqwest::Method::POST, "/session", Some(serde_json::json!({"title":"Jackalope helper","permission":[{"permission":"*","pattern":"*","action":"deny"}]})), &interrupted).ok()?;
+        let session = api(&endpoint, reqwest::Method::POST, "/session", Some(serde_json::json!({"title":"Jackalope helper","permission":[{"permission":"*","pattern":"*","action":"deny"}]})), &interrupted).ok()?;
         lease.session = session["id"]
             .as_str()
-            .filter(|id| {
-                !id.is_empty()
-                    && id.len() <= 128
-                    && id
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-            })?
+            .and_then(|id| valid_id(id).ok())?
             .to_owned();
-        cmd.args(["--attach", &url, "--session", &lease.session]);
+        cmd.args(["--attach", &endpoint.url, "--session", &lease.session]);
         if let Some(directory) = cmd.get_current_dir().map(Path::to_path_buf) {
             cmd.arg("--dir").arg(directory);
         }
-        cmd.env("OPENCODE_SERVER_PASSWORD", &password)
-            .env("OPENCODE_SERVER_USERNAME", "jackalope");
+        endpoint.authorize(cmd);
         Some(lease)
     }
 }
@@ -360,8 +351,7 @@ fn configure_api_helper(cmd: &mut Command, binding: &agent_profiles::AccountBind
 }
 
 fn api(
-    url: &str,
-    password: &str,
+    endpoint: &Endpoint,
     method: reqwest::Method,
     path: &str,
     body: Option<Value>,
@@ -369,15 +359,8 @@ fn api(
 ) -> Result<Value, String> {
     tauri::async_runtime::block_on(async {
         let operation = async {
-            let client = reqwest::Client::builder()
-                .no_proxy()
-                .redirect(reqwest::redirect::Policy::none())
-                .timeout(Duration::from_secs(5))
-                .build()
-                .map_err(|e| e.to_string())?;
-            let mut request = client
-                .request(method, format!("{url}{path}"))
-                .basic_auth("jackalope", Some(password));
+            let client = crate::commands::http::direct_client(Duration::from_secs(5))?;
+            let mut request = endpoint.request(&client, method, endpoint.url(path));
             if let Some(body) = body {
                 request = request.json(&body);
             }
@@ -388,17 +371,16 @@ fn api(
             if !response.status().is_success() {
                 return Err("The helper server rejected the request.".into());
             }
-            let mut bytes = Vec::new();
-            while let Some(chunk) = response
-                .chunk()
+            let bytes = crate::commands::http::read_bounded(&mut response, 1_000_000)
                 .await
-                .map_err(|_| "The helper response was interrupted.")?
-            {
-                if bytes.len() + chunk.len() > 1_000_000 {
-                    return Err("The helper response exceeded its limit.".into());
-                }
-                bytes.extend_from_slice(&chunk);
-            }
+                .map_err(|error| match error {
+                    crate::commands::http::BodyError::Interrupted => {
+                        "The helper response was interrupted."
+                    }
+                    crate::commands::http::BodyError::TooLarge => {
+                        "The helper response exceeded its limit."
+                    }
+                })?;
             serde_json::from_slice(&bytes).map_err(|_| "The helper response was invalid.".into())
         };
         let interrupted = async {
@@ -463,10 +445,7 @@ fn output_events(messages: &Value, session: &str) -> Result<String, String> {
 }
 
 fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, String> {
-    let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
-        .map_err(|e| e.to_string())?;
-    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let password = uuid::Uuid::new_v4().to_string();
+    let (listener, endpoint) = Endpoint::reserve()?;
     let mut cmd = command(source.get_program());
     for (name, value) in source.get_envs() {
         if let Some(value) = value {
@@ -478,68 +457,30 @@ fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, Strin
     if let Some(directory) = source.get_current_dir() {
         cmd.current_dir(directory);
     }
-    cmd.args([
-        "serve",
-        "--pure",
-        "--hostname",
-        "127.0.0.1",
-        "--port",
-        &port.to_string(),
-    ])
-    .env("OPENCODE_SERVER_PASSWORD", &password)
-    .env("OPENCODE_SERVER_USERNAME", "jackalope")
-    .stdin(Stdio::null())
-    .stdout(Stdio::null())
-    .stderr(Stdio::null());
+    endpoint.serve(&mut cmd, &["--pure"]);
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     drop(listener);
     let server = Server {
         process: AgentProcess::spawn(&mut cmd, "opencode")?.process,
-        url: format!("http://127.0.0.1:{port}"),
-        password,
+        endpoint,
     };
     let client = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(Duration::from_millis(300))
-        .timeout(Duration::from_millis(500))
+        .timeout(HELPER_STARTUP.probe())
         .build()
         .map_err(|e| e.to_string())?;
-    let started = std::time::Instant::now();
-    while started.elapsed() < Duration::from_secs(8) && !canceled() {
-        if server
-            .process
-            .try_wait()
-            .map_err(|e| e.to_string())?
-            .is_some()
-        {
-            break;
-        }
-        let ready = tauri::async_runtime::block_on(async {
-            let response = client
-                .get(format!("{}/global/health", server.url))
-                .basic_auth("jackalope", Some(&server.password))
-                .send()
-                .await
-                .ok()?;
-            if !response.status().is_success() {
-                return None;
-            }
-            let mut response = response;
-            let mut bytes = Vec::new();
-            while let Some(chunk) = response.chunk().await.ok()? {
-                if bytes.len() + chunk.len() > 4096 {
-                    return None;
-                }
-                bytes.extend_from_slice(&chunk);
-            }
-            serde_json::from_slice::<Value>(&bytes)
-                .ok()
-                .map(|value| value["healthy"] == true)
-        });
-        if ready == Some(true) {
-            return Ok(server);
-        }
-        std::thread::sleep(Duration::from_millis(50));
+    let exited = || !matches!(server.process.try_wait(), Ok(None));
+    if tauri::async_runtime::block_on(server.endpoint.wait_ready(
+        &client,
+        None,
+        &HELPER_STARTUP,
+        || canceled() || exited(),
+    )) {
+        return Ok(server);
     }
     Err("The local OpenCode helper server was not ready.".into())
 }

@@ -1,3 +1,4 @@
+import { isActive } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -35,7 +36,6 @@ import {
   type WorkingChanges,
   workingChanges,
 } from '../../lib/project-git';
-import { isActive } from '../../lib/run-status';
 import type { RunRequest } from '../../lib/run-types';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';

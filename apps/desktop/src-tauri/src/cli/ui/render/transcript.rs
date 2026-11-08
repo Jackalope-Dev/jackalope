@@ -293,7 +293,7 @@ fn conversation(
         if message.role == "agent" {
             // Who is speaking, so replies stand apart from your messages.
             let mut label = vec![
-                Span::styled(if brand::unicode() { "● " } else { "* " }, accent),
+                Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Dot)), accent),
                 Span::styled(view.agent.clone().unwrap_or_else(|| "agent".into()), muted),
             ];
             if let Some(attempt) = message.attempt {
@@ -343,11 +343,11 @@ fn conversation(
             // The reply as it is written, ending in a cursor.
             lines.push(Line::raw(""));
             lines.push(Line::from(vec![
-                Span::styled(if brand::unicode() { "● " } else { "* " }, accent),
+                Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Dot)), accent),
                 Span::styled(view.agent.clone().unwrap_or_else(|| "agent".into()), muted),
             ]));
             let mut reply = markdown(&view.partial);
-            let cursor = Span::styled(if brand::unicode() { "▍" } else { "_" }, accent);
+            let cursor = Span::styled(brand::mark_glyph(brand::Mark::Caret), accent);
             match reply.last_mut() {
                 Some(line) => line.spans.push(cursor),
                 None => reply.push(Line::from(cursor)),
@@ -361,7 +361,7 @@ fn conversation(
     for question in &view.questions {
         lines.push(Line::raw(""));
         lines.push(Line::from(vec![
-            Span::styled(if brand::unicode() { "◆ " } else { "? " }, warning),
+            Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Ask)), warning),
             Span::styled(
                 question.question.clone(),
                 Style::default().add_modifier(Modifier::BOLD),
@@ -379,7 +379,7 @@ pub(super) fn callout(
     width: u16,
 ) -> Vec<Line<'static>> {
     let bar = Span::styled(
-        if brand::unicode() { "▎ " } else { "| " },
+        format!("{} ", brand::mark_glyph(brand::Mark::Bar)),
         Style::default().fg(color),
     );
     let fill = brand::callout_style(color);

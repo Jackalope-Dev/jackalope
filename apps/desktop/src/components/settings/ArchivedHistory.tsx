@@ -1,3 +1,4 @@
+import { statusLabel } from '@jackalope/contracts/runs';
 import {
   Button,
   RefreshIcon,
@@ -11,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { statusLabel } from '../../lib/run-status';
 import type { ArchivedRun } from '../../lib/run-types';
 import { restoreArchivedTask } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';

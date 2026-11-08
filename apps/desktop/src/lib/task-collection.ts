@@ -1,10 +1,10 @@
+import { isActive, isSettled } from '@jackalope/contracts/runs';
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { taskAgents } from './agent-provider.ts';
 import { isAgentReview } from './agent-review.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
-import { isActive, isSettled } from './run-status.ts';
 import type { TaskRun } from './run-types.ts';
 import { taskTitle } from './task-title.ts';
 import { taskDecision, taskNextAction } from './task-workflow.ts';

@@ -1,3 +1,4 @@
+import { isActive, isFinished } from '@jackalope/contracts/runs';
 import {
   Button,
   Checkbox,
@@ -24,7 +25,6 @@ import {
 } from '../../lib/challenge-review';
 import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
-import { isActive, isFinished } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';

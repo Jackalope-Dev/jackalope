@@ -1,6 +1,7 @@
+import type { Review } from '@jackalope/contracts/runs';
+import { isActive } from '@jackalope/contracts/runs';
 import { invokeNative } from './native/transport.ts';
-import { isActive } from './run-status.ts';
-import type { ChangeStats, Review, TaskRun } from './run-types.ts';
+import type { ChangeStats, TaskRun } from './run-types.ts';
 
 export const stopTask = (id: string) => invokeNative<void>('task_stop', { id });
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });

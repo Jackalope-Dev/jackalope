@@ -1,3 +1,4 @@
+import type { RemoteAction } from '@jackalope/contracts/remote';
 import {
   Button,
   Disclosure,
@@ -20,7 +21,7 @@ import {
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
-import { type RemoteAction, RemoteWorkspace } from './RemoteWorkspace';
+import { RemoteWorkspace } from './RemoteWorkspace';
 
 export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   const [hosts, setHosts] = useState<RemoteHost[]>([]);

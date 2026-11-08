@@ -1,4 +1,5 @@
 import { graphlib, layout } from '@dagrejs/dagre';
+import { isActive, isFinished, isUnfinished } from '@jackalope/contracts/runs';
 import { Badge, Button, EmptyState, Select, SelectItem } from '@jackalope/ui';
 import {
   Background,
@@ -20,7 +21,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { QueueItem } from '../../lib/queue';
-import { isActive, isFinished, isUnfinished } from '../../lib/run-status';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import '@xyflow/react/dist/style.css';

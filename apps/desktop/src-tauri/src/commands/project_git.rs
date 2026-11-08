@@ -2,14 +2,7 @@ use super::repo::{self, Policy};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command};
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum Attribution {
-    Agent,
-    CoAuthor,
-    #[default]
-    User,
-}
+pub use crate::cli_protocol::Attribution;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

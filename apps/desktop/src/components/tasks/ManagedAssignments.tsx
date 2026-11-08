@@ -1,7 +1,7 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { Button, Panel } from '@jackalope/ui';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import type { managedTaskWork } from '../../lib/managed-task';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { taskDecision } from '../../lib/task-workflow';
 import { LiveCombination } from './LiveCombination';

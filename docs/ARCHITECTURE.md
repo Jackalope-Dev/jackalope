@@ -16,13 +16,15 @@ Saved history and running tasks remain accessible when access expires.
 | `packages/ui` | Browser-safe React controls shared by desktop, website and admin |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
-| `packages/contracts` | Cross-application shapes: telemetry, account and download responses, platforms, and release distribution (targets, CDN URLs, installer names, R2 layout, Store links) |
+| `packages/contracts` | Cross-application shapes: telemetry, account and download responses, platforms, release distribution (targets, CDN URLs, installer names, R2 layout, Store links), run statuses and agent questions, and the remote companion protocol (snapshot, actions, status labels, draft keys) |
 | `scripts/release` | Cross-application build, signing, release receipts and publication orchestration |
 | `scripts/verification` | Browser regression fixtures and local acceptance helpers |
 | `docs` | Public architecture, feature contracts, verification and release guidance |
 
 Application runtime imports share code through `packages/ui`, `packages/brand`, `packages/knowledge` and
-`packages/contracts`; applications do not import each other's runtime modules. Release scripts import
+`packages/contracts`; applications do not import each other's runtime modules, except that the mobile
+companion renders the desktop's remote workspace hook and a few task components (questions, changed
+files, provider marks) from `apps/desktop/src`. Release scripts import
 `packages/contracts` for release names and URLs. Release tooling intentionally spans
 applications. The website generates its monochrome SVG and PNG icons directly
 from shared character geometry during development and builds. The server bundles
@@ -89,7 +91,7 @@ changes must preserve both sides and old saved records.
 | tasks/routing.rs, tasks/routing/ | Validated default-agent selection, quota admission, routing subprocess ownership and bounded handoff |
 | coordination.rs, coordination/ | Queue contracts, eligibility, storage, guarded dispatch and loopback bridge |
 | integration.rs | Captured source snapshots, review receipts and guarded fast-forward application |
-| cli_host.rs, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint, PATH links, opening the command in the system terminal and the shared project mirror |
+| cli_host.rs, cli_host/, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint and its mapping of conversations, plans and projects onto the terminal protocol, PATH links, opening the command in the system terminal and the shared project mirror (settings and their defaults live in cli/project_settings.rs, shared with the CLI) |
 | scope_path.rs | Repository-relative paths tasks own or name, with one case-folding rule for containment and overlap |
 | git.rs, git_command.rs, repo.rs, worktree_cleanup.rs | Worktree operations, explicit Git environment policies and Git plumbing shared with the CLI (private indexes, synthetic commits, `-z` parsers) |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |

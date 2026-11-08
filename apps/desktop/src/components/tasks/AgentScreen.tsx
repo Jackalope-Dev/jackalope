@@ -1,3 +1,4 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { Badge, Button, InlineNotice } from '@jackalope/ui';
 import { AppWindow, ExternalLink, Globe, Lock, Monitor, Server } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -12,7 +13,6 @@ import {
 } from '../../lib/agent-screen';
 import { computerStateLabel, computerUsage, providerLabel } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { ComputerViewer } from '../computers/ComputerViewer';
 import { ScreenshotPreview } from './ScreenshotPreview';

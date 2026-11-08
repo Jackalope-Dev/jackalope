@@ -1,3 +1,4 @@
+import { isWorking } from '@jackalope/contracts/runs';
 import {
   Button,
   ConfirmDialog,
@@ -16,7 +17,6 @@ import { describeWake } from '../../lib/bot-hub';
 import { describeError } from '../../lib/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { isWorking } from '../../lib/run-status';
 import type { RunRequest } from '../../lib/run-types';
 import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
 import {

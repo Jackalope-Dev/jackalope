@@ -1,9 +1,9 @@
+import { isActive } from '@jackalope/contracts/runs';
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { trailHandoff } from './decision-trail.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
-import { isActive } from './run-status.ts';
 import type { TaskRun } from './run-types.ts';
 import { collectWorkspaceWork, type WorkItem, workPresence } from './task-collection.ts';
 import { taskDecision } from './task-workflow.ts';

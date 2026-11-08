@@ -893,7 +893,7 @@ mod tests {
             .requests()
             .into_iter()
             .filter_map(|request| match request {
-                Request::SessionAction { action, .. } => Some(action),
+                Request::SessionAction { action, .. } => Some(action.to_string()),
                 Request::MergePrepare { .. } => Some("prepare".into()),
                 Request::MergeApply { .. } => Some("apply".into()),
                 _ => None,
@@ -1007,7 +1007,7 @@ mod tests {
             .requests()
             .into_iter()
             .filter_map(|request| match request {
-                Request::PlanAction { action, text, .. } => Some((action, text)),
+                Request::PlanAction { action, text, .. } => Some((action.to_string(), text)),
                 _ => None,
             })
             .collect();

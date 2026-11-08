@@ -1,9 +1,9 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { Badge, Button } from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { taskAgents } from '../../lib/agent-provider';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { taskDecision } from '../../lib/task-workflow';
 import { AgentStack } from '../agents/AgentAvatar';

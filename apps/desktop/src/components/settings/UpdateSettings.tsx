@@ -1,3 +1,4 @@
+import { isLive } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -11,7 +12,6 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { isLive } from '../../lib/run-status';
 import { useExecutionStore } from '../../stores/executionStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { BetaProgram } from './BetaProgram';

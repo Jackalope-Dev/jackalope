@@ -70,7 +70,7 @@ impl Curation {
 /// content from projects that no longer do.
 fn export_all(runtime: &TaskRuntime) {
     for project in crate::commands::project_registry::list(runtime) {
-        let enabled = project.settings().export_lessons;
+        let enabled = project.settings.resolve().export_lessons;
         if let Err(error) = export_project(&runtime.knowledge, &project.id, &project.path, enabled)
         {
             if enabled || !error.starts_with("Project folder unavailable") {

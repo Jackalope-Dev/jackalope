@@ -1,7 +1,7 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { FileDiff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { isActive } from '../../lib/run-status';
 import type { WorkItem } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';

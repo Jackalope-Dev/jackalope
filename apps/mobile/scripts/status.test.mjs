@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { moveNewWorkDraft } from '../src/drafts.ts';
-import {
-  groupWork,
-  requestText,
-  taskStatus,
-  workRows,
-  workSummary,
-  workTitle,
-} from '../src/status.ts';
+import { groupWork, workRows, workSummary } from '../src/status.ts';
 
 const task = (fields) => ({
   id: 'run',
@@ -24,46 +17,6 @@ const task = (fields) => ({
   prompts: [],
   activity: [],
   ...fields,
-});
-
-test('titles skip section headings and Markdown markers', () => {
-  assert.equal(
-    workTitle('### 🎯 Objective\n\nThe pre-commit hook rejected a commit'),
-    'The pre-commit hook rejected a commit',
-  );
-  assert.equal(workTitle('Live session: **Ship** the `beta`\nmore'), 'Ship the beta');
-  assert.equal(workTitle('- keep snake_case names'), 'keep snake_case names');
-  assert.equal(workTitle('## Only a heading'), 'Only a heading');
-  assert.equal(workTitle('  \n'), 'Untitled work');
-});
-
-test('a live session request shows only the messages, not the host instructions', () => {
-  const batch = [
-    'Live session: Fix the footer …',
-    'Handle the following user messages in order as one coherent batch. Do not commit.',
-    'This folder is not a Git repository. Edit files in place.',
-    '',
-    'User message 8465324d-d302-4373-bb75-8d9fb063a288:',
-    'Fix the footer on mobile',
-    '- keep the links',
-    '',
-    'User answer (Scope) 121fa6f3-a12a-4753-a332-1096052ccf16:',
-    'Phone only',
-    '',
-  ].join('\n');
-  assert.equal(requestText(batch), 'Fix the footer on mobile\n- keep the links\n\nPhone only');
-  assert.equal(workTitle(batch), 'Fix the footer …');
-  assert.equal(
-    requestText('Live session: Fix the footer …\nHandle the following user messages in'),
-    'Fix the footer …',
-  );
-  assert.equal(requestText('  Plain request\nUser message 1:\n'), 'Plain request\nUser message 1:');
-});
-
-test('an unanswered question in the list marks running work as needing you', () => {
-  const asked = task({ prompts: [{ id: 'q', status: 'pending' }] });
-  assert.equal(taskStatus(asked).label, 'Needs your answer');
-  assert.equal(taskStatus(task({})).label, 'Working');
 });
 
 test('rows list waiting conversations, then the latest attempt per thread', () => {

@@ -21,7 +21,7 @@ fn captures_need_a_preview_command_and_default_to_the_home_page_on_desktop() {
     assert_eq!(defaults.pages, ["/"]);
     assert_eq!(defaults.viewports, ["desktop"]);
     let mut off = record(Some("pnpm dev --port {port}"));
-    off.review_captures = Some(false);
+    off.settings.review_captures = Some(false);
     assert_eq!(settings(&off), None);
     let mut custom = record(Some("pnpm dev --port {port}"));
     custom.review_pages = vec![
@@ -37,7 +37,7 @@ fn captures_need_a_preview_command_and_default_to_the_home_page_on_desktop() {
     // Older ledgers without the new fields keep working.
     let legacy: ProjectRecord =
         serde_json::from_str(r#"{"id":"old","name":"Old","path":"/old"}"#).unwrap();
-    assert!(legacy.review_pages.is_empty() && legacy.review_captures.is_none());
+    assert!(legacy.review_pages.is_empty() && legacy.settings.review_captures.is_none());
 }
 
 #[test]

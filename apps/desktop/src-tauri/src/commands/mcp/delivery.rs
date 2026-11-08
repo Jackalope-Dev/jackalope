@@ -1,7 +1,8 @@
 use serde_json::{json, Map, Value};
 use std::process::Command;
 
-fn environment(command: &Command, name: &str) -> Option<String> {
+/// A variable as `command` will see it: its own setting, else the inherited one.
+pub(in crate::commands) fn command_env(command: &Command, name: &str) -> Option<String> {
     command
         .get_envs()
         .find(|(key, _)| {
@@ -24,7 +25,7 @@ fn headers(server: &Value, command: &Command) -> Result<Map<String, Value>, Stri
             .ok_or("Connection headers must be an object.")?,
     };
     if let Some(variable) = server["bearer_token_env_var"].as_str() {
-        let token = environment(command, variable)
+        let token = command_env(command, variable)
             .filter(|value| !value.is_empty())
             .ok_or("The selected connection's bearer-token environment variable is unavailable.")?;
         headers.insert("Authorization".into(), json!(format!("Bearer {token}")));
@@ -61,44 +62,30 @@ pub(in crate::commands) fn acp_servers(
         .collect()
 }
 
-pub(in crate::commands) fn opencode_config(
-    servers: &Map<String, Value>,
+/// One `mcp` entry of OpenCode's inline configuration.
+pub(in crate::commands) fn opencode_server(
+    server: &Value,
     command: &Command,
-) -> Result<String, String> {
-    let inherited = environment(command, "OPENCODE_CONFIG_CONTENT");
-    let mut config = match inherited.filter(|value| !value.trim().is_empty()) {
-        Some(value) => serde_json::from_str::<Value>(&value)
-            .map_err(|_| "OPENCODE_CONFIG_CONTENT must contain valid JSON to add project tools.")?,
-        None => json!({}),
-    };
-    if !config.is_object() || config.get("mcp").is_some_and(|value| !value.is_object()) {
-        return Err("OpenCode's inline configuration must contain an MCP object.".into());
-    }
-    if config.get("mcp").is_none() {
-        config["mcp"] = json!({});
-    }
-    for (name, server) in servers {
-        let mut entry = if let Some(program) = server["command"].as_str() {
-            let mut args = vec![json!(program)];
-            args.extend(server["args"].as_array().into_iter().flatten().cloned());
-            let environment = match server.get("env").filter(|value| !value.is_null()) {
-                Some(value) => value
-                    .as_object()
-                    .filter(|env| env.values().all(Value::is_string))
-                    .cloned()
-                    .ok_or("Connection environment must contain string values.")?,
-                None => Map::new(),
-            };
-            json!({"type":"local","command":args,"environment":environment,"enabled":true})
-        } else {
-            json!({"type":"remote","url":server["url"],"headers":headers(server,command)?,"enabled":true})
+) -> Result<Value, String> {
+    let mut entry = if let Some(program) = server["command"].as_str() {
+        let mut args = vec![json!(program)];
+        args.extend(server["args"].as_array().into_iter().flatten().cloned());
+        let environment = match server.get("env").filter(|value| !value.is_null()) {
+            Some(value) => value
+                .as_object()
+                .filter(|env| env.values().all(Value::is_string))
+                .cloned()
+                .ok_or("Connection environment must contain string values.")?,
+            None => Map::new(),
         };
-        if let Some(timeout) = server["timeout"].as_u64() {
-            entry["timeout"] = json!(timeout);
-        }
-        config["mcp"][name] = entry;
+        json!({"type":"local","command":args,"environment":environment,"enabled":true})
+    } else {
+        json!({"type":"remote","url":server["url"],"headers":headers(server,command)?,"enabled":true})
+    };
+    if let Some(timeout) = server["timeout"].as_u64() {
+        entry["timeout"] = json!(timeout);
     }
-    Ok(config.to_string())
+    Ok(entry)
 }
 
 #[cfg(test)]
@@ -114,10 +101,7 @@ mod tests {
         });
         let servers = servers.as_object().unwrap();
         let mut command = Command::new("fixture");
-        command.env("JACKALOPE_TEST_TOKEN", "fixture-token").env(
-            "OPENCODE_CONFIG_CONTENT",
-            r#"{"model":"provider/model","permission":"ask","mcp":{"existing":{"enabled":false}}}"#,
-        );
+        command.env("JACKALOPE_TEST_TOKEN", "fixture-token");
         let acp = acp_servers(servers, &command).unwrap();
         let local = acp.iter().find(|server| server["name"] == "local").unwrap();
         let remote = acp
@@ -132,37 +116,31 @@ mod tests {
         assert!(local.get("type").is_none());
         assert_eq!(local["args"][0], "a path/tool.js");
         assert_eq!(remote["headers"][0]["value"], "Bearer fixture-token");
-        let config: Value =
-            serde_json::from_str(&opencode_config(servers, &command).unwrap()).unwrap();
-        assert_eq!(config["permission"], "ask");
-        assert_eq!(config["model"], "provider/model");
-        assert_eq!(config["mcp"]["existing"]["enabled"], false);
-        assert_eq!(config["mcp"]["local"]["command"][1], "a path/tool.js");
-        assert_eq!(config["mcp"]["remote"]["timeout"], 2220000);
-        assert!(config["mcp"]["local"].get("timeout").is_none());
+        let local = opencode_server(&servers["local"], &command).unwrap();
+        assert_eq!(local["command"][1], "a path/tool.js");
+        assert!(local.get("timeout").is_none());
+        let remote = opencode_server(&servers["remote"], &command).unwrap();
+        assert_eq!(remote["timeout"], 2220000);
+        assert_eq!(remote["headers"]["Authorization"], "Bearer fixture-token");
         command.env_remove("JACKALOPE_TEST_TOKEN");
         assert!(acp_servers(servers, &command).is_err());
-        command.env("OPENCODE_CONFIG_CONTENT", "invalid");
-        assert!(opencode_config(servers, &command).is_err());
+        assert!(opencode_server(&servers["remote"], &command).is_err());
     }
 
     #[test]
     fn opencode_local_tools_require_an_object_even_without_environment_overrides() {
-        let mut command = Command::new("fixture");
-        command.env_remove("OPENCODE_CONFIG_CONTENT");
+        let command = Command::new("fixture");
         for env in [None, Some(Value::Null), Some(json!({}))] {
             let mut server = json!({"command":"node","args":["fixture.js"]});
             if let Some(env) = env {
                 server["env"] = env;
             }
-            let servers = json!({"fixture":server});
-            let config: Value = serde_json::from_str(
-                &opencode_config(servers.as_object().unwrap(), &command).unwrap(),
-            )
-            .unwrap();
-            assert_eq!(config["mcp"]["fixture"]["environment"], json!({}));
+            assert_eq!(
+                opencode_server(&server, &command).unwrap()["environment"],
+                json!({})
+            );
         }
-        let invalid = json!({"fixture":{"command":"node","env":{"KEY":false}}});
-        assert!(opencode_config(invalid.as_object().unwrap(), &command).is_err());
+        let invalid = json!({"command":"node","env":{"KEY":false}});
+        assert!(opencode_server(&invalid, &command).is_err());
     }
 }

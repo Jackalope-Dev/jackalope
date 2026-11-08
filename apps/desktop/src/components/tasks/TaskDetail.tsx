@@ -1,3 +1,4 @@
+import { canRetry, isActive, isFinished, isWorking, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -31,7 +32,6 @@ import { openInBrowser } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { recoveryHandoff } from '../../lib/project-return';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
-import { canRetry, isActive, isFinished, isWorking, statusLabel } from '../../lib/run-status';
 import { PROMPT_MAX_CHARS, type TaskRun } from '../../lib/run-types';
 import { retryTask, stopAndSettle, stopPreview as stopPreviewTask } from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';

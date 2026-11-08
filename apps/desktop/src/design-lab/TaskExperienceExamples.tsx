@@ -1,3 +1,4 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
 import { Button, Checkbox, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
 import { AgentQuestion } from '../components/tasks/AgentQuestion';
@@ -7,7 +8,6 @@ import { TaskActivity } from '../components/tasks/TaskActivity';
 import { TaskContextPanel } from '../components/tasks/TaskContextPanel';
 import TaskMarkdown from '../components/tasks/TaskMarkdown';
 import { TaskOutcomes } from '../components/tasks/TaskOutcomes';
-import type { PendingUserPrompt } from '../lib/run-types';
 import { assemblePrompt } from '../lib/skills/context-assembler';
 import '../components/tasks/task-workspace.css';
 

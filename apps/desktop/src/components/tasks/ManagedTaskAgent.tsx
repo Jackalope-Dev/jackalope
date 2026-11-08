@@ -1,8 +1,8 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
+import { isActive } from '@jackalope/contracts/runs';
 import { Bot } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 
 export function ManagedTaskAgent({ provider, run }: { provider: string; run?: TaskRun }) {

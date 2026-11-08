@@ -35,6 +35,8 @@ pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
+#[cfg(test)]
+pub(super) use opencode::OpenCodeConfig;
 pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;

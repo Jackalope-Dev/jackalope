@@ -5,7 +5,7 @@ use super::pickers::PickerKind;
 use super::App;
 use crate::connection::short;
 use crate::history;
-use crate::protocol::{AgentStatus, Request, Response};
+use crate::protocol::{AgentStatus, Request, Response, SessionCommand};
 
 pub const COMMANDS: &[(&str, &str)] = &[
     (
@@ -348,7 +348,7 @@ impl App {
         if self
             .request(Request::SessionAction {
                 session_id,
-                action: "cancel-message".into(),
+                action: SessionCommand::CancelMessage,
                 message_id: Some(message_id),
             })
             .is_some()
@@ -413,7 +413,7 @@ impl App {
         ));
     }
 
-    fn session_action(&mut self, action: &str, done: &str, tone: Tone) {
+    fn session_action(&mut self, action: SessionCommand, done: &str, tone: Tone) {
         let Some(session_id) = self.session.clone() else {
             self.flash("Start a conversation first", Tone::Muted);
             return;
@@ -421,7 +421,7 @@ impl App {
         if self
             .request(Request::SessionAction {
                 session_id,
-                action: action.into(),
+                action,
                 message_id: None,
             })
             .is_some()
@@ -569,10 +569,10 @@ impl App {
             "unqueue" => self.unqueue(),
             "merge" => self.merge(argument),
             "pr" => self.pull_request(argument),
-            "retry" => self.session_action("retry", "Relaunching", Tone::Muted),
-            "finish" => self.session_action("finish", "Marked done", Tone::Success),
-            "pause" => self.session_action("pause", "Paused", Tone::Muted),
-            "unpause" => self.session_action("resume", "Resumed", Tone::Muted),
+            "retry" => self.session_action(SessionCommand::Retry, "Relaunching", Tone::Muted),
+            "finish" => self.session_action(SessionCommand::Finish, "Marked done", Tone::Success),
+            "pause" => self.session_action(SessionCommand::Pause, "Paused", Tone::Muted),
+            "unpause" => self.session_action(SessionCommand::Resume, "Resumed", Tone::Muted),
             "stop" => {
                 let run = self
                     .view

@@ -110,9 +110,6 @@ pub const PROBATION_OPPORTUNITIES: u64 = THRESHOLDS.probation_opportunities;
 pub const IDLE_OPPORTUNITIES: u64 = THRESHOLDS.idle_opportunities;
 pub const PROJECT_CAPACITY: usize = THRESHOLDS.project_capacity;
 const ADDS_PER_REFLECTION: usize = THRESHOLDS.adds_per_reflection;
-/// Reported tool calls between background reflections of a running task; a
-/// per-project setting.
-pub const DEFAULT_CADENCE: u32 = 50;
 const EVIDENCE_REFERENCES: usize = 10;
 const RECENT_RUNS: usize = 8;
 /// `archived_reason` of a lesson on probation that agents kept missing.

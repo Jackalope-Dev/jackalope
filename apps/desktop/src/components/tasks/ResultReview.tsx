@@ -1,3 +1,4 @@
+import type { Review } from '@jackalope/contracts/runs';
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { ArrowRight, Check, FileDiff, GitMerge, Images, ListChecks, RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
-import type { Review, TaskRun } from '../../lib/run-types';
+import type { TaskRun } from '../../lib/run-types';
 import { useProjectStore } from '../../stores/projectStore';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentReview } from './AgentReview';

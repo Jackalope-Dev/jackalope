@@ -1,4 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
+import { isActive } from '@jackalope/contracts/runs';
 import { Button, CopyButton, InlineNotice, SegmentedControl, Tooltip } from '@jackalope/ui';
 import {
   AlarmClock,
@@ -27,7 +28,6 @@ import {
   sessionWork,
 } from '../../lib/live-session';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';

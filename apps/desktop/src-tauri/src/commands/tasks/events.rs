@@ -1,12 +1,15 @@
 use super::*;
 
+/// Activity entries a run keeps; older ones are dropped.
+pub(in crate::commands) const ACTIVITY_KEPT: usize = 150;
+
 pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
     if text.trim().is_empty() {
         return;
     }
     let bounded: String = text.chars().take(6000).collect();
     run.activity.push(bounded);
-    if run.activity.len() > 150 {
+    if run.activity.len() > ACTIVITY_KEPT {
         run.activity.remove(0);
     }
 }

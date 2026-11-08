@@ -1,4 +1,11 @@
 import {
+  durationLabel,
+  elapsedLabel,
+  isActive,
+  isFinished,
+  statusLabel,
+} from '@jackalope/contracts/runs';
+import {
   Button,
   DialogCloseButton,
   DialogContent,
@@ -21,13 +28,6 @@ import {
 } from '../../lib/compare-judge';
 import { startComparisonJudge } from '../../lib/compare-launch';
 import { invokeNative } from '../../lib/native/transport';
-import {
-  durationLabel,
-  elapsedLabel,
-  isActive,
-  isFinished,
-  statusLabel,
-} from '../../lib/run-status';
 import type { ChangeStats, TaskRun } from '../../lib/run-types';
 import { latestAttempt } from '../../lib/task-workflow';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';

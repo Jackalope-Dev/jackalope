@@ -1,7 +1,6 @@
 use super::super::tasks::TaskRuntime;
 use super::*;
 static CLIENT_LOCK: Mutex<()> = Mutex::new(());
-const RESPONSE_LIMIT: usize = 4_000_000;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Host {
@@ -54,7 +53,7 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
         .await;
     }
     let (base, authority) = endpoint(host).await?;
-    let client = crate::commands::http::direct_client(Duration::from_secs(30))?;
+    let client = crate::commands::http::direct_client(super::pairing::TIMEOUT)?;
     let mut request = client.post(format!("{base}{route}")).json(&value);
     if let Some(authority) = authority {
         request = request.header("Host", authority);
@@ -62,25 +61,20 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
     if !host.token.is_empty() {
         request = request.bearer_auth(&host.token);
     }
-    let mut response = request.send().await.map_err(|_| "The host is unreachable. Work continues there; reconnect to check whether your last action completed.")?;
+    let mut response = request
+        .send()
+        .await
+        .map_err(|_| super::pairing::UNREACHABLE)?;
     let status = response.status();
-    let bytes = crate::commands::http::read_bounded(&mut response, RESPONSE_LIMIT)
+    let bytes = crate::commands::http::read_bounded(&mut response, super::pairing::RESPONSE_LIMIT)
         .await
         .map_err(|error| match error {
             crate::commands::http::BodyError::Interrupted => {
                 "Connection interrupted. Refresh the host before retrying."
             }
-            crate::commands::http::BodyError::TooLarge => "The host response is too large.",
+            crate::commands::http::BodyError::TooLarge => super::pairing::TOO_LARGE,
         })?;
-    let value: Value =
-        serde_json::from_slice(&bytes).map_err(|_| "The host returned an unreadable response.")?;
-    if !status.is_success() {
-        return Err(value["error"]
-            .as_str()
-            .unwrap_or("The host declined this request.")
-            .into());
-    }
-    Ok(value)
+    super::pairing::reply(status.is_success(), &bytes)
 }
 #[tauri::command]
 pub fn remote_hosts(state: State<'_, TaskRuntime>) -> Result<Vec<Value>, String> {
@@ -96,7 +90,7 @@ pub async fn remote_host_pair(
     code: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<Value, String> {
-    let Some(code) = super::pairing_code(&code)
+    let Some(code) = super::pairing::pairing_code(&code)
         .filter(|_| !name.trim().is_empty() && name.chars().count() <= 80 && port >= 1024)
     else {
         return Err("Enter a name, host and current pairing code.".into());
@@ -143,11 +137,7 @@ pub async fn remote_host_pair(
         }
     };
     let mut save = || -> Result<Value, String> {
-        host.token = response["token"]
-            .as_str()
-            .filter(|token| token.len() == 64)
-            .ok_or("The host did not return a device token.")?
-            .into();
+        host.token = super::pairing::device_token(&response)?.into();
         let _guard = CLIENT_LOCK.lock().map_err(|e| e.to_string())?;
         let mut saved = hosts(&state)?;
         if saved.len() >= 20 {

@@ -1,7 +1,7 @@
+import { isActive, isFinished } from '@jackalope/contracts/runs';
 import type { ContextSelection } from './knowledge-types';
 import { invokeNative } from './native/transport.ts';
 import type { QueueView } from './queue';
-import { isActive, isFinished } from './run-status.ts';
 import type { RunRequest, TaskRun } from './run-types';
 import type { TaskAssessment } from './task-strategy';
 

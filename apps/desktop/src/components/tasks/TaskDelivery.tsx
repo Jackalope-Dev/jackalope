@@ -1,3 +1,4 @@
+import { isActive } from '@jackalope/contracts/runs';
 import {
   Button,
   DefinitionList,
@@ -11,7 +12,6 @@ import { useState } from 'react';
 import { describeError } from '../../lib/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { mergeDestination } from '../../lib/task-workflow';
 import { useProjectStore } from '../../stores/projectStore';

@@ -1,5 +1,6 @@
 mod api;
 mod client;
+mod pairing;
 mod transport;
 pub mod wsl;
 pub use client::*;
@@ -11,6 +12,7 @@ use super::{
     live_sessions::LiveSessions,
     tasks::{RunRequest, TaskRuntime},
 };
+use pairing::{pairing_code, SHORT_ALPHABET, SHORT_LENGTH};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -71,9 +73,6 @@ impl Pairing {
 /// Every request to pair counts, so a short code gets at most this many guesses before
 /// the person has to create a new one.
 const PAIRING_ATTEMPTS: u16 = 10;
-/// Crockford base32: no I, L, O or U, so a typed code cannot be misread.
-const SHORT_ALPHABET: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const SHORT_LENGTH: usize = 10;
 struct Inner {
     config: Config,
     pairing: Option<Pairing>,
@@ -114,28 +113,6 @@ fn short_code() -> String {
         .map(|&index| SHORT_ALPHABET[usize::from(random[index] % 32)] as char)
         .collect();
     format!("{}-{}", &code[..5], &code[5..])
-}
-/// The code as the host compares it: a link's 64-hex code, or a short code with its
-/// dashes, spaces and case removed and look-alike letters read as digits.
-pub(super) fn pairing_code(value: &str) -> Option<String> {
-    let compact: String = value
-        .chars()
-        .filter(|c| !c.is_whitespace() && *c != '-')
-        .collect();
-    if compact.len() == 64 && compact.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Some(compact.to_ascii_lowercase());
-    }
-    let short: String = compact
-        .to_ascii_uppercase()
-        .chars()
-        .map(|c| match c {
-            'O' => '0',
-            'I' | 'L' => '1',
-            other => other,
-        })
-        .collect();
-    (short.len() == SHORT_LENGTH && short.bytes().all(|b| SHORT_ALPHABET.contains(&b)))
-        .then_some(short)
 }
 fn origin(value: &str) -> Result<String, String> {
     if value.is_empty() {

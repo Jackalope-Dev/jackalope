@@ -1,7 +1,7 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { openInBrowser } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
-import type { PendingUserPrompt } from '../../lib/run-types';
 import { respondToPrompt } from '../../lib/task-client';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';

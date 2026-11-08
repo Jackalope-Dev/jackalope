@@ -1,4 +1,5 @@
 import { PRESET_THEMES, withPreset } from '@jackalope/brand/theme';
+import { isSettled } from '@jackalope/contracts/runs';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
@@ -9,7 +10,6 @@ import { searchFiles } from '../../lib/file-search';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { attachmentReference } from '../../lib/prompt-attachments';
-import { isSettled } from '../../lib/run-status';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workShape } from '../../lib/task-collection';
 import { taskDecision } from '../../lib/task-workflow';

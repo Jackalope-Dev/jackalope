@@ -79,8 +79,9 @@ pub(super) fn run(
                 cmd.args(["-c", &value]);
             }
         } else if adapter == "opencode" {
-            let config = crate::commands::mcp::opencode_config(servers, &cmd)?;
-            cmd.env("OPENCODE_CONFIG_CONTENT", config);
+            let mut config = tasks::OpenCodeConfig::read(&cmd)?;
+            config.add_mcp(servers, &cmd)?;
+            config.apply(&mut cmd);
         } else if adapter == "claude" {
             cmd.args([
                 "--mcp-config",

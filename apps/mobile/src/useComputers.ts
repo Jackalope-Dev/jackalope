@@ -1,5 +1,5 @@
+import type { Snapshot } from '@jackalope/contracts/remote';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Snapshot } from '../../desktop/src/components/remote/useRemoteWorkspace';
 import { type Host, request } from './native';
 
 export interface ComputerState {

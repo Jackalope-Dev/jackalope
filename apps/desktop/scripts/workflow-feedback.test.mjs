@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parsePatchFiles } from '@pierre/diffs';
 import { issuePrompt, issueUrl, workSource } from '../src/lib/issues.ts';
-import { prepareRemoteRequest } from '../src/lib/remote-request.ts';
 import { appendFeedbackDraft, reviewExcerpt, reviewFeedback } from '../src/lib/review-feedback.ts';
 
 test('review feedback preserves removed code, skips resolved comments and flags stale anchors', () => {
@@ -54,46 +53,6 @@ test('issue drafts remain launchable with Unicode bodies and retain a safe sourc
   ])
     assert.throws(() => issueUrl(url));
   assert.equal(workSource('Source: https://password@example.com'), undefined);
-});
-
-test('remote sends retain their identity across reload and change it only for a new action', () => {
-  const data = new Map();
-  const storage = {
-    getItem: (key) => data.get(key) ?? null,
-    setItem: (key, value) => data.set(key, value),
-  };
-  const action = { action: 'start', projectId: 'project', text: 'Fix the focus order' };
-  const { id } = prepareRemoteRequest(storage, 'draft', action);
-  assert.equal(prepareRemoteRequest(storage, 'draft', JSON.parse(JSON.stringify(action))).id, id);
-  assert.notEqual(
-    prepareRemoteRequest(storage, 'draft', { ...action, text: 'A new request' }).id,
-    id,
-  );
-  const first = prepareRemoteRequest(storage, 'followup', {
-    action: 'followup',
-    runId: 'old',
-    text: 'Fix focus',
-  });
-  const retry = prepareRemoteRequest(storage, 'followup', {
-    action: 'followup',
-    runId: 'new',
-    text: 'Fix focus',
-  });
-  assert.deepEqual(retry, first);
-  assert.throws(
-    () =>
-      prepareRemoteRequest(
-        {
-          getItem: () => null,
-          setItem: () => {
-            throw new Error('Quota');
-          },
-        },
-        'draft',
-        action,
-      ),
-    /Quota/,
-  );
 });
 
 test('feedback preserves existing drafts, avoids repeat additions, and respects Unicode byte limits', () => {

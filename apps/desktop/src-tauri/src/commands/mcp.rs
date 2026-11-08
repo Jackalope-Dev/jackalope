@@ -16,7 +16,7 @@ static CONFIG_LOCK: Mutex<()> = Mutex::new(());
 
 mod delivery;
 mod storage;
-pub(super) use delivery::{acp_servers, opencode_config};
+pub(super) use delivery::{acp_servers, command_env, opencode_server};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

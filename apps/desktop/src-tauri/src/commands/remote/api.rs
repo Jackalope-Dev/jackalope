@@ -179,7 +179,7 @@ async fn request(
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "));
         if !token
-            .filter(|v| v.len() == 64)
+            .filter(|v| v.len() == super::pairing::TOKEN_LENGTH)
             .is_some_and(|v| inner.config.devices.iter().any(|d| d.token_hash == hash(v)))
         {
             return failure(
@@ -221,7 +221,22 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
                 json!({"projects":config.projects.iter().map(|p| json!({"id":p.project_id,"name":p.project_name})).collect::<Vec<_>>(),"tasks":tasks.into_iter().take(200).map(|r| task(r,false)).collect::<Vec<_>>(),"sessions":sessions}),
             )
         }
-        "detail" => Ok(task(run(&runs, config, action.run_id.as_deref())?, true)),
+        "detail" => {
+            let run = run(&runs, config, action.run_id.as_deref())?;
+            let mut view = task(run, true);
+            if let Some(session_id) = &run.live_session_id {
+                let snapshot = service.sessions.snapshot(Some(session_id))?;
+                if let Some(session) = snapshot.sessions.iter().find(|s| &s.id == session_id) {
+                    view["messages"] = json!(session
+                        .messages
+                        .iter()
+                        .filter(|m| m.run_id.as_deref() == Some(run.id.as_str()))
+                        .map(|m| m.text.as_str())
+                        .collect::<Vec<_>>());
+                }
+            }
+            Ok(view)
+        }
         "review" => {
             let run = run(&runs, config, action.run_id.as_deref())?;
             if let Some(session_id) = &run.live_session_id {

@@ -13,6 +13,7 @@ pub(super) fn discover_runner(
         signed_in: false,
         account: "Current CLI account".into(),
         detail: String::new(),
+        sign_in_needed: false,
     };
     if let Some(custom) = policy.custom_agents.iter().find(|agent| agent.id == id) {
         runner.name = custom.name.clone();
@@ -87,6 +88,7 @@ pub(super) fn discover_runner(
                     } else {
                         runner.signed_in = out.success;
                     }
+                    runner.sign_in_needed = !runner.signed_in;
                     runner.detail = if runner.signed_in {
                         "Signed in and ready.".into()
                     } else if binding.profile_id.is_some() {

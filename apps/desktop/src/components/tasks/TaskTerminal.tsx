@@ -1,3 +1,4 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { Button, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -6,7 +7,6 @@ import { useEffect, useRef, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { isActive } from '../../lib/run-status';
 import type { TaskRun } from '../../lib/run-types';
 import { saveWorkFeedback } from '../../lib/work-feedback';
 import { useSavedActionsStore } from '../../stores/savedActionsStore';

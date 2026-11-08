@@ -30,7 +30,7 @@ mod selection;
 mod sharpen;
 
 use crate::connection::Connection;
-use crate::protocol::{AgentStatus, Handshake, Project, SessionSummary, SessionView};
+use crate::protocol::{AgentStatus, Attribution, Handshake, Project, SessionSummary, SessionView};
 use crate::{brand, git, history, shell};
 use crossterm::event::{
     DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
@@ -153,7 +153,7 @@ struct App {
     /// The last host error a refresh reported, so it is noted once.
     problem: Option<String>,
     /// This project's commit authorship, fetched when settings open.
-    attribution: Option<String>,
+    attribution: Option<Attribution>,
     picker: Option<Picker>,
     /// The highlighted row of the slash-command or mention menu.
     slash: usize,
