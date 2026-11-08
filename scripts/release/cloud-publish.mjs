@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { httpsUrl } from '../../packages/contracts/src/platform.ts';
+import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { CLOUD_ORIGIN, cloudUpdateUrl } from '../../packages/contracts/src/release.ts';
 import { isMain } from '../lib/cli.mjs';
 import { compare, root, sha256 } from './catalog.mjs';
@@ -28,7 +28,7 @@ export async function collectCandidates(
   directory,
   { expectedTargets, source, channel, publicKey },
 ) {
-  if (!/^[a-f0-9]{40}$/.test(source) || !['beta', 'stable'].includes(channel) || !publicKey)
+  if (!/^[a-f0-9]{40}$/.test(source) || !isReleaseChannel(channel) || !publicKey)
     throw new Error('Expected source, channel and updater key are required');
   const packages = [];
   const entries = await readdir(directory, { withFileTypes: true });

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { httpsUrl, SEMVER } from '../../packages/contracts/src/platform.ts';
+import { httpsUrl, isReleaseChannel, SEMVER } from '../../packages/contracts/src/platform.ts';
 import { releasePrefix } from '../../packages/contracts/src/release.ts';
 import { isMain } from '../lib/cli.mjs';
 import { root } from '../lib/paths.mjs';
@@ -19,7 +19,7 @@ export function version(value) {
   return value;
 }
 export function channel(value) {
-  if (!['stable', 'beta'].includes(value)) throw new Error('Channel must be stable or beta');
+  if (!isReleaseChannel(value)) throw new Error('Channel must be stable or beta');
   return value;
 }
 export function origin(value) {

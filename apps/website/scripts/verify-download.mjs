@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { cloudDownloadUrl, releaseDownloads } from '@jackalope/contracts/release';
 import { chromium } from 'playwright-core';
-import { cloudDownloadUrl, releaseDownloads } from '../../../packages/contracts/src/release.ts';
 
 const origin = process.env.JACKALOPE_TEST_URL || 'http://127.0.0.1:5194';
 const output = resolve('output/download-page');

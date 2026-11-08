@@ -1,8 +1,6 @@
-import type { PublishedRelease } from '@jackalope/contracts/release';
+import { PUBLIC_SERVICE_ORIGIN, type PublishedRelease } from '@jackalope/contracts/release';
 import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-
-const service = 'https://api.jackalope.dev';
 
 function Notes({ text }: { text: string }) {
   return text.split(/\r?\n\r?\n/).map((block, index) => {
@@ -30,7 +28,7 @@ export function PublishedReleases() {
     const timeout = window.setTimeout(() => controller.abort(), 15000);
     let active = true;
     setError(false);
-    void fetch(`${service}/updates/stable/releases.json`, {
+    void fetch(`${PUBLIC_SERVICE_ORIGIN}/updates/stable/releases.json`, {
       signal: controller.signal,
       cache: attempt ? 'reload' : 'default',
     })
@@ -88,7 +86,7 @@ export function PublishedReleases() {
     <section aria-label="Published releases">
       <div className="journal-section-heading">
         <h2>What’s new in Jackalope</h2>
-        <a className="text-link" href={`${service}/updates/stable/feed.xml`}>
+        <a className="text-link" href={`${PUBLIC_SERVICE_ORIGIN}/updates/stable/feed.xml`}>
           Subscribe with RSS
         </a>
       </div>

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { RELEASE_CHANNELS } from '../../packages/contracts/src/platform.ts';
 import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
 import { isMain } from '../lib/cli.mjs';
 import { parseJsonc } from '../lib/jsonc.mjs';
@@ -56,9 +57,10 @@ if (isMain(import.meta)) {
   if ((environment === 'production') !== (receipt.channel === 'stable'))
     throw new Error('Stable uses production; beta uses staging');
   const notes = await readNotes(receipt.version, true);
+  const isPointer = (key) => RELEASE_CHANNELS.some((name) => key === `${name}/latest.json`);
   const fetchKey = async (key, json = false) => {
     if (
-      !/^(stable|beta)\/latest\.json$/.test(key) &&
+      !isPointer(key) &&
       !/^releases\/(?:beta\/)?v\d+\.\d+\.\d+\/[A-Za-z0-9_.-]+$/.test(key)
     )
       throw new Error('Invalid remote release key');
@@ -67,7 +69,7 @@ if (isMain(import.meta)) {
       headers: { 'cache-control': 'no-cache' },
       redirect: 'error',
     });
-    if (response.status === 404 && json && /^(stable|beta)\/latest\.json$/.test(key)) return null;
+    if (response.status === 404 && json && isPointer(key)) return null;
     if (!response.ok) throw new Error(`Download returned ${response.status} for ${key}`);
     const bytes = Buffer.from(await response.arrayBuffer());
     if (json && bytes.length > 3000000) throw new Error('Catalog too large');

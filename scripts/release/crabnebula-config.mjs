@@ -1,9 +1,11 @@
+import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import {
   CLOUD_APPLICATION,
   cloudUpdateEndpoint,
   isCloudTarget,
+  PUBLIC_SERVICE_ORIGIN,
 } from '../../packages/contracts/src/release.ts';
-import { ACCOUNT_SERVICE_URL, releaseChannelConfig } from './channels.mjs';
+import { releaseChannelConfig } from './channels.mjs';
 
 export const application = CLOUD_APPLICATION;
 
@@ -24,7 +26,7 @@ export function clearAppleSigning(environment) {
 }
 
 export function cloudEndpoint(channel) {
-  if (!['beta', 'stable'].includes(channel)) throw new Error('Unknown release channel');
+  if (!isReleaseChannel(channel)) throw new Error('Unknown release channel');
   return cloudUpdateEndpoint(channel);
 }
 
@@ -52,7 +54,7 @@ export function cloudConfig({ mode, channel, publicKey, signScript, target = 'wi
       // Feedback and opt-in usage reports go to the account service; without
       // it the app shows feedback as unavailable.
       jackalope: releaseChannelConfig(channel, {
-        serviceUrl: ACCOUNT_SERVICE_URL,
+        serviceUrl: PUBLIC_SERVICE_ORIGIN,
         ...(!preview
           ? { stableEndpoint: cloudEndpoint('stable'), betaEndpoint: cloudEndpoint('beta') }
           : {}),

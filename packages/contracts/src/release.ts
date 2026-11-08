@@ -49,6 +49,9 @@ export function releaseDownloadsFor(platform: Platform): ReleaseDownload[] {
   return releaseDownloads.filter((id) => RELEASE_DOWNLOADS[id].platform === platform);
 }
 
+/** The production service: the access API and the `/updates/` release files. */
+export const PUBLIC_SERVICE_ORIGIN = 'https://api.jackalope.dev';
+
 export const CLOUD_APPLICATION = 'jackalope-digital/jackalope';
 export const CLOUD_ORIGIN = 'https://cdn.crabnebula.app';
 

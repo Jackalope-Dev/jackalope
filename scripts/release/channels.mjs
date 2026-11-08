@@ -1,14 +1,13 @@
-import { httpsUrl } from '../../packages/contracts/src/platform.ts';
-import { cloudUpdateEndpoint } from '../../packages/contracts/src/release.ts';
+import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
+import { cloudUpdateEndpoint, PUBLIC_SERVICE_ORIGIN } from '../../packages/contracts/src/release.ts';
 import { isMain } from '../lib/cli.mjs';
 
-export const ACCOUNT_SERVICE_URL = 'https://api.jackalope.dev';
 export const ACCOUNT_WEB_URL = 'https://jackalope.dev';
 const endpointKeys = ['stableEndpoint', 'betaEndpoint'];
 const originKeys = ['serviceUrl', 'accountServiceUrl', 'accountWebUrl'];
 
 export function isCloudEndpoint(value, channel) {
-  if (!['beta', 'stable'].includes(channel)) return false;
+  if (!isReleaseChannel(channel)) return false;
   return new URL(value).href === new URL(cloudUpdateEndpoint(channel)).href;
 }
 
@@ -18,7 +17,7 @@ export function isCloudEndpoint(value, channel) {
  * community transport.
  */
 export function channelConfig(channel, values = {}) {
-  if (!['stable', 'beta'].includes(channel)) throw new Error('Unknown release channel');
+  if (!isReleaseChannel(channel)) throw new Error('Unknown release channel');
   const config = { channel };
   for (const [key, value] of Object.entries(values)) {
     if (![...endpointKeys, ...originKeys].includes(key) || !value) continue;
@@ -47,7 +46,7 @@ export function channelConfig(channel, values = {}) {
 /** The block a release build ships: the public account service unless overridden. */
 export function releaseChannelConfig(
   channel,
-  { accountServiceUrl = ACCOUNT_SERVICE_URL, accountWebUrl = ACCOUNT_WEB_URL, ...values } = {},
+  { accountServiceUrl = PUBLIC_SERVICE_ORIGIN, accountWebUrl = ACCOUNT_WEB_URL, ...values } = {},
 ) {
   return channelConfig(channel, { ...values, accountServiceUrl, accountWebUrl });
 }

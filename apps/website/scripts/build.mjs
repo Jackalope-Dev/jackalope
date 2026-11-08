@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { MICROSOFT_STORE_URL } from '../../../packages/contracts/src/release.ts';
+import { MICROSOFT_STORE_URL } from '@jackalope/contracts/release';
 import { changelogReleases } from '../../../scripts/release/changelog-releases.mjs';
 import { readPublicRelease } from './public-release.mjs';
 

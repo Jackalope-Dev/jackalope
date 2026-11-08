@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { isMain } from '../lib/cli.mjs';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 
 export function storePlan(env, inputs, notes) {
-  if (!['beta', 'stable'].includes(env.GITHUB_REF_NAME))
+  if (!isReleaseChannel(env.GITHUB_REF_NAME))
     throw new Error('Store releases require the beta or stable branch');
   const automatic = env.GITHUB_EVENT_NAME === 'push';
   const mode = automatic ? 'submission' : inputs.mode;

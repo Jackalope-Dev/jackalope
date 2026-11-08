@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { RELEASE_CHANNELS } from '../../packages/contracts/src/platform.ts';
 import { cloudTargets } from '../../packages/contracts/src/release.ts';
 import {
   allowedActions,
@@ -184,7 +185,7 @@ api(
   { name: 'RELEASE_DISTRIBUTION', value: 'store' },
 );
 const branches = list(`${prefix}/branches`);
-for (const branch of ['beta', 'stable']) {
+for (const branch of RELEASE_CHANNELS) {
   if (!branches.some(({ name }) => name === branch))
     api(`${prefix}/git/refs`, 'POST', {
       ref: `refs/heads/${branch}`,
