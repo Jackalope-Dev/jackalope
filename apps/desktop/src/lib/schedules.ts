@@ -51,10 +51,42 @@ export interface ScheduleDefinition {
   request: RunRequest;
 }
 
+/** Mirrors `OutcomeKind` in src-tauri/src/commands/schedules.rs. */
+type ScheduleOutcomeKind =
+  | 'reserved'
+  | 'started'
+  | 'failedToStart'
+  | 'signedOut'
+  | 'overlap'
+  | 'busy'
+  | 'missed'
+  | 'paused'
+  | 'starting'
+  | 'invalid'
+  | 'monitorAttention'
+  | 'unrelated'
+  | 'baseline'
+  | 'unchanged'
+  | 'changeDetected'
+  | 'interruptedDispatch';
+
+/** Outcomes that ask the person to look at the schedule. */
+const ACTIONABLE_OUTCOMES: ReadonlySet<ScheduleOutcomeKind> = new Set([
+  'failedToStart',
+  'changeDetected',
+  'monitorAttention',
+  'interruptedDispatch',
+]);
+
+export const needsAction = (event: ScheduleOccurrence) =>
+  !!event.kind && ACTIONABLE_OUTCOMES.has(event.kind);
+
 interface ScheduleOccurrence {
   dueAt: string;
   runId: string | null;
+  /** Display text, shown as written. */
   outcome: string;
+  kind?: ScheduleOutcomeKind;
   change?: { before: string; after: string; path: string; branch: string } | null;
 }
 
