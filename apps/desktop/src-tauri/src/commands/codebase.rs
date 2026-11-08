@@ -604,7 +604,7 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
             "Rust" => "rs",
             _ => continue,
         };
-        if started.elapsed() > Duration::from_secs(20)
+        if started.elapsed() > Duration::from_secs(search().seconds)
             || total_bytes + file.bytes > search().bytes
             || result.references.len() >= MAX_REFERENCES
         {

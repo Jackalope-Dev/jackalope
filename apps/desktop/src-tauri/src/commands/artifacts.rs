@@ -49,6 +49,21 @@ pub(crate) fn save_screenshot(
     })
 }
 
+/// The workspace's screenshot evidence folder, created when missing and
+/// confirmed to resolve inside the workspace, for captures saved by hand.
+pub(crate) fn evidence_folder(workspace: &Path) -> Result<PathBuf, String> {
+    let workspace = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
+    let directory = screenshots(&workspace);
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    if !dunce::canonicalize(&directory)
+        .map_err(|e| e.to_string())?
+        .starts_with(&workspace)
+    {
+        return Err("The artifact folder resolves outside this workspace.".into());
+    }
+    Ok(directory)
+}
+
 pub(super) fn read_screenshot(workspace: &Path, path: &Path) -> Result<Vec<u8>, String> {
     let root = screenshots(workspace)
         .canonicalize()

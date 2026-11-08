@@ -461,15 +461,8 @@ async fn inspect_preview(
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        let workspace = dunce::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
-        let directory = workspace.join(".jackalope/artifacts/screenshots");
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        if !dunce::canonicalize(&directory)
-            .map_err(|e| e.to_string())?
-            .starts_with(&workspace)
-        {
-            return Err("The artifact folder resolves outside this workspace.".into());
-        }
+        let directory =
+            crate::commands::artifacts::evidence_folder(std::path::Path::new(&run.workspace))?;
         let destination = directory.join(format!("{}.png", screenshot.id));
         std::fs::write(&destination, bytes).map_err(|e| e.to_string())?;
         let mut screenshot = screenshot;
