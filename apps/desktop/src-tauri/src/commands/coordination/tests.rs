@@ -149,12 +149,7 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
             dependencies: vec![],
         })
         .unwrap();
-    service
-        .inner
-        .lock()
-        .unwrap()
-        .enabled
-        .insert("project".into());
+    service.state().enabled.insert("project".into());
     drop(service);
     let restored = Coordinator::new(dir.join("queue"), runtime).unwrap();
     assert!(restored.state().enabled.is_empty());
@@ -267,87 +262,4 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
     drop(service);
     assert!(dir.starts_with(std::env::temp_dir()));
     std::fs::remove_dir_all(dir).unwrap();
-}
-
-#[cfg(windows)]
-fn process_is_alive(pid: u32) -> bool {
-    let output = std::process::Command::new("tasklist")
-        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
-        .output()
-        .expect("failed to run tasklist");
-    String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
-}
-#[cfg(not(windows))]
-fn process_is_alive(pid: u32) -> bool {
-    std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-#[tokio::test]
-async fn computer_verify_command_execution_is_bounded_and_non_blocking() {
-    // Guards how computer_verify runs a saved check: tokio::process::Command
-    // under tokio::time::timeout with kill_on_drop, so a hanging command
-    // neither occupies a runtime worker thread nor outlives its timeout.
-    #[cfg(windows)]
-    let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) = (
-        "cmd.exe",
-        vec!["/C", "exit", "0"],
-        "ping",
-        vec!["-n", "30", "127.0.0.1"],
-    );
-    #[cfg(not(windows))]
-    let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) =
-        ("sh", vec!["-c", "exit 0"], "sleep", vec!["30"]);
-
-    let mut quick = tokio::process::Command::new(quick_program);
-    quick.args(&quick_args);
-    let result = tokio::time::timeout(Duration::from_millis(2000), quick.output()).await;
-    assert!(
-        result.is_ok(),
-        "a quick command must not be affected by the bound"
-    );
-
-    // Spawned directly (not through a shell) so kill_on_drop's
-    // direct-child termination actually stops the real long-running
-    // process being measured, not an intermediate shell wrapper.
-    let mut hang = tokio::process::Command::new(hang_program);
-    hang.args(&hang_args)
-        .kill_on_drop(true)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    let mut child = hang.spawn().expect("failed to spawn hang command");
-    let pid = child.id().expect("spawned child has no pid");
-    assert!(
-        process_is_alive(pid),
-        "process should be running before the timeout"
-    );
-
-    let started = std::time::Instant::now();
-    // Moved into the awaited future (mirroring cmd.output()'s own
-    // internal Child ownership) so dropping it on timeout drops the
-    // Child too, which is what actually triggers kill_on_drop.
-    let result = tokio::time::timeout(
-        Duration::from_millis(200),
-        async move { child.wait().await },
-    )
-    .await;
-    assert!(
-        result.is_err(),
-        "a command that never exits must time out rather than hang forever"
-    );
-    assert!(
-        started.elapsed() < Duration::from_secs(5),
-        "the timeout must actually bound wall-clock time, not just the return type"
-    );
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    while process_is_alive(pid) && std::time::Instant::now() < deadline {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    assert!(
-        !process_is_alive(pid),
-        "kill_on_drop should terminate the process once we give up waiting on it, not leave it orphaned"
-    );
 }

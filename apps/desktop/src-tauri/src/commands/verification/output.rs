@@ -235,36 +235,4 @@ mod tests {
         assert_eq!(reported_failure["stdout"], check.result.stdout);
         assert_eq!(reported_failure["success"], true);
     }
-
-    #[test]
-    #[ignore = "Replays private captured Verification JSON records without running their commands"]
-    fn replay_captured_verification() {
-        let source =
-            std::path::PathBuf::from(std::env::var("JACKALOPE_VERIFICATION_REPLAY").unwrap());
-        let checks: Vec<Verification> =
-            serde_json::from_slice(&std::fs::read(&source).unwrap()).unwrap();
-        let mut responses = Vec::new();
-        for check in checks {
-            let started = std::time::Instant::now();
-            let candidate = response_with_reports(&check, true);
-            let elapsed = started.elapsed().as_micros();
-            let legacy = response_with_reports(&check, false);
-            let mut recovered = String::new();
-            loop {
-                let page = read(Some(&check), serde_json::from_value(json!({"check_id":check.checked_at,"offset":recovered.chars().count(),"limit":16000})).unwrap()).unwrap();
-                recovered.push_str(page["text"].as_str().unwrap());
-                if page["next_offset"].is_null() {
-                    break;
-                }
-            }
-            assert_eq!(recovered, check.result.stdout);
-            assert_eq!(candidate["stderr"], check.result.stderr);
-            responses.push(json!({"check_id":check.checked_at,"candidate":candidate,"legacy":legacy,"projection_us":elapsed,"stdout_recovered":true}));
-        }
-        std::fs::write(
-            source.with_extension("projected.json"),
-            serde_json::to_vec_pretty(&responses).unwrap(),
-        )
-        .unwrap();
-    }
 }

@@ -556,7 +556,7 @@ fn execution_and_review_briefs_are_self_contained() {
     assert!(passed && gaps.len() == 1 && gaps[0].severity == "minor");
     let prompt = interview::interview_prompt("Export CSV", 3, "- Earlier plan");
     assert!(prompt.contains("at most 3 questions") && prompt.contains("Earlier plan"));
-    assert!(prompt.contains("read-only") || prompt.contains("Work read-only"));
+    assert!(prompt.contains("read-only"));
     for area in interview::COVERAGE {
         assert!(prompt.contains(area), "{area}");
     }

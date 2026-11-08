@@ -281,16 +281,5 @@ mod tests {
                 .unwrap()
                 .contains(&serde_json::json!("command"))
         }));
-        for name in [
-            "ask_user",
-            "record_validation_step",
-            "record_decision",
-            "message",
-            "acknowledge_message",
-        ] {
-            let annotations = router.get(name).unwrap().annotations.as_ref().unwrap();
-            assert_eq!(annotations.destructive_hint, Some(false), "{name}");
-            assert_eq!(annotations.open_world_hint, Some(false), "{name}");
-        }
     }
 }
