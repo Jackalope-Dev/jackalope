@@ -878,7 +878,6 @@ The plan review left these gaps open. Fix them, then record a new Plan review:
                 endpoint: url,
                 managed: true,
                 instructions: instructions(item),
-                grant: item.id.clone(),
                 assigned: Some(item),
                 host: None,
             },

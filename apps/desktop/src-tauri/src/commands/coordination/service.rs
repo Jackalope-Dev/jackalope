@@ -404,7 +404,6 @@ impl Coordinator {
                 endpoint: url,
                 managed: true,
                 instructions,
-                grant: item.id.clone(),
                 assigned: Some(item),
                 host: Some(host),
             },
@@ -446,12 +445,12 @@ impl Coordinator {
             endpoint,
             managed,
             instructions,
-            grant,
             assigned,
             host,
         } = spec;
         let token = bridge_token();
         let id = request.id.clone();
+        let grant = assigned.map_or_else(|| id.clone(), |item| item.id.clone());
         inner.grants.insert(token.clone(), (grant, id.clone()));
         let placed = host.is_some();
         if let Some(host) = host {
@@ -555,8 +554,8 @@ impl Coordinator {
             .clone()
             .ok_or("The coordination bridge is starting or unavailable. Retry when it is ready.")?;
         let assigned = self.followed_assignment(inner, &request)?;
-        let (grant, managed, instructions) = match &assigned {
-            Some(item) => (item.id.clone(), true, instructions(item)),
+        let (managed, instructions) = match &assigned {
+            Some(item) => (true, instructions(item)),
             None => {
                 let managed = inner
                     .ledger
@@ -568,7 +567,7 @@ impl Coordinator {
                 } else {
                     focused_instructions()
                 };
-                (request.id.clone(), managed, instructions)
+                (managed, instructions)
             }
         };
         if let Some(item) = &assigned {
@@ -585,7 +584,6 @@ impl Coordinator {
                 endpoint: &endpoint,
                 managed,
                 instructions,
-                grant,
                 assigned: assigned.as_ref(),
                 host: None,
             },

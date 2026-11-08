@@ -94,8 +94,8 @@ pub(super) struct LaunchSpec<'a> {
     /// Whether the attempt works for a queued or managed assignment.
     pub managed: bool,
     pub instructions: String,
-    /// The task the bridge token speaks for.
-    pub grant: String,
+    /// The queued item the attempt works on. The bridge token speaks for it,
+    /// or for the attempt itself when there is none.
     pub assigned: Option<&'a QueueItem>,
     pub host: Option<super::computers::pool::RunHost>,
 }

@@ -541,7 +541,6 @@ impl Coordinator {
                         endpoint: url,
                         managed: true,
                         instructions: harness_instructions(),
-                        grant: run_id.clone(),
                         assigned: None,
                         host: None,
                     },
