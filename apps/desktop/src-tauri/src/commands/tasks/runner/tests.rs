@@ -178,11 +178,11 @@ fn both_runners_place_tools_from_one_table() {
         names.clone().collect::<Vec<_>>()
     );
     assert_eq!(
-        computers::runner::offered(&remote, names.clone()),
-        names
-            .filter(
-                |name| !["browser_open_profile", "peer_adopt", "permission_prompt"].contains(name)
-            )
+        computers::runner::offered(&remote, names),
+        tools
+            .iter()
+            .filter(|tool| !matches!(tool.placement, Placement::DeviceOnly))
+            .map(|tool| tool.name)
             .collect::<Vec<_>>()
     );
     // An agent on this device is told nothing about where its tools act.

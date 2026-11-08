@@ -144,7 +144,10 @@ fn endpoints(app: &AppHandle) -> Result<(reqwest::Url, reqwest::Url), String> {
 /// instead of taking a new one. The platform identifier never leaves the
 /// machine; only a hash of it, scoped to Jackalope, is sent.
 fn machine_key() -> Option<String> {
-    let identifier = platform_machine_id()?;
+    key_for(&platform_machine_id()?)
+}
+
+fn key_for(identifier: &str) -> Option<String> {
     let identifier = identifier.trim();
     (!identifier.is_empty()).then(|| sha256_hex(&format!("jackalope-device-v1:{identifier}")))
 }
@@ -758,18 +761,15 @@ mod tests {
     use super::*;
     #[test]
     fn machine_key_is_stable_and_never_the_raw_identifier() {
-        let Some(key) = machine_key() else {
-            // Some sandboxes expose no machine identifier; the connection then
-            // simply omits the key.
-            return;
-        };
+        let raw = "4C4C4544-0042-3510-8051-B4C04F4D3732";
+        let key = key_for(&format!("{raw}\n")).unwrap();
         assert!(
             valid_token(&key),
             "the service only accepts 64 lowercase hex"
         );
-        assert_eq!(machine_key().as_deref(), Some(key.as_str()));
-        let raw = platform_machine_id().unwrap_or_default();
-        assert!(!key.contains(raw.trim()) || raw.trim().is_empty());
+        assert_eq!(key_for(raw).as_deref(), Some(key.as_str()));
+        assert!(!key.contains(raw) && !key.contains(&raw.to_lowercase()));
+        assert_eq!(key_for(" \n"), None);
     }
     #[test]
     fn account_hashes_preserve_lowercase_hex_and_leading_zeroes() {

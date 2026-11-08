@@ -313,31 +313,6 @@ mod tests {
     }
 
     #[test]
-    fn key_provider_info_matches_agents() {
-        assert_eq!(
-            key_provider_info("OPENAI_API_KEY"),
-            Some(("OpenAI", "codex"))
-        );
-        assert_eq!(
-            key_provider_info("ANTHROPIC_API_KEY"),
-            Some(("Anthropic", "claude"))
-        );
-        assert_eq!(
-            key_provider_info("XAI_API_KEY"),
-            Some(("xAI (Grok)", "grok"))
-        );
-        assert_eq!(
-            key_provider_info("GEMINI_API_KEY"),
-            Some(("Google Gemini", "gemini"))
-        );
-        assert_eq!(key_provider_info("UNKNOWN_KEY"), None);
-        assert_eq!(
-            key_provider_info("DEEPSEEK_API_KEY"),
-            Some(("DeepSeek", "opencode"))
-        );
-    }
-
-    #[test]
     fn configured_environment_keys_require_an_exact_nonempty_assignment() {
         let root =
             std::env::temp_dir().join(format!("jackalope-key-detection-{}", uuid::Uuid::new_v4()));

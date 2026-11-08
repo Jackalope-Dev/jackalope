@@ -364,16 +364,17 @@ fn diagnostics(runs: &[super::tasks::TaskRun]) -> serde_json::Value {
 mod tests {
     use super::*;
     #[test]
-    fn diagnostics_contain_only_allowlisted_summary_fields() {
-        let report = diagnostics(&[]);
-        let keys: std::collections::HashSet<_> = report
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect();
-        assert_eq!(keys.len(), 15);
-        assert!(!report.to_string().contains("projectPath"));
-        assert_eq!(report["attempts"], 0);
+    fn diagnostics_count_runs_without_exposing_their_content() {
+        let run = super::super::tasks::TaskRun {
+            project_path: "/private/repository".into(),
+            prompt: "secret prompt".into(),
+            status: super::super::tasks::RunStatus::Failed,
+            ..Default::default()
+        };
+        let report = diagnostics(&[run]);
+        assert_eq!(report["attempts"], 1);
+        assert_eq!(report["failed"], 1);
+        let text = report.to_string();
+        assert!(!text.contains("/private/repository") && !text.contains("secret prompt"));
     }
 }

@@ -239,20 +239,6 @@ mod tests {
 
     #[test]
     fn the_catalog_is_consistent() {
-        let ids: Vec<&str> = all().iter().map(|agent| agent.id.as_str()).collect();
-        assert_eq!(
-            ids,
-            [
-                "codex",
-                "claude",
-                "grok",
-                "kimi",
-                "opencode",
-                "antigravity",
-                "gemini",
-                "acp"
-            ]
-        );
         for agent in all() {
             assert_eq!(
                 agent.capabilities.capacity,

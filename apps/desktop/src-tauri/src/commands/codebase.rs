@@ -977,20 +977,4 @@ mod tests {
         refs[0].target = Some("0.ts".into());
         assert_eq!(dependency_cycles(&refs), vec![vec!["0.ts".to_string()]]);
     }
-
-    #[test]
-    #[ignore = "Manual real-repository scan; set JACKALOPE_SCAN_ROOT and JACKALOPE_SCAN_OUTPUT"]
-    fn export_repository_scan() {
-        let root = std::env::var("JACKALOPE_SCAN_ROOT").unwrap();
-        let output = std::env::var("JACKALOPE_SCAN_OUTPUT").unwrap();
-        let snapshot = scan(Path::new(&root)).unwrap();
-        println!(
-            "{} files, {} references, {} diagnostics in {}ms",
-            snapshot.files.len(),
-            snapshot.references.len(),
-            snapshot.diagnostics.len(),
-            snapshot.duration_ms
-        );
-        std::fs::write(output, serde_json::to_vec_pretty(&snapshot).unwrap()).unwrap();
-    }
 }

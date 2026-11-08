@@ -233,19 +233,16 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    // Creating a symbolic link on Windows needs a privilege test machines may lack.
+    #[cfg(unix)]
     #[test]
     fn linked_folders_cannot_redirect_writes() {
         let root =
             std::env::temp_dir().join(format!("jackalope-todo-links-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(root.join("outside")).unwrap();
-        #[cfg(windows)]
-        let linked = std::os::windows::fs::symlink_dir(root.join("outside"), root.join("docs"));
-        #[cfg(not(windows))]
-        let linked = std::os::unix::fs::symlink(root.join("outside"), root.join("docs"));
-        if linked.is_ok() {
-            assert!(save_document(&root, "docs/TODO.md", None, "escape").is_err());
-            assert!(!root.join("outside/TODO.md").exists());
-        }
+        std::os::unix::fs::symlink(root.join("outside"), root.join("docs")).unwrap();
+        assert!(save_document(&root, "docs/TODO.md", None, "escape").is_err());
+        assert!(!root.join("outside/TODO.md").exists());
         std::fs::remove_dir_all(root).unwrap();
     }
 }

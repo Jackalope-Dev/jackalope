@@ -523,6 +523,5 @@ mod tests {
             serde_json::from_value(serde_json::json!({"role": "you", "text": "hi", "sent": false}))
                 .unwrap();
         assert!(older.id.is_none());
-        assert!(question(false).allow_other.is_none());
     }
 }

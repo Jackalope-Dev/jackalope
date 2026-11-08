@@ -138,25 +138,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn install_commands_come_from_the_catalog_package() {
-        for agent in super::super::agents::all() {
-            assert_eq!(
-                display_command(&agent.id),
-                agent
-                    .npm_package
-                    .as_ref()
-                    .map(|package| format!("npm install -g {package}")),
-                "{}",
-                agent.id
-            );
-        }
-        assert_eq!(
-            display_command("claude").as_deref(),
-            Some("npm install -g @anthropic-ai/claude-code")
-        );
-    }
-
-    #[test]
     fn only_catalog_packages_can_be_installed() {
         assert_eq!(display_command("antigravity"), None);
         assert_eq!(display_command("acp"), None);

@@ -613,7 +613,10 @@ fn main() {
         .and_then(|receipt| receipt.fallback_reason.clone())
         .unwrap_or_default();
     assert!(
-        reason.contains("did not answer within 8 seconds"),
+        reason.contains(&format!(
+            "did not answer within {} seconds",
+            super::process::ROUTING_BUDGET.as_secs()
+        )),
         "{reason}"
     );
     assert!(routing
@@ -632,15 +635,15 @@ fn main() {
 
 #[test]
 fn computers_only_routing_offers_only_agents_that_run_on_computers() {
-    for adapter in ["claude", "codex"] {
-        assert!(
-            routable(adapter, false) && routable(adapter, true),
-            "{adapter}"
-        );
+    let mut offered = 0;
+    for agent in crate::commands::agents::all() {
+        let id = agent.id.as_str();
+        if routable(id, true) {
+            offered += 1;
+            assert!(routable(id, false), "{id}");
+            assert!(crate::commands::agents::runs_on_computers(id), "{id}");
+        }
     }
-    for adapter in ["gemini", "kimi", "opencode"] {
-        assert!(routable(adapter, false), "{adapter}");
-        assert!(!routable(adapter, true), "{adapter}");
-    }
+    assert!(offered > 0);
     assert!(!routable("unknown", false));
 }

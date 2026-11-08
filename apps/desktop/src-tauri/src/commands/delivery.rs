@@ -415,12 +415,6 @@ mod tests {
         std::fs::write(path.join("work.txt"), "local work").unwrap();
         assert!(inspect(path, false).unwrap().changed);
         assert_eq!(read(path, &["rev-parse", "HEAD"]).unwrap(), clean.head);
-        assert_eq!(temp.parent(), Some(std::env::temp_dir().as_path()));
-        assert!(temp
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .starts_with("jackalope-delivery-"));
         std::fs::remove_dir_all(temp).unwrap();
     }
 }

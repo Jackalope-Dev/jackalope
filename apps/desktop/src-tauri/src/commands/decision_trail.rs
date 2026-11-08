@@ -676,18 +676,8 @@ mod tests {
         let parent = std::env::temp_dir().join(format!("jackalope-trail-{}", uuid::Uuid::new_v4()));
         let root = parent.join("workspace");
         std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(
-            root.join("inside.txt"),
-            "one
-",
-        )
-        .unwrap();
-        std::fs::write(
-            parent.join("outside.txt"),
-            "secret
-",
-        )
-        .unwrap();
+        std::fs::write(root.join("inside.txt"), "one\n").unwrap();
+        std::fs::write(parent.join("outside.txt"), "secret\n").unwrap();
         assert!(check_file(&root, "inside.txt", Some(1)).is_ok());
         assert!(check_file(&root, &root.join("inside.txt").to_string_lossy(), None).is_ok());
         assert!(check_file(&root, "../outside.txt", None).is_err());

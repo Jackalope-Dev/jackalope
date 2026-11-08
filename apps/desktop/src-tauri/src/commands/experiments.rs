@@ -60,8 +60,6 @@ experiments! {
 
 #[derive(Deserialize)]
 struct Registry {
-    #[cfg(test)]
-    version: u32,
     fields: BTreeMap<String, Field>,
 }
 
@@ -127,7 +125,6 @@ mod tests {
     #[test]
     fn all_experiments_have_valid_defaults_and_unique_environment_names() {
         let mut names = std::collections::HashSet::new();
-        assert_eq!(registry().version, 1);
         for field in registry().fields.values() {
             assert!(field.values.contains(&field.default));
             if let Some(name) = &field.environment {

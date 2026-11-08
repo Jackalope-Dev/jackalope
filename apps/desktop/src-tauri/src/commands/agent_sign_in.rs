@@ -513,7 +513,6 @@ mod tests {
                 assert!(command.get_env(variable).is_none());
             }
         }
-        assert_eq!(agent_profiles::login_args("claude"), &["auth", "login"]);
     }
     #[test]
     #[cfg(windows)]

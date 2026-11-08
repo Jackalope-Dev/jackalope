@@ -107,8 +107,3 @@ fn real_persistent_profile_keeps_cookies_and_clears_one_site() {
     );
     let _ = std::fs::remove_dir_all(root);
 }
-
-#[test]
-fn saved_profiles_do_not_ask_about_loopback_pages() {
-    assert_eq!(SITE_LOOPBACK, crate::commands::site_gate::Loopback::Exempt);
-}

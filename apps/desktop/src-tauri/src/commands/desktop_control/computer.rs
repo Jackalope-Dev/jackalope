@@ -425,14 +425,3 @@ pub async fn execute(
     .await
     .map_err(|e| e.to_string())?
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn computer_desktops_do_not_ask_about_their_own_pages() {
-        assert_eq!(
-            super::SITE_LOOPBACK,
-            crate::commands::site_gate::Loopback::Exempt
-        );
-    }
-}

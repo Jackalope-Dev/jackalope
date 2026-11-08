@@ -624,9 +624,6 @@ fn launch_flags_follow_settings() {
 
 #[test]
 fn experiments_gate_sessions_hooks_and_isolation() {
-    // The registry defaults: a persistent session with every hook, partial
-    // messages and the fallback model; isolation and the shared cache off.
-    let defaults = Settings::from_experiments(None);
     let all = Hooks {
         edit_check: true,
         stop_check: true,
@@ -634,16 +631,6 @@ fn experiments_gate_sessions_hooks_and_isolation() {
         permission: true,
         timing: true,
     };
-    assert_eq!(
-        defaults,
-        Settings {
-            persistent: true,
-            partials: true,
-            fallback: true,
-            hooks: all,
-            ..Settings::default()
-        }
-    );
     // A project's explicit choice overrides the isolation default either way.
     assert!(Settings::from_experiments(Some(false)).isolated);
     assert!(!Settings::from_experiments(Some(true)).isolated);

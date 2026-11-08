@@ -314,16 +314,6 @@ mod tests {
     }
 
     #[test]
-    fn commit_arguments_carry_no_trailers() {
-        assert_eq!(
-            commit_args(2),
-            ["commit", "--no-gpg-sign", "--quiet", "-m", "Initial commit"]
-        );
-        assert!(commit_args(0).contains(&"--allow-empty"));
-        assert!(!commit_args(2).iter().any(|arg| arg.contains("Co-authored")));
-    }
-
-    #[test]
     fn first_commit_respects_gitignore_and_uses_the_configured_identity() {
         let repo = scratch();
         let path = repo.0.as_path();

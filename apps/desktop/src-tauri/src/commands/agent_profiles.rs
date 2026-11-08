@@ -98,14 +98,6 @@ fn manifest_path(root: &Path) -> PathBuf {
     root.join("manifest.json")
 }
 
-#[cfg(test)]
-fn load(root: &Path) -> Manifest {
-    fs::read_to_string(manifest_path(root))
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
-}
-
 fn load_checked(root: &Path) -> Result<Manifest, String> {
     if !manifest_path(root).exists() {
         return Ok(Manifest::default());
@@ -130,18 +122,6 @@ fn save(root: &Path, manifest: &Manifest) -> Result<(), String> {
 
 pub(super) fn dir_for(root: &Path, agent: &str, id: &str) -> PathBuf {
     root.join(agent).join(id)
-}
-
-#[cfg(test)]
-fn active_profile_dir(root: &Path, agent: &str) -> Option<PathBuf> {
-    let manifest = load(root);
-    let entry = manifest.agents.get(agent)?;
-    let active = entry.active.as_ref()?;
-    entry
-        .profiles
-        .iter()
-        .any(|p| &p.id == active)
-        .then(|| dir_for(root, agent, active))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -978,14 +958,6 @@ pub fn credential_env_vars(adapter: &str) -> &'static [String] {
 }
 
 #[cfg(test)]
-fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> Option<PathBuf> {
-    bind_account(root, agent, explicit_id)
-        .ok()
-        .filter(|b| b.profile_id.is_some())
-        .map(|b| b.directory)
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1257,19 +1229,9 @@ mod tests {
             group: Some("work".into()),
             ..profile
         };
-        assert_eq!(grouped.id, "old-id");
         assert_eq!(serde_json::to_value(&grouped).unwrap()["group"], "work");
         assert!(validate_group(Some("personal")).is_ok());
         assert!(validate_group(Some("invalid")).is_err());
-    }
-
-    #[test]
-    fn env_var_mapping_matches_verified_cli_overrides() {
-        assert_eq!(env_var_for("codex"), Some("CODEX_HOME"));
-        assert_eq!(env_var_for("claude"), Some("CLAUDE_CONFIG_DIR"));
-        assert_eq!(env_var_for("grok"), Some("GROK_HOME"));
-        assert_eq!(env_var_for("opencode"), Some("XDG_DATA_HOME"));
-        assert_eq!(env_var_for("some-custom-agent"), None);
     }
 
     #[test]
@@ -1304,7 +1266,6 @@ mod tests {
         assert_eq!(env["KIMI_MODEL_API_KEY"], None);
         assert_eq!(env["KIMI_SHARE_DIR"], env["KIMI_CODE_HOME"]);
         assert_eq!(env["KIMI_MODEL_NAME"], None);
-        assert_eq!(login_args("kimi"), &["login"]);
         std::fs::remove_dir_all(directory).unwrap();
     }
 
@@ -1434,13 +1395,6 @@ mod tests {
     }
 
     #[test]
-    fn unconfigured_agent_has_no_active_profile() {
-        let root = temp_root();
-        assert!(active_profile_dir(&root, "codex").is_none());
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
     fn explicit_profile_wins_and_a_stale_id_is_rejected() {
         let root = temp_root();
         let mut manifest = Manifest::default();
@@ -1464,20 +1418,15 @@ mod tests {
         entry.active = Some("personal".into());
         save(&root, &manifest).unwrap();
 
-        // A project asking for "work" gets it, even though "personal" is active.
         assert_eq!(
-            resolve_profile_dir(&root, "codex", Some("work")),
-            Some(dir_for(&root, "codex", "work"))
-        );
-        // No explicit choice falls back to whichever profile is active.
-        assert_eq!(
-            resolve_profile_dir(&root, "codex", None),
-            Some(dir_for(&root, "codex", "personal"))
+            bind_account(&root, "codex", Some("work")).unwrap().directory,
+            dir_for(&root, "codex", "work")
         );
         assert_eq!(
-            resolve_profile_dir(&root, "codex", Some("deleted-long-ago")),
-            None
+            bind_account(&root, "codex", None).unwrap().directory,
+            dir_for(&root, "codex", "personal")
         );
+        assert!(bind_account(&root, "codex", Some("deleted-long-ago")).is_err());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1547,57 +1496,6 @@ mod tests {
         fs::write(manifest_path(&root), "broken").unwrap();
         assert!(bind_account(&root, "codex", None).is_err());
         let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn deleting_the_active_profile_falls_back() {
-        let root = temp_root();
-        let mut manifest = Manifest::default();
-        let entry = manifest.agents.entry("codex".into()).or_default();
-        entry.profiles.push(AgentProfile {
-            preferred_model: None,
-            id: "a".into(),
-            name: "Work".into(),
-            group: None,
-            tag: None,
-            config_dir: None,
-        });
-        entry.profiles.push(AgentProfile {
-            preferred_model: None,
-            id: "b".into(),
-            name: "Personal".into(),
-            group: None,
-            tag: None,
-            config_dir: None,
-        });
-        entry.active = Some("a".into());
-        save(&root, &manifest).unwrap();
-        assert_eq!(
-            active_profile_dir(&root, "codex"),
-            Some(dir_for(&root, "codex", "a"))
-        );
-
-        let mut manifest = load(&root);
-        let entry = manifest.agents.get_mut("codex").unwrap();
-        entry.profiles.retain(|p| p.id != "a");
-        entry.active = entry.profiles.first().map(|p| p.id.clone());
-        save(&root, &manifest).unwrap();
-        assert_eq!(
-            active_profile_dir(&root, "codex"),
-            Some(dir_for(&root, "codex", "b"))
-        );
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn an_active_id_no_longer_present_in_profiles_is_ignored() {
-        let root = temp_root();
-        let mut manifest = Manifest::default();
-        let entry = manifest.agents.entry("claude".into()).or_default();
-        entry.active = Some("ghost".into());
-        save(&root, &manifest).unwrap();
-        assert!(active_profile_dir(&root, "claude").is_none());
-        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

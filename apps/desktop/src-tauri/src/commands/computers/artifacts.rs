@@ -452,23 +452,10 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn upload_hash_mismatch_is_not_retried() {
-        let store = Arc::new(Mutex::new(Store::default()));
-        let mut session = session(&store);
-        let digest = Digest {
-            sha256: "1".repeat(64),
-            size: 4,
-        };
-        let error = session
-            .resume_put(
-                &mut std::io::Cursor::new(b"data".to_vec()),
-                &digest,
-                &|_, _| {},
-            )
-            .unwrap_err();
-        assert!(permanent(&error), "{error}");
+    fn reported_digests_must_be_valid() {
         assert!(Digest::parse(&json!({"sha256": "x", "size": 1})).is_err());
-        assert!(Digest::parse(&json!({"sha256": digest.sha256, "size": 4})).is_ok());
+        assert!(Digest::parse(&json!({"sha256": "1".repeat(64)})).is_err());
+        assert!(Digest::parse(&json!({"sha256": "1".repeat(64), "size": 4})).is_ok());
     }
 
     #[test]

@@ -1215,7 +1215,7 @@ mod tests {
         drop(service);
         let restarted =
             Coordinator::new(directory, TaskRuntime::with_test_access(history).unwrap()).unwrap();
-        let inner = restarted.inner.lock().unwrap();
+        let inner = restarted.state();
         assert!(inner.enabled.is_empty());
         assert!(inner.ledger.managed_tasks[0].error.is_some());
         assert!(inner.ledger.managed_tasks[0]

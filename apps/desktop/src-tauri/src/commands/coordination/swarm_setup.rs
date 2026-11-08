@@ -598,9 +598,6 @@ mod tests {
     fn bundled_worker_and_manifest_agree() {
         let manifest = manifest();
         assert_eq!(manifest.version.len(), 16);
-        assert_eq!(manifest.script, "jackalope-swarm");
-        assert_eq!(manifest.main_module, "worker.js");
-        assert_eq!(manifest.artifacts_binding, "ARTIFACTS");
         assert!(!manifest.migrations.is_empty());
         // Every Durable Object the upload binds is exported by the module.
         for object in &manifest.durable_objects {

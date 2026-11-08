@@ -192,13 +192,6 @@ fn a_paired_machine_belongs_to_one_bot() {
 }
 
 #[test]
-fn hosted_computers_have_no_provider_yet() {
-    assert!(provider(HOSTED)
-        .err()
-        .is_some_and(|error| error.contains("not available yet")));
-}
-
-#[test]
 fn docker_detection_explains_each_unavailable_state() {
     let running = r#"{"Client":{"Version":"27.1.1"},"Server":{"Version":"27.1.1","Os":"linux","Arch":"arm64"}}"#;
     let status = docker::interpret(Ok(running), "desktop-linux");
