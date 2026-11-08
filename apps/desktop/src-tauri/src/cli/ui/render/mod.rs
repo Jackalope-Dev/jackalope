@@ -327,8 +327,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
     frame.buffer_mut().set_string(
         input_area.x + 2,
         inner.y,
-        if prompt == "❯" && !brand::unicode() {
-            ">"
+        if prompt == "❯" {
+            brand::mark_glyph(brand::Mark::Prompt)
         } else {
             prompt
         },
@@ -854,7 +854,7 @@ fn welcome(app: &App, width: u16, height: u16) -> (Vec<Line<'static>>, Vec<trans
         Some(Err(error)) => group.push(Line::styled(error.clone(), muted).centered()),
         Some(Ok(overview)) => {
             let mut chips = Vec::new();
-            let dot = if brand::unicode() { "●" } else { "*" };
+            let dot = brand::mark_glyph(brand::Mark::Dot);
             for agent in overview.agents.iter().filter(|agent| usable(agent)) {
                 let ready = agent.state == "ready";
                 if !chips.is_empty() {

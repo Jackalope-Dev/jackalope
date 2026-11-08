@@ -67,7 +67,7 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(
             format!(
                 "{} {}",
-                if brand::unicode() { "◆" } else { "*" },
+                brand::mark_glyph(brand::Mark::Project),
                 brand::ellipsize(&app.project.name, 32)
             ),
             Style::default()
@@ -133,7 +133,7 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
             text(
                 format!(
                     "{} {}",
-                    if brand::unicode() { "⎇" } else { "@" },
+                    brand::mark_glyph(brand::Mark::Branch),
                     brand::short_branch(&branch)
                 ),
                 brand::accent(),
@@ -209,15 +209,15 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
     } else {
         protocol::working(session.status.as_ref())
     };
-    let dot = if brand::unicode() { "●" } else { "*" };
+    let dot = brand::mark_glyph(brand::Mark::Dot);
     if needs_you {
         (dot, brand::warning())
     } else if working {
         (brand::spinner(app.tick), brand::accent())
     } else if session.paused {
-        (if brand::unicode() { "◌" } else { "-" }, brand::muted())
+        (brand::mark_glyph(brand::Mark::Waiting), brand::muted())
     } else {
-        (if brand::unicode() { "○" } else { "o" }, brand::muted())
+        (brand::mark_glyph(brand::Mark::Idle), brand::muted())
     }
 }
 
@@ -282,7 +282,7 @@ fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
         pieces.push((Span::styled(title.to_string(), base), click));
         pieces.push((
             Span::styled(
-                if brand::unicode() { " × " } else { " x " },
+                format!(" {} ", brand::mark_glyph(brand::Mark::Close)),
                 base.fg(brand::muted()).remove_modifier(Modifier::BOLD),
             ),
             Some(Click::CloseTab(index)),
@@ -341,10 +341,8 @@ pub fn status(frame: &mut Frame, app: &App, area: Rect) {
     let (label, color, details) = super::status_parts(app);
     let glyph = if app.working() {
         brand::spinner(app.tick)
-    } else if brand::unicode() {
-        "●"
     } else {
-        "*"
+        brand::mark_glyph(brand::Mark::Dot)
     };
     let state = Style::default().fg(color);
     let mut left: Vec<Piece> = vec![(Span::styled(format!("{glyph} "), state), None)];

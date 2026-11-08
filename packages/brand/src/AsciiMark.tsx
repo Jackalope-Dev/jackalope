@@ -1,9 +1,10 @@
 import { characterPaths } from './character';
 import './ascii-mark.css';
 import { useEffect, useRef } from 'react';
+import terminal from './terminal.json' with { type: 'json' };
 
 const RAMP = ' .:-=+*#%@';
-const NOISE = '01<>/\\{}[]#$%&*+=?';
+const NOISE = terminal.noise;
 const MARK = [
   characterPaths.farEar,
   characterPaths.nearEar,

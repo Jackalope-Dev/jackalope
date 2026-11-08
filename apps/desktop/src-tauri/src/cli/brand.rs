@@ -7,11 +7,66 @@
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
+use std::sync::OnceLock;
 
-/// The default accent from `packages/brand` (`DEFAULT_THEME`, Jackalope
-/// Violet), drawn until the project's own colour is known and for projects the
-/// app has not themed.
-const DEFAULT_ACCENT: (u8, u8, u8) = (0x8b, 0x5c, 0xf6);
+/// The values the terminal shares with the app, kept in `packages/brand` and
+/// checked against `themeTokens` by `packages/brand/test/terminal.test.mjs`.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Tokens {
+    /// `DEFAULT_THEME`'s accent, Jackalope Violet.
+    default_accent: String,
+    /// Glyphs text resolves out of, the same noise the ASCII mark decodes
+    /// from in the app and on the website.
+    noise: String,
+    dark: Scheme,
+    light: Scheme,
+}
+
+/// Neutral tones are `[saturation, lightness]` in the accent's hue; status
+/// colours are `[hue, saturation, lightness]`; all in CSS percent and degrees.
+#[derive(serde::Deserialize)]
+struct Scheme {
+    /// `--color-navigation`, around the content card.
+    shell: [f64; 2],
+    /// `--color-surface`.
+    ground: [f64; 2],
+    /// `--color-surface-elevated`.
+    elevated: [f64; 2],
+    /// `--color-border-subtle`.
+    hairline: [f64; 2],
+    /// `--color-text-primary`.
+    text: [f64; 2],
+    /// `--color-text-muted`.
+    muted: [f64; 2],
+    success: [f64; 3],
+    warning: [f64; 3],
+    danger: [f64; 3],
+}
+
+fn tokens() -> &'static Tokens {
+    static TOKENS: OnceLock<Tokens> = OnceLock::new();
+    TOKENS.get_or_init(|| {
+        serde_json::from_str(include_str!(
+            "../../../../../packages/brand/src/terminal.json"
+        ))
+        .expect("packages/brand/src/terminal.json is valid")
+    })
+}
+
+fn scheme(dark: bool) -> &'static Scheme {
+    if dark {
+        &tokens().dark
+    } else {
+        &tokens().light
+    }
+}
+
+/// The brand accent, drawn until the project's own colour is known and for
+/// projects the app has not themed.
+fn default_accent() -> (u8, u8, u8) {
+    parse_hex(&tokens().default_accent).expect("the default accent is #rrggbb")
+}
 
 /// The accent in use: the project's colour, adjusted to read on this terminal.
 static ACCENT: std::sync::RwLock<Option<(u8, u8, u8)>> = std::sync::RwLock::new(None);
@@ -21,12 +76,12 @@ fn current_accent() -> (u8, u8, u8) {
         .read()
         .ok()
         .and_then(|accent| *accent)
-        .unwrap_or_else(|| readable(DEFAULT_ACCENT, background()))
+        .unwrap_or_else(|| readable(default_accent(), background()))
 }
 
 /// Wears the project's colour (`#rrggbb`), or the brand default when absent.
 pub fn set_accent(hex: Option<&str>) {
-    let color = hex.and_then(parse_hex).unwrap_or(DEFAULT_ACCENT);
+    let color = hex.and_then(parse_hex).unwrap_or_else(default_accent);
     if let Ok(mut accent) = ACCENT.write() {
         *accent = Some(readable(color, background()));
     }
@@ -299,7 +354,9 @@ pub fn spinner(tick: usize) -> &'static str {
     }
 }
 
-/// The small marks used through the interface, drawn in the logo's dot style.
+/// The glyphs used through the interface, each with the plain character drawn
+/// where Unicode is unavailable (see `unicode`).
+#[derive(Clone, Copy)]
 pub enum Mark {
     /// Fully usable.
     Full,
@@ -311,21 +368,116 @@ pub enum Mark {
     Empty,
     /// The highlighted row in a list.
     Cursor,
+    /// A state or agent dot.
+    Dot,
+    /// An open question on a card or board row.
+    Question,
+    /// An open question in the conversation.
+    Ask,
+    /// Before the project's name.
+    Project,
+    Paused,
+    Done,
+    Failed,
+    Stopped,
+    Idle,
+    /// A paused conversation's tab.
+    Waiting,
+    Branch,
+    Close,
+    /// The end of a reply still being written.
+    Caret,
+    /// A card's side edge.
+    Side,
+    /// A callout's left bar.
+    Bar,
+    TopOpen,
+    TopClose,
+    BottomOpen,
+    BottomClose,
+    /// A card edge's horizontal stroke.
+    Edge,
+    /// The divider between a reply and the record of its work.
+    Dashed,
+    /// The dotted rule.
+    Rule,
+    /// The stage gauge.
+    Gauge,
+    /// A file bar's cell.
+    Cell,
+    Minus,
+    Renamed,
+    Ellipsis,
+    Prompt,
+    /// The mark in one line.
+    Compact,
+    Read,
+    Edit,
+    Search,
+    Command,
+    Check,
+    /// Any other step of the work.
+    Step,
 }
 
 pub fn mark_glyph(mark: Mark) -> &'static str {
-    let (dots, plain) = match mark {
+    let (unicode_glyph, plain) = match mark {
         Mark::Full => ("⣿", "#"),
         Mark::Partial => ("⣤", "+"),
         Mark::Attention => ("⠿", "!"),
         Mark::Empty => ("⠄", "."),
         Mark::Cursor => ("⣿", ">"),
+        Mark::Dot => ("●", "*"),
+        Mark::Question => ("◆", "!"),
+        Mark::Ask => ("◆", "?"),
+        Mark::Project => ("◆", "*"),
+        Mark::Paused => ("‖", "="),
+        Mark::Done => ("✓", "+"),
+        Mark::Failed => ("✗", "x"),
+        Mark::Stopped | Mark::Cell => ("■", "#"),
+        Mark::Idle => ("○", "o"),
+        Mark::Waiting => ("◌", "-"),
+        Mark::Branch => ("⎇", "@"),
+        Mark::Close => ("×", "x"),
+        Mark::Caret => ("▍", "_"),
+        Mark::Side => ("│", "|"),
+        Mark::Bar => ("▎", "|"),
+        Mark::TopOpen => ("╭─ ", "+- "),
+        Mark::TopClose => (" ─╮", " -+"),
+        Mark::BottomOpen => ("╰─", "+-"),
+        Mark::BottomClose => ("─╯", "-+"),
+        Mark::Edge => ("─", "-"),
+        Mark::Dashed => ("╌", "-"),
+        Mark::Rule => ("⠒", "-"),
+        Mark::Gauge => ("━", "="),
+        Mark::Minus => ("−", "-"),
+        Mark::Renamed => ("→", ">"),
+        Mark::Ellipsis => ("…", "."),
+        Mark::Prompt => ("❯", ">"),
+        Mark::Compact => ("⣼⡿", "#"),
+        Mark::Read => ("◇", "r"),
+        Mark::Edit => ("✎", "e"),
+        Mark::Search => ("⌕", "?"),
+        Mark::Command => ("▸", ">"),
+        Mark::Check => ("◈", "c"),
+        Mark::Step => ("·", "-"),
     };
     if unicode() {
-        dots
+        unicode_glyph
     } else {
         plain
     }
+}
+
+/// How strongly column `column` of `width` catches a soft band travelling
+/// along it, `half` columns either side of its centre; `None` outside it.
+/// One pass every few seconds regardless of width, so wide terminals are not
+/// slower, eased so the band has no hard edges.
+fn band(column: usize, width: usize, tick: usize, half: usize) -> Option<f32> {
+    let span = width + 2 * half;
+    let center = (tick * span / 48) % span;
+    let distance = (center as isize - half as isize - column as isize).unsigned_abs();
+    (distance < half).then(|| 1.0 - (distance as f32 / half as f32).powi(2))
 }
 
 /// The dotted rule while an agent works: a soft band of accent glides along
@@ -335,26 +487,16 @@ pub fn divider_active(width: u16, tick: usize) -> Line<'static> {
     if !motion() || !colored() {
         return divider(width);
     }
-    let dot = if unicode() { "⠒" } else { "-" };
+    let dot = mark_glyph(Mark::Rule);
     let width = width as usize;
-    const HALF: isize = 10;
-    // One pass every few seconds regardless of width, so wide terminals are
-    // not slower.
-    let span = width + 2 * HALF as usize;
-    let center = (tick * span / 48) % span;
     let spans = (0..width)
         .map(|column| {
-            let distance = (center as isize - HALF - column as isize).abs();
-            let style = if distance >= HALF {
-                Style::default().fg(muted())
-            } else if truecolor() {
-                // Eased so the band has no hard edges.
-                let weight = 1.0 - (distance as f32 / HALF as f32).powi(2);
-                Style::default().fg(mix(muted(), accent(), weight))
-            } else {
-                Style::default().fg(accent())
+            let color = match band(column, width, tick, 10) {
+                None => muted(),
+                Some(weight) if truecolor() => mix(muted(), accent(), weight),
+                Some(_) => accent(),
             };
-            Span::styled(dot, style)
+            Span::styled(dot, Style::default().fg(color))
         })
         .collect::<Vec<_>>();
     Line::from(spans)
@@ -364,8 +506,7 @@ pub fn divider_active(width: u16, tick: usize) -> Line<'static> {
 fn mix(from: Color, to: Color, amount: f32) -> Color {
     match (from, to) {
         (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
-            let step = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * amount).round() as u8;
-            Color::Rgb(step(r1, r2), step(g1, g2), step(b1, b2))
+            rgb(blend((r1, g1, b1), (r2, g2, b2), amount))
         }
         _ => to,
     }
@@ -373,8 +514,10 @@ fn mix(from: Color, to: Color, amount: f32) -> Color {
 
 /// A dotted rule across `width` columns.
 pub fn divider(width: u16) -> Line<'static> {
-    let dot = if unicode() { "⠒" } else { "-" };
-    Line::styled(dot.repeat(width as usize), Style::default().fg(muted()))
+    Line::styled(
+        mark_glyph(Mark::Rule).repeat(width as usize),
+        Style::default().fg(muted()),
+    )
 }
 
 /// The shared fallback chain: the tone adjusted to the terminal's ground,
@@ -406,7 +549,7 @@ pub fn muted() -> Color {
         return Color::Reset;
     }
     if let Some(dark) = painted() {
-        return rgb(tinted(if dark { 0.66 } else { 0.40 }, 0.03));
+        return rgb(tinted(scheme(dark).muted));
     }
     tone((0x8b, 0x90, 0x99), Color::DarkGray)
 }
@@ -422,13 +565,10 @@ pub enum Surface {
     Elevated,
 }
 
-/// `themeTokens` tints neutral surfaces with the accent's hue at the default
-/// atmosphere (12 × 0.45 per cent saturation).
-const SURFACE_SATURATION: f64 = 0.054;
-
-fn tinted(lightness: f64, saturation: f64) -> (u8, u8, u8) {
+/// A neutral tone tinted with the accent's hue, as `themeTokens` tints them.
+fn tinted([saturation, lightness]: [f64; 2]) -> (u8, u8, u8) {
     let (hue, _, _) = to_hsl(current_accent());
-    from_hsl(hue, saturation, lightness)
+    from_hsl(hue, saturation / 100.0, lightness / 100.0)
 }
 
 fn rgb((r, g, b): (u8, u8, u8)) -> Color {
@@ -436,16 +576,12 @@ fn rgb((r, g, b): (u8, u8, u8)) -> Color {
 }
 
 fn surface_rgb(level: Surface) -> Option<(u8, u8, u8)> {
-    let dark = painted()?;
-    let lightness = match (level, dark) {
-        (Surface::Shell, true) => 0.065,
-        (Surface::Shell, false) => 0.935,
-        (Surface::Ground, true) => 0.105,
-        (Surface::Ground, false) => 0.99,
-        (Surface::Elevated, true) => 0.14,
-        (Surface::Elevated, false) => 1.0,
-    };
-    Some(tinted(lightness, SURFACE_SATURATION))
+    let scheme = scheme(painted()?);
+    Some(tinted(match level {
+        Surface::Shell => scheme.shell,
+        Surface::Ground => scheme.ground,
+        Surface::Elevated => scheme.elevated,
+    }))
 }
 
 /// A surface tone, or Reset where the terminal's own background shows.
@@ -456,7 +592,7 @@ pub fn surface(level: Surface) -> Color {
 /// Hairline borders (`--color-border-subtle`), or the muted grey unpainted.
 pub fn hairline() -> Color {
     match painted() {
-        Some(dark) => rgb(tinted(if dark { 0.21 } else { 0.86 }, SURFACE_SATURATION)),
+        Some(dark) => rgb(tinted(scheme(dark).hairline)),
         None => muted(),
     }
 }
@@ -464,7 +600,7 @@ pub fn hairline() -> Color {
 /// Body text (`--color-text-primary`), or the terminal's own foreground.
 pub fn text() -> Color {
     match painted() {
-        Some(dark) => rgb(tinted(if dark { 0.94 } else { 0.14 }, 0.04)),
+        Some(dark) => rgb(tinted(scheme(dark).text)),
         None => Color::Reset,
     }
 }
@@ -511,7 +647,7 @@ pub fn ellipsize(text: &str, width: usize) -> String {
     if text.chars().count() <= width {
         return text.to_string();
     }
-    let ellipsis = if unicode() { "…" } else { "." };
+    let ellipsis = mark_glyph(Mark::Ellipsis);
     let kept: String = text.chars().take(width.saturating_sub(1)).collect();
     format!("{}{ellipsis}", kept.trim_end())
 }
@@ -535,12 +671,19 @@ pub fn short_branch(branch: &str) -> String {
         .join("/")
 }
 
-/// Completed work and confirmed input.
-pub fn success() -> Color {
+/// A status colour for the ground in use (the dark tone on unknown grounds),
+/// adjusted to read there.
+fn status(pick: fn(&Scheme) -> [f64; 3], basic: Color) -> Color {
     if !colored() {
         return Color::Reset;
     }
-    tone((0x2e, 0xbc, 0x7e), Color::Green)
+    let [hue, saturation, lightness] = pick(scheme(background() != Background::Light));
+    tone(from_hsl(hue, saturation / 100.0, lightness / 100.0), basic)
+}
+
+/// Completed work and confirmed input.
+pub fn success() -> Color {
+    status(|scheme| scheme.success, Color::Green)
 }
 
 /// Mentions of agents and files, kept apart from plan mode's green.
@@ -551,34 +694,29 @@ pub fn info() -> Color {
     tone((0x3b, 0x82, 0xf6), Color::Blue)
 }
 
-/// Slash commands in the input: violet, or teal when the project's accent is
-/// already violet, so a command never looks like a plain message.
+/// Slash commands in the input: the brand violet, or teal when the project's
+/// accent is already near it, so a command never looks like a plain message.
 pub fn command() -> Color {
     if !colored() {
         return Color::Reset;
     }
     let (hue, _, _) = to_hsl(current_accent());
-    if (hue - 258.0).abs() < 35.0 {
+    let violet = default_accent();
+    if (hue - to_hsl(violet).0).abs() < 35.0 {
         tone((0x14, 0xb8, 0xa6), Color::Cyan)
     } else {
-        tone((0x8b, 0x5c, 0xf6), Color::Magenta)
+        tone(violet, Color::Magenta)
     }
 }
 
 /// Work that needs attention: an open question, a sign-in, a stalled action.
 pub fn warning() -> Color {
-    if !colored() {
-        return Color::Reset;
-    }
-    tone((0xf5, 0x9e, 0x0b), Color::Yellow)
+    status(|scheme| scheme.warning, Color::Yellow)
 }
 
 /// Failures and errors.
 pub fn danger() -> Color {
-    if !colored() {
-        return Color::Reset;
-    }
-    tone((0xe5, 0x48, 0x4d), Color::Red)
+    status(|scheme| scheme.danger, Color::Red)
 }
 
 /// The accent's neighbour: the same colour turned 40° round the wheel, so a
@@ -746,11 +884,7 @@ fn glitched(cell: usize, position: f32, progress: f32, tick: usize) -> Glitched 
         true
     };
     if noisy {
-        const GLYPHS: [&str; 18] = [
-            "0", "1", "<", ">", "/", "\\", "{", "}", "[", "]", "#", "$", "%", "&", "*", "+", "=",
-            "?",
-        ];
-        Glitched::Noise(GLYPHS[scatter(cell, tick) as usize % GLYPHS.len()])
+        Glitched::Noise(noise(scatter(cell, tick)))
     } else {
         Glitched::Settled
     }
@@ -831,14 +965,7 @@ pub fn frame_band(column: usize, width: usize, tick: usize) -> Option<Color> {
     if !motion() || !colored() {
         return None;
     }
-    const HALF: isize = 12;
-    let span = width + 2 * HALF as usize;
-    let center = (tick * span / 48) % span;
-    let distance = (center as isize - HALF - column as isize).abs();
-    if distance >= HALF {
-        return None;
-    }
-    let weight = 1.0 - (distance as f32 / HALF as f32).powi(2);
+    let weight = band(column, width, tick, 12)?;
     Some(mix(
         frame_at(column as f32 / width.max(1) as f32),
         lifted(0.3),
@@ -874,14 +1001,12 @@ fn lifted(amount: f32) -> Color {
     if !truecolor() {
         return accent();
     }
-    let (r, g, b) = current_accent();
     let toward = if background() == Background::Light {
-        0.0
+        (0, 0, 0)
     } else {
-        255.0
+        (255, 255, 255)
     };
-    let blend = |channel: u8| (channel as f32 + (toward - channel as f32) * amount).round() as u8;
-    Color::Rgb(blend(r), blend(g), blend(b))
+    rgb(blend(current_accent(), toward, amount))
 }
 
 /// How brightly column `column` catches a highlight sweeping left to right
@@ -921,11 +1046,15 @@ pub fn shimmer(text: &str, tick: usize, base: Style) -> Vec<Span<'static>> {
         .collect()
 }
 
-/// Glyphs text resolves out of, the same noise the ASCII mark decodes from in
-/// the app and on the website.
-const NOISE: &[char] = &[
-    '0', '1', '<', '>', '/', '\\', '{', '}', '[', ']', '#', '$', '%', '&', '*', '+', '=', '?',
-];
+/// The noise glyph at `index`, wrapping round the set.
+fn noise(index: u32) -> &'static str {
+    let noise = tokens().noise.as_str();
+    let count = noise.chars().count().max(1);
+    noise
+        .char_indices()
+        .nth(index as usize % count)
+        .map_or("?", |(at, glyph)| &noise[at..at + glyph.len_utf8()])
+}
 
 /// A cheap, stable scramble of two numbers, so noise and settle order are
 /// the same on every frame and in tests.
@@ -952,25 +1081,28 @@ pub fn decode(line: Line<'static>, progress: f32, tick: usize, seed: usize) -> L
         .map(|span| span.content.chars().count())
         .sum::<usize>()
         .max(1);
-    let noise = Style::default().fg(muted());
+    let scrambled = Style::default().fg(muted());
     let hot = Style::default().fg(lifted(0.35));
     let mut spans: Vec<Span<'static>> = Vec::new();
-    let mut push = |text: char, style: Style| match spans.last_mut() {
-        Some(last) if last.style == style => last.content.to_mut().push(text),
+    let mut push = |text: &str, style: Style| match spans.last_mut() {
+        Some(last) if last.style == style => last.content.to_mut().push_str(text),
         _ => spans.push(Span::styled(text.to_string(), style)),
     };
     let mut column = 0;
+    let mut buffer = [0; 4];
     for span in &line.spans {
         for character in span.content.chars() {
             let order = 0.65 * column as f32 / total as f32
                 + 0.35 * (scatter(column, seed) % 1000) as f32 / 1000.0;
             if character == ' ' || progress >= order + 0.08 {
-                push(character, span.style);
+                push(character.encode_utf8(&mut buffer), span.style);
             } else if progress >= order {
-                push(character, span.style.patch(hot));
+                push(character.encode_utf8(&mut buffer), span.style.patch(hot));
             } else {
-                let glyph = NOISE[scatter(column + seed, tick) as usize % NOISE.len()];
-                push(glyph, span.style.patch(noise));
+                push(
+                    noise(scatter(column + seed, tick)),
+                    span.style.patch(scrambled),
+                );
             }
             column += 1;
         }
@@ -1008,7 +1140,7 @@ pub fn header(info: Vec<Line<'static>>, working: bool, tick: usize) -> Vec<Line<
 /// The mark and the project's name in one line, for terminals too small for
 /// the framed header, where a banner would crowd out the conversation.
 pub fn compact(project: &str) -> Line<'static> {
-    let glyph = if unicode() { "⣼⡿" } else { "#" };
+    let glyph = mark_glyph(Mark::Compact);
     Line::from(vec![
         Span::raw(" "),
         Span::styled(glyph, Style::default().fg(accent())),
@@ -1124,6 +1256,15 @@ mod tests {
         let cut = ellipsize("start a fresh conversation", 10);
         assert_eq!(cut.chars().count(), 10.min(cut.chars().count()));
         assert!(cut.starts_with("start a f") || cut.starts_with("start a"));
+    }
+
+    #[test]
+    fn the_shared_brand_values_load_and_the_noise_wraps() {
+        assert_eq!(Some(default_accent()), parse_hex(&tokens().default_accent));
+        let count = tokens().noise.chars().count();
+        assert!(count > 1);
+        assert_eq!(noise(0), noise(count as u32));
+        assert_eq!(noise(0).chars().count(), 1);
     }
 
     #[test]

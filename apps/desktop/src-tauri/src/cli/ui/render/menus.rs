@@ -126,7 +126,7 @@ pub fn mention_menu(
                 Mention::Agent { name, .. } => row(
                     vec![
                         Span::styled(
-                            format!(" {} {name}", if brand::unicode() { "●" } else { "*" }),
+                            format!(" {} {name}", brand::mark_glyph(brand::Mark::Dot)),
                             strong(Style::default().fg(brand::info())),
                         ),
                         Span::styled("  agent · starts the message with it", muted),

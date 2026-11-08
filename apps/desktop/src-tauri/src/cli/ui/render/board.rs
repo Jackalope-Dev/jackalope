@@ -23,28 +23,43 @@ const AGENT_WIDTH: usize = 14;
 
 /// A conversation's state as a glyph, a label and its colour.
 fn state(app: &App, session: &SessionSummary) -> (&'static str, &'static str, Color) {
-    let unicode = brand::unicode();
     if needs_you(session) {
         (
-            if unicode { "◆" } else { "!" },
+            brand::mark_glyph(brand::Mark::Question),
             "NEEDS YOU",
             brand::warning(),
         )
     } else if protocol::working(session.status.as_ref()) {
         (brand::spinner(app.tick), "WORKING", brand::accent())
     } else if session.paused {
-        (if unicode { "‖" } else { "=" }, "PAUSED", brand::muted())
+        (
+            brand::mark_glyph(brand::Mark::Paused),
+            "PAUSED",
+            brand::muted(),
+        )
     } else {
         match &session.status {
-            Some(RunStatus::Review) => (if unicode { "✓" } else { "+" }, "READY", brand::success()),
-            Some(RunStatus::Reviewed) => {
-                (if unicode { "✓" } else { "+" }, "REVIEWED", brand::muted())
-            }
-            Some(RunStatus::Failed) => (if unicode { "✗" } else { "x" }, "FAILED", brand::danger()),
-            Some(status) if status.is_stopped() => {
-                (if unicode { "■" } else { "#" }, "STOPPED", brand::muted())
-            }
-            _ => (if unicode { "○" } else { "o" }, "IDLE", brand::muted()),
+            Some(RunStatus::Review) => (
+                brand::mark_glyph(brand::Mark::Done),
+                "READY",
+                brand::success(),
+            ),
+            Some(RunStatus::Reviewed) => (
+                brand::mark_glyph(brand::Mark::Done),
+                "REVIEWED",
+                brand::muted(),
+            ),
+            Some(RunStatus::Failed) => (
+                brand::mark_glyph(brand::Mark::Failed),
+                "FAILED",
+                brand::danger(),
+            ),
+            Some(status) if status.is_stopped() => (
+                brand::mark_glyph(brand::Mark::Stopped),
+                "STOPPED",
+                brand::muted(),
+            ),
+            _ => (brand::mark_glyph(brand::Mark::Idle), "IDLE", brand::muted()),
         }
     }
 }
