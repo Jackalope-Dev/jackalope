@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
-import { navigateWorkspace, openSettings, useAppEvent } from '../../lib/app-events';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
@@ -273,8 +273,6 @@ export function Shell({
       selectProject: s.selectProject,
     })),
   );
-  useTauriEvent('jackalope-tray-new-task', () => focusComposer());
-  useTauriEvent('jackalope-tray-settings', () => openSettings('General'));
   // `/diff` in the terminal: open Changes on that checkout, in its project.
   useTauriEvent<string>('jackalope:open-changes', (path) => {
     const owner = useProjectStore
