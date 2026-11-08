@@ -632,7 +632,9 @@ pub(in crate::commands) fn create_local(
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
     super::agent_sign_in::ensure_idle(binding)?;
     if binding.adapter == "antigravity" && binding.profile_id.is_none() {
-        let current = super::platform::home_dir().map(|home| home.join(".gemini"));
+        let current = super::platform::home_dir()
+            .zip(super::agents::find("antigravity"))
+            .map(|(home, spec)| spec.default_directory(&home));
         if current.as_ref() != Some(&binding.directory) {
             return Err("Antigravity's CLI data location changed. Start a new task.".into());
         }
