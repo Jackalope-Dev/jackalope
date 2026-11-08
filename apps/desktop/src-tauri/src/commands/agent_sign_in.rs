@@ -114,6 +114,12 @@ impl Drop for Session {
 
 #[derive(Default)]
 pub struct SignInService(Mutex<HashMap<String, Arc<Mutex<Session>>>>);
+impl crate::services::Service for SignInService {
+    fn shutdown(&self) {
+        SignInService::stop_all(self)
+    }
+}
+
 impl SignInService {
     fn session(&self, id: &str) -> Result<Arc<Mutex<Session>>, String> {
         self.0

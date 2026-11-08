@@ -125,6 +125,12 @@ pub struct Scheduler {
     webhook_port: Arc<std::sync::atomic::AtomicU16>,
 }
 
+impl crate::services::Service for Scheduler {
+    fn shutdown(&self) {
+        Scheduler::shutdown(self)
+    }
+}
+
 impl Scheduler {
     pub fn new(path: PathBuf, coordinator: Coordinator) -> Self {
         let loaded = if path.exists() {

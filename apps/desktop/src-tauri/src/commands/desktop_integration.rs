@@ -40,6 +40,12 @@ pub struct DesktopIntegration {
     worker: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
+impl crate::services::Service for DesktopIntegration {
+    fn shutdown(&self) {
+        DesktopIntegration::shutdown(self)
+    }
+}
+
 impl DesktopIntegration {
     pub fn load(path: PathBuf) -> Self {
         let mode = std::fs::read(&path)

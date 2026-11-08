@@ -89,6 +89,12 @@ pub struct Helper {
     runtime: TaskRuntime,
 }
 
+impl crate::services::Service for Helper {
+    fn shutdown(&self) {
+        Helper::stop(self)
+    }
+}
+
 impl Helper {
     pub fn new(directory: PathBuf, runtime: TaskRuntime) -> Self {
         let directory = directory.join("helper");

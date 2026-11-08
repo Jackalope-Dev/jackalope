@@ -23,6 +23,12 @@ pub struct CliHost {
     directory: Option<PathBuf>,
 }
 
+impl crate::services::Service for CliHost {
+    fn shutdown(&self) {
+        CliHost::shutdown(self)
+    }
+}
+
 impl CliHost {
     pub fn shutdown(&self) {
         let _ = std::fs::remove_file(&self.handshake);

@@ -154,6 +154,12 @@ fn origin(value: &str) -> Result<String, String> {
     }
     Ok(url.origin().ascii_serialization())
 }
+impl crate::services::Service for RemoteAccess {
+    fn shutdown(&self) {
+        RemoteAccess::shutdown(self)
+    }
+}
+
 impl RemoteAccess {
     pub fn new(
         path: PathBuf,

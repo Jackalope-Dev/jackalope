@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 
 pub mod commands;
+mod services;
 #[cfg(windows)]
 mod webview_runtime;
 mod window_behavior;
@@ -408,27 +409,7 @@ pub fn run(launch: Launch) {
                 window_behavior::show_main_window(app);
             }
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
-                if let Some(host) = app.try_state::<commands::cli_host::CliHost>() {
-                    host.shutdown();
-                }
-                app.state::<commands::desktop_integration::DesktopIntegration>()
-                    .shutdown();
-                app.state::<commands::helper::Helper>().stop();
-                app.state::<commands::remote::RemoteAccess>().shutdown();
-                commands::remote::close_tunnels();
-                app.state::<Scheduler>().shutdown();
-                app.state::<commands::bot_hub::BotHub>().shutdown();
-                app.state::<commands::notifications::Notifications>()
-                    .shutdown();
-                app.state::<commands::live_sessions::LiveSessions>()
-                    .shutdown();
-                commands::browser::close_all();
-                commands::previews::close_all();
-                commands::work_terminal::close_all();
-                app.state::<Coordinator>().shutdown();
-                app.state::<TaskRuntime>().stop_all();
-                commands::computers::shutdown(&app.state::<TaskRuntime>().computers_root());
-                app.state::<SignInService>().stop_all();
+                services::shutdown(app);
             }
         });
 }

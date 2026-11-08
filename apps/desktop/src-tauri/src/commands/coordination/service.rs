@@ -1,5 +1,11 @@
 use super::*;
 
+impl crate::services::Service for Coordinator {
+    fn shutdown(&self) {
+        Coordinator::shutdown(self)
+    }
+}
+
 impl Coordinator {
     pub(in crate::commands) fn bridge_ready(&self) -> bool {
         self.inner.lock().is_ok_and(|inner| inner.url.is_some())

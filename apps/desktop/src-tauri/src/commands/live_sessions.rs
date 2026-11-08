@@ -230,6 +230,12 @@ pub struct LiveSessions {
     changes: Arc<tokio::sync::watch::Sender<u64>>,
 }
 
+impl crate::services::Service for LiveSessions {
+    fn shutdown(&self) {
+        LiveSessions::shutdown(self)
+    }
+}
+
 impl LiveSessions {
     pub fn new(path: PathBuf, runtime: TaskRuntime, coordinator: Coordinator) -> Self {
         let loaded = if path.exists() {

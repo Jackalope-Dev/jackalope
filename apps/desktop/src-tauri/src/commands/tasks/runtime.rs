@@ -29,6 +29,12 @@ pub(super) fn preparation_failure(record: &PreparationRecord) -> String {
     }
 }
 
+impl crate::services::Service for TaskRuntime {
+    fn shutdown(&self) {
+        TaskRuntime::stop_all(self)
+    }
+}
+
 impl TaskRuntime {
     /// The workspace of a finished attempt, when a retry can safely continue in it: the
     /// directory is an isolated worktree that still exists, nothing else is using it, and

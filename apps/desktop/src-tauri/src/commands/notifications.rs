@@ -170,6 +170,12 @@ fn permitted(preferences: &Preferences, notice: &Notice, focused: bool) -> bool 
             || (preferences.level == "failures-only" && notice.attention))
 }
 
+impl crate::services::Service for Notifications {
+    fn shutdown(&self) {
+        Notifications::shutdown(self)
+    }
+}
+
 impl Notifications {
     pub fn load(path: PathBuf) -> Self {
         let (preferences, error) = if path.exists() {

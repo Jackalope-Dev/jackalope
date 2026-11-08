@@ -372,6 +372,12 @@ pub(super) fn clip(text: &str, limit: usize) -> String {
     clipped
 }
 
+impl crate::services::Service for BotHub {
+    fn shutdown(&self) {
+        BotHub::shutdown(self)
+    }
+}
+
 impl BotHub {
     pub fn new(path: PathBuf, runtime: TaskRuntime, sessions: LiveSessions) -> Self {
         let loaded = if path.exists() {

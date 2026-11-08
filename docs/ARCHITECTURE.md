@@ -69,7 +69,9 @@ dispatch, schedules, Chat and others listed there), so no caller syncs by hand.
 Each native module
 lists its own commands in a `tauri_commands!` macro; src-tauri/src/lib.rs chains
 those lists into the one handler, and a test checks that every
-`#[tauri::command]` is registered exactly once.
+`#[tauri::command]` is registered exactly once. Managed services that own
+background work implement `Service`, and src-tauri/src/services.rs lists the
+order they stop in when the app exits.
 Every webview call goes through invokeNative in lib/native/transport.ts, which
 rejects in the browser preview and reports operation telemetry and timing;
 lib/native/env.ts detects the desktop app and opens links. lib/run-types.ts holds
