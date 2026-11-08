@@ -14,6 +14,7 @@ pub(super) fn discover_runner(
         account: "Current CLI account".into(),
         detail: String::new(),
         sign_in_needed: false,
+        ready: false,
     };
     if let Some(custom) = policy.custom_agents.iter().find(|agent| agent.id == id) {
         runner.name = custom.name.clone();
@@ -43,31 +44,18 @@ pub(super) fn discover_runner(
                 }
             };
             runner.account = binding.label.clone();
-            if adapter == "acp" {
-                runner.detail = "Ready. Sign in with this CLI in a terminal first. Jackalope starts it over ACP.".into();
-                return runner;
-            }
-            if adapter == "antigravity" {
-                runner.detail =
-                    "Ready. Uses your agy sign-in or a Gemini API key added in Agents.".into();
-                return runner;
-            }
-            if adapter == "kimi" {
-                runner.detail =
-                    "Ready. Run kimi login once to sign in; access is checked when a task starts."
-                        .into();
-                return runner;
-            }
-            if adapter == "grok" {
-                runner.detail = "Ready. Access is checked when a task starts.".into();
-                return runner;
-            }
-            if adapter == "opencode" {
-                runner.detail = "Ready. Works with local and free models; provider access is checked when a task starts.".into();
-                return runner;
-            }
-            if adapter == "gemini" {
-                runner.detail = "Ready. Add and sign in to accounts in Agents; access is checked when a task starts.".into();
+            let unchecked = match adapter.as_str() {
+                "acp" => Some("Ready. Sign in with this CLI in a terminal first. Jackalope starts it over ACP."),
+                "antigravity" => Some("Ready. Uses your agy sign-in or a Gemini API key added in Agents."),
+                "kimi" => Some("Ready. Run kimi login once to sign in; access is checked when a task starts."),
+                "grok" => Some("Ready. Access is checked when a task starts."),
+                "opencode" => Some("Ready. Works with local and free models; provider access is checked when a task starts."),
+                "gemini" => Some("Ready. Add and sign in to accounts in Agents; access is checked when a task starts."),
+                _ => None,
+            };
+            if let Some(detail) = unchecked {
+                runner.ready = true;
+                runner.detail = detail.into();
                 return runner;
             }
             let args = if adapter == "codex" {
@@ -89,6 +77,7 @@ pub(super) fn discover_runner(
                         runner.signed_in = out.success;
                     }
                     runner.sign_in_needed = !runner.signed_in;
+                    runner.ready = runner.signed_in;
                     runner.detail = if runner.signed_in {
                         "Signed in and ready.".into()
                     } else if binding.profile_id.is_some() {

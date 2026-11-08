@@ -10,6 +10,7 @@ import { Pairing } from './Pairing';
 import { Splash } from './Splash';
 import { useComputers } from './useComputers';
 import { Work } from './Work';
+import { describeError } from '@jackalope/contracts/errors';
 import '../../desktop/src/index.css';
 import '@jackalope/ui/styles.css';
 import '../../desktop/src/components/tasks/task-workspace.css';
@@ -67,7 +68,7 @@ function MobileCompanion() {
       .then(setHosts)
       .catch((cause) => {
         setHosts([]);
-        setError(String(cause));
+        setError(describeError(cause));
       })
       .finally(() => {
         const wait = Math.max(0, SPLASH_MS - (Date.now() - started));
@@ -89,7 +90,7 @@ function MobileCompanion() {
         setHosts(rest);
         if (!rest.length) setScreen({ kind: 'work' });
       })
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   const open = (host: Host, opening: Opening) =>
     setScreen((current) => ({
       kind: 'host',

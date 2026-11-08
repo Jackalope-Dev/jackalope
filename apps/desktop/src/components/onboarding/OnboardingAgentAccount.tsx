@@ -5,7 +5,7 @@ import {
   accountStatusLabel,
   checkAgentProfile,
 } from '../../lib/agent-profiles';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';

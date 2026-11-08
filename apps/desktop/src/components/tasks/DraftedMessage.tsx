@@ -1,7 +1,7 @@
 import { Button, FormField, Input, Textarea } from '@jackalope/ui';
 import { Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import './drafted-message.css';
 
 interface Message {

@@ -14,6 +14,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { useCompanionNotices } from './useCompanionNotices';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function openCompanionTask(run: TaskRun) {
   openRun(run.id);
@@ -80,7 +81,7 @@ export function CompanionSources() {
           else if (alive) navigateWorkspace('kanban');
         }
       } catch (error) {
-        if (alive) useNotificationStore.setState({ error: String(error) });
+        if (alive) useNotificationStore.setState({ error: describeError(error) });
       } finally {
         opening = false;
       }
@@ -94,7 +95,7 @@ export function CompanionSources() {
         } else stop();
       })
       .catch((error) => {
-        if (alive) useNotificationStore.setState({ error: String(error) });
+        if (alive) useNotificationStore.setState({ error: describeError(error) });
       });
     window.addEventListener('focus', open);
     return () => {

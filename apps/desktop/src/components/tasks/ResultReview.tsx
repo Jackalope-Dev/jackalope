@@ -19,7 +19,7 @@ import { ReviewActions } from './ReviewActions';
 import { ReviewFeedback } from './ReviewFeedback';
 import { ReviewScreenshots } from './ReviewScreenshots';
 import './result-review.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { taskReview } from '../../lib/task-client';
 
 export type ReviewSection = 'changes' | 'screenshots' | 'checks' | 'delivery';

@@ -17,7 +17,7 @@ import type { TaskRun } from '../../lib/run-types';
 import { ComputerViewer } from '../computers/ComputerViewer';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import './agent-screen.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 2000;

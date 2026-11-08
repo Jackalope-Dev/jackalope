@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import { invokeNative } from './native/transport.ts';
 import type { RunRequest, TaskRun } from './run-types.ts';
 
@@ -83,7 +83,7 @@ export const sessionCommand = <T>(command: string, args?: Record<string, unknown
 
 export function sessionRunNeedsAttention(run: TaskRun) {
   return (
-    !isFinished(run) ||
+    !isDone(run) ||
     !!run.error ||
     !!run.persistenceError ||
     !!run.verificationError ||

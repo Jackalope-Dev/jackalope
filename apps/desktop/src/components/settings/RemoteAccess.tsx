@@ -17,7 +17,7 @@ import type { RunRequest } from '../../lib/run-types';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 interface Status {
   enabled: boolean;

@@ -315,6 +315,27 @@ pub(crate) fn set_unread_badge(app: &AppHandle, count: u32) -> Result<(), String
     refresh_badge(app, 0)
 }
 
+/// The command registry id (`src/components/layout/commands.ts`) a tray or app menu item runs.
+fn menu_action(item: &str) -> Option<&'static str> {
+    static ACTIONS: std::sync::OnceLock<std::collections::HashMap<String, String>> =
+        std::sync::OnceLock::new();
+    ACTIONS
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../../src/components/layout/menu-actions.json"))
+                .expect("src/components/layout/menu-actions.json maps menu items to commands")
+        })
+        .get(item)
+        .map(String::as_str)
+}
+
+/// Shows the main window and runs a registry command there.
+fn run_menu_action(app: &AppHandle, action: &str) {
+    show_main_window(app);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("desktop-action", action);
+    }
+}
+
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let (menu, awaiting_review) = build_tray_menu(app.handle())?;
     let mut tray = TrayIconBuilder::with_id("jackalope")
@@ -325,17 +346,11 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             let id = event.id.as_ref();
             match id {
                 "tray-open" => show_main_window(app),
-                "tray-new-task" => {
-                    show_main_window(app);
-                    let _ = app.emit("jackalope-tray-new-task", ());
-                }
-                "tray-settings" => {
-                    show_main_window(app);
-                    let _ = app.emit("jackalope-tray-settings", ());
-                }
                 "tray-quit" => app.exit(0),
                 _ => {
-                    if let Some(task_id) = id.strip_prefix(TASK_MENU_PREFIX) {
+                    if let Some(action) = menu_action(id) {
+                        run_menu_action(app, action);
+                    } else if let Some(task_id) = id.strip_prefix(TASK_MENU_PREFIX) {
                         show_main_window(app);
                         let _ = app.emit("jackalope-tray-open-task", task_id.to_string());
                     }
@@ -411,19 +426,11 @@ pub fn setup_app_menu(app: &tauri::App) -> tauri::Result<()> {
     menu.insert(&work, 1)?;
     app.set_menu(menu)?;
     app.on_menu_event(|app, event| {
-        let action = match event.id.as_ref() {
-            "app-settings" => "settings",
-            "app-new-work" => "newWork",
-            "app-search" => "search",
-            "app-show" => {
-                show_main_window(app);
-                return;
-            }
-            _ => return,
-        };
-        show_main_window(app);
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.emit("desktop-action", action);
+        let id = event.id.as_ref();
+        if let Some(action) = menu_action(id) {
+            run_menu_action(app, action);
+        } else if id == "app-show" {
+            show_main_window(app);
         }
     });
     Ok(())

@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AccessBoundary } from './components/account/AccessBoundary';
 import { Shell } from './components/layout/Shell';
 import { observeDesktopControlTheme } from './lib/desktop-control-theme';
+import { describeError } from '@jackalope/contracts/errors';
 import { selectWork } from './lib/work-selection';
 
 const OnboardingFlow = lazy(() =>
@@ -16,6 +17,7 @@ const WorkspaceTransition = lazy(() =>
 
 import { invokeNative } from './lib/native/transport';
 import { commitProjectSetup } from './lib/project-setup';
+import { observeCommunity } from './stores/communityStore';
 import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
 import { observeLessonSync } from './stores/lessonSyncStore';
@@ -35,7 +37,8 @@ export default function App() {
   useEffect(observeLessonSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
-  useEffect(() => (ready ? bootstrapWindow() : undefined), [ready]);
+  useEffect(() => bootstrapWindow({ community: false }), []);
+  useEffect(() => (ready ? observeCommunity() : undefined), [ready]);
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
   const [entry, setEntry] = useState<{
@@ -79,7 +82,7 @@ export default function App() {
     }
     invokeNative('app_finish_reset')
       .then(() => setReady(true))
-      .catch((error) => setResetError(String(error)));
+      .catch((error) => setResetError(describeError(error)));
   }, [ready]);
   if (!ready)
     return (

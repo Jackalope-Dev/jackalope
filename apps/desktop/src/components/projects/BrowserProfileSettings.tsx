@@ -27,7 +27,7 @@ import {
 } from '../../lib/browser-profiles';
 import { isTauriEnvironment } from '../../lib/native/env';
 import '../settings/settings.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 function lastUsed(status: BrowserProfileStatus) {
   if (!status.lastUsedAt) return 'Not used yet';

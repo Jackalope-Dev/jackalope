@@ -1,4 +1,4 @@
-import { isWorking } from '@jackalope/contracts/runs';
+import { isRunning } from '@jackalope/contracts/runs';
 import {
   Button,
   ConfirmDialog,
@@ -12,9 +12,9 @@ import {
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { agentAdapter } from '../../lib/agents';
+import { agentAdapter } from '../../lib/agent-catalog';
 import { describeWake } from '../../lib/bot-hub';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunRequest } from '../../lib/run-types';
@@ -25,13 +25,15 @@ import {
   savedPlanDraft,
 } from '../../lib/schedules';
 import { stopTask } from '../../lib/task-client';
-import { useAction } from '../../lib/useAction';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useAction } from '../../hooks/useAction';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { openRun } from '../../lib/work-selection';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
   agentAccountFor,
   isAgentAllowedForProject,
+  useActiveProject,
   useProjectStore,
 } from '../../stores/projectStore';
 import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
@@ -68,6 +70,7 @@ export function ScheduleManager(props: {
       activeProjectId: s.activeProjectId,
     })),
   );
+  const activeProject = useActiveProject();
   const runners = useExecutionStore((s) => s.runners);
   const runs = useExecutionStore((s) => s.runs);
   const legacy = useScheduleStore((s) => s.schedules);
@@ -132,9 +135,7 @@ export function ScheduleManager(props: {
     );
   };
   const chooseTemplate = (selected: ScheduleTemplate) => {
-    const target =
-      projects.find((item) => item.id === activeProjectId) ??
-      (projects.length === 1 ? projects[0] : undefined);
+    const target = activeProject ?? (projects.length === 1 ? projects[0] : undefined);
     open(
       scheduleTemplateDraft(selected, {
         id: crypto.randomUUID(),
@@ -197,7 +198,7 @@ export function ScheduleManager(props: {
       if (!editing || !project) return;
       if (!monitorOnly && agent !== 'auto' && !isAgentAllowedForProject(project, agent))
         throw new Error('This agent is not allowed for the selected project.');
-      const adapter = agentAdapter(agent);
+      const adapter = agentAdapter(agent, useAgentConfigStore.getState().customAgents);
       await invokeNative('schedule_save', {
         definition: {
           ...editing,
@@ -352,7 +353,7 @@ export function ScheduleManager(props: {
                           View run
                         </Button>
                       )}
-                      {run && isWorking(run) && (
+                      {run && isRunning(run) && (
                         <Button
                           variant="ghost"
                           disabled={busy}

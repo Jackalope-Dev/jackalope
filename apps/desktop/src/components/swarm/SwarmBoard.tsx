@@ -19,7 +19,7 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { SwarmDelivery } from './SwarmDelivery';
 import { SwarmMap } from './SwarmMap';
 import './swarm.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 5000;

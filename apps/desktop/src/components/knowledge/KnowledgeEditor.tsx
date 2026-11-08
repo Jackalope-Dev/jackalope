@@ -2,7 +2,7 @@ import { Button, Checkbox, Input, Textarea, useDialogFocus } from '@jackalope/ui
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import { invokeNative } from '../../lib/native/transport';
 import { OutcomeEditor } from '../tasks/OutcomeEditor';

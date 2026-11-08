@@ -13,7 +13,7 @@ import { answerCard, type BotCard, dismissCard } from '../../lib/bot-hub';
 import { openExternalUrl } from '../../lib/native/env';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import './bot-card.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 const KIND_ICONS = {

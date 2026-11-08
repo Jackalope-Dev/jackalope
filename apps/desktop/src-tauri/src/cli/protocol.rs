@@ -1251,6 +1251,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn run_status_predicates_match_the_truth_table_shared_with_the_app() {
+        type Table = std::collections::BTreeMap<String, std::collections::BTreeMap<String, bool>>;
+        let table: Table = serde_json::from_str(include_str!(
+            "../../../../../packages/contracts/test/run-status.json"
+        ))
+        .unwrap();
+        assert_eq!(table.len(), 8);
+        for (name, row) in &table {
+            let status = RunStatus::from(name.as_str());
+            assert!(!matches!(status, RunStatus::Unknown(_)), "{name}");
+            for (predicate, expected) in row {
+                let actual = match predicate.as_str() {
+                    "isActive" => status.is_active(),
+                    "isRunning" => status.is_running(),
+                    "isLive" => status.is_live(),
+                    "isDone" => status.is_done(),
+                    "isTerminal" => status.is_terminal(),
+                    "isRetryable" => status.is_retryable(),
+                    other => panic!("RunStatus has no predicate for {other}"),
+                };
+                assert_eq!(actual, *expected, "{predicate}({name})");
+            }
+        }
+    }
+
+    #[test]
     fn run_status_keeps_every_saved_name_including_unknown_ones() {
         for name in [
             "starting",

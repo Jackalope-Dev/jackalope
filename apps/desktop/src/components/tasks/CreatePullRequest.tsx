@@ -1,7 +1,7 @@
 import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';

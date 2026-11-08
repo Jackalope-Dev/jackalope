@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import {
   Button,
   FormField,
@@ -14,7 +14,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import {
   type FeatureStep,
   type ManagedTask,
@@ -28,7 +28,7 @@ import { queueCommand } from '../../lib/queue';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
 import { stopPreview } from '../../lib/task-client';
-import { useAction } from '../../lib/useAction';
+import { useAction } from '../../hooks/useAction';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -136,7 +136,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
     setPlan([]);
     setPlanRunId('');
     setPlanPending(false);
-    if (task.started || !plannerId || !plannerStatus || !isFinished(plannerStatus)) return;
+    if (task.started || !plannerId || !plannerStatus || !isDone(plannerStatus)) return;
     let alive = true;
     setPlanPending(true);
     void previewTaskPlan(task.id)
@@ -472,7 +472,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                       <Button
                         disabled={busy}
                         onClick={() => {
-                          if (work.planner && isFinished(work.planner))
+                          if (work.planner && isDone(work.planner))
                             setPreviewRevision((value) => value + 1);
                           else
                             void act(() =>
@@ -480,7 +480,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             );
                         }}
                       >
-                        {work.planner && isFinished(work.planner)
+                        {work.planner && isDone(work.planner)
                           ? 'Reload plan'
                           : 'Retry planning'}
                       </Button>
@@ -678,7 +678,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             Retry planning
                           </Button>
                         )}
-                      {isFinished(detail) &&
+                      {isDone(detail) &&
                         (detail.id === work.planner?.id ||
                           work.steps.some(({ run }) => run?.id === detail.id)) &&
                         (!task.started ||

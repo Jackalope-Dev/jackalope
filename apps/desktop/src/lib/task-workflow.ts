@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import type { TaskRun } from './run-types.ts';
 
 /**
@@ -32,7 +32,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
     return state('Work interrupted', 'Inspect interrupted work', 'activity', 'warning');
   if (run.status === 'review' && run.prompts?.some((p) => p.status === 'pending'))
     return state('Question left open', 'Answer question', 'question', 'warning');
-  if (!isFinished(run))
+  if (!isDone(run))
     return state(
       run.status === 'stopped' ? 'Work stopped' : 'Work needs attention',
       'Inspect and continue',

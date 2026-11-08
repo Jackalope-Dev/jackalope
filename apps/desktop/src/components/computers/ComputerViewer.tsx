@@ -9,7 +9,7 @@ import {
 } from '../../lib/computers';
 import { openExternalUrl } from '../../lib/native/env';
 import './computers.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 /** An open embedded viewer renews its hold well inside the 90 second lease. */

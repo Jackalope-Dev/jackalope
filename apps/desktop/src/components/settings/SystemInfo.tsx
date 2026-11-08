@@ -8,7 +8,7 @@ import {
 } from '@jackalope/ui';
 import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DesktopPermission,

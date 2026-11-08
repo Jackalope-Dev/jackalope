@@ -8,6 +8,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import './onboarding.css';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function WorkspaceTransition({
   onComplete,
@@ -64,7 +65,7 @@ export function WorkspaceTransition({
         setChecks((current) =>
           current.map((check) =>
             check.id === id
-              ? { ...check, state, error: cause === undefined ? undefined : String(cause) }
+              ? { ...check, state, error: cause === undefined ? undefined : describeError(cause) }
               : check,
           ),
         );

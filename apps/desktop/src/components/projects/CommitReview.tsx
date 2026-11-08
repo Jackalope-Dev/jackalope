@@ -46,7 +46,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { stopTask } from '../../lib/task-client';
 import { openRun } from '../../lib/work-selection';
 import { CommitFilesList, STATUS } from './CommitFilesList';

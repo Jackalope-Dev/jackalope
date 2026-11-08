@@ -10,7 +10,7 @@ import {
   type LocalLlmEndpoint,
 } from '../../lib/local-detection';
 import './detected-keys.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function DetectedKeysModal({
   open,

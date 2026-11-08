@@ -11,14 +11,18 @@ import { useThemeStore } from './stores/themeStore';
 /** Saved stores a secondary window reloads when the main window changes them. */
 const SHARED_STORES = [useThemeStore, useProjectStore, useSettingsStore, useAgentConfigStore];
 
-/** Starts what every window root needs: the theme clock, privacy settings and telemetry. */
-export function bootstrapWindow() {
+/**
+ * Starts what every window root needs: the theme clock, privacy settings and telemetry.
+ * The main window passes `community: false` and observes community settings itself once an
+ * app reset has finished.
+ */
+export function bootstrapWindow({ community = true }: { community?: boolean } = {}) {
   const main = windowKind().kind === 'main';
-  const stops = [
+  const stops: Array<(() => void) | undefined> = [
     startThemeClock(),
-    observeCommunity(),
     main ? observeTelemetry() : observeUiTelemetry(),
   ];
+  if (community) stops.push(observeCommunity());
   if (!main) {
     const reload = (event: StorageEvent) => {
       for (const store of SHARED_STORES)

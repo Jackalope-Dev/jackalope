@@ -32,6 +32,7 @@ import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
 import { ActionError } from '../ui/ActionError';
 import { BotAppearancePicker } from './BotAppearancePicker';
 import { BotWakes } from './BotWakes';
+import { describeError } from '@jackalope/contracts/errors';
 
 const STEPS = [
   {
@@ -133,7 +134,7 @@ export function BotEditor({
     try {
       onSave(draft);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(describeError(cause));
     }
   };
   return (

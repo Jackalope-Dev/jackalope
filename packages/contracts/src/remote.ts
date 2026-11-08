@@ -1,4 +1,4 @@
-import { isActive, type PendingUserPrompt } from './runs.ts';
+import { isActive, needsAttention, type PendingUserPrompt } from './runs.ts';
 
 /** One request a companion sends to a paired host's `/api/request`. */
 export interface RemoteAction {
@@ -116,7 +116,7 @@ export function taskStatus(task: RemoteTask): WorkStatus {
     return { label: 'Ready to review', variant: 'success', needsYou: true, working: false };
   if (task.status === 'reviewed')
     return { label: 'Done', variant: 'default', needsYou: false, working: false };
-  if (task.error || ['failed', 'interrupted'].includes(task.status))
+  if (task.error || needsAttention(task))
     return { label: 'Needs attention', variant: 'danger', needsYou: true, working: false };
   if (task.status === 'stopped')
     return { label: 'Stopped', variant: 'default', needsYou: false, working: false };

@@ -35,7 +35,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '@xyflow/react/dist/style.css';
 import { CodebaseChecks } from './CodebaseChecks';
 import './codebase.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 export default function CodebaseExplorer({ project }: { project: Project }) {
   const [snapshot, setSnapshot] = useState<CodebaseSnapshot | null>(null);

@@ -24,7 +24,7 @@ import {
   useWorkSignals,
   WorkSignals,
 } from '../tasks/WorkSignals';
-import { type ActiveTab, groupViews, viewLabel, workspaceView } from './navigation';
+import { type ActiveTab, groupViews, viewLabel, workspaceView } from '../../lib/navigation';
 
 /** Finished rows shown per project before the rest are left to the Work page. */
 const RECENT_PER_PROJECT = 3;

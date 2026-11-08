@@ -10,10 +10,11 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { markReviewed } from '../../lib/task-client';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
 import { ActionError } from '../ui/ActionError';
 
@@ -51,7 +52,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
           },
         });
       }
-      await invokeNative('task_mark_reviewed', { id: run.id });
+      await markReviewed(run.id);
       await useExecutionStore.getState().refresh();
       setOpen(false);
       onApproved();

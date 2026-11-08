@@ -16,6 +16,10 @@ export interface Runner {
   signedIn: boolean;
   account: string;
   detail: string;
+  /** The sign-in check ran and found no signed-in account. */
+  signInNeeded?: boolean;
+  /** Tasks can start: signed in, or the agent checks access when a task starts. */
+  ready?: boolean;
 }
 export interface RunUsage {
   input: number;

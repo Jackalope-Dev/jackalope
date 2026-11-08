@@ -5,7 +5,7 @@ import { type Issue, type IssuePage, issuePrompt, issueUrl } from '../../lib/iss
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import './issue-picker.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function IssuePicker({
   projectPath,

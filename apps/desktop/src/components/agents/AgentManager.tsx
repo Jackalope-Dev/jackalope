@@ -10,7 +10,12 @@ import {
 import { ArrowLeft, MoreHorizontal, Star } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents } from '../../lib/agent-catalog';
+import {
+  agentNames,
+  builtinAgents,
+  canOrchestrate,
+  ORCHESTRATING_AGENTS,
+} from '../../lib/agent-catalog';
 import { navigateWorkspace } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -26,8 +31,7 @@ import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import { ProviderMark } from './ProviderMark';
 import './agents-workspace.css';
 import './agent-manager.css';
-import { agentNames, canOrchestrate, ORCHESTRATING_AGENTS } from '../../lib/agents';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {

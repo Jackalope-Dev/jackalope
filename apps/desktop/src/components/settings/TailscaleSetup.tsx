@@ -1,7 +1,7 @@
 import { Button, InlineNotice } from '@jackalope/ui';
 import { Check } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { type TailscaleStatus, tailscaleEnableLink } from '../../lib/tailscale-setup';

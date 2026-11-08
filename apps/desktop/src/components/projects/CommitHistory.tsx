@@ -3,7 +3,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './commit-history.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 interface GraphLine {

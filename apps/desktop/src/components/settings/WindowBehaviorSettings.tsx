@@ -1,9 +1,9 @@
 import { InlineNotice, SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useNativeResource } from '../../hooks/useNativeResource';
 
 interface DesktopSettings {
   closeToTray: boolean;

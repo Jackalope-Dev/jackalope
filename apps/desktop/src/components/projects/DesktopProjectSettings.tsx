@@ -6,7 +6,7 @@ import {
   forgetDesktopPermission,
   type RememberedDesktopGrant,
 } from '../../lib/agent-screen';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 
 /** Remembered desktop-control grants and website decisions for one project, each removable. */

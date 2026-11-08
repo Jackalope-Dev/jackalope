@@ -13,7 +13,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
 import { openHelperDraft } from '../../lib/app-events';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { type LiveSession, type SessionTopic, sessionCommand } from '../../lib/live-session';
 import { suggestTopics, topicDraft } from '../../lib/session-topics';
 import { useExecutionStore } from '../../stores/executionStore';

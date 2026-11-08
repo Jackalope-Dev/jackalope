@@ -1,7 +1,7 @@
 import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useAppEvent } from '../../lib/app-events';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { pendingWorkFeedback, type WorkFeedback } from '../../lib/work-feedback';
 import { ActionError } from '../ui/ActionError';
 
@@ -22,7 +22,7 @@ export function WorkFeedbackInbox({
       try {
         setItems(pendingWorkFeedback(taskId));
       } catch (cause) {
-        setError(`Saved feedback could not be read: ${String(cause)}`);
+        setError(`Saved feedback could not be read: ${describeError(cause)}`);
       }
     };
     refresh();

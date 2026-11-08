@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { useSettingsStore } from './settingsStore';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface NotificationStatus {
   supported: boolean;
@@ -19,7 +20,7 @@ export const useNotificationStore = create<{
     try {
       set({ status: await invokeNative<NotificationStatus>('notification_status'), error: '' });
     } catch (error) {
-      set({ error: String(error) });
+      set({ error: describeError(error) });
     }
   },
 }));
@@ -38,7 +39,7 @@ export function observeNotifications() {
         });
         if (alive) useNotificationStore.setState({ status, error: '' });
       } catch (error) {
-        if (alive) useNotificationStore.setState({ error: String(error) });
+        if (alive) useNotificationStore.setState({ error: describeError(error) });
       }
     });
   };
@@ -60,7 +61,7 @@ export function observeNotifications() {
       else stop();
     })
     .catch((error) => {
-      if (alive) useNotificationStore.setState({ error: String(error) });
+      if (alive) useNotificationStore.setState({ error: describeError(error) });
     });
   return () => {
     alive = false;

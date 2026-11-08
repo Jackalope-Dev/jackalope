@@ -14,7 +14,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 interface TerminalView {

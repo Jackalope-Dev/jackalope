@@ -31,8 +31,8 @@ import {
 import { openExternalUrl } from '../../lib/native/env';
 import { SwarmConnection } from './SwarmConnection';
 import './artifacts-connection.css';
-import { describeError } from '../../lib/errors';
-import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
+import { describeError } from '@jackalope/contracts/errors';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
 import { ActionError } from '../ui/ActionError';
 
 export function ArtifactsTitle() {
@@ -89,6 +89,10 @@ export function ArtifactsConnectForm({
     setBusy(true);
     try {
       const accounts = await cloudflareSignIn({}, (url) => setStage({ kind: 'waiting', url }));
+      if (!accounts) {
+        setStage({ kind: 'start' });
+        return;
+      }
       const only = accounts.length === 1 ? accounts[0] : undefined;
       if (only) {
         try {
@@ -100,8 +104,7 @@ export function ArtifactsConnectForm({
       }
       setStage({ kind: 'choose', accounts, accountId: accounts[0]?.id ?? '' });
     } catch (cause) {
-      const message = String(cause);
-      if (!message.includes('canceled')) setError(message);
+      setError(describeError(cause));
       setStage({ kind: 'start' });
     } finally {
       setBusy(false);

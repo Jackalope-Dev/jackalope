@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -60,7 +60,7 @@ export function ComparisonJudge({
   onOpen: (run: TaskRun) => void;
 }) {
   const running = !!judgeRun && isActive(judgeRun);
-  const finished = !!judgeRun && isFinished(judgeRun);
+  const finished = !!judgeRun && isDone(judgeRun);
   const byLabel = new Map(attempts.map((attempt) => [attempt.label, attempt]));
   const showStart = canStart && !running && !loading && !verdict;
   return (

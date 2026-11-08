@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
+import { describeError } from '@jackalope/contracts/errors';
 
 interface ReferralInvite {
   id: string;
@@ -60,7 +61,7 @@ export const useReferralStore = create<{
       })
       .catch((cause) => {
         if (version === generation)
-          set({ referrals: null, error: String(cause), checkedAt: Date.now() });
+          set({ referrals: null, error: describeError(cause), checkedAt: Date.now() });
       })
       .finally(() => {
         if (version === generation) {

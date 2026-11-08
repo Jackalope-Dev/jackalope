@@ -4,7 +4,7 @@ import { Check, Hand } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import './agent-decision.css';
 import './task-experience.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 const DONE = 'Done';

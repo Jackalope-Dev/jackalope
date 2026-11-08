@@ -188,7 +188,7 @@ pub async fn cloudflare_oauth_begin(
     workers: Option<bool>,
     scopes: Option<Vec<String>>,
     state: State<'_, TaskRuntime>,
-) -> Result<String, String> {
+) -> Result<String, oauth::SignInError> {
     let mut requested = Vec::new();
     for name in scopes.unwrap_or_default() {
         requested.push(
@@ -219,7 +219,7 @@ pub async fn cloudflare_oauth_begin(
 
 /// Waits for the browser sign-in and returns the accounts the person shared.
 #[tauri::command]
-pub async fn cloudflare_oauth_complete() -> Result<Vec<oauth::Account>, String> {
+pub async fn cloudflare_oauth_complete() -> Result<Vec<oauth::Account>, oauth::SignInError> {
     oauth::complete().await
 }
 
@@ -231,11 +231,15 @@ pub fn cloudflare_oauth_cancel() {
 /// Replaces the saved sign-in with a newer one for the same account, keeping the
 /// namespace and data location. Used after Connect Cloudflare asks for Workers access.
 #[tauri::command]
-pub async fn cloudflare_oauth_reauthorize(state: State<'_, TaskRuntime>) -> Result<Status, String> {
+pub async fn cloudflare_oauth_reauthorize(
+    state: State<'_, TaskRuntime>,
+) -> Result<Status, oauth::SignInError> {
     let existing = connection(&state)?;
-    let previous = existing.oauth.clone().ok_or(
-        "This connection uses an API token. Replace it with one that has Workers Scripts: Edit.",
-    )?;
+    let previous = existing.oauth.clone().ok_or_else(|| {
+        oauth::SignInError::api_token(
+            "This connection uses an API token. Replace it with one that has Workers Scripts: Edit.",
+        )
+    })?;
     let tokens = oauth::signed_in(&existing.account_id).map_err(|_| {
         "Share the same Cloudflare account you connected before, or disconnect and connect again."
             .to_string()

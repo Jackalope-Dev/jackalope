@@ -35,7 +35,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import './feature-map.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 interface Draft {
   name: string;

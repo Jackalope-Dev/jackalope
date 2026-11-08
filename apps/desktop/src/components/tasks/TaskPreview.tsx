@@ -9,7 +9,7 @@ import {
   SelectItem,
 } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { previewUrl } from '../../lib/preview-url';

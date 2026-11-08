@@ -1,4 +1,4 @@
-import { isActive } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import type { QueueView } from './queue';
 import type { TaskRun } from './run-types';
 import type { SwarmConflict, SwarmFile } from './swarm';
@@ -215,7 +215,7 @@ function phaseOf(
     };
   }
   if (merged.has(run.id)) return { phase: 'merged', detail: 'Merged into the target branch' };
-  if (run.status === 'review' || run.status === 'reviewed') {
+  if (isDone(run)) {
     if (run.verificationError || (run.verification && !run.verification.result.success))
       return { phase: 'attention', detail: 'Checks failed' };
     if (!run.verification?.tree) return { phase: 'attention', detail: 'Not checked yet' };

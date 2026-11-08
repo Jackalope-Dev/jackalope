@@ -52,8 +52,8 @@ import { useActiveProject } from '../../stores/projectStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';
-import { describeError } from '../../lib/errors';
-import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
+import { describeError, errorCode } from '@jackalope/contracts/errors';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
 
 interface Run {
   kinds: CloudResourceKind[];
@@ -64,14 +64,17 @@ interface Run {
   failure?: CloudResourcesFailure;
 }
 
-const signInFailure = (message: string): CloudResourcesFailure => ({
-  step: 'account',
-  message,
-  recovery: message.includes('API token') ? 'token' : null,
-  link: message.includes('API token') ? ARTIFACTS_TOKEN_URL : null,
-  scopes: [],
-  permissions: [],
-});
+const signInFailure = (cause: unknown): CloudResourcesFailure => {
+  const token = errorCode(cause) === 'apiToken';
+  return {
+    step: 'account',
+    message: describeError(cause),
+    recovery: token ? 'token' : null,
+    link: token ? ARTIFACTS_TOKEN_URL : null,
+    scopes: [],
+    permissions: [],
+  };
+};
 
 function runSteps(run: Run): StepperStep[] {
   const ids: CloudResourceStep[] = ['account', ...run.kinds, 'manifest'];
@@ -164,10 +167,11 @@ export function CloudResources() {
   const toggle = (kind: CloudResourceKind, on: boolean) =>
     update({ kinds: on ? [...draft.kinds, kind] : draft.kinds.filter((item) => item !== kind) });
 
-  /** Connect Cloudflare again for the same account, asking for `scopes` as well. */
+  /** Connect Cloudflare again for the same account, asking for `scopes` as well. False when canceled. */
   const allow = async (scopes: string[]) => {
-    await cloudflareSignIn({ scopes });
+    if (!(await cloudflareSignIn({ scopes }))) return false;
     await reauthorizeCloudflare();
+    return true;
   };
 
   const start = async (allowFirst?: string[]) => {
@@ -191,13 +195,13 @@ export function CloudResources() {
         if (scopes) {
           show({ ...state, current: 'account', signingIn: true, failure: undefined });
           try {
-            await allow(scopes);
-          } catch (cause) {
-            const message = String(cause);
-            if (message.includes('canceled')) {
+            if (!(await allow(scopes))) {
               setRun(null);
               setView('choose');
-            } else show({ ...state, signingIn: false, failure: signInFailure(message) });
+              return;
+            }
+          } catch (cause) {
+            show({ ...state, signingIn: false, failure: signInFailure(cause) });
             return;
           }
           scopes = undefined;

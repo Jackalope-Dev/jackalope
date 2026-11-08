@@ -13,10 +13,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { agentName } from '../../lib/agents';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { queueCommand } from '../../lib/queue';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentName, useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
 
 interface PlanEntry {

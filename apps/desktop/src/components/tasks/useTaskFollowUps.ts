@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
@@ -116,7 +116,7 @@ export function useTaskFollowUps({
         );
         await refresh();
       } catch (cause) {
-        onError(String(cause));
+        onError(describeError(cause));
       } finally {
         setQueueing(false);
       }
@@ -138,7 +138,7 @@ export function useTaskFollowUps({
         if (action === 'cancel' && !remaining.length) queuedHere.current = false;
         setFollowups(remaining);
       } catch (cause) {
-        onError(String(cause));
+        onError(describeError(cause));
       } finally {
         setQueueing(false);
       }

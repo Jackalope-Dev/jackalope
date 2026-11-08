@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { openInBrowser } from '../../lib/native/env';
 import './agent-manager.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 export function AgentInstallGuide({

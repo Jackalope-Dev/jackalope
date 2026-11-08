@@ -1,6 +1,6 @@
 import { Button, Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import type { SessionLimits as Limits } from '../../lib/live-session';
 import { ActionError } from '../ui/ActionError';
 

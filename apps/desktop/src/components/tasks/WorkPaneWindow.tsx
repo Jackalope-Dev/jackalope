@@ -10,7 +10,7 @@ import { ResultReview } from './ResultReview';
 import { TaskPreview } from './TaskPreview';
 import { TaskTerminal } from './TaskTerminal';
 import './workbench.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 export default function WorkPaneWindow({ id, pane }: { id: string; pane: string }) {

@@ -1,6 +1,6 @@
 import { Button, ConfirmDialog, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import {
   createFirstCommit,
   type FirstCommitPreview,

@@ -9,7 +9,7 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type AgentCredential, agentCredentials, setAgentCredential } from '../../lib/computers';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 
 const HINTS: Record<string, string> = {

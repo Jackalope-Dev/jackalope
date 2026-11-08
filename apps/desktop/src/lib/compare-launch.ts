@@ -7,6 +7,7 @@ import type { ContextSelection } from './knowledge-types';
 import type { RunRequest, TaskRun } from './run-types';
 import { taskReview } from './task-client';
 import { taskTitle } from './task-title';
+import { describeError } from '@jackalope/contracts/errors';
 
 /**
  * Starts the same prompt once per agent, each as an ordinary isolated task, and
@@ -71,7 +72,7 @@ export async function startComparison({
         runId,
       });
     } catch (error) {
-      failures.push(`${agent.name}: ${String(error)}`);
+      failures.push(`${agent.name}: ${describeError(error)}`);
     }
   }
   if (!comparison.taskIds.length) {

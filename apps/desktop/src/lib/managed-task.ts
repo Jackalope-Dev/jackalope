@@ -1,4 +1,4 @@
-import { isActive, isFinished } from '@jackalope/contracts/runs';
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import type { ContextSelection } from './knowledge-types';
 import { invokeNative } from './native/transport.ts';
 import type { QueueView } from './queue';
@@ -120,7 +120,7 @@ export function managedTaskWork(task: ManagedTask, queue: QueueView, runs: TaskR
         (item.runId && !run) ||
         (run &&
           !isActive(run) &&
-          (!isFinished(run) ||
+          (!isDone(run) ||
             run.error ||
             run.persistenceError ||
             run.verificationError ||
@@ -154,7 +154,7 @@ export function managedTaskWork(task: ManagedTask, queue: QueueView, runs: TaskR
         : 'Planning'
       : integrated
         ? 'Integrated'
-        : failed || (!task.started && (!planner || !isFinished(planner)))
+        : failed || (!task.started && (!planner || !isDone(planner)))
           ? 'Needs attention'
           : interfaceIssue
             ? 'Needs attention'
@@ -191,7 +191,7 @@ export function managedTaskProgress(task: ManagedTask, work: ReturnType<typeof m
     ({ run }) => run && !isActive(run) && run.verification?.result.success,
   ).length;
   const implemented =
-    work.assignments.length > 0 && work.assignments.every(({ run }) => run && isFinished(run));
+    work.assignments.length > 0 && work.assignments.every(({ run }) => run && isDone(run));
   const stage = work.integrated
     ? 4
     : work.ready

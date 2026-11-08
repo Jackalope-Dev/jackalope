@@ -36,6 +36,61 @@ pub struct Occurrence {
     pub due_at: DateTime<Utc>,
     pub run_id: Option<String>,
     pub outcome: String,
+    /// What `outcome` describes. Occurrences saved before this field existed get it from
+    /// their text when the ledger loads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<OutcomeKind>,
+}
+
+/// The kind of an [`Outcome`], saved beside its text so the app can act on it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OutcomeKind {
+    Reserved,
+    Started,
+    FailedToStart,
+    SignedOut,
+    Overlap,
+    Busy,
+    Missed,
+    Paused,
+    Starting,
+    Invalid,
+    MonitorAttention,
+    Unrelated,
+    Baseline,
+    Unchanged,
+    ChangeDetected,
+    /// A reserved occurrence whose dispatch never finished before the app stopped.
+    InterruptedDispatch,
+}
+
+impl OutcomeKind {
+    /// Reads the kind of an occurrence saved with text only.
+    fn from_saved_text(text: &str) -> Option<Self> {
+        const PREFIXES: [(&str, OutcomeKind); 16] = [
+            ("Reserved", OutcomeKind::Reserved),
+            ("Started", OutcomeKind::Started),
+            ("Failed to start", OutcomeKind::FailedToStart),
+            ("Skipped: sign in", OutcomeKind::SignedOut),
+            ("Skipped: earlier run", OutcomeKind::Overlap),
+            ("Skipped: three tasks", OutcomeKind::Busy),
+            ("Skipped: missed", OutcomeKind::Missed),
+            ("Skipped: schedule is paused", OutcomeKind::Paused),
+            ("Skipped: Jackalope is still starting", OutcomeKind::Starting),
+            ("Paused: this schedule is invalid", OutcomeKind::Invalid),
+            (ATTENTION, OutcomeKind::MonitorAttention),
+            ("Unrelated change", OutcomeKind::Unrelated),
+            ("Baseline recorded", OutcomeKind::Baseline),
+            ("Unchanged", OutcomeKind::Unchanged),
+            ("Change detected", OutcomeKind::ChangeDetected),
+            ("Interrupted dispatch", OutcomeKind::InterruptedDispatch),
+        ];
+        PREFIXES
+            .iter()
+            .find(|(prefix, _)| text.starts_with(*prefix))
+            .map(|(_, kind)| *kind)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -151,7 +206,14 @@ impl Scheduler {
                 if event.outcome == "Reserved" {
                     event.outcome =
                         "Interrupted dispatch; inspect task history before retrying".into();
+                    event.kind = Some(OutcomeKind::InterruptedDispatch);
                 }
+                if event.kind.is_none() {
+                    event.kind = OutcomeKind::from_saved_text(&event.outcome);
+                }
+            }
+            if let Some(event) = schedule.last_notice.as_mut().filter(|e| e.kind.is_none()) {
+                event.kind = OutcomeKind::from_saved_text(&event.outcome);
             }
         }
         Self {
@@ -356,6 +418,7 @@ impl Scheduler {
                     due_at: current.next_at,
                     run_id: None,
                     outcome: outcome.text(),
+                    kind: Some(outcome.kind()),
                 };
                 if notice
                     || (result.is_err()
@@ -369,7 +432,7 @@ impl Scheduler {
                     && current
                         .last_notice
                         .as_ref()
-                        .is_some_and(|e| Outcome::needs_attention(&e.outcome))
+                        .is_some_and(|e| e.kind == Some(OutcomeKind::MonitorAttention))
                 {
                     current.last_notice = None;
                 }
@@ -822,7 +885,9 @@ impl Scheduler {
             Err(error) => Outcome::FailedToStart(error),
         };
         let current = &mut ledger.schedules[index];
-        current.history.last_mut().unwrap().outcome = outcome.text();
+        let event = current.history.last_mut().unwrap();
+        event.outcome = outcome.text();
+        event.kind = Some(outcome.kind());
         if due && current.definition.monitor.is_some() {
             current.last_notice = current.history.last().cloned();
         }
@@ -845,7 +910,7 @@ enum Trigger {
 }
 
 /// What happened when a schedule fell due or was called. Saved in each
-/// occurrence as its [`Outcome::text`], which the app shows as written.
+/// occurrence as its [`Outcome::text`], which the app shows as written, and its [`OutcomeKind`].
 #[derive(Clone, Debug, PartialEq)]
 enum Outcome {
     Reserved,
@@ -889,9 +954,24 @@ impl Outcome {
         }
     }
 
-    /// Whether a saved outcome reported a monitor that could not be read.
-    fn needs_attention(text: &str) -> bool {
-        text.starts_with(ATTENTION)
+    fn kind(&self) -> OutcomeKind {
+        match self {
+            Self::Reserved => OutcomeKind::Reserved,
+            Self::Started => OutcomeKind::Started,
+            Self::FailedToStart(_) => OutcomeKind::FailedToStart,
+            Self::SignedOut => OutcomeKind::SignedOut,
+            Self::Overlap => OutcomeKind::Overlap,
+            Self::Busy => OutcomeKind::Busy,
+            Self::Missed => OutcomeKind::Missed,
+            Self::Paused => OutcomeKind::Paused,
+            Self::Starting => OutcomeKind::Starting,
+            Self::Invalid(_) => OutcomeKind::Invalid,
+            Self::MonitorAttention(_) => OutcomeKind::MonitorAttention,
+            Self::Unrelated => OutcomeKind::Unrelated,
+            Self::Baseline => OutcomeKind::Baseline,
+            Self::Unchanged => OutcomeKind::Unchanged,
+            Self::ChangeDetected => OutcomeKind::ChangeDetected,
+        }
     }
 }
 
@@ -908,6 +988,7 @@ fn record(
         due_at,
         run_id,
         outcome: outcome.text(),
+        kind: Some(outcome.kind()),
     };
     push(current, event);
 }

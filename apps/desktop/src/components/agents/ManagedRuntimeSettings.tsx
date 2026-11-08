@@ -1,6 +1,6 @@
 import { Button, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';

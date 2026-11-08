@@ -2,7 +2,7 @@ import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
 import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { navigateWorkspace, openHelperDraft } from '../../lib/app-events';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import {
   helperPreferencePatch,
   helperTheme,
@@ -22,7 +22,7 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { helperView } from '../layout/navigation';
+import { helperView } from '../../lib/navigation';
 import { ActionError } from '../ui/ActionError';
 
 const labels: Record<string, string> = {
@@ -214,7 +214,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         await invokeNative('helper_action', {
           id: action.id,
           decision: 'failed',
-          result: { error: String(cause) },
+          result: { error: describeError(cause) },
         }).catch(() => {});
     } finally {
       setBusy(false);

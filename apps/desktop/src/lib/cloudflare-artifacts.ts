@@ -138,7 +138,6 @@ export async function createArtifactsProject(
         name: created.project.name,
         path: created.project.path,
         ...projectGitState(created.project),
-        agentProvider: 'codex' as const,
         worktrees: [],
       };
   return {

@@ -69,20 +69,23 @@ const within = (statuses: readonly RunStatus[]) => {
   return (value: HasStatus) => set.has(statusOf(value));
 };
 
+// Same names and sets as `RunStatus` in apps/desktop/src-tauri/src/cli/protocol.rs;
+// test/run-status.json holds the truth table both sides check.
+
 /** The agent process is starting, working or being stopped. */
 export const isActive = within(['starting', 'running', 'stopping']);
-/** Preparing or working, and not being stopped. */
-export const isWorking = within(['starting', 'running']);
+/** Active and not being stopped, so the agent can still act. */
+export const isRunning = within(['starting', 'running']);
 /** Active, or cut off by an app restart and able to resume. */
 export const isLive = within(['starting', 'running', 'stopping', 'interrupted']);
 /** The attempt produced a result to review. */
-export const isFinished = within(['review', 'reviewed']);
-/** The attempt ended without a result. */
-export const isUnfinished = within(['failed', 'stopped', 'interrupted']);
-/** The attempt ended and will not resume: a result, a failure or a stop. */
-export const isSettled = within(['review', 'reviewed', 'failed', 'stopped']);
-/** An attempt that ended without finishing can be tried again from the same task. */
-export const canRetry = (run: HasStatus) => isUnfinished(run);
+export const isDone = within(['review', 'reviewed']);
+/** Ended for good: a result, a failure or a stop. */
+export const isTerminal = within(['review', 'reviewed', 'failed', 'stopped']);
+/** Ended without a result, so it can be tried again from the same task. */
+export const isRetryable = within(['failed', 'stopped', 'interrupted']);
+/** Ended without a result and without being stopped on purpose: the person should look. */
+export const needsAttention = within(['failed', 'interrupted']);
 
 export const statusLabel: Record<RunStatus, string> = {
   starting: 'Preparing workspace',

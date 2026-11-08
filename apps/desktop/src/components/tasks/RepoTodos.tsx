@@ -40,7 +40,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import './repo-todos.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function RepoTodos({
   onOpenProject,

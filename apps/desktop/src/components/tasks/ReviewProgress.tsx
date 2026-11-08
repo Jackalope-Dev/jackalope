@@ -1,6 +1,6 @@
 import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import { ActionError } from '../ui/ActionError';
 import { ChangedFiles } from './ChangedFiles';

@@ -8,8 +8,8 @@ import { useHelperStore } from '../../stores/helperStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { HelperAction } from './HelperAction';
 import './helper.css';
-import { describeError } from '../../lib/errors';
-import { useAction } from '../../lib/useAction';
+import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
 
 const Markdown = lazy(() => import('../tasks/TaskMarkdown'));
 async function openLink(url: string) {

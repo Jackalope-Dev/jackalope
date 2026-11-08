@@ -12,9 +12,12 @@ import {
 } from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { connectionSupport } from '../../lib/agent-capabilities';
-import { builtinAgents } from '../../lib/agent-catalog';
-import { agentNames, MCP_SIGN_IN_AGENTS } from '../../lib/agents';
+import {
+  agentNames,
+  builtinAgents,
+  connectionSupport,
+  MCP_SIGN_IN_AGENTS,
+} from '../../lib/agent-catalog';
 import type { McpServerConfig } from '../../lib/mcp-client';
 import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-connection';
 import { mcpEndpointError } from '../../lib/mcp-endpoint';
@@ -22,6 +25,7 @@ import { useMcpStore } from '../../stores/mcpStore';
 import { useActiveProject } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import type { SavedMcpConnection } from './McpConnectionResult';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function McpConnectionForm({
   initial,
@@ -187,7 +191,7 @@ export function McpConnectionForm({
       }
       onSaved({ server, agentSignIn });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(describeError(cause));
     } finally {
       setChecking(false);
       setBusy(false);

@@ -38,7 +38,7 @@ import { ComputerViewer } from './ComputerViewer';
 import { IdleStopSelect } from './IdleStopSelect';
 import '../settings/settings.css';
 import './computers.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { PairMachineForm } from './PairMachineForm';
 
 type Kind = 'none' | 'local-docker' | 'remote-machine' | 'agent37';

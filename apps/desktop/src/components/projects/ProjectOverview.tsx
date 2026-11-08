@@ -39,7 +39,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './project-overview.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { projectReadiness, type Readiness } from '../../lib/readiness';
 
 export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }) {

@@ -2,7 +2,7 @@ import { InlineNotice } from '@jackalope/ui';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { RunUsage } from '../../lib/run-types';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { useNativeResource } from '../../hooks/useNativeResource';
 
 export interface JevConnectionTotals {
   calls: number;

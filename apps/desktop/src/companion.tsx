@@ -4,6 +4,7 @@ import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RemoteWorkspace } from './components/remote/RemoteWorkspace';
+import { describeError } from '@jackalope/contracts/errors';
 import './index.css';
 import '@jackalope/ui/styles.css';
 import './components/tasks/task-workspace.css';
@@ -120,7 +121,7 @@ function Companion() {
                 setError('Connected for this visit. This browser could not save the pairing.');
               }
             } catch (cause) {
-              if (attempt === pairingAttempt.current) setError(String(cause));
+              if (attempt === pairingAttempt.current) setError(describeError(cause));
             } finally {
               if (attempt === pairingAttempt.current) setBusy(false);
             }

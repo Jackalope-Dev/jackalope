@@ -6,7 +6,7 @@ import {
   knowledgeFiles,
   knowledgeGuides,
 } from '../../../packages/knowledge/src/index.ts';
-import { helperView, WORKSPACE_VIEWS } from '../src/components/layout/navigation.ts';
+import { helperView, WORKSPACE_VIEWS } from '../src/lib/navigation.ts';
 import { helperPreferencePatch, helperTheme, sameHelperValue } from '../src/lib/helper-actions.ts';
 import destinations from '../src/lib/helper-destinations.json' with { type: 'json' };
 

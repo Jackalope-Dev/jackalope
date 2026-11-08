@@ -19,7 +19,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { type ReviewAnchor, type ReviewComment, reviewFeedback } from '../../lib/review-feedback';
 import { useReviewFeedbackStore } from '../../stores/reviewFeedbackStore';
 import './review-feedback.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 const FeedbackContext = createContext<{
@@ -209,7 +209,7 @@ export function ReviewFeedback({
                   setEditing(null);
                   setError('');
                 } catch (cause) {
-                  setError(`Could not save this comment: ${String(cause)}`);
+                  setError(`Could not save this comment: ${describeError(cause)}`);
                 }
               }}
             >

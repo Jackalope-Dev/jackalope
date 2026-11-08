@@ -27,16 +27,17 @@ import {
   reviewState,
   taskReviews,
 } from '../../lib/agent-review';
-import { agentAdapter } from '../../lib/agents';
+import { agentAdapter } from '../../lib/agent-catalog';
 import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
 import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { stopTask } from '../../lib/task-client';
 import { ActionError } from '../ui/ActionError';
 
@@ -92,7 +93,7 @@ export function AgentReview({
           projectName: run.projectName,
           projectPath: run.projectPath,
           agent,
-          agentProfileId: agentAccountFor(project, agentAdapter(agent)),
+          agentProfileId: agentAccountFor(project, agentAdapter(agent, useAgentConfigStore.getState().customAgents)),
           prompt: '',
           isolated: true,
           targetBranch: run.targetBranch ?? project?.preferences?.baseBranch,

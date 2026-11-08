@@ -10,7 +10,7 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { agent37Status, agent37Usage, setAgent37Key } from '../../lib/computers';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { ActionError } from '../ui/ActionError';
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { hostLoad, type ProjectHosts, projectHosts } from '../../lib/computers';
 import { isTauriEnvironment } from '../../lib/native/env';
 import './computers.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 /** How often an open capacity summary re-reads the pool. */
 const REFRESH_MS = 5000;

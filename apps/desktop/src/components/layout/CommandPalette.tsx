@@ -1,11 +1,11 @@
 import { PRESET_THEMES, withPreset } from '@jackalope/brand/theme';
-import { isSettled } from '@jackalope/contracts/runs';
+import { isTerminal } from '@jackalope/contracts/runs';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { emitAppEvent } from '../../lib/app-events';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { searchFiles } from '../../lib/file-search';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -21,7 +21,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type Command, type CommandContext, matchingCommands } from './commands';
-import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
+import { type ActiveTab, WORKSPACE_VIEWS } from '../../lib/navigation';
 
 const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
 
@@ -97,7 +97,7 @@ export function CommandPalette({
         { label: taskDecision(current).action, section: taskDecision(current).section },
         { label: 'Open conversation', section: 'result' },
         { label: 'Open task terminal and workspace tools', section: 'terminal' },
-        ...(isSettled(current)
+        ...(isTerminal(current)
           ? [
               { label: 'Try result', section: 'preview' },
               { label: 'Review changes and checks', section: 'changes' },

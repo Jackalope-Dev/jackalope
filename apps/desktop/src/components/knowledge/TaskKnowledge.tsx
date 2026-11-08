@@ -15,7 +15,7 @@ import type { ContextReceipt, ContextSelection } from '../../lib/knowledge-types
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import './task-knowledge.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function TaskKnowledge({
   projectId,

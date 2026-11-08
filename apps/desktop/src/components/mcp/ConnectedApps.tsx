@@ -33,7 +33,7 @@ import { useMcpStore } from '../../stores/mcpStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './connected-apps.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 const DASHBOARD = 'https://dashboard.composio.dev';

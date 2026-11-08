@@ -16,7 +16,7 @@ import type {
   ModelEvidence,
   DecisionOptions as Options,
 } from '../../lib/decisions';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 
 const helpers = [

@@ -29,7 +29,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import {
   archiveWorktree,
   cleanupWorktree,
@@ -44,7 +44,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -94,7 +94,6 @@ function displayPath(path: string, root?: string) {
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
   const {
-    projects,
     activeProjectId,
     loadWorktreesForActiveProject,
     spawnTaskWorktree,
@@ -103,7 +102,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     worktreesError,
   } = useProjectStore(
     useShallow((s) => ({
-      projects: s.projects,
       activeProjectId: s.activeProjectId,
       loadWorktreesForActiveProject: s.loadWorktreesForActiveProject,
       spawnTaskWorktree: s.spawnTaskWorktree,
@@ -112,7 +110,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       worktreesError: s.worktreesError,
     })),
   );
-  const project = projects.find((p) => p.id === activeProjectId);
+  const project = useActiveProject();
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');
   const [branch, setBranch] = useState<string | null>(null);
@@ -230,7 +228,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       if (projectId.current === id) setFeedback(`Removed ${name}.`);
     } catch (cause) {
       if (projectId.current === id)
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(describeError(cause));
     } finally {
       if (projectId.current === id) {
         setProgress('Rechecking the other worktrees…');
@@ -278,13 +276,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           await cleanupWorktree(project.path, worktree);
           removed++;
         } catch (cause) {
-          failures.push(`${worktree.branch || worktree.path}: ${String(cause)}`);
+          failures.push(`${worktree.branch || worktree.path}: ${describeError(cause)}`);
         }
       }
       if (failures.length && projectId.current === id) setError(failures.join('\n'));
     } catch (cause) {
       if (projectId.current === id)
-        setError(`Cleanup stopped. ${cause instanceof Error ? cause.message : String(cause)}`);
+        setError(`Cleanup stopped. ${describeError(cause)}`);
     } finally {
       if (projectId.current === id) {
         setFeedback(`Removed ${removed} of ${candidates.length} worktrees.`);
@@ -311,7 +309,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         );
     } catch (cause) {
       if (projectId.current === id)
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(describeError(cause));
     } finally {
       if (projectId.current === id) await refresh();
       setBusy(false);
@@ -331,7 +329,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         await removeWorktreeOrphan(project.path, folder);
         removed++;
       } catch (cause) {
-        failures.push(`${folder.name}: ${cause instanceof Error ? cause.message : String(cause)}`);
+        failures.push(`${folder.name}: ${describeError(cause)}`);
       }
     }
     if (projectId.current === id) {

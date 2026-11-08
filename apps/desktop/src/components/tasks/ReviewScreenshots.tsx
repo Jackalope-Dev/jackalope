@@ -5,7 +5,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { capturedPages, capturePageName, type ReviewCaptures } from '../../lib/review-captures';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 import './review-screenshots.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 type Mode = 'slider' | 'side';
 

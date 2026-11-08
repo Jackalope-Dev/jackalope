@@ -59,8 +59,8 @@ import { SessionRecovery } from './SessionRecovery';
 import { SessionTopics } from './SessionTopics';
 import { TranscriptResult } from './TranscriptResult';
 import './live-session.css';
-import { describeError } from '../../lib/errors';
-import { useAction } from '../../lib/useAction';
+import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
 
 const TaskTerminal = lazy(() =>
   import('../tasks/TaskTerminal').then((module) => ({ default: module.TaskTerminal })),

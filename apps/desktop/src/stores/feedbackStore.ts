@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface FeedbackView {
   enabled: boolean;
@@ -56,7 +57,7 @@ export const useFeedbackStore = create<State>((set) => ({
         return view;
       } catch (error) {
         set((state) => ({
-          error: String(error),
+          error: describeError(error),
           view: state.view ? { ...state.view, eligible: false } : null,
         }));
         return null;

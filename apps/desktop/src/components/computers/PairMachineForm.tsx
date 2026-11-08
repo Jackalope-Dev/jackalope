@@ -2,8 +2,8 @@ import { Button, CopyButton, FormField, Input } from '@jackalope/ui';
 import { useState } from 'react';
 import { addCloudMachine, type CloudMachine, cloudMachines } from '../../lib/computers';
 import './computers.css';
-import { describeError } from '../../lib/errors';
-import { useNativeResource } from '../../lib/useNativeResource';
+import { describeError } from '@jackalope/contracts/errors';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import { ActionError } from '../ui/ActionError';
 
 /** The tag of an image built from resources/computer on the machine itself. */

@@ -4,7 +4,7 @@ import { providerLabel, type SwarmHosts, setProjectHosts } from '../../lib/compu
 import { isTauriEnvironment } from '../../lib/native/env';
 import { HostCapacity, useProjectHosts } from './HostCapacity';
 import './computers.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 const CHOICES: { value: SwarmHosts; title: string; description: string }[] = [
   {

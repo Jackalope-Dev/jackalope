@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
+import { describeError } from '../lib/errors.ts';
 
 export interface ReleaseStatus {
   currentVersion: string;
@@ -113,7 +114,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         });
         await get().load();
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ changingChannel: false });
       }
@@ -165,7 +166,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         );
         if (availableUpdateId(get().release) === version) set({ downloadedVersion: version });
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ downloading: false, downloadProgress: null });
       }
@@ -178,7 +179,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         try {
           set({ release: await bridge.status(false), error: null });
         } catch (error) {
-          set({ error: String(error) });
+          set({ error: describeError(error) });
         }
       })();
       try {
@@ -207,7 +208,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
           set({ downloadedVersion: null });
         if (get().autoDownload) void get().download();
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ checking: false });
       }
@@ -234,7 +235,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
           set({ installed: true, release: { ...state.release, storeUpdateAvailable: false } });
         }
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ installing: false, progress: null });
       }

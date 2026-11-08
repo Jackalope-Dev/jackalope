@@ -28,6 +28,7 @@ import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { ActionError } from '../ui/ActionError';
 import { WorkCatchUp } from './WorkCatchUp';
+import { describeError } from '@jackalope/contracts/errors';
 
 const ManagedTaskView = lazy(() =>
   import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),
@@ -187,7 +188,7 @@ export function TaskWorkspace({
           useTaskStore.getState().setArchived(item.idea.id, archive);
         }
       } catch (cause) {
-        failures.push(`${item.title}: ${String(cause)}`);
+        failures.push(`${item.title}: ${describeError(cause)}`);
       }
     }
     await useExecutionStore.getState().refresh();

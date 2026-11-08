@@ -2,7 +2,7 @@ import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/
 import { CloudUpload, Rocket } from 'lucide-react';
 import { useState } from 'react';
 import { DEPLOY_OUTCOME, type DeployStatus, deployAgain } from '../../lib/deploy';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ago } from '../../lib/swarm';
 import { ActionError } from '../ui/ActionError';
 

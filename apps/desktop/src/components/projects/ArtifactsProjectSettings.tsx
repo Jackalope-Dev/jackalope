@@ -23,7 +23,7 @@ import {
   suggestRepoName,
   validRepoName,
 } from '../../lib/cloudflare-artifacts';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ArtifactsConnectForm, ArtifactsTitle } from '../settings/ArtifactsConnection';
 import { FirstCommit } from './FirstCommit';
 

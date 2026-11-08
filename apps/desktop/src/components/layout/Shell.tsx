@@ -11,11 +11,11 @@ import {
   useState,
 } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
-import { navigateWorkspace, openSettings, useAppEvent } from '../../lib/app-events';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -59,7 +59,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { ComposerSeed } from '../sessions/SessionStart';
-import type { SettingsCategory } from '../settings/categories';
+import type { SettingsCategory } from '../../lib/settings-categories';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 
@@ -80,12 +80,11 @@ import {
   PRIMARY_VIEWS,
   viewLabel,
   workspaceView,
-} from './navigation';
+} from '../../lib/navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 import { VIEW_PAGES, type ViewContext } from './workspace-views';
 
-export type { ActiveTab } from './navigation';
 
 // The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
 const SIDEBAR_WIDTH = 248;
@@ -273,8 +272,6 @@ export function Shell({
       selectProject: s.selectProject,
     })),
   );
-  useTauriEvent('jackalope-tray-new-task', () => focusComposer());
-  useTauriEvent('jackalope-tray-settings', () => openSettings('General'));
   // `/diff` in the terminal: open Changes on that checkout, in its project.
   useTauriEvent<string>('jackalope:open-changes', (path) => {
     const owner = useProjectStore
@@ -348,7 +345,7 @@ export function Shell({
     } else openRun(run.id);
     setActiveTab('kanban');
   }, [workRequest, selectProject]);
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   const swarmConfigured = useSwarmConfigured();
   const navigate = useCallback((tab: ActiveTab) => {
     const settings = workspaceView(tab).settings;
@@ -379,7 +376,6 @@ export function Shell({
   const navWidth = useWorkViewStore((state) => state.sizes.sidebar);
   const workScope = useWorkViewStore((state) => state.scope);
   const shortcut = displayShortcut(shortcuts.search);
-  const terminalProject = useActiveProject();
   const remoteHost = useHostContextStore((state) => state.host);
   const toggleSettings = () =>
     activeTab === 'preferences' ? setActiveTab(previousView.current) : navigate('preferences');
@@ -389,7 +385,7 @@ export function Shell({
     openSettings: () => navigate('preferences'),
     toggleSettings,
     toggleSidebar: () => useWorkViewStore.getState().toggleNav(),
-    terminalProject: remoteHost ? undefined : terminalProject,
+    terminalProject: remoteHost ? undefined : project,
   };
   const [commandError, setCommandError] = useState('');
   const runCommand = (command: Command, shortcut = false) => {

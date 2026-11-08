@@ -12,7 +12,7 @@ import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { completeProviderProfile } from '../../lib/agent-profiles';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { ActionError } from '../ui/ActionError';

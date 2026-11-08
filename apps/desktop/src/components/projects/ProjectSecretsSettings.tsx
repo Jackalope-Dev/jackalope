@@ -22,7 +22,7 @@ import {
   setProjectSecret,
 } from '../../lib/project-secrets';
 import './project-secrets.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 
 const AVAILABILITY: { value: SecretAvailability; title: string; description: string }[] = [
   { value: 'both', title: 'All agents', description: 'On this device and on computers.' },

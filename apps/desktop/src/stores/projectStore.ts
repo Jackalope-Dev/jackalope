@@ -8,6 +8,7 @@ import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
+import { describeError } from '../lib/errors.ts';
 
 export interface ProjectPreferences {
   preferredRunner?: string;
@@ -108,7 +109,8 @@ export interface Project {
   /** Sidebar icon key from ProjectMark's set; the initial shows when unset. */
   icon?: string;
   preferences?: ProjectPreferences;
-  agentProvider: 'codex' | 'grok' | 'claude-code' | 'openhands' | 'ollama' | 'antigravity';
+  /** Written by earlier versions and kept in saved projects; nothing reads it. */
+  agentProvider?: string;
 }
 
 interface ProjectState {
@@ -278,7 +280,7 @@ export const useProjectStore = create<ProjectState>()(
         } catch (e) {
           if (request === worktreeRequest && get().activeProjectId === active.id) {
             set({
-              worktreesError: e instanceof Error ? e.message : String(e),
+              worktreesError: describeError(e),
             });
           }
         } finally {
@@ -296,7 +298,7 @@ export const useProjectStore = create<ProjectState>()(
           await get().loadWorktreesForActiveProject();
           return { ok: true, entry };
         } catch (e) {
-          const error = e instanceof Error ? e.message : String(e);
+          const error = describeError(e);
           console.error('Failed to spawn worktree', e);
           return { ok: false, error };
         }
@@ -421,7 +423,6 @@ export async function mergeProjectRegistry() {
         path: ordinaryProjectPath(record.path),
         gitBranch: '',
         worktrees: [],
-        agentProvider: 'codex',
       }));
     if (added.length) {
       useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));

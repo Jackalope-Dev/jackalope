@@ -1,7 +1,7 @@
 import { useAgentConfigStore } from '../stores/agentConfigStore.ts';
 import { useBotStore } from '../stores/botStore.ts';
 import { agentAccountFor, useProjectStore } from '../stores/projectStore.ts';
-import { agentAdapter } from './agents.ts';
+import { agentAdapter } from './agent-catalog.ts';
 import { hubDirectory, observeBotHub } from './bot-hub.ts';
 import { isTauriEnvironment } from './native/env.ts';
 import { invokeNative } from './native/transport.ts';

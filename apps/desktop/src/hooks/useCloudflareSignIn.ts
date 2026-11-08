@@ -3,12 +3,14 @@ import {
   beginCloudflareSignIn,
   cancelCloudflareSignIn,
   completeCloudflareSignIn,
-} from './cloudflare-artifacts';
-import { openExternalUrl } from './native/env';
+} from '../lib/cloudflare-artifacts';
+import { errorCode } from '@jackalope/contracts/errors';
+import { openExternalUrl } from '../lib/native/env';
 
 /**
  * Connect Cloudflare in the browser: open the consent page and wait for it to return the
- * shared accounts. Unmounting while waiting cancels the native listener.
+ * shared accounts. Resolves `null` when the sign-in was canceled, by a newer sign-in or by
+ * unmounting while waiting, which also cancels the native listener.
  */
 export function useCloudflareSignIn() {
   const waiting = useRef(false);
@@ -28,6 +30,9 @@ export function useCloudflareSignIn() {
       onConsentPage?.(url);
       await openExternalUrl(url);
       return await completeCloudflareSignIn();
+    } catch (cause) {
+      if (errorCode(cause) === 'canceled') return null;
+      throw cause;
     } finally {
       waiting.current = false;
     }

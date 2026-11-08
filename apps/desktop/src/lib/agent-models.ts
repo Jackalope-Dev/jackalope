@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModelEvidence } from './decisions';
 import { isTauriEnvironment } from './native/env';
 import { invokeNative } from './native/transport';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface ModelCatalog {
   models: { id: string; name: string; isDefault: boolean; metadata?: ModelEvidence }[];
@@ -42,7 +43,7 @@ export function useAgentModels(agentId: string, revision = 0, agentProfileId?: s
         }
       } catch (cause) {
         if (version === request.current) {
-          setError(String(cause));
+          setError(describeError(cause));
           setLoadedKey(key);
         }
       } finally {

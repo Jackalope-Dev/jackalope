@@ -1,6 +1,6 @@
 import { DefinitionList, Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { learningMetricRows, type LearningMetrics as Metrics } from '../../lib/learning';
 import { invokeNative } from '../../lib/native/transport';
 

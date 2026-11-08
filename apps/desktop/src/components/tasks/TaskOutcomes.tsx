@@ -12,7 +12,7 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
 import {

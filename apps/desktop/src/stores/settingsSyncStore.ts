@@ -12,6 +12,7 @@ import {
 } from '../lib/settings-sync';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
+import { describeError } from '@jackalope/contracts/errors';
 
 interface SyncState {
   available: boolean;
@@ -77,7 +78,7 @@ export const useSettingsSyncStore = create<SyncState>()(
         } catch (error) {
           if (generation === epoch)
             set({
-              error: `Could not delete saved settings. Retry Delete synced settings when online. ${String(error)}`,
+              error: `Could not delete saved settings. Retry Delete synced settings when online. ${describeError(error)}`,
             });
         } finally {
           if (generation === epoch) set({ busy: false });
@@ -98,7 +99,7 @@ export const useSettingsSyncStore = create<SyncState>()(
           set({ enabled: view.enabled, available: view.available });
           paused = false;
         } catch (error) {
-          if (generation === epoch) set({ error: String(error) });
+          if (generation === epoch) set({ error: describeError(error) });
         } finally {
           if (generation === epoch) set({ busy: false });
         }
@@ -170,7 +171,7 @@ export const useSettingsSyncStore = create<SyncState>()(
               set({ base: remote.settings, lastSynced: Date.now() });
             }
           } catch (error) {
-            if (generation === epoch) set({ error: String(error) });
+            if (generation === epoch) set({ error: describeError(error) });
           } finally {
             if (generation === epoch) set({ busy: false });
           }
@@ -224,7 +225,7 @@ export const useSettingsSyncStore = create<SyncState>()(
             set({ base: result.settings, conflict: null, lastSynced: Date.now() });
           }
         } catch (error) {
-          if (generation === epoch) set({ error: String(error) });
+          if (generation === epoch) set({ error: describeError(error) });
         } finally {
           if (generation === epoch) set({ busy: false });
         }

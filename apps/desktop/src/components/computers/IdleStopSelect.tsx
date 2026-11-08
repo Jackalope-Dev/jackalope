@@ -2,7 +2,7 @@ import { Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
 import { type ComputerStatus, IDLE_STOP_CHOICES, setComputerIdleStop } from '../../lib/computers';
 import './computers.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 
 /** When an unused local sandbox stops. Applies at once. */

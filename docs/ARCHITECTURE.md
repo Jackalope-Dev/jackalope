@@ -44,10 +44,11 @@ uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integr
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
 Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
 and MCP connections and marketplace. Workspace views are registered once in
-layout/navigation.ts (label, group, icon, telemetry feature, search keywords) with
+lib/navigation.ts (label, group, icon, telemetry feature, search keywords) with
 their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
 read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
-command search and the shortcut sheet live in layout/commands.ts. Work is read through
+command search and the shortcut sheet live in layout/commands.ts; the tray and macOS
+menu items name their command in layout/menu-actions.json, which the native menus read. Work is read through
 lib/work-selection.ts (`useWorkspaceWork`, `useAllRuns`) and opened with `openWork`,
 `openRun` or `openConversation`, which clear the other selections and focus the
 project. Zustand stores keep
@@ -226,7 +227,7 @@ Subscribe to native events with hooks/useTauriEvent. Requests between parts of a
 window (navigate, open settings or the Agents page, open a helper draft, attach to the
 composer, changes or feedback saved) are typed events in lib/app-events: send them with
 its helpers or emitAppEvent and listen with useAppEvent. Settings categories, their
-groups, icons and search words are one registry in components/settings/categories.ts;
+groups, icons and search words are one registry in lib/settings-categories.ts;
 the in-app helper's page names are lib/helper-destinations.json, which the native
 helper validates against and workspace views name with `helper`. The mascot's mood is
 derived in stores/mascotStore from activity sources (running work, a requested

@@ -1,4 +1,4 @@
-import { isActive, isFinished, isUnfinished, statusLabel } from '@jackalope/contracts/runs';
+import { isActive, isDone, isRetryable, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -29,7 +29,6 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ownerComputer } from '../../lib/computers';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
 import {
   type QueueCommand,
   type QueueItem,
@@ -37,6 +36,7 @@ import {
   queueCommand,
   queueSnapshot,
 } from '../../lib/queue';
+import { stopTask } from '../../lib/task-client';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
@@ -49,8 +49,8 @@ import { FeaturePlanner } from './FeaturePlanner';
 import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
-import { describeError } from '../../lib/errors';
-import { useAction } from '../../lib/useAction';
+import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
 import { ActionError } from '../ui/ActionError';
 
 const emptyQueue: QueueView = {
@@ -128,18 +128,15 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   }, [desktop, setError]);
   const items = queue.items.filter((i) => i.projectId === project.id && !i.canceled);
   const enabled = queue.enabledProjects.includes(project.id);
-  const act = async (command: QueueCommand | 'task_stop', args: Record<string, unknown>) => {
-    await runAction(() =>
-      command === 'task_stop' ? invokeNative(command, args) : queueCommand(command, args),
-    );
-  };
+  const act = (command: QueueCommand, args: Record<string, unknown>) =>
+    runAction(() => queueCommand(command, args));
   const state = (item: QueueItem) => {
     const original = runs.find((r) => r.id === item.runId);
     const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
     if (item.runId && queue.mergedRunIds.includes(item.runId)) return 'merged';
-    if (item.error || run?.dependencyInvalidated || (run && isUnfinished(run))) return 'attention';
+    if (item.error || run?.dependencyInvalidated || (run && isRetryable(run))) return 'attention';
     if (run && isActive(run)) return 'active';
-    if (run && isFinished(run)) return 'review';
+    if (run && isDone(run)) return 'review';
     if (item.runId) return 'attention';
     return 'queued';
   };
@@ -474,7 +471,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                                 {run && isActive(run) ? (
                                   <Menu.Item
                                     className="workspace-menu-item"
-                                    onSelect={() => void act('task_stop', { id: run.id })}
+                                    onSelect={() => void runAction(() => stopTask(run.id))}
                                   >
                                     Stop agent
                                   </Menu.Item>

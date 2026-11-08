@@ -26,7 +26,7 @@ import {
   stopComputer,
   testCloudMachine,
 } from '../../lib/computers';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { Agent37Settings } from '../computers/Agent37Connect';
 import { AgentSignIns } from '../computers/AgentSignIns';

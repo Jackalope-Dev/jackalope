@@ -24,7 +24,7 @@ import {
   routingSettings,
 } from '../../lib/routing-settings';
 import './routing.css';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { DecisionOptions } from './DecisionOptions';
 
 function RoutingCircuit({ mode }: { mode: RoutingMode }) {

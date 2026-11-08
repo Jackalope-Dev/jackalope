@@ -8,7 +8,7 @@ import {
 } from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { openKnowledgeTask, prepareLessonCheck, useKnowledge } from '../../lib/knowledge';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import {
@@ -359,7 +359,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                         await navigator.clipboard.writeText(entry.content);
                         setActionError('');
                       } catch (cause) {
-                        setActionError(`Could not copy workflow: ${String(cause)}`);
+                        setActionError(`Could not copy workflow: ${describeError(cause)}`);
                       }
                     }}
                   >

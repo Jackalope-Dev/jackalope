@@ -21,8 +21,8 @@ import type { Project } from '../../stores/projectStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';
-import { isFinished } from '@jackalope/contracts/runs';
-import { describeError } from '../../lib/errors';
+import { isDone } from '@jackalope/contracts/runs';
+import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
 export function MergeReview({
   project,
@@ -70,7 +70,7 @@ export function MergeReview({
       (!onlyRunId || r.id === onlyRunId) &&
       (!onlyRunIds || onlyRunIds.includes(r.id)) &&
       r.projectId === project.id &&
-      isFinished(r) &&
+      isDone(r) &&
       r.workspace &&
       normalizePath(r.workspace) !== normalizePath(r.projectPath) &&
       !merged.includes(r.id) &&

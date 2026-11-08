@@ -18,9 +18,12 @@ export function returnToProject(
     queue,
   }: { ideas?: TaskTicket[]; sessions?: LiveSession[]; queue?: QueueView } = {},
 ) {
-  return collectWorkspaceWork(projectId, ideas, runs, sessions, integratedIds, false, queue).filter(
-    (item) => item.stage !== 'ideas' && item.stage !== 'finished',
-  );
+  return collectWorkspaceWork(projectId, runs, {
+    ideas,
+    sessions,
+    queue,
+    integratedRunIds: integratedIds,
+  }).filter((item) => item.stage !== 'ideas' && item.stage !== 'finished');
 }
 
 export function projectTaskPresence(item: WorkItem, runs: TaskRun[], queue: QueueView) {

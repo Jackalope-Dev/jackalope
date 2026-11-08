@@ -1,7 +1,7 @@
 import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
-import { describeError } from '../../lib/errors';
+import { describeError } from '@jackalope/contracts/errors';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';

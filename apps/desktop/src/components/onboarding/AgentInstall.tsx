@@ -11,6 +11,7 @@ import { pollSignIn, stopSignIn } from '../../lib/agent-profiles';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { openExternalUrl } from '../../lib/native/env';
 import { ManagedRuntimeProgress } from '../agents/ManagedRuntimeProgress';
+import { describeError } from '@jackalope/contracts/errors';
 
 type Run =
   | { kind: 'idle' }
@@ -75,7 +76,7 @@ export function AgentInstall({
     try {
       id = await startAgentInstall(agentId);
     } catch (cause) {
-      fail(String(cause));
+      fail(describeError(cause));
       return;
     }
     if (!alive.current) {
@@ -108,7 +109,7 @@ export function AgentInstall({
         return;
       } catch (cause) {
         session.current = null;
-        fail(String(cause));
+        fail(describeError(cause));
         return;
       }
     }
@@ -120,7 +121,7 @@ export function AgentInstall({
       await runner.prepare(false);
       await succeed();
     } catch (cause) {
-      fail(String(cause));
+      fail(describeError(cause));
     }
   };
 

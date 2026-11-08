@@ -2,7 +2,7 @@ import {
   durationLabel,
   elapsedLabel,
   isActive,
-  isFinished,
+  isDone,
   statusLabel,
 } from '@jackalope/contracts/runs';
 import {
@@ -17,7 +17,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Columns2, Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { getAgentMetadata } from '../../lib/agent-catalog';
+import { agentAdapter, getAgentMetadata } from '../../lib/agent-catalog';
 import {
   attemptLabel,
   buildCombinePrompt,
@@ -38,9 +38,9 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import { DismissButton } from '../ui/DismissButton';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
-import { agentAdapter } from '../../lib/agents';
 import { taskChangeStats } from '../../lib/task-client';
 import { ActionError } from '../ui/ActionError';
+import { describeError } from '@jackalope/contracts/errors';
 
 function duration(run: TaskRun) {
   if (run.durationMs != null) return durationLabel(run.durationMs / 1000);
@@ -173,7 +173,7 @@ function ComparisonDialog({
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === comparison.projectId),
   );
-  const finished = members.filter(isFinished);
+  const finished = members.filter(isDone);
   const judgeOptions = runners
     .filter((runner) => runner.available)
     .map((runner) => ({ id: runner.id, name: runner.name, adapter: adapter(runner.id) }));
@@ -191,7 +191,7 @@ function ComparisonDialog({
     .filter((attempt): attempt is LabelledAttempt => !!attempt);
   const labelFor = (taskId: string) =>
     attempts.find((attempt) => attempt.run.taskId === taskId)?.label;
-  const judgeDone = judgeRun && isFinished(judgeRun) ? judgeRun.id : '';
+  const judgeDone = judgeRun && isDone(judgeRun) ? judgeRun.id : '';
   const [fetched, setFetched] = useState<{ id: string; result: string }>();
   // Run summaries omit the final answer, so read the finished judge's full record once.
   useEffect(() => {
@@ -250,7 +250,7 @@ function ComparisonDialog({
       });
       setSkippedPorts(new Set());
     } catch (cause) {
-      setError(`The judge could not start. ${String(cause)}`);
+      setError(`The judge could not start. ${describeError(cause)}`);
     } finally {
       setJudging(false);
     }
@@ -301,7 +301,7 @@ function ComparisonDialog({
       try {
         await invokeNative('task_set_archived', { id: member.id, archived: true });
       } catch (cause) {
-        failures.push(`${name(member.agent)}: ${String(cause)}`);
+        failures.push(`${name(member.agent)}: ${describeError(cause)}`);
       }
     }
     useCompareStore.getState().choose(comparisonId, winner.taskId);
@@ -434,13 +434,13 @@ function ComparisonDialog({
                 >
                   Open
                 </Button>
-                <Button disabled={busy || !isFinished(member)} onClick={() => void keep(member)}>
+                <Button disabled={busy || !isDone(member)} onClick={() => void keep(member)}>
                   Keep this one
                 </Button>
                 {ports.length > 0 && (
                   <Button
                     variant="outline"
-                    disabled={busy || !isFinished(member)}
+                    disabled={busy || !isDone(member)}
                     onClick={() => void keep(member, ports)}
                   >
                     Keep and combine
