@@ -1480,7 +1480,7 @@ mod tests {
 
     #[test]
     fn checkpoints_and_single_commit_merge_enforce_all_attribution_modes() {
-        use crate::commands::project_git::{Attribution, CommitPolicy};
+        use crate::{cli_protocol::Attribution, commands::project_git::CommitPolicy};
         for attribution in [Attribution::User, Attribution::CoAuthor, Attribution::Agent] {
             let f = Fixture::new();
             let mut run = f.run(1, "feature.txt", "done\n");

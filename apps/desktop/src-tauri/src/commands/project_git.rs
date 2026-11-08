@@ -2,7 +2,7 @@ use super::repo::{self, Policy};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command};
 
-pub use crate::cli_protocol::Attribution;
+use crate::cli_protocol::Attribution;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,8 +28,10 @@ pub(super) fn read(path: &Path) -> Result<CommitPolicy, String> {
     .output()
     .map_err(|e| e.to_string())?;
     if output.status.success() {
-        return serde_json::from_slice(&output.stdout)
-            .map_err(|_| "Repair the project's commit settings before continuing.".into());
+        return serde_json::from_slice::<CommitPolicy>(&output.stdout)
+            .ok()
+            .filter(|policy| !matches!(policy.attribution, Attribution::Unknown(_)))
+            .ok_or_else(|| "Repair the project's commit settings before continuing.".into());
     }
     if output.status.code() != Some(1) {
         return Err("Cannot read this repository's commit settings.".into());
@@ -45,6 +47,9 @@ pub(super) fn read(path: &Path) -> Result<CommitPolicy, String> {
 
 impl CommitPolicy {
     pub(super) fn validate(&self) -> Result<(), String> {
+        if matches!(self.attribution, Attribution::Unknown(_)) {
+            return Err("Choose user, coAuthor or agent.".into());
+        }
         if self.attribution == Attribution::Agent {
             return Ok(());
         }
