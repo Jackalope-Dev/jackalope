@@ -28,10 +28,15 @@ pub struct MonitorChange {
 }
 
 impl ChangeMonitor {
+    /// Saved monitors are looked up in Git exactly as written and re-checked on
+    /// every tick, so this accepts every path earlier versions saved (a trailing
+    /// `/`, empty segments, surrounding spaces) and rejects only escapes.
     pub fn validate(&self) -> Result<(), String> {
-        let normalized = super::scope_path::ScopePath::parse(&self.path)
-            .filter(|path| !path.is_root() && path.as_str() == self.path);
-        if !self.path.is_empty() && normalized.is_none() {
+        if self.path.len() > 500
+            || self.path.contains(['\\', ':', '\0', '\n', '\r'])
+            || self.path.starts_with('/')
+            || self.path.split('/').any(|part| part == ".." || part == ".")
+        {
             return Err(
                 "Choose a tracked path relative to the project, using forward slashes.".into(),
             );
