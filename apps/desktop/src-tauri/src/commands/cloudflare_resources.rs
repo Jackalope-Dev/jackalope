@@ -869,6 +869,19 @@ pub struct Status {
     account_id: Option<String>,
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::cloudflare_resources::cloudflare_resources_status,
+            commands::cloudflare_resources::cloudflare_resources_provision,
+            commands::cloudflare_resources::cloudflare_resources_forget,
+            commands::cloudflare_resources::cloudflare_resources_delete,
+            commands::cloudflare_resources::cloudflare_resources_turnstile_secret,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn cloudflare_resources_status(
     project_path: String,

@@ -1187,6 +1187,25 @@ fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory
     prompt
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::live_sessions::live_session_snapshot,
+            commands::live_sessions::live_session_create,
+            commands::live_sessions::live_session_send,
+            commands::live_sessions::live_session_draft,
+            commands::live_sessions::live_session_action,
+            commands::live_sessions::live_session_window,
+            commands::live_sessions::live_session_topics,
+            commands::live_sessions::live_session_window_pin,
+            commands::live_sessions::live_session_review,
+            commands::live_sessions::live_session_recover,
+            commands::live_sessions::live_session_limits,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn live_session_snapshot(
     service: State<'_, LiveSessions>,

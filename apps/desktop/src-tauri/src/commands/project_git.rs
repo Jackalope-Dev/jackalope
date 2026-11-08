@@ -123,6 +123,15 @@ fn agent_identity(agent: &str) -> (String, String) {
     )
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::project_git::project_git_policy,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn project_git_policy(
     project_path: String,

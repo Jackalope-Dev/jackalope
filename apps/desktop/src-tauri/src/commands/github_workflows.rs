@@ -155,6 +155,15 @@ pub(super) fn inspect(path: &Path, kind: &str, value: &str) -> Result<WorkflowCo
     })
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::github_workflows::project_github_context,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn project_github_context(
     project_path: String,

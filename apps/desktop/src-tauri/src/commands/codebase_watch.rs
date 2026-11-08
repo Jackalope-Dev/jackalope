@@ -56,6 +56,16 @@ fn start_watch(root: &Path, on_change: impl Fn(bool) + Send + 'static) -> Result
     Ok(watcher)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::codebase_watch::codebase_watch,
+            commands::codebase_watch::codebase_unwatch,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn codebase_watch(app: tauri::AppHandle, repo_path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {

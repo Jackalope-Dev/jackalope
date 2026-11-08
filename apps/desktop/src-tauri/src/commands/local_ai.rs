@@ -188,6 +188,20 @@ fn digest(tags: &Value, model: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::local_ai::local_ai_inspect,
+            commands::local_ai::local_ai_install,
+            commands::local_ai::local_ai_pull,
+            commands::local_ai::local_ai_verify,
+            commands::local_ai::local_ai_connect,
+            commands::local_ai::local_ai_cancel,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn local_ai_inspect() -> Result<Value, String> {
     let hardware = tauri::async_runtime::spawn_blocking(hardware::inspect)

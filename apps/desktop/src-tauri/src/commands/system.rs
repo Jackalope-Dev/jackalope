@@ -77,6 +77,15 @@ fn account_full_name() -> Option<String> {
     None
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::system::system_get_info,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn system_get_info() -> Result<SystemInfo, String> {
     let (git_available, desktop_control) = tauri::async_runtime::spawn_blocking(|| {

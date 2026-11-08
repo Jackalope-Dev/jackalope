@@ -295,6 +295,20 @@ fn spawn_terminal(
     Ok(session)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_sign_in::agent_profile_sign_in,
+            commands::agent_sign_in::agent_profile_sign_in_poll,
+            commands::agent_sign_in::agent_profile_sign_in_input,
+            commands::agent_sign_in::agent_profile_sign_in_resize,
+            commands::agent_sign_in::agent_profile_sign_in_stop,
+            commands::agent_sign_in::agent_profile_status,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn agent_profile_sign_in(
     app: tauri::AppHandle,

@@ -239,6 +239,16 @@ pub(in crate::commands) fn ensure_first_commit(
     Ok(Some(note))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::first_commit::project_first_commit_preview,
+            commands::first_commit::project_first_commit,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// What a first commit would contain and who it would be attributed to.
 #[tauri::command]
 pub async fn project_first_commit_preview(

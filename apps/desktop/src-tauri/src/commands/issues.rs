@@ -122,6 +122,18 @@ fn jira(connection: &Connection, route: &str) -> Result<reqwest::RequestBuilder,
         .basic_auth(&connection.email, Some(&connection.token)))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::issues::project_issues,
+            commands::issues::issue_connections,
+            commands::issues::issue_connection_save,
+            commands::issues::issue_connection_remove,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn issue_connections(state: State<'_, TaskRuntime>) -> Result<Vec<Value>, String> {
     Ok(connections(&state)?.into_iter().map(|connection| json!({"provider":connection.provider,"site":connection.site,"email":connection.email})).collect())

@@ -1578,6 +1578,16 @@ fn override_prompt(
     override_answer(coordinator, &plan_id, &entry_id, answer)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_decider::plan_autonomy_override,
+            commands::agent_decider::task_prompt_override,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_prompt_override(
     run_id: String,

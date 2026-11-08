@@ -193,6 +193,21 @@ fn file_patch(path: &Path, file: &ChangedFile) -> Result<String, String> {
     Ok(patch)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::commit_review::git_working_changes,
+            commands::commit_review::git_working_file_diff,
+            commands::commit_review::git_generate_commit_message,
+            commands::commit_review::git_generate_pull_request,
+            commands::commit_review::git_commit_changes,
+            commands::commit_review::git_discard_changes,
+            commands::commit_review::git_push_changes,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn git_working_changes(
     repo_path: String,

@@ -317,6 +317,17 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::project_secrets::project_secrets,
+            commands::project_secrets::project_secret_set,
+            commands::project_secrets::project_secret_remove,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// A project's secrets: names, availability and save times only.
 #[tauri::command]
 pub async fn project_secrets(

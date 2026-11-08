@@ -199,6 +199,24 @@ fn complete_provider(root: &Path, id: &str, model: &str, activate: bool) -> Resu
     save(root, &manifest)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_profiles::agent_profile_list,
+            commands::agent_profiles::agent_profile_create,
+            commands::agent_profiles::agent_profile_set_config_dir,
+            commands::agent_profiles::agent_profile_save_key,
+            commands::agent_profiles::agent_profile_complete_provider,
+            commands::agent_profiles::agent_profile_rename,
+            commands::agent_profiles::agent_profile_delete,
+            commands::agent_profiles::agent_profile_set_active,
+            commands::agent_profiles::agent_profile_set_group,
+            commands::agent_profiles::agent_profile_set_tag,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn agent_profile_complete_provider(
     runtime: State<'_, TaskRuntime>,

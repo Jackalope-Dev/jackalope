@@ -923,6 +923,35 @@ fn blocking<T: Send + 'static>(
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::computers::computer_docker_status,
+            commands::computers::computer_list,
+            commands::computers::computer_status,
+            commands::computers::computer_configure,
+            commands::computers::computer_start,
+            commands::computers::computer_stop,
+            commands::computers::computer_delete,
+            commands::computers::computer_viewer,
+            commands::computers::computer_viewer_lease,
+            commands::computers::computer_idle_timeout,
+            commands::computers::computer_preferences,
+            commands::computers::computer_set_preferences,
+            commands::computers::computer_machines,
+            commands::computers::computer_machine_add,
+            commands::computers::computer_machine_test,
+            commands::computers::computer_machine_remove,
+            commands::computers::computer_agent_credentials,
+            commands::computers::computer_set_agent_credential,
+            commands::computers::computer_agent37,
+            commands::computers::computer_set_agent37_key,
+            commands::computers::computer_agent37_usage,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn computer_docker_status() -> Result<docker::DockerStatus, String> {
     blocking(|| Ok(docker::detect())).await

@@ -65,6 +65,16 @@ fn read_document(path: &Path) -> Result<Option<String>, String> {
     Ok(Some(content))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::repo_todos::repo_todos_read,
+            commands::repo_todos::repo_todos_save,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn repo_todos_read(project_path: String) -> Result<Vec<TodoDocument>, String> {
     tauri::async_runtime::spawn_blocking(move || {

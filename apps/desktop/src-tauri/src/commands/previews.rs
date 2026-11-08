@@ -101,6 +101,23 @@ fn view(preview: &mut Preview) -> Result<PreviewView, String> {
     Ok(result)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::previews::features::project_feature_suggestions,
+            commands::previews::features::project_feature_drift,
+            commands::previews::task_preview_start,
+            commands::previews::task_preview_status,
+            commands::previews::task_preview_stop,
+            commands::previews::task_preview_inspect,
+            commands::previews::task_preview_inspect_cancel,
+            commands::previews::design::task_preview_design_open,
+            commands::previews::design::task_preview_design_capture,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_preview_status(id: String) -> Result<Option<PreviewView>, String> {
     tauri::async_runtime::spawn_blocking(move || preview_status(id))

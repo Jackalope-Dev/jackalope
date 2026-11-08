@@ -84,6 +84,15 @@ fn measure(root: &Path, limit: usize, timeout: Duration) -> Result<DiskUsage, St
     Ok(result)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::worktree_usage::git_worktree_usage,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn git_worktree_usage(
     repo_path: String,

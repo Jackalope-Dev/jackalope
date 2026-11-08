@@ -284,6 +284,15 @@ fn current_snapshot(mut record: CapacityRecord, now: i64) -> CapacityRecord {
     record
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::capacity::capacity_snapshot,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn capacity_snapshot(
     service: State<'_, CapacityService>,

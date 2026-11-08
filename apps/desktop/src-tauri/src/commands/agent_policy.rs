@@ -309,6 +309,16 @@ impl TaskRuntime {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_policy::agent_save_policy,
+            commands::agent_policy::agent_probe_executable,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn agent_save_policy(
     policy: AgentPolicy,

@@ -39,6 +39,16 @@ pub(in crate::commands) fn list(project: &Path) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::project_files::project_files_list,
+            commands::project_files::project_file_open,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Tracked and untracked, non-ignored files, relative to the project root.
 #[tauri::command]
 pub async fn project_files_list(project_path: String) -> Result<Vec<String>, String> {

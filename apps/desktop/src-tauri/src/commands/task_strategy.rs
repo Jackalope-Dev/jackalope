@@ -640,6 +640,17 @@ pub(crate) fn assess(
     Ok(assessment)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::task_strategy::task_strategy_assess,
+            commands::task_strategy::task_strategy_cancel,
+            commands::task_strategy::task_strategy_history,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_strategy_assess(
     request: RunRequest,

@@ -331,6 +331,16 @@ fn inspect() -> CommandStatus {
     status
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::cli_install::cli_install_status,
+            commands::cli_install::cli_install_system,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn cli_install_status() -> CommandStatus {
     let mut status = inspect();

@@ -172,6 +172,30 @@ pub fn list(coordinator: &Coordinator, project_id: Option<&str>) -> Result<PlanL
     })
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::planning::plan_list,
+            commands::planning::plan_get,
+            commands::planning::plan_start,
+            commands::planning::plan_keep_planning,
+            commands::planning::plan_save,
+            commands::planning::plan_approve,
+            commands::planning::plan_replan,
+            commands::planning::plan_rounds,
+            commands::planning::plan_resolve_deviation,
+            commands::planning::plan_export,
+            commands::planning::plan_diff,
+            commands::planning::plan_revision,
+            commands::planning::plan_archive,
+            commands::planning::plan_settings_get,
+            commands::planning::plan_settings_set,
+            commands::planning::plan_create,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn plan_list(
     project_id: Option<String>,

@@ -209,6 +209,21 @@ fn connection(saved: &Saved) -> mcp::McpServerConfig {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::composio::composio_status,
+            commands::composio::composio_save_key,
+            commands::composio::composio_remove_key,
+            commands::composio::composio_catalog,
+            commands::composio::composio_accounts,
+            commands::composio::composio_authorize,
+            commands::composio::composio_disconnect,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn composio_status(state: State<'_, TaskRuntime>) -> Result<Status, String> {
     let saved = saved(&state)?;

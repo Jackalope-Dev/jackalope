@@ -383,6 +383,19 @@ fn save_rerun(runtime: &TaskRuntime, id: &str, rerun: &ChallengeRerun) -> Result
     super::history::write_atomic(&path, &bytes)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::challenge_review::task_start_challenge,
+            commands::challenge_review::task_start_agent_review,
+            commands::challenge_review::task_challenge_reply,
+            commands::challenge_review::task_challenge_rerun,
+            commands::challenge_review::task_challenge_reruns,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_start_challenge(
     request: RunRequest,

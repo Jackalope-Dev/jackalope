@@ -109,6 +109,18 @@ fn updater(
         .build()
         .map_err(|_| "Update settings unavailable.".into())
 }
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::release::app_diagnostics,
+            commands::release::app_release_status,
+            commands::release::app_install_update,
+            commands::release::app_download_update,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn app_release_status(
     app: AppHandle,

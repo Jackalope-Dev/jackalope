@@ -66,8 +66,10 @@ The webview owns the agent policy (stores/agentConfigStore.ts). The main window
 saves it to the native side on every change, and the transport saves it again
 before each command that reads it (task starts, discovery, queue creation and
 dispatch, schedules, Chat and others listed there), so no caller syncs by hand.
-Native commands
-are registered in src-tauri/src/lib.rs, the authoritative command inventory.
+Each native module
+lists its own commands in a `tauri_commands!` macro; src-tauri/src/lib.rs chains
+those lists into the one handler, and a test checks that every
+`#[tauri::command]` is registered exactly once.
 Every webview call goes through invokeNative in lib/native/transport.ts, which
 rejects in the browser preview and reports operation telemetry and timing;
 lib/native/env.ts detects the desktop app and opens links. lib/run-types.ts holds

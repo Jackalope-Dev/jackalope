@@ -1028,6 +1028,17 @@ fn with_earlier_attempts(sources: Vec<Vec<String>>, runs: &[TaskRun]) -> Vec<Str
     ids
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::integration::integration_prepare,
+            commands::integration::integration_apply,
+            commands::integration::integration_plans,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn integration_prepare(
     sessions: State<'_, super::live_sessions::LiveSessions>,

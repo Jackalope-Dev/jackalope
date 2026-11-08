@@ -41,6 +41,15 @@ fn stats(workspace: &Path, base: &str) -> Option<ChangeStats> {
     Some(result)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::change_stats::task_change_stats,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Change counts for the given attempts. Attempts without a readable workspace are omitted.
 #[tauri::command]
 pub async fn task_change_stats(

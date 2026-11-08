@@ -121,6 +121,16 @@ pub fn inspect(path: &str) -> Result<Readiness, String> {
     Ok(result)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::readiness::project_readiness,
+            commands::readiness::project_defaults,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn project_readiness(path: String) -> Result<Readiness, String> {
     tauri::async_runtime::spawn_blocking(move || inspect(&path))

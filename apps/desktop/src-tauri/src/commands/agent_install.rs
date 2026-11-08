@@ -85,6 +85,16 @@ fn install_command(agent: &str, npm: &Path) -> Result<CommandBuilder, String> {
     Ok(command)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_install::agent_install_plan,
+            commands::agent_install::agent_install,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// How an agent can be installed from the app.
 #[tauri::command]
 pub fn agent_install_plan(agent: String) -> InstallPlan {

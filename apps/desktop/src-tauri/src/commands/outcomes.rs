@@ -337,6 +337,16 @@ fn idle_run(runtime: &TaskRuntime, id: &str) -> Result<TaskRun, String> {
     Ok(run.clone())
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::outcomes::task_outcome_snapshot,
+            commands::outcomes::task_outcome_review,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_outcome_snapshot(
     id: String,

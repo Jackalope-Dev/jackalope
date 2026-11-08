@@ -332,6 +332,18 @@ async fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Re
     result
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::notifications::notification_status,
+            commands::notifications::notification_configure,
+            commands::notifications::notification_test,
+            commands::notifications::notification_take_open,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn notification_status(service: State<'_, Notifications>) -> NotificationStatus {
     service.status()

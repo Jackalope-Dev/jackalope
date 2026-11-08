@@ -594,6 +594,24 @@ fn usage_turn(turn: &Turn, archived: bool) -> HelperUsageTurn {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::helper::helper_snapshot,
+            commands::helper::helper_usage,
+            commands::helper::helper_sync,
+            commands::helper::helper_send,
+            commands::helper::helper_sharpen,
+            commands::helper::helper_sharpen_cancel,
+            commands::helper::helper_stop,
+            commands::helper::helper_new_conversation,
+            commands::helper::helper_action,
+            commands::helper::helper_connection,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn helper_snapshot(helper: State<'_, Helper>) -> View {
     helper.snapshot()

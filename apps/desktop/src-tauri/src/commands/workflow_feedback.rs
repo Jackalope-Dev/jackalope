@@ -42,6 +42,16 @@ fn read(runtime: &TaskRuntime) -> Result<Feedback, String> {
     })
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::workflow_feedback::task_usefulness,
+            commands::workflow_feedback::workflow_report,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_usefulness(
     state: State<'_, TaskRuntime>,

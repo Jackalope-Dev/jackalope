@@ -124,6 +124,19 @@ pub(crate) fn usage(value: &Value) -> super::tasks::Usage {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::jev::routing_settings,
+            commands::jev::checks::routing_connection_usage,
+            commands::jev::routing_connect,
+            commands::jev::routing_set_mode,
+            commands::jev::routing_disconnect,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn routing_settings(
     runtime: State<'_, TaskRuntime>,

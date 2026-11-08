@@ -102,6 +102,18 @@ pub fn launch(app: tauri::AppHandle) {
     *app.state::<DesktopIntegration>().worker.lock().unwrap() = Some(worker);
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::desktop_integration::desktop_activity,
+            commands::desktop_integration::desktop_keep_awake,
+            commands::desktop_integration::desktop_unread_badge,
+            commands::desktop_integration::desktop_zoom,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn desktop_activity(service: State<'_, DesktopIntegration>) -> DesktopStatus {
     let mut status = service.status.lock().unwrap().clone();

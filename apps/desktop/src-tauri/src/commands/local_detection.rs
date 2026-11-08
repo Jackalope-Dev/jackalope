@@ -68,6 +68,17 @@ const KNOWN_KEY_NAMES: &[&str] = &[
     "MISTRAL_API_KEY",
 ];
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::local_detection::system_detect_local_llms,
+            commands::local_detection::system_detect_env_keys,
+            commands::local_detection::agent_import_detected_key,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn system_detect_local_llms() -> Result<Vec<LocalLlmEndpoint>, String> {
     let targets = [

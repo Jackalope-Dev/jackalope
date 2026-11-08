@@ -33,6 +33,16 @@ fn save_image(project: &Path, extension: &str, bytes: &[u8]) -> Result<PathBuf, 
     Ok(path)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::attachments::prompt_attachment_save,
+            commands::attachments::prompt_attachment_pick,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Saves a pasted image for the given project and returns its absolute path.
 #[tauri::command]
 pub async fn prompt_attachment_save(

@@ -14,6 +14,18 @@ mod install;
 mod lifecycle;
 pub(super) use lifecycle::acquire;
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::managed_runtime::managed_runtime_status,
+            commands::managed_runtime::managed_runtime_cleanup,
+            commands::managed_runtime::managed_runtime_prepare,
+            commands::managed_runtime::managed_runtime_cancel,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn managed_runtime_cleanup(remove_active: bool) -> Result<lifecycle::Cleanup, String> {
     lifecycle::managed_runtime_cleanup(remove_active).await

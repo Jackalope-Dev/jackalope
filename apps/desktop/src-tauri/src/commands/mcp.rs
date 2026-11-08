@@ -376,6 +376,19 @@ fn validate(server: &McpServerConfig) -> Result<(), String> {
     Ok(())
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::mcp::mcp_authenticate,
+            commands::mcp::mcp_list_servers,
+            commands::mcp::mcp_save_server,
+            commands::mcp::mcp_delete_server,
+            commands::mcp::mcp_probe_server,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn mcp_list_servers(project_id: Option<String>) -> Result<Vec<McpServerConfig>, String> {
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;

@@ -173,10 +173,7 @@ async fn bridge_help(
         .is_ok_and(|run| run.efficiency.execution_profile.as_deref() == Some("lean"));
     let mut help = help_response(
         lean && !query.full,
-        crate::commands::experiments::is(
-            crate::commands::experiments::Experiment::ResultQueries,
-            "on",
-        ),
+        crate::commands::experiments::is(commands::experiments::Experiment::ResultQueries, "on"),
     );
     if let Ok(run) = service.authorized_run(&headers) {
         if super::decisions::agent_questions::available(&service.runtime, &run.project_id) {
@@ -698,6 +695,43 @@ pub(super) async fn bridge_computer_verify(
         .map(Json)
         .map_err(|_| StatusCode::BAD_REQUEST)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::coordination::followups::task_followup_queue,
+            commands::coordination::followups::task_followup_snapshot,
+            commands::coordination::followups::task_followup_action,
+            commands::coordination::peers::coordination_live_combination,
+            commands::coordination::subtasks::task_request_split,
+            commands::coordination::cloud::swarm_connection_status,
+            commands::coordination::cloud::swarm_connection_save,
+            commands::coordination::cloud::swarm_connection_remove,
+            commands::coordination::cloud::swarm_cloud_state,
+            commands::coordination::swarm_setup::swarm_setup,
+            commands::coordination::deploy::deploy_status,
+            commands::coordination::deploy::deploy_again,
+            commands::coordination::queue_snapshot,
+            commands::coordination::queue_add,
+            commands::coordination::queue_import,
+            commands::coordination::queue_dispatch,
+            commands::coordination::hosts::queue_hosts,
+            commands::coordination::hosts::queue_set_hosts,
+            commands::coordination::queue_cancel,
+            commands::coordination::queue_release,
+            commands::coordination::queue_cancel_agreement,
+            commands::coordination::queue_reconcile_scope,
+            commands::coordination::queue_assist_policy,
+            commands::coordination::queue_retry_reconciliation,
+            commands::coordination::managed::task_plan_create,
+            commands::coordination::managed::task_plan_preview,
+            commands::coordination::managed::task_plan_start,
+            commands::coordination::managed::task_plan_action,
+            commands::coordination::managed::task_plan_review_time,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn queue_snapshot(state: State<'_, Coordinator>) -> Result<QueueView, String> {

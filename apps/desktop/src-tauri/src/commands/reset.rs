@@ -87,6 +87,16 @@ fn remove_entry(path: &Path) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::reset::app_reset,
+            commands::reset::app_finish_reset,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn app_reset(
     confirmation: String,

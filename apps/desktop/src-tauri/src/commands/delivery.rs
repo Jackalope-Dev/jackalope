@@ -104,6 +104,17 @@ fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
     Ok(status)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::delivery::task_delivery_status,
+            commands::delivery::task_pull_request_create,
+            commands::delivery::task_merge_locally,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_delivery_status(
     id: String,

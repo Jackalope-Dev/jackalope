@@ -683,6 +683,19 @@ fn profile_name(kind: &str, owner_name: &str) -> String {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::browser_profiles::browser_profile_status,
+            commands::browser_profiles::browser_profile_open,
+            commands::browser_profiles::browser_profile_close,
+            commands::browser_profiles::browser_profile_clear_site,
+            commands::browser_profiles::browser_profile_delete,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn browser_profile_status(
     owner_kind: String,

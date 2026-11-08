@@ -161,6 +161,20 @@ pub fn active_count() -> usize {
         .unwrap_or(0)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::work_terminal::task_terminal_start,
+            commands::work_terminal::task_terminal_restore,
+            commands::work_terminal::task_terminal_status,
+            commands::work_terminal::task_terminal_write,
+            commands::work_terminal::task_terminal_resize,
+            commands::work_terminal::task_terminal_stop,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_terminal_start(
     id: String,

@@ -133,6 +133,15 @@ pub(super) fn progress(
     })
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::review_progress::task_review_progress,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_review_progress(
     state: State<'_, TaskRuntime>,

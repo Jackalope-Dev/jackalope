@@ -14,6 +14,15 @@ fn endpoint(value: &str) -> Result<reqwest::Url, String> {
     Ok(url)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::dictation::desktop_transcribe,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn desktop_transcribe(
     endpoint: String,

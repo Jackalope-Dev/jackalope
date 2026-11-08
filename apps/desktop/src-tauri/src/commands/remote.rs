@@ -262,6 +262,25 @@ impl RemoteAccess {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::remote::wsl::wsl_distributions,
+            commands::remote::remote_status,
+            commands::remote::remote_configure,
+            commands::remote::remote_pairing,
+            commands::remote::remote_revoke,
+            commands::remote::remote_private_https,
+            commands::remote::remote_tailscale_status,
+            commands::remote::remote_hosts,
+            commands::remote::remote_host_pair,
+            commands::remote::remote_host_request,
+            commands::remote::remote_host_remove,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn remote_status(service: State<'_, RemoteAccess>) -> Result<Value, String> {
     service.status()

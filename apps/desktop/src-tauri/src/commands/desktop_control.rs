@@ -1292,6 +1292,21 @@ pub async fn execute(
     result.map_err(String::from)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::desktop_control::platform::desktop_control_request_permissions,
+            commands::desktop_control::platform::desktop_control_open_settings,
+            commands::desktop_control::platform::desktop_control_restart,
+            commands::desktop_control::desktop_control_remember,
+            commands::desktop_control::desktop_control_permissions,
+            commands::desktop_control::desktop_control_forget,
+            commands::desktop_control::indicator::desktop_control_theme,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Saves the attempt's current window or app grant as "Always allow" for its project.
 #[tauri::command]
 pub async fn desktop_control_remember(

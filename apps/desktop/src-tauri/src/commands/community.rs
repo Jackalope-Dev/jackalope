@@ -125,6 +125,19 @@ pub struct CommunityStatus {
     configured: bool,
     build_channel: ReleaseChannel,
 }
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::community::app_community_settings,
+            commands::community::app_community_configure,
+            commands::community::app_release_channel,
+            commands::community::app_telemetry,
+            commands::community::app_submit_feedback,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn app_community_settings(
     app: AppHandle,

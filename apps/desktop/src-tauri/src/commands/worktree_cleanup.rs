@@ -1017,6 +1017,19 @@ fn prune(repo_path: &str) -> Result<usize, String> {
     Ok(before.saturating_sub(list_worktrees(repo_path)?.len()))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::worktree_cleanup::git_cleanup_worktree,
+            commands::worktree_cleanup::git_archive_worktree,
+            commands::worktree_cleanup::git_prune_worktrees,
+            commands::worktree_cleanup::git_list_worktree_orphans,
+            commands::worktree_cleanup::git_remove_worktree_orphan,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn git_prune_worktrees(repo_path: String) -> Result<usize, String> {
     tauri::async_runtime::spawn_blocking(move || {

@@ -16,6 +16,15 @@ fn repository(directory: &str) -> Result<PathBuf, String> {
     Ok(directory)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::cli_terminal::cli_terminal_open,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Opens the user's terminal running `jackalope` in `directory`.
 #[tauri::command]
 pub fn cli_terminal_open(directory: String) -> Result<(), String> {

@@ -69,6 +69,15 @@ impl ExecutionAccess {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::execution_access::app_execution_access,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn app_execution_access(runtime: tauri::State<'_, super::tasks::TaskRuntime>) -> AccessStatus {
     runtime.access.status()

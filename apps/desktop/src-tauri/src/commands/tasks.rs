@@ -218,6 +218,36 @@ pub(super) fn probe_auth(
     Ok(result)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::tasks::task_runners,
+            commands::tasks::task_read_context,
+            commands::tasks::task_pick_project,
+            commands::tasks::task_validate_project,
+            commands::tasks::task_project_directory,
+            commands::tasks::task_create_project,
+            commands::tasks::task_runs,
+            commands::tasks::task_changes,
+            commands::tasks::task_history_recovery,
+            commands::tasks::task_retry,
+            commands::tasks::task_retry_save,
+            commands::tasks::task_export_recovery,
+            commands::tasks::task_archived_runs,
+            commands::tasks::task_set_archived,
+            commands::tasks::task_restore_archived,
+            commands::tasks::task_import_recovery,
+            commands::tasks::task_screenshot,
+            commands::tasks::task_start,
+            commands::tasks::task_stop,
+            commands::tasks::task_mark_reviewed,
+            commands::tasks::task_review,
+            commands::tasks::task_respond_prompt,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;

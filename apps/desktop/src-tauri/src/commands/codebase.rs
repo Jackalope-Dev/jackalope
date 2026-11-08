@@ -62,6 +62,15 @@ pub struct CodebaseSnapshot {
     truncated: bool,
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::codebase::codebase_scan,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn codebase_scan(repo_path: String) -> Result<CodebaseSnapshot, String> {
     if SCANNING.swap(true, Ordering::AcqRel) {

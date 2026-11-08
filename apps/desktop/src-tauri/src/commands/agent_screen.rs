@@ -36,6 +36,16 @@ fn ensure_run(state: &TaskRuntime, run_id: &str) -> Result<(), String> {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_screen::task_agent_screen,
+            commands::agent_screen::task_agent_screen_revoke,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_agent_screen(
     run_id: String,

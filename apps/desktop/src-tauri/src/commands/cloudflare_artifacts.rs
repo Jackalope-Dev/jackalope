@@ -454,6 +454,21 @@ fn current_branch(path: &Path) -> String {
         .unwrap_or_else(|| "main".into())
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::cloudflare_artifacts::cloudflare_artifacts_connect,
+            commands::cloudflare_artifacts::cloudflare_oauth_connect,
+            commands::cloudflare_artifacts::cloudflare_artifacts_project,
+            commands::cloudflare_artifacts::cloudflare_artifacts_create_project,
+            commands::cloudflare_artifacts::cloudflare_artifacts_convert,
+            commands::cloudflare_artifacts::cloudflare_artifacts_push,
+            commands::cloudflare_artifacts::cloudflare_artifacts_share,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn cloudflare_artifacts_connect(
     connection: Connection,

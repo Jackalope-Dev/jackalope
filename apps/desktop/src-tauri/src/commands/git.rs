@@ -13,6 +13,16 @@ pub struct WorktreeEntry {
     pub cleanup: Option<super::worktree_cleanup::CleanupStatus>,
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::git::git_list_worktrees,
+            commands::git::git_create_worktree,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn git_list_worktrees(
     repo_path: String,

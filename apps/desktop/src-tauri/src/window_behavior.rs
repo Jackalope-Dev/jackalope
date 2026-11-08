@@ -111,6 +111,17 @@ pub struct DesktopSettings {
     launch_at_login: bool,
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            window_behavior::desktop_settings,
+            window_behavior::desktop_set_close_to_tray,
+            window_behavior::desktop_set_launch_at_login,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn desktop_settings(
     app: AppHandle,

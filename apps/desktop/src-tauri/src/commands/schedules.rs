@@ -384,6 +384,21 @@ impl Scheduler {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::schedules::schedule_list,
+            commands::schedules::schedule_inspect_change,
+            commands::schedules::schedule_save,
+            commands::schedules::schedule_remove,
+            commands::schedules::schedule_set_enabled,
+            commands::schedules::schedule_webhook_enable,
+            commands::schedules::schedule_webhook_disable,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn schedule_list(service: State<'_, Scheduler>) -> ScheduleLedger {
     service.ledger.lock().unwrap().clone()

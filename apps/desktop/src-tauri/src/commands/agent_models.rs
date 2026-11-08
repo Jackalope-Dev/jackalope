@@ -253,6 +253,15 @@ async fn read_catalog(
     result
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_models::agent_models,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn agent_models(
     runtime: State<'_, TaskRuntime>,

@@ -381,6 +381,25 @@ fn device_metadata(development: bool, isolated: bool) -> serde_json::Value {
         "profileKind": if isolated { "isolated" } else { "default" },
     })
 }
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::account::app_account_status,
+            commands::account::settings_sync::app_settings_sync,
+            commands::account::lesson_sync::app_lesson_sync,
+            commands::account::app_account_connect,
+            commands::account::app_account_open_browser,
+            commands::account::app_account_referrals,
+            commands::account::app_account_open_referrals,
+            commands::account::app_account_poll,
+            commands::account::app_account_disconnect,
+            commands::account::beta::app_account_beta,
+            commands::account::feedback::app_account_feedback,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn app_account_status(
     app: AppHandle,

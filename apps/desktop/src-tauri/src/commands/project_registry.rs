@@ -408,6 +408,16 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
     Ok(record)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::project_registry::project_registry_list,
+            commands::project_registry::project_registry_save,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn project_registry_list(state: State<'_, TaskRuntime>) -> Result<Vec<ProjectRecord>, String> {
     Ok(list(&state))
