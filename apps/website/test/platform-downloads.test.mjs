@@ -56,7 +56,6 @@ test('a configured Store product takes precedence and rejects foreign or credent
   }
   for (const url of [
     'https://apps.microsoft.com.evil.test/detail/9NM89QFJQ244',
-    `${store}?redirect=other`,
     `${store}#fragment`,
     'https://apps.microsoft.com/search',
   ]) {

@@ -101,9 +101,12 @@ export interface PublishedRelease {
 export const MICROSOFT_STORE_PRODUCT_ID = '9NM89QFJQ244';
 export const MICROSOFT_STORE_URL = `https://apps.microsoft.com/detail/${MICROSOFT_STORE_PRODUCT_ID}`;
 
-/** `value` when it is a plain Microsoft Store product link, else null. */
+/**
+ * `value` when it is a Microsoft Store product link, else null. Store share
+ * links carry locale query parameters, so a query string is allowed.
+ */
 export function microsoftStoreUrl(value: string | undefined): string | null {
-  const url = value ? httpsUrl(value) : null;
+  const url = value ? httpsUrl(value, { query: true }) : null;
   if (!url || url.port) return null;
   const path =
     url.hostname === 'apps.microsoft.com'

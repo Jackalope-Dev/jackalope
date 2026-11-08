@@ -62,7 +62,7 @@ export function platformDownloads(env: Record<string, string | undefined>): Plat
       if (!httpsUrl(value, { query: true, fragment: true }))
         throw new Error(`${key} must be a public HTTPS URL without credentials.`);
       if (storeUrl && !microsoftStoreUrl(storeUrl))
-        throw new Error('VITE_WINDOWS_STORE_URL must be a plain Microsoft Store product link.');
+        throw new Error('VITE_WINDOWS_STORE_URL must be a Microsoft Store product link.');
       if (!storeUrl && !env.VITE_RELEASE_VERSION?.trim())
         throw new Error('Set VITE_RELEASE_VERSION when configuring a download.');
     }
