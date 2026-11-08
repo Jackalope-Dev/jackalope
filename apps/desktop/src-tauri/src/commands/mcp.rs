@@ -665,6 +665,19 @@ pub(super) async fn connect(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_agent_with_connection_sign_in_has_its_arguments() {
+        for agent in crate::commands::agents::all() {
+            assert_eq!(
+                sign_in_args(&agent.id, "docs", &serde_json::Map::new()).is_ok(),
+                agent.mcp_sign_in,
+                "{}",
+                agent.id
+            );
+        }
+    }
+
     #[test]
     fn endpoint_validation_requires_tls_outside_loopback() {
         for value in [
@@ -1607,6 +1620,34 @@ pub(super) fn codex_overrides(
     Ok(vec![format!("mcp_servers={value}")])
 }
 
+/// The arguments that open `agent`'s interactive sign-in to connection `id`,
+/// one of `servers`.
+fn sign_in_args(
+    agent: &str,
+    id: &str,
+    servers: &serde_json::Map<String, Value>,
+) -> Result<Vec<String>, String> {
+    match agent {
+        "codex" => {
+            let mut args = Vec::new();
+            for value in codex_overrides(servers)? {
+                args.extend(["-c".to_string(), value]);
+            }
+            args.extend(["mcp".to_string(), "login".to_string(), id.to_string()]);
+            Ok(args)
+        }
+        "claude" => Ok(vec![
+            "--mcp-config".into(),
+            json!({ "mcpServers": servers }).to_string(),
+            "/mcp".into(),
+        ]),
+        _ => Err(format!(
+            "{} has no connection sign-in.",
+            super::agents::name(agent)
+        )),
+    }
+}
+
 #[tauri::command]
 pub async fn mcp_authenticate(
     id: String,
@@ -1653,18 +1694,7 @@ pub async fn mcp_authenticate(
     );
     let mut servers = serde_json::Map::new();
     servers.insert(id.clone(), spec(&server, &agent));
-    if agent == "codex" {
-        for value in codex_overrides(&servers)? {
-            command.args(["-c", &value]);
-        }
-        command.args(["mcp", "login", &id]);
-    } else {
-        command.args([
-            "--mcp-config",
-            &json!({"mcpServers":servers}).to_string(),
-            "/mcp",
-        ]);
-    }
+    command.args(sign_in_args(&agent, &id, &servers)?);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

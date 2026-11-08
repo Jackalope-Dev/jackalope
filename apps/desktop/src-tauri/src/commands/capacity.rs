@@ -162,16 +162,39 @@ pub(in crate::commands) async fn routing_snapshot(
     current_snapshot(record, Utc::now().timestamp())
 }
 
+/// The agents whose account quota Jackalope can read.
+#[derive(Clone, Copy)]
+enum QuotaReader {
+    Codex,
+    Claude,
+    Grok,
+    Kimi,
+    Antigravity,
+}
+
+impl QuotaReader {
+    fn of(adapter: &str) -> Option<Self> {
+        Some(match adapter {
+            "codex" => Self::Codex,
+            "claude" => Self::Claude,
+            "grok" => Self::Grok,
+            "kimi" => Self::Kimi,
+            "antigravity" => Self::Antigravity,
+            _ => return None,
+        })
+    }
+}
+
 async fn refresh_routing_snapshot(
     binding: &super::agent_profiles::AccountBinding,
 ) -> CapacityRecord {
-    let result = match binding.adapter.as_str() {
-        "codex" => read_codex_bound(binding).await,
-        "claude" => connected::read_claude_bound(binding).await,
-        "grok" => connected::read_grok_bound(binding).await,
-        "kimi" => kimi::read_bound(binding).await,
-        "antigravity" => antigravity::read_bound(binding).await,
-        _ => {
+    let result = match QuotaReader::of(&binding.adapter) {
+        Some(QuotaReader::Codex) => read_codex_bound(binding).await,
+        Some(QuotaReader::Claude) => connected::read_claude_bound(binding).await,
+        Some(QuotaReader::Grok) => connected::read_grok_bound(binding).await,
+        Some(QuotaReader::Kimi) => kimi::read_bound(binding).await,
+        Some(QuotaReader::Antigravity) => antigravity::read_bound(binding).await,
+        None => {
             return unavailable(
                 &binding.adapter,
                 "unsupported",
@@ -244,15 +267,19 @@ fn quota_agents() -> impl Iterator<Item = &'static str> {
         .map(|agent| agent.id.as_str())
 }
 
+/// `agent`'s record after a refresh that returned `result`. A failed refresh
+/// keeps the previous snapshot, marked stale, unless `installed` finds the
+/// agent was removed.
 fn connected_refresh(
     agent: &str,
     previous: Option<&CapacityRecord>,
     result: Result<CapacityRecord, String>,
+    installed: impl FnOnce() -> bool,
 ) -> CapacityRecord {
     match result {
         Ok(record) => record,
         Err(message) => {
-            if super::tasks::executable(agent).is_err() {
+            if !installed() {
                 return unavailable(agent, "notInstalled", &message, None);
             }
             if let Some(previous) = previous.filter(|r| r.observed_at.is_some()) {
@@ -312,7 +339,9 @@ pub async fn capacity_snapshot(
         }
         while let Some(read) = reads.join_next().await {
             let (agent, result) = read.map_err(|error| error.to_string())?;
-            let record = connected_refresh(agent, cache.records.get(agent), result);
+            let record = connected_refresh(agent, cache.records.get(agent), result, || {
+                super::tasks::executable(agent).is_ok()
+            });
             cache.records.insert(agent, record);
         }
         cache.checked = Some(Instant::now());
@@ -338,6 +367,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn every_agent_with_capacity_has_a_quota_reader() {
+        for agent in super::super::agents::all() {
+            assert_eq!(
+                QuotaReader::of(&agent.id).is_some(),
+                agent.capabilities.capacity,
+                "{}",
+                agent.id
+            );
+        }
+    }
+
+    #[test]
     fn a_confirmed_account_change_or_unsupported_plan_discards_old_windows() {
         let mut previous =
             parse_codex(&json!({"rateLimits":{"primary":{"usedPercent":20}}})).unwrap();
@@ -350,7 +391,7 @@ mod tests {
                 "No subscription data",
                 Some("new@example.com".into()),
             );
-            let result = connected_refresh("claude", Some(&previous), Ok(next));
+            let result = connected_refresh("claude", Some(&previous), Ok(next), || true);
             assert_eq!(result.account, "new@example.com");
             assert_eq!(result.status, status);
             assert!(result.windows.is_empty());
@@ -391,17 +432,17 @@ mod tests {
     #[test]
     fn refresh_error_keeps_original_observation_time_and_marks_stale() {
         let record = parse_codex(&json!({"rateLimits":{"primary":{"usedPercent":20}}})).unwrap();
-        let stale = connected_refresh("codex", Some(&record), Err("Connection failed".into()));
-        if super::super::tasks::executable("codex").is_err() {
-            assert_eq!(stale.status, "notInstalled");
-        } else {
-            assert_eq!(stale.status, "stale");
-            assert_eq!(stale.observed_at, record.observed_at);
-            assert_eq!(stale.windows[0].remaining_percent, Some(80.0));
-        }
-        assert!(connected_refresh("codex", None, Err("Offline".into()))
-            .windows
-            .is_empty());
+        let failed = || Err("Connection failed".to_string());
+        let stale = connected_refresh("codex", Some(&record), failed(), || true);
+        assert_eq!(stale.status, "stale");
+        assert_eq!(stale.observed_at, record.observed_at);
+        assert_eq!(stale.windows[0].remaining_percent, Some(80.0));
+        let removed = connected_refresh("codex", Some(&record), failed(), || false);
+        assert_eq!(removed.status, "notInstalled");
+        assert!(removed.windows.is_empty());
+        let offline = connected_refresh("codex", None, failed(), || true);
+        assert_eq!(offline.status, "unavailable");
+        assert!(offline.windows.is_empty());
     }
 
     #[test]
