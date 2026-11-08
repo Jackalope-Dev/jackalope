@@ -89,6 +89,10 @@ export function ArtifactsConnectForm({
     setBusy(true);
     try {
       const accounts = await cloudflareSignIn({}, (url) => setStage({ kind: 'waiting', url }));
+      if (!accounts) {
+        setStage({ kind: 'start' });
+        return;
+      }
       const only = accounts.length === 1 ? accounts[0] : undefined;
       if (only) {
         try {
@@ -100,8 +104,7 @@ export function ArtifactsConnectForm({
       }
       setStage({ kind: 'choose', accounts, accountId: accounts[0]?.id ?? '' });
     } catch (cause) {
-      const message = String(cause);
-      if (!message.includes('canceled')) setError(message);
+      setError(describeError(cause));
       setStage({ kind: 'start' });
     } finally {
       setBusy(false);

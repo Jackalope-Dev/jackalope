@@ -97,10 +97,11 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
     }
   };
 
-  /** Connect Cloudflare again, asking for Workers access, for the same account. */
+  /** Connect Cloudflare again, asking for Workers access, for the same account. False when canceled. */
   const allowWorkers = async () => {
-    await cloudflareSignIn({ workers: true });
+    if (!(await cloudflareSignIn({ workers: true }))) return false;
     await reauthorizeCloudflare();
+    return true;
   };
 
   const setUp = async (allowFirst = false) => {
@@ -120,16 +121,15 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
       for (;;) {
         if (state.current === 'allow') {
           try {
-            await allowWorkers();
+            if (!(await allowWorkers())) {
+              setRun(null);
+              return;
+            }
           } catch (cause) {
-            const message = String(cause);
             show({
               ...state,
-              failure: message.includes('canceled')
-                ? undefined
-                : { step: 'allow', message, recovery: null, link: null },
+              failure: { step: 'allow', message: describeError(cause), recovery: null, link: null },
             });
-            if (message.includes('canceled')) setRun(null);
             return;
           }
           show({ ...state, current: 'account' });

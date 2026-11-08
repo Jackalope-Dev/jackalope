@@ -186,6 +186,47 @@ fn requested_scopes(extra: &[String]) -> String {
     scopes
 }
 
+/// A Connect Cloudflare failure. The app reacts to `code` and shows `message`.
+#[derive(Debug, Serialize)]
+pub struct SignInError {
+    pub message: String,
+    /// `canceled` when a cancel or a newer sign-in replaced this one; `apiToken` when
+    /// only an API token can give the access asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<&'static str>,
+}
+
+impl SignInError {
+    fn canceled() -> Self {
+        Self {
+            message: "Cloudflare sign-in was canceled.".into(),
+            code: Some("canceled"),
+        }
+    }
+
+    pub fn api_token(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            code: Some("apiToken"),
+        }
+    }
+}
+
+impl From<String> for SignInError {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            code: None,
+        }
+    }
+}
+
+impl From<&str> for SignInError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
 /// The sign-in error Cloudflare returns in the redirect, in the person's terms.
 fn authorize_error(error: &str, description: Option<&str>, invalid_scope: Option<&str>) -> String {
     match error {
@@ -222,7 +263,10 @@ pub async fn revoke(grant: &Grant) {
 
 /// Prepares a sign-in and returns the Cloudflare consent URL to open. `extra` adds
 /// product scopes, and `invalid_scope` is the message shown when Cloudflare refuses one.
-pub async fn begin(extra: &[String], invalid_scope: Option<String>) -> Result<String, String> {
+pub async fn begin(
+    extra: &[String],
+    invalid_scope: Option<String>,
+) -> Result<String, SignInError> {
     let mut bound = None;
     for port in PORTS {
         if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)).await {
@@ -230,9 +274,9 @@ pub async fn begin(extra: &[String], invalid_scope: Option<String>) -> Result<St
             break;
         }
     }
-    let (listener, port) = bound.ok_or(
+    let (listener, port) = bound.ok_or_else(|| SignInError::api_token(
         "Ports 47851–47853 on this computer are in use, so Cloudflare cannot return to Jackalope. Close the program using them, or connect with an API token.",
-    )?;
+    ))?;
     let state = random(24);
     let verifier = random(48);
     let redirect_uri = format!("http://127.0.0.1:{port}{CALLBACK_PATH}");
@@ -303,7 +347,7 @@ async fn read_target(stream: &mut tokio::net::TcpStream) -> Option<String> {
 
 /// Waits for the browser to return, exchanges the code and lists the accounts
 /// the person granted. Tokens are kept in memory until `take` is called.
-pub async fn complete() -> Result<Vec<Account>, String> {
+pub async fn complete() -> Result<Vec<Account>, SignInError> {
     let generation = GENERATION.load(std::sync::atomic::Ordering::SeqCst);
     let (listener, state, verifier, redirect_uri, invalid_scope) = {
         let mut pending = PENDING.lock().map_err(|e| e.to_string())?;
@@ -322,7 +366,7 @@ pub async fn complete() -> Result<Vec<Account>, String> {
     let deadline = tokio::time::Instant::now() + SIGN_IN_TIMEOUT;
     let code = loop {
         if GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation {
-            return Err("Cloudflare sign-in was canceled.".into());
+            return Err(SignInError::canceled());
         }
         let accepted = tokio::time::timeout_at(
             deadline.min(tokio::time::Instant::now() + Duration::from_millis(500)),
@@ -369,11 +413,16 @@ pub async fn complete() -> Result<Vec<Account>, String> {
                     .as_bytes(),
                 )
                 .await;
-            return Err(authorize_error(
+            let message = authorize_error(
                 error,
                 query.get("error_description").map(String::as_str),
                 invalid_scope.as_deref(),
-            ));
+            );
+            return Err(if error.as_str() == "invalid_scope" {
+                SignInError::api_token(message)
+            } else {
+                message.into()
+            });
         }
         let Some(code) = query.get("code").cloned() else {
             continue;
@@ -400,7 +449,7 @@ pub async fn complete() -> Result<Vec<Account>, String> {
     .await?;
     let accounts = accounts(&tokens.access).await?;
     if GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation {
-        return Err("Cloudflare sign-in was canceled.".into());
+        return Err(SignInError::canceled());
     }
     *PENDING.lock().map_err(|e| e.to_string())? = None;
     *SIGNED_IN.lock().map_err(|e| e.to_string())? = Some((tokens, accounts.clone()));

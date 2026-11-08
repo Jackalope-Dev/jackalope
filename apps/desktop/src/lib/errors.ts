@@ -4,3 +4,12 @@ export function describeError(cause: unknown): string {
     return String((cause as { message: unknown }).message);
   return String(cause);
 }
+
+/** The `code` a native command attached to its failure, when it attached one. */
+export function errorCode(cause: unknown): string | undefined {
+  if (cause && typeof cause === 'object' && 'code' in cause) {
+    const code = (cause as { code: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}
