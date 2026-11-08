@@ -206,9 +206,8 @@ export function RunnerConnections({
     const enabled = config.isAgentEnabled(runner.id, scoped?.id);
     const options = config.runnerOptions[runner.id];
     const blockedModels = options?.restrictModels && !options.models.some((m) => m.trim());
-    const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in ');
-    const isReadyStatus = runner.signedIn || runner.detail.startsWith('Ready.');
-    return runner.available && enabled && !blockedModels && !needsSignIn && isReadyStatus;
+    const isReadyStatus = runner.signedIn || !!runner.ready;
+    return runner.available && enabled && !blockedModels && !runner.signInNeeded && isReadyStatus;
   };
 
   const readyRunners = allRunners.filter(
@@ -243,7 +242,7 @@ export function RunnerConnections({
     const enabled = config.isAgentEnabled(runner.id, scoped?.id);
     const options = config.runnerOptions[runner.id];
     const blockedModels = options?.restrictModels && !options.models.some((model) => model.trim());
-    const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in ');
+    const needsSignIn = !runner.signedIn && !!runner.signInNeeded;
     const canStart = runner.available && enabled && !blockedModels && !needsSignIn;
     const working = activeRuns.length > 0;
     const status = waitingRun

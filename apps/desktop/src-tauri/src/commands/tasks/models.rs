@@ -321,8 +321,9 @@ pub struct Runner {
     pub account: String,
     pub detail: String,
     /// The sign-in check ran and found no signed-in account.
-    #[serde(skip)]
     pub sign_in_needed: bool,
+    /// Tasks can start: the account is signed in, or this agent checks access when a task starts.
+    pub ready: bool,
 }
 
 impl TaskRun {
