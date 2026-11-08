@@ -1,8 +1,8 @@
 //! Plans for the `jackalope` terminal: the same sessions the app uses,
 //! shaped into the terminal protocol.
 
-use super::{handoff::CriterionState, session};
-use crate::cli_protocol as protocol;
+use crate::cli_protocol::{self as protocol, PlanCommand};
+use crate::commands::planning::{self, handoff::CriterionState, rounds, session};
 use crate::commands::{coordination::Coordinator, harness::PendingUserPrompt};
 
 pub fn question(prompt: &PendingUserPrompt) -> protocol::Question {
@@ -166,6 +166,7 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
             }
             line
         }),
+        swarm: plan.rounds.is_some(),
         verification: Some(plan.verification.source.into()),
         check: plan.verification.command.clone(),
         next_round: plan
@@ -180,7 +181,7 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
 
 /// The current round's state for the progress line, with its areas'
 /// verdicts when parallel orchestrators review it.
-pub fn round_state(rounds: &super::rounds::RoundsView) -> String {
+pub fn round_state(rounds: &rounds::RoundsView) -> String {
     let Some(round) = rounds.rounds.last() else {
         return "working".into();
     };
@@ -207,7 +208,7 @@ fn detail(coordinator: &Coordinator, id: &str) -> Result<protocol::Response, Str
 
 pub fn list(coordinator: &Coordinator, project_id: &str) -> Result<protocol::Response, String> {
     Ok(protocol::Response::Plans {
-        plans: super::list(coordinator, Some(project_id))?
+        plans: planning::list(coordinator, Some(project_id))?
             .plans
             .into_iter()
             .map(|plan| protocol::PlanSummary {
@@ -238,15 +239,15 @@ pub fn get(coordinator: &Coordinator, id: &str) -> Result<protocol::Response, St
 pub fn action(
     coordinator: &Coordinator,
     id: &str,
-    action: &str,
+    action: &PlanCommand,
     text: String,
     revision: Option<u32>,
     hash: Option<String>,
 ) -> Result<protocol::Response, String> {
     match action {
-        "keep" => session::keep_planning(coordinator, id, &text)?,
-        "replan" => session::replan(coordinator, id, &text)?,
-        "approve" => session::approve(
+        PlanCommand::Keep => session::keep_planning(coordinator, id, &text)?,
+        PlanCommand::Replan => session::replan(coordinator, id, &text)?,
+        PlanCommand::Approve => session::approve(
             coordinator,
             id,
             revision.ok_or("Approve the revision you reviewed.")?,
@@ -256,7 +257,7 @@ pub fn action(
             "terminal",
             session::ApprovalChoices::default(),
         )?,
-        "save" => {
+        PlanCommand::Save => {
             session::save_edit(
                 coordinator,
                 id,
@@ -264,18 +265,18 @@ pub fn action(
                 revision.ok_or("Save against the revision you edited.")?,
             )?;
         }
-        "export" => {
+        PlanCommand::Export => {
             let path = session::export(coordinator, id, Some(text).filter(|t| !t.is_empty()))?;
             return Ok(protocol::Response::Exported { path });
         }
-        "accept" | "redo" => {
-            session::resolve_deviation(coordinator, id, &text, action, "terminal")?
+        PlanCommand::Accept | PlanCommand::Redo => {
+            session::resolve_deviation(coordinator, id, &text, action.as_str(), "terminal")?
         }
-        "replan-deviation" => {
+        PlanCommand::ReplanDeviation => {
             session::resolve_deviation(coordinator, id, &text, "replan", "terminal")?
         }
-        "rounds" => super::rounds::action(coordinator, id, text.trim(), None)?,
-        _ => return Err("Unknown plan action.".into()),
+        PlanCommand::Rounds => rounds::action(coordinator, id, text.trim(), None)?,
+        PlanCommand::Unknown(_) => return Err("Unknown plan action.".into()),
     }
     detail(coordinator, id)
 }

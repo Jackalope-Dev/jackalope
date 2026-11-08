@@ -6,7 +6,7 @@
 //! that does not go ahead resumes what this paused.
 
 use crate::connection::unexpected;
-use crate::protocol::{MergePlan, Request, Response};
+use crate::protocol::{MergePlan, Request, Response, SessionCommand};
 
 /// Sends one request and returns the host's answer or its error.
 pub type Call<'a> = dyn FnMut(Request) -> Result<Response, String> + 'a;
@@ -27,11 +27,11 @@ pub fn prepare(
     message: Option<String>,
 ) -> Result<Prepared, String> {
     if !paused {
-        pause(call, session_id, "pause")?;
+        pause(call, session_id, SessionCommand::Pause)?;
     }
     let refused = |call: &mut Call, error: String| {
         if !paused {
-            let _ = pause(call, session_id, "resume");
+            let _ = pause(call, session_id, SessionCommand::Resume);
         }
         Err(error)
     };
@@ -86,7 +86,7 @@ pub fn apply(
 /// Resumes the conversation when preparing a merge paused it and the merge does not go ahead.
 pub fn release(call: &mut Call, session_id: &str, paused_here: bool) {
     if paused_here {
-        let _ = pause(call, session_id, "resume");
+        let _ = pause(call, session_id, SessionCommand::Resume);
     }
 }
 
@@ -95,10 +95,10 @@ pub fn pull_request_body(result: &str) -> String {
     result.trim().chars().take(4000).collect()
 }
 
-fn pause(call: &mut Call, session_id: &str, action: &str) -> Result<(), String> {
+fn pause(call: &mut Call, session_id: &str, action: SessionCommand) -> Result<(), String> {
     call(Request::SessionAction {
         session_id: session_id.to_string(),
-        action: action.into(),
+        action,
         message_id: None,
     })
     .map(|_| ())

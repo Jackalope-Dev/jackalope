@@ -7,7 +7,10 @@ use crate::brand;
 use crate::connection::short;
 use crate::files;
 use crate::host::{self, ColdStart};
-use crate::protocol::{self, AgentStatus, Learning, Project, Request, Response, SessionSummary};
+use crate::protocol::{
+    self, AgentState, AgentStatus, Attribution, Learning, Project, ProjectSettingsPatch, Request,
+    Response, SessionSummary, WorkspaceMode,
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// What choosing a picker row does.
@@ -161,39 +164,39 @@ fn cold_start_label(choice: Option<ColdStart>) -> &'static str {
     }
 }
 
-fn workspace_mode_label(mode: Option<&str>) -> &'static str {
+fn workspace_mode_label(mode: WorkspaceMode) -> &'static str {
     match mode {
-        Some("branch") => "new branch in the checkout",
-        Some("current") => "current branch, directly",
-        Some("ask") => "ask each time",
-        _ => "isolated worktree",
+        WorkspaceMode::Worktree => "isolated worktree",
+        WorkspaceMode::Branch => "new branch in the checkout",
+        WorkspaceMode::Current => "current branch, directly",
+        WorkspaceMode::Ask => "ask each time",
     }
 }
 
-fn attribution_label(attribution: Option<&str>) -> &'static str {
+fn attribution_label(attribution: Option<&Attribution>) -> &'static str {
     match attribution {
-        Some("user") => "You",
-        Some("coAuthor") => "You, with agents as co-authors",
-        Some("agent") => "The agents",
-        _ => "Loading…",
+        Some(Attribution::User) => "You",
+        Some(Attribution::CoAuthor) => "You, with agents as co-authors",
+        Some(Attribution::Agent) => "The agents",
+        None => "Loading…",
     }
 }
 
-pub fn agent_glyph(state: &str) -> &'static str {
+pub fn agent_glyph(state: &AgentState) -> &'static str {
     brand::mark_glyph(match state {
-        "ready" => brand::Mark::Full,
-        "installed" => brand::Mark::Partial,
-        "sign-in" => brand::Mark::Attention,
+        AgentState::Ready => brand::Mark::Full,
+        AgentState::Installed => brand::Mark::Partial,
+        AgentState::SignIn => brand::Mark::Attention,
         _ => brand::Mark::Empty,
     })
 }
 
 pub fn agent_state_label(agent: &AgentStatus) -> String {
-    match agent.state.as_str() {
-        "ready" => agent.account.clone(),
-        "installed" => "installed".into(),
-        "sign-in" => "sign-in needed".into(),
-        "disabled" => "disabled".into(),
+    match agent.state {
+        AgentState::Ready => agent.account.clone(),
+        AgentState::Installed => "installed".into(),
+        AgentState::SignIn => "sign-in needed".into(),
+        AgentState::Disabled => "disabled".into(),
         _ => "not installed".into(),
     }
 }
@@ -221,11 +224,6 @@ pub fn learning_detail(learning: &Learning) -> String {
         .map(|note| format!(" · {note}"))
         .unwrap_or_default();
     format!("{status} · {uses}{edited}{enforced}{attention}")
-}
-
-/// Agents that can take work or need only a sign-in.
-pub fn usable(agent: &AgentStatus) -> bool {
-    matches!(agent.state.as_str(), "ready" | "installed" | "sign-in")
 }
 
 impl App {
@@ -426,48 +424,48 @@ impl App {
                 self.open_picker(PickerKind::Settings);
             }
             Action::AutoApprove => {
-                let next = !self.project.auto_approve.unwrap_or(true);
-                self.save_project_settings(ProjectChange {
+                let next = !self.project.settings.resolve().auto_approve;
+                self.save_settings(ProjectSettingsPatch {
                     auto_approve: Some(next),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
             }
             Action::LearnAutomatically => {
-                let next = !self.project.learn_automatically.unwrap_or(true);
-                self.save_project_settings(ProjectChange {
+                let next = !self.project.settings.resolve().learn_automatically;
+                self.save_settings(ProjectSettingsPatch {
                     learn_automatically: Some(next),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
             }
             Action::SyncLessons => {
-                let next = !self.project.sync_lessons.unwrap_or(true);
-                self.save_project_settings(ProjectChange {
+                let next = !self.project.settings.resolve().sync_lessons;
+                self.save_settings(ProjectSettingsPatch {
                     sync_lessons: Some(next),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
             }
             Action::AgentReflection => {
-                let next = !self.project.agent_reflection.unwrap_or(false);
-                self.save_project_settings(ProjectChange {
+                let next = !self.project.settings.resolve().agent_reflection;
+                self.save_settings(ProjectSettingsPatch {
                     agent_reflection: Some(next),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
             }
             Action::ExportLessons => {
-                let next = !self.project.export_lessons.unwrap_or(false);
-                self.save_project_settings(ProjectChange {
+                let next = !self.project.settings.resolve().export_lessons;
+                self.save_settings(ProjectSettingsPatch {
                     export_lessons: Some(next),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
             }
             Action::ReviewCaptures => {
-                let next = !self.project.review_captures.unwrap_or(true);
-                self.save_project_settings(ProjectChange {
+                let next = !self.project.settings.resolve().review_captures;
+                self.save_settings(ProjectSettingsPatch {
                     review_captures: Some(next),
                     ..Default::default()
                 });
@@ -480,10 +478,7 @@ impl App {
                     .copied()
                     .find(|cap| *cap > current)
                     .unwrap_or(QUESTION_CAPS[0]);
-                self.save_project_settings(ProjectChange {
-                    question_cap: Some(next),
-                    ..Default::default()
-                });
+                self.save_planning(Some(next), None);
                 self.open_picker(PickerKind::Settings);
             }
             Action::PlannerAgent => {
@@ -495,7 +490,9 @@ impl App {
                         overview
                             .agents
                             .iter()
-                            .filter(|agent| matches!(agent.state.as_str(), "ready" | "installed"))
+                            .filter(|agent| {
+                                matches!(agent.state, AgentState::Ready | AgentState::Installed)
+                            })
                             .map(|agent| agent.id.clone())
                             .collect()
                     })
@@ -508,10 +505,7 @@ impl App {
                         .position(|agent| agent == current)
                         .and_then(|index| agents.get(index + 1).cloned()),
                 };
-                self.save_project_settings(ProjectChange {
-                    planner_agent: Some(next.unwrap_or_default()),
-                    ..Default::default()
-                });
+                self.save_planning(None, Some(next.unwrap_or_default()));
                 self.open_picker(PickerKind::Settings);
             }
             Action::OpenPlan(id) => self.open_plan(id),
@@ -526,28 +520,28 @@ impl App {
             Action::ShowLearning(id) => self.show_learning(&id),
             Action::ArchiveLearning(id, archived) => self.archive_learning(&id, archived),
             Action::WorkspaceMode => {
-                let next = match self.project.workspace_mode.as_deref() {
-                    None | Some("worktree") => "branch",
-                    Some("branch") => "current",
-                    Some("current") => "ask",
-                    _ => "worktree",
+                // A mode this build does not know steps back to the first.
+                let next = match self.project.settings.workspace_mode.as_deref() {
+                    None => WorkspaceMode::default().next(),
+                    Some(mode) => WorkspaceMode::parse(mode)
+                        .map_or(WorkspaceMode::Worktree, WorkspaceMode::next),
                 };
-                self.save_project_settings(ProjectChange {
-                    workspace_mode: Some(next.into()),
+                self.save_settings(ProjectSettingsPatch {
+                    workspace_mode: Some(next.as_str().into()),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
             }
             Action::Attribution => {
-                let next = match self.attribution.as_deref() {
-                    Some("user") => "coAuthor",
-                    Some("coAuthor") => "agent",
-                    _ => "user",
+                let next = match self.attribution {
+                    Some(Attribution::User) => Attribution::CoAuthor,
+                    Some(Attribution::CoAuthor) => Attribution::Agent,
+                    _ => Attribution::User,
                 };
                 if let Some(Response::CommitPolicy { attribution, .. }) =
                     self.request(Request::SetCommitAttribution {
                         project_path: self.project.path.clone(),
-                        attribution: next.into(),
+                        attribution: next,
                     })
                 {
                     self.attribution = Some(attribution);
@@ -648,9 +642,15 @@ impl App {
             let mut agents = overview.agents.clone();
             // Usable agents first; the order is otherwise the host's.
             agents.sort_by_key(|agent| {
-                ["ready", "installed", "sign-in", "disabled", "missing"]
-                    .iter()
-                    .position(|state| *state == agent.state)
+                [
+                    AgentState::Ready,
+                    AgentState::Installed,
+                    AgentState::SignIn,
+                    AgentState::Disabled,
+                    AgentState::Missing,
+                ]
+                .iter()
+                .position(|state| *state == agent.state)
             });
             for agent in agents {
                 let default = if agent.id == overview.default_agent {
@@ -673,33 +673,51 @@ impl App {
         items
     }
 
-    /// Saves this project's approval, workspace or learning setting in the
-    /// host, which the app and every terminal then share.
-    fn save_project_settings(&mut self, change: ProjectChange) {
+    /// Saves a change to this project's settings in the host, which the app
+    /// and every terminal then share.
+    fn save_settings(&mut self, settings: ProjectSettingsPatch) {
+        self.save_project(settings, None, None);
+    }
+
+    /// Saves this project's planning question cap or planning agent; an empty
+    /// agent plans with the task's agent.
+    fn save_planning(&mut self, question_cap: Option<u32>, planner_agent: Option<String>) {
+        self.save_project(ProjectSettingsPatch::default(), question_cap, planner_agent);
+    }
+
+    fn save_project(
+        &mut self,
+        settings: ProjectSettingsPatch,
+        question_cap: Option<u32>,
+        planner_agent: Option<String>,
+    ) {
+        let ProjectSettingsPatch {
+            auto_approve,
+            workspace_mode,
+            learn_automatically,
+            learning_cadence,
+            sync_lessons,
+            agent_reflection,
+            export_lessons,
+            review_captures,
+        } = settings;
         if let Some(Response::Project { project }) = self.request(Request::SetProjectSettings {
             project_id: self.project.id.clone(),
-            auto_approve: change.auto_approve,
-            workspace_mode: change.workspace_mode,
-            learn_automatically: change.learn_automatically,
-            learning_cadence: None,
-            sync_lessons: change.sync_lessons,
-            agent_reflection: change.agent_reflection,
-            export_lessons: change.export_lessons,
-            question_cap: change.question_cap,
-            planner_agent: change.planner_agent,
-            review_captures: change.review_captures,
+            auto_approve,
+            workspace_mode,
+            learn_automatically,
+            learning_cadence,
+            sync_lessons,
+            agent_reflection,
+            export_lessons,
+            question_cap,
+            planner_agent,
+            review_captures,
         }) {
-            self.project.auto_approve = project.auto_approve;
-            self.project.workspace_mode = project.workspace_mode;
-            self.project.learn_automatically = project.learn_automatically;
-            self.project.learning_cadence = project.learning_cadence;
-            self.project.sync_lessons = project.sync_lessons;
-            self.project.agent_reflection = project.agent_reflection;
-            self.project.export_lessons = project.export_lessons;
-            self.project.question_cap = project.question_cap;
-            self.project.planner_agent = project.planner_agent;
-            self.project.review_captures = project.review_captures;
-            self.project.preview_command = project.preview_command;
+            if project.accent != self.project.accent {
+                brand::set_accent(project.accent.as_deref());
+            }
+            self.project = project;
         }
     }
 
@@ -804,6 +822,7 @@ impl App {
     }
 
     fn settings_items(&mut self) -> Vec<Item> {
+        let settings = self.project.settings.resolve();
         if self.attribution.is_none() {
             if let Some(Response::CommitPolicy { attribution, .. }) =
                 self.request(Request::CommitPolicy {
@@ -827,7 +846,7 @@ impl App {
             },
             Item {
                 label: format!("Auto-approve agent requests in {}", self.project.name),
-                detail: if self.project.auto_approve.unwrap_or(true) {
+                detail: if settings.auto_approve {
                     "on · asks only for risky actions".into()
                 } else {
                     "off · asks for every request".into()
@@ -836,15 +855,15 @@ impl App {
             },
             Item {
                 label: format!("Where tasks work in {}", self.project.name),
-                detail: workspace_mode_label(self.project.workspace_mode.as_deref()).into(),
+                detail: workspace_mode_label(settings.workspace_mode).into(),
                 action: Action::WorkspaceMode,
             },
             Item {
                 label: format!("Learn automatically in {}", self.project.name),
-                detail: if self.project.learn_automatically.unwrap_or(true) {
+                detail: if settings.learn_automatically {
                     format!(
                         "on · reflects every {} tool calls and when work ends",
-                        self.project.learning_cadence.unwrap_or(50)
+                        settings.learning_cadence
                     )
                 } else {
                     "off · /learn still saves lessons on request".into()
@@ -853,7 +872,7 @@ impl App {
             },
             Item {
                 label: format!("Reflect with an agent in {}", self.project.name),
-                detail: if self.project.agent_reflection.unwrap_or(false) {
+                detail: if settings.agent_reflection {
                     "on · uses your default agent's quota when work ends".into()
                 } else {
                     "off · reflection makes no model calls".into()
@@ -862,7 +881,7 @@ impl App {
             },
             Item {
                 label: format!("Sync learned lessons from {}", self.project.name),
-                detail: if self.project.sync_lessons.unwrap_or(true) {
+                detail: if settings.sync_lessons {
                     "included · when lesson sync is on in the app".into()
                 } else {
                     "excluded · lessons stay on this computer".into()
@@ -871,7 +890,7 @@ impl App {
             },
             Item {
                 label: format!("Write lessons to AGENTS.md in {}", self.project.name),
-                detail: if self.project.export_lessons.unwrap_or(false) {
+                detail: if settings.export_lessons {
                     "on · managed AGENTS.md section and Claude Code skill".into()
                 } else {
                     "off · lessons stay in Jackalope".into()
@@ -881,7 +900,7 @@ impl App {
             Item {
                 label: format!("Review screenshots in {}", self.project.name),
                 detail: review_captures_label(
-                    self.project.review_captures,
+                    settings.review_captures,
                     self.project.preview_command.is_some(),
                 )
                 .into(),
@@ -906,7 +925,7 @@ impl App {
             },
             Item {
                 label: format!("Commit author in {}", self.project.name),
-                detail: attribution_label(self.attribution.as_deref()).into(),
+                detail: attribution_label(self.attribution.as_ref()).into(),
                 action: Action::Attribution,
             },
             Item {
@@ -1014,7 +1033,7 @@ impl App {
             for agent in overview
                 .agents
                 .iter()
-                .filter(|agent| matches!(agent.state.as_str(), "ready" | "installed"))
+                .filter(|agent| matches!(agent.state, AgentState::Ready | AgentState::Installed))
             {
                 items.push(Item {
                     label: format!("{} {}", agent_glyph(&agent.state), agent.name),
@@ -1185,12 +1204,11 @@ impl App {
                             ""
                         };
                         if multiple {
-                            let tick = match (checked.contains(&option), brand::unicode()) {
-                                (true, true) => "☑",
-                                (false, true) => "☐",
-                                (true, false) => "[x]",
-                                (false, false) => "[ ]",
-                            };
+                            let tick = brand::mark_glyph(if checked.contains(&option) {
+                                brand::Mark::Ticked
+                            } else {
+                                brand::Mark::Unticked
+                            });
                             Item {
                                 label: format!("{tick} {option}{mark}"),
                                 detail: String::new(),
@@ -1345,9 +1363,9 @@ mod tests {
 
     #[test]
     fn review_screenshot_setting_explains_the_preview_requirement() {
-        assert!(review_captures_label(None, true).starts_with("on"));
-        assert!(review_captures_label(None, false).contains("preview command"));
-        assert!(review_captures_label(Some(false), true).starts_with("off"));
+        assert!(review_captures_label(true, true).starts_with("on"));
+        assert!(review_captures_label(true, false).contains("preview command"));
+        assert!(review_captures_label(false, true).starts_with("off"));
     }
 
     #[test]
@@ -1428,23 +1446,8 @@ mod tests {
     }
 }
 
-/// One settings change for the current project; `None` keeps a value.
-#[derive(Default)]
-struct ProjectChange {
-    auto_approve: Option<bool>,
-    workspace_mode: Option<String>,
-    learn_automatically: Option<bool>,
-    sync_lessons: Option<bool>,
-    agent_reflection: Option<bool>,
-    export_lessons: Option<bool>,
-    question_cap: Option<u32>,
-    /// Empty plans with the task's agent.
-    planner_agent: Option<String>,
-    review_captures: Option<bool>,
-}
-
-fn review_captures_label(enabled: Option<bool>, preview: bool) -> &'static str {
-    match (enabled.unwrap_or(true), preview) {
+fn review_captures_label(enabled: bool, preview: bool) -> &'static str {
+    match (enabled, preview) {
         (false, _) => "off · no screenshots after work finishes",
         (true, true) => "on · before/after shots from the preview, shown in the app",
         (true, false) => "on · save a preview command in the app to start",

@@ -5,7 +5,9 @@ use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
 use crate::host::{self, ColdStart};
 use crate::merge;
-use crate::protocol::{self, profile, AgentStatus, Project, Request, Response, SessionSummary};
+use crate::protocol::{
+    self, profile, AgentState, AgentStatus, Project, Request, Response, SessionSummary,
+};
 use serde_json::json;
 
 /// The project for this directory. A terminal tool should work where the user
@@ -40,8 +42,8 @@ fn swarms(connection: &mut Connection, path: &str) -> Vec<Swarm> {
             }) else {
                 return None;
             };
-            let progress = view.progress.as_deref()?;
-            progress.starts_with("swarm").then(|| Swarm {
+            let progress = view.progress.as_deref().filter(|_| view.swarm)?;
+            Some(Swarm {
                 id: plan.id.clone(),
                 line: format!("{} · {progress}", view.title),
                 needs_you: plan.needs_you,
@@ -393,10 +395,6 @@ fn agents(connection: &mut Connection) -> Result<(Vec<AgentStatus>, String), Str
     }
 }
 
-fn usable(agent: &AgentStatus) -> bool {
-    matches!(agent.state.as_str(), "ready" | "installed" | "sign-in")
-}
-
 pub fn status(as_json: bool) -> Result<(), String> {
     let profile = profile::root()
         .map(|path| path.display().to_string())
@@ -490,10 +488,10 @@ pub fn status(as_json: bool) -> Result<(), String> {
     match overview {
         Ok((agents, default_agent)) => {
             let mut first = true;
-            for agent in agents.iter().filter(|agent| usable(agent)) {
-                let state = match agent.state.as_str() {
-                    "ready" => agent.account.as_str(),
-                    "sign-in" => "sign-in needed",
+            for agent in agents.iter().filter(|agent| agent.state.is_usable()) {
+                let state = match agent.state {
+                    AgentState::Ready => agent.account.as_str(),
+                    AgentState::SignIn => "sign-in needed",
                     _ => "installed",
                 };
                 let default = if agent.id == default_agent {

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub use crate::cli_protocol::RunStatus;
+pub use crate::cli_protocol::{RunStatus, WorkspaceMode};
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -286,42 +286,6 @@ impl RunRequest {
     }
 }
 
-/// Where new work in a Git project runs.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum WorkspaceMode {
-    /// A separate worktree on a new `jackalope/<name>` branch named after the request.
-    #[default]
-    Worktree,
-    /// A new `jackalope/<name>` branch checked out in the project checkout.
-    Branch,
-    /// The project checkout on its current branch.
-    Current,
-    /// Ask the person when the task starts.
-    Ask,
-}
-
-impl WorkspaceMode {
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "worktree" => Some(Self::Worktree),
-            "branch" => Some(Self::Branch),
-            "current" => Some(Self::Current),
-            "ask" => Some(Self::Ask),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Worktree => "worktree",
-            Self::Branch => "branch",
-            Self::Current => "current",
-            Self::Ask => "ask",
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct CoordinationContext {
     pub managed: bool,
@@ -356,6 +320,9 @@ pub struct Runner {
     pub signed_in: bool,
     pub account: String,
     pub detail: String,
+    /// The sign-in check ran and found no signed-in account.
+    #[serde(skip)]
+    pub sign_in_needed: bool,
 }
 
 impl TaskRun {

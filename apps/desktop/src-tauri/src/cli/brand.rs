@@ -418,6 +418,9 @@ pub enum Mark {
     Check,
     /// Any other step of the work.
     Step,
+    /// A chosen option of a question that takes several.
+    Ticked,
+    Unticked,
 }
 
 pub fn mark_glyph(mark: Mark) -> &'static str {
@@ -461,6 +464,8 @@ pub fn mark_glyph(mark: Mark) -> &'static str {
         Mark::Command => ("▸", ">"),
         Mark::Check => ("◈", "c"),
         Mark::Step => ("·", "-"),
+        Mark::Ticked => ("☑", "[x]"),
+        Mark::Unticked => ("☐", "[ ]"),
     };
     if unicode() {
         unicode_glyph

@@ -384,7 +384,7 @@ pub fn rounds(
 /// The plan's round line and its proposed next round, as `plan rounds` prints them.
 pub fn rounds_lines(view: &PlanView) -> Vec<String> {
     let progress = view.progress.as_deref().unwrap_or_default();
-    if !progress.starts_with("swarm") {
+    if !view.swarm {
         return vec![format!("{} does not run in swarm rounds.", view.title)];
     }
     let mut lines = vec![format!("{} · {progress}", view.title)];
@@ -404,6 +404,7 @@ mod tests {
         let view = PlanView {
             title: "Export".into(),
             progress: Some("swarm (beta) round 2/5 · next round waits for your approval".into()),
+            swarm: true,
             next_round: vec!["Add the button".into()],
             ..Default::default()
         };

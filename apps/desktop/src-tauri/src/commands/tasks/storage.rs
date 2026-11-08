@@ -433,8 +433,9 @@ impl TaskRuntime {
         if run.screenshots.len() > 100 {
             run.screenshots.drain(..run.screenshots.len() - 100);
         }
-        if run.activity.len() > 150 {
-            run.activity.drain(..run.activity.len() - 150);
+        if run.activity.len() > events::ACTIVITY_KEPT {
+            run.activity
+                .drain(..run.activity.len() - events::ACTIVITY_KEPT);
         }
         if run.diagnostics.len() > 150 {
             run.diagnostics.drain(..run.diagnostics.len() - 150);

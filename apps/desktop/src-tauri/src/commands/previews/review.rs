@@ -94,7 +94,7 @@ pub struct Settings {
 /// usable preview command is saved.
 pub fn settings(record: &project_registry::ProjectRecord) -> Option<Settings> {
     let command = record.preview_command.as_deref()?.trim();
-    if record.review_captures == Some(false)
+    if !record.settings.resolve().review_captures
         || command.is_empty()
         || command.len() > 4000
         || command.contains('\0')

@@ -3,7 +3,6 @@
 //! agent, planned subtasks or a swarm through the managed-task queue.
 
 pub mod artifact;
-pub mod cli;
 #[cfg(test)]
 mod fixture_tests;
 pub mod handoff;

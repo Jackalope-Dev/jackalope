@@ -18,6 +18,67 @@ use std::time::Duration;
 #[path = "profile.rs"]
 pub mod profile;
 pub use profile::ProfilePaths;
+#[path = "project_settings.rs"]
+pub mod project_settings;
+pub use project_settings::{
+    ProjectSettings, ProjectSettingsPatch, WorkspaceMode, DEFAULT_LEARNING_CADENCE,
+    LEARNING_CADENCES,
+};
+
+/// An enum sent as one of a fixed set of strings. A string this build does not
+/// know is kept as `Unknown` and sent back unchanged, so a newer peer's value
+/// survives a round trip through an older one.
+macro_rules! wire_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($(#[$doc:meta])* $variant:ident = $text:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub enum $name {
+            $($(#[$doc])* $variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $text,)+
+                    Self::Unknown(text) => text,
+                }
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(text: &str) -> Self {
+                match text {
+                    $($text => Self::$variant,)+
+                    other => Self::Unknown(other.to_string()),
+                }
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                Ok(Self::from(String::deserialize(deserializer)?.as_str()))
+            }
+        }
+    };
+}
 
 /// Bumped when a request or response shape changes incompatibly. A client that
 /// finds a different version refuses to attach rather than guessing.
@@ -85,10 +146,9 @@ pub enum Request {
     },
     /// A conversation and the state of its current work.
     SessionDetail { session_id: String },
-    /// `pause`, `resume`, `finish` or `retry`.
     SessionAction {
         session_id: String,
-        action: String,
+        action: SessionCommand,
         /// The message a `cancel-message` takes back. Sent only then, since
         /// older hosts refuse fields they do not know.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -110,10 +170,9 @@ pub enum Request {
     Overview,
     /// A repository's commit authorship settings.
     CommitPolicy { project_path: String },
-    /// `user`, `coAuthor` or `agent`.
     SetCommitAttribution {
         project_path: String,
-        attribution: String,
+        attribution: Attribution,
     },
     /// Open the app's Changes page on a checkout (the project or a worktree).
     ShowChanges { path: String },
@@ -217,7 +276,7 @@ pub enum Request {
     /// `rounds` takes `pause`, `resume`, `stop` or `approve` in `text`.
     PlanAction {
         plan_id: String,
-        action: String,
+        action: PlanCommand,
         #[serde(default, skip_serializing_if = "String::is_empty")]
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -234,25 +293,66 @@ pub enum Request {
         body: String,
         draft: bool,
     },
-    /// A project's persistent agent browser. An empty `action` reads its
-    /// status; `open` opens it in a window to sign in (at `url` when given),
-    /// creating it on first use; `done` closes that window. Answers with
-    /// `Response::BrowserProfile`.
+    /// A project's persistent agent browser. `open` opens it in a window to
+    /// sign in (at `url` when given), creating it on first use; `done` closes
+    /// that window. Answers with `Response::BrowserProfile`.
     BrowserProfile {
         project_id: String,
-        #[serde(default, skip_serializing_if = "String::is_empty")]
-        action: String,
+        #[serde(default, skip_serializing_if = "BrowserCommand::is_status")]
+        action: BrowserCommand,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         url: Option<String>,
     },
     /// The conversation's computer: its bot's, or the one its task was given.
-    /// An empty `action` reads its status; `start` and `stop` change it.
     /// Answers with `Response::Computer`.
     Computer {
         session_id: String,
-        #[serde(default, skip_serializing_if = "String::is_empty")]
-        action: String,
+        #[serde(default, skip_serializing_if = "ComputerCommand::is_status")]
+        action: ComputerCommand,
     },
+}
+
+impl Request {
+    /// Whether sending this twice is harmless, so a client may retry it after
+    /// a dropped connection.
+    pub fn is_idempotent(&self) -> bool {
+        match self {
+            Self::Ping
+            | Self::Projects
+            | Self::EnsureProject { .. }
+            | Self::Sessions
+            | Self::SessionDetail { .. }
+            | Self::Watch { .. }
+            | Self::Overview
+            | Self::CommitPolicy { .. }
+            | Self::ShowWindow
+            | Self::ShowChanges { .. }
+            | Self::SetAccent { .. }
+            | Self::SetProjectSettings { .. }
+            | Self::Learnings { .. }
+            | Self::Learning { .. }
+            | Self::SetLearningArchived { .. } => true,
+            Self::StartSession { .. }
+            | Self::Send { .. }
+            | Self::Draft { .. }
+            | Self::SessionAction { .. }
+            | Self::Answer { .. }
+            | Self::Stop { .. }
+            | Self::SetCommitAttribution { .. }
+            | Self::SessionLearn { .. }
+            | Self::Sharpen { .. }
+            | Self::Usage
+            | Self::MergePrepare { .. }
+            | Self::MergeApply { .. }
+            | Self::PlanStart { .. }
+            | Self::Plans { .. }
+            | Self::PlanDetail { .. }
+            | Self::PlanAction { .. }
+            | Self::PullRequest { .. }
+            | Self::BrowserProfile { .. }
+            | Self::Computer { .. } => false,
+        }
+    }
 }
 
 /// A bot or task computer as a terminal shows it.
@@ -298,34 +398,9 @@ pub struct Project {
     /// The project's theme accent as `#rrggbb`, when the app has one for it.
     #[serde(default)]
     pub accent: Option<String>,
-    /// Whether routine agent requests are approved without asking. Absent from
-    /// older hosts; treat absent as on.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub auto_approve: Option<bool>,
-    /// Where new tasks work: `worktree`, `branch`, `current` or `ask`. Absent
-    /// from older hosts; treat absent as `worktree`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workspace_mode: Option<String>,
-    /// Whether background learning is on. Absent from older hosts; treat
-    /// absent as on.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub learn_automatically: Option<bool>,
-    /// Reported tool calls between background reflections. Absent from older
-    /// hosts.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub learning_cadence: Option<u32>,
-    /// Whether learned lessons are included in account lesson sync. Absent
-    /// from older hosts; treat absent as included.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sync_lessons: Option<bool>,
-    /// Whether the default agent also reflects on finished work. Absent from
-    /// older hosts; treat absent as off.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent_reflection: Option<bool>,
-    /// Whether active lessons are mirrored into AGENTS.md and a Claude Code
-    /// skill. Absent from older hosts; treat absent as off.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub export_lessons: Option<bool>,
+    /// Absent from older hosts, which mean the defaults.
+    #[serde(flatten)]
+    pub settings: ProjectSettingsPatch,
     /// The project's saved check, as the app mirrors it. Absent when none is
     /// saved or from older hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -345,10 +420,6 @@ pub struct Project {
     /// hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_command: Option<String>,
-    /// Whether finished work gets review screenshots when a preview command is
-    /// saved. Absent from older hosts.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub review_captures: Option<bool>,
 }
 
 /// A lesson Jackalope learned for a project.
@@ -497,6 +568,9 @@ pub struct PlanView {
     /// A one-line summary of running work, when it runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<String>,
+    /// The plan runs as a swarm in rounds. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub swarm: bool,
     /// How approval would verify the work: `project`, `criteria` or `review`
     /// (no automatic check). Absent from older hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -673,8 +747,7 @@ pub struct RunStep {
 pub struct AgentStatus {
     pub id: String,
     pub name: String,
-    /// `ready`, `sign-in`, `installed`, `missing` or `disabled`.
-    pub state: String,
+    pub state: AgentState,
     pub account: String,
     pub detail: String,
     /// Models configured for this agent in the app; empty when none are listed.
@@ -743,7 +816,7 @@ pub enum Response {
         default_agent: String,
     },
     CommitPolicy {
-        attribution: String,
+        attribution: Attribution,
         name: String,
         email: String,
     },
@@ -820,37 +893,22 @@ impl Response {
     }
 }
 
-/// A task run's status, saved and sent as its lowercase name. A name this
-/// build does not know is kept as `Unknown` and written back unchanged.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RunStatus {
-    Starting,
-    Running,
-    Stopping,
-    Stopped,
-    Interrupted,
-    Failed,
-    /// The agent finished; its result waits for review.
-    Review,
-    Reviewed,
-    Unknown(String),
+wire_enum! {
+    /// A task run's status, saved and sent as its lowercase name.
+    pub enum RunStatus {
+        Starting = "starting",
+        Running = "running",
+        Stopping = "stopping",
+        Stopped = "stopped",
+        Interrupted = "interrupted",
+        Failed = "failed",
+        /// The agent finished; its result waits for review.
+        Review = "review",
+        Reviewed = "reviewed",
+    }
 }
 
 impl RunStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Starting => "starting",
-            Self::Running => "running",
-            Self::Stopping => "stopping",
-            Self::Stopped => "stopped",
-            Self::Interrupted => "interrupted",
-            Self::Failed => "failed",
-            Self::Review => "review",
-            Self::Reviewed => "reviewed",
-            Self::Unknown(name) => name,
-        }
-    }
-
     /// The agent process exists or is being started or stopped.
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Starting | Self::Running | Self::Stopping)
@@ -894,38 +952,103 @@ impl Default for RunStatus {
     }
 }
 
-impl From<&str> for RunStatus {
-    fn from(name: &str) -> Self {
-        match name {
-            "starting" => Self::Starting,
-            "running" => Self::Running,
-            "stopping" => Self::Stopping,
-            "stopped" => Self::Stopped,
-            "interrupted" => Self::Interrupted,
-            "failed" => Self::Failed,
-            "review" => Self::Review,
-            "reviewed" => Self::Reviewed,
-            other => Self::Unknown(other.to_string()),
-        }
+wire_enum! {
+    /// What a conversation is asked to do.
+    pub enum SessionCommand {
+        Pause = "pause",
+        Resume = "resume",
+        Finish = "finish",
+        Retry = "retry",
+        /// Take back the queued message named by `message_id`.
+        CancelMessage = "cancel-message",
     }
 }
 
-impl std::fmt::Display for RunStatus {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
+wire_enum! {
+    /// What a plan is asked to do; see `Request::PlanAction`.
+    pub enum PlanCommand {
+        Keep = "keep",
+        Replan = "replan",
+        Approve = "approve",
+        Save = "save",
+        Export = "export",
+        Accept = "accept",
+        Redo = "redo",
+        ReplanDeviation = "replan-deviation",
+        Rounds = "rounds",
     }
 }
 
-impl Serialize for RunStatus {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
+wire_enum! {
+    /// What happens to a project's agent browser; `Status` only reads it.
+    pub enum BrowserCommand {
+        Status = "",
+        Open = "open",
+        Done = "done",
     }
 }
 
-impl<'de> Deserialize<'de> for RunStatus {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Ok(Self::from(String::deserialize(deserializer)?.as_str()))
+impl Default for BrowserCommand {
+    fn default() -> Self {
+        Self::Status
     }
+}
+
+impl BrowserCommand {
+    pub fn is_status(&self) -> bool {
+        *self == Self::Status
+    }
+}
+
+wire_enum! {
+    /// What happens to a conversation's computer; `Status` only reads it.
+    pub enum ComputerCommand {
+        Status = "",
+        Start = "start",
+        Stop = "stop",
+    }
+}
+
+impl Default for ComputerCommand {
+    fn default() -> Self {
+        Self::Status
+    }
+}
+
+impl ComputerCommand {
+    pub fn is_status(&self) -> bool {
+        *self == Self::Status
+    }
+}
+
+wire_enum! {
+    /// Whether an agent can take work.
+    pub enum AgentState {
+        Ready = "ready",
+        /// Installed, and its sign-in check found no signed-in account.
+        SignIn = "sign-in",
+        /// Installed; its sign-in cannot be checked ahead of a task.
+        Installed = "installed",
+        Missing = "missing",
+        Disabled = "disabled",
+    }
+}
+
+impl AgentState {
+    /// Installed and not turned off, so work can be routed to it.
+    pub fn is_usable(&self) -> bool {
+        matches!(self, Self::Ready | Self::Installed | Self::SignIn)
+    }
+}
+
+/// Who commits are attributed to in a repository.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Attribution {
+    Agent,
+    CoAuthor,
+    #[default]
+    User,
 }
 
 pub fn working(status: Option<&RunStatus>) -> bool {
@@ -1161,9 +1284,9 @@ mod tests {
         .unwrap();
         assert_eq!(
             (
-                older.sync_lessons,
-                older.agent_reflection,
-                older.export_lessons
+                older.settings.sync_lessons,
+                older.settings.agent_reflection,
+                older.settings.export_lessons
             ),
             (None, None, None)
         );
@@ -1185,7 +1308,8 @@ mod tests {
         assert!(!request.contains("agent_reflection") && !request.contains("export_lessons"));
         assert!(!request.contains("question_cap") && !request.contains("planner_agent"));
         assert!(!request.contains("review_captures"));
-        assert_eq!(older.review_captures, None);
+        assert_eq!(older.settings.review_captures, None);
+        assert!(older.settings.resolve().review_captures);
         let parsed: Request = serde_json::from_str(
             r#"{"request":"set-project-settings","project_id":"p","auto_approve":true}"#,
         )
@@ -1222,14 +1346,16 @@ mod tests {
     fn computer_requests_are_additive() {
         let status = serde_json::to_string(&Request::Computer {
             session_id: "s".into(),
-            action: String::new(),
+            action: ComputerCommand::Status,
         })
         .unwrap();
         assert_eq!(status, r#"{"request":"computer","session_id":"s"}"#);
         let start: Request =
             serde_json::from_str(r#"{"request":"computer","session_id":"s","action":"start"}"#)
                 .unwrap();
-        assert!(matches!(start, Request::Computer { action, .. } if action == "start"));
+        assert!(
+            matches!(start, Request::Computer { action, .. } if action == ComputerCommand::Start)
+        );
         let none: Response =
             serde_json::from_str(r#"{"response":"computer","computer":null}"#).unwrap();
         assert!(matches!(none, Response::Computer { computer: None }));
@@ -1239,7 +1365,7 @@ mod tests {
     fn browser_profile_requests_are_additive() {
         let status = serde_json::to_string(&Request::BrowserProfile {
             project_id: "p".into(),
-            action: String::new(),
+            action: BrowserCommand::Status,
             url: None,
         })
         .unwrap();
@@ -1249,7 +1375,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            matches!(open, Request::BrowserProfile { action, url: Some(_), .. } if action == "open")
+            matches!(open, Request::BrowserProfile { action, url: Some(_), .. } if action == BrowserCommand::Open)
         );
         let response: Response =
             serde_json::from_str(r#"{"response":"browser-profile","profile":null}"#).unwrap();
