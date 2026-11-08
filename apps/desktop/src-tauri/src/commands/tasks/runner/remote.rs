@@ -126,10 +126,7 @@ impl AttemptRunner for RemoteRunner {
             &root,
             bridge.map(|b| b.endpoint.as_str()),
         )?;
-        if runtime
-            .register_process(id, Some(workspace), || Ok((None, ())))?
-            .is_none()
-        {
+        if !runtime.claim_workspace(id, workspace)? {
             runtime.mark_stopped(id);
             return Ok(Step::Stopped);
         }

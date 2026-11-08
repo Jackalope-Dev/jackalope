@@ -136,18 +136,21 @@ impl TaskRuntime {
         start: impl FnOnce() -> Result<(Option<Arc<AgentProcess>>, T), String>,
     ) -> Result<Option<T>, String> {
         let mut inner = self.inner.lock().unwrap();
-        if inner.canceled.contains(id) {
+        if !startable(&inner, id, workspace)? {
             return Ok(None);
-        }
-        if workspace.is_some_and(|workspace| super::runner::workspace_in_use(&inner, id, workspace))
-        {
-            return Err(super::runner::WORKSPACE_IN_USE.into());
         }
         let (process, value) = start()?;
         if let Some(process) = process {
             inner.processes.insert(id.into(), process);
         }
         Ok(Some(value))
+    }
+
+    /// Whether attempt `id`, which starts no local process, may still start
+    /// in `workspace`: false when it was already stopped, an error when
+    /// another active attempt is using the workspace.
+    pub(super) fn claim_workspace(&self, id: &str, workspace: &str) -> Result<bool, String> {
+        startable(&self.inner.lock().unwrap(), id, Some(workspace))
     }
 
     pub(super) fn unregister_process(&self, id: &str) {
@@ -185,6 +188,16 @@ impl TaskRuntime {
             update(run);
         })
     }
+}
+
+fn startable(inner: &Inner, id: &str, workspace: Option<&str>) -> Result<bool, String> {
+    if inner.canceled.contains(id) {
+        return Ok(false);
+    }
+    if workspace.is_some_and(|workspace| super::runner::workspace_in_use(inner, id, workspace)) {
+        return Err(super::runner::WORKSPACE_IN_USE.into());
+    }
+    Ok(true)
 }
 
 /// Reads `stdout` line by line, each clipped to [`STDOUT_LINE_LIMIT`].
