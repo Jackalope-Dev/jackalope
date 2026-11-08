@@ -828,7 +828,7 @@ fn split_agent_mentions(text: &str, agents: &[AgentStatus]) -> (Vec<String>, Str
         let agent = word.strip_prefix('@').and_then(|name| {
             agents
                 .iter()
-                .find(|agent| super::pickers::usable(agent) && agent.id.eq_ignore_ascii_case(name))
+                .find(|agent| agent.state.is_usable() && agent.id.eq_ignore_ascii_case(name))
         });
         match agent {
             Some(agent) => {

@@ -245,7 +245,7 @@ impl App {
             Some(Ok(overview)) => overview
                 .agents
                 .iter()
-                .filter(|agent| super::pickers::usable(agent))
+                .filter(|agent| agent.state.is_usable())
                 .filter(|agent| {
                     agent.id.to_lowercase().starts_with(&wanted)
                         || agent

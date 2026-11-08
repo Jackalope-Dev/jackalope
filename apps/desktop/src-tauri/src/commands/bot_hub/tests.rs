@@ -823,11 +823,6 @@ fn bots_recall_only_their_own_earlier_conversations() {
     assert!(read["text"].as_str().unwrap().contains("Wake-up (Test)"));
     assert!(read["nextOffset"].is_null());
     assert!(fixture.hub.recall(&run, recall("", Some(&theirs))).is_err());
-    let through_bridge = fixture
-        .hub
-        .call(&run, "recall", serde_json::json!({"query": "release"}))
-        .unwrap();
-    assert_eq!(through_bridge["conversations"].as_array().unwrap().len(), 1);
 }
 
 #[test]

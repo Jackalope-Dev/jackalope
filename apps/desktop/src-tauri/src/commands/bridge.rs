@@ -17,6 +17,7 @@ mod table;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
 pub(in crate::commands) use http::help;
 pub(crate) use http::{http_bootstrap, router};
 pub(in crate::commands) use permission::{approve_computer_tool, approve_remote_execute};

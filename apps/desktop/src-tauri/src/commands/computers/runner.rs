@@ -347,7 +347,9 @@ pub(crate) fn for_run(run_id: &str) -> Access {
         .unwrap_or_else(|| Access::device(false))
 }
 
-/// The tools among `names` an attempt with `access` is offered, in order.
+/// The tools among `names` an attempt with `access` is offered, in order: the
+/// same filter the bridge's tool list applies.
+#[cfg(test)]
 pub(crate) fn offered<'a>(
     access: &Access,
     names: impl IntoIterator<Item = &'a str>,

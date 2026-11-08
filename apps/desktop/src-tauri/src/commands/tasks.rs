@@ -22,7 +22,7 @@ mod routing;
 pub(in crate::commands) mod runner;
 mod runners;
 mod runtime;
-mod snapshots;
+pub(crate) mod snapshots;
 pub(super) mod speed;
 mod storage;
 #[cfg(test)]
@@ -230,7 +230,7 @@ macro_rules! tauri_commands {
             commands::tasks::task_project_directory,
             commands::tasks::task_create_project,
             commands::tasks::task_runs,
-            commands::tasks::task_changes,
+            commands::tasks::snapshots::task_changes,
             commands::tasks::task_history_recovery,
             commands::tasks::task_retry,
             commands::tasks::task_retry_save,

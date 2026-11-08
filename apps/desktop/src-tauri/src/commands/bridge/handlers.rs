@@ -17,7 +17,7 @@ use crate::commands::{
 use axum::http::StatusCode;
 use rmcp::{model::CallToolResult, schemars};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 fn joined(error: impl std::fmt::Display) -> ToolError {
     ToolError::failed(error.to_string())
@@ -93,7 +93,7 @@ pub(super) async fn discover_harness_tools(
         .collect();
     loaded.sort_by(|a, b| a.name.cmp(&b.name));
     if super::Surface::of(call.run()) != super::Surface::Deferred {
-        return Ok(json!({"tools":loaded}).into());
+        return Ok(serde_json::json!({"tools":loaded}).into());
     }
     call.runtime()
         .update_checked(&call.run().id, |run| {
@@ -103,7 +103,7 @@ pub(super) async fn discover_harness_tools(
         })
         .map_err(ToolError::failed)?;
     Ok(Reply::ListChanged(
-        json!({"tools":loaded,"hint":"These tools are now included in tools/list. Use their normal named calls and permissions. Discovery grants no approval and does not execute an operation."}),
+        serde_json::json!({"tools":loaded,"hint":"These tools are now included in tools/list. Use their normal named calls and permissions. Discovery grants no approval and does not execute an operation."}),
     ))
 }
 

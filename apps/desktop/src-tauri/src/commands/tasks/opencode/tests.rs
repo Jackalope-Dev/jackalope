@@ -332,9 +332,10 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
             crate::commands::project_registry::set_settings(
                 &runtime,
                 "fixture",
-                Some(false),
-                None,
-                Default::default(),
+                &crate::commands::project_registry::ProjectSettingsPatch {
+                    auto_approve: Some(false),
+                    ..Default::default()
+                },
             )
             .unwrap();
         }

@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::State;
 
-pub use crate::cli_protocol::{ProjectSettings, ProjectSettingsPatch};
+pub use crate::cli_protocol::project_settings::{ProjectSettings, ProjectSettingsPatch};
 
 use super::tasks::TaskRuntime;
 
@@ -342,7 +342,7 @@ mod tests {
         assert!(legacy.settings.resolve().learn_automatically);
         assert_eq!(
             legacy.settings.resolve().learning_cadence,
-            crate::cli_protocol::DEFAULT_LEARNING_CADENCE
+            crate::cli_protocol::project_settings::DEFAULT_LEARNING_CADENCE
         );
         let future: ProjectRecord = serde_json::from_str(
             r#"{"id":"new","name":"New","path":"/new","workspaceMode":"cloud","autoApprove":false}"#,
@@ -360,7 +360,7 @@ mod tests {
         assert!(!ledger.projects[1].settings.resolve().learn_automatically);
         assert_eq!(
             ledger.projects[1].settings.resolve().learning_cadence,
-            crate::cli_protocol::DEFAULT_LEARNING_CADENCE,
+            crate::cli_protocol::project_settings::DEFAULT_LEARNING_CADENCE,
             "an out-of-range cadence reads as the default"
         );
     }

@@ -8,7 +8,7 @@ use tauri::State;
 
 use super::tasks::TaskRuntime;
 
-mod credentials;
+pub(crate) mod credentials;
 pub use credentials::agent_profile_save_key;
 pub(in crate::commands) use credentials::save_imported_key;
 
@@ -205,7 +205,7 @@ macro_rules! tauri_commands {
             commands::agent_profiles::agent_profile_list,
             commands::agent_profiles::agent_profile_create,
             commands::agent_profiles::agent_profile_set_config_dir,
-            commands::agent_profiles::agent_profile_save_key,
+            commands::agent_profiles::credentials::agent_profile_save_key,
             commands::agent_profiles::agent_profile_complete_provider,
             commands::agent_profiles::agent_profile_rename,
             commands::agent_profiles::agent_profile_delete,

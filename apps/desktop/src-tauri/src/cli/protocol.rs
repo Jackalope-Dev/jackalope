@@ -20,10 +20,7 @@ pub mod profile;
 pub use profile::ProfilePaths;
 #[path = "project_settings.rs"]
 pub mod project_settings;
-pub use project_settings::{
-    ProjectSettings, ProjectSettingsPatch, WorkspaceMode, DEFAULT_LEARNING_CADENCE,
-    LEARNING_CADENCES,
-};
+pub use project_settings::{ProjectSettingsPatch, WorkspaceMode};
 
 /// An enum sent as one of a fixed set of strings. A string this build does not
 /// know is kept as `Unknown` and sent back unchanged, so a newer peer's value

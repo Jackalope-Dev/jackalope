@@ -3,8 +3,8 @@ pub(super) mod autonomy;
 pub mod cloud;
 pub mod deploy;
 pub mod peers;
-mod reconciliation;
-mod scope_audit;
+pub(crate) mod reconciliation;
+pub(crate) mod scope_audit;
 pub mod subtasks;
 pub mod swarm_setup;
 pub use reconciliation::{queue_assist_policy, queue_retry_reconciliation};
@@ -364,10 +364,10 @@ macro_rules! tauri_commands {
             commands::coordination::hosts::queue_set_hosts,
             commands::coordination::queue_cancel,
             commands::coordination::queue_release,
-            commands::coordination::queue_cancel_agreement,
-            commands::coordination::queue_reconcile_scope,
-            commands::coordination::queue_assist_policy,
-            commands::coordination::queue_retry_reconciliation,
+            commands::coordination::scope_audit::queue_cancel_agreement,
+            commands::coordination::scope_audit::queue_reconcile_scope,
+            commands::coordination::reconciliation::queue_assist_policy,
+            commands::coordination::reconciliation::queue_retry_reconciliation,
             commands::coordination::managed::task_plan_create,
             commands::coordination::managed::task_plan_preview,
             commands::coordination::managed::task_plan_start,

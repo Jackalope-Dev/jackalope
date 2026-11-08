@@ -12,7 +12,7 @@ use super::{
     live_sessions::LiveSessions,
     tasks::{RunRequest, TaskRuntime},
 };
-use pairing::{pairing_code, SHORT_ALPHABET, SHORT_LENGTH};
+use pairing::{pairing_code, SHORT_ALPHABET};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -439,7 +439,7 @@ mod tests {
     fn short_codes_are_typable_and_read_forgivingly() {
         for _ in 0..50 {
             let code = short_code();
-            assert_eq!(code.len(), SHORT_LENGTH + 1);
+            assert_eq!(code.len(), pairing::SHORT_LENGTH + 1);
             assert_eq!(&code[5..6], "-");
             assert!(code
                 .bytes()

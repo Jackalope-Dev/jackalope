@@ -19,6 +19,9 @@ mod merge;
 mod once;
 mod planning;
 mod prefs;
+#[path = "../commands/process_control/console.rs"]
+#[allow(dead_code)]
+mod process_control;
 mod protocol;
 // Shared with the app so both measure a checkout's changes the same way.
 #[path = "../commands/repo.rs"]

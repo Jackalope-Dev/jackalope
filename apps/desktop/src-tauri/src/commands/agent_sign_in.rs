@@ -11,7 +11,7 @@ use std::{
 };
 use tauri::State;
 
-mod status;
+pub(crate) mod status;
 pub use status::agent_profile_status;
 
 static SIGNING_IN: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(Mutex::default);
@@ -309,7 +309,7 @@ macro_rules! tauri_commands {
             commands::agent_sign_in::agent_profile_sign_in_input,
             commands::agent_sign_in::agent_profile_sign_in_resize,
             commands::agent_sign_in::agent_profile_sign_in_stop,
-            commands::agent_sign_in::agent_profile_status,
+            commands::agent_sign_in::status::agent_profile_status,
         ] $($rest)*)
     };
 }
