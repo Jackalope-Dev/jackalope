@@ -343,16 +343,14 @@ impl Coordinator {
             {
                 let result = self.finish_assist(inner, runs, &policy, &job);
                 if let Err(error) = result {
-                    let mut ledger = inner.ledger.clone();
-                    let saved = ledger
-                        .reconciliations
-                        .iter_mut()
-                        .find(|j| j.id == job.id)
-                        .unwrap();
-                    saved.status = "failed".into();
-                    saved.error = Some(error);
-                    self.commit(inner, |saved| {
-                        *saved = ledger;
+                    self.commit(inner, |ledger| {
+                        let saved = ledger
+                            .reconciliations
+                            .iter_mut()
+                            .find(|j| j.id == job.id)
+                            .unwrap();
+                        saved.status = "failed".into();
+                        saved.error = Some(error);
                         Ok::<_, String>(())
                     })?;
                 }
@@ -467,10 +465,8 @@ impl Coordinator {
                     ) {
                         job.status = "review".into();
                         job.held = Some(reason);
-                        let mut ledger = inner.ledger.clone();
-                        ledger.reconciliations.push(job);
-                        self.commit(inner, |saved| {
-                            *saved = ledger;
+                        self.commit(inner, |ledger| {
+                            ledger.reconciliations.push(job);
                             Ok::<_, String>(())
                         })?;
                         return Ok(true);
@@ -493,10 +489,8 @@ impl Coordinator {
             {
                 job.plan_id = Some(plan.id.clone());
                 job.status = if policy.merge { "applying" } else { "review" }.into();
-                let mut ledger = inner.ledger.clone();
-                ledger.reconciliations.push(job.clone());
-                self.commit(inner, |saved| {
-                    *saved = ledger;
+                self.commit(inner, |ledger| {
+                    ledger.reconciliations.push(job.clone());
                     Ok::<_, String>(())
                 })?;
                 if policy.merge {
@@ -510,10 +504,8 @@ impl Coordinator {
             // Persist the launch claim first; a crash never silently launches another worker.
             let run_id = Uuid::new_v4().to_string();
             job.run_id = Some(run_id.clone());
-            let mut ledger = inner.ledger.clone();
-            ledger.reconciliations.push(job.clone());
-            self.commit(inner, |saved| {
-                *saved = ledger;
+            self.commit(inner, |ledger| {
+                ledger.reconciliations.push(job.clone());
                 Ok::<_, String>(())
             })?;
             let launched = (|| {
@@ -555,21 +547,19 @@ impl Coordinator {
                     },
                 )
             })();
-            let mut ledger = inner.ledger.clone();
-            let saved = ledger
-                .reconciliations
-                .iter_mut()
-                .find(|j| j.id == job_id)
-                .unwrap();
-            match launched {
-                Ok(_) => saved.status = "running".into(),
-                Err(error) => {
-                    saved.status = "failed".into();
-                    saved.error = Some(error);
+            self.commit(inner, |ledger| {
+                let saved = ledger
+                    .reconciliations
+                    .iter_mut()
+                    .find(|j| j.id == job_id)
+                    .unwrap();
+                match launched {
+                    Ok(_) => saved.status = "running".into(),
+                    Err(error) => {
+                        saved.status = "failed".into();
+                        saved.error = Some(error);
+                    }
                 }
-            }
-            self.commit(inner, |saved| {
-                *saved = ledger;
                 Ok::<_, String>(())
             })?;
             return Ok(true);
@@ -587,17 +577,7 @@ impl Coordinator {
         let directory = self.runtime.integration_directory();
         if let Some(id) = &job.plan_id {
             if integration::recover_applied(&directory, runs, id)?.is_some() {
-                let mut ledger = inner.ledger.clone();
-                ledger
-                    .reconciliations
-                    .iter_mut()
-                    .find(|j| j.id == job.id)
-                    .unwrap()
-                    .status = "merged".into();
-                return self.commit(inner, |saved| {
-                    *saved = ledger;
-                    Ok::<_, String>(())
-                });
+                return self.mark_merged(inner, &job.id);
             }
         }
         for id in &job.source_ids {
@@ -677,16 +657,14 @@ impl Coordinator {
                     runs,
                     &ids,
                 ) {
-                    let mut ledger = inner.ledger.clone();
-                    let saved = ledger
-                        .reconciliations
-                        .iter_mut()
-                        .find(|j| j.id == job.id)
-                        .unwrap();
-                    saved.status = "review".into();
-                    saved.held = Some(reason);
-                    return self.commit(inner, |saved| {
-                        *saved = ledger;
+                    return self.commit(inner, |ledger| {
+                        let saved = ledger
+                            .reconciliations
+                            .iter_mut()
+                            .find(|j| j.id == job.id)
+                            .unwrap();
+                        saved.status = "review".into();
+                        saved.held = Some(reason);
                         Ok::<_, String>(())
                     });
                 }
@@ -706,24 +684,6 @@ impl Coordinator {
             );
         }
         self.refresh_scopes_locked(inner)?;
-        // A recorded mediator result is distinct from the original owners agreeing.
-        let mut ledger = inner.ledger.clone();
-        if let Some(run_id) = job.run_id.as_ref().filter(|_| job.plan_id.is_none()) {
-            for (id, _) in &job.agreement_revisions {
-                let a = ledger.agreements.iter_mut().find(|a| &a.id == id).unwrap();
-                a.status = "reconciled".into();
-                a.resolution_run = Some(run_id.clone());
-                a.revision += 1;
-                a.updated_at = Utc::now().to_rfc3339();
-                let a = a.clone();
-                agreements::announce(&mut ledger, &a, "jackalope");
-            }
-        }
-        let saved = ledger
-            .reconciliations
-            .iter_mut()
-            .find(|j| j.id == job.id)
-            .unwrap();
         // A plan already being applied was cleared by the policy before it started.
         let held = if policy.merge && plan.status == "ready" {
             match plan.integration_head.as_deref() {
@@ -738,11 +698,9 @@ impl Coordinator {
             None
         };
         let merge = policy.merge && held.is_none();
-        saved.plan_id = Some(plan.id.clone());
-        saved.status = if merge { "applying" } else { "review" }.into();
-        saved.held = held;
+        let mediator = job.run_id.as_ref().filter(|_| job.plan_id.is_none());
         // Save the revised decision versions together with the merge receipt for restart.
-        saved.agreement_revisions = job
+        let revisions: Vec<_> = job
             .agreement_revisions
             .iter()
             .map(|(id, _)| {
@@ -755,38 +713,57 @@ impl Coordinator {
                         .find(|a| &a.id == id)
                         .unwrap()
                         .revision
-                        + u64::from(job.run_id.is_some() && job.plan_id.is_none()),
+                        + u64::from(mediator.is_some()),
                 )
             })
             .collect();
-        self.validate_integration_locked(&ledger, runs, &ids)?;
-        for source in &plan.sources {
-            if ledger.scope_audits.iter().any(|audit| {
-                audit.run_id == source.run_id && audit.tree.as_ref() != Some(&source.tree)
-            }) {
-                return Err(
-                    "Source files changed during the scope check. Review and retry.".into(),
-                );
+        self.commit(inner, |ledger| {
+            // A recorded mediator result is distinct from the original owners agreeing.
+            if let Some(run_id) = mediator {
+                for (id, _) in &job.agreement_revisions {
+                    let a = ledger.agreements.iter_mut().find(|a| &a.id == id).unwrap();
+                    a.status = "reconciled".into();
+                    a.resolution_run = Some(run_id.clone());
+                    a.revision += 1;
+                    a.updated_at = Utc::now().to_rfc3339();
+                    let a = a.clone();
+                    agreements::announce(ledger, &a, "jackalope");
+                }
             }
-        }
-        self.commit(inner, |saved| {
-            *saved = ledger;
+            let saved = ledger
+                .reconciliations
+                .iter_mut()
+                .find(|j| j.id == job.id)
+                .unwrap();
+            saved.plan_id = Some(plan.id.clone());
+            saved.status = if merge { "applying" } else { "review" }.into();
+            saved.held = held;
+            saved.agreement_revisions = revisions;
+            self.validate_integration_locked(ledger, runs, &ids)?;
+            for source in &plan.sources {
+                if ledger.scope_audits.iter().any(|audit| {
+                    audit.run_id == source.run_id && audit.tree.as_ref() != Some(&source.tree)
+                }) {
+                    return Err(
+                        "Source files changed during the scope check. Review and retry.".into(),
+                    );
+                }
+            }
             Ok::<_, String>(())
         })?;
         if merge {
             integration::apply(&directory, runs, &plan.id)?;
-            let mut ledger = inner.ledger.clone();
-            ledger
-                .reconciliations
-                .iter_mut()
-                .find(|j| j.id == job.id)
-                .unwrap()
-                .status = "merged".into();
-            self.commit(inner, |saved| {
-                *saved = ledger;
-                Ok::<_, String>(())
-            })?;
+            self.mark_merged(inner, &job.id)?;
         }
         Ok(())
+    }
+
+    fn mark_merged(&self, inner: &mut Inner, job_id: &str) -> Result<(), String> {
+        self.commit(inner, |ledger| {
+            if let Some(job) = ledger.reconciliations.iter_mut().find(|j| j.id == job_id) {
+                job.status = "merged".into();
+            }
+            Ok::<_, String>(())
+        })
     }
 }
