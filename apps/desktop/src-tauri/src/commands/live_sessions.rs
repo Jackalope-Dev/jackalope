@@ -1081,10 +1081,11 @@ impl LiveSessions {
                     request.prompt = format!("{history}\n{}", request.prompt);
                 }
             }
-            if let Err(error) = self.coordinator.start_manual(request) {
-                if error == "Session is waiting for execution capacity." {
-                    continue;
-                }
+            let started = self.coordinator.start_session(request);
+            if let Ok(super::coordination::SessionStart::Waiting) = started {
+                continue;
+            }
+            if let Err(error) = started {
                 self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
                     if let Some(batch) = session

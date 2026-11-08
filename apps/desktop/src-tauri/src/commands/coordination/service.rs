@@ -521,6 +521,37 @@ impl Coordinator {
         self.transact(|inner, guard| self.start_manual_locked(inner, guard, request))
     }
 
+    /// Starts a live session's next attempt, or reports that it waits for a
+    /// free execution slot.
+    pub(crate) fn start_session(&self, request: RunRequest) -> Result<SessionStart, String> {
+        self.runtime.access.ensure()?;
+        self.ensure_storage_loaded()?;
+        self.transact(|inner, guard| {
+            if self.awaits_capacity(inner, &request)? {
+                return Ok(SessionStart::Waiting);
+            }
+            self.start_manual_locked(inner, guard, request)
+                .map(|_| SessionStart::Started)
+        })
+    }
+
+    /// Whether a session or planner attempt that has not started would exceed
+    /// the execution limit.
+    fn awaits_capacity(&self, inner: &Inner, request: &RunRequest) -> Result<bool, String> {
+        if request.live_session_id.is_none()
+            && !inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .any(|task| task.planner_run_id == request.id)
+        {
+            return Ok(false);
+        }
+        let runs = self.runtime.integration_runs()?;
+        Ok(!runs.iter().any(|run| run.id == request.id)
+            && runs.iter().filter(|run| run.status.is_active()).count() >= inner.concurrency)
+    }
+
     pub(super) fn start_manual_locked(
         &self,
         inner: &mut Inner,
@@ -535,19 +566,8 @@ impl Coordinator {
                 &mut request,
             )?;
         }
-        if request.live_session_id.is_some()
-            || inner
-                .ledger
-                .managed_tasks
-                .iter()
-                .any(|task| task.planner_run_id == request.id)
-        {
-            let runs = self.runtime.integration_runs()?;
-            if !runs.iter().any(|run| run.id == request.id)
-                && runs.iter().filter(|run| run.status.is_active()).count() >= inner.concurrency
-            {
-                return Err("Session is waiting for execution capacity.".into());
-            }
+        if self.awaits_capacity(inner, &request)? {
+            return Err("Session is waiting for execution capacity.".into());
         }
         let endpoint = inner
             .url
@@ -750,6 +770,13 @@ impl Coordinator {
             error: None,
         }))
     }
+}
+
+/// How [`Coordinator::start_session`] ended.
+pub(crate) enum SessionStart {
+    Started,
+    /// Every execution slot is in use; the session tries again later.
+    Waiting,
 }
 
 /// An authenticated bridge request: the attempt its token speaks for.

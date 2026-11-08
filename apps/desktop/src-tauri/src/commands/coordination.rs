@@ -39,7 +39,7 @@ mod quality_direct;
 #[cfg(test)]
 mod quality_trial;
 mod service;
-pub(crate) use service::Caller;
+pub(crate) use service::{Caller, SessionStart};
 mod storage;
 #[cfg(test)]
 mod swarm_trial;
