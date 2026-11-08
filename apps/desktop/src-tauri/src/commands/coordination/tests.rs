@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_overlap;
 
 #[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {

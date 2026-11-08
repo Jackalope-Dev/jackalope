@@ -39,7 +39,7 @@ impl Coordinator {
             .truncate(false)
             .read(true)
             .write(true)
-            .open(directory.join("owner.lock"))
+            .open(directory.join(crate::cli_protocol::profile::COORDINATOR_LOCK))
             .map_err(|e| e.to_string())?;
         let lock = super::super::file_lock::FileLock::try_new(lock).map_err(|_| "Another Jackalope instance owns this task queue. Close it before opening this workspace.".to_string())?;
         let path = directory.join("queue.json");

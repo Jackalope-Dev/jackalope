@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_contains;
 use crate::commands::tasks::TaskRun;
 use serde::Serialize;
 

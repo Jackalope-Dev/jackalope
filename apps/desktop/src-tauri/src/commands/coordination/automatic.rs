@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_overlap;
 use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use serde_json::{json, Value};
