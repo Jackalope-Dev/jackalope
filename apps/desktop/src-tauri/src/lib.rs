@@ -1,5 +1,4 @@
 pub mod commands;
-pub mod state;
 #[cfg(windows)]
 mod webview_runtime;
 mod window_behavior;
@@ -34,8 +33,7 @@ use commands::mcp::*;
 use commands::reset::*;
 use commands::schedules::*;
 use commands::tasks::*;
-use commands::{git::*, pty::*, system::*};
-use state::AppState;
+use commands::{git::*, system::*};
 use tauri::Manager;
 use window_behavior::{
     desktop_set_close_to_tray, desktop_set_launch_at_login, desktop_settings, setup_tray,
@@ -116,7 +114,6 @@ pub fn run(launch: Launch) {
     context.config_mut().app.windows[0].create = false;
     if let Some(path) = &profile {
         assert!(path.is_absolute(), "JACKALOPE_PROFILE_DIR must be absolute");
-        context.config_mut().app.windows[0].create = false;
     }
     let builder = tauri::Builder::default();
     builder
@@ -127,7 +124,6 @@ pub fn run(launch: Launch) {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .manage(AppState::default())
         .manage(SignInService::default())
         .manage(commands::local_ai::LocalAi::default())
         .manage(commands::managed_runtime::ManagedRuntime::default())
@@ -380,7 +376,6 @@ pub fn run(launch: Launch) {
             commands::managed_runtime::managed_runtime_cleanup,
             commands::managed_runtime::managed_runtime_prepare,
             commands::managed_runtime::managed_runtime_cancel,
-            pty_spawn,
             commands::work_terminal::task_terminal_start,
             commands::work_terminal::task_terminal_restore,
             commands::work_windows::task_work_window,
@@ -389,9 +384,6 @@ pub fn run(launch: Launch) {
             commands::work_terminal::task_terminal_write,
             commands::work_terminal::task_terminal_resize,
             commands::work_terminal::task_terminal_stop,
-            pty_write,
-            pty_resize,
-            pty_kill,
             schedule_list,
             schedule_inspect_change,
             schedule_save,
@@ -635,7 +627,6 @@ pub fn run(launch: Launch) {
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 commands::computers::shutdown(&app.state::<TaskRuntime>().computers_root());
-                app.state::<AppState>().kill_all_pty_sessions();
                 app.state::<SignInService>().stop_all();
             }
         });

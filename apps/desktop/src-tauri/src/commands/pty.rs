@@ -1,206 +1,28 @@
-use crate::state::{AppState, PtySession};
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use serde::Serialize;
-use std::io::{Read, Write};
-use tauri::{AppHandle, Emitter, Manager, State};
+use portable_pty::{Child, MasterPty};
 
-#[derive(Debug, Clone, Serialize)]
-pub struct PtyOutputEvent {
-    pub session_id: String,
-    pub chunk: String,
+/// A process running in a pseudo-terminal, with the handles needed to write to,
+/// resize and stop it.
+pub struct PtySession {
+    pub writer: Box<dyn std::io::Write + Send>,
+    pub master: Box<dyn MasterPty + Send>,
+    pub child: Box<dyn Child + Send + Sync>,
+    pub tree: Option<super::process_control::ProcessTree>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct PtyExitEvent {
-    pub session_id: String,
-    pub exit_code: Option<u32>,
-}
-
-/// Spawns `program` inside a real pseudo-terminal and streams its combined
-/// stdout/stderr back to the frontend as `agent-pty-output` events (each
-/// carrying `session_id` so one listener can demux many concurrent agents),
-/// followed by a single `agent-pty-exit` event when the process ends.
-///
-/// Reading happens on a plain OS thread (portable-pty's reader is blocking
-/// I/O, not `tokio`-aware), so this command returns immediately with the
-/// session id rather than waiting for the process to finish.
-#[tauri::command]
-pub async fn pty_spawn(
-    program: String,
-    args: Vec<String>,
-    working_dir: String,
-    cols: u16,
-    rows: u16,
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
-    app.state::<crate::commands::tasks::TaskRuntime>()
-        .access
-        .ensure()?;
-    let pty_system = native_pty_system();
-    let pair = pty_system
-        .openpty(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("Failed to allocate a pty: {e}"))?;
-
-    let mut cmd = CommandBuilder::new(&program);
-    cmd.args(&args);
-    cmd.cwd(&working_dir);
-
-    let mut child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| format!("Failed to spawn '{program}' in pty: {e}"))?;
-    // The slave end belongs to the child process now; drop our copy so
-    // reading the master side actually reaches EOF once the child exits.
-    drop(pair.slave);
-
-    let tree = match child
-        .process_id()
-        .ok_or("Terminal process has no identity".into())
-        .and_then(super::process_control::ProcessTree::attach_pid)
-    {
-        Ok(tree) => tree,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(error);
+impl PtySession {
+    pub fn stop(&mut self) -> std::io::Result<()> {
+        if let Some(tree) = &self.tree {
+            tree.terminate();
         }
-    };
-
-    let pid = child
-        .process_id()
-        .map(|p| p.to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    let session_id = format!("{program}-{pid}");
-
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| format!("Failed to clone pty reader: {e}"))?;
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| format!("Failed to take pty writer: {e}"))?;
-
-    {
-        let mut sessions = state
-            .pty_sessions
-            .lock()
-            .map_err(|_| "pty session lock poisoned")?;
-        sessions.insert(
-            session_id.clone(),
-            PtySession {
-                writer,
-                master: pair.master,
-                child,
-                tree: Some(tree),
-            },
-        );
+        if self.child.try_wait()?.is_none() {
+            let killed = self.child.kill();
+            if killed.is_err() && self.child.try_wait()?.is_none() {
+                killed?;
+            }
+        }
+        self.child.wait()?;
+        Ok(())
     }
-
-    let monitor_app = app.clone();
-    let monitor_id = session_id.clone();
-    std::thread::spawn(move || loop {
-        let state = monitor_app.state::<AppState>();
-        let Ok(mut sessions) = state.pty_sessions.lock() else {
-            break;
-        };
-        let Some(session) = sessions.get_mut(&monitor_id) else {
-            break;
-        };
-        if session.child.try_wait().ok().flatten().is_some() {
-            if let Some(tree) = &session.tree {
-                tree.terminate();
-            }
-            break;
-        }
-        drop(sessions);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    });
-    let event_session_id = session_id.clone();
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
-        // Bytes read but not yet emitted because they're the start of a
-        // multi-byte UTF-8 sequence that hadn't finished arriving yet — a
-        // pty read boundary has no relation to character boundaries, so
-        // lossy-decoding each raw chunk in isolation (the previous
-        // behavior) corrupted any non-ASCII output that happened to split
-        // across two reads into two separate replacement characters.
-        let mut pending: Vec<u8> = Vec::new();
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    pending.extend_from_slice(&buf[..n]);
-                    let (chunk, carry) = split_valid_utf8_prefix(&pending);
-                    if !chunk.is_empty() {
-                        let _ = app.emit(
-                            "agent-pty-output",
-                            PtyOutputEvent {
-                                session_id: event_session_id.clone(),
-                                chunk,
-                            },
-                        );
-                    }
-                    pending = carry;
-                }
-                Err(_) => break,
-            }
-        }
-        if !pending.is_empty() {
-            // No more bytes are coming: whatever's left is either a
-            // genuinely invalid tail or an unterminated sequence truncated
-            // by process exit — flush it lossily rather than drop it.
-            let _ = app.emit(
-                "agent-pty-output",
-                PtyOutputEvent {
-                    session_id: event_session_id.clone(),
-                    chunk: String::from_utf8_lossy(&pending).into_owned(),
-                },
-            );
-        }
-
-        // The read loop only observes EOF, not the process's actual exit
-        // status. The child handle lives in the shared session map (moved
-        // there by `pty_spawn` above), so reach it via the app handle
-        // instead of trying to smuggle it into this closure directly.
-        let exit_code = loop {
-            let state = app.state::<AppState>();
-            let Ok(mut sessions) = state.pty_sessions.lock() else {
-                break None;
-            };
-            let Some(session) = sessions.get_mut(&event_session_id) else {
-                break None;
-            };
-            match session.child.try_wait() {
-                Ok(Some(status)) => break Some(status.exit_code()),
-                Err(_) => break None,
-                Ok(None) => (),
-            }
-            drop(sessions);
-            std::thread::sleep(std::time::Duration::from_millis(50));
-        };
-        app.state::<AppState>()
-            .pty_sessions
-            .lock()
-            .ok()
-            .map(|mut sessions| sessions.remove(&event_session_id));
-
-        let _ = app.emit(
-            "agent-pty-exit",
-            PtyExitEvent {
-                session_id: event_session_id.clone(),
-                exit_code,
-            },
-        );
-    });
-
-    Ok(session_id)
 }
 
 /// Splits off the longest valid-UTF-8 prefix of `bytes`, returning it
@@ -229,76 +51,11 @@ pub(super) fn split_valid_utf8_prefix(bytes: &[u8]) -> (String, Vec<u8>) {
     }
 }
 
-/// Writes raw bytes (e.g. a command plus `\n`) to a running pty session's stdin.
-#[tauri::command]
-pub async fn pty_write(
-    session_id: String,
-    data: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let mut sessions = state
-        .pty_sessions
-        .lock()
-        .map_err(|_| "pty session lock poisoned")?;
-    let session = sessions
-        .get_mut(&session_id)
-        .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
-    session
-        .writer
-        .write_all(data.as_bytes())
-        .map_err(|e| format!("Failed to write to pty '{session_id}': {e}"))
-}
-
-/// Resizes a running pty session — call this when the frontend terminal
-/// component's viewport dimensions change.
-#[tauri::command]
-pub async fn pty_resize(
-    session_id: String,
-    cols: u16,
-    rows: u16,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let sessions = state
-        .pty_sessions
-        .lock()
-        .map_err(|_| "pty session lock poisoned")?;
-    let session = sessions
-        .get(&session_id)
-        .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
-    session
-        .master
-        .resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("Failed to resize pty '{session_id}': {e}"))
-}
-
-/// Kills a running pty session's child process and drops its session state.
-#[tauri::command]
-pub async fn pty_kill(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut sessions = state
-        .pty_sessions
-        .lock()
-        .map_err(|_| "pty session lock poisoned")?;
-    let mut session = sessions
-        .remove(&session_id)
-        .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
-    session
-        .stop()
-        .map_err(|e| format!("Failed to kill pty session '{session_id}': {e}"))
-}
-
 #[cfg(test)]
 mod tests {
-    //! Exercises the same portable-pty APIs `pty_spawn` uses (openpty,
-    //! CommandBuilder, spawn_command, try_clone_reader) directly, without
-    //! going through Tauri's command/State/AppHandle plumbing — proves the
-    //! pty mechanics themselves work on this machine's backend (ConPTY on
-    //! Windows), independent of whether anything calls the command yet.
-    use super::split_valid_utf8_prefix;
+    //! Exercises the portable-pty APIs the work terminal and agent sign-in use
+    //! on this machine's backend (ConPTY on Windows).
+    use super::{split_valid_utf8_prefix, PtySession};
     use portable_pty::{native_pty_system, CommandBuilder, PtySize};
     use std::io::{Read, Write};
     use std::time::{Duration, Instant};
@@ -416,5 +173,80 @@ mod tests {
         let (chunk, carry) = split_valid_utf8_prefix(&[b'o', b'k', 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
         assert!(carry.is_empty());
         assert!(chunk.starts_with("ok"));
+    }
+
+    fn process_is_alive(pid: u32) -> bool {
+        #[cfg(windows)]
+        {
+            let output = std::process::Command::new("tasklist")
+                .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+                .output()
+                .expect("failed to run tasklist");
+            String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+        }
+        #[cfg(not(windows))]
+        {
+            std::process::Command::new("kill")
+                .args(["-0", &pid.to_string()])
+                .status()
+                .is_ok_and(|status| status.success())
+        }
+    }
+
+    /// Checks the OS process itself, not only the handle.
+    #[test]
+    fn stop_terminates_the_real_child_process() {
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("failed to allocate a pty");
+
+        #[cfg(windows)]
+        let mut cmd = CommandBuilder::new("cmd.exe");
+        #[cfg(windows)]
+        cmd.args(["/C", "ping", "-t", "127.0.0.1"]);
+        #[cfg(not(windows))]
+        let mut cmd = CommandBuilder::new("sleep");
+        #[cfg(not(windows))]
+        cmd.arg("30");
+
+        let child = pair
+            .slave
+            .spawn_command(cmd)
+            .expect("failed to spawn command in pty");
+        drop(pair.slave);
+        let pid = child.process_id().expect("spawned child has no pid");
+        let tree = crate::commands::process_control::ProcessTree::attach_pid(pid).unwrap();
+        let writer = pair
+            .master
+            .take_writer()
+            .expect("failed to take pty writer");
+
+        let mut session = PtySession {
+            writer,
+            master: pair.master,
+            child,
+            tree: Some(tree),
+        };
+        assert!(
+            process_is_alive(pid),
+            "process should be running before kill"
+        );
+
+        let _ = session.stop();
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while process_is_alive(pid) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(
+            !process_is_alive(pid),
+            "process should be killed, not orphaned"
+        );
     }
 }

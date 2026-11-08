@@ -33,7 +33,7 @@ pub(in crate::commands) fn read_capped(
     Ok(Some(bytes))
 }
 
-pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     replace_with(path, |file| std::io::Write::write_all(file, bytes))
         .map_err(|error| error.to_string())
 }

@@ -1,5 +1,5 @@
+use super::pty::PtySession;
 use super::{integration, process_control::ProcessTree, tasks::TaskRuntime};
-use crate::state::PtySession;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

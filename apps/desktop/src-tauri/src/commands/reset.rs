@@ -1,6 +1,5 @@
 use super::{coordination::Coordinator, tasks::TaskRuntime};
 use crate::cli_protocol::{profile, ProfilePaths};
-use crate::state::AppState;
 use std::path::Path;
 use tauri::{Manager, State};
 
@@ -95,20 +94,11 @@ pub async fn app_reset(
     scheduler: State<'_, super::schedules::Scheduler>,
     coordinator: State<'_, Coordinator>,
     runtime: State<'_, TaskRuntime>,
-    state: State<'_, AppState>,
 ) -> Result<(), String> {
     scheduler.ensure_paused()?;
     app.state::<super::helper::Helper>().ensure_idle()?;
     if confirmation != "RESET" {
         return Err("Type RESET to confirm.".into());
-    }
-    if !state
-        .pty_sessions
-        .lock()
-        .map_err(|e| e.to_string())?
-        .is_empty()
-    {
-        return Err("Stop terminal agent sessions before resetting.".into());
     }
     coordinator.prepare_reset()?;
     app.state::<super::remote::RemoteAccess>().shutdown();

@@ -44,21 +44,18 @@ pub struct WindowBehavior {
 impl WindowBehavior {
     pub fn load(path: PathBuf) -> Self {
         let preferences = match std::fs::read(&path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|error| {
-                eprintln!("Could not read desktop preferences: {error}");
-                DesktopPreferences {
-                    close_to_tray: false,
-                }
-            }),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 DesktopPreferences::default()
             }
-            Err(error) => {
-                eprintln!("Could not read desktop preferences: {error}");
-                DesktopPreferences {
-                    close_to_tray: false,
-                }
-            }
+            read => read
+                .map_err(|error| error.to_string())
+                .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|error| error.to_string()))
+                .unwrap_or_else(|error| {
+                    eprintln!("Could not read desktop preferences: {error}");
+                    DesktopPreferences {
+                        close_to_tray: false,
+                    }
+                }),
         };
         Self {
             preferences: Mutex::new(preferences),
@@ -97,13 +94,10 @@ impl WindowBehavior {
         }
         let mut preferences = self.preferences.lock().map_err(|e| e.to_string())?;
         let next = DesktopPreferences { close_to_tray };
-        let temporary = self.path.with_extension("json.tmp");
-        std::fs::write(
-            &temporary,
-            serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        std::fs::rename(temporary, &self.path).map_err(|e| e.to_string())?;
+        crate::commands::history::write_atomic(
+            &self.path,
+            &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
+        )?;
         *preferences = next;
         Ok(())
     }
@@ -376,10 +370,6 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn setup_app_menu(app: &tauri::App) -> tauri::Result<()> {
-    use tauri::{
-        menu::{PredefinedMenuItem, Submenu},
-        Emitter,
-    };
     let menu = Menu::default(app.handle())?;
     if let Some(first) = menu.items()?.first().and_then(|item| item.as_submenu()) {
         first.insert(

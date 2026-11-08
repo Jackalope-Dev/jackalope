@@ -67,7 +67,7 @@ pub struct SignInView {
 }
 
 struct Session {
-    terminal: Option<crate::state::PtySession>,
+    terminal: Option<super::pty::PtySession>,
     tree: Option<ProcessTree>,
     lease: Option<Lease>,
     runner_lease: Option<super::managed_runtime::UseGuard>,
@@ -221,7 +221,7 @@ fn spawn_terminal(
         }
     };
     let session = Arc::new(Mutex::new(Session {
-        terminal: Some(crate::state::PtySession {
+        terminal: Some(super::pty::PtySession {
             writer,
             master: pair.master,
             child,
