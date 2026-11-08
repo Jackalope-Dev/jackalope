@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
-import { describeError } from '../lib/errors.ts';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface ReleaseStatus {
   currentVersion: string;

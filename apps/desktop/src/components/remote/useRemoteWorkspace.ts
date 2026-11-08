@@ -11,7 +11,7 @@ import {
 } from '@jackalope/contracts/remote';
 import type { Review } from '@jackalope/contracts/runs';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { describeError } from '../../lib/errors.ts';
+import { describeError } from '@jackalope/contracts/errors';
 
 /**
  * A paired host's work as the companion screens show it: the polled snapshot, the

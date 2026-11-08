@@ -4,7 +4,7 @@ import { invokeNative } from './native/transport.ts';
 import { observeRefresh } from './observe-refresh.ts';
 import type { RunRequest } from './run-types.ts';
 import { parseScheduleTiming } from './schedules.ts';
-import { describeError } from './errors.ts';
+import { describeError } from '@jackalope/contracts/errors';
 
 /** A card a bot showed the person: a decision, a request for input, an action, sources or an update. */
 export interface BotCard {

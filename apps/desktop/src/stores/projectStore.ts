@@ -8,7 +8,7 @@ import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
-import { describeError } from '../lib/errors.ts';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface ProjectPreferences {
   preferredRunner?: string;

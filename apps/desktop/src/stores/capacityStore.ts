@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invokeNative } from '../lib/native/transport.ts';
-import { describeError } from '../lib/errors.ts';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface CapacityWindow {
   poolId: string;

@@ -10,7 +10,7 @@ import {
 import { createReadCache } from '../lib/read-cache.ts';
 import { useProjectStore } from './projectStore.ts';
 import { useSettingsStore } from './settingsStore.ts';
-import { describeError } from '../lib/errors.ts';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface AllMcpsServer {
   id: string;
