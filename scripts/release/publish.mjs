@@ -58,10 +58,7 @@ if (import.meta.main) {
   const notes = await readNotes(receipt.version, true);
   const isPointer = (key) => RELEASE_CHANNELS.some((name) => key === `${name}/latest.json`);
   const fetchKey = async (key, json = false) => {
-    if (
-      !isPointer(key) &&
-      !/^releases\/(?:beta\/)?v\d+\.\d+\.\d+\/[A-Za-z0-9_.-]+$/.test(key)
-    )
+    if (!isPointer(key) && !/^releases\/(?:beta\/)?v\d+\.\d+\.\d+\/[A-Za-z0-9_.-]+$/.test(key))
       throw new Error('Invalid remote release key');
     const response = await fetch(`${base}/updates/${key}`, {
       signal: AbortSignal.timeout(120000),

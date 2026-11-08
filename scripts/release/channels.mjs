@@ -1,5 +1,8 @@
 import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
-import { cloudUpdateEndpoint, PUBLIC_SERVICE_ORIGIN } from '../../packages/contracts/src/release.ts';
+import {
+  cloudUpdateEndpoint,
+  PUBLIC_SERVICE_ORIGIN,
+} from '../../packages/contracts/src/release.ts';
 
 export const ACCOUNT_WEB_URL = 'https://jackalope.dev';
 const endpointKeys = ['stableEndpoint', 'betaEndpoint'];

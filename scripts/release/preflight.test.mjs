@@ -31,8 +31,7 @@ test('edge blocks identify the origin and status without exposing response bodie
   await assert.rejects(
     verifyReadiness(
       'https://api.jackalope.dev',
-      async () =>
-        new Response('{"secret":', { headers: { 'content-type': 'application/json' } }),
+      async () => new Response('{"secret":', { headers: { 'content-type': 'application/json' } }),
     ),
     (error) => {
       assert.match(error.message, /^https:\/\/api\.jackalope\.dev: .*invalid JSON/);

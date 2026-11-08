@@ -7,7 +7,11 @@
 export function gitEnvironment(base = process.env) {
   const env = { ...base };
   for (const key of Object.keys(env))
-    if (/^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|PREFIX)$/.test(key))
+    if (
+      /^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|PREFIX)$/.test(
+        key,
+      )
+    )
       delete env[key];
   return env;
 }
