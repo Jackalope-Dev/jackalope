@@ -147,7 +147,7 @@ http.createServer(async (req, res) => {
             .expect("local server ready");
         assert_eq!(lease.reused, index == 1);
         let server = lease.entry.server.lock().unwrap();
-        endpoint = server.as_ref().unwrap().url.clone();
+        endpoint = server.as_ref().unwrap().endpoint.url.clone();
         drop(server);
         let denied = tauri::async_runtime::block_on(async {
             reqwest::Client::new()

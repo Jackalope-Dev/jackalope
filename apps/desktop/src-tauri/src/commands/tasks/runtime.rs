@@ -674,6 +674,7 @@ impl TaskRuntime {
         let persistent = claude.is_some_and(|settings| settings.persistent) && remote.is_none();
         let mut cmd = command(executable);
         let mut opencode_connection = None;
+        let mut opencode_config = None;
         if let Some(binding) = &req.account_binding {
             if !self
                 .policy()?
@@ -787,7 +788,10 @@ impl TaskRuntime {
                     cmd.args(["--title", &format!("Jackalope task {id}")]);
                 }
             } else {
-                opencode_connection = Some(super::opencode::Connection::configure(&mut cmd)?);
+                opencode_connection = Some(super::opencode::Connection::configure(
+                    &mut cmd,
+                    &mut opencode_config,
+                )?);
             }
         } else if adapter == "grok" {
             cmd.args([
@@ -1207,11 +1211,13 @@ impl TaskRuntime {
                 bridge["timeout"] =
                     serde_json::json!(crate::commands::verification::BRIDGE_TIMEOUT_SECS * 1000);
             }
-            let config = crate::commands::mcp::opencode_config(&project_mcp, &cmd)?;
-            cmd.env("OPENCODE_CONFIG_CONTENT", config);
+            super::opencode::OpenCodeConfig::get(&mut opencode_config, &cmd)?
+                .add_mcp(&project_mcp, &cmd)?;
         }
         if adapter == "opencode" && req.coordination.is_some() {
-            if super::opencode::configure_tools(&mut cmd, &self.directory, id).is_err() {
+            if super::opencode::configure_tools(&mut cmd, &mut opencode_config, &self.directory, id)
+                .is_err()
+            {
                 self.update_checked(id, |run| {
                     activity(
                         run,
@@ -1219,6 +1225,9 @@ impl TaskRuntime {
                     )
                 })?;
             }
+        }
+        if let Some(config) = opencode_config {
+            config.apply(&mut cmd);
         }
         self.update_checked(id, |run| {
             run.efficiency.execution_profile = Some(if lean { "lean" } else { "standard" }.into());
