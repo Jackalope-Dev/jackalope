@@ -22,7 +22,7 @@ export function WorkFeedbackInbox({
       try {
         setItems(pendingWorkFeedback(taskId));
       } catch (cause) {
-        setError(`Saved feedback could not be read: ${String(cause)}`);
+        setError(`Saved feedback could not be read: ${describeError(cause)}`);
       }
     };
     refresh();

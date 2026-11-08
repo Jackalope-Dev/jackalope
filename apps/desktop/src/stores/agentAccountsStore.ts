@@ -6,6 +6,7 @@ import {
   checkAgentProfile,
   listAgentProfiles,
 } from '../lib/agent-profiles';
+import { describeError } from '../lib/errors';
 
 export const CLI_ACCOUNT_ID = '__default';
 export const profileId = (id: string) => (id === CLI_ACCOUNT_ID ? null : id);
@@ -108,7 +109,7 @@ export const useAgentAccountsStore = create<State>((set, get) => ({
       set((state) => ({
         agents: {
           ...state.agents,
-          [agent]: { ...(state.agents[agent] ?? empty()), loading: false, error: String(cause) },
+          [agent]: { ...(state.agents[agent] ?? empty()), loading: false, error: describeError(cause) },
         },
       }));
       return;

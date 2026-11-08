@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AccessBoundary } from './components/account/AccessBoundary';
 import { Shell } from './components/layout/Shell';
 import { observeDesktopControlTheme } from './lib/desktop-control-theme';
+import { describeError } from './lib/errors';
 import { selectWork } from './lib/work-selection';
 
 const OnboardingFlow = lazy(() =>
@@ -81,7 +82,7 @@ export default function App() {
     }
     invokeNative('app_finish_reset')
       .then(() => setReady(true))
-      .catch((error) => setResetError(String(error)));
+      .catch((error) => setResetError(describeError(error)));
   }, [ready]);
   if (!ready)
     return (

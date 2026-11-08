@@ -149,8 +149,8 @@ function ConnectProvider({
             } catch (cause) {
               setError(
                 saved.current
-                  ? `Your account and model are saved. Finishing setup failed; retry to finish or close to keep the connection. ${String(cause)}`
-                  : String(cause),
+                  ? `Your account and model are saved. Finishing setup failed; retry to finish or close to keep the connection. ${describeError(cause)}`
+                  : describeError(cause),
               );
             } finally {
               setBusy(false);

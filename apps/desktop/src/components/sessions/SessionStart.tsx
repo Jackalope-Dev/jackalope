@@ -34,6 +34,7 @@ import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
 import { selectWork } from '../../lib/work-selection';
+import { describeError } from '../../lib/errors';
 
 /** Saved work handed to the composer: a draft, an idea or an agent choice. */
 export interface ComposerSeed {
@@ -318,7 +319,7 @@ ${incoming}`
       localStorage.removeItem(`${draftKey}:context`);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
+      if (mounted.current) setError(describeError(cause));
     } finally {
       sending.current = false;
       if (mounted.current) setBusy(false);

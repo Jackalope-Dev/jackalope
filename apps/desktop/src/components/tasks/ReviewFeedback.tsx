@@ -209,7 +209,7 @@ export function ReviewFeedback({
                   setEditing(null);
                   setError('');
                 } catch (cause) {
-                  setError(`Could not save this comment: ${String(cause)}`);
+                  setError(`Could not save this comment: ${describeError(cause)}`);
                 }
               }}
             >

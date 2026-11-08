@@ -22,6 +22,7 @@ import { useMcpStore } from '../../stores/mcpStore';
 import { useActiveProject } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import type { SavedMcpConnection } from './McpConnectionResult';
+import { describeError } from '../../lib/errors';
 
 export function McpConnectionForm({
   initial,
@@ -187,7 +188,7 @@ export function McpConnectionForm({
       }
       onSaved({ server, agentSignIn });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(describeError(cause));
     } finally {
       setChecking(false);
       setBusy(false);

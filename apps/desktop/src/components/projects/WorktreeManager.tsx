@@ -230,7 +230,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       if (projectId.current === id) setFeedback(`Removed ${name}.`);
     } catch (cause) {
       if (projectId.current === id)
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(describeError(cause));
     } finally {
       if (projectId.current === id) {
         setProgress('Rechecking the other worktrees…');
@@ -278,13 +278,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           await cleanupWorktree(project.path, worktree);
           removed++;
         } catch (cause) {
-          failures.push(`${worktree.branch || worktree.path}: ${String(cause)}`);
+          failures.push(`${worktree.branch || worktree.path}: ${describeError(cause)}`);
         }
       }
       if (failures.length && projectId.current === id) setError(failures.join('\n'));
     } catch (cause) {
       if (projectId.current === id)
-        setError(`Cleanup stopped. ${cause instanceof Error ? cause.message : String(cause)}`);
+        setError(`Cleanup stopped. ${describeError(cause)}`);
     } finally {
       if (projectId.current === id) {
         setFeedback(`Removed ${removed} of ${candidates.length} worktrees.`);
@@ -311,7 +311,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         );
     } catch (cause) {
       if (projectId.current === id)
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(describeError(cause));
     } finally {
       if (projectId.current === id) await refresh();
       setBusy(false);
@@ -331,7 +331,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         await removeWorktreeOrphan(project.path, folder);
         removed++;
       } catch (cause) {
-        failures.push(`${folder.name}: ${cause instanceof Error ? cause.message : String(cause)}`);
+        failures.push(`${folder.name}: ${describeError(cause)}`);
       }
     }
     if (projectId.current === id) {

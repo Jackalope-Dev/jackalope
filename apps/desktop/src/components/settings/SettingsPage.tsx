@@ -52,6 +52,7 @@ import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
 import { SavedActions } from './SavedActions';
+import { describeError } from '../../lib/errors';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -122,7 +123,7 @@ export function SettingsPage({
       );
       setMessage('Preferences copied to clipboard.');
     } catch (error) {
-      setMessage(`Could not copy preferences: ${String(error)}`);
+      setMessage(`Could not copy preferences: ${describeError(error)}`);
     }
   };
   const reset = async () => {
@@ -137,7 +138,7 @@ export function SettingsPage({
         window.location.reload();
       }
     } catch (error) {
-      setMessage(`Reset failed: ${String(error)}`);
+      setMessage(`Reset failed: ${describeError(error)}`);
       setResetting(false);
     }
   };

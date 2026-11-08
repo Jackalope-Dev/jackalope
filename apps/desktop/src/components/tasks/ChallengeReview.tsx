@@ -100,7 +100,7 @@ export function ChallengeDialog({
             },
           });
         } catch (cause) {
-          failures.push(`${name(agent)}: ${String(cause)}`);
+          failures.push(`${name(agent)}: ${describeError(cause)}`);
         }
       await useExecutionStore.getState().refresh();
       if (failures.length < agents.length) onStarted();

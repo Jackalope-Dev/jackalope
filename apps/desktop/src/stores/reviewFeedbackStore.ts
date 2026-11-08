@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ReviewComment } from '../lib/review-feedback';
+import { describeError } from '../lib/errors';
 
 const key = 'jackalope-review-feedback';
 type Threads = Record<string, ReviewComment[]>;
@@ -36,7 +37,7 @@ function initial() {
   try {
     return { threads: read(), error: '' };
   } catch (cause) {
-    return { threads: {}, error: String(cause) };
+    return { threads: {}, error: describeError(cause) };
   }
 }
 interface ReviewFeedbackState {

@@ -4,6 +4,7 @@ import { invokeNative } from './native/transport.ts';
 import { observeRefresh } from './observe-refresh.ts';
 import type { RunRequest } from './run-types.ts';
 import { parseScheduleTiming } from './schedules.ts';
+import { describeError } from './errors.ts';
 
 /** A card a bot showed the person: a decision, a request for input, an action, sources or an update. */
 export interface BotCard {
@@ -223,7 +224,7 @@ export const useBotHubStore = create<HubState>((set) => ({
     try {
       set({ ...(await invokeNative<HubSnapshot>('bot_hub_snapshot')), loaded: true });
     } catch (error) {
-      set({ error: String(error), loaded: true });
+      set({ error: describeError(error), loaded: true });
     }
   },
 }));

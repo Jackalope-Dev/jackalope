@@ -6,6 +6,7 @@ import type { DiscoveredCodebaseMemory } from '../lib/context/types';
 import { useAuditStore } from './auditStore';
 import { useMascotStore } from './mascotStore';
 import { useProjectStore } from './projectStore';
+import { describeError } from '../lib/errors';
 
 interface ContextMemoryState {
   memories: Record<string, DiscoveredCodebaseMemory>;
@@ -84,7 +85,7 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
             category: 'discovery',
             severity: 'warning',
             title: 'Codebase Discovery Incomplete',
-            message: `Could not read repository context: ${String(error)}`,
+            message: `Could not read repository context: ${describeError(error)}`,
           });
           throw error;
         } finally {

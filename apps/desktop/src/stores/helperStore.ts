@@ -10,6 +10,7 @@ import { useExecutionStore } from './executionStore';
 import { useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
+import { describeError } from '../lib/errors';
 
 interface HelperTurn {
   id: string;
@@ -91,7 +92,7 @@ export const useHelperStore = create<HelperState>()(
           if (JSON.stringify(view) !== JSON.stringify(get().view) || get().syncError)
             set({ view, syncError: null });
         } catch (error) {
-          set({ syncError: String(error) });
+          set({ syncError: describeError(error) });
         }
       },
       send: async () => {
@@ -104,7 +105,7 @@ export const useHelperStore = create<HelperState>()(
           const view = await invokeNative<HelperView>('helper_send', { prompt });
           set({ view, draft: '', error: null });
         } catch (error) {
-          set({ error: String(error) });
+          set({ error: describeError(error) });
         } finally {
           set({ sending: false });
         }
@@ -180,7 +181,7 @@ export function observeHelper() {
     clearTimeout(contextTimer);
     contextTimer = setTimeout(() => {
       void syncHelperContext().catch((error) =>
-        useHelperStore.setState({ syncError: String(error) }),
+        useHelperStore.setState({ syncError: describeError(error) }),
       );
     }, 100);
   };

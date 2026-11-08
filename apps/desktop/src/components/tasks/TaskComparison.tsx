@@ -41,6 +41,7 @@ import './task-comparison.css';
 import { agentAdapter } from '../../lib/agents';
 import { taskChangeStats } from '../../lib/task-client';
 import { ActionError } from '../ui/ActionError';
+import { describeError } from '../../lib/errors';
 
 function duration(run: TaskRun) {
   if (run.durationMs != null) return durationLabel(run.durationMs / 1000);
@@ -250,7 +251,7 @@ function ComparisonDialog({
       });
       setSkippedPorts(new Set());
     } catch (cause) {
-      setError(`The judge could not start. ${String(cause)}`);
+      setError(`The judge could not start. ${describeError(cause)}`);
     } finally {
       setJudging(false);
     }
@@ -301,7 +302,7 @@ function ComparisonDialog({
       try {
         await invokeNative('task_set_archived', { id: member.id, archived: true });
       } catch (cause) {
-        failures.push(`${name(member.agent)}: ${String(cause)}`);
+        failures.push(`${name(member.agent)}: ${describeError(cause)}`);
       }
     }
     useCompareStore.getState().choose(comparisonId, winner.taskId);

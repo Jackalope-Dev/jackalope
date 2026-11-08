@@ -16,6 +16,7 @@ import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigS
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
 import { ActionError } from '../ui/ActionError';
+import { describeError } from '../../lib/errors';
 
 /**
  * Choices that apply across agents: which one starts new work, quota handoff and,
@@ -45,7 +46,7 @@ export function AgentDefaults({ projectId }: { projectId?: string }) {
     } catch (cause) {
       useAgentConfigStore.setState(beforeAgents);
       useProjectStore.setState({ projects: beforeProjects });
-      setError(`Could not save agent defaults: ${String(cause)}`);
+      setError(`Could not save agent defaults: ${describeError(cause)}`);
     } finally {
       setBusy(false);
     }

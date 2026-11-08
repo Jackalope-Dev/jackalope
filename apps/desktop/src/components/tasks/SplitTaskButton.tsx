@@ -4,6 +4,7 @@ import { Split } from 'lucide-react';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
+import { describeError } from '../../lib/errors';
 
 /** Lets the agent of a running isolated task spin off separable work as subtasks. */
 export function SplitTaskButton({
@@ -32,7 +33,7 @@ export function SplitTaskButton({
             false,
           );
         } catch (cause) {
-          onResult(String(cause), true);
+          onResult(describeError(cause), true);
         } finally {
           setBusy(false);
         }

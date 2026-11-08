@@ -11,6 +11,7 @@ import {
 import { ChevronLeft, QrCode } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { type Host, pair, scanPairingCode } from './native';
+import { describeError } from '@jackalope/contracts/errors';
 
 /** A starting name the person can keep: phones rarely need telling apart beyond their kind. */
 function defaultName() {
@@ -49,7 +50,7 @@ export function Pairing({
       const host = await pair(target.trim(), name.trim() || defaultName(), pairingCode);
       if (current === attempt.current) onPaired(host);
     } catch (cause) {
-      if (current === attempt.current) setError(String(cause));
+      if (current === attempt.current) setError(describeError(cause));
     } finally {
       if (current === attempt.current) setBusy(false);
     }
@@ -60,7 +61,7 @@ export function Pairing({
       const scanned = await scanPairingCode();
       if (scanned) await connect(scanned);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const message = describeError(cause);
       // Backing out of the camera is not a failure.
       if (!/cancel/i.test(message)) setError(message);
     }

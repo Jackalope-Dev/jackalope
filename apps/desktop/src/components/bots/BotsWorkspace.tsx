@@ -1140,7 +1140,7 @@ function BotWakeList({
         wakes: bot.wakes.map((wake) => (wake.id === id ? { ...wake, ...patch } : wake)),
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(describeError(cause));
     }
   };
   return (

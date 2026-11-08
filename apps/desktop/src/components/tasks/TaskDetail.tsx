@@ -365,7 +365,7 @@ export function TaskDetail({
       await navigator.clipboard.writeText(run.result);
       setNotice('Result copied.');
     } catch (cause) {
-      setError(`Could not copy the result: ${String(cause)}`);
+      setError(`Could not copy the result: ${describeError(cause)}`);
     }
   };
   const captureRecovery = () => {

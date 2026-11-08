@@ -12,6 +12,7 @@ import type { TaskEffort } from '../lib/task-effort';
 import { windowKind } from '../lib/window-kind';
 import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
+import { describeError } from '../lib/errors';
 
 interface TaskDraft {
   effort?: TaskEffort;
@@ -89,7 +90,7 @@ export const useExecutionStore = create<ExecutionState>()(
               discoveryError: null,
             });
           } catch (error) {
-            set({ error: String(error), discoveryError: String(error) });
+            set({ error: describeError(error), discoveryError: describeError(error) });
           } finally {
             discovering = undefined;
             set({ discovering: false });
@@ -117,7 +118,7 @@ export const useExecutionStore = create<ExecutionState>()(
               set({ runs, loading: false, error: null, historyError: null });
             useMascotStore.getState().setActivity('runs', runs.some(isActive));
           } catch (error) {
-            set({ error: String(error), historyError: String(error), loading: false });
+            set({ error: describeError(error), historyError: describeError(error), loading: false });
           } finally {
             refreshing = undefined;
             if (get().selectedId !== detailId) queueMicrotask(() => void get().refresh());

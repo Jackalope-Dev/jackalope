@@ -2,6 +2,7 @@ import { type ClipboardEvent, type RefObject, useEffect, useRef, useState } from
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { attachmentReference } from '../lib/prompt-attachments';
+import { describeError } from '../lib/errors';
 
 const PASTE_TYPES: Record<string, string> = {
   'image/png': 'png',
@@ -87,7 +88,7 @@ export function usePromptAttachments({
       }),
     )
       .then((references) => attach.current(references))
-      .catch((cause) => setError(String(cause)))
+      .catch((cause) => setError(describeError(cause)))
       .finally(() => setBusy(false));
   };
   const pick = async () => {
@@ -97,7 +98,7 @@ export function usePromptAttachments({
       const paths = await invokeNative<string[]>('prompt_attachment_pick', { projectPath });
       if (paths.length) attach.current(paths.map((path) => attachmentReference(path, projectPath)));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   return { available, dragging, busy, error, clearError: () => setError(''), onPaste, pick };

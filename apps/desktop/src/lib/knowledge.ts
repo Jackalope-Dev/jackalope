@@ -10,6 +10,7 @@ import { createReadCache } from './read-cache';
 import { restoreArchivedTask } from './task-client';
 import { selectWork } from './work-selection';
 import { workspaceModeFor } from './workspace-mode';
+import { describeError } from './errors';
 
 const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);
 
@@ -52,7 +53,7 @@ export function useKnowledge(projectId: string, projectPath: string) {
         setEntries(values);
         setError('');
       } catch (cause) {
-        if (version === request.current) setError(String(cause));
+        if (version === request.current) setError(describeError(cause));
       } finally {
         if (version === request.current) setLoading(false);
       }

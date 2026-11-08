@@ -1,6 +1,7 @@
 import type { Snapshot } from '@jackalope/contracts/remote';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type Host, request } from './native';
+import { describeError } from '@jackalope/contracts/errors';
 
 export interface ComputerState {
   /** The last list this computer returned; kept while it is unreachable. */
@@ -33,7 +34,7 @@ export function useComputers(hosts: Host[], active: boolean) {
       const snapshot = await request<Snapshot>(host.id, { action: 'snapshot' });
       settle(() => ({ snapshot, error: '' }));
     } catch (cause) {
-      settle((current) => ({ snapshot: current?.snapshot ?? null, error: String(cause) }));
+      settle((current) => ({ snapshot: current?.snapshot ?? null, error: describeError(cause) }));
     }
   }, []);
   const refresh = useCallback(() => Promise.all(hosts.map((host) => load(host))), [hosts, load]);

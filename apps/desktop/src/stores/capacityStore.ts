@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invokeNative } from '../lib/native/transport.ts';
+import { describeError } from '../lib/errors.ts';
 
 export interface CapacityWindow {
   poolId: string;
@@ -57,7 +58,7 @@ export const useCapacityStore = create<CapacityState>((set, get) => ({
         });
         set({ records, lastFetched: Date.now() });
       } catch (cause) {
-        set({ error: String(cause) });
+        set({ error: describeError(cause) });
       } finally {
         inFlight = undefined;
         set({ loading: false });

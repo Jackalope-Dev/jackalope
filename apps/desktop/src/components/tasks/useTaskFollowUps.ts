@@ -116,7 +116,7 @@ export function useTaskFollowUps({
         );
         await refresh();
       } catch (cause) {
-        onError(String(cause));
+        onError(describeError(cause));
       } finally {
         setQueueing(false);
       }
@@ -138,7 +138,7 @@ export function useTaskFollowUps({
         if (action === 'cancel' && !remaining.length) queuedHere.current = false;
         setFollowups(remaining);
       } catch (cause) {
-        onError(String(cause));
+        onError(describeError(cause));
       } finally {
         setQueueing(false);
       }

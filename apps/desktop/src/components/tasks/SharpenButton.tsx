@@ -13,6 +13,7 @@ import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { DismissButton } from '../ui/DismissButton';
+import { describeError } from '../../lib/errors';
 
 type Sharpen = ReturnType<typeof useSharpen>;
 
@@ -66,7 +67,7 @@ export function useSharpen({
       apply(rewritten);
       setUndo({ original, rewritten });
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const message = describeError(cause);
       if (!/Stopped\.$/.test(message)) setError(message);
     } finally {
       running.current = false;

@@ -359,7 +359,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                         await navigator.clipboard.writeText(entry.content);
                         setActionError('');
                       } catch (cause) {
-                        setActionError(`Could not copy workflow: ${String(cause)}`);
+                        setActionError(`Could not copy workflow: ${describeError(cause)}`);
                       }
                     }}
                   >

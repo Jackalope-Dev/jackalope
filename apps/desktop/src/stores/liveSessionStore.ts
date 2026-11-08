@@ -4,6 +4,7 @@ import { type SessionSnapshot, sessionCommand } from '../lib/live-session';
 import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { knownSessionRevisions, mergeSessionChanges } from '../lib/session-changes';
+import { describeError } from '../lib/errors';
 
 interface SessionsState extends SessionSnapshot {
   selectedId: string | null;
@@ -45,7 +46,7 @@ export const useLiveSessionStore = create<SessionsState>((set, get) => ({
           return;
         set({ ...next, loading: false });
       })
-      .catch((error) => set({ error: String(error), loading: false }))
+      .catch((error) => set({ error: describeError(error), loading: false }))
       .finally(() => {
         refresh = undefined;
       });

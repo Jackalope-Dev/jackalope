@@ -214,7 +214,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         await invokeNative('helper_action', {
           id: action.id,
           decision: 'failed',
-          result: { error: String(cause) },
+          result: { error: describeError(cause) },
         }).catch(() => {});
     } finally {
       setBusy(false);

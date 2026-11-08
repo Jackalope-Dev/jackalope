@@ -3,6 +3,7 @@ import { EMPTY_LESSON_SYNC, type LessonSyncView, parseLessonSyncView } from '../
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { useSettingsSyncStore } from './settingsSyncStore';
+import { describeError } from '../lib/errors';
 
 interface LessonSyncState {
   view: LessonSyncView;
@@ -31,7 +32,7 @@ export const useLessonSyncStore = create<LessonSyncState>()((set, get) => {
         const view = await work();
         if (view) set({ view });
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ busy: false });
       }

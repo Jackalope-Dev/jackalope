@@ -1,6 +1,7 @@
 import { isActive, isDone } from '@jackalope/contracts/runs';
 import { Button, InlineNotice } from '@jackalope/ui';
 import type { TaskRun } from '../../lib/run-types';
+import { describeError } from '../../lib/errors';
 
 /** A commit refused by a hook, with the output needed to fix it. */
 export interface HookFailure {
@@ -18,7 +19,7 @@ export function failureOf(cause: unknown): {
 } {
   if (cause && typeof cause === 'object' && 'kind' in cause && 'message' in cause)
     return cause as { kind: string; hook?: string | null; message: string; output?: string };
-  return { kind: 'git', message: cause instanceof Error ? cause.message : String(cause) };
+  return { kind: 'git', message: describeError(cause) };
 }
 
 export function HookFixStatus({
