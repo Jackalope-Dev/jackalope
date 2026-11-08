@@ -452,15 +452,23 @@ fn pending_count(view: &PlanView) -> usize {
 fn editor_command(path: &std::path::Path) -> std::process::Command {
     let configured = std::env::var("VISUAL")
         .ok()
-        .or_else(|| std::env::var("EDITOR").ok())
-        .filter(|editor| !editor.trim().is_empty());
-    let editor = configured.unwrap_or_else(|| {
-        if cfg!(windows) {
-            "notepad".into()
-        } else {
-            "vi".into()
-        }
-    });
+        .or_else(|| std::env::var("EDITOR").ok());
+    command_for_editor(configured, path)
+}
+
+fn command_for_editor(
+    configured: Option<String>,
+    path: &std::path::Path,
+) -> std::process::Command {
+    let editor = configured
+        .filter(|editor| !editor.trim().is_empty())
+        .unwrap_or_else(|| {
+            if cfg!(windows) {
+                "notepad".into()
+            } else {
+                "vi".into()
+            }
+        });
     // Editors are often configured with arguments, such as `code --wait`.
     let mut parts = editor.split_whitespace();
     let mut command = std::process::Command::new(parts.next().unwrap_or("vi"));
@@ -496,11 +504,12 @@ mod tests {
 
     #[test]
     fn editors_with_arguments_split_into_a_command() {
-        std::env::set_var("VISUAL", "code --wait");
-        let command = editor_command(std::path::Path::new("plan.md"));
+        let path = std::path::Path::new("plan.md");
+        let command = command_for_editor(Some("code --wait".into()), path);
         assert_eq!(command.get_program(), "code");
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args, ["--wait", "plan.md"]);
-        std::env::remove_var("VISUAL");
+        let fallback = if cfg!(windows) { "notepad" } else { "vi" };
+        assert_eq!(command_for_editor(Some("  ".into()), path).get_program(), fallback);
     }
 }

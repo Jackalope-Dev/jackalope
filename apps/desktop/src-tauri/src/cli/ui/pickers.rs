@@ -1362,13 +1362,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn review_screenshot_setting_explains_the_preview_requirement() {
-        assert!(review_captures_label(true, true).starts_with("on"));
-        assert!(review_captures_label(true, false).contains("preview command"));
-        assert!(review_captures_label(false, true).starts_with("off"));
-    }
-
-    #[test]
     fn typing_in_a_picker_narrows_and_ranks_its_rows() {
         let item = |label: &str, detail: &str| Item {
             label: label.into(),

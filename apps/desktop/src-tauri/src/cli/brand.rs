@@ -1258,9 +1258,12 @@ mod tests {
         );
         assert_eq!(short_branch("feature/login-form"), "feature/login-form");
         assert_eq!(ellipsize("short", 10), "short");
-        let cut = ellipsize("start a fresh conversation", 10);
-        assert_eq!(cut.chars().count(), 10.min(cut.chars().count()));
-        assert!(cut.starts_with("start a f") || cut.starts_with("start a"));
+        let ellipsis = mark_glyph(Mark::Ellipsis);
+        assert_eq!(
+            ellipsize("start a fresh conversation", 10),
+            format!("start a f{ellipsis}")
+        );
+        assert_eq!(ellipsize("start a fresh", 9), format!("start a{ellipsis}"));
     }
 
     #[test]
@@ -1281,18 +1284,14 @@ mod tests {
                 .map(|span| span.content.to_string())
                 .collect()
         };
-        let colors = |tick| -> Vec<_> {
-            divider_active(40, tick)
-                .spans
-                .iter()
-                .map(|span| span.style.fg)
+        let weights = |tick| -> Vec<_> {
+            (0..40)
+                .map(|column| band(column, 40, tick, 10))
                 .collect()
         };
         assert_eq!(text(5).chars().count(), 40);
         assert_eq!(text(5), text(15), "only colour moves");
-        if motion() && colored() {
-            assert_ne!(colors(5), colors(15), "the band advances between frames");
-        }
+        assert_ne!(weights(5), weights(15), "the band advances between frames");
     }
 
     #[test]
