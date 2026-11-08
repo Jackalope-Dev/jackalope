@@ -109,15 +109,28 @@ export function workPresence(item: WorkItem): {
   return { agents, state, action };
 }
 
+interface WorkspaceWorkOptions {
+  ideas?: TaskTicket[];
+  sessions?: LiveSession[];
+  queue?: QueueView;
+  /** Attempts merged into their target; the queue's merged attempts when left out. */
+  integratedRunIds?: string[];
+  archived?: boolean;
+  /** Also list attempts that belong to a managed task. */
+  nested?: boolean;
+}
+
 export function collectWorkspaceWork(
   projectId: string | null,
-  ideas: TaskTicket[],
   runs: TaskRun[],
-  sessions: LiveSession[],
-  integratedRunIds: string[] = [],
-  archived = false,
-  queue?: QueueView,
-  nested = false,
+  {
+    ideas = [],
+    sessions = [],
+    queue,
+    integratedRunIds = queue?.mergedRunIds ?? [],
+    archived = false,
+    nested = false,
+  }: WorkspaceWorkOptions = {},
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
   const managedWork = (queue?.managedTasks ?? [])

@@ -124,13 +124,13 @@ test('unified work includes live sessions once and respects project scope and ar
     status: 'running',
     prompts: [{ status: 'pending' }],
   };
-  const items = collectWorkspaceWork('a', [], [run, liveRun], [session]);
+  const items = collectWorkspaceWork('a', [run, liveRun], { sessions: [session] });
   assert.equal(items.length, 2);
   assert.equal(items[0].session.id, 'live');
   assert.equal(items[0].stage, 'attention');
-  assert.equal(collectWorkspaceWork('b', [], [run, liveRun], [session]).length, 0);
-  assert.equal(collectWorkspaceWork('a', [], [run, liveRun], [session], [], true).length, 0);
-  assert.equal(collectWorkspaceWork('a', [], [], [{ ...session, batches: [] }])[0].stage, 'ideas');
+  assert.equal(collectWorkspaceWork('b', [run, liveRun], { sessions: [session] }).length, 0);
+  assert.equal(collectWorkspaceWork('a', [run, liveRun], { sessions: [session], archived: true }).length, 0);
+  assert.equal(collectWorkspaceWork('a', [], { sessions: [{ ...session, batches: [] }] })[0].stage, 'ideas');
 });
 
 test('global work prioritizes decisions, review, running work and saved projectless ideas', () => {

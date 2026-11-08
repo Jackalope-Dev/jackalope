@@ -112,16 +112,7 @@ export function useWorkspaceWork({
   const ideas = withoutDrafts ? noIdeas : savedIdeas;
   return useMemo(
     () =>
-      collectWorkspaceWork(
-        projectId,
-        ideas,
-        runs,
-        sessions,
-        queue.mergedRunIds,
-        archived,
-        queue,
-        nested,
-      ),
+      collectWorkspaceWork(projectId, runs, { ideas, sessions, queue, archived, nested }),
     [projectId, ideas, runs, sessions, queue, archived, nested],
   );
 }
