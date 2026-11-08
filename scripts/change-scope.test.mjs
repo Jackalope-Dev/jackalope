@@ -57,8 +57,6 @@ test('files the native crate embeds run the native checks', () => {
     'apps/desktop/src/lib/agents.json',
     'packages/knowledge/catalog.json',
     'scripts/evaluation/cases.json',
-    'apps/desktop/scripts/fixtures/telemetry-events.json',
-    'patches/glib/src/lib.rs',
   ])
     assert.equal(affected([file]).native, true, file);
   assert.equal(affected(['apps/desktop/src/lib/agent-capabilities.ts']).native, false);

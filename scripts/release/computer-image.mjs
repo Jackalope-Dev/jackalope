@@ -16,12 +16,12 @@ async function sourceValue(path, pattern) {
   return match[1];
 }
 
-export const repository = () =>
+const repository = () =>
   sourceValue('src/commands/computers/image.rs', /const REPOSITORY: &str = "([^"]+)";/);
 
 export const appVersion = () => sourceValue('Cargo.toml', /^version = "([^"]+)"$/m);
 
-export async function imageFiles() {
+async function imageFiles() {
   const list = await sourceValue(
     'src/commands/computers/docker.rs',
     /const IMAGE_FILES: &\[&str\] = &\[([^\]]+)\];/,

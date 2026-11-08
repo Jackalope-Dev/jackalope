@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { comparisonPages } from '../src/comparison-content.ts';
+import { posts } from '../src/content.ts';
 import { discoveryFiles, pageHtml } from '../src/seo.ts';
 
 const origin = 'https://site.example.test';
@@ -56,20 +58,24 @@ test('discovery availability follows each configured platform, including Store w
 });
 
 test('an editorial refresh preserves publication dates and exposes the actual modification date', () => {
-  const comparison = metadata('/compare/superset/');
-  assert.equal(comparison.datePublished, '2026-09-09');
-  assert.equal(comparison.dateModified, '2026-09-17');
-  const post = metadata('/blog/from-brief-to-review/');
-  assert.equal(post.datePublished, '2026-09-06');
-  assert.equal(post.dateModified, '2026-09-17');
   const files = discoveryFiles(origin);
-  for (const path of ['/compare/', '/compare/superset/', '/blog/from-brief-to-review/']) {
-    assert.ok(
-      files['sitemap.xml'].includes(`<loc>${origin}${path}</loc><lastmod>2026-09-17</lastmod>`),
-    );
+  const lastmod = (path) =>
+    files['sitemap.xml'].match(
+      new RegExp(`<loc>${origin}${path}</loc>(?:<lastmod>([^<]+)</lastmod>)?`),
+    )?.[1];
+  for (const { path, comparison } of comparisonPages) {
+    const page = metadata(path);
+    assert.equal(page.datePublished, comparison.published, path);
+    assert.equal(page.dateModified, comparison.reviewed, path);
+    assert.equal(lastmod(path), comparison.reviewed, path);
   }
-  const item = files['feed.xml']
-    .split(`<link>${origin}/blog/from-brief-to-review/</link>`)[1]
-    .split('</item>')[0];
-  assert.match(item, /06 Sep 2026/);
+  for (const post of posts) {
+    const path = `/blog/${post.slug}/`;
+    const page = metadata(path);
+    assert.equal(page.datePublished, post.date, path);
+    assert.equal(page.dateModified, post.updated ?? post.date, path);
+    const item = files['feed.xml'].split(`<link>${origin}${path}</link>`)[1].split('</item>')[0];
+    const published = new Date(item.match(/<pubDate>([^<]+)<\/pubDate>/)[1]);
+    assert.equal(published.toISOString().slice(0, 10), post.date, path);
+  }
 });

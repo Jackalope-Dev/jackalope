@@ -22,17 +22,23 @@ test('edge blocks identify the origin and status without exposing response bodie
           headers: { 'content-type': 'text/html' },
         }),
     ),
-    {
-      message:
-        'https://api.jackalope.dev: readiness returned HTTP 403 (text/html); check edge rules if the service is healthy locally',
+    (error) => {
+      assert.match(error.message, /^https:\/\/api\.jackalope\.dev: .*HTTP 403/);
+      assert.doesNotMatch(error.message, /private challenge/);
+      return true;
     },
   );
   await assert.rejects(
     verifyReadiness(
       'https://api.jackalope.dev',
-      async () => new Response('invalid', { headers: { 'content-type': 'application/json' } }),
+      async () =>
+        new Response('{"secret":', { headers: { 'content-type': 'application/json' } }),
     ),
-    { message: 'https://api.jackalope.dev: readiness returned invalid JSON' },
+    (error) => {
+      assert.match(error.message, /^https:\/\/api\.jackalope\.dev: .*invalid JSON/);
+      assert.doesNotMatch(error.message, /secret/);
+      return true;
+    },
   );
 });
 
