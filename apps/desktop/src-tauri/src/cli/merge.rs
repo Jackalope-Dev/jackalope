@@ -17,6 +17,19 @@ pub struct Prepared {
     pub paused_here: bool,
 }
 
+/// Why a merge was not prepared. Each front end words these itself.
+pub enum Refusal {
+    /// The host refused or could not be reached.
+    Failed(String),
+    /// The work conflicts with the target branch in these files.
+    Conflicts {
+        target_branch: String,
+        files: Vec<String>,
+    },
+    /// The latest attempt changes nothing.
+    Empty,
+}
+
 /// Pauses the conversation unless it is `paused` already, prepares the merge of
 /// its latest attempt and checks there is something to merge without conflicts.
 /// Every refusal resumes what this paused.
@@ -25,36 +38,33 @@ pub fn prepare(
     session_id: &str,
     paused: bool,
     message: Option<String>,
-) -> Result<Prepared, String> {
+) -> Result<Prepared, Refusal> {
     if !paused {
-        pause(call, session_id, SessionCommand::Pause)?;
+        pause(call, session_id, SessionCommand::Pause).map_err(Refusal::Failed)?;
     }
-    let refused = |call: &mut Call, error: String| {
+    let refused = |call: &mut Call, refusal: Refusal| {
         if !paused {
             let _ = pause(call, session_id, SessionCommand::Resume);
         }
-        Err(error)
+        Err(refusal)
     };
     let plan = match call(Request::MergePrepare {
         session_id: session_id.to_string(),
         message,
     }) {
         Ok(Response::Merge { plan }) => plan,
-        Ok(_) => return refused(call, unexpected()),
-        Err(error) => return refused(call, error),
+        Ok(_) => return refused(call, Refusal::Failed(unexpected())),
+        Err(error) => return refused(call, Refusal::Failed(error)),
     };
     if !plan.conflicts.is_empty() {
-        return refused(
-            call,
-            format!(
-                "This work conflicts with {}: {}. Resolve them in the app's merge review.",
-                plan.target_branch,
-                plan.conflicts.join(", ")
-            ),
-        );
+        let refusal = Refusal::Conflicts {
+            target_branch: plan.target_branch,
+            files: plan.conflicts,
+        };
+        return refused(call, refusal);
     }
     if plan.files.is_empty() {
-        return refused(call, "There are no changes to merge.".into());
+        return refused(call, Refusal::Empty);
     }
     Ok(Prepared {
         plan,
