@@ -695,14 +695,15 @@ impl Coordinator {
     pub(in crate::commands) fn caller(&self, headers: &HeaderMap) -> Result<Caller, StatusCode> {
         let token = bearer(headers)?.to_owned();
         let (_, run_id) = self.grant(&token)?;
-        let run = self
-            .runtime
-            .integration_runs()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .into_iter()
-            .find(|r| r.id == run_id && r.status.is_active())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+        let run = self.active_run(&run_id)?;
         Ok(Caller { token, run })
+    }
+
+    fn active_run(&self, run_id: &str) -> Result<crate::commands::tasks::TaskRun, StatusCode> {
+        self.runtime
+            .run_snapshot(run_id)
+            .filter(|run| run.status.is_active())
+            .ok_or(StatusCode::UNAUTHORIZED)
     }
 
     /// The assignment `caller` works on, checked again against its grant and
@@ -717,13 +718,7 @@ impl Coordinator {
             .iter()
             .find(|i| i.id == id && !i.canceled)
             .cloned();
-        let run = self
-            .runtime
-            .integration_runs()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .into_iter()
-            .find(|r| r.id == run_id && r.status.is_active())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+        let run = self.active_run(&run_id)?;
         Ok(item.unwrap_or_else(|| QueueItem {
             excluded_scopes: vec![],
             parent_task_id: None,
