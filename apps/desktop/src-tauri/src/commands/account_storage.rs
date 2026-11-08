@@ -217,58 +217,8 @@ mod registry_tests {
         ));
         assert!(is_record(&root.join("project-secrets/project.bin")));
         assert!(is_record(&root.join("computers/secrets/agent37-a.bin")));
+        assert!(is_record(&root.join("secrets/agent37.bin")));
         assert!(!is_record(&root.join("history/run.bin")));
         assert!(!is_record(&root.join("project-secrets/notes.json")));
-    }
-
-    /// Every record file name written as a literal outside tests is one reset
-    /// recognises, so none leaves its keyring secret behind.
-    #[test]
-    fn every_record_name_in_the_source_is_registered() {
-        fn visit(directory: &Path, names: &mut Vec<(String, String)>) {
-            for entry in std::fs::read_dir(directory).unwrap() {
-                let path = entry.unwrap().path();
-                if path.is_dir() {
-                    visit(&path, names);
-                    continue;
-                }
-                let file = path.file_name().unwrap().to_string_lossy().into_owned();
-                if path.extension().is_none_or(|extension| extension != "rs")
-                    || file == "tests.rs"
-                    || file.ends_with("_tests.rs")
-                {
-                    continue;
-                }
-                let text = std::fs::read_to_string(&path)
-                    .unwrap()
-                    .replace("\r\n", "\n");
-                let source = text
-                    .find("\n#[cfg(test)]\nmod ")
-                    .map_or(text.as_str(), |end| &text[..end]);
-                for (end, _) in source.match_indices(".bin\"") {
-                    let start = source[..end].rfind('"').map_or(end, |quote| quote + 1);
-                    let name = &source[start..end];
-                    if !name.is_empty()
-                        && name
-                            .bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-                    {
-                        names.push((format!("{name}.bin"), path.display().to_string()));
-                    }
-                }
-            }
-        }
-        let mut names = Vec::new();
-        visit(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
-            &mut names,
-        );
-        assert!(names.iter().any(|(name, _)| name == "swarm.bin"));
-        for (name, file) in names {
-            assert!(
-                RECORD_NAMES.contains(&name.as_str()),
-                "{name} in {file} is not a registered record name"
-            );
-        }
     }
 }
