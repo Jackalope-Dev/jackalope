@@ -169,10 +169,13 @@
     box-shadow: var(--shadow-pop);
     color: var(--color-text-primary);
   }
-  :where(.ui-dialog-overlay[data-layer="confirm"]) {
-    z-index: 90;
-  }
-  :where(.ui-dialog[data-layer="confirm"]) {
-    z-index: 91;
-  }
+}
+
+/* Unlayered, so a confirm dialog also stacks above an app's own dialog z-index
+   (the desktop styles task-dialog without a layer). */
+:is(.ui-dialog-overlay, .task-dialog-overlay)[data-layer="confirm"] {
+  z-index: 90;
+}
+:is(.ui-dialog, .task-dialog)[data-layer="confirm"] {
+  z-index: 91;
 }

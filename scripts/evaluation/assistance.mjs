@@ -1,5 +1,4 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 
 export function assistanceEvidence(records, labels) {
   if (!Array.isArray(records) || !records.length || !Array.isArray(labels) || !labels.length)
@@ -68,7 +67,7 @@ export function assistanceEvidence(records, labels) {
   };
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [records, labels, output] = process.argv.slice(2);
   if (!records || !labels)
     throw new Error('Usage: node assistance.mjs <receipts.json> <labels.json> [report.json]');

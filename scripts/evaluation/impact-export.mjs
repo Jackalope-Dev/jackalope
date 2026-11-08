@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 import { impactReport } from './impact-report.mjs';
 
 export function publicImpact(comparison, options) {
@@ -133,7 +132,7 @@ export function publicImpact(comparison, options) {
   };
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [input, output, options] = process.argv.slice(2);
   if (!input || !output || !options)
     throw new Error('Usage: impact-export.mjs comparison.json public-experiment.json options.json');

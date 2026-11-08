@@ -51,7 +51,7 @@ export function AgentKeySignIn({
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
+        <Dialog.Overlay data-layer="confirm" className="task-dialog-overlay" />
         <Dialog.Content
           {...focus}
           data-layer="confirm"

@@ -1,7 +1,9 @@
-import { SEMVER } from '../../../packages/contracts/src/platform.ts';
-import { releasePrefix, windowsInstallerName } from '../../../packages/contracts/src/release.ts';
-
-export const releaseService = 'https://api.jackalope.dev';
+import { SEMVER } from '@jackalope/contracts/platform';
+import {
+  PUBLIC_SERVICE_ORIGIN,
+  releasePrefix,
+  windowsInstallerName,
+} from '@jackalope/contracts/release';
 
 /**
  * The stable release the update service publishes, as the website's download
@@ -9,7 +11,7 @@ export const releaseService = 'https://api.jackalope.dev';
  * state; anything else unexpected fails, so a build never drops a live download.
  */
 export async function readPublicRelease({ fetcher = fetch, bootstrap = false } = {}) {
-  const response = await fetcher(`${releaseService}/updates/stable/latest.json`, {
+  const response = await fetcher(`${PUBLIC_SERVICE_ORIGIN}/updates/stable/latest.json`, {
     signal: AbortSignal.timeout(30000),
     redirect: 'error',
     headers: { 'cache-control': 'no-cache' },
@@ -28,7 +30,7 @@ export async function readPublicRelease({ fetcher = fetch, bootstrap = false } =
   const download = manifest.platforms?.['windows-x86_64-nsis']?.url;
   if (
     download !==
-    `${releaseService}/updates/${releasePrefix(manifest.version, 'stable')}/${windowsInstallerName(manifest.version)}`
+    `${PUBLIC_SERVICE_ORIGIN}/updates/${releasePrefix(manifest.version, 'stable')}/${windowsInstallerName(manifest.version)}`
   )
     throw new Error('Invalid published installer URL');
   return { VITE_RELEASE_VERSION: manifest.version, VITE_WINDOWS_DOWNLOAD_URL: download };

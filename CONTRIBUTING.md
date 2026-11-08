@@ -59,9 +59,11 @@ development is independent and requires no Cloudflare login; see its
 
 Use `pnpm test` for every suite: `pnpm test:scripts` runs the repository script
 tests (`scripts/*.test.mjs` and `scripts/release/*.test.mjs`), then each package
-runs its own `test`. Package suites are discovered from their folders (for
-example `apps/desktop/scripts/*.test.mjs` and `apps/website/test/*.test.mjs`);
-new suites do not need a package script entry. `pnpm typecheck` checks every
+runs its own `test`. `pnpm verify` and CI run the same suites: every workspace
+package with a `test` script is included, so a new package only needs that
+script. Within a package, suites are discovered from their folders (for example
+`apps/desktop/scripts/*.test.mjs` and `apps/website/test/*.test.mjs`), so a new
+test file needs no script entry. `pnpm typecheck` checks every
 package, including the server and the swarm Worker.
 
 For a single suite or test name, pass Node test-runner arguments to `test:file`:

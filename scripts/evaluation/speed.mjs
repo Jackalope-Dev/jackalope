@@ -1,5 +1,4 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
 
 export function speedReport(comparison, reviews = {}) {
@@ -71,7 +70,7 @@ export function speedReport(comparison, reviews = {}) {
   };
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [input, reviews, output] = process.argv.slice(2);
   if (!input)
     throw new Error('Usage: pnpm evaluate:speed comparison.json [reviews.json] [report.json]');

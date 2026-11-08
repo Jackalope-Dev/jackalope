@@ -86,9 +86,19 @@ const sharedChecks = [
   [process.execPath, [pnpm, 'check:changelog']],
   ...(pushing ? [] : [[process.execPath, [pnpm, 'ui:build']]]),
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test', ...serverTests]],
-  ...['@jackalope/mobile', '@jackalope/swarm', '@jackalope/website', '@jackalope/contracts'].map(
-    (name) => [process.execPath, [pnpm, '--filter', name, 'test']],
-  ),
+  // Every other package with a `test` script; the desktop suite runs separately below.
+  [
+    process.execPath,
+    [
+      pnpm,
+      '--recursive',
+      '--workspace-concurrency=1',
+      '--filter=!jackalope-monorepo',
+      '--filter=!@jackalope/server',
+      '--filter=!@jackalope/desktop',
+      'test',
+    ],
+  ],
 ];
 const sharedBuilds = [
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'build']],

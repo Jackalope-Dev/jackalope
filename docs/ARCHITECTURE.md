@@ -77,7 +77,8 @@ order they stop in when the app exits.
 Every webview call goes through invokeNative in lib/native/transport.ts, which
 rejects in the browser preview and reports operation telemetry and timing;
 lib/native/env.ts detects the desktop app and opens links. lib/run-types.ts holds
-the attempt DTOs and lib/run-status.ts the named status predicates and labels.
+the attempt DTOs and `@jackalope/contracts/runs` the named status predicates and
+labels.
 Per-domain clients (lib/task-client.ts, lib/queue.ts, lib/agent-profiles.ts,
 lib/git-worktrees.ts, lib/mcp-client.ts, lib/system-info.ts, lib/codebase.ts and
 others) own their command names and DTOs. DTOs follow Rust serde field names;

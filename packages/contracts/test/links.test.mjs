@@ -25,17 +25,17 @@ test('website links carry tokens in the fragment and invitations in the query', 
   );
 });
 
-test('Store links must be plain Microsoft product pages', () => {
+test('Store links must be Microsoft product pages', () => {
   for (const url of [
     'https://apps.microsoft.com/detail/9NM89QFJQ244',
     'https://apps.microsoft.com/detail/9NM89QFJQ244/',
+    'https://apps.microsoft.com/detail/9NM89QFJQ244?hl=en-us&gl=US',
     'https://www.microsoft.com/store/apps/9NM89QFJQ244',
   ])
     assert.equal(microsoftStoreUrl(url), url);
   for (const url of [
     undefined,
     'http://apps.microsoft.com/detail/9NM89QFJQ244',
-    'https://apps.microsoft.com/detail/9NM89QFJQ244?hl=en',
     'https://apps.microsoft.com/detail/9NM89QFJQ244#reviews',
     'https://apps.microsoft.com:444/detail/9NM89QFJQ244',
     'https://apps.microsoft.com.evil.test/detail/9NM89QFJQ244',

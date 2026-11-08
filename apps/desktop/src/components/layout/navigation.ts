@@ -1,3 +1,4 @@
+import type { Feature } from '@jackalope/contracts/telemetry';
 import {
   Blocks,
   BookOpen,
@@ -20,7 +21,6 @@ import {
   Share2,
 } from 'lucide-react';
 import { openExternalUrl } from '../../lib/native/env.ts';
-import type { Feature } from '../../lib/telemetry';
 import type { SettingsCategory } from '../settings/categories';
 export type ViewGroup = 'tasks' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
 

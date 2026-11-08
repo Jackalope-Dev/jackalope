@@ -3,8 +3,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { httpsUrl } from '../../packages/contracts/src/platform.ts';
-import { isMain } from '../lib/cli.mjs';
+import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { assertVersions, readNotes } from './catalog.mjs';
 import { waitForSourceChecks } from './source-checks.mjs';
 import { storePlan } from './store-plan.mjs';
@@ -13,7 +12,7 @@ const api = 'https://manage.devcenter.microsoft.com/v1.0/my';
 
 export function submissionPath(appId, channel, flightId) {
   if (!/^[A-Z0-9]{12}$/i.test(appId ?? '')) throw new Error('Invalid Store app ID');
-  if (!['beta', 'stable'].includes(channel)) throw new Error('Invalid Store channel');
+  if (!isReleaseChannel(channel)) throw new Error('Invalid Store channel');
   if (channel === 'beta' && !/^[a-z0-9-]+$/i.test(flightId ?? ''))
     throw new Error('Beta releases require a Store flight ID');
   return `/applications/${appId}${channel === 'beta' ? `/flights/${flightId}` : ''}`;
@@ -162,7 +161,7 @@ export function validateSource(receipt, env) {
     receipt.channel !== env.EXPECTED_CHANNEL
   )
     throw new Error('Store candidate does not match the reviewed source and channel');
-  if (!['beta', 'stable'].includes(receipt.channel) || receipt.architecture !== 'x64')
+  if (!isReleaseChannel(receipt.channel) || receipt.architecture !== 'x64')
     throw new Error('Invalid Store candidate channel or architecture');
 }
 
@@ -278,7 +277,7 @@ async function main() {
   );
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

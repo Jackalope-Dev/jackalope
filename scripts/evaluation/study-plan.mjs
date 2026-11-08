@@ -1,5 +1,3 @@
-import { isMain } from '../lib/cli.mjs';
-
 export const qualityMethod = 'Independent source-family Wilson endpoint difference, z=1.96';
 export const qualityMargin = 0.02;
 
@@ -48,7 +46,7 @@ export function studyPlan({ margin = qualityMargin, expectedPassRate = 1, famili
   };
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const args = process.argv.slice(2);
   const value = (name, fallback) =>
     Number(args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);

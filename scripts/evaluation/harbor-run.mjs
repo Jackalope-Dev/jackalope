@@ -4,7 +4,6 @@ import path from 'node:path';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
-import { isMain } from '../lib/cli.mjs';
 import { aggregateAttempts, reconcileProviderUsage } from './attempts.mjs';
 import { experimentEnvironment, validateExperiments } from './experiments.mjs';
 import { prepareProviderMeter } from './provider-meter.mjs';
@@ -186,6 +185,6 @@ export async function runExternal(inputPath, output, binary) {
   return report;
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   await runExternal(process.argv[2], process.argv[3], process.env.JACKALOPE_QUALITY_BINARY);
 }

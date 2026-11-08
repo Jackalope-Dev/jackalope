@@ -11,7 +11,7 @@ import { ServiceError } from './errors';
 import { deliverFeedback } from './feedback-mail';
 import { lopebase, lopebasePath } from './lopebase';
 import { limit } from './rate-limit';
-import { API_HEADERS, errorResponse, json } from './respond';
+import { API_HEADERS, errorResponse, json, SERVICE_ERRORS } from './respond';
 import { prune, saveFeedback, saveTelemetry } from './storage';
 
 /** Rows the ingestion migrations create; storage guards need every one. */
@@ -184,8 +184,7 @@ export default {
           pathname.startsWith('/updates/') && ['GET', 'HEAD'].includes(request.method)
             ? { ...API_HEADERS, 'access-control-allow-origin': '*' }
             : API_HEADERS,
-        retryAfter: { 429: '60', 503: '300' },
-        log: true,
+        ...SERVICE_ERRORS,
       });
     }
   },

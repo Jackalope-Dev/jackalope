@@ -1,17 +1,12 @@
+import { measured, quantile, sum } from '../lib/stats.mjs';
+
 function measurements(values) {
-  const measured = values
-    .filter((value) => Number.isFinite(value) && value >= 0)
-    .sort((a, b) => a - b);
-  const percentile = (fraction) =>
-    measured[Math.max(0, Math.ceil(measured.length * fraction) - 1)] ?? null;
+  const recorded = values.filter(measured);
   return {
-    coverage: measured.length,
-    total:
-      measured.length === values.length && values.length
-        ? measured.reduce((sum, value) => sum + value, 0)
-        : null,
-    p50: percentile(0.5),
-    p95: percentile(0.95),
+    coverage: recorded.length,
+    total: sum(values),
+    p50: quantile(recorded, 0.5),
+    p95: quantile(recorded, 0.95),
   };
 }
 
@@ -19,22 +14,15 @@ export function qualitySummary(trials, variants = ['before', 'after']) {
   return Object.fromEntries(
     variants.map((variant) => {
       const rows = trials.filter((trial) => trial.variant === variant);
-      const measured = rows.filter(
-        (trial) => Number.isFinite(trial.totalTokens) && trial.totalTokens >= 0,
-      );
-      const total =
-        rows.length && measured.length === rows.length
-          ? measured.reduce((sum, trial) => sum + trial.totalTokens, 0)
-          : null;
+      const usage = rows.filter((trial) => measured(trial.totalTokens));
+      const total = sum(rows.map((trial) => trial.totalTokens));
       const successes = rows.filter((trial) => trial.oraclePassed).length;
       const elapsed = measurements(rows.map((trial) => trial.elapsedMs));
       const accepted = rows.filter((trial) => trial.accepted === true).length;
       const reviewed = rows.filter((trial) => typeof trial.accepted === 'boolean').length;
       const delivery = measurements(
         rows.map((trial) =>
-          [trial.elapsedMs, trial.reviewMinutes, trial.correctionMinutes].every(
-            (value) => Number.isFinite(value) && value >= 0,
-          )
+          [trial.elapsedMs, trial.reviewMinutes, trial.correctionMinutes].every(measured)
             ? trial.elapsedMs + (trial.reviewMinutes + trial.correctionMinutes) * 60_000
             : null,
         ),
@@ -54,7 +42,7 @@ export function qualitySummary(trials, variants = ['before', 'after']) {
             accepted && reviewed === rows.length && delivery.total !== null
               ? delivery.total / accepted
               : null,
-          usageCoverage: measured.length,
+          usageCoverage: usage.length,
           totalTokens: total,
           tokensPerOracleSuccess: successes && total !== null ? total / successes : null,
           elapsedMs: elapsed,

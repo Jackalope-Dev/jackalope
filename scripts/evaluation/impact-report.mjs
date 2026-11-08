@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 import { measured, quantile, reduction, seededRandom, sum } from '../lib/stats.mjs';
 import { studyPlan, wilson } from './study-plan.mjs';
 
@@ -439,7 +438,7 @@ export function impactReport(
   };
 }
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [input, output, options] = process.argv.slice(2);
   if (!input || !output)
     throw new Error('Usage: impact-report.mjs comparison.json report.json [options.json]');

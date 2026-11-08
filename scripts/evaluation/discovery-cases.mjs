@@ -1,5 +1,4 @@
 import { writeFile } from 'node:fs/promises';
-import { isMain } from '../lib/cli.mjs';
 
 const tools = [
   ['audit_log', 'Read immutable security and access events.'],
@@ -83,7 +82,7 @@ export const discoveryCases = [
   ),
 }));
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   if (!process.argv[2]) throw new Error('Supply a discovery suite output JSON path.');
   await writeFile(
     process.argv[2],

@@ -1,6 +1,5 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { posix, resolve } from 'node:path';
-import { isMain } from './lib/cli.mjs';
 import { root } from './lib/paths.mjs';
 import { git } from './lib/proc.mjs';
 
@@ -92,7 +91,7 @@ export function affected(files) {
 
 // CI: `node scripts/change-scope.mjs <base>` writes desktop=true|false to the step
 // outputs. Without a base, or when the diff is unavailable, it reports true.
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const base = process.argv[2];
   const files = base ? changedFiles(base) : null;
   const { desktop } = affected(files);

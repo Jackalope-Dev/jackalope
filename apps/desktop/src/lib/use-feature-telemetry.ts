@@ -1,6 +1,6 @@
+import type { Feature } from '@jackalope/contracts/telemetry';
 import { useEffect, useRef } from 'react';
 import { telemetry, useCommunityStore } from '../stores/communityStore';
-import type { Feature } from './telemetry';
 
 export function useFeatureTelemetry(feature: Feature | undefined) {
   const enabled = useCommunityStore(

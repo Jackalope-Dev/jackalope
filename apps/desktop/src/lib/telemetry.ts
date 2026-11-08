@@ -1,18 +1,5 @@
 import type { Metric } from '@jackalope/contracts/telemetry';
 
-export type {
-  Feature,
-  Metric,
-  Operation,
-  OperationOutcome,
-  TaskState,
-  TelemetryAgent,
-} from '@jackalope/contracts/telemetry';
-export {
-  OPERATIONS as operations,
-  TELEMETRY_AGENTS as agents,
-} from '@jackalope/contracts/telemetry';
-
 type Event = Metric & { id: string };
 export function createTelemetry(send: (events: Event[]) => Promise<unknown>, delay = 15_000) {
   let enabled = false,

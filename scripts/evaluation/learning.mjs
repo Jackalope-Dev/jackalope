@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { isMain } from '../lib/cli.mjs';
 import {
   hash,
   promotionDecision,
@@ -138,7 +137,7 @@ const write = async (directory, filename, value) => {
   });
 };
 
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [mode, ...inputs] = process.argv.slice(2);
   if (mode === 'prepare' && inputs.length === 3) {
     const [suite, training, output] = inputs;

@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { httpsUrl, SEMVER } from '../../packages/contracts/src/platform.ts';
+import { httpsUrl, isReleaseChannel, SEMVER } from '../../packages/contracts/src/platform.ts';
 import { releasePrefix } from '../../packages/contracts/src/release.ts';
-import { isMain } from '../lib/cli.mjs';
 import { root } from '../lib/paths.mjs';
 
 export { root };
@@ -19,7 +18,7 @@ export function version(value) {
   return value;
 }
 export function channel(value) {
-  if (!['stable', 'beta'].includes(value)) throw new Error('Channel must be stable or beta');
+  if (!isReleaseChannel(value)) throw new Error('Channel must be stable or beta');
   return value;
 }
 export function origin(value) {
@@ -147,7 +146,7 @@ export function releasePlan({ receipt, notes, previous = [], base, current }) {
   if (manifest.version !== v) throw new Error('Manifest version mismatch');
   return { releases, manifest, feed: feed(releases, base, c), directory: prefix(v, c) };
 }
-if (isMain(import.meta)) {
+if (import.meta.main) {
   const [command, v] = process.argv.slice(2);
   if (command === 'prepare') await prepare(v);
   else if (command === 'check') {
