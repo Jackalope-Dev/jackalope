@@ -43,7 +43,6 @@ pub(super) fn run(
         None
     };
     cmd.env_remove("JACKALOPE_QUALITY_SPEC");
-    cmd.env_remove("JACKALOPE_JEV_TEST_KEY");
     agent_profiles::apply_binding(&mut cmd, &binding)?;
     let effort = serde_json::from_value(spec["effort"].clone()).map_err(|e| e.to_string())?;
     if adapter == "codex" {

@@ -478,8 +478,12 @@ impl Partials {
         self.published = Instant::now();
         let mut inner = runtime.inner.lock().unwrap();
         if let Some(run) = inner.runs.get_mut(id) {
-            if run.streaming != self.text {
-                run.streaming.clone_from(&self.text);
+            let mut text = self.text.clone();
+            if let Some(secrets) = &run.secrets {
+                secrets.streaming(&mut text);
+            }
+            if run.streaming != text {
+                run.streaming = text;
                 runtime.writer.changed(id);
             }
         }

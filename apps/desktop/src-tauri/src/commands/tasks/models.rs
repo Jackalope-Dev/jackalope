@@ -169,6 +169,10 @@ pub struct TaskRun {
     /// The result this attempt challenges, when it is a Challenge reviewer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
+    /// Secret values the agent was given, which the record never shows. Kept
+    /// in memory only, for as long as the attempt can still produce output.
+    #[serde(skip)]
+    pub(crate) secrets: Option<std::sync::Arc<crate::commands::redaction::KnownSecrets>>,
 }
 
 impl TaskRun {
@@ -182,6 +186,48 @@ impl TaskRun {
         self.error = Some(error);
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
         self.progress = None;
+    }
+
+    /// Adds `values` to the secrets this attempt's record never shows, and
+    /// redacts what it already holds.
+    pub(in crate::commands) fn protect(&mut self, values: Vec<String>) {
+        if let Some(secrets) =
+            crate::commands::redaction::KnownSecrets::with(self.secrets.as_deref(), values)
+        {
+            self.secrets = Some(std::sync::Arc::new(secrets));
+            self.redact_secrets();
+        }
+    }
+
+    /// Replaces the attempt's secret values wherever the record keeps what the
+    /// agent wrote, asked, decided, checked or showed. The person's prompt and
+    /// the record's identifiers, paths and statuses are left as they are.
+    pub(in crate::commands) fn redact_secrets(&mut self) {
+        let Some(secrets) = self.secrets.clone() else {
+            return;
+        };
+        secrets.text(&mut self.result);
+        secrets.streaming(&mut self.streaming);
+        for text in self
+            .activity
+            .iter_mut()
+            .chain(&mut self.diagnostics)
+            .chain(&mut self.visited_pages)
+            .chain(&mut self.error)
+            .chain(&mut self.verification_error)
+            .chain(&mut self.checkpoint_error)
+        {
+            secrets.text(text);
+        }
+        secrets.record(&mut self.prompts);
+        secrets.record(&mut self.validation_steps);
+        secrets.record(&mut self.decisions);
+        secrets.record(&mut self.understanding);
+        secrets.record(&mut self.screenshots);
+        secrets.record(&mut self.desktop_actions);
+        secrets.record(&mut self.quota_failure);
+        secrets.record(&mut self.verification);
+        secrets.record(&mut self.progress);
     }
 }
 
@@ -425,6 +471,7 @@ impl TaskRun {
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
             challenge_of: self.challenge_of.clone(),
+            secrets: None,
         }
     }
 }

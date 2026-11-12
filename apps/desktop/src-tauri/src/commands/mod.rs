@@ -104,6 +104,7 @@ mod file_lock;
 pub mod first_commit;
 mod git_command;
 pub mod notifications;
+mod redaction;
 mod repo;
 mod scope_path;
 

@@ -7,6 +7,11 @@ pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
     if text.trim().is_empty() {
         return;
     }
+    // Redacted before it is shortened, so the cut cannot leave part of a value.
+    let text = match &run.secrets {
+        Some(secrets) => secrets.redacted(text),
+        None => std::borrow::Cow::Borrowed(text),
+    };
     let bounded: String = text.chars().take(6000).collect();
     run.activity.push(bounded);
     if run.activity.len() > ACTIVITY_KEPT {

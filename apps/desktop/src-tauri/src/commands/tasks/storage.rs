@@ -389,7 +389,9 @@ impl TaskRuntime {
     }
 
     pub(super) fn save(&self, run: &TaskRun) -> Result<(), String> {
-        journal::Writer::wait(self.writer.submit(run.clone(), true)?)
+        let mut run = run.clone();
+        run.redact_secrets();
+        journal::Writer::wait(self.writer.submit(run, true)?)
     }
 
     pub(in crate::commands) fn update_output(
@@ -414,6 +416,7 @@ impl TaskRuntime {
     }
 
     fn bound_output(run: &mut TaskRun) {
+        run.redact_secrets();
         if !run.status.is_active() {
             run.progress = None;
         }
