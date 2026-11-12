@@ -80,9 +80,7 @@ async fn permission_for(
             &service.runtime,
             &run.id,
             &crate::commands::permission_risk::label(&input.tool_name, &input.input),
-            |workspace| {
-                crate::commands::permission_risk::assess(&input.tool_name, &input.input, workspace)
-            },
+            |scope| crate::commands::permission_risk::assess(&input.tool_name, &input.input, scope),
         )
     {
         escalation = reason;

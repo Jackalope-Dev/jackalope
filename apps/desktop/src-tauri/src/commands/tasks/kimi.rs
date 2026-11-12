@@ -490,8 +490,8 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
             crate::commands::permission_risk::label("", &tool_call["rawInput"])
                 .trim_start_matches(": ")
         );
-        match crate::commands::permission_risk::decide(runtime, run_id, &label, |workspace| {
-            crate::commands::permission_risk::assess_acp(tool_call, workspace)
+        match crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
+            crate::commands::permission_risk::assess_acp(tool_call, scope)
         }) {
             crate::commands::permission_risk::Decision::Approve => {
                 return json!({"outcome":"selected","optionId":allow_once});

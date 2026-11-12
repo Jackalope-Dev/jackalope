@@ -538,8 +538,12 @@ impl Turn {
             .chars()
             .take(160)
             .collect();
-        match crate::commands::permission_risk::assess(tool, tool_input, Path::new(&self.workspace))
-        {
+        let scope = crate::commands::permission_risk::Scope::of_run(
+            &self.runtime,
+            &self.id,
+            Path::new(&self.workspace),
+        );
+        match crate::commands::permission_risk::assess(tool, tool_input, &scope) {
             crate::commands::permission_risk::Verdict::Routine => {
                 self.activity(&format!("Auto-approved {label}"));
                 json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow",

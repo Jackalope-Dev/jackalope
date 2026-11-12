@@ -32,7 +32,7 @@ mod tests;
 pub(super) mod timing;
 pub(in crate::commands) mod tool_activity;
 mod warm_opencode;
-mod workspace_processes;
+pub(in crate::commands) mod workspace_processes;
 
 pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;

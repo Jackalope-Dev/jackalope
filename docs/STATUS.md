@@ -561,8 +561,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a plain push of an existing non-protected local branch to a configured remote,
   history or working-tree loss, piped or encoded code, elevated or system changes,
   software installs beyond the project (system packages, toolchains, global tools),
-  credential files, publishing and deploys, process kills and writes outside the
-  workspace. Here-document bodies read as data, such as commit messages, and command
+  credential files, publishing and deploys, writes outside the workspace, and process
+  kills. On macOS and Linux, `kill` by ID of a process the attempt started, in its
+  agent's process tree or running inside the attempt's own worktree (never the project
+  checkout), is routine; kills by name (`pkill`, `killall`) always ask. Here-document bodies read as data, such as commit messages, and command
   output assigned to a variable are not parsed as commands. Agents are asked to edit
   files with their edit tools so each edit is checked, and `record_decision` replies
   flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the

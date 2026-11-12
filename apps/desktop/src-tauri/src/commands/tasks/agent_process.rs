@@ -14,6 +14,7 @@ pub(super) const STDERR_LINE_LIMIT: usize = 6000;
 
 pub(in crate::commands) struct AgentProcess {
     child: Mutex<Child>,
+    pid: u32,
     tree: ProcessTree,
     _lease: Option<UseGuard>,
 }
@@ -79,6 +80,7 @@ impl AgentProcess {
             (child.stdin.take(), child.stdout.take(), child.stderr.take());
         Ok(Spawned {
             process: Arc::new(Self {
+                pid: child.id(),
                 child: Mutex::new(child),
                 tree,
                 _lease: lease,
@@ -95,9 +97,9 @@ impl AgentProcess {
         self.child.lock().unwrap().try_wait()
     }
 
-    #[cfg(test)]
+    /// The agent's process ID, which on Unix also names the process group it heads.
     pub(in crate::commands) fn id(&self) -> u32 {
-        self.child.lock().unwrap().id()
+        self.pid
     }
 
     pub(in crate::commands) fn alive(&self) -> bool {
@@ -155,6 +157,12 @@ impl TaskRuntime {
 
     pub(super) fn unregister_process(&self, id: &str) {
         self.inner.lock().unwrap().processes.remove(id);
+    }
+
+    /// The process ID of attempt `id`'s running agent, when it runs on this device.
+    pub(in crate::commands) fn agent_pid(&self, id: &str) -> Option<u32> {
+        let inner = self.inner.lock().unwrap();
+        inner.processes.get(id).map(|process| process.id())
     }
 
     /// Whether attempt `id` was not stopped and its agent process still runs.
