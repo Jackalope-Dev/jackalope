@@ -55,19 +55,13 @@ pub fn assignments(doc: &PlanDocument, shape: &str) -> Result<String, String> {
         let mut scopes: Vec<String> = tasks.iter().flat_map(|task| task.scopes.clone()).collect();
         scopes.sort();
         scopes.dedup();
-        let briefing = tasks
-            .iter()
-            .filter(|task| !task.briefing.is_empty())
-            .map(|task| format!("{}: {}", task.key, task.briefing))
-            .collect::<Vec<_>>()
-            .join("\n");
+        // No briefing: the request is the rendered plan, which holds every task's briefing.
         serde_json::json!([{
             "key": "plan",
             "title": bounded(&doc.title, 160),
             "prompt": format!("Implement every remaining task in the approved plan, in dependency order: {}.", open.join(", ")),
             "scopes": scopes,
             "outcomes": outcomes(doc, &[]),
-            "briefing": bounded(&briefing, 4000),
         }])
     } else {
         serde_json::Value::Array(

@@ -107,7 +107,9 @@ development agent. The agent receives the complete request and checks repository
 boundaries before proposing one to four assignments, or up to eight when the
 concurrency limit is higher. Each assignment includes a planner briefing (key files,
 patterns, contracts, checks and pitfalls, under 1,500 characters) that the worker
-receives so it can skip repeated discovery; workers are told to confirm it. Review ownership and
+receives so it can skip repeated discovery; workers are told to confirm it. Every worker
+also receives the complete request after its assignment, so the planner does not copy it
+into assignments. Review ownership and
 dependencies, then choose **Start reviewed plan**. Native validation rejects cycles,
 escaping paths and independent assignments with overlapping scopes, for automatic and
 reviewed plans alike. A changed planner attempt requires another review. Planning
