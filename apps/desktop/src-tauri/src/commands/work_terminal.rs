@@ -297,7 +297,9 @@ fn spawn_terminal(
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
     command.cwd(&workspace);
     command.env("TERM", "xterm-256color");
-    command.env_remove("JACKALOPE_BRIDGE_TOKEN");
+    for name in super::process_control::inherited_credentials() {
+        command.env_remove(name);
+    }
     command.env_remove("JACKALOPE_BRIDGE_URL");
     let mut child = pair
         .slave

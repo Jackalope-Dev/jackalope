@@ -472,7 +472,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Project secrets (Project settings → Secrets) give a project's task agents environment
   variables such as service API keys, on this device, on its computer or both. Values
   stay in protected storage and reach only agent processes; the app shows names and
-  save times. See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
+  save times. Their values and managed keys given to an agent are redacted from the
+  attempt's saved and displayed record; the agent itself can still use or send them.
+  See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People

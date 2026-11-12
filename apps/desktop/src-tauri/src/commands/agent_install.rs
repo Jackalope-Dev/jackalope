@@ -82,6 +82,9 @@ fn install_command(agent: &str, npm: &Path) -> Result<CommandBuilder, String> {
     command.env("TERM", "xterm-256color");
     command.env("NPM_CONFIG_FUND", "false");
     command.env("NPM_CONFIG_UPDATE_NOTIFIER", "false");
+    for name in super::process_control::inherited_credentials() {
+        command.env_remove(name);
+    }
     Ok(command)
 }
 

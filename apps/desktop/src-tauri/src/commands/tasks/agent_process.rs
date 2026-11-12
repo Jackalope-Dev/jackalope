@@ -226,3 +226,64 @@ pub(super) fn read_diagnostics(stderr: impl std::io::Read, mut consume: impl FnM
         },
     );
 }
+
+/// A file an agent reads its prompt or configuration from, readable only by
+/// this user and removed when dropped. It is always created new, so it never
+/// follows a link or replaces a file already at its path.
+pub(super) struct PrivateFile(PathBuf);
+
+impl PrivateFile {
+    pub(super) fn create(path: PathBuf, contents: &str) -> std::io::Result<Self> {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&path)?;
+        let created = Self(path);
+        std::io::Write::write_all(&mut file, contents.as_bytes())?;
+        Ok(created)
+    }
+}
+
+impl Drop for PrivateFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+#[cfg(test)]
+mod private_file_tests {
+    use super::PrivateFile;
+
+    #[test]
+    fn a_private_file_is_new_owner_only_and_removed_when_dropped() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-private-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("prompt");
+        let file = PrivateFile::create(path.clone(), "the prompt").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "the prompt");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+        assert!(PrivateFile::create(path.clone(), "again").is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "the prompt");
+        drop(file);
+        assert!(!path.exists());
+        #[cfg(unix)]
+        {
+            let target = folder.join("target");
+            std::fs::write(&target, "kept").unwrap();
+            std::os::unix::fs::symlink(&target, &path).unwrap();
+            assert!(PrivateFile::create(path.clone(), "redirected").is_err());
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "kept");
+        }
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+}
