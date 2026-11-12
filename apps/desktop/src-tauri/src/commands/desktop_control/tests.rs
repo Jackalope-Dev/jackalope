@@ -898,3 +898,31 @@ fn wait_for_fixture_text(path: &std::path::Path, expected: &str) {
     }
     assert_eq!(std::fs::read_to_string(path).unwrap(), expected);
 }
+
+#[test]
+fn missing_permissions_read_as_system_settings_names_them() {
+    let names = |ids: &[&str]| {
+        platform::permission_names(&ids.iter().map(|id| id.to_string()).collect::<Vec<_>>())
+    };
+    assert_eq!(names(&["accessibility"]), "Accessibility");
+    assert_eq!(
+        names(&["accessibility", "screenRecording"]),
+        "Accessibility and Screen Recording"
+    );
+    assert_eq!(
+        names(&["accessibility", "screenRecording", "inputMonitoring"]),
+        "Accessibility, Screen Recording and Input Monitoring"
+    );
+    assert_eq!(names(&[]), "");
+}
+
+#[test]
+fn only_system_settings_links_open_natively() {
+    for url in [
+        "https://example.com",
+        "file:///Applications",
+        "x-apple.systempreferences:com.apple preference",
+    ] {
+        assert!(platform::desktop_control_open_settings_link(url.into()).is_err());
+    }
+}

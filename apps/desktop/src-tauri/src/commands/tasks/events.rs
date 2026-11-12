@@ -23,6 +23,35 @@ pub(super) fn num(value: &Value, key: &str) -> u64 {
     value[key].as_u64().unwrap_or(0)
 }
 
+/// Totals the per-call usage an attempt observed when its agent ended without reporting
+/// its own total (stopped, failed, or interrupted when Jackalope closed), so the attempt
+/// still records what it used. Each call counts once, subagent calls included; calls the
+/// agent made after its last observation, and the cost, stay unknown.
+pub(in crate::commands) fn settle_usage(run: &mut TaskRun) {
+    if run.usage.reported || run.usage_observations.is_empty() {
+        return;
+    }
+    let mut usage = Usage {
+        reported: true,
+        ..Usage::default()
+    };
+    for observed in &run.usage_observations {
+        usage.input = usage.input.saturating_add(observed.input);
+        usage.output = usage.output.saturating_add(observed.output);
+        usage.cache_read = usage.cache_read.saturating_add(observed.cache_read);
+        usage.cache_write = usage.cache_write.saturating_add(observed.cache_write);
+    }
+    run.usage = usage;
+    let calls = run.usage_observations.len();
+    activity(
+        run,
+        &format!(
+            "Usage totals the {calls} model call{} observed; the agent ended without reporting its own total or cost.",
+            if calls == 1 { "" } else { "s" }
+        ),
+    );
+}
+
 #[cfg(test)]
 pub(super) fn consume_event(run: &mut TaskRun, line: &str) {
     let adapter = run.agent.clone();
@@ -65,15 +94,21 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         let usage = &message["usage"];
         if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {
             if usage["input_tokens"].is_u64() && usage["output_tokens"].is_u64() {
+                let (read, write) = (
+                    num(usage, "cache_read_input_tokens"),
+                    num(usage, "cache_creation_input_tokens"),
+                );
                 let observation = UsageObservation {
                     session_id: None,
                     message_id: id.to_string(),
                     parent_tool_use_id: child.map(str::to_string),
                     model: message["model"].as_str().map(str::to_string),
                     input: num(usage, "input_tokens")
-                        .saturating_add(num(usage, "cache_read_input_tokens"))
-                        .saturating_add(num(usage, "cache_creation_input_tokens")),
+                        .saturating_add(read)
+                        .saturating_add(write),
                     output: num(usage, "output_tokens"),
+                    cache_read: read,
+                    cache_write: write,
                 };
                 if let Some(old) = run
                     .usage_observations
@@ -314,6 +349,8 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
                 model: run.model.clone(),
                 input,
                 output,
+                cache_read: read,
+                cache_write: write,
             });
             run.usage.input = run.usage.input.saturating_add(input);
             run.usage.output = run.usage.output.saturating_add(output);

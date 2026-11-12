@@ -126,7 +126,9 @@ pub struct HumanActionInput {
         description = "Clear numbered steps for the person, up to 2,000 characters. Never ask them to paste a secret into the conversation."
     )]
     pub instructions: String,
-    #[schemars(description = "Optional https link where the person does it")]
+    #[schemars(
+        description = "Optional link where the person does it: https, or a macOS System Settings pane such as x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    )]
     #[serde(default)]
     pub url: Option<String>,
     #[schemars(
@@ -136,12 +138,26 @@ pub struct HumanActionInput {
     pub secret_name: Option<String>,
 }
 
+/// Whether `url` opens a macOS System Settings pane, such as
+/// `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
+/// Only pane identifiers and their anchors are accepted.
+pub(crate) fn system_settings_link(url: &str) -> bool {
+    url.strip_prefix("x-apple.systempreferences:")
+        .is_some_and(|pane| {
+            !pane.is_empty()
+                && pane.len() <= 200
+                && pane
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "._-?=&".contains(c))
+        })
+}
+
 pub const HUMAN_DONE: &str = "Done";
 pub const HUMAN_DECLINED: &str = "Declined";
 
 impl HumanActionInput {
-    /// The question record the person sees: bounded text, an https link only,
-    /// and an environment-variable-shaped secret name.
+    /// The question record the person sees: bounded text, an https or System
+    /// Settings link only, and an environment-variable-shaped secret name.
     pub(super) fn into_question(self) -> Result<(AskUserInput, HumanAction), String> {
         let clean = |text: &str, limit: usize| -> String {
             text.replace(char::from(0), "")
@@ -160,9 +176,14 @@ impl HumanActionInput {
             .map(|url| url.trim().to_string())
             .filter(|url| !url.is_empty());
         if url.as_deref().is_some_and(|url| {
-            !url.starts_with("https://") || url.len() > 2000 || url.contains(char::is_whitespace)
+            !(url.starts_with("https://") || system_settings_link(url))
+                || url.len() > 2000
+                || url.contains(char::is_whitespace)
         }) {
-            return Err("Use an https link without spaces, or leave url out.".into());
+            return Err(
+                "Use an https link or a macOS System Settings link (x-apple.systempreferences:) without spaces, or leave url out."
+                    .into(),
+            );
         }
         let secret_name = self
             .secret_name
@@ -766,6 +787,42 @@ mod tests {
             ..Default::default()
         };
         assert!(!lone.sanitized(&[]).multi_select);
+    }
+
+    #[test]
+    fn human_action_links_are_https_or_system_settings_panes() {
+        let link = |url: &str| {
+            HumanActionInput {
+                kind: HumanActionKind::Other,
+                title: "Allow Accessibility".into(),
+                instructions: "1. Turn on Jackalope.".into(),
+                url: Some(url.into()),
+                secret_name: None,
+            }
+            .into_question()
+            .map(|(_, action)| action.url)
+        };
+        for good in [
+            "https://dashboard.stripe.com/apikeys",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            " x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture ",
+        ] {
+            assert_eq!(link(good).unwrap().as_deref(), Some(good.trim()));
+        }
+        for bad in [
+            "http://insecure.example",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "x-apple.systempreferences:",
+            "x-apple.systempreferences:com.apple preference",
+            "x-apple.systempreferences:com.apple.preference.security?a/../b",
+            "X-APPLE.SYSTEMPREFERENCES:com.apple.preference.security",
+            "https://example.com/a b",
+        ] {
+            let error = link(bad).unwrap_err();
+            assert!(error.contains("System Settings"), "{bad}: {error}");
+        }
+        assert_eq!(link("  ").unwrap(), None);
     }
 
     #[test]

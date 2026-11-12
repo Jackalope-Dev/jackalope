@@ -8,7 +8,8 @@ description: Build, launch and inspect native Jackalope with an isolated test pr
 Follow [SELF-DEVELOPMENT.md](../../../docs/SELF-DEVELOPMENT.md). Build the frontend
 before the native binary; use an absolute JACKALOPE_PROFILE_DIR unique to the
 test. Retain the returned process ID and stop only that instance. Do not force-stop
-every Jackalope process or use a contributor's everyday profile.
+every Jackalope process or use a contributor's everyday profile. Use `pnpm tauri dev`
+only with `--no-watch`, and poll for readiness instead of matching colored log text.
 
 A running process does not prove a window rendered. Inspect the actual native
 window and interactions, then distinguish real native responses from fixtures.

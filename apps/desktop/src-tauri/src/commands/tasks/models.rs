@@ -21,8 +21,13 @@ pub struct UsageObservation {
     pub session_id: Option<String>,
     pub parent_tool_use_id: Option<String>,
     pub model: Option<String>,
+    /// Includes the cache reads and writes below.
     pub input: u64,
     pub output: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cache_write: u64,
 }
 
 /// Where an attempt's agent ran when a project computer ran it.
@@ -162,6 +167,10 @@ pub struct TaskRun {
     pub usage_observations: Vec<UsageObservation>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
+    /// Questions whose ask returned to the agent unanswered and whose answer has
+    /// not reached it yet, through `user_response` or a Claude Code hook.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub awaiting_answers: Vec<String>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
     /// Append-only decision trail the agent reported for this attempt.
@@ -169,6 +178,10 @@ pub struct TaskRun {
     pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// macOS permissions this attempt's last desktop-control call lacked, such as
+    /// `accessibility`, for the task view's setup notice. Cleared when a call succeeds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub desktop_permissions: Vec<String>,
     /// Desktop-control actions for the Screen view, newest last and bounded.
     #[serde(default)]
     pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
@@ -192,11 +205,13 @@ pub struct TaskRun {
 
 impl TaskRun {
     pub fn mark_stopped(&mut self) {
+        super::events::settle_usage(self);
         self.status = RunStatus::Stopped;
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
     }
 
     pub fn mark_failed(&mut self, error: String) {
+        super::events::settle_usage(self);
         self.status = RunStatus::Failed;
         self.error = Some(error);
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
@@ -482,9 +497,11 @@ impl TaskRun {
             mcp_usage: self.mcp_usage.clone(),
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
+            awaiting_answers: self.awaiting_answers.clone(),
             validation_steps: self.validation_steps.clone(),
             decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_permissions: self.desktop_permissions.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
             visited_pages: self.visited_pages.clone(),

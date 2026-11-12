@@ -1,5 +1,19 @@
 [
   {
+    "id": "agents-waste-less-time-on-long-runs",
+    "date": "2026-11-12",
+    "title": "Agents waste less time on long runs",
+    "description": "Changes from studying a long desktop task that spent most of its hour waiting.",
+    "items": [
+      "With auto-approve on, an agent can stop a process it started, such as a dev server in its own worktree, without asking you first. Stopping processes by name still asks.",
+      "If you answer a question after the agent stopped waiting, your answer reaches the agent with its next step instead of waiting for it to check. Questions can link straight to a System Settings pane.",
+      "When an agent can't control your Mac because a permission is missing, the task shows which one, opens the right System Settings pane and offers a restart once the work has stopped.",
+      "Large planned tasks are split into steps that can each be checked, starting with a read-only audit when the work needs one. Steps from an approved plan no longer repeat the same briefing.",
+      "A run that ends early still shows the tokens it used."
+    ],
+    "note": "Not yet tested in the installed app."
+  },
+  {
     "id": "resume-work-jackalope-closed-in-the-middle-of",
     "date": "2026-11-12",
     "title": "Resume work Jackalope closed in the middle of",

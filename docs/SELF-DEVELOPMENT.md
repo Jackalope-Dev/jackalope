@@ -28,6 +28,31 @@ try {
 Get-Process -Id $trial.Id
 ~~~
 
+On macOS and Linux, after the same build:
+
+~~~sh
+trial_profile="$PWD/scratch/native-trial-$(date +%s)"
+mkdir -p "$trial_profile"
+target="${CARGO_TARGET_DIR:-$PWD/apps/desktop/src-tauri/target}"
+JACKALOPE_PROFILE_DIR="$trial_profile" "$target/debug/jackalope-desktop" > "$trial_profile.log" 2>&1 &
+trial_pid=$!
+kill -0 "$trial_pid"
+~~~
+
+For frontend hot reload, run `pnpm tauri dev --no-watch` from apps/desktop with the same
+profile variable instead. It starts `pnpm dev` itself on port 5173, so do not start another
+dev server; if something else already holds that port, the window loads that server, so
+launch the built binary instead. Without `--no-watch`, every change under src-tauri
+rebuilds and restarts the app. pnpm, Vite, Cargo and the app run as separate processes,
+and stopping only the pnpm process leaves the others running. Start it as a background job
+of an interactive shell, or under `set -m` in a bash script, so it leads its own process
+group, and stop that group with `kill -- -"$dev_pid"`.
+
+Wait for readiness by polling, not by fixed sleeps or log patterns: `kill -0` for the
+process, `curl -sf http://localhost:5173/` for the dev server, then the window. Cargo and
+Tauri color their output and add terminal links even when redirected, so strip escapes
+before matching log text: `perl -pe 's/\e\[[0-9;]*[A-Za-z]|\e\]8;[^\e]*\e\\//g' "$log"`.
+
 Show and inspect the test app's window for interactive checks; process startup
 alone is insufficient. Use disposable repositories. The native profile isolates
 Jackalope history and WebView storage, but agent sign-ins/global MCP configuration
@@ -35,8 +60,8 @@ may still be shared. Use intended accounts and scoped fixtures.
 
 Stop tasks and quit this test instance through its tray menu when done. If it
 cannot quit, confirm the saved process ID still identifies the executable you
-launched before stopping it. Retain failed profiles for diagnosis. Never recursively
-remove a directory without checking its resolved path.
+launched before stopping it (`kill "$trial_pid"`). Retain failed profiles for
+diagnosis. Never recursively remove a directory without checking its resolved path.
 
 Inspect 1280×840 and 960×640 windows, keyboard/focus, themes, automatic appearance,
 preview cancellation and persistence. For runtime changes, exercise setup, a real

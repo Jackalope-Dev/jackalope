@@ -630,6 +630,7 @@ fn experiments_gate_sessions_hooks_and_isolation() {
         context: true,
         permission: true,
         timing: true,
+        answers: true,
     };
     // A project's explicit choice overrides the isolation default either way.
     assert!(Settings::from_experiments(Some(false)).isolated);
@@ -731,4 +732,71 @@ fn the_context_hook_delivers_selected_context_once() {
         turn.answer("permission", &json!({"tool_name":"Bash"})),
         json!({})
     );
+}
+
+#[test]
+fn the_answers_hook_delivers_a_late_answer_once() {
+    let folder =
+        std::env::temp_dir().join(format!("jackalope-answers-hook-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let mut run = super::super::tests::sample("claude");
+    run.id = "answers-run".into();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run);
+    let mut prompt = crate::commands::harness::PendingUserPrompt::choice(
+        "answers-run",
+        "Needs you",
+        "Allow Accessibility for Jackalope".into(),
+        vec!["Done".into(), "Declined".into()],
+    );
+    runtime.record_asked_prompt(&prompt);
+    let turn = |bridge| Turn {
+        runtime: runtime.clone(),
+        id: "answers-run".into(),
+        project_id: "answers-project".into(),
+        workspace: folder.to_string_lossy().into_owned(),
+        hooks: Hooks {
+            answers: true,
+            ..Hooks::default()
+        },
+        bridge,
+        final_check: false,
+        edit_check: None,
+        context: None,
+        delivered: AtomicBool::new(false),
+        rounds: AtomicU32::new(0),
+    };
+    let input = json!({"hook_event_name":"PostToolUse","tool_name":"Bash"});
+    assert_eq!(
+        turn(true).answer("answers", &input),
+        json!({}),
+        "unanswered"
+    );
+    assert!(runtime
+        .respond_prompt("answers-run", &prompt.id, "Done\nNote: granted")
+        .unwrap());
+    assert_eq!(
+        turn(false).answer("answers", &input),
+        json!({}),
+        "no bridge, no answers"
+    );
+    let first = turn(true).answer("answers", &input);
+    let text = first["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert_eq!(first["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    assert!(text.contains(&prompt.id) && text.contains("Done\n  Note: granted"));
+    assert_eq!(turn(true).answer("answers", &input), json!({}), "only once");
+    // An answer the agent received while its ask waited is never repeated.
+    prompt.id = "answered-in-time".into();
+    prompt.status = "answered".into();
+    prompt.answer = Some("Done".into());
+    runtime.record_asked_prompt(&prompt);
+    assert_eq!(turn(true).answer("answers", &input), json!({}));
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
 }
