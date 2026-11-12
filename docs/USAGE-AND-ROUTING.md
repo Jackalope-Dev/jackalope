@@ -208,6 +208,13 @@ and available cost estimates; task rows combine the selected calls across attemp
 Dates use the viewer's local time: workers use attempt start dates; routing and
 quota handoffs use recorded dates. These are not per-token billing timestamps.
 
+Attempt usage stores input as every prompt token the provider read, cache included:
+Claude, OpenCode and Antigravity report cache reads and writes beside uncached input,
+which Jackalope adds; Codex and Gemini CLI input already contains its cached part.
+New context is input minus cache reads and writes, and the cache hit rate shown with
+an attempt is cache reads divided by input. A Claude attempt with at least 50,000
+input tokens and no cache reads is flagged, since prompt caching may be off.
+
 Agent selection is measured routing overhead, including failed selections.
 Quota-interrupted worker legs remain separate from the final worker. Prompt,
 coordination, tool and in-task verification tokens remain inside worker usage;

@@ -430,7 +430,10 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
                 update["status"].as_str().unwrap_or("pending")
             ),
         ),
-        "current_model_update" => run.model = update["currentModelId"].as_str().map(str::to_string),
+        "current_model_update" => match update["currentModelId"].as_str() {
+            Some(model) => super::served_model::observe(run, model),
+            None => run.model = None,
+        },
         _ => {}
     }
 }

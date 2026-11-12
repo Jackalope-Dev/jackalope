@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { usageEntries } from '../src/lib/usage-entries.ts';
 import {
+  describeRunUsage,
   selectHelperTurns,
   summarizeUsage,
   usageCutoff,
@@ -233,5 +234,33 @@ test('helper turns follow project, account and period filters without inventing 
   assert.deepEqual(
     selectHelperTurns(turns, { ...filters, period: '7', cutoff: now + 1 }).map((turn) => turn.id),
     [],
+  );
+});
+
+test('run usage reports the cache hit rate and flags a large uncached Claude prompt', () => {
+  const run = (agent, usage) => ({
+    agent,
+    usageObservations: [],
+    usage: { output: 10, cacheWrite: 0, estimatedCostUsd: null, reported: true, ...usage },
+  });
+  assert.equal(
+    describeRunUsage(run('codex', { input: 24763, cacheRead: 24448 })),
+    '315 new context · 24,448 cached re-reads (99% cache hits) · 10 output · 24,773 cumulative tokens',
+  );
+  assert.match(
+    describeRunUsage(run('claude', { input: 80000, cacheRead: 0 })),
+    /\(0% cache hits\) · no prompt cache reuse; check whether prompt caching is disabled · /,
+  );
+  assert.doesNotMatch(
+    describeRunUsage(run('claude', { input: 20000, cacheRead: 0 })),
+    /no prompt cache reuse/,
+  );
+  assert.doesNotMatch(
+    describeRunUsage(run('codex', { input: 80000, cacheRead: 0 })),
+    /no prompt cache reuse/,
+  );
+  assert.equal(
+    describeRunUsage(run('kimi', { input: 300, cacheRead: 0 })),
+    '300 input · cache breakdown unavailable · 10 output · 310 cumulative tokens',
   );
 });

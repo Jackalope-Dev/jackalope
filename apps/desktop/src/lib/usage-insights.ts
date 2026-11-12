@@ -1,5 +1,5 @@
 import { latestTaskRuns, recordedOutcome } from './agent-analytics.ts';
-import { catalogEntry } from './agent-catalog.ts';
+import { agentFamily, catalogEntry } from './agent-catalog.ts';
 import type { RunUsage, TaskRun } from './run-types.ts';
 import type { usageEntries } from './usage-entries.ts';
 
@@ -44,22 +44,36 @@ export function summarizeUsage(items: { usage: RunUsage }[]) {
   };
 }
 
+/** A Claude attempt this large normally re-reads its cached prompt on every later call. */
+const UNCACHED_CLAUDE_INPUT = 50_000;
+
 /**
  * Cumulative prompt tokens re-count the whole conversation on every model call, so they
  * scale with turn count rather than work done. Lead with the figures that do not.
  */
 export function describeRunUsage(run: TaskRun) {
   const { usage } = run;
-  const cacheless = [run.accountBinding?.adapter, run.agent].some(
-    (id) => !!id && catalogEntry(id)?.reportsCache === false,
-  );
+  const adapters = [run.accountBinding?.adapter, run.agent].filter((id): id is string => !!id);
+  const cacheless = adapters.some((id) => catalogEntry(id)?.reportsCache === false);
   const calls = run.usageObservations?.length ?? 0;
   const parts: string[] = [];
-  parts.push(
-    cacheless
-      ? `${usage.input.toLocaleString()} input · cache breakdown unavailable`
-      : `${Math.max(0, usage.input - usage.cacheRead - usage.cacheWrite).toLocaleString()} new context · ${usage.cacheRead.toLocaleString()} cached re-reads`,
-  );
+  if (cacheless) {
+    parts.push(`${usage.input.toLocaleString()} input · cache breakdown unavailable`);
+  } else {
+    // `input` already includes cache reads and writes, so this is the share of the prompt
+    // the provider served from its cache.
+    const hitRate = usage.input ? Math.round((100 * usage.cacheRead) / usage.input) : null;
+    parts.push(
+      `${Math.max(0, usage.input - usage.cacheRead - usage.cacheWrite).toLocaleString()} new context · ${usage.cacheRead.toLocaleString()} cached re-reads${hitRate === null ? '' : ` (${hitRate}% cache hits)`}`,
+    );
+    if (
+      !usage.cacheRead &&
+      usage.input >= UNCACHED_CLAUDE_INPUT &&
+      adapters.some((id) => agentFamily(id) === 'anthropic')
+    ) {
+      parts.push('no prompt cache reuse; check whether prompt caching is disabled');
+    }
+  }
   parts.push(`${usage.output.toLocaleString()} output`);
   if (calls) {
     parts.push(

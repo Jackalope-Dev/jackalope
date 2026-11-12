@@ -93,7 +93,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         .as_str()
         .or(event["message"]["model"].as_str())
     {
-        run.model = Some(model.into());
+        super::served_model::observe(run, model);
     }
     match (protocol, kind) {
         (Some(Protocol::Codex), "item.started") => {
@@ -189,6 +189,9 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 for block in content {
                     if let Some(text) = block["text"].as_str() {
                         activity(run, text);
+                        if let Some(error) = super::failure::provider_error_text(text) {
+                            run.provider_error = Some(error);
+                        }
                     }
                     if block["type"] == "tool_use" {
                         if let Some(name) = block["name"].as_str() {
@@ -214,8 +217,22 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 .chars()
                 .take(120_000)
                 .collect();
+            // The CLI retries a provider error it printed mid-turn; only an unanswered
+            // turn fails with it.
+            let printed = super::failure::provider_error_text(&run.result).or_else(|| {
+                run.provider_error
+                    .take()
+                    .filter(|_| run.result.trim().is_empty())
+            });
             if event["is_error"] == true {
-                run.error = Some(extract_error_message(&event, adapter));
+                run.error = Some(
+                    printed
+                        .or_else(|| reported_error(&event))
+                        .unwrap_or_else(|| unexplained_error(&event, adapter)),
+                );
+            } else if let Some(error) = printed {
+                run.result.clear();
+                run.error = Some(error);
             }
             let u = &event["usage"];
             if u["input_tokens"].is_u64() && u["output_tokens"].is_u64() {
@@ -323,7 +340,8 @@ fn short_name(adapter: &str) -> &str {
     crate::commands::agents::find(adapter).map_or(adapter, |agent| agent.short_name.as_str())
 }
 
-fn extract_error_message(event: &Value, adapter: &str) -> String {
+/// The error a result event names, from its most specific field.
+fn reported_error(event: &Value) -> Option<String> {
     if let Some(errors) = event["errors"].as_array() {
         let messages: Vec<_> = errors
             .iter()
@@ -335,35 +353,24 @@ fn extract_error_message(event: &Value, adapter: &str) -> String {
             .filter(|s| !s.trim().is_empty() && *s != "null")
             .collect();
         if !messages.is_empty() {
-            return messages.join("\n");
+            return Some(messages.join("\n"));
         }
     }
-    if let Some(err_str) = event["errors"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return err_str.to_string();
-    }
-    if let Some(err_str) = event["error"]["message"]
-        .as_str()
-        .or_else(|| event["error"]["data"]["message"].as_str())
-        .or_else(|| event["error"].as_str())
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return err_str.to_string();
-    }
-    if let Some(msg) = event["message"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return msg.to_string();
-    }
-    if let Some(result) = event["result"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return result.to_string();
-    }
+    [
+        &event["errors"],
+        &event["error"]["message"],
+        &event["error"]["data"]["message"],
+        &event["error"],
+        &event["message"],
+        &event["result"],
+    ]
+    .into_iter()
+    .filter_map(Value::as_str)
+    .find(|s| !s.trim().is_empty() && *s != "null")
+    .map(str::to_string)
+}
+
+fn unexplained_error(event: &Value, adapter: &str) -> String {
     if let Some(subtype) = event["subtype"]
         .as_str()
         .filter(|s| !s.trim().is_empty() && *s != "null")
