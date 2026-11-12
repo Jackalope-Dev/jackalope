@@ -197,6 +197,17 @@ impl TaskRuntime {
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
         let mut resume = previous;
+        if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
+            let adapter = old
+                .account_binding
+                .as_ref()
+                .map_or(old.agent.as_str(), |binding| binding.adapter.as_str());
+            request
+                .prompt
+                .push_str(&super::resume::earlier_progress(adapter, old));
+            self.update_checked(id, |run| activity(run, &super::resume::restarted(adapter)))?;
+            resume = None;
+        }
         let mut routed = true;
         loop {
             if !self.is_running(id) {
