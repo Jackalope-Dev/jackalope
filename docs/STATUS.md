@@ -229,7 +229,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   are labeled. Optional batch and estimated-cost limits pause subsequent batches, with
   unknown cost blocking further dispatch when a cost threshold is set. These are not billing caps.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity and Gemini CLI adapters with
-  [provider-specific capabilities](AGENT-SUPPORT.md).
+  [provider-specific capabilities](AGENT-SUPPORT.md). A continuation whose native session
+  the CLI no longer has is reported in the attempt rather than answered as if resumed; Codex
+  and Grok start a new conversation in the same workspace with the earlier progress.
 - Project-scoped agent lists, task defaults and account choices; app-wide limits
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded

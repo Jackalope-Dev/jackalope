@@ -211,6 +211,9 @@ pub(super) fn drive_with_servers(
             observe(
                 &json!({"sessionUpdate":"jackalope_error","type":"error","error":event["error"]}),
             );
+            if expected == 1 && previous.is_some() {
+                return Err("The agent could not load this task's earlier conversation; its session store may no longer have it. Start a new task with the relevant context.".into());
+            }
             return Err(format!("Kimi rejected ACP request {expected}. Check its sign-in, model and CLI version, then retry."));
         }
         let Some(result) = event.get("result").filter(|value| value.is_object()) else {
@@ -758,6 +761,7 @@ mod tests {
             json!({"id":1,"error":{"message":"private provider diagnostic"}}),
             json!({"id":1,"result":{}}),
         ] {
+            let refused = tail.get("error").is_some();
             let mut sent = Vec::new();
             let result = drive(
                 transcript(&[
@@ -772,8 +776,13 @@ mod tests {
                 |_| {},
                 |_| json!({"outcome":"cancelled"}),
             );
-            assert!(result.is_err());
-            assert!(!result.unwrap_err().contains("private provider"));
+            let error = result.unwrap_err();
+            assert!(!error.contains("private provider"));
+            assert_eq!(
+                error.contains("could not load this task's earlier conversation"),
+                refused,
+                "{error}"
+            );
             assert!(!String::from_utf8(sent).unwrap().contains("session/new"));
         }
         for tail in [

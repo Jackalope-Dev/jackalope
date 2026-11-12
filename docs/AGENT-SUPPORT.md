@@ -147,6 +147,20 @@ profiles additionally redirect XDG config, cache and state directories; the
 default profile preserves the user's existing CLI configuration. Use OpenCode’s `debug paths` command to inspect the selected profile.
 The temporary-directory path remains controlled by OpenCode and the OS.
 
+A continuation resumes the agent's own session from these directories. When the
+session is no longer there (deleted, pruned, another home), Codex starts a new thread
+and Grok tries to restore it from xAI. On this device, Codex and Grok continuations
+therefore check the store first: Codex rollouts under `sessions/` and
+`archived_sessions/` by thread ID, and Grok's `sessions/<directory>/<id>/`. A missing
+session starts a new conversation in the same workspace, with the earlier request and
+the quota handoff's progress context in the prompt, and the attempt's activity says so.
+A store without the expected `sessions/` directory, or one too large to read, leaves
+the decision to the CLI. Codex reporting a different thread on resume is recorded in
+activity. Claude Code, OpenCode's server and ACP agents refuse an unknown session
+themselves; the attempt fails as a lost conversation and asks for a new task. Gemini CLI
+and Antigravity fail when a different session comes back. Continuations on a computer
+rely on the CLI there.
+
 Gemini account setup uses `GEMINI_CLI_HOME` as the parent of `.gemini` and
 `GEMINI_FORCE_FILE_STORAGE=true` to isolate credentials from the shared keychain.
 Antigravity profiles use the documented
