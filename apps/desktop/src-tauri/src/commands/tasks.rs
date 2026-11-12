@@ -101,6 +101,24 @@ impl TaskRuntime {
         self.claude_sessions.invalidate_account(directory);
     }
 
+    /// The agent sessions loaded attempts ran or continued, without cloning run records.
+    pub(in crate::commands) fn recorded_sessions(&self) -> std::collections::HashSet<String> {
+        let Ok(inner) = self.inner.lock() else {
+            return Default::default();
+        };
+        inner
+            .runs
+            .values()
+            .flat_map(|run| {
+                [
+                    run.session_id.clone(),
+                    run.continues.as_ref().map(|c| c.session_id.clone()),
+                ]
+            })
+            .flatten()
+            .collect()
+    }
+
     /// Every loaded run's tool-call total and whether it finished, without
     /// cloning run records.
     pub(in crate::commands) fn learning_activity(&self) -> Vec<RunActivity> {

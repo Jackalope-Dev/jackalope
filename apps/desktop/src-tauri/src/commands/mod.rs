@@ -14,6 +14,7 @@ pub mod commit_graph;
 pub mod coordination;
 pub mod desktop_integration;
 pub mod dictation;
+pub mod external_sessions;
 pub mod git;
 pub mod harness;
 pub mod helper;

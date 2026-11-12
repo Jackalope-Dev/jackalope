@@ -28,7 +28,9 @@ representative benefit and installed-platform acceptance remain open.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
-  unread results; recently opened work stays in tabs.
+  unread results; recently opened work stays in tabs. Claude Code and Codex conversations
+  from outside Jackalope appear read-only under their project and can be continued where
+  they ran.
   Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.

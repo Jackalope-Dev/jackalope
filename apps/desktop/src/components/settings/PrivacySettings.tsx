@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { ExternalSessionsSetting } from './ExternalSessionsSetting';
 import { SettingsSync } from './SettingsSync';
 
 export function PrivacySettings() {
@@ -140,6 +141,7 @@ export function PrivacySettings() {
           )}
         </SettingBody>
       </SettingGroup>
+      {isTauriEnvironment() && <ExternalSessionsSetting />}
     </>
   );
 }

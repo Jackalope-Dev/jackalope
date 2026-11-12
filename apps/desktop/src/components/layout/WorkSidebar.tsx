@@ -9,8 +9,14 @@ import {
 } from 'react';
 import { type ActiveTab, groupViews, viewLabel, workspaceView } from '../../lib/navigation';
 import { type WorkItem, workPresence } from '../../lib/task-collection';
-import { openWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
+import {
+  openExternalSession,
+  openWork,
+  useWorkspaceWork,
+  workProjectId,
+} from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
@@ -25,6 +31,18 @@ import {
   useWorkSignals,
   WorkSignals,
 } from '../tasks/WorkSignals';
+import { ExternalSessionRows } from './ExternalSessionRows';
+
+/** A project's conversations from outside Jackalope, newest first. */
+function useExternalByProject() {
+  const sessions = useExternalSessionStore((state) => state.sessions);
+  return useMemo(() => {
+    const byProject = new Map<string, typeof sessions>();
+    for (const session of sessions)
+      byProject.set(session.projectId, [...(byProject.get(session.projectId) ?? []), session]);
+    return byProject;
+  }, [sessions]);
+}
 
 /** Finished rows shown per project before the rest are left to the Work page. */
 const RECENT_PER_PROJECT = 3;
@@ -201,6 +219,8 @@ export function WorkSidebar({
   const selectedRun = useExecutionStore((state) => state.selectedId);
   const selectedSession = useLiveSessionStore((state) => state.selectedId);
   const selectedManaged = useManagedTaskStore((state) => state.selectedId);
+  const selectedExternal = useExternalSessionStore((state) => state.selectedKey);
+  const external = useExternalByProject();
   const signals = useWorkSignals();
   const openKey = useOpenSignalKey();
   const stats = useChangeStats(
@@ -209,7 +229,9 @@ export function WorkSidebar({
       .slice(0, 48)
       .map((item) => item.run),
   );
-  const somethingOpen = Boolean(selectedRun || selectedSession || selectedManaged);
+  const somethingOpen = Boolean(
+    selectedRun || selectedSession || selectedManaged || selectedExternal,
+  );
   const projectView = workspaceView(activeTab).group === 'project';
   const open = (item: WorkItem) => {
     openWork(item);
@@ -232,6 +254,7 @@ export function WorkSidebar({
       </div>
       {projects.map((project) => {
         const items = byProject.get(project.id) ?? [];
+        const outside = external.get(project.id) ?? [];
         const expanded = !collapsed[project.id];
         const attention = items.filter((item) =>
           ['attention', 'review'].includes(item.stage),
@@ -249,13 +272,13 @@ export function WorkSidebar({
                 className="project-tree-head"
                 data-active={project.id === activeProject || undefined}
               >
-                {items.length ? (
+                {items.length || outside.length ? (
                   <button
                     type="button"
                     className="project-tree-toggle"
                     aria-label={`${expanded ? 'Collapse' : 'Expand'} ${project.name}`}
                     aria-expanded={expanded}
-                    aria-controls={expanded ? listId : undefined}
+                    aria-controls={expanded && items.length ? listId : undefined}
                     onClick={() => useWorkViewStore.getState().toggleProject(project.id)}
                   >
                     <ChevronRight size={14} aria-hidden="true" className="project-tree-chevron" />
@@ -408,6 +431,16 @@ export function WorkSidebar({
                   );
                 })}
               </ul>
+            )}
+            {expanded && (
+              <ExternalSessionRows
+                sessions={outside}
+                selectedKey={selectedExternal}
+                onOpen={(session) => {
+                  openExternalSession(session.key, session.projectId);
+                  onOpen();
+                }}
+              />
             )}
           </section>
         );

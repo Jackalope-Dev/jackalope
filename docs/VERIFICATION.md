@@ -35,6 +35,7 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-task-detail.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Task states, live step progress, preparation failure detail and retry dispatch |
 | verify-core-flows.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Project scope, unified work, keyboard search, preview readiness and delivery drafts |
 | verify-decisions.mjs | Desktop 5198; JACKALOPE_PREVIEW_URL override | Decision settings, project inheritance, key retry and removal |
+| verify-external-sessions.mjs | Desktop 5193; JACKALOPE_PREVIEW_URL override | Outside Jackalope sidebar group, transcript, continue and unavailable states, keyboard and appearance |
 | verify-task-cleanup.mjs | Desktop 5199; JACKALOPE_PREVIEW_URL override | Bulk archive and restore, undo, saved ideas and focus |
 | performance.mjs --production | Builds and starts its own fixture | History lists, output, rich rendering and production CSP |
 

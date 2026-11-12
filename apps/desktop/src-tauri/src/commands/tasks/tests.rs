@@ -8,6 +8,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         progress: None,
         preparation: None,
         retry_of: None,
+        continues: None,
         archived_at: None,
         live_session_id: None,
         effort: None,
@@ -405,6 +406,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         .flatten();
     let request = RunRequest {
         retry_of: None,
+        continues: None,
         live_session_id: None,
                 effort: None,
         codex_speed: None,
@@ -922,6 +924,7 @@ process.stdin.on('end', () => {
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let request = RunRequest {
         retry_of: None,
+        continues: None,
         live_session_id: None,
         effort: None,
         codex_speed: None,
@@ -1049,6 +1052,7 @@ process.stdin.on('end', () => {
     runtime
         .start(RunRequest {
             retry_of: None,
+            continues: None,
             live_session_id: None,
             effort: None,
             codex_speed: None,

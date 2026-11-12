@@ -33,6 +33,17 @@ pub struct RemoteExecution {
     pub computer_name: String,
 }
 
+/// A Claude Code or Codex session someone started outside Jackalope that an attempt
+/// continues, in the folder it ran in and under the account directory it was saved in.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContinuedSession {
+    pub adapter: String,
+    pub session_id: String,
+    pub workspace: String,
+    pub home: std::path::PathBuf,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
@@ -63,6 +74,9 @@ pub struct TaskRun {
     /// The attempt this run retried, linking a retry back to what it replaced.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// The session from outside Jackalope this task continued, carried by every attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues: Option<ContinuedSession>,
     #[serde(default)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(default)]
@@ -253,6 +267,9 @@ pub struct RunRequest {
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// A first attempt that resumes a session from outside Jackalope where it ran.
+    #[serde(skip)]
+    pub continues: Option<ContinuedSession>,
     #[serde(default)]
     pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
@@ -295,6 +312,7 @@ impl RunRequest {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: None,
+            continues: None,
             connection_ids: None,
             coordination: None,
         }
@@ -371,6 +389,7 @@ impl TaskRun {
             progress: self.progress.clone(),
             preparation: self.preparation.clone(),
             retry_of: self.retry_of.clone(),
+            continues: self.continues.clone(),
             dependency_snapshot: self.dependency_snapshot.clone(),
             checkpoint: self.checkpoint.clone(),
             checkpoint_error: self.checkpoint_error.clone(),

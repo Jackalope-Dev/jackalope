@@ -11,6 +11,7 @@
 //! a lost conversation rather than a generic failure.
 
 use super::*;
+use crate::commands::external_sessions::codex;
 
 /// Directory entries a store check reads before it gives up without an answer.
 const SCAN_LIMIT: usize = 100_000;
@@ -50,19 +51,17 @@ fn stored(adapter: &str, home: &Path, session: &str) -> Stored {
     }
     let mut budget = SCAN_LIMIT;
     match adapter {
-        // One rollout per thread, rollout-<time>-<thread id>.jsonl, compressed to
-        // .jsonl.zst once idle, under sessions/YYYY/MM/DD/ or archived_sessions/
-        // (Codex 0.156).
+        // Rollouts are named by thread ID; see `external_sessions::codex` for the layout.
         "codex" => {
-            let sessions = home.join("sessions");
-            if !sessions.is_dir() {
+            let roots = codex::roots(home);
+            if !roots[0].is_dir() {
                 return Stored::Unknown;
             }
-            for root in [sessions, home.join("archived_sessions")] {
+            for root in roots {
                 if !root.is_dir() {
                     continue;
                 }
-                match names_file(&root, session, 4, &mut budget) {
+                match names_file(&root, session, codex::DEPTH, &mut budget) {
                     Some(true) => return Stored::Present,
                     Some(false) => {}
                     None => return Stored::Unknown,

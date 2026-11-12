@@ -30,6 +30,7 @@ import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useBotStore } from '../../stores/botStore';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { observeExternalSessions } from '../../stores/externalSessionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -131,6 +132,7 @@ export function Shell({
   focusOnMount?: boolean;
 } = {}) {
   useEffect(observeLiveSessions, []);
+  useEffect(observeExternalSessions, []);
   useEffect(observeBots, []);
   const botsWaiting = useBotHubStore((state) => needsYou(state).count);
   const { botSessions, botRuns } = useLiveSessionStore(
