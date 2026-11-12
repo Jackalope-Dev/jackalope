@@ -815,6 +815,79 @@ fn final_usage_replaces_replayed_totals_and_cache_is_counted_once() {
     }
 }
 
+const CLAUDE_CALLS: [&str; 4] = [
+    r#"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"output_tokens":1}}}"#,
+    // The same call again for its next content block, with its final output count.
+    r#"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"output_tokens":7}}}"#,
+    r#"{"type":"assistant","message":{"id":"m2","usage":{"input_tokens":5,"cache_read_input_tokens":130,"cache_creation_input_tokens":0,"output_tokens":3}}}"#,
+    r#"{"type":"assistant","parent_tool_use_id":"child-1","message":{"id":"m3","usage":{"input_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":6,"output_tokens":2}}}"#,
+];
+
+#[test]
+fn an_attempt_ended_without_a_result_keeps_the_usage_it_observed_once() {
+    for end in [
+        TaskRun::mark_stopped as fn(&mut TaskRun),
+        |run: &mut TaskRun| run.mark_failed("Agent exited".into()),
+    ] {
+        let mut run = sample("claude");
+        for event in CLAUDE_CALLS {
+            consume_event(&mut run, event);
+        }
+        assert!(!run.usage.reported);
+        end(&mut run);
+        end(&mut run);
+        assert!(run.usage.reported);
+        assert_eq!(run.usage.input, 130 + 135 + 10);
+        assert_eq!(run.usage.output, 7 + 3 + 2);
+        assert_eq!(run.usage.cache_read, 230);
+        assert_eq!(run.usage.cache_write, 26);
+        assert_eq!(run.usage.estimated_cost_usd, None);
+        let notes = run
+            .activity
+            .iter()
+            .filter(|line| line.contains("3 model calls observed"))
+            .count();
+        assert_eq!(notes, 1);
+    }
+}
+
+#[test]
+fn a_reported_result_wins_over_observed_calls() {
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","usage":{"input_tokens":15,"cache_read_input_tokens":230,"cache_creation_input_tokens":20,"output_tokens":10},"total_cost_usd":0.02}"#,
+    );
+    run.mark_failed("Checks failed".into());
+    assert_eq!(run.usage.input, 265);
+    assert_eq!(run.usage.output, 10);
+    assert_eq!(run.usage.estimated_cost_usd, Some(0.02));
+    assert!(!run.activity.iter().any(|line| line.contains("model call")));
+}
+
+#[test]
+fn an_attempt_interrupted_by_closing_keeps_its_observed_usage_after_reload() {
+    let folder = std::env::temp_dir().join(format!("jackalope-usage-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    runtime.save(&run).unwrap();
+    drop(runtime);
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restored = loaded.inner.lock().unwrap().runs[&run.id].clone();
+    drop(loaded);
+    std::fs::remove_dir_all(folder).unwrap();
+    assert_eq!(restored.status, RunStatus::Interrupted);
+    assert!(restored.usage.reported);
+    assert_eq!(restored.usage.input + restored.usage.output, 287);
+    assert_eq!(restored.usage.cache_read, 230);
+}
+
 #[test]
 fn claude_result_with_error_extracts_message_and_never_serializes_null() {
     let mut run = sample("claude");

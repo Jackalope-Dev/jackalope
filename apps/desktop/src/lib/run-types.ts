@@ -220,6 +220,8 @@ export interface TaskRun {
     model: string | null;
     input: number;
     output: number;
+    cacheRead?: number;
+    cacheWrite?: number;
   }[];
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];

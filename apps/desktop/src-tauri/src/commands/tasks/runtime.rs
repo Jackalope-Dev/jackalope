@@ -1383,6 +1383,7 @@ impl TaskRuntime {
         crate::commands::decision_trail::check_evidence(self, id);
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
+            settle_usage(r);
             r.finishing = false;
             r.exit_code = exit_code;
             r.ended_at = Some(Utc::now().to_rfc3339());

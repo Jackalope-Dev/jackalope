@@ -158,6 +158,7 @@ impl TaskRuntime {
                             let _ = runtime.save(&run);
                         }
                         if run.status.is_active() {
+                            settle_usage(&mut run);
                             run.status = if cfg!(windows) && run.process_contained {
                                 RunStatus::Stopped
                             } else {
@@ -373,6 +374,7 @@ impl TaskRuntime {
         }
         run.persistence_error = None;
         if run.status.is_active() {
+            settle_usage(&mut run);
             run.status = RunStatus::Interrupted;
             run.error.get_or_insert_with(|| {
                 "Restored from a recovery copy of an unfinished attempt; it was not rerun.".into()

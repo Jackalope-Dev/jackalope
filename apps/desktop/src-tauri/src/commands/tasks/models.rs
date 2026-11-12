@@ -21,8 +21,13 @@ pub struct UsageObservation {
     pub session_id: Option<String>,
     pub parent_tool_use_id: Option<String>,
     pub model: Option<String>,
+    /// Includes the cache reads and writes below.
     pub input: u64,
     pub output: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cache_write: u64,
 }
 
 /// Where an attempt's agent ran when a project computer ran it.
@@ -188,11 +193,13 @@ pub struct TaskRun {
 
 impl TaskRun {
     pub fn mark_stopped(&mut self) {
+        super::events::settle_usage(self);
         self.status = RunStatus::Stopped;
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
     }
 
     pub fn mark_failed(&mut self, error: String) {
+        super::events::settle_usage(self);
         self.status = RunStatus::Failed;
         self.error = Some(error);
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
