@@ -116,6 +116,13 @@ workspaces must remain unchanged before implementation starts.
 Planning considers integration and review effort, shared contracts, generated files,
 manifests and lockfiles. Shared changes have one owner or an explicit dependency.
 Tightly coupled work stays together; a small request can remain one assignment.
+Assignments are sized for one agent session: a request spanning many independent
+areas, screens or files, or a long verification checklist, is split into separately
+verifiable assignments, each saying how its result is checked. Work that must first
+discover the current state (an audit, sweep or investigation) starts with a read-only
+audit assignment that reports its findings, and later assignments depend on it.
+Shared groundwork, such as a shared component, is a prerequisite its consumers depend
+on. There is no minimum assignment count.
 
 Planning accounts for repeated discovery, setup and checks in each assignment.
 Dispatch prioritizes prerequisites on the longest remaining dependency chains,

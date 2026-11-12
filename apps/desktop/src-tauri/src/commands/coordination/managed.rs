@@ -148,7 +148,7 @@ pub(super) fn reconcile_attempts(ledger: &mut Ledger, runs: &[TaskRun]) -> bool 
 }
 
 fn planning_prompt(request: &str, limit: usize) -> String {
-    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–{limit} assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), outcomes (reviewable requirements) and briefing. The briefing gives that worker what you learned so it can skip repository discovery: key files and symbols, patterns to follow, contracts it must honor, the commands that check it and pitfalls, as facts under 1500 characters. Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract and dependency change one owner; put it in a prerequisite and name the contract in consumer instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
+    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–{limit} assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), outcomes (reviewable requirements) and briefing. The briefing gives that worker what you learned so it can skip repository discovery: key files and symbols, patterns to follow, contracts it must honor, the commands that check it and pitfalls, as facts under 1500 characters. Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract, shared component and dependency change one owner; put it in a prerequisite that its consumers list in dependsOn, and name the contract in their instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Size each assignment for one agent session: keep a small or focused change in one assignment, and split a request spanning many independent areas, screens or files, or a long verification checklist, into separately verifiable assignments. When the current state must be discovered first (an audit, sweep or investigation), the first assignment is a read-only audit that publishes its findings in its completion report, and later assignments depend on it. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained, identify its exact responsibility and say how its result is checked.\n\nComplete request:\n{request}")
 }
 
 /// Assignments for an approved plan, with the plan-aware review appended.
@@ -914,6 +914,21 @@ mod tests {
         assert!(plan[0].prompt.contains("src/types.ts"));
         assert!(planning_prompt("x", 6).contains("1–6 assignments"));
         assert!(planning_prompt("x", 6).contains("briefing"));
+    }
+    #[test]
+    fn planning_sizes_assignments_to_the_request() {
+        let prompt = planning_prompt("x", 4);
+        // Small changes stay whole; broad work, audits and shared groundwork split.
+        for guidance in [
+            "keep a small or focused change in one assignment",
+            "Do not split a short change just to fill available slots",
+            "many independent areas, screens or files, or a long verification checklist",
+            "the first assignment is a read-only audit",
+            "put it in a prerequisite that its consumers list in dependsOn",
+            "say how its result is checked",
+        ] {
+            assert!(prompt.contains(guidance), "{guidance}");
+        }
     }
     #[test]
     fn one_assignment_avoids_an_unnecessary_extra_worker() {
