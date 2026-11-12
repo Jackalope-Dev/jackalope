@@ -22,6 +22,8 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         checkpoint_error: None,
         routing: None,
         quota_failure: None,
+        failure_kind: None,
+        provider_error: None,
         contract: Default::default(),
         understanding: None,
         monitor_change: None,
@@ -50,6 +52,9 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         account: "test".into(),
         connection_ids: None,
         model: None,
+        requested_model: None,
+        fallback_model: None,
+        model_mismatch: None,
         prompt: "Example".into(),
         status: RunStatus::Running,
         started_at: Utc::now().to_rfc3339(),
@@ -1732,4 +1737,208 @@ fn kimi_print_mode_keeps_assistant_answers_and_rejects_tool_calls() {
         "kimi",
     );
     assert!(run.error.is_some());
+}
+
+#[test]
+fn claude_provider_errors_printed_as_answers_fail_the_turn() {
+    for agent in ["claude", "grok"] {
+        let mut run = sample(agent);
+        consume_event(
+            &mut run,
+            r#"{"type":"system","subtype":"init","session_id":"s","model":"claude-opus-5"}"#,
+        );
+        consume_event(
+            &mut run,
+            r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: Opus 5's safeguards flagged this message. Try rephrasing the request."}]}}"#,
+        );
+        consume_event(
+            &mut run,
+            r#"{"type":"result","subtype":"success","is_error":false,"result":"API Error: Opus 5's safeguards flagged this message. Try rephrasing the request."}"#,
+        );
+        assert!(run.result.is_empty(), "{agent}");
+        assert_eq!(
+            run.error.as_deref(),
+            Some(
+                "API Error: Opus 5's safeguards flagged this message. Try rephrasing the request."
+            )
+        );
+        assert_eq!(
+            run.model.as_deref(),
+            Some("claude-opus-5"),
+            "<synthetic> is not a served model"
+        );
+    }
+
+    // A mid-turn error the CLI retried past keeps the real answer.
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"}]}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"Fixed the bug."}"#,
+    );
+    assert_eq!(run.result, "Fixed the bug.");
+    assert!(run.error.is_none());
+
+    // An unanswered turn fails with the error it printed.
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: 400 prompt is too long: 215000 tokens > 200000 maximum"}]}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":""}"#,
+    );
+    assert_eq!(
+        run.error.as_deref(),
+        Some("API Error: 400 prompt is too long: 215000 tokens > 200000 maximum")
+    );
+
+    // A failed result with no message of its own takes the printed provider error.
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: 401 Invalid bearer token · Please run /login"}]}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":""}"#,
+    );
+    assert_eq!(
+        run.error.as_deref(),
+        Some("API Error: 401 Invalid bearer token · Please run /login")
+    );
+    failure::explain(&mut run, Some(1));
+    assert_eq!(run.failure_kind, Some(failure::FailureKind::Authentication));
+}
+
+#[test]
+fn claude_stream_records_its_overload_fallback_as_a_labeled_model_change() {
+    let mut run = sample("claude");
+    run.requested_model = Some("opus".into());
+    run.fallback_model = Some("sonnet".into());
+    consume_event(
+        &mut run,
+        r#"{"type":"system","subtype":"init","session_id":"s","model":"claude-opus-4-5-20251101"}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-4-5-20251101","content":[{"type":"text","text":"Looking."}]}}"#,
+    );
+    assert!(run.model_mismatch.is_none());
+    // A subagent's model is not the attempt's.
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","parent_tool_use_id":"t1","message":{"id":"m2","model":"claude-haiku-4-5-20251001","content":[]}}"#,
+    );
+    assert!(run.model_mismatch.is_none());
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m3","model":"claude-sonnet-4-5-20250929","content":[{"type":"text","text":"Done."}]}}"#,
+    );
+    let mismatch = run.model_mismatch.clone().unwrap();
+    assert_eq!(
+        (
+            mismatch.requested.as_str(),
+            mismatch.served.as_str(),
+            mismatch.fallback
+        ),
+        ("opus", "claude-sonnet-4-5-20250929", true)
+    );
+    assert_eq!(run.model.as_deref(), Some("claude-sonnet-4-5-20250929"));
+
+    let mut gemini = sample("gemini");
+    gemini.requested_model = Some("gemini-3.8-flash".into());
+    let mut stream = gemini::Stream::default();
+    stream.consume(&mut gemini, r#"{"type":"init","timestamp":"t","session_id":"session-1","model":"gemini-3-flash-preview"}"#);
+    assert!(gemini.model_mismatch.as_ref().is_some_and(|m| !m.fallback));
+}
+
+/// Every adapter stores `input` as all prompt tokens the provider read, with cache
+/// reads and writes as parts of it, so new context is `input - cache_read - cache_write`
+/// and nothing cached is counted twice.
+#[test]
+fn reported_input_includes_cache_once_for_every_adapter() {
+    let fresh = |usage: &Usage| usage.input - usage.cache_read - usage.cache_write;
+
+    // Anthropic counts input_tokens without the cache, so Claude adds both cache counters.
+    let mut claude = sample("claude");
+    consume_event(
+        &mut claude,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":3,"cache_creation_input_tokens":1200,"cache_read_input_tokens":15000,"output_tokens":40}}}"#,
+    );
+    assert_eq!(claude.usage_observations[0].input, 16_203);
+    consume_event(
+        &mut claude,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"Done","usage":{"input_tokens":12,"cache_creation_input_tokens":2400,"cache_read_input_tokens":48000,"output_tokens":900},"total_cost_usd":0.05}"#,
+    );
+    assert_eq!(
+        (
+            claude.usage.input,
+            claude.usage.cache_read,
+            claude.usage.cache_write
+        ),
+        (50_412, 48_000, 2400)
+    );
+    assert_eq!(fresh(&claude.usage), 12);
+
+    // Codex's input_tokens already includes cached_input_tokens.
+    let mut codex = sample("codex");
+    consume_event(
+        &mut codex,
+        r#"{"type":"turn.completed","usage":{"input_tokens":24763,"cached_input_tokens":24448,"output_tokens":122}}"#,
+    );
+    assert_eq!(
+        (codex.usage.input, codex.usage.cache_read),
+        (24_763, 24_448)
+    );
+    assert_eq!(fresh(&codex.usage), 315);
+
+    // OpenCode subtracts the cache from tokens.input itself and reports reasoning beside output.
+    let mut opencode = sample("opencode");
+    consume_event(
+        &mut opencode,
+        r#"{"type":"step_finish","part":{"id":"p1","tokens":{"input":14823,"output":224,"reasoning":8,"cache":{"read":1664,"write":10}},"cost":0.001}}"#,
+    );
+    assert_eq!(
+        (
+            opencode.usage.input,
+            opencode.usage.cache_read,
+            opencode.usage.cache_write
+        ),
+        (16_497, 1664, 10)
+    );
+    assert_eq!(
+        (fresh(&opencode.usage), opencode.usage.output),
+        (14_823, 232)
+    );
+
+    // Gemini CLI's input_tokens is the whole prompt and `cached` is part of it (`input` is the rest).
+    let mut gemini = sample("gemini");
+    let mut stream = gemini::Stream::default();
+    stream.consume(
+        &mut gemini,
+        r#"{"type":"init","timestamp":"t","session_id":"session-1","model":"gemini-2.5-pro"}"#,
+    );
+    stream.consume(
+        &mut gemini,
+        r#"{"type":"message","timestamp":"t","role":"assistant","content":"Done."}"#,
+    );
+    stream.consume(&mut gemini, r#"{"type":"result","timestamp":"t","status":"success","stats":{"total_tokens":130,"input_tokens":100,"output_tokens":30,"cached":40,"input":60,"duration_ms":5,"tool_calls":1}}"#);
+    assert_eq!((gemini.usage.input, gemini.usage.cache_read), (100, 40));
+    assert_eq!(fresh(&gemini.usage), 60);
+
+    // Antigravity reports uncached input and cache reads separately.
+    let mut antigravity = sample("antigravity");
+    let mut stream = antigravity::Stream::new(Some("conversation-1".into()));
+    stream.consume(&mut antigravity, r#"{"event":"init","conversation_id":"conversation-1","init":{"permission_mode":"request-review","model":"test-model"}}"#);
+    stream.consume(&mut antigravity, r#"{"event":"step_update","step_update":{"conversation_id":"conversation-1","step_index":1,"step_type":"agent_response","state":"DONE","text_delta":"Hi","usage":{"input_tokens":10,"output_tokens":7,"thinking_tokens":5,"cache_read_tokens":20}}}"#);
+    assert_eq!(
+        (antigravity.usage.input, antigravity.usage.cache_read),
+        (30, 20)
+    );
+    assert_eq!(fresh(&antigravity.usage), 10);
 }

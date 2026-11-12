@@ -831,7 +831,7 @@ impl Stream {
                         .map(|(p, m)| format!("{p}/{m}"));
                     if info["sessionID"] == self.root {
                         if let Some(model) = &model {
-                            run.model = Some(model.clone());
+                            super::served_model::observe(run, model);
                         }
                     }
                     let before = run.usage_observations.len();

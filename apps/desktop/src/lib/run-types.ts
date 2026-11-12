@@ -21,6 +21,15 @@ export interface Runner {
   /** Tasks can start: signed in, or the agent checks access when a task starts. */
   ready?: boolean;
 }
+export type FailureKind =
+  | 'authentication'
+  | 'quota_exhausted'
+  | 'rate_limited'
+  | 'provider_refused'
+  | 'model_unavailable'
+  | 'context_too_long'
+  | 'agent_exited'
+  | 'other';
 export interface RunUsage {
   input: number;
   output: number;
@@ -171,7 +180,14 @@ export interface TaskRun {
     directory: string;
     label: string;
   } | null;
+  /** The model last reported serving the attempt, or the requested one until it reports. */
   model: string | null;
+  /** The model Jackalope asked for; absent when the agent used its default. */
+  requestedModel?: string | null;
+  /** Set when the agent reported serving a different model than the one requested. */
+  modelMismatch?: { requested: string; served: string; fallback: boolean } | null;
+  /** What kind of failure `error` describes, when its message says. */
+  failureKind?: FailureKind | null;
   prompt: string;
   status: RunStatus;
   startedAt: string;

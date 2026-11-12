@@ -649,6 +649,7 @@ export function TaskDetail({
       {run.error && (
         <TaskFailure
           message={run.error}
+          kind={run.failureKind}
           preparation={run.preparation}
           retrying={retrying}
           onRetry={isLatest && isRetryable(run) && !integrated ? () => void retry() : undefined}

@@ -60,7 +60,21 @@ export function TaskRunDetails({
       <DefinitionList
         items={[
           { label: 'Agent', value: run.agent },
-          { label: 'Model', value: run.model || 'Agent default' },
+          {
+            label: 'Model',
+            value: run.modelMismatch ? (
+              <span className="task-run-model">
+                {run.modelMismatch.served}
+                <small className="task-muted">
+                  {run.modelMismatch.fallback
+                    ? `Overload fallback for ${run.modelMismatch.requested}`
+                    : `Requested ${run.modelMismatch.requested}; the agent reported this model instead`}
+                </small>
+              </span>
+            ) : (
+              run.model || 'Agent default'
+            ),
+          },
           { label: 'Account', value: run.accountBinding?.label || run.account },
           ...(run.host || run.remote
             ? [
