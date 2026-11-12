@@ -52,7 +52,7 @@ import { TaskPreview } from '../tasks/TaskPreview';
 import { useWorkSeen, WorkContextDetails } from '../tasks/WorkContext';
 import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
-import { useWorkspaceActions } from '../tasks/WorkTools';
+import { isPopOutPane, PopOutButton, useWorkspaceActions } from '../tasks/WorkTools';
 import { ChatOptions } from './ChatOptions';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
@@ -272,6 +272,7 @@ export function LiveSessionView({
             detached
               ? []
               : [
+                  ...(workspace.editor ? [workspace.editor] : []),
                   ...(integrated
                     ? []
                     : [{ id: 'pause', label: pauseLabel, onSelect: togglePause, disabled: busy }]),
@@ -305,8 +306,8 @@ export function LiveSessionView({
                 ]
           }
           submenus={
-            workspace.groups.length
-              ? [{ id: 'workspace', label: 'Workspace', groups: workspace.groups }]
+            workspace.more.length
+              ? [{ id: 'open-in', label: 'Open in…', groups: [workspace.more] }]
               : []
           }
           items={[
@@ -592,6 +593,10 @@ export function LiveSessionView({
                   ]),
             ]}
           />
+          {/* A conversation pops out its review, preview and terminal; the transcript stays. */}
+          {workspace.popOut && tab !== 'conversation' && isPopOutPane(tab) && (
+            <PopOutButton pane={tab} onPopOut={workspace.popOut} />
+          )}
         </div>
       )}
       <div className="live-columns">

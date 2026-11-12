@@ -1,0 +1,853 @@
+@import "./foundation.css";
+@layer components {
+  /* One rhythm for setup screens: steps, the aside and the intro share this gap. */
+  .ui-setup-layout,
+  .ui-setup-steps {
+    --setup-gap: 1rem;
+    /* Inside a step: title to hint or summary, then to the controls, then to the next step. */
+    --setup-step-tight: 4px;
+    --setup-step-controls: 12px;
+    --setup-step-gap: 1.25rem;
+    --setup-mark: 1.75rem;
+  }
+
+  /* Steps at a reading measure on the left, a sticky live aside taking the rest of the width
+     on the right. It answers to its own width, so a settings column and a full page both lay
+     out well; narrow panes stack with the aside first. */
+  .ui-setup-layout {
+    container-type: inline-size;
+    min-width: 0;
+  }
+  .ui-setup-grid {
+    display: grid;
+    gap: var(--setup-gap);
+    min-width: 0;
+  }
+  .ui-setup-main {
+    display: grid;
+    align-content: start;
+    gap: var(--setup-gap);
+    min-width: 0;
+  }
+  .ui-setup-aside {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-sunken);
+  }
+  .ui-setup-grid[data-aside] > .ui-setup-aside {
+    order: -1;
+  }
+  @container (min-width: 52rem) {
+    .ui-setup-grid[data-aside] {
+      grid-template-columns: minmax(0, 42rem) minmax(18rem, 1fr);
+      column-gap: 2rem;
+      align-items: start;
+    }
+    .ui-setup-grid[data-aside] > .ui-setup-aside {
+      position: sticky;
+      top: 0;
+      order: 0;
+    }
+  }
+  /* The choices so far, as short label and value rows. */
+  /* One grid for every row, so the values share a column whatever the label lengths. */
+  .ui-setup-summary {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 16px;
+    margin: 0;
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.45;
+  }
+  .ui-setup-summary-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+  .ui-setup-summary dt {
+    color: var(--color-text-secondary);
+  }
+  .ui-setup-summary dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--color-text-primary);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  /* Setup intro: icon, a sentence on what the feature does, an optional action and visual. */
+  .ui-setup-intro {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 4px 14px;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+  }
+  .ui-setup-intro-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-ink);
+  }
+  .ui-setup-intro-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .ui-setup-intro-title {
+    margin: 0;
+    font-size: var(--text-base, 1rem);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .ui-setup-intro-description {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.45;
+  }
+  .ui-setup-intro-visual {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+  }
+  @media (max-width: 720px) {
+    .ui-setup-intro {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .ui-setup-intro-action {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* An intro at the top of the aside reads as its heading, not a nested card: a small icon
+     inline before the title, and the title, body, diagram and summary on one left edge. */
+  .ui-setup-aside > .ui-setup-intro {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 8px;
+    align-items: start;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-icon {
+    grid-row: 1;
+    grid-column: 1;
+    width: 24px;
+    height: 24px;
+    /* Centred on the title's first line, however many lines it wraps to. */
+    margin-top: calc((var(--text-base, 1rem) * 1.35 - 24px) / 2);
+    border-radius: var(--radius-sm);
+  }
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-icon > * {
+    width: 14px;
+    height: 14px;
+  }
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-text {
+    display: contents;
+  }
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-title {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-description,
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-action,
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-visual {
+    grid-column: 1 / -1;
+  }
+  .ui-setup-aside > .ui-setup-intro .ui-setup-intro-action {
+    margin-top: 6px;
+  }
+
+  /* Numbered steps. The rail between marks fills once a step is done, as in the Stepper. */
+  .ui-setup-steps {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ui-setup-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--setup-mark) minmax(0, 1fr);
+    gap: 0.875rem;
+    padding-bottom: var(--setup-step-gap);
+  }
+  .ui-setup-step:last-child {
+    padding-bottom: 0;
+  }
+  .ui-setup-step:not(:last-child)::before,
+  .ui-setup-step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: var(--setup-mark);
+    bottom: 0;
+    left: calc(var(--setup-mark) / 2 - 1px);
+    width: 2px;
+    border-radius: var(--radius-full);
+    background: var(--color-border-subtle);
+  }
+  .ui-setup-step:not(:last-child)::after {
+    background: var(--color-action);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform var(--motion-slow, 240ms) var(--ease-out, ease-out);
+  }
+  .ui-setup-step[data-state="done"]:not(:last-child)::after {
+    transform: scaleY(1);
+  }
+  .ui-setup-step-mark {
+    display: grid;
+    place-items: center;
+    width: var(--setup-mark);
+    height: var(--setup-mark);
+    border-radius: var(--radius-full);
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--color-border);
+    transition:
+      background-color var(--motion-base, 180ms) var(--ease-out, ease-out),
+      color var(--motion-base, 180ms) var(--ease-out, ease-out),
+      box-shadow var(--motion-base, 180ms) var(--ease-out, ease-out);
+  }
+  .ui-setup-step[data-state="current"] .ui-setup-step-mark {
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 2px var(--color-action);
+  }
+  .ui-setup-step[data-state="done"] .ui-setup-step-mark {
+    color: var(--color-on-action);
+    background: var(--color-action);
+    box-shadow: none;
+  }
+  .ui-setup-step-body {
+    display: grid;
+    align-content: start;
+    min-width: 0;
+  }
+  /* The head is the mark's height, so the mark, the title and the Change button share one
+     centre line whatever sits below. */
+  .ui-setup-step-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: var(--setup-mark);
+  }
+  .ui-setup-step-edit {
+    flex-shrink: 0;
+    height: var(--setup-mark);
+  }
+  .ui-setup-step-title {
+    margin: 0;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .ui-setup-step-optional {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 0 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 500;
+    line-height: 1.5;
+    vertical-align: 1px;
+  }
+  /* An optional step's mark is dashed, so it reads as skippable on the rail. */
+  .ui-setup-step[data-optional]:not([data-state="done"]) .ui-setup-step-mark {
+    box-shadow: none;
+    border: 1px dashed var(--color-border);
+  }
+  .ui-setup-step[data-state="upcoming"] .ui-setup-step-title {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+  .ui-setup-step-hint {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.45;
+  }
+  .ui-setup-step-content {
+    display: grid;
+    gap: var(--setup-step-controls);
+    margin-top: var(--setup-step-controls);
+    animation: ui-setup-open var(--motion-base, 180ms) var(--ease-out, ease-out);
+  }
+  .ui-setup-step-head + .ui-setup-step-content {
+    margin-top: calc(
+      var(--setup-step-controls) -
+      (var(--setup-mark) - var(--text-sm, 0.875rem) * 1.35) /
+      2
+    );
+  }
+  /* The hint or summary sits the tight gap under the title's text, not under the taller head. */
+  .ui-setup-step-head + :is(.ui-setup-step-hint, .ui-setup-step-summary) {
+    margin-top: calc(
+      var(--setup-step-tight) -
+      (var(--setup-mark) - var(--text-sm, 0.875rem) * 1.35) /
+      2
+    );
+  }
+  /* A done step's stated choice, in place of its controls. */
+  .ui-setup-step-summary {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  @keyframes ui-setup-open {
+    from {
+      opacity: 0;
+      translate: 0 -4px;
+    }
+  }
+
+  /* A dense multi-select grid of tiles, with bulk actions and a filter for long lists. */
+  .ui-choice-grid {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .ui-choice-grid-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .ui-choice-grid-filter {
+    flex: 1 1 12rem;
+    max-width: 18rem;
+  }
+  .ui-choice-grid-count {
+    margin-right: auto;
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-choice-grid-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11.25rem, 1fr));
+    gap: 6px;
+  }
+  .ui-choice-tile {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 10px 6px 8px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast, 120ms) ease,
+      border-color var(--motion-fast, 120ms) ease;
+  }
+  .ui-choice-tile:hover:not(:has(input:disabled)) {
+    border-color: var(--color-border);
+    background: var(--color-surface-hover);
+  }
+  .ui-choice-tile:has(input:checked) {
+    border-color: var(--color-border);
+    background: var(--color-accent-subtle);
+  }
+  .ui-choice-tile:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .ui-choice-tile:has(input:focus-visible) {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: -2px;
+  }
+  .ui-choice-tile-icon {
+    display: grid;
+    place-items: center;
+  }
+  .ui-choice-tile-text {
+    display: grid;
+    min-width: 0;
+  }
+  .ui-choice-tile-title,
+  .ui-choice-tile-description {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-choice-tile-title {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .ui-choice-tile-description {
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    line-height: 1.3;
+  }
+  /* A square check, so multi-select reads apart from the round radio of ChoiceCards. */
+  .ui-choice-tile-check {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-xs);
+    color: var(--color-on-action);
+  }
+  .ui-choice-tile:has(input:checked) .ui-choice-tile-check {
+    border-color: var(--color-action);
+    background: var(--color-action);
+  }
+  .ui-choice-grid-empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+  }
+
+  /* Large selectable cards for conceptual options. */
+  .ui-choice-cards {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 8px;
+  }
+  .ui-choice-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast, 120ms) ease,
+      border-color var(--motion-fast, 120ms) ease,
+      translate var(--motion-fast, 120ms) var(--ease-out, ease-out);
+  }
+  .ui-choice-card:hover:not(:has(input:disabled)) {
+    border-color: var(--color-border);
+    background: var(--color-surface-hover);
+    translate: 0 -1px;
+  }
+  .ui-choice-card:has(input:checked) {
+    border-color: var(--color-border);
+    background: var(--color-accent-subtle);
+  }
+  .ui-choice-card:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .ui-choice-card:has(input:focus-visible) {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: -2px;
+  }
+  .ui-choice-card-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    transition:
+      background-color var(--motion-fast, 120ms) ease,
+      color var(--motion-fast, 120ms) ease;
+  }
+  .ui-choice-card:has(input:checked) .ui-choice-card-icon {
+    background: var(--color-surface);
+    color: var(--color-accent-ink);
+  }
+  .ui-choice-card-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .ui-choice-card-title {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .ui-choice-card-description {
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    line-height: 1.45;
+  }
+  .ui-choice-card-indicator {
+    margin-top: 2px;
+  }
+  .ui-choice-card:has(input:checked) .ui-choice-card-indicator {
+    border-color: var(--color-action);
+    background: var(--color-action);
+  }
+
+  /* Flow diagram: two endpoints and the link between them. */
+  .ui-flow {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+  }
+  .ui-flow-row {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(4rem, 1fr) minmax(0, max-content);
+    gap: 10px;
+    align-items: center;
+  }
+  .ui-flow-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 11rem;
+    padding: 6px 10px 6px 6px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    background: var(--color-surface);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+  }
+  .ui-flow-node-icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+  }
+  /* Labels wrap to two lines rather than truncating a name. */
+  .ui-flow-node-label {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .ui-flow-link {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 28px;
+  }
+  .ui-flow-line {
+    position: absolute;
+    inset: 10px 0;
+    width: 100%;
+    height: 8px;
+    overflow: visible;
+  }
+  .ui-flow-line line {
+    stroke: var(--color-border);
+    stroke-width: 2;
+    stroke-dasharray: 4 4;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    transition: stroke var(--motion-base, 180ms) var(--ease-out, ease-out);
+  }
+  .ui-flow[data-state="checking"] .ui-flow-line line {
+    stroke: color-mix(in srgb, var(--color-action) 45%, var(--color-border));
+  }
+  .ui-flow[data-state="connected"] .ui-flow-line line {
+    stroke: var(--color-success);
+    stroke-dasharray: none;
+  }
+  .ui-flow[data-state="failed"] .ui-flow-line line {
+    stroke: var(--color-danger);
+    stroke-dasharray: 12 10;
+  }
+  /* A dot crossing the link while a request is in flight; nothing moves otherwise. */
+  .ui-flow-pulse {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: var(--radius-full);
+    background: var(--color-action);
+    animation: ui-flow-travel 1100ms var(--ease-out, ease-out) infinite;
+  }
+  .ui-flow-badge {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    color: var(--color-on-action);
+    animation: ui-pop-in var(--motion-slow, 240ms) var(--ease-out, ease-out);
+  }
+  .ui-flow[data-state="connected"] .ui-flow-badge {
+    background: var(--color-success);
+  }
+  .ui-flow[data-state="failed"] .ui-flow-badge {
+    background: var(--color-danger);
+  }
+  .ui-flow-via {
+    position: absolute;
+    bottom: -12px;
+    left: 50%;
+    translate: -50% 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .ui-flow-status:empty {
+    display: none;
+  }
+  .ui-flow-error {
+    display: block;
+    margin-top: 8px;
+    color: var(--color-danger);
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  @keyframes ui-flow-travel {
+    from {
+      left: 0;
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    to {
+      left: calc(100% - 8px);
+      opacity: 0;
+    }
+  }
+
+  /* A live check line under a field. */
+  .ui-field-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    line-height: 1.4;
+  }
+  .ui-field-check[data-tone="ok"] {
+    color: var(--color-success);
+  }
+  .ui-field-check[data-tone="error"] {
+    color: var(--color-danger);
+  }
+  .ui-field-check svg {
+    flex-shrink: 0;
+    animation: ui-pop-in var(--motion-base, 180ms) var(--ease-out, ease-out);
+  }
+  .ui-field-check-dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-inline: 4px;
+    border-radius: var(--radius-full);
+    background: currentColor;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-setup-step::after,
+    .ui-setup-step-mark,
+    .ui-choice-tile,
+    .ui-choice-card,
+    .ui-choice-card-icon,
+    .ui-flow-line line {
+      transition: none;
+    }
+    .ui-choice-card:hover:not(:has(input:disabled)) {
+      translate: none;
+    }
+    .ui-setup-step .ui-stepper-check,
+    .ui-setup-step-content,
+    .ui-flow-badge,
+    .ui-field-check svg {
+      animation: none;
+    }
+    /* Checking reads from the tinted line and the spoken status instead. */
+    .ui-flow-pulse {
+      display: none;
+    }
+  }
+}
+@layer components {
+  /* A secret field keeps its Show/Hide toggle beside the input; keys are long, so the input
+     takes the row and the text stays monospaced so pasted keys can be compared. */
+  .ui-secret-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ui-secret-input {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--text-sm, 0.875rem);
+  }
+}
+
+@layer components {
+  /* Editable name and value rows: compact, one line each, with a remove button. */
+  .ui-kv-list {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .ui-kv-legend {
+    margin-bottom: 2px;
+    padding: 0;
+    color: var(--color-text-primary);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+  }
+  .ui-kv-rows {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ui-kv-row {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto;
+    gap: 6px;
+    align-items: center;
+  }
+  .ui-kv-list[data-values-only] .ui-kv-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ui-kv-key,
+  .ui-kv-list[data-values-only] .ui-kv-value {
+    font-family: var(--font-mono, ui-monospace, monospace);
+  }
+  .ui-kv-add {
+    justify-self: start;
+  }
+
+  /* Connected items listed first, with the add action below. */
+  .ui-setup-list {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+  .ui-setup-list-items {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+  }
+  .ui-setup-list-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    min-height: var(--control-height, 36px);
+    padding: 10px 12px;
+  }
+  .ui-setup-list-item:not(:first-child) {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .ui-setup-list-item:not(:has(.ui-setup-list-icon)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ui-setup-list-icon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+  }
+  .ui-setup-list-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .ui-setup-list-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-primary);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+  }
+  .ui-setup-list-status {
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 500;
+  }
+  .ui-setup-list-description {
+    overflow: hidden;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-setup-list-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .ui-setup-list-empty {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+  }
+  .ui-setup-list-action {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  @media (max-width: 720px) {
+    .ui-setup-list-item {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .ui-setup-list-actions {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
+    }
+  }
+}

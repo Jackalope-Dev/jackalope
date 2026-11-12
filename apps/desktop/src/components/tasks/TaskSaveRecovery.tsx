@@ -10,7 +10,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
-import { taskTitle } from '../../lib/task-title';
+import { runTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import { ActionError } from '../ui/ActionError';
@@ -25,7 +25,7 @@ export function UnsavedTasksNotice() {
     unsaved.map((run) => ({
       id: `unsaved:${run.id}`,
       title: 'Task history has not been saved',
-      detail: `${run.projectName} · ${taskTitle(run.prompt)}\nKeep Jackalope open while you recover this task’s history.`,
+      detail: `${run.projectName} · ${runTitle(run)}\nKeep Jackalope open while you recover this task’s history.`,
       kind: 'attention',
       actionLabel: 'Recover task history',
       onOpen: () => setSelectedId(run.id),

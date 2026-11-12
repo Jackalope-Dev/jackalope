@@ -40,62 +40,88 @@
   user-select: all;
   overflow-wrap: anywhere;
 }
-.remote-setup-steps {
+/* Tailscale for phones, inside the optional setup step: what's done as a compact column,
+   then the next task and its actions, all on the step content's left edge. */
+.tailscale-setup {
   display: grid;
-  gap: 0.75rem;
-  border-top: 1px solid var(--color-border-subtle);
+  gap: 12px;
+  font-size: var(--text-sm);
 }
-.remote-setup-steps h3 {
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-.remote-steps {
+.tailscale-done {
   display: grid;
-  gap: 0.75rem;
-  list-style: none;
+  gap: 4px;
+}
+.tailscale-progress {
   margin: 0;
-  padding: 0;
-}
-.remote-steps li {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-.remote-step-mark {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
   color: var(--color-text-secondary);
-  box-shadow: inset 0 0 0 1px var(--color-border);
-}
-.remote-steps li[data-done] .remote-step-mark {
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-  box-shadow: none;
-}
-.remote-step-body {
-  display: grid;
-  gap: 0.375rem;
-  min-width: 0;
-}
-.remote-step-title {
-  font-size: 0.875rem;
+  font-size: var(--text-xs);
   font-weight: 500;
 }
-.remote-steps li[data-done] .remote-step-title {
-  color: var(--color-text-secondary);
+.tailscale-checklist {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.remote-step-error {
+.tailscale-checklist li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+.tailscale-check {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-top: calc((1.45em - 14px) / 2);
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  color: var(--color-on-action);
+}
+.tailscale-next {
+  display: grid;
+  gap: 4px;
+}
+.tailscale-next-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.tailscale-next-label {
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tailscale-item-detail {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+.tailscale-checklist .tailscale-item-detail {
+  color: var(--color-text-muted);
+}
+.tailscale-item-error {
   display: block;
   margin-top: 0.25rem;
-  font-size: 0.75rem;
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
+}
+.tailscale-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .remote-qr {
   flex-shrink: 0;
@@ -239,4 +265,130 @@ body.companion-body {
   .remote-pairing input {
     font-size: 1rem;
   }
+}
+/* Connect a host: numbered steps beside the live link and summary (SetupLayout). */
+.remote-connect {
+  max-width: none;
+}
+.remote-connect-field {
+  display: grid;
+  gap: 6px;
+}
+/* Fields sized to what they hold rather than the column. */
+.remote-field-name {
+  max-width: 22rem;
+}
+.remote-field-address {
+  max-width: 28rem;
+}
+.remote-field-port,
+.remote-field-port input {
+  max-width: 8rem;
+}
+.remote-connect-code {
+  width: calc(11ch + 2.5rem);
+  max-width: 100%;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+}
+.remote-connect-submit {
+  margin-top: 4px;
+}
+/* The clicks on the other computer that make a pairing code. */
+.remote-host-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.remote-host-path li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.remote-host-path-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.remote-host-path-step > span {
+  display: inline-flex;
+  color: var(--color-accent-ink);
+}
+.remote-host-path-arrow {
+  color: var(--color-text-muted);
+}
+/* Share this computer (Settings → Remote access): intro, then steps beside the live link. */
+.remote-share {
+  display: grid;
+  gap: 1rem;
+}
+.remote-share .remote-setup {
+  gap: 0.75rem;
+}
+.remote-share-devices {
+  display: grid;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+/* "Share this computer instead" names where it goes, so it reads as a button that leaves
+   this page rather than a choice that changes it. */
+.remote-intro-destination {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+.remote-intro-destination::before {
+  content: "· ";
+}
+/* The phone pairs with each computer directly; this says so where hosts are set up. */
+.remote-phone-note {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.remote-phone-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.remote-phone-access {
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.remote-phone-access h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.remote-phone-access p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.remote-phone-access ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+/* Pairing a phone with a host from here: the host's one-time code, sized for scanning. */
+.remote-invite-dialog {
+  width: min(420px, calc(100vw - 32px));
 }

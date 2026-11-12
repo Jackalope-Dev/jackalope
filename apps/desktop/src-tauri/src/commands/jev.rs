@@ -104,7 +104,7 @@ pub(crate) fn key_for_routing(
     }
     connection(&path)?
         .map(|value| value.key)
-        .ok_or_else(|| "Connect a Jev API key in Settings → Decisions.".into())
+        .ok_or_else(|| "Connect a Jev API key in Agents → Routing.".into())
         .map(Some)
 }
 

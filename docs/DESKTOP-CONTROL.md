@@ -30,7 +30,7 @@ are never listed or controllable.
 
 App questions offer "Always allow <app> in <project>", and the Screen view offers the
 same for an active window or app grant. Remembered grants are stored per project in
-`preferences/desktop-grants.json`, listed under Project settings, Desktop control, and
+`preferences/desktop-grants.json`, listed under Project settings → Integrations → Desktop control, and
 removable there. A remembered grant answers a later request only when the agent names
 that app; a window request is answered only when the app has exactly one window, and an
 app request only by a remembered app grant. Unknown scopes written by a newer app are

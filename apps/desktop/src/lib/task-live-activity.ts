@@ -14,10 +14,15 @@ function activityLine(text: string) {
   return text.replace(ansiEscape, '').trim().split('\n')[0].slice(0, 240);
 }
 
+// A failed tool step from the native activity log, such as "Running pnpm failed: exit 1".
+const failedStep =
+  /^(running|reading|editing|writing|searching|using|finding|asking|starting|updating|tool request)\b.* failed(: .+)?$/i;
+
 function activityKind(
   text: string,
 ): 'attention' | 'read' | 'edit' | 'search' | 'check' | 'activity' {
   if (
+    failedStep.test(text) ||
     /^(tool request failed|file change failed|command failed|error\b|permission denied)|(?: · |: )(failed|error|denied)$/i.test(
       text,
     )

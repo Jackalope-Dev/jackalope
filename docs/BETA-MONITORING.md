@@ -21,7 +21,7 @@ Use [Cloud configuration](CRABNEBULA-RELEASE.md) for active Mac/Linux release fe
 
 Both feeds use the same trusted updater key and app identity. Numeric versions must
 increase: a user leaving beta waits until the stable feed offers a higher version.
-Settings → Updates & support persists the selection in the native profile. A channel
+Settings → Help & community persists the selection in the native profile. A channel
 change clears the offered update and is blocked during checking/installation; the
 native install command also rechecks the chosen channel and version. The telemetry
 channel comes from the installed binary, not the selected feed.
@@ -151,7 +151,7 @@ for narrower filters. Missing/expired login shows an error; there is no public b
 
 ## Feedback and notification email
 
-Settings → Updates & support offers bug, feature and idea submissions. The user
+Settings → Help & community offers bug, feature and idea submissions. The user
 reviews their message and optional four task counters before Send. Version, binary
 channel and OS are attached by the native host. Telemetry opt-out does not disable
 feedback. No email identity is automatically attached; include contact details

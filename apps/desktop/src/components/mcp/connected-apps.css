@@ -83,16 +83,16 @@
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
-/* The key and its action share one row and one height. */
+/* The key field (with its show toggle and format check) sits above its action. */
 .connected-apps-key {
-  display: flex;
+  display: grid;
+  justify-items: start;
   gap: 8px;
   max-width: 560px;
   margin-top: 12px;
 }
-.connected-apps-key input {
-  flex: 1;
-  min-width: 0;
+.connected-apps-key-field {
+  justify-self: stretch;
 }
 .connected-apps-step-body .inline-notice {
   max-width: 560px;

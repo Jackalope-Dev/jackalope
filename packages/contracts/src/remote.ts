@@ -39,8 +39,19 @@ export interface RemoteSession {
   error: string | null;
   pending: number;
 }
+/** A project a host shares. Hosts before `hint` and the icon fields send only id and name. */
+export interface RemoteProject {
+  id: string;
+  name: string;
+  /** Parent folders that tell projects with the same name apart. */
+  hint?: string;
+  /** The host's sidebar icon key, such as "rocket" or "website". */
+  icon?: string;
+  /** Changes when the project's icon image does; fetch it with the `projectIcons` action. */
+  iconVersion?: string;
+}
 export interface Snapshot {
-  projects: { id: string; name: string }[];
+  projects: RemoteProject[];
   tasks: RemoteTask[];
   sessions: RemoteSession[];
 }

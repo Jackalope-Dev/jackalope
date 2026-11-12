@@ -60,8 +60,15 @@ try {
     };
     useOnboardingStore.getState().finish();
   });
-  await page.getByRole('button', { name: 'Open saved work', exact: true }).click();
-  await page.getByRole('button', { name: 'Recurring', exact: true }).click();
+  // Schedules live on the Bots page, reached from the sidebar's Setup group.
+  await page
+    .getByRole('navigation', { name: 'Setup', exact: true })
+    .getByRole('button', { name: 'Bots', exact: true })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Bots views', exact: true })
+    .getByRole('button', { name: 'Schedules', exact: true })
+    .click();
   const loading = page.locator('.workspace-loading').filter({ hasText: 'Loading schedules…' });
   await loading.waitFor();
   assert.equal(await loading.locator('.workspace-loading-row').count(), 3);
@@ -108,12 +115,14 @@ try {
   await page
     .getByRole('textbox', { name: 'Instructions', exact: true })
     .fill('Review recent changes and report findings. Do not modify files.');
+  await page.getByLabel('Use matching project lessons (up to three)', { exact: true }).uncheck();
+  // A new schedule walks What to do → When → How it runs.
+  await dialog.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.locator('#schedule-time').fill('10:30');
   await page.getByRole('textbox', { name: 'Timezone', exact: true }).fill('America/Denver');
-  await page.getByRole('combobox', { name: 'Repeat schedule', exact: true }).click();
-  await page.getByRole('option', { name: 'Every week', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Day of week', exact: true }).click();
-  await page.getByRole('option', { name: 'Friday', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Weekly', exact: true }).click();
+  await page.getByRole('radio', { name: 'Friday', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Continue', exact: true }).click();
   for (const width of [1280, 960, 700]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const isDark of [false, true]) {
@@ -138,7 +147,6 @@ try {
       assert.ok(save.y >= 0 && save.y + save.height <= (width === 1280 ? 840 : 640));
     }
   }
-  await page.getByLabel('Use matching project lessons (up to three)', { exact: true }).uncheck();
   await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
   assert.deepEqual(
@@ -160,11 +168,11 @@ try {
       prompt: 'Review recent changes and report findings. Do not modify files.',
     },
   );
+  // A saved schedule opens with every step showing.
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Repeat schedule', exact: true }).click();
-  await page.getByRole('option', { name: 'Every few hours', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Hourly', exact: true }).click();
   await page.getByRole('combobox', { name: 'Hourly interval', exact: true }).click();
-  await page.getByRole('option', { name: 'Every 4 hours', exact: true }).click();
+  await page.getByRole('option', { name: '4 hours', exact: true }).click();
   await page.locator('#schedule-minute').fill('17');
   await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
@@ -176,9 +184,9 @@ try {
   assert.equal(await page.locator('#schedule-minute').inputValue(), '17');
   assert.match(
     await page.getByRole('combobox', { name: 'Hourly interval', exact: true }).innerText(),
-    /Every 4 hours/,
+    /4 hours/,
   );
-  assert.match(await dialog.innerText(), /Runs every 4 hours from 00:17/);
+  assert.match(await dialog.innerText(), /Every 4 hours at :17/);
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const isDark of [false, true]) {
@@ -207,8 +215,7 @@ try {
       .evaluate((e) => e === document.activeElement),
     true,
   );
-  await page.getByRole('combobox', { name: 'Repeat schedule', exact: true }).click();
-  await page.getByRole('option', { name: 'Custom cron', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByRole('textbox', { name: 'Cron expression', exact: true }).fill('*/15 * * * *');
   await page
     .getByRole('radio', { name: 'Notify about changes without an agent', exact: true })

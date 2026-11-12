@@ -23,7 +23,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a project row opens that project's work and its menu opens project pages. The title
   bar holds command search; the bottom bar shows the focused project, branch, local
   activity and visual account allowances with freshness and reset times.
-  Settings → Desktop holds sleep prevention, owned terminals and preview ports.
+  Settings → Editor & terminal holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
 - Claude Code and Codex conversations people had outside Jackalope (a terminal, another
   app) appear read-only under each project in an Outside Jackalope group, read locally from
@@ -63,8 +63,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   VS Code/Cursor workspace links and separate result, review, preview and terminal
   windows. A running task terminal reserves its workspace against agent work, checks,
   previews, integration and cleanup. Closing a pane keeps it running; quitting stops it.
-  Two terminal panes can share a task workspace, with output search and explicit
-  saved-command execution. Optional local output retention restores a stopped
+  Two terminal panes can share a task workspace, with output search and buttons for the
+  project's preparation, verification and terminal commands (Project settings), each run
+  only when chosen. Saved prompts from earlier versions become project workflows and saved
+  commands become terminal commands when a project first opens; the saved list is kept
+  unchanged. Optional local output retention restores a stopped
   snapshot of up to 256 KiB per pane; it never restarts commands.
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
@@ -108,6 +111,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   while an earlier run is still active is skipped instead of queued.
 - Project setup asks for the project, its agents and an optional first task;
   decisions, Git behavior and appearance start from defaults edited in Project settings.
+  Project settings open from the project's own Settings tab and group into Basics,
+  Commands, Automation, Secrets, Integrations and Feature map; Automation's Hands-on,
+  Balanced and Autonomous presets set the task, learning and plan-autonomy switches
+  together, read back from those switches and undoable.
   When no agent is detected, the agents step offers API-key and local-server
   connections through the private runner, applied app-wide. It re-scans agents when the
   window regains focus, signs a signed-out account in through the in-app sign-in, and
@@ -658,8 +665,8 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm, which appears once a swarm Worker is connected. Its Settings card
-appears once Artifacts is connected, or while a Worker is saved. Set up Swarm deploys the
+forks on Project → Swarm, which appears once a swarm Worker is connected. Its card in
+Settings → Swarm appears once Artifacts is connected, or while a Worker is saved. Set up Swarm deploys the
 Worker bundled with the app to the connected account (bound to the connected namespace, with
 a generated token in protected storage), publishes it on workers.dev, checks it and connects
 it, with per-step progress and retry; it shows Update Swarm Worker when the bundle or namespace
@@ -706,15 +713,23 @@ Which product scopes Connect Cloudflare grants, and provisioning against a live 
 not yet accepted.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
-Settings → Remote access scopes paired devices to selected projects. Before it is on, every
+Devices → Let devices use this one scopes paired devices to selected projects. Before it is on, every
 project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
 Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
 address or private Tailscale Serve, which Remote access sets up through detected steps.
 Pairing shows a ten-character code (or a QR link for phones) that works once, expires after
 five minutes and allows ten attempts; a phone paired under a generic model name takes the
-computer owner's first name. Work continues through client disconnection. Live multi-device,
-provider, Tailscale and cross-platform acceptance remain open.
+computer owner's first name. Work continues through client disconnection. Shared projects
+reach phones with their sidebar icon and, when names clash, the parent folders that tell them
+apart (never a full path). With "Let paired computers invite phones" turned on in Devices → Let
+devices use this one (off by default), a paired computer can show that host's one-time phone code
+from Use from your phone; the phone then pairs with the host directly over its HTTPS address,
+is listed as invited by that computer and is revoked with it. Replies that aren't Jackalope's,
+such as a Tailscale Serve 502 when nothing listens behind it, name the status instead of a
+generic error, and the Tailscale steps warn when Serve points at a different port than Remote
+access listens on. Live multi-device, provider, Tailscale and cross-platform acceptance remain
+open.
 
 ## Known limits
 

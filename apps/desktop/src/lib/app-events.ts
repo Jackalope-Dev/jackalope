@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { type DevicesTab, useViewTabStore } from '../stores/viewTabStore.ts';
 import type { ActiveTab } from './navigation';
 import type { AppSettingsCategory, ProjectSettingsCategory } from './settings-categories';
 
@@ -22,6 +23,8 @@ interface AppEvents {
   'helper-draft': string;
   'configure-agent': string;
   'open-shortcuts': undefined;
+  /** Opens the feedback dialog the status bar holds. */
+  'open-feedback': undefined;
   /** Adds attachment lines to the open new-work composer. */
   'attach-to-composer': string[];
   /** Working-tree changes were committed or discarded. */
@@ -50,6 +53,12 @@ export function useAppEvent<K extends AppEvent>(name: K, handler: (detail: AppEv
 
 export const navigateWorkspace = (tab: ActiveTab) => emitAppEvent('navigate', tab);
 
+/** Opens Devices on one of its tabs (this is where Hosts and Remote access now live). */
+export function openDevices(tab: DevicesTab) {
+  useViewTabStore.getState().setDevices(tab);
+  navigateWorkspace('remote-hosts');
+}
+
 export const openSettings = (category: AppSettingsCategory) =>
   emitAppEvent('open-settings', category);
 
@@ -70,3 +79,5 @@ export const openHelperDraft = (key: string) => emitAppEvent('helper-draft', key
 export const openAgentConfiguration = (agentId: string) => emitAppEvent('configure-agent', agentId);
 
 export const openShortcuts = () => emitAppEvent('open-shortcuts');
+
+export const openFeedback = () => emitAppEvent('open-feedback');

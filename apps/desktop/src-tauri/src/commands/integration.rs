@@ -902,6 +902,19 @@ struct AppliedCheck {
     files: Vec<(String, u64, Option<std::time::SystemTime>)>,
     targets: Vec<(String, String, Option<String>)>,
     sources: Vec<Vec<String>>,
+    stale: Vec<PausedIntegration>,
+}
+
+/// An applied integration whose merge is no longer on its target branch. Work that depends
+/// on it stays paused until the merge is back; `message` is the full native explanation.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PausedIntegration {
+    pub plan_id: String,
+    pub project_path: String,
+    pub target_branch: String,
+    pub commit: String,
+    pub message: String,
 }
 
 static APPLIED: Mutex<Vec<(PathBuf, AppliedCheck)>> = Mutex::new(Vec::new());
@@ -923,8 +936,31 @@ fn branch_head(project: &str, branch: &str) -> Option<String> {
 /// Attempts whose work an applied integration brought onto its target branch,
 /// with the earlier attempts of the same tasks. Reading every plan and asking
 /// Git about each is slow, so the answer is reused until a plan is saved or a
-/// target branch moves.
+/// target branch moves. Any stale integration fails the call, which keeps
+/// dispatch paused until the merge is restored.
 pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
+    let (sources, stale) = applied_check(runtime)?;
+    if let Some(paused) = stale.first() {
+        return Err(paused.message.clone());
+    }
+    Ok(with_earlier_attempts(sources, &runtime.integration_runs()?))
+}
+
+/// The same answer for display: the run ids every reachable integration merged, and
+/// the integrations that are paused, so one stale merge does not hide every plan.
+pub fn applied_view(
+    runtime: &TaskRuntime,
+) -> Result<(Vec<String>, Vec<PausedIntegration>), String> {
+    let (sources, stale) = applied_check(runtime)?;
+    Ok((
+        with_earlier_attempts(sources, &runtime.integration_runs()?),
+        stale,
+    ))
+}
+
+type AppliedSources = (Vec<Vec<String>>, Vec<PausedIntegration>);
+
+fn applied_check(runtime: &TaskRuntime) -> Result<AppliedSources, String> {
     let directory = runtime.integration_directory();
     let files = plan_files(&directory)?;
     let mut cache = APPLIED.lock().map_err(|e| e.to_string())?;
@@ -936,50 +972,61 @@ pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
                 .iter()
                 .all(|(project, branch, head)| &branch_head(project, branch) == head)
     });
-    let sources = match cached {
-        Some(index) => cache[index].1.sources.clone(),
-        None => {
-            let applied: Vec<_> = plans(runtime)?
-                .into_iter()
-                .filter(|plan| plan.status == "applied")
-                .collect();
-            let mut targets: Vec<(String, String, Option<String>)> = Vec::new();
-            for plan in &applied {
-                if !targets.iter().any(|(project, branch, _)| {
-                    project == &plan.project_path && branch == &plan.target_branch
-                }) {
-                    targets.push((
-                        plan.project_path.clone(),
-                        plan.target_branch.clone(),
-                        branch_head(&plan.project_path, &plan.target_branch),
-                    ));
-                }
-            }
-            // A failure may be transient (Git could not start, or a lock), so
-            // only a successful check is reused.
-            let sources = reachable_sources(applied)?;
-            cache.retain(|(path, _)| path != &directory);
-            if cache.len() >= 16 {
-                cache.remove(0);
-            }
-            cache.push((
-                directory,
-                AppliedCheck {
-                    files,
-                    targets,
-                    sources: sources.clone(),
-                },
+    if let Some(index) = cached {
+        let check = &cache[index].1;
+        return Ok((check.sources.clone(), check.stale.clone()));
+    }
+    let applied: Vec<_> = plans(runtime)?
+        .into_iter()
+        .filter(|plan| plan.status == "applied")
+        .collect();
+    let mut targets: Vec<(String, String, Option<String>)> = Vec::new();
+    for plan in &applied {
+        if !targets.iter().any(|(project, branch, _)| {
+            project == &plan.project_path && branch == &plan.target_branch
+        }) {
+            targets.push((
+                plan.project_path.clone(),
+                plan.target_branch.clone(),
+                branch_head(&plan.project_path, &plan.target_branch),
             ));
-            sources
         }
-    };
-    drop(cache);
-    Ok(with_earlier_attempts(sources, &runtime.integration_runs()?))
+    }
+    // A failure may be transient (Git could not start, or a lock), so only a
+    // completed check is reused. A stale merge is a completed answer: it holds
+    // until a plan is saved or the target branch moves, which invalidates it.
+    let (sources, stale) = classify_sources(applied)?;
+    cache.retain(|(path, _)| path != &directory);
+    if cache.len() >= 16 {
+        cache.remove(0);
+    }
+    cache.push((
+        directory,
+        AppliedCheck {
+            files,
+            targets,
+            sources: sources.clone(),
+            stale: stale.clone(),
+        },
+    ));
+    Ok((sources, stale))
 }
 
 /// The attempts each applied plan merged, provided its target branch still contains it.
+#[cfg(test)]
 fn reachable_sources(plans: Vec<IntegrationPlan>) -> Result<Vec<Vec<String>>, String> {
+    let (sources, stale) = classify_sources(plans)?;
+    match stale.into_iter().next() {
+        Some(paused) => Err(paused.message),
+        None => Ok(sources),
+    }
+}
+
+/// Splits applied plans into those whose merge is still on the target branch and
+/// those that are paused. Errors only when Git cannot answer.
+fn classify_sources(plans: Vec<IntegrationPlan>) -> Result<AppliedSources, String> {
     let mut sources = Vec::new();
+    let mut stale = Vec::new();
     for plan in plans {
         let head = plan
             .integration_head
@@ -995,12 +1042,23 @@ fn reachable_sources(plans: Vec<IntegrationPlan>) -> Result<Vec<Vec<String>>, St
             ],
             Snapshot,
         )?;
-        if !result.status.success() {
-            return Err(format!("Dispatch paused: the target branch in {} no longer contains integration {}. Restore that integration before running dependent work.", plan.project_path, plan.id));
+        if result.status.success() {
+            sources.push(plan.run_ids);
+            continue;
         }
-        sources.push(plan.run_ids);
+        let commit = head.get(..12).unwrap_or(head).to_string();
+        stale.push(PausedIntegration {
+            message: format!(
+                "Dispatch paused: the target branch {} in {} no longer contains integration {} (commit {commit}). Merge that commit back into {}, or reset {} to a commit that includes it, before running dependent work.",
+                plan.target_branch, plan.project_path, plan.id, plan.target_branch, plan.target_branch
+            ),
+            plan_id: plan.id,
+            project_path: plan.project_path,
+            target_branch: plan.target_branch,
+            commit,
+        });
     }
-    Ok(sources)
+    Ok((sources, stale))
 }
 
 fn with_earlier_attempts(sources: Vec<Vec<String>>, runs: &[TaskRun]) -> Vec<String> {
@@ -2004,6 +2062,33 @@ mod tests {
         .unwrap();
         assert!(reachable_sources(vec![applied])
             .map(|sources| with_earlier_attempts(sources, &runs))
+            .unwrap_err()
+            .contains("no longer contains integration"));
+    }
+
+    #[test]
+    fn a_stale_integration_is_reported_alongside_reachable_ones_but_still_blocks_dependents() {
+        let fixture = Fixture::new();
+        let runs = vec![fixture.run(1, "first.txt", "first\n")];
+        let plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
+        let stale = apply(&fixture.plans, &runs, &plan.id).unwrap();
+        repo::git(
+            &fixture.project,
+            &["reset", "--hard", &fixture.base],
+            Snapshot,
+        )
+        .unwrap();
+        let more = vec![fixture.run(2, "second.txt", "second\n")];
+        let plan = prepare(&fixture.plans, &more, &[more[0].id.clone()]).unwrap();
+        let reachable = apply(&fixture.plans, &more, &plan.id).unwrap();
+
+        let (sources, paused) = classify_sources(vec![stale.clone(), reachable.clone()]).unwrap();
+        assert_eq!(sources, vec![reachable.run_ids.clone()]);
+        assert_eq!(paused.len(), 1);
+        assert_eq!(paused[0].plan_id, stale.id);
+        assert!(paused[0].message.contains("no longer contains integration"));
+        // Dispatch keeps treating any stale merge as a reason to wait.
+        assert!(reachable_sources(vec![stale, reachable])
             .unwrap_err()
             .contains("no longer contains integration"));
     }

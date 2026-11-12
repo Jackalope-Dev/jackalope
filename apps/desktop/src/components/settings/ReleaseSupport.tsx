@@ -32,18 +32,7 @@ export function ReleaseSupport() {
   };
   return (
     <>
-      <UpdateSettings />
-      <FeedbackForm />
-      <SettingGroup aria-label="Help and community">
-        <SettingRow
-          title="Documentation & guides"
-          description="Architecture guides, agent configuration, worktree workflows and troubleshooting recipes in the online Knowledgebase."
-        >
-          <Button variant="outline" onClick={() => void openHelp()}>
-            <LifeBuoy className="size-4 mr-2" />
-            Browse Knowledgebase
-          </Button>
-        </SettingRow>
+      <SettingGroup aria-label="Help and community" data-settings-tile>
         <SettingRow
           title="Community"
           description="Ask questions, share workflows and hear about new releases first in the Jackalope Discord."
@@ -53,7 +42,18 @@ export function ReleaseSupport() {
             Join the Discord
           </Button>
         </SettingRow>
+        <SettingRow
+          title="Help Center"
+          description="Guides for agents, worktrees, review and troubleshooting."
+        >
+          <Button variant="outline" onClick={() => void openHelp()}>
+            <LifeBuoy className="size-4 mr-2" />
+            Open Help Center
+          </Button>
+        </SettingRow>
       </SettingGroup>
+      <FeedbackForm />
+      <UpdateSettings />
       <SettingGroup
         aria-label="Support report"
         title="Prepare a local support report"

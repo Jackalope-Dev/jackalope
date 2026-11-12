@@ -15,8 +15,10 @@ import {
   History,
   ListTodo,
   type LucideIcon,
+  MonitorSmartphone,
   Network,
   Plug,
+  Route,
   Settings2,
   Share2,
 } from 'lucide-react';
@@ -83,11 +85,12 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'remote-hosts',
-    label: 'Hosts',
-    description: 'Connect to trusted hosts and continue work from another device.',
-    icon: Network,
+    label: 'Devices',
+    description: 'Use other computers from here, or let a phone or another computer use this one.',
+    icon: MonitorSmartphone,
     group: 'hosts',
     feature: 'connections',
+    keywords: 'hosts remote access phone companion pair pairing SSH Tailscale',
   },
   {
     id: 'project-overview',
@@ -213,6 +216,15 @@ export const WORKSPACE_VIEWS = [
     icon: Blocks,
     group: 'agents',
     feature: 'connections',
+  },
+  {
+    id: 'routing',
+    label: 'Routing',
+    description: 'Agents: how Jackalope picks an agent and model for each task.',
+    icon: Route,
+    group: 'agents',
+    feature: 'agents',
+    keywords: 'decisions automatic agent model cost tokens capacity Jev TypeSafe',
   },
   {
     id: 'usage',

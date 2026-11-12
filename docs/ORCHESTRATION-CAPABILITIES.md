@@ -403,7 +403,7 @@ when builds are running to avoid locking Cargo's linker output.
 
 ## Cloud resources
 
-**Project settings → Cloud resources** (or **Cloud resources** on Project → Swarm) creates
+**Project settings → Integrations → Cloud resources** (or **Cloud resources** on Project → Swarm) creates
 what a project's Worker binds to in the Cloudflare account connected under Settings →
 Cloudflare. Without a connection the card links there instead. The screen offers R2, D1,
 KV, Queues, Durable Objects, Workers, Hyperdrive and Turnstile; R2, KV, Queues and Durable

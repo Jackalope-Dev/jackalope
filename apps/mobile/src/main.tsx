@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { moveNewWorkDraft } from './drafts';
 import { Hosts } from './Hosts';
 import { HostWork, type Opening } from './HostWork';
+import { moveTo } from './motion';
 import { forget, type Host, listHosts } from './native';
 import { Pairing } from './Pairing';
 import { Splash } from './Splash';
@@ -57,6 +58,13 @@ function MobileCompanion() {
   const [screen, setScreen] = useState<Screen>({ kind: 'work' });
   const [splash, setSplash] = useState<'shown' | 'leaving' | 'gone'>('shown');
   const [error, setError] = useState('');
+  // A computer just paired is greeted once on Work; the greeting clears itself.
+  const [welcome, setWelcome] = useState<Host | undefined>();
+  useEffect(() => {
+    if (!welcome) return;
+    const timer = setTimeout(() => setWelcome(undefined), 8000);
+    return () => clearTimeout(timer);
+  }, [welcome]);
   // A computer's own screen polls it, so the combined lists pause while one is open.
   const { computers, retry } = useComputers(
     hosts ?? NO_HOSTS,
@@ -91,13 +99,19 @@ function MobileCompanion() {
         if (!rest.length) setScreen({ kind: 'work' });
       })
       .catch((cause) => setError(describeError(cause)));
-  const open = (host: Host, opening: Opening) =>
-    setScreen((current) => ({
-      kind: 'host',
-      host,
-      opening,
-      back: current.kind === 'host' ? current.back : current,
-    }));
+  const open = (host: Host, opening: Opening, from?: HTMLElement | null) =>
+    moveTo(
+      () =>
+        setScreen((current) => ({
+          kind: 'host',
+          host,
+          opening,
+          back: current.kind === 'host' ? current.back : current,
+        })),
+      from,
+    );
+  /** Screen changes without a source element still cross-fade where supported. */
+  const go = (next: Screen) => moveTo(() => setScreen(next));
   /** New work moves to another computer, carrying the draft typed so far. */
   const switchComputer = (from: Host, to: Host) => {
     moveNewWorkDraft(localStorage, from.id, to.id);
@@ -108,13 +122,14 @@ function MobileCompanion() {
     if (screen.kind === 'pair' || !hosts.length) {
       view = (
         <Pairing
-          onBack={hosts.length ? () => setScreen({ kind: 'computers' }) : undefined}
+          onBack={hosts.length ? () => go({ kind: 'computers' }) : undefined}
           onPaired={(host) => {
             setHosts((current) => [
               ...(current ?? []).filter((item) => item.origin !== host.origin),
               host,
             ]);
-            setScreen({ kind: 'work' });
+            setWelcome(host);
+            go({ kind: 'work' });
           }}
         />
       );
@@ -125,7 +140,7 @@ function MobileCompanion() {
           host={screen.host}
           hosts={hosts}
           opening={screen.opening}
-          onBack={() => setScreen(screen.back)}
+          onBack={() => go(screen.back)}
           onSwitch={(to) => switchComputer(screen.host, to)}
         />
       );
@@ -134,9 +149,9 @@ function MobileCompanion() {
         <Hosts
           hosts={hosts}
           computers={computers}
-          onBack={() => setScreen({ kind: 'work' })}
-          onOpen={(host) => setScreen({ kind: 'work', hostId: host.id })}
-          onPair={() => setScreen({ kind: 'pair' })}
+          onBack={() => go({ kind: 'work' })}
+          onOpen={(host) => go({ kind: 'work', hostId: host.id })}
+          onPair={() => go({ kind: 'pair' })}
           onRemove={remove}
         />
       );
@@ -147,10 +162,11 @@ function MobileCompanion() {
           hosts={hosts}
           computers={computers}
           only={only}
-          onOpen={(host, selected) => open(host, { selected })}
-          onCompose={(host) => open(host, { composing: true })}
-          onComputers={() => setScreen({ kind: 'computers' })}
-          onBack={only ? () => setScreen({ kind: 'computers' }) : undefined}
+          welcome={welcome}
+          onOpen={(host, selected, from) => open(host, { selected }, from)}
+          onCompose={(host, from) => open(host, { composing: true }, from)}
+          onComputers={() => go({ kind: 'computers' })}
+          onSelect={(host) => setScreen({ kind: 'work', hostId: host?.id })}
           onRetry={(host) => void retry(host)}
         />
       );

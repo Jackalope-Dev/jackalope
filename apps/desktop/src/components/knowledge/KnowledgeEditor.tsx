@@ -1,12 +1,24 @@
 import { describeError } from '@jackalope/contracts/errors';
-import { Button, Checkbox, Input, Textarea, useDialogFocus } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  FieldCheck,
+  FormField,
+  Input,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import { invokeNative } from '../../lib/native/transport';
 import { OutcomeEditor } from '../tasks/OutcomeEditor';
 import { ActionError } from '../ui/ActionError';
+import './knowledge-editor.css';
 
 export function KnowledgeEditor({
   entry,
@@ -25,6 +37,11 @@ export function KnowledgeEditor({
   const memory = value.kind === 'memory';
   const limit = memory ? 800 : 6000;
   const bytes = new TextEncoder().encode(value.content).length;
+  const keywords = phrases
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const process = value.process ?? { inputs: [], steps: [], outcomes: [] };
   return (
     <Dialog.Root
       open
@@ -32,76 +49,77 @@ export function KnowledgeEditor({
         if (!open && !busy) onClose();
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content {...focus} className="task-dialog appearance-panel">
-          <Dialog.Close className="task-close" disabled={busy} aria-label="Close editor">
-            <X size={18} />
-          </Dialog.Close>
-          <Dialog.Title className="text-xl">
-            {memory ? 'Save a project lesson' : 'Save a reusable workflow'}
-          </Dialog.Title>
-          <Dialog.Description className="task-muted mt-3">
-            {memory
+      <DialogContent {...focus} className={memory ? 'knowledge-editor' : 'knowledge-editor wide'}>
+        <DialogCloseButton disabled={busy} label="Close editor" />
+        <DialogHeader
+          title={memory ? 'Save a project lesson' : 'Save a reusable workflow'}
+          description={`${
+            memory
               ? 'Keep one useful fact or decision. Matching future tasks can use it with any agent.'
-              : 'Describe the repeatable procedure, required tools, and checks. Apply it to a new task when needed.'}{' '}
-            Saved locally; no model call is made.
-          </Dialog.Description>
-          <form
-            className="space-y-4 mt-5"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (busy) return;
-              setBusy(true);
-              setError('');
-              try {
-                await invokeNative('knowledge_save', {
-                  entry: {
-                    ...value,
-                    keywords: phrases
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  },
-                });
-                onSaved();
-              } catch (cause) {
-                setError(describeError(cause));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <label className="block" htmlFor="knowledge-title">
-              Title
-              <Input
-                id="knowledge-title"
-                required
-                maxLength={120}
-                value={value.title}
-                onChange={(e) => setValue({ ...value, title: e.target.value })}
-              />
-            </label>
-            <label className="block" htmlFor="knowledge-content">
-              {memory ? 'Lesson' : 'Procedure'}
+              : 'Describe the repeatable procedure, required tools, and checks. Apply it to a new task when needed.'
+          } Saved locally; no model call is made.`}
+        />
+        <form
+          className="knowledge-editor-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (busy) return;
+            setBusy(true);
+            setError('');
+            try {
+              await invokeNative('knowledge_save', { entry: { ...value, keywords } });
+              onSaved();
+            } catch (cause) {
+              setError(describeError(cause));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <FormField label="Title">
+            <Input
+              id="knowledge-title"
+              required
+              maxLength={120}
+              value={value.title}
+              onChange={(e) => setValue({ ...value, title: e.target.value })}
+            />
+          </FormField>
+          <div className="knowledge-editor-content">
+            <FormField label={memory ? 'Lesson' : 'Procedure'}>
               <Textarea
                 id="knowledge-content"
                 required
-                className="task-input w-full"
-                rows={memory ? 4 : 8}
+                aria-describedby="knowledge-content-size"
+                rows={memory ? 4 : 6}
                 maxLength={limit}
                 value={value.content}
                 onChange={(e) => setValue({ ...value, content: e.target.value })}
               />
-            </label>
-            <p className="task-muted">
-              {bytes.toLocaleString()} / {limit.toLocaleString()} bytes.{' '}
+            </FormField>
+            <FieldCheck id="knowledge-content-size" tone={bytes > limit ? 'error' : 'info'}>
+              {bytes.toLocaleString()} of {limit.toLocaleString()} bytes.{' '}
               {memory
                 ? 'Keep it concise; at most three matching lessons are included per task.'
                 : 'Only included when you select this workflow.'}
-            </p>
-            {!memory && (
-              <>
+            </FieldCheck>
+          </div>
+          {!memory && (
+            <section className="knowledge-process" aria-label="Workflow process">
+              <ol className="knowledge-process-flow" aria-label="How the workflow runs">
+                <li>
+                  <strong>{process.inputs.length}</strong> inputs
+                </li>
+                <ArrowRight size={14} aria-hidden="true" />
+                <li>
+                  <strong>{process.steps.length}</strong> steps, each reviewed
+                </li>
+                <ArrowRight size={14} aria-hidden="true" />
+                <li>
+                  <strong>{process.outcomes.length}</strong> outcomes
+                </li>
+              </ol>
+              <div className="knowledge-process-lists">
                 <OutcomeEditor
                   label="Required inputs"
                   values={value.process?.inputs ?? []}
@@ -132,16 +150,20 @@ export function KnowledgeEditor({
                     })
                   }
                 />
-                <p className="task-muted">
-                  Inputs are required before launch. Each step runs separately and pauses for your
-                  evidence review before the next step. Final outcomes require review before
-                  completion or integration.
-                </p>
-              </>
-            )}
-            {memory && (
-              <label className="block" htmlFor="knowledge-phrases">
-                Use when a task mentions
+              </div>
+              <p className="task-muted">
+                Inputs are required before launch. Each step runs separately and pauses for your
+                evidence review before the next step. Final outcomes require review before
+                completion or integration.
+              </p>
+            </section>
+          )}
+          {memory && (
+            <div className="knowledge-editor-content">
+              <FormField
+                label="Use when a task mentions"
+                description="Comma-separated words or phrases. Matches ignore case and punctuation."
+              >
                 <Input
                   id="knowledge-phrases"
                   required
@@ -149,30 +171,34 @@ export function KnowledgeEditor({
                   onChange={(e) => setPhrases(e.target.value)}
                   placeholder="release, installer, Windows upgrade"
                 />
-                <span className="task-muted">
-                  Comma-separated words or phrases. Matches ignore case and punctuation.
-                </span>
-              </label>
-            )}
-            <label className="flex items-center gap-3 min-h-11">
-              <Checkbox
-                checked={value.enabled}
-                onChange={(e) => setValue({ ...value, enabled: e.target.checked })}
-              />
-              Available for future tasks
-            </label>
-            <ActionError error={error} />
-            <Button
-              type="submit"
-              disabled={busy || bytes > limit}
-              loading={busy}
-              loadingLabel="Saving…"
-            >
-              {memory ? 'Save lesson' : 'Save workflow'}
-            </Button>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
+              </FormField>
+              {keywords.length > 0 && (
+                <ul className="knowledge-phrases" aria-label="Matching phrases">
+                  {keywords.map((keyword) => (
+                    <li key={keyword}>{keyword}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <label className="knowledge-editor-enabled">
+            <Checkbox
+              checked={value.enabled}
+              onChange={(e) => setValue({ ...value, enabled: e.target.checked })}
+            />
+            Available for future tasks
+          </label>
+          <ActionError error={error} />
+          <Button
+            type="submit"
+            disabled={busy || bytes > limit}
+            loading={busy}
+            loadingLabel="Saving…"
+          >
+            {memory ? 'Save lesson' : 'Save workflow'}
+          </Button>
+        </form>
+      </DialogContent>
     </Dialog.Root>
   );
 }

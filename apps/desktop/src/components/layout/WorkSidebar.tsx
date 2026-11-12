@@ -1,5 +1,16 @@
 import { ContextMenu, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
-import { ChevronRight, Copy, Ellipsis, Plus, Smile, Trash2, X } from 'lucide-react';
+import {
+  ChevronRight,
+  Code2,
+  Copy,
+  Ellipsis,
+  FolderOpen,
+  LayoutGrid,
+  Plus,
+  Smile,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
   forwardRef,
@@ -7,7 +18,10 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { type ActiveTab, groupViews, viewLabel, workspaceView } from '../../lib/navigation';
+import { type Editor, editorName } from '../../lib/editor';
+import { fileManagerName } from '../../lib/native/env';
+import { type ActiveTab, workspaceView } from '../../lib/navigation';
+import { projectNameHints } from '../../lib/project-name-hints';
 import { type WorkItem, workPresence } from '../../lib/task-collection';
 import {
   openExternalSession,
@@ -20,6 +34,7 @@ import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { LatestAgent } from '../agents/AgentAvatar';
@@ -69,7 +84,7 @@ function closedState(item: WorkItem) {
 const STAGE_ORDER: Record<string, number> = { attention: 0, review: 0, working: 1, finished: 2 };
 
 /** Work started in the sidebar, grouped by project: what needs you, then running, then recent. */
-function useProjectWork() {
+export function useProjectWork() {
   const work = useWorkspaceWork();
   const dismissed = useWorkSignalsStore((state) => state.dismissed);
   return useMemo(() => {
@@ -96,9 +111,9 @@ type ProjectActions = {
   onNewWork: (projectId: string) => void;
   onRemoveProject: (project: Project) => void;
   onCopyPath: (project: Project) => void;
+  onRevealPath: (project: Project) => void;
+  onOpenInEditor: (project: Project, editor: Editor) => void;
 };
-
-const projectViews = groupViews('project');
 
 /**
  * A project's actions, shared by its options button and its right-click menu so both
@@ -112,11 +127,14 @@ function ProjectMenuItems({
   onNewWork,
   onRemoveProject,
   onCopyPath,
+  onRevealPath,
+  onOpenInEditor,
 }: ProjectActions & {
   menu: typeof Menu | typeof ContextMenu;
   project: Project;
   onSetIcon: (project: Project) => void;
 }) {
+  const editor = useSettingsStore((state) => state.preferredEditor);
   return (
     <>
       <M.Item className="workspace-menu-item" onSelect={() => onNewWork(project.id)}>
@@ -124,17 +142,22 @@ function ProjectMenuItems({
         New work
       </M.Item>
       <M.Separator className="menu-separator" />
-      {projectViews.map((view) => (
-        <M.Item
-          key={view.id}
-          className="workspace-menu-item"
-          onSelect={() => onOpenProject(project.id, view.id)}
-        >
-          <view.icon size={16} aria-hidden="true" />
-          {viewLabel(view.id)}
-        </M.Item>
-      ))}
-      <M.Separator className="menu-separator" />
+      {/* The project's other views are its page's own subnavigation. */}
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => onOpenProject(project.id, 'project-overview')}
+      >
+        <LayoutGrid size={16} aria-hidden="true" />
+        Open project
+      </M.Item>
+      <M.Item className="workspace-menu-item" onSelect={() => onOpenInEditor(project, editor)}>
+        <Code2 size={16} aria-hidden="true" />
+        Open in {editorName(editor)}
+      </M.Item>
+      <M.Item className="workspace-menu-item" onSelect={() => onRevealPath(project)}>
+        <FolderOpen size={16} aria-hidden="true" />
+        Reveal in {fileManagerName()}
+      </M.Item>
       <M.Item className="workspace-menu-item" onSelect={() => onSetIcon(project)}>
         <Smile size={16} aria-hidden="true" />
         Set icon…
@@ -174,6 +197,8 @@ const ProjectContextMenu = forwardRef<
       onNewWork,
       onRemoveProject,
       onCopyPath,
+      onRevealPath,
+      onOpenInEditor,
       ...trigger
     },
     ref,
@@ -192,6 +217,8 @@ const ProjectContextMenu = forwardRef<
             onNewWork={onNewWork}
             onRemoveProject={onRemoveProject}
             onCopyPath={onCopyPath}
+            onRevealPath={onRevealPath}
+            onOpenInEditor={onOpenInEditor}
           />
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -216,6 +243,7 @@ export function WorkSidebar({
   const collapsed = useWorkViewStore((state) => state.collapsedProjects);
   const scope = useWorkViewStore((state) => state.scope);
   const byProject = useProjectWork();
+  const hints = useMemo(() => projectNameHints(projects), [projects]);
   const selectedRun = useExecutionStore((state) => state.selectedId);
   const selectedSession = useLiveSessionStore((state) => state.selectedId);
   const selectedManaged = useManagedTaskStore((state) => state.selectedId);
@@ -260,6 +288,19 @@ export function WorkSidebar({
           ['attention', 'review'].includes(item.stage),
         ).length;
         const running = items.filter((item) => item.stage === 'working').length;
+        // The tree keeps only live work: rows that need the person, are running, are unread or
+        // are open. The rest stays one click away on the project's Work page.
+        const shown = items.filter(
+          (item) =>
+            ['attention', 'review', 'working'].includes(item.stage) ||
+            isUnread(item, signals, openKey) ||
+            (item.managed
+              ? item.managed.id === selectedManaged
+              : item.session
+                ? item.session.id === selectedSession
+                : item.run?.id === selectedRun),
+        );
+        const more = items.length - shown.length;
         // The project row is "where you are" when its page or its unfiltered work list is open.
         const current =
           project.id === activeProject &&
@@ -295,6 +336,9 @@ export function WorkSidebar({
                 >
                   <ProjectMark project={project} />
                   <span className="project-tree-label">{project.name}</span>
+                  {hints.has(project.id) && (
+                    <span className="project-tree-hint">{hints.get(project.id)}</span>
+                  )}
                   {!expanded && (attention > 0 || running > 0) && (
                     <span className="project-tree-counts">
                       {attention > 0 && (
@@ -354,7 +398,7 @@ export function WorkSidebar({
             </ProjectContextMenu>
             {expanded && items.length > 0 && (
               <ul id={listId} className="project-tree-items">
-                {items.map((item) => {
+                {shown.map((item) => {
                   const presence = workPresence(item);
                   const selected = item.managed
                     ? item.managed.id === selectedManaged
@@ -430,6 +474,21 @@ export function WorkSidebar({
                     </li>
                   );
                 })}
+                {more > 0 && (
+                  <li className="work-sidebar-row">
+                    <button
+                      type="button"
+                      className="work-sidebar-item work-sidebar-more"
+                      title={`Open all of ${project.name}'s work`}
+                      onClick={() => actions.onOpenProject(project.id, 'kanban')}
+                    >
+                      <span className="work-sidebar-title">
+                        {more} more
+                        <span className="sr-only"> in {project.name}</span>
+                      </span>
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
             {expanded && (
@@ -457,19 +516,22 @@ export function CollapsedProjects(actions: ProjectActions) {
   const projects = useProjectStore((state) => state.projects);
   const activeProject = useProjectStore((state) => state.activeProjectId);
   const byProject = useProjectWork();
+  const hints = useMemo(() => projectNameHints(projects), [projects]);
   return (
     <nav className="project-rail" aria-label="Projects">
       {projects.map((project) => {
         const attention = (byProject.get(project.id) ?? []).filter((item) =>
           ['attention', 'review'].includes(item.stage),
         ).length;
+        const hint = hints.get(project.id);
+        const name = hint ? `${project.name} · ${hint}` : project.name;
         return (
-          <Tooltip key={project.id} side="right" content={project.name}>
+          <Tooltip key={project.id} side="right" content={name}>
             <ProjectContextMenu project={project} onSetIcon={setIconFor} {...actions}>
               <button
                 type="button"
                 className="project-rail-item"
-                aria-label={attention ? `${project.name}, ${attention} need you` : project.name}
+                aria-label={attention ? `${name}, ${attention} need you` : name}
                 data-active={project.id === activeProject || undefined}
                 onClick={() => onOpenProject(project.id, 'kanban')}
               >
@@ -485,12 +547,17 @@ export function CollapsedProjects(actions: ProjectActions) {
   );
 }
 
-/** Work across every project that is waiting on the person, beside the Work link. */
-export function NeedsYouCount() {
+/** Work across every project that is waiting on the person; the Work and mascot badges share it. */
+export function useNeedsYouCount() {
   const byProject = useProjectWork();
-  const count = [...byProject.values()]
+  return [...byProject.values()]
     .flat()
     .filter((item) => ['attention', 'review'].includes(item.stage)).length;
+}
+
+/** The needs-you count beside the Work link. */
+export function NeedsYouCount() {
+  const count = useNeedsYouCount();
   if (!count) return null;
   return (
     <small className="workspace-nav-count">

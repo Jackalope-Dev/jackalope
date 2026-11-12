@@ -86,6 +86,25 @@
 .work-board .work-archive {
   margin-left: auto;
 }
+/* Archive appears with the row's hover or keyboard focus; it stays focusable while hidden,
+   and touch screens, which cannot hover, always show it. */
+.work-list .work-archive {
+  opacity: 0;
+  transition: opacity var(--motion-fast, 120ms) ease;
+}
+.work-list .work-item-row:is(:hover, :focus-within) .work-archive {
+  opacity: 1;
+}
+@media (hover: none), (pointer: coarse) {
+  .work-list .work-archive {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-list .work-archive {
+    transition: none;
+  }
+}
 .work-item:hover {
   background: var(--color-surface-hover);
 }
@@ -100,6 +119,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.work-item-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: bottom;
+  color: var(--color-text-secondary);
+}
+.work-item-project .project-tree-mark {
+  width: 16px;
+  height: 16px;
+  font-size: 0.5625rem;
+}
+.work-item-project .project-tree-mark :is(svg, img) {
+  max-width: 11px;
+  max-height: 11px;
+}
+.work-item-project-hint {
+  color: var(--color-text-muted);
 }
 .work-item-title {
   font-size: var(--text-sm);
@@ -182,6 +220,32 @@
   font-size: var(--text-sm);
   font-weight: 500;
   border-bottom: 1px solid var(--color-border-subtle);
+}
+/* Needs-you work outside the filtered project: a quiet line, never a second list. */
+.work-elsewhere {
+  padding: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.work-elsewhere-action {
+  color: var(--color-accent-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.work-elsewhere-action:hover {
+  text-decoration-thickness: 2px;
+}
+.work-elsewhere-action:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.work-subgroup {
+  padding: 10px 10px 4px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 .work-group h2 span,
 .work-finished > summary span {

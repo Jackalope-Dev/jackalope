@@ -170,3 +170,10 @@
     forced-color-adjust: none;
   }
 }
+
+/* One line per agent, so the tooltip also names the agents behind "+N". */
+.statusbar-usage-tooltip {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}

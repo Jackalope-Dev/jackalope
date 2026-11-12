@@ -95,6 +95,16 @@ export interface QueueView {
   bridgeUrl: string | null;
   bridgeError: string | null;
   mergedRunIds: string[];
+  /** Applied integrations whose merge left the target branch; their dependents wait. */
+  pausedIntegrations?: PausedIntegration[];
+}
+interface PausedIntegration {
+  planId: string;
+  projectPath: string;
+  targetBranch: string;
+  commit: string;
+  /** The native explanation, in the same wording dispatch reports. */
+  message: string;
 }
 export interface IntegrationPlan {
   id: string;

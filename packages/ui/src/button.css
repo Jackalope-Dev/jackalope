@@ -1,15 +1,37 @@
 @layer theme, base, components, utilities;
 
 @layer components {
+  /* Translucent tinted plastic, like a clear handheld console shell: thin theme-tinted bodies
+     the page shows through, a hairline moulded lip, a faint corner highlight and fine grain. */
   :where(.ui-button) {
+    --button-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23n)'/%3E%3C/svg%3E");
+    --button-edge: color-mix(in srgb, var(--color-text-primary) 11%, transparent);
+    --button-edge-low: color-mix(in srgb, var(--color-text-primary) 18%, transparent);
+    /* Clear plastic carries a trace of the theme so secondary controls match the shell. */
+    --button-clear: color-mix(
+      in oklab,
+      color-mix(in oklab, var(--color-surface-elevated), var(--color-accent) 5%) 52%,
+      transparent
+    );
+    --button-clear-edge: color-mix(
+      in oklab,
+      var(--color-accent) 22%,
+      color-mix(in srgb, var(--color-text-primary) 10%, transparent)
+    );
+    --button-lip: light-dark(rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.1));
+    --button-highlight: radial-gradient(
+      120% 90% at 16% 0%,
+      light-dark(rgb(255 255 255 / 0.26), rgb(255 255 255 / 0.06)),
+      transparent 46%
+    );
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     height: var(--control-height, 36px);
     padding: 0 14px;
-    border: 0;
-    border-radius: 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 8px);
     font: inherit;
     font-size: var(--text-sm, 0.875rem);
     font-weight: 500;
@@ -17,6 +39,8 @@
     cursor: pointer;
     transition:
       background-color 150ms,
+      border-color 150ms,
+      box-shadow 150ms,
       color 150ms,
       transform 150ms;
   }
@@ -36,45 +60,107 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+  /* Tinted plastic with a dense core: the rim lets the page through, while the band behind
+     the label is the action colour, shaded 10% away from the label colour, at 90%. Measured
+     across every preset in both schemes, that band keeps --color-on-action at 4.5:1 or more
+     over any pane; the 10% shade moves away from the label so dark labels stay legible too. */
   :where(.ui-button[data-variant="primary"]) {
-    background: var(--color-action);
+    --button-away: rgb(from var(--color-on-action) calc(255 - r) calc(255 - g) calc(255 - b));
+    --button-tint: color-mix(in srgb, var(--color-action) 90%, var(--button-away));
+    background-color: transparent;
+    background-image:
+      var(--button-highlight),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--button-tint) 70%, transparent) 0%,
+        color-mix(in srgb, var(--button-tint) 90%, transparent) 28%,
+        color-mix(in srgb, var(--button-tint) 90%, transparent) 72%,
+        color-mix(in srgb, var(--button-tint) 88%, var(--button-away)) 100%
+      ),
+      var(--button-grain);
     color: var(--color-on-action);
     font-weight: 600;
-    box-shadow: var(--shadow-flat);
+    border-color: color-mix(in srgb, var(--color-action) 75%, var(--button-away));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      inset 0 -1px 0 color-mix(in srgb, var(--color-action) 70%, var(--button-away));
+    -webkit-backdrop-filter: blur(12px) saturate(170%);
+    backdrop-filter: blur(12px) saturate(170%);
   }
   :where(.ui-button[data-variant="primary"]):hover {
-    background: var(--color-action-hover);
+    --button-tint: color-mix(in srgb, var(--color-action-hover) 90%, var(--button-away));
+  }
+  :where(.ui-button[data-variant="primary"]):active {
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--color-action) 60%, var(--button-away));
+  }
+  /* A faded accent reads as a different button on glass, so unavailable primaries go neutral. */
+  :where(.ui-button[data-variant="primary"]):is(:disabled, [aria-disabled="true"]) {
+    background-color: var(--color-surface-hover);
+    background-image: none;
+    border-color: var(--button-edge);
+    color: var(--color-text-secondary);
+    box-shadow: none;
+    opacity: 1;
+  }
+  :where(
+    .ui-button[data-variant="secondary"],
+    .ui-button[data-variant="outline"],
+    .ui-button[data-variant="ghost"],
+    .ui-button[data-variant="danger"]
+  ) {
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+  }
+  /* Clear plastic: a smoky, faintly theme-tinted shell with the same lip and edges. */
+  :where(.ui-button[data-variant="secondary"], .ui-button[data-variant="outline"]) {
+    color: var(--color-text-primary);
+    background-image: var(--button-highlight), var(--button-grain);
+    border-color: var(--button-clear-edge);
+    box-shadow:
+      inset 0 1px 0 var(--button-lip),
+      inset 0 -1px 0 color-mix(in oklab, var(--color-accent) 10%, transparent);
   }
   :where(.ui-button[data-variant="secondary"]) {
-    background: var(--color-surface-elevated);
-    color: var(--color-text-primary);
-    border: 1px solid var(--color-border);
+    background-color: var(--button-clear);
   }
   :where(.ui-button[data-variant="outline"]) {
-    background: transparent;
-    color: var(--color-text-primary);
-    border: 1px solid var(--color-border);
+    background-color: color-mix(in oklab, var(--color-surface-elevated) 28%, transparent);
   }
+  /* Ghost is the quietest button but still reads as one: a hairline clear-plastic edge with
+     no fill at rest, taking the clear plastic on hover. Text-only actions use LinkButton. */
   :where(.ui-button[data-variant="ghost"]) {
-    background: transparent;
+    background-color: transparent;
     color: var(--color-text-secondary);
-    border: 1px solid transparent;
+    border-color: var(--button-clear-edge);
   }
   :where(
     .ui-button[data-variant="secondary"],
     .ui-button[data-variant="outline"],
     .ui-button[data-variant="ghost"]
   ):hover {
-    background: var(--color-surface-hover);
+    background-color: color-mix(
+      in oklab,
+      color-mix(in oklab, var(--color-surface-hover), var(--color-accent) 10%) 80%,
+      transparent
+    );
+    background-image: var(--button-highlight), var(--button-grain);
+    border-color: var(--button-clear-edge);
     color: var(--color-text-primary);
+    box-shadow:
+      inset 0 1px 0 var(--button-lip),
+      inset 0 -1px 0 color-mix(in oklab, var(--color-accent) 12%, transparent);
   }
   :where(.ui-button[data-variant="danger"]) {
-    background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+    background-color: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    background-image: var(--button-highlight), var(--button-grain);
     color: var(--color-danger);
-    border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+    border-color: color-mix(in srgb, var(--color-danger) 32%, transparent);
+    box-shadow:
+      inset 0 1px 0 var(--button-lip),
+      inset 0 -1px 0 color-mix(in srgb, var(--color-danger) 16%, transparent);
   }
   :where(.ui-button[data-variant="danger"]):hover {
-    background: color-mix(in srgb, var(--color-danger) 25%, transparent);
+    background-color: color-mix(in srgb, var(--color-danger) 24%, transparent);
   }
   :where(.ui-button[data-size="sm"]) {
     height: var(--control-height-compact, 32px);
@@ -109,6 +195,32 @@
   }
   .ui-button[data-loading="false"] .ui-icon-loading {
     animation: none;
+  }
+  /* Reduced transparency and forced colours keep a solid, flat control. */
+  @media (prefers-reduced-transparency: reduce) {
+    :where(.ui-button) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    :where(.ui-button[data-variant="secondary"]) {
+      background-color: var(--color-surface-elevated);
+    }
+    :where(.ui-button[data-variant="outline"]) {
+      background-color: transparent;
+    }
+    :where(
+        .ui-button[data-variant="secondary"],
+        .ui-button[data-variant="outline"],
+        .ui-button[data-variant="ghost"]
+      ):hover {
+      background-color: var(--color-surface-hover);
+    }
+  }
+  @media (forced-colors: active) {
+    :where(.ui-button) {
+      background-image: none;
+      border: 1px solid ButtonText;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     .ui-button {

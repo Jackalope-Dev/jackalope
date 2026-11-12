@@ -1,23 +1,17 @@
+import { parseDispatchPaused, pausedDispatchMessages } from '../../lib/dispatch-paused';
 import { openWork, selectWork, useAllRuns, useWorkspaceWork } from '../../lib/work-selection';
-import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { describeError } from '@jackalope/contracts/errors';
-import {
-  Button,
-  EmptyState,
-  LoadingState,
-  DropdownMenu as Menu,
-  Select,
-  SelectItem,
-} from '@jackalope/ui';
-import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
+import { Button, EmptyState, LoadingState, DropdownMenu as Menu } from '@jackalope/ui';
+import { FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
 import { invokeNative } from '../../lib/native/transport';
 import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
+import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -28,7 +22,9 @@ import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { ActionError } from '../ui/ActionError';
+import { DispatchPausedNotices } from './DispatchPausedNotice';
 import { WorkCatchUp } from './WorkCatchUp';
+import { WorkHeader } from './WorkHeader';
 
 const ManagedTaskView = lazy(() =>
   import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),
@@ -85,7 +81,11 @@ export function TaskWorkspace({
   const selectedId = useExecutionStore((state) => state.selectedId);
   const select = useExecutionStore((state) => state.select);
   const loading = useExecutionStore((state) => state.loading);
-  const error = useExecutionStore((state) => state.error) || managed.error;
+  // Paused dispatches have their own notices; other queue errors show as they are.
+  const pausedMessages = pausedDispatchMessages(managed.queue?.pausedIntegrations, managed.error);
+  const error =
+    useExecutionStore((state) => state.error) ||
+    (parseDispatchPaused(managed.error) ? null : managed.error);
   const ideas = useTaskStore((state) => state.tasks);
   const {
     scope,
@@ -108,12 +108,19 @@ export function TaskWorkspace({
   const [archived, setArchived] = useState(false);
   const [parallel, setParallel] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
+  /** Text typed into the one-line composer, handed to the full one as it opens. */
+  const [quickSeed, setQuickSeed] = useState<ComposerSeed | null>(null);
   const hasWork = !!(
     runs.length ||
     ideas.length ||
     sessions.length ||
     managed.queue.managedTasks?.length
   );
+  // The mascot stays quiet about work this list already shows.
+  useEffect(() => {
+    useCompanionStore.getState().setOnWorkList(true);
+    return () => useCompanionStore.getState().setOnWorkList(false);
+  }, []);
   const previousProject = useRef(activeProjectId);
   useEffect(() => {
     if (previousProject.current === activeProjectId) return;
@@ -278,66 +285,43 @@ export function TaskWorkspace({
       </Suspense>
     );
 
+  const openComposer = () => {
+    setComposerExpanded(true);
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLTextAreaElement>('.task-home textarea');
+      input?.focus();
+      input?.scrollIntoView({ block: 'center' });
+    });
+  };
+  // The page's commands share the work list's menu; without a list they get their own.
+  // New work is the composer bar, and Repo TODOs is a project page view.
+  const pageMenuItems = project && (
+    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+      <Workflow size={16} aria-hidden="true" />
+      Plan feature work
+    </Menu.Item>
+  );
+  const composeFromBar = (text: string) => {
+    if (!text.trim()) return openComposer();
+    setQuickSeed({ id: `quick-${Date.now()}`, text });
+    setComposerExpanded(true);
+  };
   return (
     <WorkspacePage className="task-home">
-      <WorkspaceHeading
-        title="Work"
-        action={
-          <div className="task-home-actions">
-            {hasWork && !composerExpanded && (
-              <Button
-                onClick={() => {
-                  setComposerExpanded(true);
-                  requestAnimationFrame(() => {
-                    const input =
-                      document.querySelector<HTMLTextAreaElement>('.task-home textarea');
-                    input?.focus();
-                    input?.scrollIntoView({ block: 'center' });
-                  });
-                }}
-              >
-                <Plus size={16} />
-                New work
-              </Button>
-            )}
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="outline" aria-label="More work actions">
-                  <MoreHorizontal size={18} />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
-                  <Menu.Item className="workspace-menu-item" onSelect={() => onCapture()}>
-                    <Radio size={16} />
-                    Save a draft
-                  </Menu.Item>
-                  {project && (
-                    <Menu.Item
-                      className="workspace-menu-item"
-                      onSelect={() => navigateWorkspace('repo-todos')}
-                    >
-                      <ListTodo size={16} />
-                      Repo TODOs
-                    </Menu.Item>
-                  )}
-                  {project && (
-                    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
-                      <Workflow size={16} />
-                      Plan feature work
-                    </Menu.Item>
-                  )}
-                </Menu.Content>
-              </Menu.Portal>
-            </Menu.Root>
-          </div>
-        }
+      <WorkHeader
+        scope={scope}
+        project={project}
+        onScopeChange={setScope}
+        onCompose={hasWork && !composerExpanded ? composeFromBar : undefined}
       />
       {(!hasWork || composerExpanded) && (
         <SessionStart
           embedded
-          seed={composerSeed}
-          onSeedApplied={onComposerSeedApplied}
+          seed={quickSeed ?? composerSeed}
+          onSeedApplied={(seed) => {
+            if (seed === quickSeed) setQuickSeed(null);
+            else onComposerSeedApplied?.(seed);
+          }}
           key={project?.id ?? 'none'}
           project={project}
           starters={!hasWork}
@@ -351,6 +335,13 @@ export function TaskWorkspace({
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
       <ActionError error={error} />
+      <DispatchPausedNotices
+        messages={pausedMessages}
+        onShowProject={(projectId) => {
+          useProjectStore.getState().selectProject(projectId);
+          setScope('project');
+        }}
+      />
       {hasWork && !archived && <WorkCatchUp />}
       {hasWork ? (
         <Suspense fallback={<LoadingState label="Loading work list…" />}>
@@ -359,16 +350,7 @@ export function TaskWorkspace({
             archived={archived}
             onArchive={archiveItems}
             onArchivedChange={setArchived}
-            scope={
-              <Select
-                aria-label="Filter by project"
-                value={scope}
-                onValueChange={(value) => setScope(value as 'all' | 'project')}
-              >
-                <SelectItem value="all">All projects</SelectItem>
-                <SelectItem value="project">{project?.name ?? 'No project yet'}</SelectItem>
-              </Select>
-            }
+            menuItems={pageMenuItems}
             emptyState={
               <EmptyState
                 icon={FolderOpen}
@@ -404,6 +386,21 @@ export function TaskWorkspace({
             onOpen={openItem}
           />
         </Suspense>
+      ) : pageMenuItems ? (
+        <div className="work-toolbar work-toolbar-solo">
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="ghost" aria-label="Work actions">
+                <MoreHorizontal size={18} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                {pageMenuItems}
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
+        </div>
       ) : null}
       {archived && (
         <Suspense fallback={<LoadingState label="Loading archive…" />}>

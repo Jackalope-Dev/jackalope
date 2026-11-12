@@ -65,6 +65,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         session_id: None,
         result: String::new(),
         streaming: String::new(),
+        pending_tools: Default::default(),
         details_omitted: false,
         activity: vec![],
         diagnostics: vec![],
@@ -143,6 +144,21 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
         assert_eq!(run.activity.last().unwrap(), "Tool request failed");
         assert!(run.error.is_none());
         assert!(!run.activity.join(" ").contains("private"));
+        consume_event(
+            &mut run,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"bash-1","name":"Bash","input":{"command":"cd /private && TOKEN=private pnpm test"}}]}}"#,
+        );
+        consume_event(
+            &mut run,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"bash-1","is_error":true,"content":[{"type":"text","text":"Exit code 1\nprivate output"}]}]}}"#,
+        );
+        assert_eq!(run.activity.last().unwrap(), "Running pnpm failed: exit 1");
+        assert_eq!(
+            super::tool_activity::kind(run.activity.last().unwrap()),
+            "failure"
+        );
+        assert!(!run.pending_tools.contains_key("bash-1"));
+        assert!(!run.activity.join(" ").contains("private"));
     }
     let mut run = sample("codex");
     consume_event(
@@ -164,6 +180,14 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
         r#"{"type":"item.completed","item":{"type":"mcp_tool_call","status":"failed"}}"#,
     );
     assert_eq!(run.activity.last().unwrap(), "Tool request failed");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"mcp_tool_call","server":"linear","tool":"create_issue","status":"failed","error":{"message":"Request timed out for private-team"}}}"#,
+    );
+    assert_eq!(
+        run.activity.last().unwrap(),
+        "Using create_issue failed: timed out"
+    );
     consume_event(
         &mut run,
         r#"{"type":"item.completed","item":{"type":"file_change","changes":[{"path":"src/a.rs"}]}}"#,

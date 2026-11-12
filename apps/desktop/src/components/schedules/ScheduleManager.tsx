@@ -38,6 +38,7 @@ import {
 } from '../../stores/projectStore';
 import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { BotNextWakes } from '../bots/BotNextWakes';
 import { ActionError } from '../ui/ActionError';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -251,6 +252,7 @@ export function ScheduleManager(props: {
         }
       />
       {!desktop && <InlineNotice>Open the desktop app to schedule execution.</InlineNotice>}
+      {desktop && <BotNextWakes />}
       {visible.length > 0 && <WorkspaceSectionHeading title="Your schedules" />}
       <ActionError error={error || ledger?.error} />
       {desktop && !ledger && !error && <LoadingState label={'Loading schedules…'} />}
@@ -450,6 +452,9 @@ export function ScheduleManager(props: {
       />
       <ScheduleEditDialog
         editing={editing}
+        existing={
+          !!editing && !!ledger?.schedules.some((item) => item.definition.id === editing.id)
+        }
         template={template}
         projects={projects}
         projectId={projectId}

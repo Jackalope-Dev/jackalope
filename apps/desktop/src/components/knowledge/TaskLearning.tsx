@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import type { TaskRun } from '../../lib/run-types';
-import { taskTitle } from '../../lib/task-title';
+import { runTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
@@ -104,7 +104,7 @@ export function TaskLearning({ run, allowSave = false }: { run: TaskRun; allowSa
                       'workflow',
                       run.id,
                     );
-                    entry.title = taskTitle(run.prompt).slice(0, 100);
+                    entry.title = runTitle(run).slice(0, 100);
                     entry.process = {
                       inputs: Object.keys(run.contract?.inputs ?? {}),
                       steps: (run.contract?.requirements ?? [])

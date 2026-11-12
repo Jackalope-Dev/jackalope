@@ -1,4 +1,4 @@
-import { Button, Popover, RefreshIcon } from '@jackalope/ui';
+import { Button, Popover, RefreshIcon, Tooltip } from '@jackalope/ui';
 import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -95,12 +95,24 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
     const windows = record.windows.map((window) => ({
       ...capacityWindowDisplay(record, window, now),
       name: capacityWindowName(window),
+      resetsAt: window.resetsAt,
     }));
     const limiting =
       windows.find((window) => window.remaining === null) ??
       windows.sort((a, b) => (a.remaining ?? 100) - (b.remaining ?? 100))[0];
     return { record, ...limiting };
   });
+  // What each meter measures: the agent's most limiting allowance window and when it resets.
+  const describe = (summary: (typeof summaries)[number]) => {
+    const agent = agentName(summary.record.agent);
+    if (summary.remaining == null) return `${agent}: ${summary.label ?? 'Not reported'}`;
+    const window = (summary.name ?? 'account allowance').toLowerCase();
+    const resets =
+      summary.resetsAt != null && summary.resetsAt * 1000 > now
+        ? `, resets ${resetsIn(summary.resetsAt * 1000 - now)}`
+        : '';
+    return `${agent}: ${summary.label} in the ${window}${resets}`;
+  };
   const label = remote ? 'This computer’s quota' : 'Usage & quota';
   const refresh = () => {
     setNow(Date.now());
@@ -115,42 +127,51 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
         }
       }}
     >
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className="statusbar-usage"
-          aria-label={[
-            label,
-            ...summaries.map(
-              (summary) => `${agentName(summary.record.agent)}: ${summary.label ?? 'Not reported'}`,
-            ),
-          ].join(', ')}
-        >
-          <Gauge size={15} aria-hidden="true" />
-          {!summaries.length && <span className="statusbar-usage-label">{label}</span>}
-          {summaries.slice(0, 2).map((summary) => (
-            <span
-              key={summary.record.agent}
-              className="statusbar-quota"
-              data-tone={summary.tone ?? 'unknown'}
-              title={`${agentName(summary.record.agent)} · ${summary.name ?? 'Account allowance'} · ${summary.label ?? 'Not reported'}`}
-            >
-              <ProviderMark provider={summary.record.agent} size={16} />
-              <span className="statusbar-quota-readout">
-                <span>
-                  {summary.remaining == null
-                    ? '—'
-                    : `${summary.remaining.toLocaleString(undefined, { maximumFractionDigits: summary.remaining < 10 ? 1 : 0 })}%`}
-                </span>
-                <AllowanceMeter remaining={summary.remaining ?? null} label="" compact />
-              </span>
+      <Tooltip
+        side="top"
+        content={
+          summaries.length ? (
+            <span className="statusbar-usage-tooltip">
+              {summaries.map((summary) => (
+                <span key={summary.record.agent}>{describe(summary)}</span>
+              ))}
             </span>
-          ))}
-          {summaries.length > 2 && (
-            <span className="statusbar-quota-more">+{summaries.length - 2}</span>
-          )}
-        </button>
-      </Popover.Trigger>
+          ) : (
+            label
+          )
+        }
+      >
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            className="statusbar-usage"
+            aria-label={[label, ...summaries.map(describe)].join('. ')}
+          >
+            <Gauge size={15} aria-hidden="true" />
+            {!summaries.length && <span className="statusbar-usage-label">{label}</span>}
+            {summaries.slice(0, 2).map((summary) => (
+              <span
+                key={summary.record.agent}
+                className="statusbar-quota"
+                data-tone={summary.tone ?? 'unknown'}
+              >
+                <ProviderMark provider={summary.record.agent} size={16} />
+                <span className="statusbar-quota-readout">
+                  <span>
+                    {summary.remaining == null
+                      ? '—'
+                      : `${summary.remaining.toLocaleString(undefined, { maximumFractionDigits: summary.remaining < 10 ? 1 : 0 })}%`}
+                  </span>
+                  <AllowanceMeter remaining={summary.remaining ?? null} label="" compact />
+                </span>
+              </span>
+            ))}
+            {summaries.length > 2 && (
+              <span className="statusbar-quota-more">+{summaries.length - 2}</span>
+            )}
+          </button>
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Content
           className="statusbar-allowances"

@@ -24,17 +24,25 @@ import {
   Radio,
 } from 'lucide-react';
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-
+import { projectNameHints } from '../../lib/project-name-hints';
 import {
   matchesWorkFilter,
+  needsYou,
+  OPEN_SECTION_LIMIT,
   type WorkItem,
   workGroup,
   workGroups,
   workPresence,
+  workRowStatus,
   workShape,
 } from '../../lib/task-collection';
+import { workProjectId } from '../../lib/work-selection';
+import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useChangeStats } from '../../stores/workSignalsStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
+import { useProjectWork } from '../layout/WorkSidebar';
+import { ProjectMark } from '../projects/ProjectMark';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './task-collection.css';
 import { describeError } from '@jackalope/contracts/errors';
@@ -52,6 +60,7 @@ export function TaskCollection({
   view,
   onViewChange,
   scope,
+  menuItems,
   emptyState,
   archived = false,
   onArchivedChange,
@@ -62,6 +71,8 @@ export function TaskCollection({
   view: TaskCollectionView;
   onViewChange: (view: TaskCollectionView) => void;
   scope?: ReactNode;
+  /** The page's own commands, listed first in the toolbar's work menu. */
+  menuItems?: ReactNode;
   emptyState?: ReactNode;
   archived?: boolean;
   /** Switches between current and archived work from the organize menu. */
@@ -100,8 +111,7 @@ export function TaskCollection({
   const selected = eligible.filter((item) => selection.includes(item.id));
   const finished = eligible.filter((item) => item.stage === 'finished');
   const canArchiveFinished = !!onArchive && !archived && finished.length > 0;
-  const hasOrganizeItems =
-    (!!onArchive && !selecting) || canArchiveFinished || (!!onArchivedChange && !archived);
+  const hasOrganizeItems = (!!onArchive && !selecting) || canArchiveFinished;
   const changeArchive = async (targets: WorkItem[], archive: boolean) => {
     if (!onArchive || pending.current || !targets.length) return;
     pending.current = true;
@@ -126,6 +136,41 @@ export function TaskCollection({
   };
   const signals = useWorkSignals();
   const openKey = useOpenSignalKey();
+  const projects = useProjectStore((state) => state.projects);
+  const activeProjectId = useProjectStore((state) => state.activeProjectId);
+  const workScope = useWorkViewStore((state) => state.scope);
+  const projectWork = useProjectWork();
+  // Counted from the same work as the sidebar's Work badge, so the two always agree.
+  const elsewhere =
+    workScope === 'project' && activeProjectId && !archived
+      ? [...projectWork]
+          .filter(([projectId]) => projectId !== activeProjectId)
+          .flatMap(([, work]) => work)
+          .filter(needsYou).length
+      : 0;
+  const elsewhereLine = elsewhere > 0 && (
+    <p className="work-elsewhere">
+      {elsewhere} more {elsewhere === 1 ? 'needs' : 'need'} you in other projects ·{' '}
+      <button
+        type="button"
+        className="work-elsewhere-action"
+        onClick={() => useWorkViewStore.getState().setScope('all')}
+      >
+        Show all
+      </button>
+    </p>
+  );
+  // Small sections open by default; a toggle the person makes holds until the page reloads.
+  const [finishedChoice, setFinishedChoice] = useState<boolean | null>(null);
+  // Rows name their project only when the list spans more than one.
+  const rowProjects = useMemo(() => {
+    const ids = new Set(items.map(workProjectId).filter(Boolean));
+    if (ids.size < 2) return new Map<string, RowProject>();
+    const hints = projectNameHints(projects);
+    return new Map(
+      projects.map((project) => [project.id, { project, hint: hints.get(project.id) }]),
+    );
+  }, [items, projects]);
   // Bounded so a long history does not trigger many Git reads at once.
   const stats = useChangeStats(archived ? [] : filtered.slice(0, 60).map((item) => item.run));
   const card = (item: WorkItem) => (
@@ -150,6 +195,7 @@ export function TaskCollection({
         disabled={busy}
         unread={isUnread(item, signals, openKey)}
         stats={item.run ? stats[item.run.id]?.value : undefined}
+        project={rowProjects.get(workProjectId(item) ?? '')}
       />
       {onArchive && !selecting && (
         <Button
@@ -183,13 +229,23 @@ export function TaskCollection({
           onValueChange={(value) => setQuery(value)}
           containerClassName="work-search"
         />
-        <Select aria-label="Filter tasks by status" value={filter} onValueChange={setFilter}>
+        <Select
+          aria-label="Filter tasks by status"
+          value={archived ? ARCHIVED_FILTER : filter}
+          onValueChange={(value) => {
+            if (value === ARCHIVED_FILTER) return onArchivedChange?.(true);
+            if (archived) onArchivedChange?.(false);
+            setFilter(value);
+          }}
+        >
           <SelectItem value="all">All statuses</SelectItem>
-          {workGroups.map((stage) => (
-            <SelectItem key={stage.id} value={stage.id}>
-              {stage.label} · {items.filter((item) => matchesWorkFilter(item, stage.id)).length}
-            </SelectItem>
-          ))}
+          {!archived &&
+            workGroups.map((stage) => (
+              <SelectItem key={stage.id} value={stage.id}>
+                {stage.label} · {items.filter((item) => matchesWorkFilter(item, stage.id)).length}
+              </SelectItem>
+            ))}
+          {onArchivedChange && <SelectItem value={ARCHIVED_FILTER}>Archived</SelectItem>}
         </Select>
         <SegmentedControl
           className="work-layout"
@@ -217,23 +273,21 @@ export function TaskCollection({
             },
           ]}
         />
-        {(onArchive || onArchivedChange) && (
+        {(menuItems || hasOrganizeItems) && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button
-                ref={actionFocus}
-                variant="ghost"
-                aria-label="Organize work"
-                disabled={busy || !hasOrganizeItems}
-              >
+              <Button ref={actionFocus} variant="ghost" aria-label="Work actions">
                 <MoreHorizontal size={18} />
               </Button>
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                {menuItems}
+                {menuItems && hasOrganizeItems && <Menu.Separator className="menu-separator" />}
                 {onArchive && !selecting && (
                   <Menu.Item
                     className="workspace-menu-item"
+                    disabled={busy}
                     onSelect={() => {
                       setSelecting(true);
                       setSelection([]);
@@ -246,25 +300,12 @@ export function TaskCollection({
                 {canArchiveFinished && (
                   <Menu.Item
                     className="workspace-menu-item"
+                    disabled={busy}
                     onSelect={() => void changeArchive(finished, true)}
                   >
                     <Archive size={16} />
                     Archive finished ({finished.length})
                   </Menu.Item>
-                )}
-                {onArchivedChange && !archived && (
-                  <>
-                    {onArchive && (!selecting || canArchiveFinished) && (
-                      <Menu.Separator className="menu-separator" />
-                    )}
-                    <Menu.Item
-                      className="workspace-menu-item"
-                      onSelect={() => onArchivedChange(true)}
-                    >
-                      <ArchiveRestore size={16} />
-                      Show archived work
-                    </Menu.Item>
-                  </>
                 )}
               </Menu.Content>
             </Menu.Portal>
@@ -339,17 +380,23 @@ export function TaskCollection({
         </div>
       )}
       {!items.length && emptyState ? (
-        emptyState
+        <>
+          {emptyState}
+          {elsewhereLine}
+        </>
       ) : !filtered.length ? (
-        <EmptyState
-          icon={ListTodo}
-          title={items.length ? 'No matching tasks' : 'Room for your next task'}
-          description={
-            items.length
-              ? 'Try another stage or search.'
-              : 'Start a task now, or save a draft for later. Its work and review stay here.'
-          }
-        />
+        <>
+          <EmptyState
+            icon={ListTodo}
+            title={items.length ? 'No matching tasks' : 'Room for your next task'}
+            description={
+              items.length
+                ? 'Try another stage or search.'
+                : 'Start a task now, or save a draft for later. Its work and review stay here.'
+            }
+          />
+          {elsewhereLine}
+        </>
       ) : layout === 'list' ? (
         <fieldset
           className="work-list"
@@ -379,6 +426,7 @@ export function TaskCollection({
             rows[next]?.focus();
           }}
         >
+          {!filtered.some((item) => matchesWorkFilter(item, 'attention')) && elsewhereLine}
           {workGroups.map((stage) => {
             const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
             if (!stageItems.length) return null;
@@ -392,39 +440,59 @@ export function TaskCollection({
               !query.trim() &&
               !selecting &&
               !archived ? (
-              <Disclosure key={stage.id} className="work-group work-finished">
+              <Disclosure
+                key={stage.id}
+                className="work-group work-finished"
+                open={finishedChoice ?? stageItems.length <= OPEN_SECTION_LIMIT}
+                onToggle={(event) => {
+                  const open = event.currentTarget.open;
+                  // React setting `open` also fires toggle; only a change away from it is a choice.
+                  if (open !== (finishedChoice ?? stageItems.length <= OPEN_SECTION_LIMIT))
+                    setFinishedChoice(open);
+                }}
+              >
                 <DisclosureSummary>{heading}</DisclosureSummary>
                 {stageItems.map(card)}
               </Disclosure>
             ) : (
               <section key={stage.id} className="work-group" aria-label={stage.label}>
                 <h2>{heading}</h2>
-                {stageItems.map(card)}
+                {stage.id === 'attention' ? (
+                  <>
+                    {needsYouRows(stageItems, card)}
+                    {elsewhereLine}
+                  </>
+                ) : (
+                  stageItems.map(card)
+                )}
               </section>
             );
           })}
         </fieldset>
       ) : (
-        <div className="work-board">
-          {workGroups
-            .filter((stage) => filter === 'all' || filter === stage.id)
-            .map((stage) => {
-              const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
-              return (
-                <section key={stage.id} className="work-column" aria-label={stage.label}>
-                  <h2>
-                    {stage.label}
-                    <span>{stageItems.length}</span>
-                  </h2>
-                  {stageItems.length ? (
-                    stageItems.map(card)
-                  ) : (
-                    <p className="work-column-empty">Nothing here yet</p>
-                  )}
-                </section>
-              );
-            })}
-        </div>
+        <>
+          {elsewhereLine}
+          <div className="work-board">
+            {workGroups
+              .filter((stage) => filter === 'all' || filter === stage.id)
+              .map((stage) => {
+                const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
+                return (
+                  <section key={stage.id} className="work-column" aria-label={stage.label}>
+                    <h2>
+                      {stage.label}
+                      <span>{stageItems.length}</span>
+                    </h2>
+                    {stageItems.length ? (
+                      stageItems.map(card)
+                    ) : (
+                      <p className="work-column-empty">Nothing here yet</p>
+                    )}
+                  </section>
+                );
+              })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -439,11 +507,37 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'short',
   timeStyle: 'medium',
 });
-/** The row's single next-step line: why it needs you, otherwise what opening it does. */
+const OLDER_MS = 7 * 24 * 60 * 60 * 1000;
+/** The status filter's entry for the archived view, which the parent owns. */
+const ARCHIVED_FILTER = 'archived';
+
+/** Needs-you rows, with ones untouched for a week under a quiet "Older" subheading. */
+function needsYouRows(items: WorkItem[], card: (item: WorkItem) => ReactNode) {
+  const cutoff = Date.now() - OLDER_MS;
+  const older = items
+    .filter((item) => Date.parse(item.date) < cutoff)
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  if (!older.length || older.length === items.length) return items.map(card);
+  return (
+    <>
+      {items.filter((item) => !older.includes(item)).map(card)}
+      <h3 className="work-subgroup">Older</h3>
+      {older.map(card)}
+    </>
+  );
+}
+
+interface RowProject {
+  project: Project;
+  hint?: string;
+}
+
+/** The row's next step, always a verb; why it needs you reads in the meta line. */
 function workRowAction(item: WorkItem, action: string) {
   if (!item.run && !item.session && !item.managed && item.idea?.runId) return 'History unavailable';
-  return item.stage === 'attention' && item.statusLabel ? item.statusLabel : action;
+  return action;
 }
+
 const WorkCard = memo(
   function WorkCard({
     item,
@@ -451,15 +545,19 @@ const WorkCard = memo(
     disabled,
     unread,
     stats,
+    project,
   }: {
     unread: boolean;
     stats?: ChangeStats;
+    project?: RowProject;
     item: WorkItem;
     onOpen: (item: WorkItem) => void;
     disabled: boolean;
   }) {
     const presence = workPresence(item);
     const date = new Date(item.date);
+    const action = workRowAction(item, presence.action);
+    const status = workRowStatus(item, action);
     return (
       <button
         id={`work-item-${item.id}`}
@@ -482,7 +580,20 @@ const WorkCard = memo(
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
             <span className="work-item-meta-text">
+              {project && (
+                <>
+                  <span className="work-item-project">
+                    <ProjectMark project={project.project} />
+                    {project.project.name}
+                    {project.hint && (
+                      <span className="work-item-project-hint"> {project.hint}</span>
+                    )}
+                  </span>
+                  {' · '}
+                </>
+              )}
               {workShape(item)}
+              {status && ` · ${status}`}
               {!Number.isNaN(date.getTime()) && (
                 <>
                   {' · '}
@@ -496,7 +607,7 @@ const WorkCard = memo(
           </span>
         </span>
         <span className="work-item-action">
-          {workRowAction(item, presence.action)}
+          {action}
           <ChevronRight size={14} aria-hidden="true" />
         </span>
       </button>
@@ -507,6 +618,7 @@ const WorkCard = memo(
     before.disabled === after.disabled &&
     before.unread === after.unread &&
     before.stats === after.stats &&
+    before.project === after.project &&
     before.item.id === after.item.id &&
     before.item.title === after.item.title &&
     before.item.stage === after.item.stage &&

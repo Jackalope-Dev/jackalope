@@ -225,7 +225,7 @@
   align-items: stretch;
   justify-content: flex-start;
   gap: 2px;
-  padding: 8px 6px 6px;
+  padding: 6px;
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid var(--color-border-subtle);
@@ -239,25 +239,16 @@
   gap: 4px;
   margin-bottom: 6px;
 }
+/* The shared primary button (ui-button) supplies fill and edge; this lays the label out in
+   line with the navigation items below. The top controls sit in the pane's corners, 6px
+   inside its 18px radius, so they take the concentric 12px radius. */
 .workspace-new-work {
   flex: 1;
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-.workspace-new-work:hover {
-  background: var(--color-surface-hover);
+  border-radius: var(--radius-lg);
 }
 .workspace-nav-toggle,
 .project-tree-action,
@@ -275,6 +266,7 @@
 .workspace-nav-toggle {
   width: 32px;
   height: 32px;
+  border-radius: var(--radius-lg);
 }
 span.project-tree-toggle {
   cursor: default;
@@ -303,9 +295,12 @@ button.project-tree-toggle:hover {
   height: 16px;
   flex-shrink: 0;
 }
+/* Sits in the pane's bottom corner, 6px inside its 18px radius, so it takes the concentric
+   12px like New work in the top corner. */
 .workspace-shell .workspace-settings {
   margin-top: auto;
   flex-shrink: 0;
+  border-radius: var(--radius-lg);
 }
 /* Bot replies the person has not opened; counts are reserved for things waiting on them. */
 .workspace-shell .workspace-nav-item[data-unread] > span {
@@ -348,6 +343,26 @@ button.project-tree-toggle:hover {
 .project-tree-action {
   width: 24px;
   height: 24px;
+}
+/* Bots and Agents are set up once and visited occasionally, so they sit together above
+   Settings, below the projects; the heading matches Projects. */
+.workspace-setup {
+  flex-shrink: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.workspace-nav-heading {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-heading {
+  display: none;
 }
 .project-tree-group + .project-tree-group {
   margin-top: 2px;
@@ -412,6 +427,16 @@ button.project-tree-toggle:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Parent folders that tell same-named projects apart; it gives up its width before the name. */
+.project-tree-hint {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 .project-tree-counts {
   display: inline-flex;
@@ -494,6 +519,11 @@ button.project-tree-toggle:hover {
   [data-stage="working"]
 ):not([aria-current="page"]) {
   color: var(--color-text-primary);
+}
+/* "N more" stands in for the project's finished and idle work; quieter than live rows. */
+.work-sidebar-item.work-sidebar-more {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 .work-sidebar-title {
   flex: 1;
@@ -1009,15 +1039,6 @@ button.project-tree-toggle:hover {
   color: var(--color-accent-ink);
   font-weight: 600;
 }
-.workspace-statusbar .statusbar-project {
-  max-width: 200px;
-  padding: 0 2px 0 8px;
-  overflow: hidden;
-  color: var(--color-text-primary);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 /* Touch and other coarse pointers keep 44px targets in the dense navigation. */
 @media (pointer: coarse) {
   .workspace-shell .workspace-navigation .workspace-nav-item,
@@ -1057,8 +1078,15 @@ html[data-window-glass]
   outline-offset: -1px;
   box-shadow: var(--glass-shadow);
 }
-html[data-window-glass] .workspace-shell .workspace-navigation {
-  background: var(--glass-pane-dense);
+html[data-window-glass]
+  .workspace-shell
+  :is(
+    .workspace-navigation,
+    .workspace-statusbar,
+    .app-titlebar-center .command-trigger.command-jump
+  ) {
+  --color-text-muted: var(--color-text-secondary);
+  background: var(--glass-chrome);
 }
 html[data-window-glass] .workspace-shell .workspace-canvas {
   background: var(--glass-page);
@@ -1068,10 +1096,8 @@ html[data-window-glass] .workspace-shell .workspace-statusbar {
   /* Side padding keeps the first and last items (the mascot's badge) inside the rounded corners. */
   padding: 2px 6px;
   border-radius: var(--radius-lg);
-  background: var(--glass-pane-dense);
 }
 html[data-window-glass] .workspace-shell .app-titlebar-center .command-trigger.command-jump {
-  background: var(--glass-pane-dense);
   backdrop-filter: none;
 }
 

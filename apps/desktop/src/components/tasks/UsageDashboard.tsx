@@ -18,7 +18,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { countedTaskDecisions } from '../../lib/decision-usage';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { taskTitle } from '../../lib/task-title';
+import { runTitle } from '../../lib/task-title';
 import { usageEntries } from '../../lib/usage-entries';
 import {
   type HelperAccountingTurn,
@@ -532,7 +532,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                           onTask();
                         }}
                       >
-                        {taskTitle(task.run.prompt)}
+                        {runTitle(task.run)}
                       </button>
                       <small>{task.run.projectName}</small>
                     </td>
@@ -587,7 +587,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                           onTask();
                         }}
                       >
-                        {taskTitle(run.prompt)}
+                        {runTitle(run)}
                       </button>
                       <span className="task-muted text-xs block mt-1">
                         {run.projectName} · {new Date(run.startedAt).toLocaleDateString()}

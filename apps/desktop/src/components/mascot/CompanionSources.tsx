@@ -1,6 +1,7 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { useEffect, useMemo, useState } from 'react';
 import { navigateWorkspace, openSettings } from '../../lib/app-events';
+import { markAnnounced } from '../../lib/companion-announce';
 import { taskNotices } from '../../lib/companion-tasks';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -8,6 +9,7 @@ import { type PlanSummary, planCommands } from '../../lib/plan-mode';
 import type { TaskRun } from '../../lib/run-types';
 import { openRun, selectWork } from '../../lib/work-selection';
 import { useBotStore } from '../../stores/botStore';
+import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { usePlanStore } from '../../stores/planStore';
@@ -119,6 +121,20 @@ export function CompanionSources() {
   );
   const viewing = useWorkViewStore((state) => state.viewing);
   useCompanionNotices('tasks', taskNotices(runs, openCompanionTask, viewing));
+  // A task the person opens is seen: its notice counts as read and never pops up afterwards.
+  const viewedRun = viewing ? runs.find((item) => item.id === viewing) : undefined;
+  const viewed = viewedRun
+    ? taskNotices([viewedRun], () => {})
+        .map((notice) => notice.id)
+        .join('\n')
+    : '';
+  useEffect(() => {
+    if (!viewed) return;
+    const ids = viewed.split('\n');
+    markAnnounced(ids);
+    const { readIds, markRead } = useCompanionStore.getState();
+    if (ids.some((id) => !readIds.includes(id))) markRead(ids);
+  }, [viewed]);
   // Deviations are recorded as attempts report, so re-read plans when runs change.
   const runSignal = useMemo(() => runs.map((run) => `${run.id}:${run.status}`).join(), [runs]);
   const [waitingPlans, setWaitingPlans] = useState<PlanSummary[]>([]);

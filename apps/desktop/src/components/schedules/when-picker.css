@@ -1,0 +1,104 @@
+/* Repeat, then only that choice's fields on one row, then the summary of what it means. */
+.when-picker {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.when-picker-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+}
+.when-picker-field {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.when-picker-field > button {
+  min-width: 9rem;
+}
+/* Short values get inputs sized to their content, per the setup-screen rules. */
+.when-picker-time {
+  width: 8.5rem;
+}
+.when-picker-minute {
+  width: 5.5rem;
+}
+.when-picker-cron {
+  flex: 1 1 18rem;
+}
+.when-picker-cron input {
+  font-family: var(--font-mono);
+}
+.when-picker-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.when-picker-day {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: var(--control-height, 36px);
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.when-picker-day:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.when-picker-day:has(input:checked) {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+.when-picker-day:has(input:focus-visible) {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.when-picker-summary {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.when-picker-summary > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-accent-ink);
+}
+.when-picker-summary strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+.when-picker-summary p {
+  margin: 2px 0 0;
+}
+.when-picker-runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.when-picker-runs li {
+  font-variant-numeric: tabular-nums;
+}
+.when-picker-zone {
+  font-size: var(--text-xs);
+}

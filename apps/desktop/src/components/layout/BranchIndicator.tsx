@@ -98,7 +98,7 @@ function useSwitchTargets(checkout: string) {
   return targets;
 }
 
-/** The branch in focus, in the status bar beside the project name, with where it lives and what to do with it. */
+/** The branch in focus, in the status bar; the page header names the scope, so the trigger names the project only in its label. */
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
   const targets = useSwitchTargets(checkout);
@@ -116,7 +116,12 @@ export function BranchIndicator() {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
+        <button
+          type="button"
+          className="chrome-branch"
+          title={`${project.name} · Branch: ${branch}`}
+          aria-label={`${project.name}, branch ${branch}`}
+        >
           <GitBranch size={14} aria-hidden="true" />
           <span className="chrome-branch-name">{branchLabel(branch)}</span>
           <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />

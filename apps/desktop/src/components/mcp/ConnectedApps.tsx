@@ -4,11 +4,11 @@ import {
   ConfirmDialog,
   ExternalLinkIcon,
   InlineNotice,
-  Input,
   LinkButton,
   LoadingState,
   DropdownMenu as Menu,
   SearchField,
+  SecretField,
   SegmentedControl,
 } from '@jackalope/ui';
 import { Blocks, ExternalLink, KeyRound, MoreHorizontal } from 'lucide-react';
@@ -163,16 +163,21 @@ function KeySetup({ onSaved }: { onSaved: (status: ComposioStatus) => void }) {
                 }
               }}
             >
-              <Input
-                type="password"
-                aria-label="Composio project key"
-                aria-invalid={error ? true : undefined}
-                autoComplete="off"
-                spellCheck={false}
+              <SecretField
+                label="Composio project key"
+                className="connected-apps-key-field"
                 placeholder="ak_…"
                 value={key}
-                onChange={(event) => setKey(event.target.value)}
+                onValueChange={setKey}
                 required
+                check={(value) =>
+                  value.trim().startsWith('ak_')
+                    ? { tone: 'ok', message: 'Looks like a Composio project key.' }
+                    : {
+                        tone: 'info',
+                        message: 'Project keys start with ak_. Saving checks it with Composio.',
+                      }
+                }
               />
               <Button
                 type="submit"

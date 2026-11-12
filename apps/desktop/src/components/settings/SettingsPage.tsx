@@ -3,38 +3,35 @@ import {
   FormField,
   Input,
   SearchField,
-  SegmentedControl,
-  Select,
-  SelectItem,
   SettingActions,
   SettingBody,
   SettingGroup,
   SettingRow,
-  Switch,
 } from '@jackalope/ui';
-import { KeyRound } from 'lucide-react';
+import { ArrowUpRight, KeyRound } from 'lucide-react';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { navigateWorkspace, openDevices } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
-import { ProjectPreferences } from '../projects/ProjectPreferences';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
+import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
-import { RoutingPreferences } from './RoutingSetup';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
@@ -51,21 +48,27 @@ import { ArtifactsConnection } from './ArtifactsConnection';
 import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
-import { RemoteAccess } from './RemoteAccess';
-import { SavedActions } from './SavedActions';
+import { SwarmSettings } from './SwarmConnection';
+
+/** Opens the page a settings entry stands for; Devices lands on sharing this computer. */
+function openCategoryPage(category: SettingsCategory) {
+  const page = settingsCategory(category).page;
+  if (page === 'remote-hosts') openDevices('share');
+  else if (page) navigateWorkspace(page);
+}
 
 interface SettingsPageProps {
   onClose: () => void;
-  initialScope?: 'app' | 'project';
+  /** The project a project link (openProjectSettings) asked about. */
   initialProjectId?: string;
   initialCategory?: SettingsCategory;
 }
-export function SettingsPage({
-  onClose,
-  initialScope = 'app',
-  initialCategory,
-  initialProjectId,
-}: SettingsPageProps) {
+/**
+ * App-wide settings. Project links redirect: a project's settings open its page's Settings
+ * tab, its routing opens Agents → Routing scoped to it, and its appearance opens here with
+ * that project's override.
+ */
+export function SettingsPage({ onClose, initialCategory, initialProjectId }: SettingsPageProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -73,19 +76,20 @@ export function SettingsPage({
   const settings = useSettingsStore();
   const agents = useAgentConfigStore();
   const { currentTheme } = useThemeStore(useShallow((s) => ({ currentTheme: s.currentTheme })));
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const [scope, setScope] = useState<'app' | 'project'>(initialScope);
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    initialProjectId ?? activeProjectId ?? '',
-  );
-  const project = projects.find((project) => project.id === selectedProjectId);
-  const scopedCategories = SETTINGS_CATEGORIES.filter((entry) =>
-    scope === 'project' ? 'project' in entry : !('app' in entry),
-  ).map((entry) => entry.id);
+  const selectProject = useProjectStore((s) => s.selectProject);
+  const redirect =
+    initialProjectId && (initialCategory === 'Project' || initialCategory === 'Routing');
+  useLayoutEffect(() => {
+    if (!initialProjectId || !redirect) return;
+    selectProject(initialProjectId);
+    if (initialCategory === 'Routing') {
+      useAgentScopeStore.getState().setScope('project');
+      navigateWorkspace('routing');
+    } else navigateWorkspace('project-settings');
+  }, [initialProjectId, initialCategory, redirect, selectProject]);
+  const categories = SETTINGS_CATEGORIES.map((entry) => entry.id);
   const [category, setCategory] = useState<SettingsCategory>(
-    initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
+    initialCategory && !redirect ? initialCategory : 'General',
   );
   const selectedSection = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -106,7 +110,10 @@ export function SettingsPage({
           .toLowerCase()
           .includes(query.trim().toLowerCase())
       : sidebarCategory(section) === sidebarCategory(category);
-  const visible = scopedCategories.filter(matches);
+  // Search-only entries (hidden) appear for a query, never as the open page.
+  const visible = categories.filter(
+    (c) => matches(c) && (query.trim() !== '' || !('hidden' in settingsCategory(c))),
+  );
   const exportConfig = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -161,48 +168,11 @@ export function SettingsPage({
         General, appearance, agents, privacy, project preferences and local data. Changes save
         immediately unless a Save button is shown.
       </p>
-      <div className="settings-scope-bar">
-        <SegmentedControl
-          label="Settings scope"
-          value={scope}
-          onChange={(value) => {
-            setScope(value);
-            setCategory(value === 'app' ? 'General' : 'Project');
-            setQuery('');
-          }}
-          items={[
-            { id: 'app', label: 'App-wide' },
-            { id: 'project', label: 'Per project' },
-          ]}
-        />
-        {scope === 'project' && (
-          <Select
-            aria-label="Project to configure"
-            value={selectedProjectId || '__none'}
-            onValueChange={setSelectedProjectId}
-          >
-            {!projects.length && (
-              <SelectItem value="__none" disabled>
-                No projects added
-              </SelectItem>
-            )}
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </Select>
-        )}
-        {scope === 'project' && <p className="task-muted">App-wide restrictions still apply.</p>}
-      </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
           {SETTINGS_GROUPS.map((group) => {
             const items = SETTINGS_CATEGORIES.filter(
-              (entry) =>
-                entry.group === group &&
-                !('within' in entry) &&
-                scopedCategories.includes(entry.id),
+              (entry) => entry.group === group && !('within' in entry) && !('hidden' in entry),
             );
             if (!items.length) return null;
             return (
@@ -211,6 +181,24 @@ export function SettingsPage({
                 {items.map((entry) => {
                   const c = entry.id;
                   const Icon = ('icon' in entry && entry.icon) || KeyRound;
+                  const opensPage = 'page' in entry;
+                  if (opensPage)
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        className="settings-nav-item settings-nav-link"
+                        onClick={() => openCategoryPage(c)}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {c}
+                        <ArrowUpRight
+                          size={14}
+                          aria-hidden="true"
+                          className="settings-nav-link-icon"
+                        />
+                      </button>
+                    );
                   return (
                     <button
                       key={c}
@@ -243,23 +231,27 @@ export function SettingsPage({
               ref={c === category ? selectedSection : undefined}
             >
               <WorkspaceSectionHeading title={c === 'Project' ? 'Project settings' : c} />
+              {settingsCategory(c).page && (
+                <SettingGroup>
+                  <SettingRow title={c} description={settingsCategory(c).summary}>
+                    <Button variant="outline" onClick={() => openCategoryPage(c)}>
+                      Open {c === 'Project' ? 'project settings' : c}
+                      <ArrowUpRight size={14} aria-hidden="true" />
+                    </Button>
+                  </SettingRow>
+                </SettingGroup>
+              )}
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
               {c === 'Connected work' && <IssueConnections />}
               {c === 'Computers' && <ComputersSettings />}
               {c === 'Cloudflare' && <ArtifactsConnection />}
-              {c === 'Desktop' && <DesktopPreferences />}
-              {c === 'Saved actions' && <SavedActions />}
-              {c === 'Remote access' && <RemoteAccess />}
+              {c === 'Swarm' && <SwarmSettings />}
+              {c === 'Editor & terminal' && <DesktopPreferences />}
+              {c === 'Keyboard shortcuts' && <KeyboardShortcuts />}
               {c === 'Invitations' && (
                 <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
-              )}
-              {c === 'Decisions' && (
-                <RoutingPreferences
-                  key={scope === 'project' ? project?.id : 'app'}
-                  projectId={scope === 'project' ? project?.id : undefined}
-                />
               )}
               {c === 'General' && (
                 <>
@@ -283,39 +275,11 @@ export function SettingsPage({
                   </SettingGroup>
                 </>
               )}
-              {c === 'Appearance' && (scope === 'app' || project) && (
-                <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />
-              )}
-              {c === 'Privacy' && (
-                <>
-                  <PrivacySettings />
-                  <SettingGroup>
-                    <SettingRow
-                      title="Use MCP marketplace"
-                      description="Allow searches and server details from allmcps.com."
-                    >
-                      <Switch
-                        label="Use MCP marketplace"
-                        checked={settings.useMcpMarketplace}
-                        onCheckedChange={settings.setUseMcpMarketplace}
-                      />
-                    </SettingRow>
-                    <SettingBody>
-                      <p className="settings-row-description">
-                        Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
-                        which publicly logs requests. Your connected agents and MCP servers use
-                        their own services.
-                      </p>
-                    </SettingBody>
-                  </SettingGroup>
-                </>
-              )}
-              {c === 'Project' && (
-                <ProjectPreferences embedded projectId={project?.id ?? '__none'} />
-              )}
+              {c === 'Appearance' && <AppearancePreferences overrideProjectId={initialProjectId} />}
+              {c === 'Privacy' && <PrivacySettings />}
               {c === 'System' && <SystemInfoView />}
               {c === 'Diagnostics' && <AuditLogWorkspace />}
-              {c === 'Updates & support' && <ReleaseSupport />}
+              {c === 'Help & community' && <ReleaseSupport />}
               {c === 'Data & reset' && (
                 <>
                   <SettingGroup>
@@ -332,9 +296,28 @@ export function SettingsPage({
                   <SettingGroup
                     tone="danger"
                     title="Reset Jackalope"
-                    description="Erase this profile's projects, task history, drafts, queue, audit log, agent selections and appearance. Jackalope restarts for first-time setup. Repositories, worktrees, external agent sign-ins and agent MCP configuration files are preserved."
+                    description="Start this profile over. Jackalope restarts for first-time setup."
                   >
                     <SettingBody>
+                      <div className="settings-reset-scope">
+                        <div>
+                          <h4>Erased</h4>
+                          <ul>
+                            <li>Projects and their settings</li>
+                            <li>Task history, drafts and queue</li>
+                            <li>Audit log</li>
+                            <li>Agent selections and appearance</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4>Kept</h4>
+                          <ul>
+                            <li>Your repositories and worktrees</li>
+                            <li>Agent sign-ins outside Jackalope</li>
+                            <li>Agent MCP configuration files</li>
+                          </ul>
+                        </div>
+                      </div>
                       <p className="settings-row-description">
                         Stop active tasks and pause queues before resetting. Existing worktrees will
                         remain on disk and can be managed after reopening the repository.
@@ -343,6 +326,7 @@ export function SettingsPage({
                         <FormField label="Type RESET to confirm permanent deletion">
                           <Input
                             id="reset-confirmation"
+                            className="settings-reset-input"
                             autoComplete="off"
                             value={confirmation}
                             disabled={resetting}

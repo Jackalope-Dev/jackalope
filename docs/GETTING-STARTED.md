@@ -8,8 +8,8 @@ supported). Jackalope uses the account already on this computer unless you choos
 isolated account in Agents. Each provider's own subscription and permissions
 still apply.
 
-1. Open a Git repository with at least one commit (Project settings → Cloudflare
-   Artifacts can make the first one). Choose the agent you want.
+1. Open a Git repository with at least one commit (Project settings → Integrations →
+   Cloudflare Artifacts can make the first one). Choose the agent you want.
    Project setup asks for the project, its agents and an optional first-task
    draft. Decisions, Git behavior and appearance start from defaults that you can
    change in Project settings.
@@ -70,7 +70,7 @@ caps. Missing cost reports pause later batches when a cost threshold is set.
   with Jackalope closed, then restart. Existing task results remain readable.
 - **History cannot be read:** open the recovery notice. Jackalope preserves the
   affected file and shows its location; it does not invent a replacement result.
-- **Need help:** Settings → Updates & support → Preview support report. Review its
+- **Need help:** Settings → Help & community → Preview support report. Review its
   contents, describe what happened, then copy it. Share it only through the
   support channel supplied with your release; the app does not send it for you.
 
@@ -81,7 +81,7 @@ have no update service configured.
 ## Keeping Jackalope up to date
 
 Published builds check for updates after startup and every hour while open.
-Open **Settings → Updates & support** to change automatic checking or check now.
+Open **Settings → Help & community** to change automatic checking or check now.
 When an update is available, use **Review update** to read the release notes.
 **Later** dismisses the notice for the current session; the update remains in
 Settings. Finish active work and save task history, then choose **Install update

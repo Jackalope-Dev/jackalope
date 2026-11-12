@@ -2,16 +2,19 @@ import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
   Checkbox,
+  ChoiceCards,
   DialogFooter,
   FormField,
   InlineNotice,
   Input,
+  KeyValueList,
+  SecretField,
   Select,
   SelectItem,
   Switch,
   Textarea,
 } from '@jackalope/ui';
-import { Plus, Trash2 } from 'lucide-react';
+import { Globe, History, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
 import {
   agentNames,
@@ -72,11 +75,11 @@ export function McpConnectionForm({
   );
   const [token, setToken] = useState(initialToken ?? '');
   const [command, setCommand] = useState(initial?.command ?? '');
-  const [args, setArgs] = useState(
+  const [args, setArgs] = useState<{ id: string; value: string }[]>(
     (initial?.args ?? []).map((value) => ({ id: crypto.randomUUID(), value })),
   );
   const [url, setUrl] = useState(initial?.url ?? '');
-  const [env, setEnv] = useState(
+  const [env, setEnv] = useState<{ id: string; key: string; value: string }[]>(
     Object.entries(initial?.env ?? {}).map(([key, value]) => ({
       id: crypto.randomUUID(),
       key,
@@ -217,23 +220,35 @@ export function McpConnectionForm({
               />
             </FormField>
           </div>
-          <fieldset className="mcp-scope-options" aria-label="Connection type">
-            {[
-              { id: 'http', label: 'Remote URL' },
-              { id: 'stdio', label: 'Local command' },
-              ...(transport === 'sse' ? [{ id: 'sse', label: 'Legacy SSE' }] : []),
-            ].map((item) => (
-              <Button
-                type="button"
-                key={item.id}
-                variant={transport === item.id ? 'secondary' : 'outline'}
-                aria-pressed={transport === item.id}
-                onClick={() => setTransport(item.id)}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </fieldset>
+          <ChoiceCards
+            label="Connection type"
+            value={transport}
+            onValueChange={setTransport}
+            options={[
+              {
+                value: 'http',
+                title: 'Remote URL',
+                description: 'A hosted server you reach over HTTPS.',
+                icon: <Globe size={18} />,
+              },
+              {
+                value: 'stdio',
+                title: 'Local command',
+                description: 'A program Jackalope starts on this computer.',
+                icon: <SquareTerminal size={18} />,
+              },
+              ...(transport === 'sse'
+                ? [
+                    {
+                      value: 'sse',
+                      title: 'Legacy SSE',
+                      description: 'An older streaming endpoint this connection already uses.',
+                      icon: <History size={18} />,
+                    },
+                  ]
+                : []),
+            ]}
+          />
           {transport === 'stdio' ? (
             <>
               <p className="task-muted">
@@ -249,43 +264,16 @@ export function McpConnectionForm({
                   required
                 />
               </FormField>
-              <div>
-                <div className="mcp-field-heading">
-                  <h3>Arguments</h3>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setArgs([...args, { id: crypto.randomUUID(), value: '' }])}
-                  >
-                    <Plus size={15} />
-                    Add argument
-                  </Button>
-                </div>
-                {args.map((item, index) => (
-                  <div className="mcp-variable-row" key={item.id}>
-                    <Input
-                      aria-label={`Argument ${index + 1}`}
-                      className="task-input font-mono"
-                      value={item.value}
-                      onChange={(event) =>
-                        setArgs(
-                          args.map((arg) =>
-                            arg.id === item.id ? { ...arg, value: event.target.value } : arg,
-                          ),
-                        )
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      aria-label={`Remove argument ${index + 1}`}
-                      onClick={() => setArgs(args.filter((arg) => arg.id !== item.id))}
-                    >
-                      <Trash2 size={15} />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              <KeyValueList
+                label="Arguments"
+                valuesOnly
+                valuePlaceholder="--flag or value"
+                addLabel="Add argument"
+                rows={args.map((item) => ({ id: item.id, key: '', value: item.value }))}
+                onRowsChange={(rows) =>
+                  setArgs(rows.map((row) => ({ id: row.id, value: row.value })))
+                }
+              />
             </>
           ) : (
             <FormField label="Endpoint URL">
@@ -346,16 +334,14 @@ export function McpConnectionForm({
                 </Select>
               </FormField>
               {authentication === 'token' && (
-                <FormField label="Bearer token">
-                  <Input
-                    type="password"
-                    autoComplete="off"
-                    value={token}
-                    onChange={(event) => setToken(event.target.value)}
-                    required
-                    placeholder="Token from the service"
-                  />
-                </FormField>
+                <SecretField
+                  label="Bearer token"
+                  description="Save and check sends it to the server to confirm it works."
+                  value={token}
+                  onValueChange={setToken}
+                  required
+                  placeholder="Token from the service"
+                />
               )}
               {authentication === 'oauth' && (
                 <InlineNotice>
@@ -380,62 +366,15 @@ export function McpConnectionForm({
                 }}
               />
             </FormField>
-            <div>
-              <div className="mcp-field-heading">
-                <h3>Environment variables</h3>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setEnv([...env, { id: crypto.randomUUID(), key: '', value: '' }])}
-                >
-                  <Plus size={15} />
-                  Add variable
-                </Button>
-              </div>
-              {env.map((item, index) => (
-                <div className="mcp-variable-row" key={item.id}>
-                  <Input
-                    aria-label={`Variable ${index + 1} name`}
-                    className="task-input font-mono"
-                    placeholder="API_TOKEN"
-                    value={item.key}
-                    onChange={(event) =>
-                      setEnv(
-                        env.map((variable) =>
-                          variable.id === item.id
-                            ? { ...variable, key: event.target.value }
-                            : variable,
-                        ),
-                      )
-                    }
-                  />
-                  <Input
-                    aria-label={`Variable ${index + 1} value`}
-                    className="task-input"
-                    type="password"
-                    placeholder="Value"
-                    value={item.value}
-                    onChange={(event) =>
-                      setEnv(
-                        env.map((variable) =>
-                          variable.id === item.id
-                            ? { ...variable, value: event.target.value }
-                            : variable,
-                        ),
-                      )
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    aria-label={`Remove variable ${index + 1}`}
-                    onClick={() => setEnv(env.filter((variable) => variable.id !== item.id))}
-                  >
-                    <Trash2 size={15} />
-                  </Button>
-                </div>
-              ))}
-            </div>
+            <KeyValueList
+              label="Environment variables"
+              keyPlaceholder="API_TOKEN"
+              valuePlaceholder="Value"
+              secretValues
+              addLabel="Add variable"
+              rows={env}
+              onRowsChange={setEnv}
+            />
             <FormField label="Headers and client options (JSON)">
               <Textarea
                 className="font-mono"

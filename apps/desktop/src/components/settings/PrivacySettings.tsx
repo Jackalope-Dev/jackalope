@@ -11,7 +11,9 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { useCommunityStore } from '../../stores/communityStore';
+import { useLessonSyncStore } from '../../stores/lessonSyncStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { ExternalSessionsSetting } from './ExternalSessionsSetting';
 import { SettingsSync } from './SettingsSync';
 
@@ -49,6 +51,7 @@ export function PrivacySettings() {
   }, [community.settings]);
   return (
     <>
+      <PrivacySummary usage={usage} errors={errors} />
       <SettingsSync />
       <SettingGroup
         aria-label="Usage sharing"
@@ -143,5 +146,44 @@ export function PrivacySettings() {
       </SettingGroup>
       {isTauriEnvironment() && <ExternalSessionsSetting />}
     </>
+  );
+}
+
+/**
+ * What leaves this computer, read from the same switches below: nothing here is decorative, and
+ * each line changes as soon as its switch does.
+ */
+function PrivacySummary({ usage, errors }: { usage: boolean; errors: boolean }) {
+  const sync = useSettingsSyncStore((state) => state.enabled && Boolean(state.owner));
+  const lessons = useLessonSyncStore((state) => state.view.enabled);
+  const outgoing = [
+    { label: 'Settings sync', on: sync, detail: 'Preferences, to your Jackalope account' },
+    {
+      label: 'Learned lessons',
+      on: sync && lessons,
+      detail: 'With settings sync, to your account',
+    },
+    { label: 'Usage counts', on: usage, detail: 'Anonymous daily counts' },
+    { label: 'Error categories', on: usage && errors, detail: 'Known categories only' },
+  ];
+  return (
+    <SettingGroup aria-label="What leaves this computer" title="What leaves this computer">
+      <SettingBody>
+        <ul className="privacy-summary" aria-label="Outgoing data">
+          {outgoing.map((item) => (
+            <li key={item.label} className="privacy-summary-item" data-on={item.on || undefined}>
+              <span className="privacy-summary-state">{item.on ? 'On' : 'Off'}</span>
+              <span>
+                <strong>{item.label}</strong>
+                <span className="settings-row-description">{item.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="settings-row-description">
+          Always stays here: your code, prompts, file paths, command output and project secrets.
+        </p>
+      </SettingBody>
+    </SettingGroup>
   );
 }

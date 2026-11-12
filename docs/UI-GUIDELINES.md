@@ -151,13 +151,33 @@ material (Acrylic on Windows 11, vibrancy on macOS) and sets `data-window-glass`
 Frosted window setting is off; other platforms and reduced transparency keep the opaque look.
 On glass, text and icons sit only on panes or title bar capsules tinted enough to keep 4.5:1
 over any backdrop: at least 85% where text is primary, secondary or accent and 90% where muted
-text appears. The shared values sit a step above those floors (90% panes, 94% dense panes and
-pages) so busy windows behind stay quiet. Use the shared `--glass-*` values; screens without
+text appears. Panes and pages use `--glass-pane` and `--glass-page` at the 90% floor. Window chrome
+(sidebar, status bar, title bar capsules) uses `--glass-chrome` at 85% and maps muted text to
+secondary inside it. Use the shared `--glass-*` values; screens without
 `WindowGlass` paint an opaque background.
+Buttons share one translucent plastic material from `@jackalope/ui`: theme-tinted bodies the
+page shows through, a hairline moulded lip, a faint corner highlight and fine grain, with no
+glow. Primary is tinted plastic with a dense core: a see-through rim and a 90% band of the action
+colour, shaded 10% away from `--color-on-action`, behind the label, which holds 4.5:1 on every
+preset; don't thin the band. Secondary and outline are clear plastic, and
+ghost keeps a hairline edge at rest, so every button reads as a button; text-only actions
+inline with copy use `LinkButton`. Unavailable primaries turn neutral rather than fading the
+accent. Reduced transparency drops the blur and forced colours drop the grain.
+
+Setup and settings screens that walk through a task use the `@jackalope/ui` setup kit.
+`SetupLayout` keeps the steps at a reading measure and, on wide panes, puts the intro, a
+`FlowDiagram` of the real connection state and a `SetupSummary` of the choices so far in a
+sticky aside on the right; narrow panes stack it on top. Done steps fold to a summary that
+states the choice, with a Change button; upcoming steps show their title and hint; optional
+steps carry a tag and never hold the flow. Don't nest numbered steps inside a step; use a
+checklist. Pick several items from a `ChoiceGrid` of tiles rather than a column of checkboxes,
+and size inputs to what they hold, such as a short code.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
-for menu rows, segments and dense navigation; coarse pointers raise both to 44px. Prefer
-compact layouts that keep projects, work and agents in view over extra padding. Native
+for menu rows, segments and dense navigation; coarse pointers raise both to 44px. The sidebar
+leads with Inbox (work across projects that needs the person), then projects with only their
+live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
+compact layouts that keep this in view over extra padding. Native
 window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
 small windows. Respect reduced motion, including preference changes while open.
 

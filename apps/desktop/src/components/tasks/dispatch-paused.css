@@ -1,0 +1,61 @@
+/* The Work page lays out by sibling margins, not a gap; this matches the composer-to-list
+   space (.task-collection's margin-top in task-collection.css). */
+.workspace-page-layout > .dispatch-paused {
+  margin-top: 12px;
+}
+/* Leading inset matches the composer's text column (16px padding + 6px textarea padding). */
+.dispatch-paused.inline-notice {
+  padding-inline: 22px 14px;
+}
+.dispatch-paused-title {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+/* Small buttons centre on the title's first line rather than sitting below it. */
+.dispatch-paused .inline-notice-action {
+  margin-top: calc((1lh - var(--control-height-compact, 32px)) / 2);
+}
+.dispatch-paused-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* The raw message carries long paths and ids; wrap them instead of widening the page. */
+.dispatch-paused-raw {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+/* Several pauses: one row each, name first, then where, then its actions. */
+.dispatch-paused-list {
+  display: grid;
+  gap: 2px;
+  margin-block: 8px;
+}
+.dispatch-paused-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: var(--control-height-compact, 32px);
+}
+.dispatch-paused-name {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dispatch-paused-where {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dispatch-paused-raw + .dispatch-paused-raw {
+  margin-top: 8px;
+}

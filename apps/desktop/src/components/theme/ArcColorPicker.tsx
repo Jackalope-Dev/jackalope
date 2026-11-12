@@ -2,6 +2,7 @@ import { applyThemeTokens } from '@jackalope/brand/theme';
 import { Button, Popover, Tooltip } from '@jackalope/ui';
 import { RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { ThemeEditor } from './ThemeEditor';
 
@@ -14,9 +15,21 @@ export function ArcColorPicker({
 }) {
   const theme = useThemeStore();
   const currentTheme = scope === 'app' ? theme.appTheme : theme.currentTheme;
-  const setTheme = scope === 'app' ? theme.setAppTheme : theme.setTheme;
+  // The project picker themes the open project; with none open it themes the app.
+  const project = useProjectStore((state) =>
+    scope === 'project'
+      ? state.projects.find((item) => item.id === state.activeProjectId)
+      : undefined,
+  );
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(currentTheme);
+  /** Saves the draft only when it changed, so opening and dismissing the panel never creates
+      a project theme the person didn't choose. */
+  const keep = (next: typeof draft) => {
+    if (next === currentTheme) return;
+    if (project) useProjectStore.getState().updateProjectPreferences(project.id, { theme: next });
+    else theme.setAppTheme(next);
+  };
   useEffect(() => {
     if (!open) return;
     useThemeStore.setState({ previewing: true });
@@ -48,7 +61,7 @@ export function ArcColorPicker({
             onMouseDown={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
             onClick={() => {
-              if (open) setTheme(draft);
+              if (open) keep(draft);
             }}
           >
             <span
@@ -66,12 +79,14 @@ export function ArcColorPicker({
           align="end"
           sideOffset={12}
           collisionPadding={16}
-          onInteractOutside={() => setTheme(draft)}
+          onInteractOutside={() => keep(draft)}
           aria-label="Workspace appearance"
           className="workspace-appearance appearance-panel w-[340px] max-w-[calc(100vw-2rem)] p-5 z-[70]"
         >
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-base tracking-tight font-semibold">Appearance</h2>
+            <h2 className="text-base tracking-tight font-semibold">
+              {project ? `${project.name} appearance` : 'Appearance'}
+            </h2>
             <Popover.Close asChild>
               <button type="button" className="quiet-icon" aria-label="Cancel theme preview">
                 <X className="size-4" />
@@ -88,15 +103,31 @@ export function ArcColorPicker({
               <RotateCcw className="size-3" />
               Reset preview
             </button>
-            <Button
-              size="sm"
-              onClick={() => {
-                setTheme(draft);
-                setOpen(false);
-              }}
-            >
-              Keep theme
-            </Button>
+            <span className="flex gap-2">
+              {project?.preferences?.theme && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    useProjectStore.getState().updateProjectPreferences(project.id, {
+                      theme: undefined,
+                    });
+                    setOpen(false);
+                  }}
+                >
+                  Use app theme
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => {
+                  keep(draft);
+                  setOpen(false);
+                }}
+              >
+                Keep theme
+              </Button>
+            </span>
           </div>
           <Popover.Arrow className="fill-[var(--color-surface-elevated)]" />
         </Popover.Content>

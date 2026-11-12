@@ -12,6 +12,10 @@ release dates.
   credentials, generic notification text), signed device builds and CI builds for both
   platforms, and on-device checks of the keyboard over the reply bar, camera scanning and
   Tailscale HTTPS pairing before any store listing.
+- [ ] Design an always-on host (Jackalope Cloud): Jackalope running on a workstation or cloud
+  machine as the coordinator, with the laptop and phone as clients, so work and the phone keep
+  going while the laptop is offline. Today hosts don't relay to each other and agent computers
+  depend on the desktop that drives them.
 - [ ] Decide how a desktop coordinates work across several hosts: a combined view of every
   paired host's work, and whether new work can be routed to an available host, while each
   host keeps execution ownership.

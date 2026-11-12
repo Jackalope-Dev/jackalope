@@ -1,16 +1,16 @@
 import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
+  ChoiceCards,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
   FormField,
   InlineNotice,
   Input,
-  Select,
-  SelectItem,
   Textarea,
 } from '@jackalope/ui';
+import { Gauge, Pencil, Scale, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   DecisionOptionsView,
@@ -70,6 +70,16 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
   const [message, setMessage] = useState('');
   const generation = useRef(0);
   const [modelKeys, setModelKeys] = useState<string[]>([]);
+  /** Evidence entries open for editing; saved ones fold to a one-line summary. */
+  const [editing, setEditing] = useState<Set<string>>(new Set());
+  /** Entries showing their optional limits and pricing. */
+  const [extras, setExtras] = useState<Set<string>>(new Set());
+  const toggle = (set: Set<string>, key: string, on: boolean) => {
+    const next = new Set(set);
+    if (on) next.add(key);
+    else next.delete(key);
+    return next;
+  };
   const load = useCallback(async () => {
     const ticket = ++generation.current;
     setError('');
@@ -146,21 +156,38 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
         ) : (
           <fieldset disabled={pending} className="workspace-stack">
             <legend className="sr-only">Jev decision options</legend>
-            <FormField
-              label="Routing goal"
-              description="Cost comparisons require sufficient relevant outcome history and complete cost reports. Otherwise Jackalope retains quality ranking. Subscription quota is separate from API dollars."
-            >
-              <Select
+            <div className="workspace-stack decision-goal">
+              <ChoiceCards
+                label="Routing goal"
                 value={draft.objective}
-                onValueChange={(value) =>
-                  setDraft({ ...draft, objective: value as Options['objective'] })
-                }
-              >
-                <SelectItem value="quality">Quality first</SelectItem>
-                <SelectItem value="balanced">Balanced</SelectItem>
-                <SelectItem value="economical">Economical</SelectItem>
-              </Select>
-            </FormField>
+                onValueChange={(value) => setDraft({ ...draft, objective: value })}
+                options={[
+                  {
+                    value: 'quality',
+                    title: 'Quality first',
+                    description: 'Pick the strongest worker for the task.',
+                    icon: <Sparkles size={18} />,
+                  },
+                  {
+                    value: 'balanced',
+                    title: 'Balanced',
+                    description: 'Weigh quality against cost.',
+                    icon: <Scale size={18} />,
+                  },
+                  {
+                    value: 'economical',
+                    title: 'Economical',
+                    description: 'Prefer cheaper workers when they are good enough.',
+                    icon: <Gauge size={18} />,
+                  },
+                ]}
+              />
+              <p className="task-muted text-sm">
+                Cost comparisons need enough relevant outcome history and complete cost reports;
+                otherwise Jackalope keeps quality ranking. Subscription quota is separate from API
+                dollars.
+              </p>
+            </div>
             {helpers.map(([key, label, description]) => (
               <label key={key} className="flex items-start gap-3">
                 <input
@@ -182,129 +209,189 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
                   supplied facts, not verified model performance. Unknown capabilities remain
                   unknown; evidence older than 90 days is marked stale.
                 </p>
-                {draft.models.map((model, index) => (
-                  <fieldset
-                    key={modelKeys[index]}
-                    className="workspace-stack border rounded-lg p-3"
-                  >
-                    <legend>Model {index + 1}</legend>
-                    <FormField label="Agent adapter">
-                      <Input
-                        value={model.adapter}
-                        maxLength={80}
-                        onChange={(e) => modelChange(index, { adapter: e.target.value })}
-                        placeholder="codex, claude, opencode…"
-                      />
-                    </FormField>
-                    <FormField label="Exact model ID">
-                      <Input
-                        value={model.model}
-                        maxLength={160}
-                        onChange={(e) => modelChange(index, { model: e.target.value })}
-                      />
-                    </FormField>
-                    <FormField label="Capabilities and restrictions">
-                      <Textarea
-                        value={model.capabilities}
-                        maxLength={2000}
-                        onChange={(e) => modelChange(index, { capabilities: e.target.value })}
-                      />
-                    </FormField>
-                    <FormField label="Evidence source">
-                      <Input
-                        value={model.source}
-                        maxLength={500}
-                        onChange={(e) => modelChange(index, { source: e.target.value })}
-                        placeholder="Documentation URL or evaluation reference"
-                      />
-                    </FormField>
-                    <FormField
-                      label="Checked at"
-                      description="Date and time with timezone, for example 2026-09-17T12:00:00Z."
-                    >
-                      <Input
-                        value={model.checkedAt}
-                        onChange={(e) => modelChange(index, { checkedAt: e.target.value })}
-                      />
-                    </FormField>
-                    <FormField label="Context window in tokens (optional)">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={10000000}
-                        value={model.contextTokens ?? ''}
-                        onChange={(e) =>
-                          modelChange(index, {
-                            contextTokens: e.target.value ? Number(e.target.value) : null,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <fieldset>
-                      <legend>Supported effort levels (optional)</legend>
-                      <div className="flex flex-wrap gap-3">
-                        {['low', 'medium', 'high', 'xhigh', 'max'].map((level) => (
-                          <label key={level} className="flex gap-2 items-center">
-                            <input
-                              type="checkbox"
-                              checked={model.efforts.includes(level)}
-                              onChange={(event) =>
+                {draft.models.map((model, index) => {
+                  const key = modelKeys[index];
+                  const optional =
+                    extras.has(key) ||
+                    model.contextTokens !== null ||
+                    model.efforts.length > 0 ||
+                    model.inputUsdPerMillion !== null ||
+                    model.outputUsdPerMillion !== null;
+                  if (!editing.has(key))
+                    return (
+                      <div key={key} className="decision-evidence-row">
+                        <span className="decision-evidence-summary">
+                          <strong>{model.model || 'Unnamed model'}</strong>
+                          <span className="task-muted">
+                            {[model.adapter || 'No adapter', model.checkedAt.slice(0, 10)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Edit evidence for ${model.model || `model ${index + 1}`}`}
+                          onClick={() => setEditing(toggle(editing, key, true))}
+                        >
+                          <Pencil size={14} aria-hidden="true" />
+                          Edit
+                        </Button>
+                      </div>
+                    );
+                  return (
+                    <fieldset key={key} className="decision-evidence">
+                      <legend>{model.model || `Model ${index + 1}`}</legend>
+                      <div className="decision-evidence-grid">
+                        <FormField label="Agent adapter">
+                          <Input
+                            value={model.adapter}
+                            maxLength={80}
+                            onChange={(e) => modelChange(index, { adapter: e.target.value })}
+                            placeholder="codex, claude, opencode…"
+                          />
+                        </FormField>
+                        <FormField label="Exact model ID">
+                          <Input
+                            value={model.model}
+                            maxLength={160}
+                            onChange={(e) => modelChange(index, { model: e.target.value })}
+                          />
+                        </FormField>
+                        <FormField label="Evidence source">
+                          <Input
+                            value={model.source}
+                            maxLength={500}
+                            onChange={(e) => modelChange(index, { source: e.target.value })}
+                            placeholder="Documentation URL or evaluation reference"
+                          />
+                        </FormField>
+                        <FormField
+                          label="Checked at"
+                          description="Date and time with timezone, such as 2026-09-17T12:00:00Z."
+                        >
+                          <Input
+                            value={model.checkedAt}
+                            onChange={(e) => modelChange(index, { checkedAt: e.target.value })}
+                          />
+                        </FormField>
+                      </div>
+                      <FormField label="Capabilities and restrictions">
+                        <Textarea
+                          value={model.capabilities}
+                          maxLength={2000}
+                          onChange={(e) => modelChange(index, { capabilities: e.target.value })}
+                        />
+                      </FormField>
+                      {optional ? (
+                        <div className="decision-evidence-grid">
+                          <FormField label="Context window in tokens">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10000000}
+                              value={model.contextTokens ?? ''}
+                              onChange={(e) =>
                                 modelChange(index, {
-                                  efforts: event.target.checked
-                                    ? [...model.efforts, level]
-                                    : model.efforts.filter((value) => value !== level),
+                                  contextTokens: e.target.value ? Number(e.target.value) : null,
                                 })
                               }
                             />
-                            {level}
-                          </label>
-                        ))}
+                          </FormField>
+                          <fieldset className="decision-efforts">
+                            <legend>Supported effort levels</legend>
+                            <div className="flex flex-wrap gap-3">
+                              {['low', 'medium', 'high', 'xhigh', 'max'].map((level) => (
+                                <label key={level} className="flex gap-2 items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={model.efforts.includes(level)}
+                                    onChange={(event) =>
+                                      modelChange(index, {
+                                        efforts: event.target.checked
+                                          ? [...model.efforts, level]
+                                          : model.efforts.filter((value) => value !== level),
+                                      })
+                                    }
+                                  />
+                                  {level}
+                                </label>
+                              ))}
+                            </div>
+                          </fieldset>
+                          <FormField label="Input USD per million tokens">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={model.inputUsdPerMillion ?? ''}
+                              onChange={(e) =>
+                                modelChange(index, {
+                                  inputUsdPerMillion: e.target.value
+                                    ? Number(e.target.value)
+                                    : null,
+                                })
+                              }
+                            />
+                          </FormField>
+                          <FormField label="Output USD per million tokens">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={model.outputUsdPerMillion ?? ''}
+                              onChange={(e) =>
+                                modelChange(index, {
+                                  outputUsdPerMillion: e.target.value
+                                    ? Number(e.target.value)
+                                    : null,
+                                })
+                              }
+                            />
+                          </FormField>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-self-start"
+                          onClick={() => setExtras(toggle(extras, key, true))}
+                        >
+                          Add context window, effort levels and pricing
+                        </Button>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditing(toggle(editing, key, false))}
+                        >
+                          Done
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setModelKeys(modelKeys.filter((_, i) => i !== index));
+                            setDraft({
+                              ...draft,
+                              models: draft.models.filter((_, i) => i !== index),
+                            });
+                          }}
+                        >
+                          Remove model evidence
+                        </Button>
                       </div>
                     </fieldset>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <FormField label="Input USD per million tokens (optional)">
-                        <Input
-                          type="number"
-                          min={0}
-                          step="any"
-                          value={model.inputUsdPerMillion ?? ''}
-                          onChange={(e) =>
-                            modelChange(index, {
-                              inputUsdPerMillion: e.target.value ? Number(e.target.value) : null,
-                            })
-                          }
-                        />
-                      </FormField>
-                      <FormField label="Output USD per million tokens (optional)">
-                        <Input
-                          type="number"
-                          min={0}
-                          step="any"
-                          value={model.outputUsdPerMillion ?? ''}
-                          onChange={(e) =>
-                            modelChange(index, {
-                              outputUsdPerMillion: e.target.value ? Number(e.target.value) : null,
-                            })
-                          }
-                        />
-                      </FormField>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setModelKeys(modelKeys.filter((_, i) => i !== index));
-                        setDraft({ ...draft, models: draft.models.filter((_, i) => i !== index) });
-                      }}
-                    >
-                      Remove model evidence
-                    </Button>
-                  </fieldset>
-                ))}
+                  );
+                })}
                 <Button
                   variant="outline"
                   disabled={draft.models.length >= 64}
                   onClick={() => {
-                    setModelKeys([...modelKeys, crypto.randomUUID()]);
+                    const key = crypto.randomUUID();
+                    setModelKeys([...modelKeys, key]);
+                    setEditing(toggle(editing, key, true));
                     setDraft({
                       ...draft,
                       models: [

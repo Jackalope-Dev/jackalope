@@ -556,17 +556,17 @@ async function _verifyOnboarding(page) {
         (await search.boundingBox()).width >= 200,
         'Jump to has room for its label and shortcut',
       );
-      const help = page.getByRole('button', { name: 'Help and knowledgebase', exact: true });
+      const help = page.getByRole('button', { name: 'Help and community', exact: true });
       assert((await help.getAttribute('title')) === null, 'Help uses the in-app tooltip');
       await help.hover();
-      await page.getByRole('tooltip', { name: 'Help Center', exact: true }).waitFor();
+      await page.getByRole('tooltip', { name: 'Help and community', exact: true }).waitFor();
       await page.screenshot({
         path: `output/playwright/shell-search-${isDark ? 'dark' : 'light'}-${width}.png`,
       });
       await page.keyboard.press('Escape');
       await page.mouse.move(0, 0);
       await help.focus();
-      await page.getByRole('tooltip', { name: 'Help Center', exact: true }).waitFor();
+      await page.getByRole('tooltip', { name: 'Help and community', exact: true }).waitFor();
       await page.keyboard.press('Escape');
       await search.click();
       await page.getByRole('dialog', { name: 'Jump to a view or theme', exact: true }).waitFor();
