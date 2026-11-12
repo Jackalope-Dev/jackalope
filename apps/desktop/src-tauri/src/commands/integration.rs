@@ -249,6 +249,14 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
         if workspace == canonical(&run.project_path)? {
             return Err("Integration requires an isolated task worktree.".into());
         }
+        // Its folder is the person's own checkout or worktree, so the changes are already
+        // where they work; merging it would also offer to remove that folder.
+        if run.continues.is_some() {
+            return Err(format!(
+                "This work continued a conversation from outside Jackalope directly in {}. Commit its changes there.",
+                run.workspace
+            ));
+        }
         if selected
             .iter()
             .any(|other| canonical(&other.workspace).ok().as_ref() == Some(&workspace))

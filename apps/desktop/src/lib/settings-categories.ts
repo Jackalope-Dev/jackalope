@@ -119,7 +119,8 @@ export const SETTINGS_CATEGORIES = [
     id: 'Privacy',
     group: 'Account & access',
     icon: Shield,
-    keywords: 'marketplace MCP network telemetry crash reporting',
+    keywords:
+      'marketplace MCP network telemetry crash reporting Claude Code Codex terminal conversations sessions outside',
   },
   {
     id: 'Updates & support',

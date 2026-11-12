@@ -19,6 +19,7 @@ import { navigateWorkspace } from '../../lib/app-events';
 import { invokeNative } from '../../lib/native/transport';
 import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -34,6 +35,9 @@ const ManagedTaskView = lazy(() =>
 );
 const LiveSessionView = lazy(() =>
   import('../sessions/LiveSessionView').then((m) => ({ default: m.LiveSessionView })),
+);
+const ExternalSessionView = lazy(() =>
+  import('../sessions/ExternalSessionView').then((m) => ({ default: m.ExternalSessionView })),
 );
 const TaskDetail = lazy(() => import('./TaskDetail').then((m) => ({ default: m.TaskDetail })));
 const ProjectQueue = lazy(() =>
@@ -73,6 +77,9 @@ export function TaskWorkspace({
   const runs = useExecutionStore((state) => state.runs);
   const sessions = useLiveSessionStore((state) => state.sessions);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
+  const external = useExternalSessionStore((state) =>
+    state.sessions.find((session) => session.key === state.selectedKey),
+  );
   const sessionRuns = useLiveSessionStore((state) => state.runs);
   const allRuns = useAllRuns();
   const selectedId = useExecutionStore((state) => state.selectedId);
@@ -256,6 +263,12 @@ export function TaskWorkspace({
     return (
       <Suspense fallback={<LoadingState label="Loading conversation…" />}>
         <LiveSessionView key={selectedSession.id} session={selectedSession} runs={sessionRuns} />
+      </Suspense>
+    );
+  if (external && (projectFilter === 'all' || external.projectId === projectFilter))
+    return (
+      <Suspense fallback={<LoadingState label="Loading conversation…" />}>
+        <ExternalSessionView key={external.key} session={external} />
       </Suspense>
     );
   if (parallel && project)

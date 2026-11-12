@@ -76,6 +76,7 @@ fn request(
 ) -> RunRequest {
     RunRequest {
         retry_of: None,
+        continues: None,
         live_session_id: None,
         effort: None,
         codex_speed: None,
@@ -732,6 +733,110 @@ fn the_context_hook_delivers_selected_context_once() {
         turn.answer("permission", &json!({"tool_name":"Bash"})),
         json!({})
     );
+}
+
+#[test]
+fn a_session_from_outside_jackalope_resumes_in_the_folder_it_ran_in() {
+    let project = "claude-session-external";
+    let fixture = Fixture::new(project, persistent());
+    let worktree = fixture.folder.join(".worktrees").join("mine");
+    git(
+        &fixture.root,
+        &["worktree", "add", "-b", "mine", worktree.to_str().unwrap()],
+    )
+    .unwrap();
+    let worktree = dunce::canonicalize(&worktree).unwrap();
+    let home = crate::commands::agent_profiles::bind_cli_account(
+        &fixture.runtime.profiles_root(),
+        "claude",
+    )
+    .unwrap()
+    .directory;
+    let continued = |id: &str, home: &Path| RunRequest {
+        agent: "claude-fixture".into(),
+        agent_profile_id: Some("__default".into()),
+        isolated: true,
+        continues: Some(ContinuedSession {
+            adapter: "claude".into(),
+            session_id: "0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f".into(),
+            workspace: worktree.to_string_lossy().into_owned(),
+            home: home.to_path_buf(),
+        }),
+        ..fixture.request(project, id, "Carry on", None)
+    };
+
+    // Saved under a directory Jackalope would not use for this account: refused.
+    let refused = fixture
+        .runtime
+        .start(continued(
+            "claude-external-other",
+            Path::new("/elsewhere/.claude"),
+        ))
+        .unwrap_err();
+    assert!(refused.contains("/elsewhere/.claude"), "{refused}");
+
+    let run = fixture.finish(continued("claude-external", &home));
+    assert_eq!(
+        run.status,
+        RunStatus::Review,
+        "{:?} {:?}",
+        run.error,
+        run.diagnostics
+    );
+    assert_eq!(Path::new(&run.workspace), worktree);
+    assert_eq!(run.branch, "mine");
+    assert_eq!(
+        run.base_head,
+        git(&fixture.root, &["rev-parse", "mine"]).unwrap()
+    );
+    assert!(run.continues.is_some());
+    let processes: Vec<Value> = std::fs::read_to_string(worktree.join("processes.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let args: Vec<String> = serde_json::from_value(processes[0]["args"].clone()).unwrap();
+    let resume = args
+        .iter()
+        .position(|arg| arg == "--resume")
+        .expect("resume flag");
+    assert_eq!(args[resume + 1], "0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f");
+    assert!(fixture
+        .runtime
+        .recorded_sessions()
+        .contains("0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f"));
+
+    // Its changes are already in the person's own worktree: no merge, no retry.
+    let merge = crate::commands::integration::prepare_with_message(
+        &fixture.runtime.integration_directory(),
+        &fixture.runtime.integration_runs().unwrap(),
+        &["claude-external".into()],
+        None,
+    )
+    .unwrap_err();
+    assert!(merge.contains("Commit its changes there"), "{merge}");
+    let retry = fixture
+        .runtime
+        .start(RunRequest {
+            retry_of: Some("claude-external".into()),
+            ..fixture.request(project, "claude-external-retry", "Carry on", None)
+        })
+        .unwrap_err();
+    assert!(retry.contains("Send a follow-up"), "{retry}");
+
+    // A follow-up continues the session it reported, still in that worktree.
+    let follow = fixture.finish(RunRequest {
+        agent: "claude-fixture".into(),
+        ..fixture.request(
+            project,
+            "claude-external-two",
+            "And more",
+            Some("claude-external"),
+        )
+    });
+    assert_eq!(follow.status, RunStatus::Review, "{:?}", follow.error);
+    assert_eq!(Path::new(&follow.workspace), worktree);
+    assert!(follow.continues.is_some());
 }
 
 #[test]

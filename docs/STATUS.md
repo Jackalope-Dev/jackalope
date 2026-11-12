@@ -25,6 +25,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   activity and visual account allowances with freshness and reset times.
   Settings → Desktop holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
+- Claude Code and Codex conversations people had outside Jackalope (a terminal, another
+  app) appear read-only under each project in an Outside Jackalope group, read locally from
+  those CLIs' session files for the accounts Jackalope uses; Jackalope's own attempts are
+  left out. Continue in Jackalope starts a conversation that resumes the CLI's session
+  directly in the checkout or worktree it ran in. Settings → Privacy turns reading off.
+  See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
 - The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
   text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
   Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
@@ -746,6 +752,12 @@ computers have no viewer. The image workflow has not run, so no image is publish
 Placing swarm forks across hosts is covered by unit tests of the placer, the dispatcher and
 the lost-host retry; no swarm has yet run across this device and real computers, and host
 health is learned only from runs and resets when the app restarts.
+
+Conversations from outside Jackalope cover Claude Code and Codex session stores as
+their current versions write them, with fixture tests only; Gemini CLI, OpenCode, Kimi
+Code and Grok stores are not read. Continuing one has not been accepted against a real
+CLI session in an installed app, and attempts that retention archived are not excluded
+by session ID.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

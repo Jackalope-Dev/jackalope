@@ -197,6 +197,23 @@ impl TaskRuntime {
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
         let mut resume = previous;
+        if let (None, Some(continued)) = (&resume, &request.continues) {
+            let continued = self.continued_run(id, &request, continued);
+            if super::resume::lost(&continued) {
+                return Err(format!(
+                    "{} no longer has this conversation in {}.",
+                    crate::commands::agents::name(&continued.agent),
+                    continued
+                        .account_binding
+                        .as_ref()
+                        .map_or_else(String::new, |binding| binding
+                            .directory
+                            .display()
+                            .to_string())
+                ));
+            }
+            resume = Some(continued);
+        }
         if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
             let adapter = old
                 .account_binding
@@ -281,12 +298,63 @@ impl TaskRuntime {
         });
     }
 
+    /// What a continuation of a session from outside Jackalope resumes: the CLI's own
+    /// session, in the folder this attempt claimed for it.
+    fn continued_run(&self, id: &str, req: &RunRequest, continued: &ContinuedSession) -> TaskRun {
+        TaskRun {
+            agent: continued.adapter.clone(),
+            session_id: Some(continued.session_id.clone()),
+            workspace: self
+                .run_snapshot(id)
+                .map_or_else(|| continued.workspace.clone(), |run| run.workspace),
+            account_binding: req.account_binding.clone(),
+            ..Default::default()
+        }
+    }
+
+    /// Claims the folder a session from outside Jackalope ran in, the person's own
+    /// checkout or worktree, and works there directly from its current commit.
+    fn prepare_continued(&self, id: &str, continued: &ContinuedSession) -> Result<(), String> {
+        let workspace = continued.workspace.as_str();
+        if !Path::new(workspace).is_dir() {
+            return Err(format!("{workspace} no longer exists."));
+        }
+        self.claim_checkout(id, workspace)?;
+        let (branch, head) = if plain_folder(workspace)?.is_some() {
+            (String::new(), String::new())
+        } else {
+            (
+                git(workspace, &["branch", "--show-current"]).unwrap_or_default(),
+                git(workspace, &["rev-parse", "HEAD"])?,
+            )
+        };
+        let agent = crate::commands::agents::name(&continued.adapter);
+        self.update_checked(id, |run| {
+            activity(
+                run,
+                &if branch.is_empty() {
+                    format!("Continuing the {agent} conversation directly in {workspace}.")
+                } else {
+                    format!(
+                        "Continuing the {agent} conversation directly in {workspace} on {branch}."
+                    )
+                },
+            );
+            run.workspace = workspace.to_string();
+            run.branch = branch.clone();
+            run.base_head = head.clone();
+        })
+    }
+
     pub(super) fn prepare_workspace(
         &self,
         id: &str,
         req: &RunRequest,
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
+        if let (Some(continued), None) = (&req.continues, &previous) {
+            return self.prepare_continued(id, continued);
+        }
         if let Some(folder) = plain_folder(&req.project_path)? {
             return self.prepare_plain_folder(id, req, previous, &folder);
         }
@@ -630,6 +698,9 @@ impl TaskRuntime {
         let spec = crate::commands::agents::find(&adapter)
             .ok_or("Choose a supported CLI adapter for this agent.")?;
         let remote = self.placed_target(id, req, &adapter, previous.as_ref())?;
+        if remote.is_some() && req.continues.is_some() {
+            return Err("This conversation's history is on this device, but this project's agents run on a computer. Continue it in a terminal.".into());
+        }
         let executable = match remote {
             Some(_) => PathBuf::from(&adapter),
             None => policy.resolve(&req.agent)?.1,
@@ -1078,7 +1149,8 @@ impl TaskRuntime {
             }
             cmd.envs(secrets);
         }
-        if req.previous_run_id.is_none() {
+        // A resumed session already has its context.
+        if req.previous_run_id.is_none() && req.continues.is_none() {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
             // run with and without it is otherwise identical and the difference is measurable.
             if !crate::commands::experiments::is(
@@ -1834,6 +1906,7 @@ impl TaskRuntime {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
+            continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
         })
@@ -1879,6 +1952,14 @@ impl TaskRuntime {
         }
         if request.previous_run_id.is_some() {
             request.workspace_mode = None;
+            request.continues = None;
+        }
+        if let Some(continued) = &request.continues {
+            // It works where the session ran, which is never a worktree Jackalope made.
+            request.workspace_mode = None;
+            request.isolated = false;
+            crate::commands::previews::ensure_idle(&continued.workspace)?;
+            crate::commands::verification::ensure_idle(&continued.workspace)?;
         }
         if let Some(mode) = request.workspace_mode {
             request.isolated = mode == WorkspaceMode::Worktree;
@@ -1968,6 +2049,9 @@ impl TaskRuntime {
                 })
                 .transpose()?;
             if let Some(ref old) = retried {
+                if old.continues.is_some() {
+                    return Err("This work continues a conversation from outside Jackalope. Send a follow-up in its conversation instead of retrying it.".into());
+                }
                 if old.status.is_active() {
                     return Err("This attempt is still running. Stop it before retrying.".into());
                 }
@@ -2038,6 +2122,20 @@ impl TaskRuntime {
                     request.agent_profile_id.as_deref(),
                 )?
             };
+            if let Some(continued) = &request.continues {
+                if adapter != continued.adapter
+                    || !crate::commands::external_sessions::same_directory(
+                        &binding.directory,
+                        &continued.home,
+                    )
+                {
+                    return Err(format!(
+                        "This conversation was saved under {}, which is no longer the {} account Jackalope would use. Continue it in a terminal.",
+                        continued.home.display(),
+                        crate::commands::agents::name(&continued.adapter)
+                    ));
+                }
+            }
             if request.agent != "auto" && adapter == "opencode" {
                 let requested = request
                     .model
@@ -2148,6 +2246,10 @@ impl TaskRuntime {
                 progress: None,
                 preparation: None,
                 retry_of: request.retry_of.clone(),
+                continues: previous
+                    .as_ref()
+                    .and_then(|old| old.continues.clone())
+                    .or_else(|| request.continues.clone()),
                 dependency_snapshot: previous
                     .as_ref()
                     .or(retried.as_ref())

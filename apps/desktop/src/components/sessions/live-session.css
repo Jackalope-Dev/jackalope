@@ -710,3 +710,56 @@
   height: var(--control-height, 36px);
   border-radius: var(--radius-sm);
 }
+
+/* A conversation from outside Jackalope: the read-only transcript, then the way to continue it. */
+.external-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+.external-session-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.external-transcript {
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+}
+.external-transcript :is(.live-message > p, .live-reply > div) {
+  user-select: text;
+}
+.external-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -10px 0 22px 46px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.external-continue {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+  padding: 12px 0;
+  background: var(--color-bg);
+}
+.external-continue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+html[data-window-glass] .external-continue {
+  background: var(--glass-page);
+}

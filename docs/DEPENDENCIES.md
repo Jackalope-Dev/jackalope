@@ -879,6 +879,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | rustls-platform-verifier-android | 0.1.1 | MIT OR Apache-2.0 |
 | rustls-webpki | 0.103.16 | ISC |
 | rustversion | 1.0.23 | MIT OR Apache-2.0 |
+| ruzstd | 0.9.1 | MIT |
 | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 |
 | same-file | 1.0.6 | Unlicense/MIT |
 | schannel | 0.1.29 | MIT |

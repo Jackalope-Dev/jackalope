@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useExecutionStore } from '../stores/executionStore';
+import { useExternalSessionStore } from '../stores/externalSessionStore';
 import { useLiveSessionStore } from '../stores/liveSessionStore';
 import { useManagedTaskStore } from '../stores/managedTaskStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -17,12 +18,15 @@ export interface WorkTarget {
   task?: string;
   conversation?: string;
   plan?: string;
+  /** A conversation from outside Jackalope, by its key; read-only until continued. */
+  external?: string;
 }
 
 export function selectWork(target: WorkTarget = {}) {
   useExecutionStore.getState().select(target.task ?? null);
   useLiveSessionStore.getState().select(target.conversation ?? null);
   useManagedTaskStore.getState().select(target.plan ?? null);
+  useExternalSessionStore.getState().select(target.external ?? null);
 }
 
 /** The selection that opens a work-list item; a draft selects nothing. */
@@ -54,6 +58,12 @@ export function showWork(item: WorkItem, section?: string) {
   openWork(item);
   if (item.run && !item.session && !item.managed)
     useWorkViewStore.getState().open(item.run.id, section);
+}
+
+/** Opens a conversation from outside Jackalope, focusing its project. */
+export function openExternalSession(key: string, projectId: string) {
+  selectWork({ external: key });
+  useProjectStore.getState().selectProject(projectId);
 }
 
 /** Opens one task run by id, focusing the project it belongs to when it is loaded. */

@@ -1,5 +1,17 @@
 [
   {
+    "id": "pick-up-terminal-conversations-in-jackalope",
+    "date": "2026-11-12",
+    "title": "Pick up terminal conversations in Jackalope.",
+    "description": "Claude Code and Codex conversations you had in a terminal or another app now show up under the project they worked in.",
+    "items": [
+      "Open one to read it, with the tools the agent used.",
+      "Continue in Jackalope resumes that conversation in the same checkout or worktree, under the same account.",
+      "Sessions are read only on this computer and nothing is uploaded. Turn it off in Settings under Privacy."
+    ],
+    "note": "Claude Code and Codex only for now."
+  },
+  {
     "id": "agents-waste-less-time-on-long-runs",
     "date": "2026-11-12",
     "title": "Agents waste less time on long runs",
