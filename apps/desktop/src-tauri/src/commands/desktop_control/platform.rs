@@ -248,12 +248,26 @@ pub fn desktop_control_open_settings(permission: String) -> Result<(), String> {
         "inputMonitoring" => "Privacy_ListenEvent",
         _ => return Err("Unknown macOS permission.".into()),
     };
+    open_system_settings(&format!(
+        "x-apple.systempreferences:com.apple.preference.security?{pane}"
+    ))
+}
+
+/// Opens a System Settings link an agent gave with `request_human_action`. The
+/// webview's opener allows only web links, so this scheme opens natively.
+#[tauri::command]
+pub fn desktop_control_open_settings_link(url: String) -> Result<(), String> {
+    if !crate::commands::harness::system_settings_link(&url) {
+        return Err("Only System Settings links open here.".into());
+    }
+    open_system_settings(&url)
+}
+
+fn open_system_settings(url: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let opened = std::process::Command::new("/usr/bin/open")
-            .arg(format!(
-                "x-apple.systempreferences:com.apple.preference.security?{pane}"
-            ))
+            .arg(url)
             .status()
             .map_err(|error| error.to_string())?;
         if !opened.success() {
@@ -263,8 +277,8 @@ pub fn desktop_control_open_settings(permission: String) -> Result<(), String> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = pane;
-        Err("This platform does not use macOS desktop permissions.".into())
+        let _ = url;
+        Err("System Settings links open only on macOS.".into())
     }
 }
 

@@ -1414,17 +1414,58 @@ impl TaskRuntime {
         &self,
         prompt: &crate::commands::harness::PendingUserPrompt,
     ) {
+        self.update(&prompt.run_id, |run| merge_prompt(run, prompt));
+    }
+
+    /// Records the prompt an agent's own ask returned. When it returned
+    /// unanswered, the answer is owed to the agent until it is fetched.
+    pub(in crate::commands) fn record_asked_prompt(
+        &self,
+        prompt: &crate::commands::harness::PendingUserPrompt,
+    ) {
         self.update(&prompt.run_id, |run| {
-            if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
-                // A saved prompt only moves forward: a stale copy returned after the
-                // wait must not undo an escalation or an answer saved meanwhile.
-                if existing.status != "answered" && prompt.status == "answered" {
-                    *existing = prompt.clone();
-                }
-            } else {
-                run.prompts.push(prompt.clone());
+            merge_prompt(run, prompt);
+            if prompt.status != "answered" && !run.awaiting_answers.contains(&prompt.id) {
+                run.awaiting_answers.push(prompt.id.clone());
             }
         });
+    }
+
+    /// Answered questions the agent was told were pending and has not received,
+    /// optionally only `only`. They count as delivered once returned.
+    pub(in crate::commands) fn take_late_answers(
+        &self,
+        run_id: &str,
+        only: Option<&str>,
+    ) -> Vec<crate::commands::harness::PendingUserPrompt> {
+        let Ok(mut inner) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let Some(run) = inner.runs.get_mut(run_id) else {
+            return Vec::new();
+        };
+        let answered: Vec<_> = run
+            .prompts
+            .iter()
+            .filter(|prompt| {
+                prompt.status == "answered"
+                    && only.is_none_or(|id| id == prompt.id)
+                    && run.awaiting_answers.contains(&prompt.id)
+            })
+            .cloned()
+            .collect();
+        if answered.is_empty() {
+            return answered;
+        }
+        run.awaiting_answers
+            .retain(|id| !answered.iter().any(|prompt| &prompt.id == id));
+        match self.save(run) {
+            Ok(()) => run.persistence_error = None,
+            Err(error) => {
+                run.persistence_error = Some(format!("History could not be saved: {error}"))
+            }
+        }
+        answered
     }
 
     pub(in crate::commands) fn respond_prompt(
@@ -2147,6 +2188,7 @@ impl TaskRuntime {
                 mcp_usage: None,
                 usage_observations: vec![],
                 prompts: vec![],
+                awaiting_answers: Vec::new(),
                 validation_steps: vec![],
                 decisions: vec![],
                 screenshots: vec![],
@@ -2189,6 +2231,18 @@ impl TaskRuntime {
             crate::commands::computers::release_run(&request.id);
         });
         Ok(id)
+    }
+}
+
+/// Saves `prompt` into `run`. A saved prompt only moves forward: a stale copy
+/// returned after the wait must not undo an escalation or an answer saved meanwhile.
+fn merge_prompt(run: &mut TaskRun, prompt: &crate::commands::harness::PendingUserPrompt) {
+    if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
+        if existing.status != "answered" && prompt.status == "answered" {
+            *existing = prompt.clone();
+        }
+    } else {
+        run.prompts.push(prompt.clone());
     }
 }
 

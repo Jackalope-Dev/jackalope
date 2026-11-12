@@ -1297,6 +1297,7 @@ macro_rules! tauri_commands {
         $next!($finish [$($done)*
             commands::desktop_control::platform::desktop_control_request_permissions,
             commands::desktop_control::platform::desktop_control_open_settings,
+            commands::desktop_control::platform::desktop_control_open_settings_link,
             commands::desktop_control::platform::desktop_control_restart,
             commands::desktop_control::desktop_control_remember,
             commands::desktop_control::desktop_control_permissions,

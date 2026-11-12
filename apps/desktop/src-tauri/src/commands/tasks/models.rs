@@ -167,6 +167,10 @@ pub struct TaskRun {
     pub usage_observations: Vec<UsageObservation>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
+    /// Questions whose ask returned to the agent unanswered and whose answer has
+    /// not reached it yet, through `user_response` or a Claude Code hook.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub awaiting_answers: Vec<String>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
     /// Append-only decision trail the agent reported for this attempt.
@@ -443,6 +447,7 @@ impl TaskRun {
             mcp_usage: self.mcp_usage.clone(),
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
+            awaiting_answers: self.awaiting_answers.clone(),
             validation_steps: self.validation_steps.clone(),
             decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),

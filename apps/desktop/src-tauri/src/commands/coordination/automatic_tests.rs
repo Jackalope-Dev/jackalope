@@ -659,3 +659,54 @@ async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
         .unwrap()
         .contains("routine project/inbox checks"));
 }
+
+#[tokio::test]
+async fn a_late_answer_is_owed_to_the_agent_until_user_response_reads_it() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    let asked = bridge::call(
+        &f.service,
+        &headers("reader-run"),
+        "request_human_action",
+        json!({"kind":"other","title":"Allow Accessibility for Jackalope",
+            "instructions":"1. Turn on Jackalope in Accessibility.",
+            "url":"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(asked["status"], "pending");
+    let id = asked["id"].as_str().unwrap().to_owned();
+    let owed = |f: &Fixture| {
+        f.runtime
+            .run_snapshot("reader-run")
+            .unwrap()
+            .awaiting_answers
+    };
+    assert_eq!(owed(&f), vec![id.clone()]);
+    let unanswered = bridge::call(
+        &f.service,
+        &headers("reader-run"),
+        "user_response",
+        json!({ "id": id }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(unanswered["status"], "pending");
+    assert_eq!(
+        owed(&f),
+        vec![id.clone()],
+        "a pending read delivers nothing"
+    );
+    assert!(f.runtime.respond_prompt("reader-run", &id, "Done").unwrap());
+    let read = bridge::call(
+        &f.service,
+        &headers("reader-run"),
+        "user_response",
+        json!({ "id": id }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(read["answer"], "Done");
+    assert!(owed(&f).is_empty());
+    assert!(f.runtime.take_late_answers("reader-run", None).is_empty());
+}

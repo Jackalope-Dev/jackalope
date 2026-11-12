@@ -36,6 +36,8 @@ pub(super) struct Hooks {
     pub context: bool,
     pub permission: bool,
     pub timing: bool,
+    /// Delivers answers that arrived after the agent's ask returned pending.
+    pub answers: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -66,6 +68,7 @@ impl Settings {
                 context: hook(Experiment::ClaudeContextHook),
                 permission: hook(Experiment::ClaudePermissionHook),
                 timing: hook(Experiment::ClaudeToolTiming),
+                answers: true,
             },
         }
     }
@@ -163,6 +166,9 @@ pub(super) fn registrations(hooks: &Hooks) -> Value {
     }
     if hooks.timing {
         post.push(json!({"hookCallbackIds":["timing"],"timeout":10}));
+    }
+    if hooks.answers {
+        post.push(json!({"hookCallbackIds":["answers"],"timeout":10}));
     }
     if !post.is_empty() {
         events.insert("PostToolUse".into(), Value::Array(post));
@@ -511,6 +517,7 @@ impl Turn {
             "timing" if self.hooks.timing => self.timing(input),
             "stop" if self.hooks.stop_check => self.stop(),
             "context" if self.hooks.context => self.context(),
+            "answers" if self.hooks.answers && self.bridge => self.answers(),
             _ => json!({}),
         }
     }
@@ -658,6 +665,32 @@ impl Turn {
                 json!({})
             }
         }
+    }
+
+    /// Answers the person gave after the agent's question returned pending, delivered
+    /// once after the agent's next tool call so it need not be polling at that moment.
+    fn answers(&self) -> Value {
+        let answered = self.runtime.take_late_answers(&self.id, None);
+        if answered.is_empty() {
+            return json!({});
+        }
+        let mut text = String::from(
+            "Jackalope: answers arrived for questions you asked earlier. Do not poll user_response for these.",
+        );
+        for prompt in &answered {
+            let question: String = prompt.question.chars().take(300).collect();
+            text.push_str(&format!(
+                "\n- Question {} ({question:?}): {}",
+                prompt.id,
+                prompt
+                    .answer
+                    .as_deref()
+                    .unwrap_or_default()
+                    .trim()
+                    .replace('\n', "\n  ")
+            ));
+        }
+        json!({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":text}})
     }
 
     fn context(&self) -> Value {

@@ -72,6 +72,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         mcp_usage: None,
         usage_observations: vec![],
         prompts: vec![],
+        awaiting_answers: Vec::new(),
         validation_steps: vec![],
         decisions: vec![],
         screenshots: vec![],
