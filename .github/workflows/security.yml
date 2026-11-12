@@ -22,19 +22,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
+          fetch-depth: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 2 || 1 }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: '.node-version'
           cache: pnpm
-      # A pull request that changes no manifest, lockfile or audit input passes
-      # without auditing, so an advisory published against master does not block
-      # unrelated pull requests such as blog posts. Pushes, the weekly schedule and
-      # manual runs always audit.
+      # A pull request or merge group that changes no manifest, lockfile or audit
+      # input passes without auditing, so an advisory published against master does
+      # not block unrelated pull requests such as blog posts. The merge queue
+      # squashes, so a merge group's HEAD^1 is the entry before it. Pushes, the
+      # weekly schedule and manual runs always audit.
       - name: Decide whether the change can affect the audit
         id: scope
-        run: node scripts/change-scope.mjs ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: node scripts/change-scope.mjs ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'HEAD^1' || '' }}
       - run: pnpm install --frozen-lockfile
         if: steps.scope.outputs.dependencies != 'false'
       - run: rustup toolchain install 1.98.1 --profile minimal
