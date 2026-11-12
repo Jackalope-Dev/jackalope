@@ -492,14 +492,18 @@ fn a_routing_agent_routes_on_a_fast_model_at_its_lowest_effort() {
     assert_eq!(routing_model("codex", None), None);
     let args = |adapter: &str| {
         let mut command = Command::new("fixture");
-        routing_effort(&mut command, adapter);
+        routing_effort(
+            &mut command,
+            adapter,
+            routing_model(adapter, None).as_deref(),
+        );
         command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
     };
     assert_eq!(args("claude"), ["--effort", "low"]);
-    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"minimal\""]);
+    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"low\""]);
     assert!(args("opencode").is_empty());
 }
 

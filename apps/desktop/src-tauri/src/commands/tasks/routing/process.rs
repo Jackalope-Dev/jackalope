@@ -22,17 +22,18 @@ pub(in crate::commands::tasks) fn routing_model(
     }
 }
 
-/// The lowest reasoning effort each agent offers for a routing answer.
-pub(in crate::commands::tasks) fn routing_effort(cmd: &mut Command, adapter: &str) {
-    match adapter {
-        "codex" => {
-            cmd.args(["-c", "model_reasoning_effort=\"minimal\""]);
-        }
-        "claude" => {
-            cmd.args(["--effort", "low"]);
-        }
-        _ => {}
-    }
+/// A routing answer asks for the lowest effort the router's model accepts.
+pub(in crate::commands::tasks) fn routing_effort(
+    cmd: &mut Command,
+    adapter: &str,
+    model: Option<&str>,
+) {
+    super::super::effort::configure(
+        cmd,
+        adapter,
+        model,
+        Some(super::super::effort::TaskEffort::Quick),
+    );
 }
 
 impl TaskRuntime {
@@ -68,7 +69,7 @@ impl TaskRuntime {
         }
         .run(
             self,
-            |cmd| routing_effort(cmd, &router.adapter),
+            |cmd| routing_effort(cmd, &router.adapter, model.as_deref()),
             &|| !self.is_running(&req.id),
             |answer| {
                 self.update_checked(&req.id, |run| {
