@@ -1,0 +1,3 @@
+# build.rs stages these; a change here would restart the build that wrote it.
+resources/agent-browser/agent-browser*
+resources/desktop-control/jackalope-desktop-control

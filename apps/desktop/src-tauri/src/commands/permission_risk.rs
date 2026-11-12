@@ -10,6 +10,7 @@
 
 use serde_json::Value;
 use std::path::Path;
+use std::rc::Rc;
 
 use super::tasks::TaskRuntime;
 
@@ -49,6 +50,37 @@ pub enum Decision {
     Ask(Option<String>),
 }
 
+/// Whether every listed process belongs to the requesting attempt; a negative
+/// entry is a process group.
+type Owns = Rc<dyn Fn(&[i64]) -> bool>;
+
+/// Where a request runs, and which processes it may stop without asking.
+pub struct Scope<'a> {
+    workspace: &'a Path,
+    owns: Option<Owns>,
+}
+
+impl<'a> Scope<'a> {
+    /// A request that owns no processes, so stopping one by its ID asks.
+    pub fn new(workspace: &'a Path) -> Self {
+        Self {
+            workspace,
+            owns: None,
+        }
+    }
+
+    /// A request from attempt `run_id`, which may stop the processes it started.
+    pub fn of_run(runtime: &TaskRuntime, run_id: &str, workspace: &'a Path) -> Self {
+        let (runtime, run_id) = (runtime.clone(), run_id.to_string());
+        Self {
+            workspace,
+            owns: Some(Rc::new(move |targets| {
+                super::tasks::workspace_processes::owns_processes(&runtime, &run_id, targets)
+            })),
+        }
+    }
+}
+
 /// Applies the run's project setting to a request and records the outcome in
 /// the run's activity, so every automatic approval is auditable. `label` is
 /// the short form shown there, such as `Bash: pnpm test`.
@@ -56,7 +88,7 @@ pub fn decide(
     runtime: &TaskRuntime,
     run_id: &str,
     label: &str,
-    assess: impl FnOnce(&Path) -> Verdict,
+    assess: impl FnOnce(&Scope) -> Verdict,
 ) -> Decision {
     let Some(run) = runtime.run_snapshot(run_id) else {
         return Decision::Ask(None);
@@ -72,7 +104,7 @@ pub fn decide(
         .chars()
         .take(160)
         .collect();
-    match assess(Path::new(&run.workspace)) {
+    match assess(&Scope::of_run(runtime, run_id, Path::new(&run.workspace))) {
         Routine => {
             runtime.update(run_id, |r| {
                 super::tasks::events::activity(r, &format!("Auto-approved {label}"))
@@ -150,14 +182,14 @@ fn input_paths(input: &Value) -> Vec<String> {
 }
 
 /// Classifies a Claude Code style tool request (`Bash`, `Write`, `Read`, ...).
-pub fn assess(tool: &str, input: &Value, workspace: &Path) -> Verdict {
-    Context::new(workspace).tool(tool, input)
+pub fn assess(tool: &str, input: &Value, scope: &Scope) -> Verdict {
+    Context::new(scope).tool(tool, input)
 }
 
 /// Classifies an ACP `session/request_permission` tool call (Kimi Code and
 /// custom ACP agents).
-pub fn assess_acp(tool_call: &Value, workspace: &Path) -> Verdict {
-    let context = Context::new(workspace);
+pub fn assess_acp(tool_call: &Value, scope: &Scope) -> Verdict {
+    let context = Context::new(scope);
     let raw = &tool_call["rawInput"];
     let title = tool_call["title"].as_str().unwrap_or("Tool");
     match tool_call["kind"].as_str().unwrap_or("other") {
@@ -192,9 +224,9 @@ pub fn assess_opencode(
     permission: &str,
     patterns: &[String],
     metadata: &Value,
-    workspace: &Path,
+    scope: &Scope,
 ) -> Verdict {
-    let context = Context::new(workspace);
+    let context = Context::new(scope);
     match permission {
         "bash" => {
             let mut commands: Vec<String> = patterns.to_vec();
@@ -269,6 +301,7 @@ struct Context {
     home: Option<String>,
     temp: Vec<String>,
     windows: bool,
+    owns: Option<Owns>,
 }
 
 /// A simple command: its words, with redirections and substitutions removed.
@@ -289,8 +322,8 @@ struct Part {
 const SUBSTITUTION: &str = "\u{1}substitution";
 
 impl Context {
-    fn new(workspace: &Path) -> Self {
-        let raw = workspace.to_string_lossy().into_owned();
+    fn new(scope: &Scope) -> Self {
+        let raw = scope.workspace.to_string_lossy().into_owned();
         let windows = is_windows_path(&raw);
         let normal = |path: String| normalize(&path, windows);
         let home =
@@ -304,6 +337,7 @@ impl Context {
             home,
             temp,
             windows,
+            owns: scope.owns.clone(),
         }
     }
 
@@ -817,20 +851,12 @@ impl Context {
             | "op"
             | "bw"
             | "lpass" => risky("it reads stored credentials"),
-            "kill" => {
-                let targets: Vec<&String> =
-                    lower.iter().filter(|arg| !arg.starts_with('-')).collect();
-                if !targets.is_empty()
-                    && targets
-                        .iter()
-                        .all(|arg| arg.starts_with('%') || arg.starts_with('$'))
-                {
-                    Routine
-                } else {
-                    risky("it stops a process this task may not own")
-                }
-            }
-            "killall" | "pkill" | "taskkill" | "tskill" | "stop-process" | "spps" | "xkill" => {
+            "kill" => self.kill(&lower),
+            "killall" | "pkill" => risky(
+                "it stops processes by name, which can include ones this task did not start; \
+                 stopping a process the task started by its process ID does not ask",
+            ),
+            "taskkill" | "tskill" | "stop-process" | "spps" | "xkill" => {
                 risky("it stops a process this task may not own")
             }
             "chmod" | "chown" | "chgrp" | "icacls" | "takeown" | "attrib" | "cacls" | "set-acl" => {
@@ -1057,6 +1083,51 @@ impl Context {
             index += 1;
         }
         Routine
+    }
+
+    /// `kill` of a job (`%1`), a shell variable (`$!`) or the group it names (`-- -$PGID`) is
+    /// routine; a process ID
+    /// or process group (`-- -<id>`) is routine only when the attempt started it.
+    fn kill(&self, lower: &[String]) -> Verdict {
+        const NOT_OWNED: &str = "it stops a process this task may not own";
+        let (mut options, mut signal) = (true, false);
+        let (mut jobs, mut ids) = (0, Vec::new());
+        let mut args = lower.iter();
+        while let Some(arg) = args.next() {
+            if options && arg == "--" {
+                options = false;
+            } else if options && matches!(arg.as_str(), "-s" | "-n" | "--signal") {
+                args.next();
+                signal = true;
+            } else if options && arg.starts_with('-') && !(signal && arg.parse::<i64>().is_ok()) {
+                signal = true;
+            } else if arg.starts_with('%')
+                || arg.starts_with('$')
+                || !options && arg.starts_with("-$")
+            {
+                // After `--`, `-$PGID` signals the group a saved variable names.
+                options = false;
+                jobs += 1;
+            } else if let Ok(id) = arg.parse::<i64>() {
+                options = false;
+                ids.push(id);
+            } else {
+                return risky(NOT_OWNED);
+            }
+        }
+        if jobs == 0 && ids.is_empty() {
+            return risky(NOT_OWNED);
+        }
+        let owned = ids.is_empty()
+            || self
+                .owns
+                .as_ref()
+                .is_some_and(|owns| ids.iter().all(|id| id.saturating_abs() > 1) && owns(&ids));
+        if owned {
+            Routine
+        } else {
+            risky(NOT_OWNED)
+        }
     }
 
     fn delete(&self, program: &str, args: &[String], dynamic: bool) -> Verdict {
@@ -2379,6 +2450,7 @@ mod tests {
             home: Some("/home/me".into()),
             temp: vec!["/tmp".into(), "/var/tmp".into()],
             windows: false,
+            owns: None,
         }
     }
 
@@ -2388,6 +2460,7 @@ mod tests {
             home: Some("c:/users/me".into()),
             temp: vec!["c:/users/me/appdata/local/temp".into()],
             windows: true,
+            owns: None,
         }
     }
 
@@ -2436,6 +2509,9 @@ mod tests {
             "echo $(git rev-parse HEAD)",
             "FOO=1 pnpm vitest run",
             "kill $!",
+            "PID=$(cat pidfile); kill $PID",
+            "PID=$(cat pidfile); kill -- -$PID",
+            "kill -TERM -- -$PID",
             "docker build -t app .",
             "wrangler dev",
             "kubectl get pods",
@@ -2451,6 +2527,54 @@ mod tests {
         ] {
             routine(bash(command), command);
         }
+    }
+
+    #[test]
+    fn stopping_processes_by_id_is_routine_only_when_the_task_started_them() {
+        let task = Context {
+            owns: Some(Rc::new(|targets: &[i64]| {
+                targets
+                    .iter()
+                    .all(|target| [4242, 4243, -4242].contains(target))
+            })),
+            ..unix()
+        };
+        let stop = |command: &str| task.tool("Bash", &json!({ "command": command }));
+        for command in [
+            "kill 4242",
+            "kill -9 4242 4243",
+            "kill -TERM 4242",
+            "kill -s KILL 4242",
+            "kill -- -4242",
+            "kill -9 -4242",
+            "kill $! 4242",
+            "kill %1",
+            "sleep 1; kill 4242",
+        ] {
+            routine(stop(command), command);
+        }
+        for command in [
+            "kill 999",
+            "kill 4242 999",
+            "kill -- -999",
+            "kill -9 -1",
+            "kill 1",
+            "kill 0",
+            "kill -9",
+            "kill $(lsof -ti :1420)",
+            "lsof -ti :1420 | xargs kill",
+            "kill 4242 && rm -rf ~",
+            "pkill -f vite",
+            "killall node",
+        ] {
+            asks(stop(command), command);
+        }
+        // Without an attempt to own them, process IDs always ask.
+        asks(bash("kill 4242"), "kill 4242 without an attempt");
+        let Risky(reason) = stop("pkill -f vite") else {
+            unreachable!()
+        };
+        assert!(reason.contains("process ID"), "{reason}");
     }
 
     #[test]
@@ -2538,6 +2662,9 @@ mod tests {
             "killall node",
             "pkill -f vite",
             "kill -9 1234",
+            "kill -- -1",
+            "kill -- -1234",
+            "kill -- -$PID 1234",
             "chmod 600 ~/.bashrc",
             "echo export X=1 >> ~/.bashrc",
             "tee /etc/hosts < hosts",
@@ -2808,7 +2935,7 @@ mod tests {
 
     #[test]
     fn acp_and_opencode_requests_use_the_same_rules() {
-        let workspace = Path::new("/work/repo");
+        let workspace = &Scope::new(Path::new("/work/repo"));
         let acp = |kind: &str, raw: Value| {
             assess_acp(
                 &json!({"kind": kind, "title": "x", "rawInput": raw}),
@@ -2932,7 +3059,7 @@ mod tests {
             "config",
             "[core]\n\tbare = false\n[remote \"origin\"]\n\turl = git@example.com:a/b.git\n",
         );
-        let context = Context::new(&root.join("repo"));
+        let context = Context::new(&Scope::new(&root.join("repo")));
         let push = |command: &str| context.tool("Bash", &json!({ "command": command }));
         for command in [
             "git push",
@@ -2972,7 +3099,7 @@ mod tests {
             format!("gitdir: {}\n", private.display()),
         )
         .unwrap();
-        let context = Context::new(&worktree);
+        let context = Context::new(&Scope::new(&worktree));
         routine(
             context.tool("Bash", &json!({ "command": "git push -u origin HEAD" })),
             "worktree push",

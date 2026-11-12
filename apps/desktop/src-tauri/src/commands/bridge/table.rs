@@ -394,7 +394,7 @@ pub(super) fn tools() -> Vec<Tool> {
         .help("recall {query?,conversationId?,offset?} searches your earlier conversations or reads one back"),
         Tool::new(
             "ask_user",
-            "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets; use request_human_action for sign-ins, payment, accounts and secrets. Routine questions on an approved plan may be answered by another agent on the owner's behalf, marked in the answer. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
+            "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets; use request_human_action for sign-ins, payment, accounts and secrets. Routine questions on an approved plan may be answered by another agent on the owner's behalf, marked in the answer. Waits briefly and returns pending when unanswered; the answer may then arrive with a later tool result, otherwise read it with user_response. Neither a default nor elapsed time grants approval.",
             h::ask_user,
         )
         .read_only(false)
@@ -414,7 +414,7 @@ pub(super) fn tools() -> Vec<Tool> {
         .help("If a question is pending (or deciding: another agent is answering for the owner), keep the task alive and GET /v1/user-prompt/poll?id=<question-id> to read the saved answer (native MCP: user_response with the question ID). Poll at a modest interval while doing independent work. A default choice or elapsed time is not an answer. Use this bridge for Jackalope-visible questions; an agent's own terminal prompt cannot be answered from Jackalope. If the bridge is unavailable, explain the question and stop for a continuation."),
         Tool::new(
             "request_human_action",
-            "Ask the person to do something only they can: sign in, pay, create an account, add a secret or another manual step. Give short numbered steps and a link. Never ask them to paste a secret into the conversation; for a secret, name the environment variable. Always goes to the person, never to another agent. Waits briefly and returns pending; poll user_response for Done or Declined and any note.",
+            "Ask the person to do something only they can: sign in, pay, create an account, add a secret, allow a macOS permission or another manual step. Give short numbered steps and a link (https, or x-apple.systempreferences: for a System Settings pane). Never ask them to paste a secret into the conversation; for a secret, name the environment variable. Always goes to the person, never to another agent. Waits briefly and returns pending; Done or Declined and any note may then arrive with a later tool result, otherwise poll user_response.",
             h::request_human_action,
         )
         .read_only(false)
@@ -422,7 +422,7 @@ pub(super) fn tools() -> Vec<Tool> {
         .idempotent(false)
         .open_world(false)
         .post("/v1/human-action")
-        .help("Ask the person to do something only they can (sign in, pay, create an account, add a secret): POST $env:JACKALOPE_BRIDGE_URL/v1/human-action (JSON {\"kind\":\"secret\"|\"sign_in\"|\"payment\"|\"account\"|\"other\",\"title\":\"...\",\"instructions\":\"numbered steps\"}; optional url (https) and secretName). It always goes to the person; poll its answer like a question (Done or Declined, with any note). Never ask for a secret's value."),
+        .help("Ask the person to do something only they can (sign in, pay, create an account, add a secret): POST $env:JACKALOPE_BRIDGE_URL/v1/human-action (JSON {\"kind\":\"secret\"|\"sign_in\"|\"payment\"|\"account\"|\"other\",\"title\":\"...\",\"instructions\":\"numbered steps\"}; optional url (https, or x-apple.systempreferences: for a System Settings pane) and secretName). It always goes to the person; poll its answer like a question (Done or Declined, with any note). Never ask for a secret's value."),
         Tool::new(
             "record_validation_step",
             "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification, evidence and evidence level per requirement, plus an optional safety_fact. Jackalope checks cited files, commands and captures locally and lowers unsupported levels. Surfaces in review; does not grant human acceptance.",

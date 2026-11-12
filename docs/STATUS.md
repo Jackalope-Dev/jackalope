@@ -527,7 +527,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Usage separates context a provider read as new from cached re-reads, with a cache
   hit rate, and reports model calls and average context, because cumulative tokens
   track turn count rather than work done. Per-message usage is recorded for Claude,
-  Grok and OpenCode.
+  Grok and OpenCode; an attempt that ends without the agent's final total (stopped,
+  failed or interrupted) keeps the sum of the calls it observed, without a cost, and
+  says so in its activity.
 - Failed attempts keep the agent's own message with a typed kind (authentication,
   quota, rate limit, provider refusal, unavailable model, context length or exit),
   and a next step for sign-in, model and context-length failures. Requested and served models are compared;
@@ -571,8 +573,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a plain push of an existing non-protected local branch to a configured remote,
   history or working-tree loss, piped or encoded code, elevated or system changes,
   software installs beyond the project (system packages, toolchains, global tools),
-  credential files, publishing and deploys, process kills and writes outside the
-  workspace. Here-document bodies read as data, such as commit messages, and command
+  credential files, publishing and deploys, writes outside the workspace, and process
+  kills. On macOS and Linux, `kill` by ID of a process the attempt started, in its
+  agent's process tree or running inside the attempt's own worktree (never the project
+  checkout), is routine; kills by name (`pkill`, `killall`) always ask. Here-document bodies read as data, such as commit messages, and command
   output assigned to a variable are not parsed as commands. Agents are asked to edit
   files with their edit tools so each edit is checked, and `record_decision` replies
   flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the

@@ -1,3 +1,20 @@
+/// Writes an executable into src-tauri/resources only when its bytes or mode differ.
+/// `tauri dev` watches that directory and restarts the build on any change, including a
+/// permission change, so rewriting an unchanged file restarts this script indefinitely.
+fn stage(destination: &std::path::Path, bytes: &[u8]) {
+    if std::fs::read(destination).ok().as_deref() != Some(bytes) {
+        std::fs::write(destination, bytes).unwrap();
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(destination).unwrap().permissions().mode();
+        if mode & 0o777 != 0o755 {
+            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+}
+
 fn main() {
     let root = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
     // Tauri embeds `frontendDist` at compile time. Debug checks and tests of a
@@ -48,15 +65,7 @@ fn main() {
         package.join("package.json").display()
     );
     let staged = destination.join(format!("agent-browser{suffix}"));
-    let bytes = std::fs::read(&source).unwrap();
-    if std::fs::read(&staged).ok().as_deref() != Some(bytes.as_slice()) {
-        std::fs::write(&staged, bytes).unwrap();
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(staged, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
+    stage(&staged, &std::fs::read(&source).unwrap());
     if target.contains("apple") {
         let source = root.join("src/commands/desktop_control/macos.swift");
         println!("cargo:rerun-if-changed={}", source.display());
@@ -111,15 +120,7 @@ fn main() {
             .expect("Building macOS desktop control requires Xcode command-line tools");
         assert!(status.success(), "macOS desktop helper compilation failed");
         let destination = root.join("resources/desktop-control/jackalope-desktop-control");
-        let bytes = std::fs::read(&output).unwrap();
-        if std::fs::read(&destination).ok().as_deref() != Some(bytes.as_slice()) {
-            std::fs::write(&destination, bytes).unwrap();
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        stage(&destination, &std::fs::read(&output).unwrap());
     }
     if target.contains("linux") {
         let source = root.join("src/commands/desktop_control/linux.c");
@@ -164,15 +165,7 @@ fn main() {
             .expect("Linux desktop control requires a native C compiler");
         assert!(status.success(), "Linux desktop helper compilation failed");
         let destination = root.join("resources/desktop-control/jackalope-desktop-control");
-        let bytes = std::fs::read(&output).unwrap();
-        if std::fs::read(&destination).ok().as_deref() != Some(bytes.as_slice()) {
-            std::fs::write(&destination, bytes).unwrap();
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        stage(&destination, &std::fs::read(&output).unwrap());
     }
     tauri_build::build()
 }

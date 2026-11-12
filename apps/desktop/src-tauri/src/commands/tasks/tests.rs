@@ -1,4 +1,5 @@
 use super::*;
+mod agent_matrix;
 mod decision_trail;
 mod workbench;
 mod workspace_modes;
@@ -56,6 +57,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         requested_model: None,
         fallback_model: None,
         model_mismatch: None,
+        model_reported: false,
         prompt: "Example".into(),
         status: RunStatus::Running,
         started_at: Utc::now().to_rfc3339(),
@@ -73,9 +75,11 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         mcp_usage: None,
         usage_observations: vec![],
         prompts: vec![],
+        awaiting_answers: Vec::new(),
         validation_steps: vec![],
         decisions: vec![],
         screenshots: vec![],
+        desktop_permissions: Vec::new(),
         desktop_actions: vec![],
         visited_pages: vec![],
         review_captures: None,
@@ -351,9 +355,8 @@ fn installed_agent_lifecycle_trial() {
     agent_lifecycle_trial(&agent, None);
 }
 
-pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
-    assert!(crate::commands::agents::is_builtin(agent));
-    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+/// A disposable repository with one fixture commit, for trials that run installed agents.
+pub(super) fn trial_repository(root: &Path) -> PathBuf {
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
     let repo_text = repo.to_string_lossy().to_string();
@@ -382,6 +385,68 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         ],
     )
     .unwrap();
+    repo
+}
+
+/// A new isolated task for a trial, with no MCP connections.
+pub(super) fn trial_request(
+    repo: &Path,
+    agent: &str,
+    model: Option<String>,
+    prompt: &str,
+) -> RunRequest {
+    RunRequest {
+        retry_of: None,
+        continues: None,
+        live_session_id: None,
+        effort: None,
+        codex_speed: None,
+        dependency_snapshot: Default::default(),
+        id: uuid::Uuid::new_v4().to_string(),
+        project_id: uuid::Uuid::new_v4().to_string(),
+        project_name: "Agent acceptance fixture".into(),
+        project_path: repo.to_string_lossy().into_owned(),
+        agent: agent.into(),
+        agent_profile_id: None,
+        verify_command: None,
+        target_branch: Some("main".into()),
+        account_binding: None,
+        model,
+        prompt: prompt.into(),
+        isolated: true,
+        workspace_mode: None,
+        previous_run_id: None,
+        connection_ids: Some(vec![]),
+        coordination: None,
+        prepare_command: None,
+        setup_files: Vec::new(),
+        auto_verify: false,
+        monitor_change: None,
+        context_selection: Default::default(),
+        context_receipt: Default::default(),
+    }
+}
+
+/// Waits for an attempt to finish. One still active after `limit` is stopped and `None`.
+pub(super) fn trial_settled(runtime: &TaskRuntime, id: &str, limit: Duration) -> Option<TaskRun> {
+    let deadline = std::time::Instant::now() + limit;
+    loop {
+        let run = runtime.inner.lock().unwrap().runs[id].clone();
+        if !run.status.is_active() {
+            return Some(run);
+        }
+        if std::time::Instant::now() > deadline {
+            let _ = runtime.stop(id);
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
+    assert!(crate::commands::agents::is_builtin(agent));
+    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+    let repo = trial_repository(&root);
     let history = root.join("history");
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let selected_agent = if let Some(executable) = executable {
@@ -405,25 +470,13 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         .is_none()
         .then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok())
         .flatten();
-    let request = RunRequest {
-        retry_of: None,
-        continues: None,
-        live_session_id: None,
-                effort: None,
-        codex_speed: None,
-        dependency_snapshot: Default::default(),
-        id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
-        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: selected_agent.into(),
-        agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
-        account_binding: None, model,
-        prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
-        isolated: true, workspace_mode: None, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
-        prepare_command: None,
-        setup_files: Vec::new(), auto_verify: false, monitor_change: None,
-        context_selection: Default::default(), context_receipt: Default::default(),
-    };
+    let mut request = trial_request(
+        &repo,
+        selected_agent,
+        model,
+        "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.",
+    );
     let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
-    let mut request = request;
     if executable.is_some() {
         request.auto_verify = true;
         request.verify_command = Some("node -e \"require('node:assert/strict').equal(require('node:fs').readFileSync('receipt.txt','utf8').trim(),'JACKALOPE_NATIVE_OK')\"".into());
@@ -466,23 +519,14 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
             .input_values
             .insert("Receipt name".into(), "receipt.txt".into());
     }
-    fn settled(runtime: &TaskRuntime, id: &str) -> TaskRun {
-        let deadline = std::time::Instant::now() + Duration::from_secs(180);
-        loop {
-            let run = runtime.inner.lock().unwrap().runs[id].clone();
-            if !run.status.is_active() {
-                return run;
-            }
-            if std::time::Instant::now() > deadline {
-                let _ = runtime.stop(id);
-                panic!(
-                    "Agent trial timed out; retained fixture history at {}",
-                    runtime.directory.display()
-                );
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        }
-    }
+    let settled = |runtime: &TaskRuntime, id: &str| {
+        trial_settled(runtime, id, Duration::from_secs(180)).unwrap_or_else(|| {
+            panic!(
+                "Agent trial timed out; retained fixture history at {}",
+                runtime.directory.display()
+            )
+        })
+    };
     runtime.start(request.clone()).unwrap();
     let first = settled(&runtime, &request.id);
     assert_eq!(
@@ -816,6 +860,79 @@ fn final_usage_replaces_replayed_totals_and_cache_is_counted_once() {
         assert_eq!(run.usage.input + run.usage.output, 135);
         assert_eq!(run.usage.estimated_cost_usd, Some(0.012));
     }
+}
+
+const CLAUDE_CALLS: [&str; 4] = [
+    r#"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"output_tokens":1}}}"#,
+    // The same call again for its next content block, with its final output count.
+    r#"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"output_tokens":7}}}"#,
+    r#"{"type":"assistant","message":{"id":"m2","usage":{"input_tokens":5,"cache_read_input_tokens":130,"cache_creation_input_tokens":0,"output_tokens":3}}}"#,
+    r#"{"type":"assistant","parent_tool_use_id":"child-1","message":{"id":"m3","usage":{"input_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":6,"output_tokens":2}}}"#,
+];
+
+#[test]
+fn an_attempt_ended_without_a_result_keeps_the_usage_it_observed_once() {
+    for end in [
+        TaskRun::mark_stopped as fn(&mut TaskRun),
+        |run: &mut TaskRun| run.mark_failed("Agent exited".into()),
+    ] {
+        let mut run = sample("claude");
+        for event in CLAUDE_CALLS {
+            consume_event(&mut run, event);
+        }
+        assert!(!run.usage.reported);
+        end(&mut run);
+        end(&mut run);
+        assert!(run.usage.reported);
+        assert_eq!(run.usage.input, 130 + 135 + 10);
+        assert_eq!(run.usage.output, 7 + 3 + 2);
+        assert_eq!(run.usage.cache_read, 230);
+        assert_eq!(run.usage.cache_write, 26);
+        assert_eq!(run.usage.estimated_cost_usd, None);
+        let notes = run
+            .activity
+            .iter()
+            .filter(|line| line.contains("3 model calls observed"))
+            .count();
+        assert_eq!(notes, 1);
+    }
+}
+
+#[test]
+fn a_reported_result_wins_over_observed_calls() {
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","usage":{"input_tokens":15,"cache_read_input_tokens":230,"cache_creation_input_tokens":20,"output_tokens":10},"total_cost_usd":0.02}"#,
+    );
+    run.mark_failed("Checks failed".into());
+    assert_eq!(run.usage.input, 265);
+    assert_eq!(run.usage.output, 10);
+    assert_eq!(run.usage.estimated_cost_usd, Some(0.02));
+    assert!(!run.activity.iter().any(|line| line.contains("model call")));
+}
+
+#[test]
+fn an_attempt_interrupted_by_closing_keeps_its_observed_usage_after_reload() {
+    let folder = std::env::temp_dir().join(format!("jackalope-usage-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    runtime.save(&run).unwrap();
+    drop(runtime);
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restored = loaded.inner.lock().unwrap().runs[&run.id].clone();
+    drop(loaded);
+    std::fs::remove_dir_all(folder).unwrap();
+    assert_eq!(restored.status, RunStatus::Interrupted);
+    assert!(restored.usage.reported);
+    assert_eq!(restored.usage.input + restored.usage.output, 287);
+    assert_eq!(restored.usage.cache_read, 230);
 }
 
 #[test]

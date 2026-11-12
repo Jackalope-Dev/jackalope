@@ -28,7 +28,10 @@ run the same handler and fail the same way. An HTTP error is a status with a JSO
 `{"error": ...}` body. A question (`ask_user`, `request_human_action`) waits up to a
 minute for an answer over MCP before it returns pending; over HTTP it returns at once,
 since an agent's shell command may time out sooner and a retried command would ask
-again, and the agent polls `user_response`. `GET /v1/help` lists each tool's HTTP
+again, and the agent polls `user_response`. An answer saved after the question returned
+pending is owed to the agent until `user_response` returns it; in a persistent Claude Code
+session it also arrives once as context after the agent's next tool call, so an agent that
+stopped polling still receives it. `GET /v1/help` lists each tool's HTTP
 contract; a lean attempt gets a short form unless it asks for `?full=true`.
 
 Project awareness includes manual tasks, queued assignments, latest attempts,
@@ -121,8 +124,9 @@ question the local classifier flags, reaches the person with an `escalation` rea
 [agent decisions](PLAN-MODE.md#agent-decisions).
 `request_human_action` asks the person to sign in, pay, create an account, add a secret or
 take another manual step: `kind` (`secret`, `sign_in`, `payment`, `account` or `other`), a
-`title` up to 120 characters, numbered `instructions` up to 2,000, an optional https `url`
-and, for a secret, a `secretName` shaped like an environment variable. It is never routed
+`title` up to 120 characters, numbered `instructions` up to 2,000, an optional `url`
+(https, or an `x-apple.systempreferences:` pane identifier that the desktop opens in macOS
+System Settings; other schemes and spaces are refused) and, for a secret, a `secretName` shaped like an environment variable. It is never routed
 to an agent. The app and the phone companion show it as a **Needs you** card with the steps,
 the link, a hint to add a secret under Project settings → Secrets, an optional note and
 **Done** or **I can't do this**; the agent waits like `ask_user` and reads `Done` or

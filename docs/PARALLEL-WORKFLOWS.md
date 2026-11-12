@@ -107,7 +107,9 @@ development agent. The agent receives the complete request and checks repository
 boundaries before proposing one to four assignments, or up to eight when the
 concurrency limit is higher. Each assignment includes a planner briefing (key files,
 patterns, contracts, checks and pitfalls, under 1,500 characters) that the worker
-receives so it can skip repeated discovery; workers are told to confirm it. Review ownership and
+receives so it can skip repeated discovery; workers are told to confirm it. Every worker
+also receives the complete request after its assignment, so the planner does not copy it
+into assignments. Review ownership and
 dependencies, then choose **Start reviewed plan**. Native validation rejects cycles,
 escaping paths and independent assignments with overlapping scopes, for automatic and
 reviewed plans alike. A changed planner attempt requires another review. Planning
@@ -116,6 +118,13 @@ workspaces must remain unchanged before implementation starts.
 Planning considers integration and review effort, shared contracts, generated files,
 manifests and lockfiles. Shared changes have one owner or an explicit dependency.
 Tightly coupled work stays together; a small request can remain one assignment.
+Assignments are sized for one agent session: a request spanning many independent
+areas, screens or files, or a long verification checklist, is split into separately
+verifiable assignments, each saying how its result is checked. Work that must first
+discover the current state (an audit, sweep or investigation) starts with a read-only
+audit assignment that reports its findings, and later assignments depend on it.
+Shared groundwork, such as a shared component, is a prerequisite its consumers depend
+on. There is no minimum assignment count.
 
 Planning accounts for repeated discovery, setup and checks in each assignment.
 Dispatch prioritizes prerequisites on the longest remaining dependency chains,

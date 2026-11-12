@@ -53,6 +53,7 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentScreen } from './AgentScreen';
 import { DecisionTrail } from './DecisionTrail';
+import { DesktopPermissionNotice } from './DesktopPermissionNotice';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ResumeInterrupted, resumePrompt } from './ResumeInterrupted';
@@ -681,6 +682,7 @@ export function TaskDetail({
           onInspect={() => setTab('activity')}
         />
       )}
+      <DesktopPermissionNotice key={run.id} run={run} />
       {!!pending.length && (
         <TaskQuestions>
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>

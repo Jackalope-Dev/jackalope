@@ -14,6 +14,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { agentAdapter } from '../../lib/agent-catalog';
 import { navigateWorkspace, openProjectSettings } from '../../lib/app-events';
 import { runHostName } from '../../lib/computers';
+import { openExternalUrl } from '../../lib/native/env';
 import {
   type AutonomyEntry,
   approvalVerification,
@@ -346,6 +347,7 @@ function PlanDetail({
               await respondToPrompt(prompt.runId, prompt.id, answer);
               await act(async () => {});
             }}
+            onOpenLink={(url) => void openExternalUrl(url)}
           />
         );
       })}

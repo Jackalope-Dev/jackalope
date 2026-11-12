@@ -472,12 +472,12 @@ impl Api<'_> {
             let decision = if scopes.iter().any(|scope| denials.scopes.contains(scope)) {
                 crate::commands::permission_risk::Decision::Ask(None)
             } else {
-                crate::commands::permission_risk::decide(runtime, run_id, &label, |workspace| {
+                crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
                     crate::commands::permission_risk::assess_opencode(
                         permission,
                         &patterns,
                         &request["metadata"],
-                        workspace,
+                        scope,
                     )
                 })
             };

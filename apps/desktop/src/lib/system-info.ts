@@ -17,6 +17,13 @@ export interface DesktopControlReadiness {
 
 export type DesktopPermission = 'accessibility' | 'screenRecording' | 'inputMonitoring';
 
+/** Each permission's pane name in macOS System Settings. */
+export const DESKTOP_PERMISSION_LABELS: Record<DesktopPermission, string> = {
+  accessibility: 'Accessibility',
+  screenRecording: 'Screen Recording',
+  inputMonitoring: 'Input Monitoring',
+};
+
 export const getSystemInfo = () => invokeNative<SystemInfo>('system_get_info');
 
 export const openDesktopPermissionSettings = (permission: DesktopPermission) =>
