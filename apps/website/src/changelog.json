@@ -1,5 +1,17 @@
 [
   {
+    "id": "resume-work-jackalope-closed-in-the-middle-of",
+    "date": "2026-11-12",
+    "title": "Resume work Jackalope closed in the middle of",
+    "description": "Work that was running when Jackalope closed or restarted now has a Resume button, so you can pick it up instead of starting over.",
+    "items": [
+      "Resume shows anything still running in the task's workspace, such as a dev server the agent started, so you can stop it first. Checking works on macOS and Linux.",
+      "Resuming continues the agent's conversation in the same workspace, with any instructions you add. If no conversation was saved, the work starts again in that workspace.",
+      "Text on task, settings and other workspace pages can now be selected and copied."
+    ],
+    "note": "Not yet tested in the installed app."
+  },
+  {
     "id": "swarm-tasks-keep-their-work-when-a-computer-drops-out",
     "date": "2026-11-07",
     "title": "Swarm tasks keep their work when a computer drops out",

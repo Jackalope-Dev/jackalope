@@ -30,6 +30,7 @@ mod tests;
 pub(super) mod timing;
 pub(in crate::commands) mod tool_activity;
 mod warm_opencode;
+mod workspace_processes;
 
 pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;
@@ -242,6 +243,8 @@ macro_rules! tauri_commands {
             commands::tasks::task_screenshot,
             commands::tasks::task_start,
             commands::tasks::task_stop,
+            commands::tasks::task_release_interrupted,
+            commands::tasks::task_workspace_processes,
             commands::tasks::task_mark_reviewed,
             commands::tasks::task_review,
             commands::tasks::task_respond_prompt,
@@ -562,6 +565,43 @@ pub async fn task_stop(id: String, state: State<'_, TaskRuntime>) -> Result<(), 
     tauri::async_runtime::spawn_blocking(move || runtime.stop(&id))
         .await
         .map_err(|e| e.to_string())?
+}
+
+/// Processes still running in an attempt's workspace; `None` when this system cannot tell.
+#[tauri::command]
+pub async fn task_workspace_processes(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Option<Vec<workspace_processes::WorkspaceProcess>>, String> {
+    let workspace = {
+        let inner = state.inner.lock().map_err(|e| e.to_string())?;
+        let run = inner.runs.get(&id).ok_or("Attempt not found")?;
+        PathBuf::from(if run.workspace.is_empty() {
+            &run.project_path
+        } else {
+            &run.workspace
+        })
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        workspace_processes::workspace_processes(&workspace)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Clears an interrupted attempt after the person confirmed nothing from it is running.
+#[tauri::command]
+pub async fn task_release_interrupted(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<TaskRun, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        runtime.release_interrupted(&id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

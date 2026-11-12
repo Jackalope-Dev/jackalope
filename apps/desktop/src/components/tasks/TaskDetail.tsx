@@ -34,6 +34,7 @@ import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { PROMPT_MAX_CHARS, type TaskRun } from '../../lib/run-types';
 import {
   markReviewed,
+  releaseInterrupted,
   retryTask,
   stopAndSettle,
   stopPreview as stopPreviewTask,
@@ -54,6 +55,7 @@ import { AgentScreen } from './AgentScreen';
 import { DecisionTrail } from './DecisionTrail';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
+import { ResumeInterrupted, resumePrompt } from './ResumeInterrupted';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { SplitTaskButton } from './SplitTaskButton';
 import { TaskActivity } from './TaskActivity';
@@ -141,7 +143,9 @@ export function TaskDetail({
   useEffect(() => {
     if (workRequest?.id !== run.id) return;
     const section = workRequest.section;
-    if (section === 'question' || section === 'recovery') {
+    if (section === 'resume') {
+      document.getElementById('task-resume')?.focus();
+    } else if (section === 'question' || section === 'recovery') {
       document
         .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
         ?.querySelector<HTMLElement>('button, input, textarea')
@@ -231,7 +235,9 @@ export function TaskDetail({
     onError: setError,
   });
   const inspect = (section: string) => {
-    if (section === 'question' || section === 'recovery') {
+    if (section === 'resume') {
+      document.getElementById('task-resume')?.focus();
+    } else if (section === 'question' || section === 'recovery') {
       document
         .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
         ?.scrollIntoView({ block: 'center' });
@@ -282,6 +288,18 @@ export function TaskDetail({
     }
   };
   /** Start a fresh attempt at this task and follow it. */
+  /** Picks up an interrupted attempt the person checked: its conversation, or a fresh attempt. */
+  const resumeInterrupted = async (instructions: string) => {
+    await releaseInterrupted(run.id);
+    await refresh();
+    if (run.sessionId) {
+      await startContinuation(resumePrompt(instructions));
+      return;
+    }
+    const id = await retryTask(run.id);
+    await refresh();
+    useExecutionStore.getState().select(id);
+  };
   const retry = async () => {
     if (retrying || submitting) return;
     setRetrying(true);
@@ -458,7 +476,14 @@ export function TaskDetail({
           />
         )}
         <div className="task-detail-utilities">
-          {!active && isLatest && (
+          {!active && isLatest && run.status === 'interrupted' && !integrated ? (
+            <ResumeInterrupted
+              id="task-resume"
+              run={run}
+              disabled={acting || submitting}
+              onResume={resumeInterrupted}
+            />
+          ) : !active && isLatest ? (
             <Button
               disabled={acting || submitting}
               loading={acting}
@@ -467,7 +492,7 @@ export function TaskDetail({
             >
               {decision.action}
             </Button>
-          )}
+          ) : null}
           <WorkSourceLink prompts={attempts.map((attempt) => attempt.prompt)} />
           {attempts.length > 1 && (
             <Select

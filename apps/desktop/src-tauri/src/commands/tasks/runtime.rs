@@ -1664,6 +1664,37 @@ impl TaskRuntime {
             .revision
             .load(std::sync::atomic::Ordering::SeqCst)
     }
+    /// Records that the person checked an interrupted attempt and nothing from it is still
+    /// running, so it becomes a stopped attempt that can be continued or retried and no
+    /// longer holds its workspace. The agent's own process group was already ended by its
+    /// guardian when Jackalope closed; anything it started outside that group is for the
+    /// person to judge (see `workspace_processes`).
+    pub(in crate::commands) fn release_interrupted(&self, id: &str) -> Result<TaskRun, String> {
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let run = inner.runs.get(id).ok_or("Attempt not found")?;
+        if run.status != RunStatus::Interrupted {
+            return Err("Only an interrupted attempt can be resumed.".into());
+        }
+        if inner
+            .runs
+            .values()
+            .any(|r| r.task_id == run.task_id && r.started_at > run.started_at)
+        {
+            return Err("Open the latest attempt before resuming this task.".into());
+        }
+        let mut updated = run.clone();
+        updated.status = RunStatus::Stopped;
+        updated.error = Some(
+            "Jackalope closed before this attempt finished. It was resumed after you confirmed nothing from it was still running.".into(),
+        );
+        self.save(&updated)?;
+        updated.persistence_error = None;
+        inner.runs.insert(updated.id.clone(), updated.clone());
+        drop(inner);
+        self.writer.changed(id);
+        Ok(updated)
+    }
+
     /// Describe a fresh attempt at the same work as `id`. The retry keeps the task's
     /// settings and agreed outcome, starts no agent session from the old attempt, and is
     /// free to continue in that attempt's workspace when `reusable_workspace` allows it.

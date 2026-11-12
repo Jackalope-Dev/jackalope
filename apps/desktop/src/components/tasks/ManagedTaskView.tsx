@@ -28,7 +28,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { queueCommand } from '../../lib/queue';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
-import { stopPreview } from '../../lib/task-client';
+import { releaseInterrupted, stopPreview } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -44,6 +44,7 @@ import { ManagedTaskDetails } from './ManagedTaskDetails';
 import { ManagedTaskJourney } from './ManagedTaskJourney';
 import { MergeReview } from './MergeReview';
 import { ResultReview } from './ResultReview';
+import { ResumeInterrupted, resumePrompt } from './ResumeInterrupted';
 import { RunStatus } from './RunStatus';
 import { TaskActivity } from './TaskActivity';
 import { TaskLiveActivity } from './TaskLiveActivity';
@@ -207,8 +208,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
     setViewTab('activity');
     requestAnimationFrame(() => activityTabRef.current?.focus());
   };
-  const continueRun = async (run: TaskRun, advanceWorkflow = false) => {
-    if (!correction.trim()) return;
+  const continueRun = async (run: TaskRun, prompt: string) => {
     await managedTaskCommand('action', { id: task.id, action: 'pause' });
     if (previewRunning) await stopPreview(run.id);
     const id = await start(
@@ -218,15 +218,36 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
         model: run.model ?? undefined,
         agentProfileId: run.accountBinding?.profileId ?? '__default',
         previousRunId: run.id,
-        prompt: correction.trim(),
-        ...(advanceWorkflow ? { contextSelection: { advanceWorkflow: true } } : {}),
+        prompt,
       },
       { background: true },
     );
-    setCorrection('');
     setDetailId(id);
     setViewTab('overview');
     if (task.started) await managedTaskCommand('action', { id: task.id, action: 'resume' });
+  };
+  const sendCorrection = async (run: TaskRun) => {
+    const prompt = correction.trim();
+    if (!prompt) return;
+    await continueRun(run, prompt);
+    setCorrection('');
+  };
+  const interrupted = [work.planner, ...work.steps.map(({ run }) => run)].find(
+    (run) => run?.status === 'interrupted',
+  );
+  /** Picks up an interrupted attempt the person checked: its conversation, or a fresh attempt. */
+  const resumeRun = async (run: TaskRun, instructions: string) => {
+    await releaseInterrupted(run.id);
+    await refreshAll();
+    const item = work.steps.find((step) => step.run?.id === run.id)?.item;
+    if (run.sessionId) await continueRun(run, resumePrompt(instructions));
+    else if (run.id === work.planner?.id)
+      await managedTaskCommand('action', { id: task.id, action: 'retry-plan' });
+    else if (item) {
+      await queueCommand('queue_release', { id: item.id, retry: true });
+      if (task.started) await managedTaskCommand('action', { id: task.id, action: 'resume' });
+    }
+    await refreshAll();
   };
   const prepareCorrection = (text: string) => {
     setCorrection(appendFeedbackDraft(correction, text));
@@ -255,6 +276,13 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
           description={<span role="status">{work.status}</span>}
           action={
             <div className="managed-task-actions">
+              {interrupted && !work.active.length && !work.integrated && (
+                <ResumeInterrupted
+                  run={interrupted}
+                  disabled={busy}
+                  onResume={(instructions) => resumeRun(interrupted, instructions)}
+                />
+              )}
               {task.delivery &&
                 task.error &&
                 task.delivery.repairs.length >= task.delivery.repairLimit &&
@@ -304,6 +332,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                 !work.integrated &&
                 viewTab !== 'review' && (
                   <Button
+                    variant={interrupted ? 'outline' : undefined}
                     onClick={() => {
                       setDetailId(null);
                       setViewTab('review');
@@ -595,7 +624,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                     <Button
                       variant="outline"
                       disabled={busy || !correction.trim()}
-                      onClick={() => void act(() => continueRun(work.combined as TaskRun))}
+                      onClick={() => void act(() => sendCorrection(work.combined as TaskRun))}
                     >
                       {previewRunning ? 'Stop preview and update result' : 'Update result'}
                     </Button>
@@ -700,7 +729,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             />
                             <Button
                               disabled={busy || !correction.trim()}
-                              onClick={() => void act(() => continueRun(detail))}
+                              onClick={() => void act(() => sendCorrection(detail))}
                             >
                               Send follow-up
                             </Button>
