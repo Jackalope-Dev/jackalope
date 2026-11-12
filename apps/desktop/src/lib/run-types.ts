@@ -2,6 +2,7 @@ import type { PendingUserPrompt, RunStatus } from '@jackalope/contracts/runs';
 import type { DecisionReceipt } from './decisions.ts';
 import type { ContextReceipt, ContextSelection } from './knowledge-types.ts';
 import type { ReviewCaptures } from './review-captures.ts';
+import type { DesktopPermission } from './system-info.ts';
 import type { TaskEffort } from './task-effort.ts';
 import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
 
@@ -228,6 +229,8 @@ export interface TaskRun {
   /** Append-only decision trail the agent reported for this attempt. */
   decisions?: DecisionEntry[];
   screenshots?: ScreenshotArtifact[];
+  /** macOS permissions the last desktop-control call lacked; cleared when one succeeds. */
+  desktopPermissions?: DesktopPermission[];
   /** Desktop-control actions, newest last; summaries keep only the latest few. */
   desktopActions?: DesktopActionRecord[];
   /** Local preview paths the agent opened in its task browser, newest last. */

@@ -1240,6 +1240,7 @@ pub async fn execute(
     platform::capabilities().action(&request.action)?;
     let owned = session(&runtime, &run.id, request.action == "request_access")?;
     let id = run.id.clone();
+    let (recorder, recorded) = (runtime.clone(), !run.desktop_permissions.is_empty());
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<Value, Failure> {
         let mut access = owned
             .access
@@ -1289,7 +1290,30 @@ pub async fn execute(
     if matches!(result, Err(Failure::Ended(_))) {
         close(&id);
     }
-    result.map_err(String::from)
+    match result {
+        // The helper refuses with a System Settings step when macOS lacks a permission.
+        Err(failure) => {
+            let message = String::from(failure);
+            if !message.contains("restart") {
+                return Err(message);
+            }
+            let missing = tauri::async_runtime::spawn_blocking(platform::missing_permissions)
+                .await
+                .unwrap_or_default();
+            if missing.is_empty() {
+                return Err(message);
+            }
+            let names = platform::permission_names(&missing);
+            recorder.update(&id, |run| run.desktop_permissions = missing);
+            Err(format!("macOS has not allowed Jackalope {names}, so desktop control is unavailable. This task shows the person how to allow it. macOS applies it only after Jackalope restarts, which interrupts this attempt: continue without desktop control, or finish and report that it is blocked."))
+        }
+        Ok(value) => {
+            if recorded {
+                recorder.update(&id, |run| run.desktop_permissions.clear());
+            }
+            Ok(value)
+        }
+    }
 }
 
 macro_rules! tauri_commands {

@@ -178,6 +178,10 @@ pub struct TaskRun {
     pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// macOS permissions this attempt's last desktop-control call lacked, such as
+    /// `accessibility`, for the task view's setup notice. Cleared when a call succeeds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub desktop_permissions: Vec<String>,
     /// Desktop-control actions for the Screen view, newest last and bounded.
     #[serde(default)]
     pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
@@ -451,6 +455,7 @@ impl TaskRun {
             validation_steps: self.validation_steps.clone(),
             decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_permissions: self.desktop_permissions.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
             visited_pages: self.visited_pages.clone(),

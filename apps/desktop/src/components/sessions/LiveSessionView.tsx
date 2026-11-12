@@ -43,6 +43,7 @@ import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
 import { DecisionTrail } from '../tasks/DecisionTrail';
+import { DesktopPermissionNotice } from '../tasks/DesktopPermissionNotice';
 import { MergeReview } from '../tasks/MergeReview';
 import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
@@ -767,6 +768,7 @@ export function LiveSessionView({
                   </Button>
                 </div>
               )}
+              {latest && <DesktopPermissionNotice key={latest.id} run={latest} />}
               {questions.map((prompt) => (
                 <AgentQuestion
                   key={prompt.id}

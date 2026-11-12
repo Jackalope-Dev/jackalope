@@ -175,6 +175,9 @@ async fn project_exposes_only_the_authorized_attempts_verification_command() {
     );
     assert_eq!(snapshot["verification"]["automatic"], true);
     assert_eq!(snapshot["verification"]["arguments"], json!({}));
+    let capabilities = &snapshot["capabilities"];
+    assert!(capabilities["desktopControl"].is_boolean());
+    assert!(capabilities["desktopControlMissing"].is_array());
     f.runtime
         .update("reader-run", |run| run.verify_command = None);
     assert!(project().await.unwrap()["verification"]["command"].is_null());

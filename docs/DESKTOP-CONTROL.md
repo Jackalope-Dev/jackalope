@@ -214,7 +214,18 @@ acceptance; those remain separate [native release checks](SELF-DEVELOPMENT.md).
 Settings → Devices reports native-control readiness. On macOS, **Set up macOS
 permissions** explicitly requests Accessibility, Screen Recording and Input
 Monitoring. Complete the OS prompts, restart Jackalope and refresh. Permission
-checks alone never grant an agent a window. Development launches may attribute
+checks alone never grant an agent a window.
+
+Agents see the permissions still missing as `desktopControlMissing` in the `project`
+snapshot's capabilities (empty when none are missing or off macOS). When a
+`desktop_control` call fails because macOS lacks one, the agent is told which and that
+granting takes effect only after a restart, and the attempt records them
+(`desktopPermissions`, cleared by the next successful call). The task and conversation
+views then show a dismissible notice, while this Mac still reports them missing, with a
+button per System Settings pane and **Restart Jackalope**, which is disabled while that
+work runs; the restart itself still refuses while any work or terminal runs. Agents may
+link a pane in `request_human_action` with an `x-apple.systempreferences:` URL, which the
+desktop opens natively because the webview's opener allows only web links. Development launches may attribute
 permissions to the launching application or helper; verify attribution again from
 the eventual app bundle. No permission bypass or automatic resume is provided.
 

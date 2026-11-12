@@ -172,6 +172,32 @@ pub fn readiness() -> Readiness {
     }
 }
 
+/// The macOS permissions desktop control still lacks; empty elsewhere or when
+/// the check fails. Runs the helper on macOS, so call it off the async runtime.
+pub fn missing_permissions() -> Vec<String> {
+    #[cfg(target_os = "macos")]
+    return readiness().missing;
+    #[cfg(not(target_os = "macos"))]
+    Vec::new()
+}
+
+/// Names permission ids from [`Readiness::missing`] as System Settings does.
+pub(crate) fn permission_names(missing: &[String]) -> String {
+    let names: Vec<&str> = missing
+        .iter()
+        .map(|permission| match permission.as_str() {
+            "accessibility" => "Accessibility",
+            "screenRecording" => "Screen Recording",
+            "inputMonitoring" => "Input Monitoring",
+            other => other,
+        })
+        .collect();
+    match names.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => names.concat(),
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn linux_readiness() -> Readiness {
     let detected = detected(true);
