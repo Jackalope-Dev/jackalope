@@ -189,7 +189,13 @@ native Keychain/Secret Service storage on Unix. Existing account identities rema
 The desktop never marks Grok or OpenCode authenticated merely because an
 executable or saved credential exists. Profiles are account organization,
 not a sandbox: inherited provider environment variables, CLI plugins, project
-configuration and filesystem permissions still apply. Real account switching
+configuration and filesystem permissions still apply. Child processes do not
+inherit Jackalope's own `JACKALOPE_*` credentials (keys, tokens, secrets and
+passwords) from the app's environment; one reaches a process only when Jackalope
+sets it for that process, as it does an attempt's bridge token. Values an attempt
+gives its agent are redacted from its record
+([project secrets](AGENT-ACCOUNTS.md#project-secrets)). Grok's prompt file is created
+new, owner-only on Unix, and removed when the attempt ends. Real account switching
 between two authenticated identities, revoked/expired credentials and every
 provider/model combination remain release acceptance work.
 
