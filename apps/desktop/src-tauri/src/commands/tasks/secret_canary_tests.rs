@@ -206,7 +206,11 @@ fn files(directory: &std::path::Path) -> String {
     let mut text = String::new();
     for entry in std::fs::read_dir(directory).unwrap() {
         let path = entry.unwrap().path();
-        if path.is_file() {
+        // The runtime's ownership lock holds no record, and Windows refuses to
+        // read a file another handle has locked.
+        if path.is_file()
+            && path.file_name() != Some(crate::cli_protocol::profile::RUNTIME_LOCK.as_ref())
+        {
             text.push_str(&String::from_utf8_lossy(&std::fs::read(&path).unwrap()));
         }
     }
