@@ -321,6 +321,40 @@ Remove-Item Env:JACKALOPE_AGENT_TRIAL, Env:JACKALOPE_AGENT_MODEL
 ```
 
 Use `codex`, `claude` or `grok` without `JACKALOPE_AGENT_MODEL` to use that CLI's
-configured model. Free-model availability can change. Install OpenCode from
+configured model. Free-model availability can change.
+
+### Agent × model matrix
+
+The ignored `installed_agent_matrix` test runs scenarios per listed agent and model on
+the lifecycle trial's fixtures, each pair in its own disposable repository and history.
+It spends provider usage only when invoked and never runs in `pnpm verify` or CI. List every pair explicitly: each model
+is a pair, the next model listed for that agent is its switch partner, and an agent
+without models uses its CLI default.
+
+```powershell
+$env:JACKALOPE_AGENT_MATRIX = 'claude=claude-haiku-4-5,claude-sonnet-4-5;codex'
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features installed_agent_matrix -- --ignored --nocapture
+Remove-Item Env:JACKALOPE_AGENT_MATRIX
+```
+
+One session per pair runs, in order: a first turn, a follow-up that must keep the
+session, a switch to the partner model and back, a named file with exact content
+in the attempt's worktree, and a restart. The restart closes the runtime as an app
+exit does (warm sessions and helpers end), reopens the same history, checks the
+saved attempt, session and file came back, then asks for the first turn's word. It
+proves continuation from saved history and the CLI's own session store. A pair
+stops at its first failing scenario; a scenario without an answer within
+`JACKALOPE_AGENT_MATRIX_TURN_SECONDS` (default 300) fails. An adapter failure runs
+the pair once more and keeps the first try beside the retry.
+
+Findings are reported apart from verdicts: a served model other than the requested
+one (`served_model.rs`), a completed turn that named no served model, a Claude pair
+with at least 10,000 input tokens and no cache reads, and missing usage. Pairs with
+a substituted or unconfirmed served model are left out of the pass count.
+Authentication, quota, rate-limit and model-access failures (`failure.rs`) stop the
+pair as account findings, without a retry. `report.json` and `report.md` go to
+ignored `output/agent-matrix/<time>/`, or the absolute `JACKALOPE_AGENT_MATRIX_OUT`;
+fixtures stay in the temporary folder for diagnosis. Agent sign-ins and global CLI
+configuration are shared with your everyday use. Install OpenCode from
 [its official documentation](https://opencode.ai/docs/); the Windows npm binary
 layout and `.opencode/bin` are discovered alongside PATH executables.
