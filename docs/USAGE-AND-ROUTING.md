@@ -154,7 +154,7 @@ real-task cost/latency comparisons and native macOS/Linux credential checks rema
 outside coordinator/execution locks. The default agent sees the complete request, its
 acceptance criteria, recorded outcomes and eligible agent/model/account options with
 provider windows; context saved for the worker is left out. It answers without tools at
-its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at minimal
+its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at low
 reasoning) and returns a validated option ID, a short reason, an optional quota
 estimate and up to three ordered alternatives. A routing agent that does not answer
 within eight seconds, or fails without a quota error, leaves the choice to local rules
@@ -207,6 +207,13 @@ the latest saved attempt. Individual calls retain provider, model, input/output
 and available cost estimates; task rows combine the selected calls across attempts.
 Dates use the viewer's local time: workers use attempt start dates; routing and
 quota handoffs use recorded dates. These are not per-token billing timestamps.
+
+Attempt usage stores input as every prompt token the provider read, cache included:
+Claude, OpenCode and Antigravity report cache reads and writes beside uncached input,
+which Jackalope adds; Codex and Gemini CLI input already contains its cached part.
+New context is input minus cache reads and writes, and the cache hit rate shown with
+an attempt is cache reads divided by input. A Claude attempt with at least 50,000
+input tokens and no cache reads is flagged, since prompt caching may be off.
 
 Agent selection is measured routing overhead, including failed selections.
 Quota-interrupted worker legs remain separate from the final worker. Prompt,

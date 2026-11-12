@@ -72,7 +72,7 @@ pub(super) fn run(
     } else {
         return Err("Direct trials support Codex, Claude, OpenCode and Antigravity tasks".into());
     }
-    let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, effort);
+    let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, Some(model), effort);
     if let Some(servers) = spec["fixtureMcp"].as_object() {
         if adapter == "codex" {
             for value in crate::commands::mcp::codex_overrides(servers)? {

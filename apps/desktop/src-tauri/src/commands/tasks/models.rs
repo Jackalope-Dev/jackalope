@@ -73,6 +73,12 @@ pub struct TaskRun {
     pub routing: Option<super::routing::RoutingHistory>,
     #[serde(default)]
     pub quota_failure: Option<super::routing::QuotaFailure>,
+    /// What kind of failure `error` describes, when its message says. Never replaces it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_kind: Option<super::failure::FailureKind>,
+    /// A provider error the agent printed as assistant text, used if the turn ends unanswered.
+    #[serde(skip)]
+    pub provider_error: Option<String>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     /// The agent's own restatement of the task, reported once at the start.
@@ -121,7 +127,16 @@ pub struct TaskRun {
     pub finishing: bool,
     #[serde(default)]
     pub verification_error: Option<String>,
+    /// The model last reported serving the attempt, or the requested one until it reports.
     pub model: Option<String>,
+    /// The model Jackalope asked the agent for; absent when the CLI chose its default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_model: Option<String>,
+    /// The overload fallback model Claude Code was given for this attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_mismatch: Option<super::served_model::ModelMismatch>,
     pub prompt: String,
     pub status: RunStatus,
     pub started_at: String,
@@ -361,6 +376,8 @@ impl TaskRun {
             checkpoint_error: self.checkpoint_error.clone(),
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
+            failure_kind: self.failure_kind,
+            provider_error: None,
             contract: self.contract.clone(),
             understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
@@ -389,6 +406,9 @@ impl TaskRun {
             finishing: self.finishing.clone(),
             verification_error: self.verification_error.clone(),
             model: self.model.clone(),
+            requested_model: self.requested_model.clone(),
+            fallback_model: self.fallback_model.clone(),
+            model_mismatch: self.model_mismatch.clone(),
             prompt: self.prompt.chars().take(500).collect(),
             status: self.status.clone(),
             started_at: self.started_at.clone(),

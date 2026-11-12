@@ -28,8 +28,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
   }
   if (integrated)
     return state('Changes integrated locally', 'View delivery', 'delivery', 'success');
-  if (run.status === 'interrupted')
-    return state('Work interrupted', 'Inspect interrupted work', 'activity', 'warning');
+  if (run.status === 'interrupted') return state('Work interrupted', 'Resume', 'resume', 'warning');
   if (run.status === 'review' && run.prompts?.some((p) => p.status === 'pending'))
     return state('Question left open', 'Answer question', 'question', 'warning');
   if (!isDone(run))

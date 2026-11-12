@@ -516,9 +516,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Ask Jackalope turns record a date and, when project sharing is current, the open
   project. Archived conversations stay in that ledger. Older turns have no date.
   Unreadable helper files stay on disk and are reported as unavailable.
-  Usage separates context a provider read as new from cached re-reads, and reports
-  model calls and average context, because cumulative tokens track turn count rather
-  than work done. Per-message usage is recorded for Claude, Grok and OpenCode.
+  Usage separates context a provider read as new from cached re-reads, with a cache
+  hit rate, and reports model calls and average context, because cumulative tokens
+  track turn count rather than work done. Per-message usage is recorded for Claude,
+  Grok and OpenCode.
+- Failed attempts keep the agent's own message with a typed kind (authentication,
+  quota, rate limit, provider refusal, unavailable model, context length or exit),
+  and a next step for sign-in, model and context-length failures. Requested and served models are compared;
+  a differing served model, including Claude's overload fallback, is shown on the attempt.
 - Task launches carry a bounded repository map from static analysis, seeded by the
   paths recent attempts in the project touched, so a worker starts from the relevant
   files instead of searching for them. Token effect is not yet measured on real work;

@@ -189,7 +189,7 @@ export function TaskFollowUpPanel({
         <>
           <p className="task-muted mb-3">
             {run.status === 'interrupted'
-              ? 'Inspect the agent session and workspace before starting more work; ownership could not be confirmed after interruption.'
+              ? 'Jackalope closed before this attempt finished. Resume it to send follow-ups.'
               : integrated
                 ? 'Start a new task from the updated target branch, with this result attached.'
                 : active

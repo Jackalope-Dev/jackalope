@@ -836,7 +836,8 @@ impl TaskRuntime {
         } else {
             return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
-        let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
+        let reasoning_effort =
+            super::effort::configure(&mut cmd, &adapter, selected_model.as_deref(), req.effort);
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
         self.update_checked(id, |run| {
             run.reasoning_effort = reasoning_effort;
@@ -846,8 +847,18 @@ impl TaskRuntime {
             if spec.protocol != Protocol::Acp && opencode_connection.is_none() {
                 cmd.args(["--model", model]);
             }
-            self.update_checked(id, |run| run.model = Some(model.clone()))?;
         }
+        let fallback = claude
+            .filter(|settings| settings.fallback)
+            .and_then(|_| super::claude_session::fallback_model(selected_model.as_deref()));
+        self.update_checked(id, |run| {
+            if selected_model.is_some() {
+                run.model = selected_model.clone();
+            }
+            run.requested_model = selected_model.clone();
+            run.fallback_model = fallback.map(str::to_string);
+            run.model_mismatch = None;
+        })?;
         if let Some(settings) = &claude {
             super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
         }
@@ -1305,6 +1316,7 @@ impl TaskRuntime {
         exit_code: Option<i32>,
         quota_stopped: bool,
     ) -> Result<(), String> {
+        self.update(id, super::failure::reject_error_answer);
         let run = self
             .integration_runs()?
             .into_iter()
@@ -1382,17 +1394,22 @@ impl TaskRuntime {
         crate::commands::decision_trail::check_evidence(self, id);
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
-            r.finishing = false; r.exit_code = exit_code; r.ended_at = Some(Utc::now().to_rfc3339());
-            r.status = if canceled || r.status == RunStatus::Stopping { RunStatus::Stopped } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; RunStatus::Starting } else if success && r.error.is_none() && !r.result.is_empty() { RunStatus::Review } else { RunStatus::Failed };
+            r.finishing = false;
+            r.exit_code = exit_code;
+            r.ended_at = Some(Utc::now().to_rfc3339());
+            r.status = if canceled || r.status == RunStatus::Stopping {
+                RunStatus::Stopped
+            } else if r.routing.is_some() && r.quota_failure.is_some() {
+                r.ended_at = None;
+                RunStatus::Starting
+            } else if success && r.error.is_none() && !r.result.is_empty() {
+                RunStatus::Review
+            } else {
+                RunStatus::Failed
+            };
             r.review_capturing = capture_review && r.status == RunStatus::Review;
             if r.status == RunStatus::Failed {
-                if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
-                    if let Some(failure) = &r.quota_failure {
-                        r.error = Some(failure.message.clone());
-                    } else {
-                        r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit_code.map_or("no exit code".into(), |c| c.to_string())));
-                    }
-                }
+                super::failure::explain(r, exit_code);
             }
         });
         if capture_review {
@@ -1675,6 +1692,37 @@ impl TaskRuntime {
             .revision
             .load(std::sync::atomic::Ordering::SeqCst)
     }
+    /// Records that the person checked an interrupted attempt and nothing from it is still
+    /// running, so it becomes a stopped attempt that can be continued or retried and no
+    /// longer holds its workspace. The agent's own process group was already ended by its
+    /// guardian when Jackalope closed; anything it started outside that group is for the
+    /// person to judge (see `workspace_processes`).
+    pub(in crate::commands) fn release_interrupted(&self, id: &str) -> Result<TaskRun, String> {
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let run = inner.runs.get(id).ok_or("Attempt not found")?;
+        if run.status != RunStatus::Interrupted {
+            return Err("Only an interrupted attempt can be resumed.".into());
+        }
+        if inner
+            .runs
+            .values()
+            .any(|r| r.task_id == run.task_id && r.started_at > run.started_at)
+        {
+            return Err("Open the latest attempt before resuming this task.".into());
+        }
+        let mut updated = run.clone();
+        updated.status = RunStatus::Stopped;
+        updated.error = Some(
+            "Jackalope closed before this attempt finished. It was resumed after you confirmed nothing from it was still running.".into(),
+        );
+        self.save(&updated)?;
+        updated.persistence_error = None;
+        inner.runs.insert(updated.id.clone(), updated.clone());
+        drop(inner);
+        self.writer.changed(id);
+        Ok(updated)
+    }
+
     /// Describe a fresh attempt at the same work as `id`. The retry keeps the task's
     /// settings and agreed outcome, starts no agent session from the old attempt, and is
     /// free to continue in that attempt's workspace when `reusable_workspace` allows it.
@@ -2053,6 +2101,8 @@ impl TaskRuntime {
                 checkpoint_error: None,
                 routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
                 quota_failure: None,
+                failure_kind: None,
+                provider_error: None,
                 contract,
                 understanding: None,
                 monitor_change: previous
@@ -2087,6 +2137,9 @@ impl TaskRuntime {
                 verification_error: None,
                 verification: None,
                 model: request.model.clone(),
+                requested_model: None,
+                fallback_model: None,
+                model_mismatch: None,
                 prompt: request.prompt.clone(),
                 status: RunStatus::Starting,
                 started_at: Utc::now().to_rfc3339(),

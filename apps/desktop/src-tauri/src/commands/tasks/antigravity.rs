@@ -90,7 +90,7 @@ impl Stream {
                 }
                 self.initialized = self.session(run, &event["conversation_id"]);
                 if let Some(model) = event["init"]["model"].as_str() {
-                    run.model = Some(model.chars().take(160).collect());
+                    super::served_model::observe(run, model);
                 }
                 let mode = event["init"]["permission_mode"]
                     .as_str()

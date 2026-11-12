@@ -207,6 +207,12 @@ later attempt. It continues in the previous attempt's worktree only when that wo
 still exists, no other attempt owns it, and the agent left no uncommitted changes;
 otherwise a fresh worktree is cut and the earlier one is kept for inspection.
 
+An interrupted attempt keeps its workspace until the person resumes it. Resume lists
+processes still running in the workspace (on macOS and Linux) so anything the attempt
+started outside its own process group, such as a dev server, can be stopped first.
+Confirming records the attempt as stopped, then continues its agent session with a
+note that Jackalope restarted, or retries it when no session was recorded.
+
 ## Iteration and delivery
 
 Follow-ups use the same native session, workspace and saved account. During active
