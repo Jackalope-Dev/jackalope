@@ -60,6 +60,26 @@ const DESKTOP_INDEPENDENT = [
   /^apps\/server\//,
 ];
 
+/**
+ * Files that decide which packages the advisory audit checks, and the audit itself.
+ * A pull request that changes none of them cannot change the audit's result, so its
+ * advisories are master's, which push and scheduled runs report.
+ */
+const DEPENDENCY_INPUTS = [
+  /(^|\/)package\.json$/,
+  /(^|\/)Cargo\.(toml|lock)$/,
+  /^pnpm-(lock|workspace)\.yaml$/,
+  /^\.npmrc$/,
+  /^\.node-version$/,
+  /^rust-toolchain/,
+  /^\.cargo\//,
+  /^patches\//,
+  /^scripts\/security\//,
+  /^scripts\/change-scope\.mjs$/,
+  /^scripts\/lib\//,
+  /^\.github\/workflows\/security\.yml$/,
+];
+
 /** Files changed between `base` and HEAD, or null when Git cannot tell. */
 export function changedFiles(base) {
   let diff;
@@ -75,31 +95,34 @@ export function changedFiles(base) {
 /**
  * Which checks a set of changed files can affect. `shared` and `native` are the
  * halves of `pnpm verify` (Rust sources cannot change a JavaScript result);
- * `desktop` covers CI's native and desktop platform suites. Unknown changes
- * (null) affect everything.
+ * `desktop` covers CI's native and desktop platform suites, and `dependencies` the
+ * advisory audit. Unknown changes (null) affect everything.
  */
 export function affected(files) {
-  if (!files) return { shared: true, native: true, desktop: true };
+  if (!files) return { shared: true, native: true, desktop: true, dependencies: true };
   return {
     shared: files.some((file) => !file.startsWith(NATIVE)),
     native: files.some(
       (file) => NATIVE_INPUTS.some((input) => input.test(file)) || nativeEmbeds().has(file),
     ),
     desktop: files.some((file) => !DESKTOP_INDEPENDENT.some((path) => path.test(file))),
+    dependencies: files.some((file) => DEPENDENCY_INPUTS.some((input) => input.test(file))),
   };
 }
 
-// CI: `node scripts/change-scope.mjs <base>` writes desktop=true|false to the step
-// outputs. Without a base, or when the diff is unavailable, it reports true.
+// CI: `node scripts/change-scope.mjs <base>` writes desktop=true|false and
+// dependencies=true|false to the step outputs. Without a base, or when the diff is
+// unavailable, both are true.
 if (import.meta.main) {
   const base = process.argv[2];
   const files = base ? changedFiles(base) : null;
-  const { desktop } = affected(files);
+  const { desktop, dependencies } = affected(files);
   console.log(
     files
-      ? `${files.length} changed files since ${base}: desktop suites ${desktop ? 'run' : 'skipped'}.`
-      : 'No comparable base: desktop suites run.',
+      ? `${files.length} changed files since ${base}: desktop suites ${desktop ? 'run' : 'skipped'}, dependency audit ${dependencies ? 'runs' : 'skipped'}.`
+      : 'No comparable base: desktop suites and dependency audit run.',
   );
-  if (!desktop) console.log(files.join('\n'));
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `desktop=${desktop}\n`);
+  if (files && (!desktop || !dependencies)) console.log(files.join('\n'));
+  if (process.env.GITHUB_OUTPUT)
+    appendFileSync(process.env.GITHUB_OUTPUT, `desktop=${desktop}\ndependencies=${dependencies}\n`);
 }

@@ -22,24 +22,39 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: '.node-version'
           cache: pnpm
+      # A pull request that changes no manifest, lockfile or audit input passes
+      # without auditing, so an advisory published against master does not block
+      # unrelated pull requests such as blog posts. Pushes, the weekly schedule and
+      # manual runs always audit.
+      - name: Decide whether the change can affect the audit
+        id: scope
+        run: node scripts/change-scope.mjs ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
       - run: pnpm install --frozen-lockfile
+        if: steps.scope.outputs.dependencies != 'false'
       - run: rustup toolchain install 1.98.1 --profile minimal
+        if: steps.scope.outputs.dependencies != 'false'
       - run: rustup override set 1.98.1
+        if: steps.scope.outputs.dependencies != 'false'
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: steps.scope.outputs.dependencies != 'false'
         id: audit-cache
         with:
           path: ~/.cargo/bin/cargo-audit
           key: audit-ubuntu-22.04-x64-rust-1.98.1-0.22.2
       - run: cargo install cargo-audit --version 0.22.2 --locked
-        if: steps.audit-cache.outputs.cache-hit != 'true'
+        if: steps.scope.outputs.dependencies != 'false' && steps.audit-cache.outputs.cache-hit != 'true'
       - run: pnpm check:dependencies
+        if: steps.scope.outputs.dependencies != 'false'
       - run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev
+        if: steps.scope.outputs.dependencies != 'false'
       - run: cargo test --manifest-path patches/glib/Cargo.toml --release --lib variant_iter
+        if: steps.scope.outputs.dependencies != 'false'
   codeql:
     if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-latest

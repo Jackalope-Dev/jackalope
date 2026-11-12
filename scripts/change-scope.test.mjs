@@ -3,7 +3,12 @@ import test from 'node:test';
 import { affected, embeddedInputs } from './change-scope.mjs';
 
 test('unknown changes run every suite', () => {
-  assert.deepEqual(affected(null), { shared: true, native: true, desktop: true });
+  assert.deepEqual(affected(null), {
+    shared: true,
+    native: true,
+    desktop: true,
+    dependencies: true,
+  });
 });
 
 test('documentation, website and server changes skip the desktop suites', () => {
@@ -64,4 +69,23 @@ test('files the native crate embeds run the native checks', () => {
 
 test('Rust-only changes skip the shared half', () => {
   assert.equal(affected(['apps/desktop/src-tauri/src/lib.rs']).shared, false);
+});
+
+test('only dependency manifests, lockfiles and the audit run the dependency audit', () => {
+  assert.equal(
+    affected(['apps/website/content/blog/a-post.md', 'apps/desktop/src/App.tsx']).dependencies,
+    false,
+  );
+  for (const file of [
+    'package.json',
+    'apps/website/package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'apps/desktop/src-tauri/Cargo.lock',
+    'apps/mobile/src-tauri/Cargo.toml',
+    'patches/glib/src/variant_iter.rs',
+    'scripts/security/dependency-policy.json',
+    '.github/workflows/security.yml',
+  ])
+    assert.equal(affected(['docs/STATUS.md', file]).dependencies, true, file);
 });

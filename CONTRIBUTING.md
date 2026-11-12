@@ -172,7 +172,10 @@ separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates
 the [dependency inventory](docs/DEPENDENCIES.md) after dependency changes.
 
-CI also runs `pnpm check:dependencies` against current advisory databases. To run
+CI also runs `pnpm check:dependencies` against current advisory databases. Pull
+requests run it only when they change a manifest, lockfile or audit input
+(`scripts/change-scope.mjs`), so a new advisory against master does not block unrelated
+pull requests; pushes and the weekly schedule always run it. To run
 it locally, install `cargo-audit` 0.22.2 with
 `cargo install cargo-audit --version 0.22.2 --locked`. The offline vendored-patch
 integrity check is included in `pnpm verify`; the full advisory check needs network
