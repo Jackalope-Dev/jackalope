@@ -14,6 +14,23 @@ existing CLI sign-in. See [Antigravity support](ANTIGRAVITY.md) for permissions,
 account limits and verification, and [orchestration capabilities](ORCHESTRATION-CAPABILITIES.md)
 for shared tools and notification coverage.
 
+## Failure reasons and served models
+
+A failed attempt keeps the agent's own message: a provider error the CLI printed,
+then the result or error event's message, then its last stderr lines, then the exit
+code. A turn whose only answer is a printed provider error (Claude Code's
+`API Error: …`, goose's `Ran into this error: …`) fails with that message instead of
+reaching review; an error the CLI retried past keeps the later answer. Beside the
+message, `tasks/failure.rs` records a kind (authentication, quota exhausted, rate
+limited, provider refused, model unavailable, context too long or agent exited).
+Authentication is judged on the message's first line only. The kind is descriptive;
+quota handoff still requires a provider quota event.
+
+The requested model is saved separately from the model the agent reports serving.
+A served model that differs beyond a vendor prefix, a dated or versioned suffix, or a
+CLI family alias such as `opus` is recorded once with an activity note; Claude Code's
+configured overload fallback is labeled as the fallback. CLI-default models are not compared.
+
 ## Adapter capabilities
 
 | CLI | Sign-in discovery | Project-selected MCP |

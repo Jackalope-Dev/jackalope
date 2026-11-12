@@ -5,6 +5,7 @@ mod delegation;
 mod efficiency;
 pub(super) mod effort;
 pub(in crate::commands) mod events;
+pub(super) mod failure;
 mod gemini;
 pub(super) mod helper_process;
 mod journal;
@@ -24,6 +25,7 @@ mod runners;
 mod runtime;
 #[cfg(test)]
 mod secret_canary_tests;
+pub(super) mod served_model;
 pub(crate) mod snapshots;
 pub(super) mod speed;
 mod storage;

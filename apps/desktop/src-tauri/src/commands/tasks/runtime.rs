@@ -836,8 +836,18 @@ impl TaskRuntime {
             if spec.protocol != Protocol::Acp && opencode_connection.is_none() {
                 cmd.args(["--model", model]);
             }
-            self.update_checked(id, |run| run.model = Some(model.clone()))?;
         }
+        let fallback = claude
+            .filter(|settings| settings.fallback)
+            .and_then(|_| super::claude_session::fallback_model(selected_model.as_deref()));
+        self.update_checked(id, |run| {
+            if selected_model.is_some() {
+                run.model = selected_model.clone();
+            }
+            run.requested_model = selected_model.clone();
+            run.fallback_model = fallback.map(str::to_string);
+            run.model_mismatch = None;
+        })?;
         if let Some(settings) = &claude {
             super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
         }
@@ -1308,6 +1318,7 @@ impl TaskRuntime {
         exit_code: Option<i32>,
         quota_stopped: bool,
     ) -> Result<(), String> {
+        self.update(id, super::failure::reject_error_answer);
         let run = self
             .integration_runs()?
             .into_iter()
@@ -1385,17 +1396,22 @@ impl TaskRuntime {
         crate::commands::decision_trail::check_evidence(self, id);
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
-            r.finishing = false; r.exit_code = exit_code; r.ended_at = Some(Utc::now().to_rfc3339());
-            r.status = if canceled || r.status == RunStatus::Stopping { RunStatus::Stopped } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; RunStatus::Starting } else if success && r.error.is_none() && !r.result.is_empty() { RunStatus::Review } else { RunStatus::Failed };
+            r.finishing = false;
+            r.exit_code = exit_code;
+            r.ended_at = Some(Utc::now().to_rfc3339());
+            r.status = if canceled || r.status == RunStatus::Stopping {
+                RunStatus::Stopped
+            } else if r.routing.is_some() && r.quota_failure.is_some() {
+                r.ended_at = None;
+                RunStatus::Starting
+            } else if success && r.error.is_none() && !r.result.is_empty() {
+                RunStatus::Review
+            } else {
+                RunStatus::Failed
+            };
             r.review_capturing = capture_review && r.status == RunStatus::Review;
             if r.status == RunStatus::Failed {
-                if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
-                    if let Some(failure) = &r.quota_failure {
-                        r.error = Some(failure.message.clone());
-                    } else {
-                        r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit_code.map_or("no exit code".into(), |c| c.to_string())));
-                    }
-                }
+                super::failure::explain(r, exit_code);
             }
         });
         if capture_review {
@@ -2087,6 +2103,8 @@ impl TaskRuntime {
                 checkpoint_error: None,
                 routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
                 quota_failure: None,
+                failure_kind: None,
+                provider_error: None,
                 contract,
                 understanding: None,
                 monitor_change: previous
@@ -2121,6 +2139,9 @@ impl TaskRuntime {
                 verification_error: None,
                 verification: None,
                 model: request.model.clone(),
+                requested_model: None,
+                fallback_model: None,
+                model_mismatch: None,
                 prompt: request.prompt.clone(),
                 status: RunStatus::Starting,
                 started_at: Utc::now().to_rfc3339(),

@@ -98,7 +98,7 @@ impl Stream {
                 }
                 self.initialized = self.session(run, &event["session_id"]);
                 if let Some(model) = event["model"].as_str().filter(|model| !model.is_empty()) {
-                    run.model = Some(model.chars().take(160).collect());
+                    super::served_model::observe(run, model);
                 }
             }
             "message" => self.message(run, &event),

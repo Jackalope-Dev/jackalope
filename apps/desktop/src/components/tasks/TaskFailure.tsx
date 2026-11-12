@@ -1,6 +1,14 @@
 import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { RotateCw } from 'lucide-react';
-import type { PreparationRecord } from '../../lib/run-types';
+import type { FailureKind, PreparationRecord } from '../../lib/run-types';
+
+/** What to do next for failures whose kind has one clear remedy. */
+const NEXT_STEP: Partial<Record<FailureKind, string>> = {
+  authentication: 'Sign in to this agent’s account in Agents, then retry.',
+  model_unavailable: 'Choose another model for this agent, then retry.',
+  context_too_long:
+    'Start a new task with a narrower request; continuing resends the full context.',
+};
 
 /** The setup command's own output, which is usually where the real cause is. */
 function SetupOutput({ preparation }: { preparation: PreparationRecord }) {
@@ -18,12 +26,14 @@ function SetupOutput({ preparation }: { preparation: PreparationRecord }) {
 
 export function TaskFailure({
   message,
+  kind,
   preparation,
   onInspect,
   onRetry,
   retrying,
 }: {
   message: string;
+  kind?: FailureKind | null;
   /** Shown when the attempt died in project setup rather than in the agent. */
   preparation?: PreparationRecord | null;
   onInspect: () => void;
@@ -34,6 +44,11 @@ export function TaskFailure({
   const firstLine = failureSummary(message);
   const summary = firstLine.length > 200 ? `${firstLine.slice(0, 200)}…` : firstLine;
   const failedSetup = !!preparation && !preparation.success;
+  // Jackalope's own messages, such as Gemini's sign-in error, can already say what to do.
+  const nextStep =
+    kind && !/\b(sign in|choose another|start a new)\b/i.test(message)
+      ? NEXT_STEP[kind]
+      : undefined;
   return (
     <InlineNotice
       tone="error"
@@ -53,6 +68,7 @@ export function TaskFailure({
       }
     >
       <p>{summary || 'The task ended with an error.'}</p>
+      {nextStep && <p className="task-muted">{nextStep}</p>}
       {onRetry && (
         <p className="task-muted">
           A retry starts a fresh attempt at the same task and continues in this workspace when the
