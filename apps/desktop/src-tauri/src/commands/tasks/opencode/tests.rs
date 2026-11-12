@@ -200,6 +200,20 @@ fn effort_uses_only_advertised_enabled_variants_and_preserves_unknown_models() {
 }
 
 #[test]
+fn a_session_missing_from_the_server_reads_as_a_lost_conversation() {
+    assert!(
+        lost_session("OpenCode /session/ses_gone returned HTTP 404.".into())
+            .starts_with("OpenCode no longer has this task's earlier conversation")
+    );
+    for other in [
+        "OpenCode /session/ses_gone returned HTTP 500.",
+        "Could not reach the task's OpenCode server for /session/ses_gone.",
+    ] {
+        assert_eq!(lost_session(other.into()), other);
+    }
+}
+
+#[test]
 fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history() {
     use crate::commands::agent_policy::{AgentPolicy, CustomAgent};
     let folder = std::env::temp_dir().join(format!("jackalope-opencode-{}", uuid::Uuid::new_v4()));
