@@ -818,8 +818,20 @@ impl Context {
             | "bw"
             | "lpass" => risky("it reads stored credentials"),
             "kill" => {
-                let targets: Vec<&String> =
-                    lower.iter().filter(|arg| !arg.starts_with('-')).collect();
+                // After `--`, `-$PID` signals the process group that the variable PID leads.
+                let split = lower.iter().position(|arg| arg == "--");
+                let options = &lower[..split.unwrap_or(lower.len())];
+                let operands = split.map_or(&[][..], |index| &lower[index + 1..]);
+                let targets: Vec<&str> = options
+                    .iter()
+                    .filter(|arg| !arg.starts_with('-'))
+                    .map(String::as_str)
+                    .chain(operands.iter().map(|arg| {
+                        arg.strip_prefix('-')
+                            .filter(|group| group.starts_with('$'))
+                            .unwrap_or(arg)
+                    }))
+                    .collect();
                 if !targets.is_empty()
                     && targets
                         .iter()
@@ -2436,6 +2448,9 @@ mod tests {
             "echo $(git rev-parse HEAD)",
             "FOO=1 pnpm vitest run",
             "kill $!",
+            "PID=$(cat pidfile); kill $PID",
+            "PID=$(cat pidfile); kill -- -$PID",
+            "kill -TERM -- -$PID",
             "docker build -t app .",
             "wrangler dev",
             "kubectl get pods",
@@ -2538,6 +2553,9 @@ mod tests {
             "killall node",
             "pkill -f vite",
             "kill -9 1234",
+            "kill -- -1",
+            "kill -- -1234",
+            "kill -- -$PID 1234",
             "chmod 600 ~/.bashrc",
             "echo export X=1 >> ~/.bashrc",
             "tee /etc/hosts < hosts",
