@@ -825,7 +825,8 @@ impl TaskRuntime {
         } else {
             return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
-        let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
+        let reasoning_effort =
+            super::effort::configure(&mut cmd, &adapter, selected_model.as_deref(), req.effort);
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
         self.update_checked(id, |run| {
             run.reasoning_effort = reasoning_effort;
