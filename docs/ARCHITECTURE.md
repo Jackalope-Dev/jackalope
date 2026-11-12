@@ -189,7 +189,7 @@ checks. See [DESKTOP-CONTROL.md](DESKTOP-CONTROL.md) for platform support and li
 
 Native profiles store task journals, queues, schedules, integration receipts and
 preferences. Locks prevent concurrent writers. Interrupted attempts are retained,
-not automatically replayed. Unreadable files are preserved; unsaved history blocks
+not automatically replayed, until the person resumes them. Unreadable files are preserved; unsaved history blocks
 operations that would lose continuity. Legacy plan-only schedules and saved ideas
 remain compatible.
 

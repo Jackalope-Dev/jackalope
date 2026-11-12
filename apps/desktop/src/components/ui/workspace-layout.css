@@ -15,6 +15,23 @@
   scrollbar-gutter: stable;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
+  /* The app shell is unselectable; page content (titles, results, details) can be copied. */
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* Controls keep clicks and drags from starting a selection. */
+.workspace-page-layout
+  :where(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    summary,
+    .ui-choice
+  ) {
+  -webkit-user-select: none;
+  user-select: none;
 }
 /* Sub-views sit above the page heading at the same gutter; the control carries its own track. */
 .workspace-subnavigation {

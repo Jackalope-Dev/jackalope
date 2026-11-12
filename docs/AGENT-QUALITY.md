@@ -473,11 +473,13 @@ tool-response workflow and do not represent ordinary coding-task savings.
 
 New captured tasks send Quick/Balanced/Thorough as low/medium/high model effort
 requests to Codex and Claude, in addition to the task approach instructions.
-The flags apply only to the launched process. Providers can reject unsupported
-models or constrain effort; the saved receipt records what Jackalope requested,
-not a provider confirmation. OpenCode's server transport requests only enabled
-variants advertised by the selected provider/model. Quick/Balanced/Thorough select
-low/medium/high when supported; DeepSeek Balanced uses high because its medium
+The flags apply only to the launched process. For models with measured levels,
+Jackalope sends the nearest level the model accepts and sends no flag for Claude
+models that Claude Code runs without effort; unmeasured models receive the requested
+level unchanged. The saved receipt records the level Jackalope sent, or none for the
+agent default, not a provider confirmation. OpenCode's server transport requests
+only enabled variants advertised by the selected provider/model.
+Quick/Balanced/Thorough select low/medium/high when supported; DeepSeek Balanced uses high because its medium
 setting maps to high. Unknown variants retain the provider default. Other adapters
 retain their configured model effort. Independent provider receipts record outbound
 reasoning and thinking fields when available; a variant name alone is not confirmation.

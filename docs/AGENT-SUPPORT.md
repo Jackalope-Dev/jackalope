@@ -201,7 +201,7 @@ give Jackalope control of the model's conversation history or built-in tools.
 | Execution control | Current scope |
 | --- | --- |
 | Task instructions, selected context, workspace ownership and final saved checks | Shared task runtime across native adapters. Required user/repository checks still apply. |
-| Model reasoning effort | Native flags for Codex and Claude Code. OpenCode requests only enabled low/medium/high variants advertised for the selected provider/model; DeepSeek Balanced requests high. Unsupported variants and absent effort preserve provider defaults. Requested effort is not proof of provider behavior. |
+| Model reasoning effort | Native flags for Codex and Claude Code, clamped to the levels measured for the selected model and omitted for models the CLI runs without effort. OpenCode requests only enabled low/medium/high variants advertised for the selected provider/model; DeepSeek Balanced requests high. Unsupported variants and absent effort preserve provider defaults. Requested effort is not proof of provider behavior. |
 | Exact result selection and recovery | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. Explicit selections retain the captured original. These do not intercept the agent's own shell or file tools. |
 | Optional browser, desktop and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
 | Source-range reads | Experimental native MCP tool for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
@@ -321,15 +321,17 @@ Remove-Item Env:JACKALOPE_AGENT_TRIAL, Env:JACKALOPE_AGENT_MODEL
 ```
 
 Use `codex`, `claude` or `grok` without `JACKALOPE_AGENT_MODEL` to use that CLI's
-configured model. Free-model availability can change.
+configured model. Free-model availability can change. Install OpenCode from
+[its official documentation](https://opencode.ai/docs/); the Windows npm binary
+layout and `.opencode/bin` are discovered alongside PATH executables.
 
 ### Agent × model matrix
 
 The ignored `installed_agent_matrix` test runs scenarios per listed agent and model on
 the lifecycle trial's fixtures, each pair in its own disposable repository and history.
-It spends provider usage only when invoked and never runs in `pnpm verify` or CI. List every pair explicitly: each model
-is a pair, the next model listed for that agent is its switch partner, and an agent
-without models uses its CLI default.
+It spends provider usage only when invoked and never runs in `pnpm verify` or CI.
+List every pair explicitly: each model is a pair, the next model listed for that
+agent is its switch partner, and an agent without models uses its CLI default.
 
 ```powershell
 $env:JACKALOPE_AGENT_MATRIX = 'claude=claude-haiku-4-5,claude-sonnet-4-5;codex'
@@ -355,6 +357,4 @@ Authentication, quota, rate-limit and model-access failures (`failure.rs`) stop 
 pair as account findings, without a retry. `report.json` and `report.md` go to
 ignored `output/agent-matrix/<time>/`, or the absolute `JACKALOPE_AGENT_MATRIX_OUT`;
 fixtures stay in the temporary folder for diagnosis. Agent sign-ins and global CLI
-configuration are shared with your everyday use. Install OpenCode from
-[its official documentation](https://opencode.ai/docs/); the Windows npm binary
-layout and `.opencode/bin` are discovered alongside PATH executables.
+configuration are shared with your everyday use.

@@ -1191,6 +1191,51 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
 }
 
 #[test]
+fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() {
+    let folder = std::env::temp_dir().join(format!("jackalope-release-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("codex");
+    consume_event(
+        &mut run,
+        r#"{"type":"thread.started","thread_id":"session-1"}"#,
+    );
+    runtime.save(&run).unwrap();
+    drop(runtime);
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut newer = sample("codex");
+    newer.id = "newer-attempt".into();
+    newer.task_id = run.task_id.clone();
+    newer.status = RunStatus::Failed;
+    newer.started_at = "2999-01-01T00:00:00Z".into();
+    loaded
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(newer.id.clone(), newer.clone());
+    assert!(loaded
+        .release_interrupted(&run.id)
+        .unwrap_err()
+        .contains("latest attempt"));
+    loaded.inner.lock().unwrap().runs.remove(&newer.id);
+
+    let released = loaded.release_interrupted(&run.id).unwrap();
+    assert_eq!(released.status, RunStatus::Stopped);
+    assert!(loaded
+        .release_interrupted(&run.id)
+        .unwrap_err()
+        .contains("Only an interrupted attempt"));
+    drop(loaded);
+    let reloaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restored = reloaded.inner.lock().unwrap().runs[&run.id].clone();
+    assert_eq!(restored.status, RunStatus::Stopped);
+    assert_eq!(restored.session_id.as_deref(), Some("session-1"));
+    assert!(reloaded.retry_request(&run.id).is_ok());
+    drop(reloaded);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
 fn journal_identifiers_cannot_escape_the_storage_directory() {
     for id in ["../../other", "a/bbbbbbb", "C:\\test-file", "short"] {
         assert!(!valid_id(id));

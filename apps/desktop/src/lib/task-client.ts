@@ -8,6 +8,18 @@ export const markReviewed = (id: string) => invokeNative<void>('task_mark_review
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });
 /** Start a fresh attempt at a task whose last attempt did not finish. */
 export const retryTask = (id: string) => invokeNative<string>('task_retry', { id });
+/** Marks an interrupted attempt stopped once the person confirmed nothing from it still runs. */
+export const releaseInterrupted = (id: string) =>
+  invokeNative<TaskRun>('task_release_interrupted', { id });
+
+export interface WorkspaceProcess {
+  pid: number;
+  name: string;
+  directory: string;
+}
+/** Processes running in an attempt's workspace; `null` when this system cannot tell. */
+export const workspaceProcesses = (id: string) =>
+  invokeNative<WorkspaceProcess[] | null>('task_workspace_processes', { id });
 export const taskReview = (id: string) => invokeNative<Review>('task_review', { id });
 /** Diff size per attempt, keyed by id; attempts whose diff cannot be read are left out. */
 export const taskChangeStats = (ids: string[]) =>

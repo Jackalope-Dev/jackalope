@@ -154,7 +154,7 @@ real-task cost/latency comparisons and native macOS/Linux credential checks rema
 outside coordinator/execution locks. The default agent sees the complete request, its
 acceptance criteria, recorded outcomes and eligible agent/model/account options with
 provider windows; context saved for the worker is left out. It answers without tools at
-its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at minimal
+its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at low
 reasoning) and returns a validated option ID, a short reason, an optional quota
 estimate and up to three ordered alternatives. A routing agent that does not answer
 within eight seconds, or fails without a quota error, leaves the choice to local rules
