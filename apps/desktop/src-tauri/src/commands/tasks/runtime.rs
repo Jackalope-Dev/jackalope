@@ -858,6 +858,7 @@ impl TaskRuntime {
             run.requested_model = selected_model.clone();
             run.fallback_model = fallback.map(str::to_string);
             run.model_mismatch = None;
+            run.model_reported = false;
         })?;
         if let Some(settings) = &claude {
             super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
@@ -2195,6 +2196,7 @@ impl TaskRuntime {
                 requested_model: None,
                 fallback_model: None,
                 model_mismatch: None,
+                model_reported: false,
                 prompt: request.prompt.clone(),
                 status: RunStatus::Starting,
                 started_at: Utc::now().to_rfc3339(),

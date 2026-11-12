@@ -50,6 +50,7 @@ pub(in crate::commands) fn observe(run: &mut TaskRun, served: &str) {
         }
     }
     run.model = Some(served);
+    run.model_reported = true;
 }
 
 /// Whether `served` names the `requested` model. A vendor prefix (`anthropic/…`) and a
@@ -145,8 +146,10 @@ mod tests {
     #[test]
     fn a_served_alias_records_no_finding() {
         let mut run = run(Some("claude-haiku-4-5"), None);
-        observe(&mut run, "claude-haiku-4-5-20251001");
         observe(&mut run, "<synthetic>");
+        assert!(!run.model_reported);
+        observe(&mut run, "claude-haiku-4-5-20251001");
+        assert!(run.model_reported);
         assert_eq!(run.model.as_deref(), Some("claude-haiku-4-5-20251001"));
         assert!(run.model_mismatch.is_none());
         assert!(run.activity.is_empty());

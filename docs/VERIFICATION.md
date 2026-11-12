@@ -58,7 +58,8 @@ fixture prerequisites before invoking them through a Playwright CLI session.
 - [Native development](SELF-DEVELOPMENT.md): disposable profiles, process ownership
   and actual window inspection.
 - [Agent support](AGENT-SUPPORT.md#run-opt-in-validation): installed CLI lifecycle
-  with the selected account/model. Real providers may consume quota.
+  with the selected account/model, and the opt-in agent × model scenario matrix.
+  Real providers may consume quota.
 - [Quality evaluation](AGENT-QUALITY.md): matched native executables and frozen
   prompt fixtures. Retain all failures and missing usage.
 - [Execution evaluation](EXECUTION-EVALUATION.md): single/serial/staged task trials.

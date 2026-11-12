@@ -142,6 +142,9 @@ pub struct TaskRun {
     pub fallback_model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_mismatch: Option<super::served_model::ModelMismatch>,
+    /// The agent named the model serving this attempt; until it does, `model` is the request.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub model_reported: bool,
     pub prompt: String,
     pub status: RunStatus,
     pub started_at: String,
@@ -470,6 +473,7 @@ impl TaskRun {
             requested_model: self.requested_model.clone(),
             fallback_model: self.fallback_model.clone(),
             model_mismatch: self.model_mismatch.clone(),
+            model_reported: self.model_reported,
             prompt: self.prompt.chars().take(500).collect(),
             status: self.status.clone(),
             started_at: self.started_at.clone(),

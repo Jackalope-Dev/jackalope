@@ -1,4 +1,5 @@
 use super::*;
+mod agent_matrix;
 mod decision_trail;
 mod workbench;
 mod workspace_modes;
@@ -55,6 +56,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         requested_model: None,
         fallback_model: None,
         model_mismatch: None,
+        model_reported: false,
         prompt: "Example".into(),
         status: RunStatus::Running,
         started_at: Utc::now().to_rfc3339(),
@@ -352,9 +354,8 @@ fn installed_agent_lifecycle_trial() {
     agent_lifecycle_trial(&agent, None);
 }
 
-pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
-    assert!(crate::commands::agents::is_builtin(agent));
-    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+/// A disposable repository with one fixture commit, for trials that run installed agents.
+pub(super) fn trial_repository(root: &Path) -> PathBuf {
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
     let repo_text = repo.to_string_lossy().to_string();
@@ -383,6 +384,67 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         ],
     )
     .unwrap();
+    repo
+}
+
+/// A new isolated task for a trial, with no MCP connections.
+pub(super) fn trial_request(
+    repo: &Path,
+    agent: &str,
+    model: Option<String>,
+    prompt: &str,
+) -> RunRequest {
+    RunRequest {
+        retry_of: None,
+        live_session_id: None,
+        effort: None,
+        codex_speed: None,
+        dependency_snapshot: Default::default(),
+        id: uuid::Uuid::new_v4().to_string(),
+        project_id: uuid::Uuid::new_v4().to_string(),
+        project_name: "Agent acceptance fixture".into(),
+        project_path: repo.to_string_lossy().into_owned(),
+        agent: agent.into(),
+        agent_profile_id: None,
+        verify_command: None,
+        target_branch: Some("main".into()),
+        account_binding: None,
+        model,
+        prompt: prompt.into(),
+        isolated: true,
+        workspace_mode: None,
+        previous_run_id: None,
+        connection_ids: Some(vec![]),
+        coordination: None,
+        prepare_command: None,
+        setup_files: Vec::new(),
+        auto_verify: false,
+        monitor_change: None,
+        context_selection: Default::default(),
+        context_receipt: Default::default(),
+    }
+}
+
+/// Waits for an attempt to finish. One still active after `limit` is stopped and `None`.
+pub(super) fn trial_settled(runtime: &TaskRuntime, id: &str, limit: Duration) -> Option<TaskRun> {
+    let deadline = std::time::Instant::now() + limit;
+    loop {
+        let run = runtime.inner.lock().unwrap().runs[id].clone();
+        if !run.status.is_active() {
+            return Some(run);
+        }
+        if std::time::Instant::now() > deadline {
+            let _ = runtime.stop(id);
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
+    assert!(crate::commands::agents::is_builtin(agent));
+    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+    let repo = trial_repository(&root);
     let history = root.join("history");
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let selected_agent = if let Some(executable) = executable {
@@ -406,24 +468,13 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         .is_none()
         .then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok())
         .flatten();
-    let request = RunRequest {
-        retry_of: None,
-        live_session_id: None,
-                effort: None,
-        codex_speed: None,
-        dependency_snapshot: Default::default(),
-        id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
-        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: selected_agent.into(),
-        agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
-        account_binding: None, model,
-        prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
-        isolated: true, workspace_mode: None, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
-        prepare_command: None,
-        setup_files: Vec::new(), auto_verify: false, monitor_change: None,
-        context_selection: Default::default(), context_receipt: Default::default(),
-    };
+    let mut request = trial_request(
+        &repo,
+        selected_agent,
+        model,
+        "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.",
+    );
     let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
-    let mut request = request;
     if executable.is_some() {
         request.auto_verify = true;
         request.verify_command = Some("node -e \"require('node:assert/strict').equal(require('node:fs').readFileSync('receipt.txt','utf8').trim(),'JACKALOPE_NATIVE_OK')\"".into());
@@ -466,23 +517,14 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
             .input_values
             .insert("Receipt name".into(), "receipt.txt".into());
     }
-    fn settled(runtime: &TaskRuntime, id: &str) -> TaskRun {
-        let deadline = std::time::Instant::now() + Duration::from_secs(180);
-        loop {
-            let run = runtime.inner.lock().unwrap().runs[id].clone();
-            if !run.status.is_active() {
-                return run;
-            }
-            if std::time::Instant::now() > deadline {
-                let _ = runtime.stop(id);
-                panic!(
-                    "Agent trial timed out; retained fixture history at {}",
-                    runtime.directory.display()
-                );
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        }
-    }
+    let settled = |runtime: &TaskRuntime, id: &str| {
+        trial_settled(runtime, id, Duration::from_secs(180)).unwrap_or_else(|| {
+            panic!(
+                "Agent trial timed out; retained fixture history at {}",
+                runtime.directory.display()
+            )
+        })
+    };
     runtime.start(request.clone()).unwrap();
     let first = settled(&runtime, &request.id);
     assert_eq!(
