@@ -19,10 +19,13 @@ mod performance;
 pub(super) mod preparation;
 mod project_setup;
 mod prompt;
+mod resume;
 mod routing;
 pub(in crate::commands) mod runner;
 mod runners;
 mod runtime;
+#[cfg(test)]
+mod secret_canary_tests;
 pub(super) mod served_model;
 pub(crate) mod snapshots;
 pub(super) mod speed;

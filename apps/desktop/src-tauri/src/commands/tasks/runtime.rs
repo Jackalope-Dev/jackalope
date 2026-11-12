@@ -197,6 +197,17 @@ impl TaskRuntime {
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
         let mut resume = previous;
+        if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
+            let adapter = old
+                .account_binding
+                .as_ref()
+                .map_or(old.agent.as_str(), |binding| binding.adapter.as_str());
+            request
+                .prompt
+                .push_str(&super::resume::earlier_progress(adapter, old));
+            self.update_checked(id, |run| activity(run, &super::resume::restarted(adapter)))?;
+            resume = None;
+        }
         let mut routed = true;
         loop {
             if !self.is_running(id) {
@@ -1045,6 +1056,7 @@ impl TaskRuntime {
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
         // Project secrets reach the agent process only; an agent on a computer
         // receives its own set when its run starts there.
+        let mut secret_names = Vec::new();
         if remote.is_none() {
             let secrets = crate::commands::project_secrets::environment(
                 &self.project_secrets_root(),
@@ -1052,12 +1064,15 @@ impl TaskRuntime {
                 crate::commands::project_secrets::Place::Local,
             )
             .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+            secret_names = secrets.iter().map(|(name, _)| name.clone()).collect();
             if !secrets.is_empty() {
-                let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
                 self.update_checked(id, |run| {
                     activity(
                         run,
-                        &format!("Project secrets for the agent: {}.", names.join(", ")),
+                        &format!(
+                            "Project secrets for the agent: {}.",
+                            secret_names.join(", ")
+                        ),
                     )
                 })?;
             }
@@ -1201,10 +1216,16 @@ impl TaskRuntime {
                 Path::new(&req.project_path)
             )
         ));
-        if spec.prompt == Prompt::File {
-            std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
-                .map_err(|e| e.to_string())?;
-        }
+        // Removed when the attempt ends, however it ends.
+        let _prompt_file = (spec.prompt == Prompt::File)
+            .then(|| {
+                super::agent_process::PrivateFile::create(
+                    self.directory.join(format!("{id}.prompt")),
+                    &input,
+                )
+            })
+            .transpose()
+            .map_err(|e| format!("The agent's prompt file could not be written: {e}"))?;
         if adapter == "antigravity" {
             input = antigravity::input(&input, &workspace);
         }
@@ -1256,7 +1277,10 @@ impl TaskRuntime {
         })?;
         #[cfg(test)]
         cmd.env_remove("JACKALOPE_QUALITY_SPEC");
-        cmd.env_remove("JACKALOPE_JEV_TEST_KEY");
+        let protected = crate::commands::redaction::injected_into(&cmd, &secret_names);
+        if !protected.is_empty() {
+            self.update_checked(id, |run| run.protect(protected))?;
+        }
         #[cfg(test)]
         if std::env::var_os("JACKALOPE_QUALITY_SPEC").is_some() {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
@@ -2156,6 +2180,7 @@ impl TaskRuntime {
                 review_captures: None,
                 review_capturing: false,
                 challenge_of: retried.as_ref().and_then(|old| old.challenge_of.clone()),
+                secrets: None,
             };
             self.save(&run)?;
             crate::commands::browser::register(&run.id);

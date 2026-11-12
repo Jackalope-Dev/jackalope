@@ -9,7 +9,7 @@
 //! session is driven through [`TaskRuntime::run_claude_session`].
 
 use super::super::{
-    agent_process::AgentProcess, antigravity, claude_session, gemini, kimi, opencode,
+    agent_process::AgentProcess, antigravity, claude_session, gemini, kimi, opencode, resume,
 };
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -209,6 +209,7 @@ impl AttemptRunner for LocalRunner {
                 }
                 return;
             }
+            let mut watch = resume::Watch::new(&output_adapter, resumed_session.as_deref());
             let mut gemini_stream = gemini::Stream::new(resumed_session.clone());
             let mut stream = antigravity::Stream::new(resumed_session);
             let mut partials = claude_session::Partials::new(launched);
@@ -231,7 +232,7 @@ impl AttemptRunner for LocalRunner {
                     }
                     else if protocol == Protocol::Antigravity { stream.consume(r, &line); }
                     else if protocol == Protocol::Gemini { gemini_stream.consume(r, &line); }
-                    else { consume_adapter_event(r, &line, &output_adapter); }
+                    else { consume_adapter_event(r, &line, &output_adapter); watch.observe(r); }
                 });
                 },
             ) {
@@ -293,6 +294,9 @@ impl AttemptRunner for LocalRunner {
                 settings: persistent.settings,
                 final_check: persistent.final_check,
             })?;
+            runtime.update(id, |run| {
+                resume::explain_refusal(run, adapter, self.resumed_session.as_deref())
+            });
             return Ok(outcome.map(|outcome| Outcome {
                 success: outcome.success,
                 exit_code: outcome.exit_code,
@@ -343,6 +347,9 @@ impl AttemptRunner for LocalRunner {
         process.process.terminate();
         let _ = process.reader.join();
         let _ = process.diagnostics.join();
+        runtime.update(id, |run| {
+            resume::explain_refusal(run, adapter, self.resumed_session.as_deref())
+        });
         if adapter == "gemini" && !exit.success() {
             runtime.update(id, |run| {
                 for line in run.diagnostics.clone() {
