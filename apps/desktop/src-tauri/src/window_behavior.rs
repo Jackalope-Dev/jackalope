@@ -239,14 +239,14 @@ pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
-/// Builds the tray's menu fresh from current task state: Open/New Task/
+/// Builds the tray's menu fresh from current task state: Open/New Work/
 /// Settings up top, a Recent Tasks submenu, then Quit. Called once at
 /// startup and again whenever `task-state-changed` fires, so the submenu
 /// and the returned awaiting-review count (used for the dock badge) never
 /// go stale while the tray is open.
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<(Menu<tauri::Wry>, usize)> {
     let open = MenuItem::with_id(app, "tray-open", "Open Jackalope", true, None::<&str>)?;
-    let new_task = MenuItem::with_id(app, "tray-new-task", "New Task", true, None::<&str>)?;
+    let new_task = MenuItem::with_id(app, "tray-new-task", "New Work", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "tray-settings", "Settings…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "tray-quit", "Quit Jackalope", true, None::<&str>)?;
     let separator_top = PredefinedMenuItem::separator(app)?;
@@ -402,11 +402,24 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 #[cfg(target_os = "macos")]
 pub fn setup_app_menu(app: &tauri::App) -> tauri::Result<()> {
     let menu = Menu::default(app.handle())?;
+    // The default app menu is About, separator, Services…; Settings… joins About's group.
     if let Some(first) = menu.items()?.first().and_then(|item| item.as_submenu()) {
         first.insert(
             &MenuItem::with_id(app, "app-settings", "Settings…", true, None::<&str>)?,
             2,
         )?;
+        first.insert(&PredefinedMenuItem::separator(app)?, 3)?;
+    }
+    // macOS adds its own search field to the (otherwise empty) default Help menu.
+    if let Some(help) = menu
+        .get(tauri::menu::HELP_SUBMENU_ID)
+        .and_then(|item| item.as_submenu().cloned())
+    {
+        help.append_items(&[
+            &MenuItem::with_id(app, "app-help", "Jackalope Help", true, None::<&str>)?,
+            &MenuItem::with_id(app, "app-feedback", "Send Feedback…", true, None::<&str>)?,
+            &MenuItem::with_id(app, "app-discord", "Join the Discord", true, None::<&str>)?,
+        ])?;
     }
     let work = Submenu::with_items(
         app,

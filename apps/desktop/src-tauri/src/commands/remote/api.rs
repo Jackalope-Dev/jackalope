@@ -73,6 +73,9 @@ async fn boundary(State(service): State<RemoteAccess>, req: Request, next: Next)
 struct Pair {
     code: String,
     name: String,
+    /// "computer" from a desktop client; phones send none.
+    #[serde(default)]
+    kind: Option<String>,
 }
 /// Phones can only report a generic model name, so the host names them after the person
 /// who owns this computer. A name the person typed is kept as typed.
@@ -104,6 +107,7 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
             "Pairing expired or was declined. Create a new link on the host.",
         );
     }
+    let invited_by = pending.invited_by.clone();
     let name = pair.name.trim();
     if name.is_empty() || name.chars().count() > 80 || inner.config.devices.len() >= 20 {
         return failure(
@@ -114,12 +118,18 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
     let name = device_label(name, owner.as_deref());
     let token = secret();
     let id = Uuid::new_v4().to_string();
+    // An invited code is for a phone, so it never pairs another computer that could invite.
+    let kind = pair
+        .kind
+        .filter(|kind| kind == "computer" && invited_by.is_none());
     let mut config = inner.config.clone();
     config.devices.push(Device {
         id: id.clone(),
         name,
         token_hash: hash(&token),
         paired_at: chrono::Utc::now().to_rfc3339(),
+        kind,
+        invited_by,
     });
     if let Err(error) = service.save(&config) {
         return failure(StatusCode::INTERNAL_SERVER_ERROR, &error);
@@ -171,19 +181,32 @@ async fn request(
     Json(action): Json<Action>,
 ) -> Response {
     let config = {
-        let inner = service.inner.lock().unwrap();
+        let mut inner = service.inner.lock().unwrap();
         let token = headers
             .get(header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "));
-        if !token
+        let Some(device) = token
             .filter(|v| v.len() == super::pairing::TOKEN_LENGTH)
-            .is_some_and(|v| inner.config.devices.iter().any(|d| d.token_hash == hash(v)))
-        {
+            .and_then(|v| {
+                inner
+                    .config
+                    .devices
+                    .iter()
+                    .find(|d| d.token_hash == hash(v))
+            })
+            .cloned()
+        else {
             return failure(
                 StatusCode::UNAUTHORIZED,
                 "Pair this device again on the host.",
             );
+        };
+        if action.action == "invitePhone" {
+            return match invite_phone(&mut inner, &device) {
+                Ok(value) => Json(value).into_response(),
+                Err(error) => failure(StatusCode::FORBIDDEN, &error),
+            };
         }
         inner.config.clone()
     };
@@ -195,6 +218,36 @@ async fn request(
             "The host could not complete this request. Refresh task status before retrying.",
         ),
     }
+}
+/// A one-time phone pairing code for a paired computer to show its person, so their phone
+/// pairs with this host directly. Allowed only when this host's owner turned invitations on,
+/// only for a device that paired as a computer (not one that was itself invited), and only
+/// while this host has an HTTPS address a phone can reach. The phone gets the same projects
+/// every paired device gets, and is revoked with the computer that invited it.
+pub(super) fn invite_phone(inner: &mut Inner, device: &Device) -> Result<Value, String> {
+    let host = crate::commands::system::device_name();
+    if !inner.config.allow_phone_invites {
+        return Err(format!(
+            "{host} doesn't let paired computers invite phones. On {host}, open Devices → Let devices use this one and turn on \"Let paired computers invite phones\"."
+        ));
+    }
+    if device.kind.as_deref() != Some("computer") || device.invited_by.is_some() {
+        return Err(format!(
+            "Only a computer paired with {host} can invite a phone. Remove {host} here and pair it again to update this computer's pairing."
+        ));
+    }
+    if inner.config.public_origin.is_empty() {
+        return Ok(json!({"needsHttps":true,"computer":host}));
+    }
+    let mut reply = new_pairing(
+        inner,
+        Some(Invitation {
+            device_id: device.id.clone(),
+            name: device.name.clone(),
+        }),
+    )?;
+    reply["computer"] = json!(host);
+    Ok(reply)
 }
 fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<Value, String> {
     let runs = service.runtime.snapshot(if action.action == "detail" {
@@ -216,7 +269,7 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
             let sessions = service.sessions.snapshot(None)?;
             let sessions: Vec<_> = sessions.sessions.iter().filter(|s| !s.closed && allowed(config, &s.request.project_id, &s.request.project_path)).map(|s| json!({"id":s.id,"title":s.title,"projectId":s.request.project_id,"paused":s.paused,"error":s.error,"pending":s.messages.iter().filter(|m| !m.canceled && m.run_id.is_none()).count()})).collect();
             Ok(
-                json!({"projects":config.projects.iter().map(|p| json!({"id":p.project_id,"name":p.project_name})).collect::<Vec<_>>(),"tasks":tasks.into_iter().take(200).map(|r| task(r,false)).collect::<Vec<_>>(),"sessions":sessions}),
+                json!({"projects":super::projects::entries(&config.projects, &config.project_icons),"tasks":tasks.into_iter().take(200).map(|r| task(r,false)).collect::<Vec<_>>(),"sessions":sessions}),
             )
         }
         "detail" => {
@@ -332,6 +385,10 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
             }
             Ok(json!({"accepted":true}))
         }
+        "projectIcons" => Ok(super::projects::images(
+            &config.projects,
+            &config.project_icons,
+        )),
         "stop" => {
             let run = run(&runs, config, action.run_id.as_deref())?;
             if let Some(id) = &run.live_session_id {
@@ -520,6 +577,7 @@ mod tests {
                     short: String::new(),
                     expires: Instant::now() + Duration::from_secs(300),
                     attempts: 0,
+                    invited_by: None,
                 }),
                 error: None,
                 stop: None,
@@ -668,6 +726,7 @@ mod tests {
             short: String::new(),
             expires: Instant::now() - Duration::from_secs(1),
             attempts: 0,
+            invited_by: None,
         });
         assert_eq!(
             client

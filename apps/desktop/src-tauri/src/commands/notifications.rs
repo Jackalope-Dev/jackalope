@@ -220,9 +220,12 @@ impl Notifications {
 pub fn launch(app: tauri::AppHandle) {
     let initial = app.state::<TaskRuntime>().notification_snapshot();
     tauri::async_runtime::spawn(async move {
+        // Everything already waiting at launch counts as announced, plans included, so only
+        // later transitions notify.
         let mut seen: HashSet<String> = notices(&initial)
             .into_iter()
             .chain(bot_notices())
+            .chain(plan_notices())
             .map(|notice| notice.key)
             .collect();
         loop {

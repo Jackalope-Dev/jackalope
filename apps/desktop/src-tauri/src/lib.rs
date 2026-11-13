@@ -95,6 +95,7 @@ macro_rules! with_commands {
             commands::outcomes,
             commands::planning,
             commands::previews,
+            commands::project_favicon,
             commands::project_files,
             commands::project_git,
             commands::project_registry,

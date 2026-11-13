@@ -1,5 +1,21 @@
 [
   {
+    "id": "a-cleaner-guided-jackalope-on-desktop-and-phone",
+    "date": "2026-11-12",
+    "title": "A cleaner, guided Jackalope on desktop and phone",
+    "description": "Settings, setup and the everyday screens are reorganised and guided, with a new look for buttons and the frosted window.",
+    "items": [
+      "Settings are regrouped so things are easier to find: Devices brings Hosts and Remote access together, Agents holds Routing, and project settings live on each project in tabs, with a How hands-on? preset.",
+      "Setup screens guide you step by step, show what's connected with a live diagram, and check keys and codes as you type.",
+      "The sidebar starts with an Inbox of what needs you, and each project lists only its live work.",
+      "Projects can use their website's icon, and project menus can open the folder in your editor or Finder.",
+      "Bots have a new gallery with characters that come alive, and schedules use one clear When picker.",
+      "Fewer bottom-right alerts: only new things that need you, grouped together.",
+      "The phone app has a new look, shows offline computers, and a laptop can show a phone pairing code for another computer that allows it."
+    ],
+    "note": "Not yet tested in the installed app or on a device."
+  },
+  {
     "id": "pick-up-terminal-conversations-in-jackalope",
     "date": "2026-11-12",
     "title": "Pick up terminal conversations in Jackalope.",

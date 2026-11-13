@@ -80,11 +80,17 @@
 }
 .live-tabbar {
   display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 0 20px 12px;
   overflow-x: auto;
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
   flex: none;
+}
+/* The current panel's pop-out button sits at the far end of the tabs. */
+.live-tabbar > .ui-button {
+  margin-left: auto;
 }
 .live-status-actions {
   display: flex;

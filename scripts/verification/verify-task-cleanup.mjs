@@ -48,8 +48,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
 const organize = async (name) => {
-  await page.getByRole('button', { name: 'Organize work', exact: true }).click();
+  await page.getByRole('button', { name: 'Work actions', exact: true }).click();
   await page.getByRole('menuitem', { name, exact: true }).click();
+};
+// Archived work is a status filter entry rather than a menu command.
+const showArchived = async () => {
+  await page.getByRole('combobox', { name: 'Filter tasks by status' }).click();
+  await page.getByRole('option', { name: 'Archived', exact: true }).click();
 };
 try {
   await page.routeWebSocket(/.*/, (socket) => socket.close());
@@ -60,7 +65,7 @@ try {
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByRole('button', { name: 'Organize work', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Work actions', exact: true }).waitFor();
   assert.equal(
     await page.getByRole('button', { name: 'Archive Live indexing', exact: true }).isDisabled(),
     true,
@@ -69,12 +74,12 @@ try {
     await page.getByRole('button', { name: 'Archive Recover indexing', exact: true }).isDisabled(),
     true,
   );
-  await page.getByRole('combobox', { name: 'Filter by project' }).click();
-  await page.getByRole('option', { name: 'Atlas', exact: true }).click();
+  await page.locator('.work-header-switch').click();
+  await page.getByRole('menuitemradio', { name: 'Atlas', exact: true }).click();
   await organize('Archive finished (1)');
   await page.getByText('1 task archived.', { exact: true }).waitFor();
   await page.waitForFunction(
-    () => document.activeElement?.getAttribute('aria-label') === 'Organize work',
+    () => document.activeElement?.getAttribute('aria-label') === 'Work actions',
   );
   assert.deepEqual(
     await page.evaluate(() =>
@@ -84,7 +89,7 @@ try {
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByText('1 task restored.', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Organize work', exact: true }).focus();
+  await page.getByRole('button', { name: 'Work actions', exact: true }).focus();
   await page.keyboard.press('Enter');
   await page.getByRole('menuitem', { name: 'Select tasks', exact: true }).waitFor();
   await page.keyboard.press('Enter');
@@ -121,7 +126,7 @@ try {
   });
   await page.getByText('1 task archived.', { exact: true }).waitFor();
   await page.getByRole('searchbox', { name: 'Search tasks' }).fill('');
-  await organize('Show archived work');
+  await showArchived();
   await page.getByRole('button', { name: 'Restore Retry indexing', exact: true }).click();
   await page.getByText('1 task restored.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Show current work', exact: true }).click();
@@ -139,7 +144,7 @@ try {
   });
   await page.getByRole('button', { name: 'Archive Explore shortcuts', exact: true }).click();
   await page.waitForFunction(
-    () => document.activeElement?.getAttribute('aria-label') === 'Organize work',
+    () => document.activeElement?.getAttribute('aria-label') === 'Work actions',
   );
   assert.ok(
     await page.evaluate(
@@ -171,7 +176,7 @@ try {
   await page.evaluate(() => {
     window.cleanupFixture.fail = null;
   });
-  await organize('Show archived work');
+  await showArchived();
   await organize('Select tasks');
   await page.getByRole('checkbox', { name: 'Select all matching tasks', exact: true }).check();
   await page.getByRole('button', { name: 'Restore selected (3)', exact: true }).click();

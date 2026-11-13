@@ -1,20 +1,32 @@
 import {
   Button,
   Checkbox,
-  CopyButton,
+  ChoiceGrid,
   Disclosure,
-  DisclosureBody,
   DisclosureSummary,
+  FlowDiagram,
   FormField,
   InlineNotice,
   Input,
   SettingGroup,
   SettingRow,
+  SetupIntro,
+  SetupLayout,
+  type SetupStepState,
+  SetupSteps,
+  SetupSummary,
+  Switch,
 } from '@jackalope/ui';
+import { Laptop, Share2, Smartphone } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
+import { projectNameHints } from '../../lib/project-name-hints';
+import { thisComputerLabel } from '../../lib/remote-checks';
+import { syncProjectIcons } from '../../lib/remote-project-icons';
 import type { RunRequest } from '../../lib/run-types';
-import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
+import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
+import { ProjectMark } from '../projects/ProjectMark';
+import { type PairingCode, PairingView } from '../remote/PairingCode';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
 import { describeError } from '@jackalope/contracts/errors';
@@ -25,104 +37,41 @@ interface Status {
   port: number;
   publicOrigin: string;
   projectIds: string[];
-  devices: { id: string; name: string; pairedAt: string }[];
+  devices: { id: string; name: string; pairedAt: string; invitedBy?: string | null }[];
+  /** Paired computers may ask for a one-time phone pairing code (off by default). */
+  allowPhoneInvites?: boolean;
   error: string | null;
 }
-interface PairingCode {
-  /** The short code for typing, grouped as ABCDE-FGHJK. */
-  code: string;
-  link: string | null;
-  /** The link as QR rows, '1' for a dark module; present when there is a link. */
-  qr: string[] | null;
-  expiresIn: number;
+/** The host part of an HTTPS address, or the address as saved when it doesn't parse. */
+function originHost(origin: string) {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
 }
 
-/** Scannable from the companion app. Always dark on white so phone cameras read it in any theme. */
-function PairingQr({ rows }: { rows: string[] }) {
-  const size = rows.length + 8;
-  const path = rows
-    .flatMap((row, y) =>
-      [...row].flatMap((module, x) => (module === '1' ? [`M${x + 4} ${y + 4}h1v1h-1z`] : [])),
-    )
-    .join('');
-  return (
-    <svg
-      className="remote-qr"
-      viewBox={`0 0 ${size} ${size}`}
-      role="img"
-      aria-label="QR code for the pairing link"
-      shapeRendering="crispEdges"
-    >
-      <rect width={size} height={size} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
-  );
+/** How the link to this computer is made, named only from what remote access reports. */
+function linkLabel(status: Status | null) {
+  if (!status?.listening) return undefined;
+  // Without an HTTPS address, other computers reach the local port through an SSH tunnel.
+  if (!status.publicOrigin) return 'SSH tunnel';
+  return originHost(status.publicOrigin).split(':')[0].endsWith('.ts.net')
+    ? 'Tailscale HTTPS'
+    : 'HTTPS';
 }
-/** The typed code, large enough to read across a desk, with copy and the address. */
-function TypedCode({ pair, origin }: { pair: PairingCode; origin: string }) {
-  return (
-    <div className="remote-pair-code">
-      <output className="remote-code" aria-label={`Pairing code ${[...pair.code].join(' ')}`}>
-        {pair.code}
-      </output>
-      {origin && (
-        <p className="task-muted">
-          Address: <span className="font-mono">{origin}</span>
-        </p>
-      )}
-      <div className="remote-toolbar">
-        <CopyButton size="sm" variant="outline" text={pair.code} label="Copy code" />
-        {pair.link && (
-          <CopyButton size="sm" variant="outline" text={pair.link} label="Copy phone link" />
-        )}
-      </div>
-    </div>
+
+/** The shared projects in a few words: all of them, up to two names, or two and a count. */
+function sharedProjects(chosen: Project[], total: number, hints: Map<string, string>) {
+  if (!chosen.length) return 'No projects chosen';
+  if (chosen.length === total && total > 2) return `All ${total} projects`;
+  const named = chosen.map((project) =>
+    hints.has(project.id) ? `${project.name} (${hints.get(project.id)})` : project.name,
   );
+  if (named.length <= 2) return named.join(' and ');
+  return `${named.slice(0, 2).join(', ')} and ${named.length - 2} more`;
 }
-/**
- * A new pairing: the QR code to scan with the phone app, with the typed code folded away
- * for when the camera can't be used. Without an HTTPS address there is no QR code, and the
- * typed code is for connecting another computer over SSH.
- */
-function PairingView({
-  pair,
-  expires,
-  origin,
-}: {
-  pair: PairingCode;
-  expires: number;
-  origin: string;
-}) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const left = Math.max(0, Math.ceil((expires - now) / 1000));
-  const remaining = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  if (!pair.qr)
-    return (
-      <div className="remote-pair px-5 py-4">
-        <TypedCode pair={pair} origin={origin} />
-        <p className="task-muted">
-          Enter it where you connect this computer. It works once and expires in {remaining}.
-        </p>
-      </div>
-    );
-  return (
-    <div className="remote-pair remote-pair-hero px-5 py-4">
-      <PairingQr rows={pair.qr} />
-      <p>Scan this with the Jackalope app on your phone.</p>
-      <p className="task-muted">Works once · expires in {remaining}</p>
-      <Disclosure className="remote-pair-manual">
-        <DisclosureSummary>Can't scan? Enter a code</DisclosureSummary>
-        <DisclosureBody>
-          <TypedCode pair={pair} origin={origin} />
-        </DisclosureBody>
-      </Disclosure>
-    </div>
-  );
-}
+
 export function RemoteAccess() {
   const projects = useProjectStore((state) => state.projects);
   const [status, setStatus] = useState<Status | null>(null);
@@ -241,6 +190,8 @@ export function RemoteAccess() {
     });
     apply(next);
     setPair(null);
+    // The host keeps icons only for shared projects, so newly shared ones need theirs.
+    syncProjectIcons(true);
     return next;
   };
   const createPairing = async (devices: Status['devices']) => {
@@ -249,166 +200,322 @@ export function RemoteAccess() {
     setPair(result);
     setExpires(Date.now() + result.expiresIn * 1000);
   };
+  const hints = projectNameHints(projects);
+  const chosen = projects.filter((project) => selected.includes(project.id));
+  const shared = sharedProjects(chosen, projects.length, hints);
+  // A changed selection only reaches paired devices once saved.
+  const projectsChanged =
+    Boolean(status?.enabled) &&
+    (selected.length !== status?.projectIds.length ||
+      selected.some((id) => !status?.projectIds.includes(id)));
+  const devices = status?.devices ?? [];
+  const pairedSummary = devices.length
+    ? `${devices.length} ${devices.length === 1 ? 'device' : 'devices'}: ${devices
+        .map((device) => device.name)
+        .join(', ')}`
+    : 'None yet';
+  const done = {
+    projects: selected.length > 0,
+    on: Boolean(status?.listening),
+    phone: Boolean(status?.publicOrigin),
+    paired: Boolean(status?.devices.length),
+  };
+  // HTTPS for phones is optional, so it never holds the current step.
+  const required = ['projects', 'on', 'paired'] as const;
+  const current = required.find((step) => !done[step]);
+  const stepState = (step: keyof typeof done): SetupStepState =>
+    done[step] ? 'done' : step === current ? 'current' : 'upcoming';
+  const quickPair = status && !status.enabled && projects.length > 0 && (
+    <Button
+      disabled={busy || !selected.length}
+      onClick={() =>
+        void perform(async () => {
+          const next = await configure(true);
+          if (next.listening && next.publicOrigin) await createPairing(next.devices);
+          else if (next.listening)
+            setNotice('Remote access is on. Set up private HTTPS below to pair a phone.');
+        })
+      }
+    >
+      Pair a phone
+    </Button>
+  );
   return (
-    <SettingGroup title="Remote access">
-      {status && !status.enabled && projects.length > 0 && (
-        <SettingRow
-          title="Pair a phone"
-          description="Turns on remote access. Your phone can read work, start tasks and respond in the projects selected below."
-        >
-          <Button
-            disabled={busy || !selected.length}
-            onClick={() =>
-              void perform(async () => {
-                const next = await configure(true);
-                if (next.listening && next.publicOrigin) await createPairing(next.devices);
-                else if (next.listening)
-                  setNotice('Remote access is on. Set up private HTTPS below to pair a phone.');
-              })
-            }
-          >
-            Pair a phone
-          </Button>
-        </SettingRow>
-      )}
-      <form
-        className="remote-setup px-5 py-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void perform(async () => {
-            await configure(enabled);
-            setNotice('Remote access saved.');
-          });
-        }}
-      >
-        <label className="remote-project">
-          <Checkbox
-            disabled={busy || !status}
-            checked={enabled}
-            onChange={(event) => setEnabled(event.target.checked)}
-          />
-          Allow paired devices
-        </label>
-        <p className="task-muted">
-          Paired devices can read work, start tasks and respond for the projects you choose. Keep
-          Jackalope running on this host.
-        </p>
-        <fieldset disabled={busy || !status}>
-          <legend>Projects</legend>
-          {projects.map((project) => (
-            <label className="remote-project" key={project.id}>
-              <Checkbox
-                checked={selected.includes(project.id)}
-                onChange={(event) =>
-                  setSelected((ids) =>
-                    event.target.checked
-                      ? [...ids, project.id]
-                      : ids.filter((id) => id !== project.id),
-                  )
+    // The settings page already titles this category, so the group carries no header.
+    <SettingGroup>
+      <div className="remote-share px-5 py-4">
+        <SetupLayout
+          aside={
+            <>
+              <SetupIntro
+                icon={<Share2 size={20} />}
+                title="Use this computer from elsewhere"
+                description="Paired phones and computers can follow work and answer questions in the projects you share."
+                action={quickPair}
+              />
+              <FlowDiagram
+                from={
+                  status?.listening && !status.publicOrigin
+                    ? { label: 'Another computer', icon: <Laptop size={15} /> }
+                    : { label: 'Phone or computer', icon: <Smartphone size={15} /> }
                 }
+                to={{ label: thisComputerLabel(), icon: <Laptop size={15} /> }}
+                via={linkLabel(status)}
+                state={
+                  busy
+                    ? 'checking'
+                    : status?.error
+                      ? 'failed'
+                      : status?.listening
+                        ? 'connected'
+                        : 'idle'
+                }
+                error={status?.error}
               />
-              {project.name}
-            </label>
-          ))}
-          {!projects.length && <p>Add a project before enabling remote access.</p>}
-        </fieldset>
-        <Disclosure>
-          <DisclosureSummary>Advanced</DisclosureSummary>
-          <div className="space-y-3 pt-3">
-            <FormField label="Local port">
-              <Input
-                type="number"
-                disabled={busy || !status}
-                min={1024}
-                max={65535}
-                required
-                value={port}
-                onChange={(event) => setPort(Number(event.target.value))}
+              <SetupSummary
+                label="Sharing so far"
+                items={[
+                  { label: 'Projects', value: shared },
+                  {
+                    label: 'Remote access',
+                    value: status?.listening
+                      ? `On · port ${status.port}`
+                      : status?.enabled
+                        ? 'Allowed, not listening'
+                        : 'Off',
+                  },
+                  {
+                    label: 'Phones',
+                    value: status?.publicOrigin ? originHost(status.publicOrigin) : 'Not set up',
+                  },
+                  { label: 'Paired', value: pairedSummary },
+                ]}
               />
-            </FormField>
-            <FormField
-              label="HTTPS address"
-              description="Your own HTTPS address, such as a reverse proxy. Leave blank to set up Tailscale below. SSH connections use the local port."
-            >
-              <Input
-                type="url"
-                disabled={busy || !status}
-                placeholder="https://your-host"
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-              />
-            </FormField>
-          </div>
-        </Disclosure>
-        <Button
-          type="submit"
-          disabled={!status || busy || (enabled && !selected.length)}
-          loading={busy}
-          loadingLabel="Saving…"
-        >
-          Save
-        </Button>
-      </form>
-      {status?.error && <InlineNotice tone="error">{status.error}</InlineNotice>}
-      {status?.listening && !status.publicOrigin && (
-        <TailscaleSetup
-          turnOn={async () => {
-            apply(await invokeNative<Status>('remote_private_https'));
-            setPair(null);
-            setNotice('Private HTTPS is on. Create a pairing code for your phone.');
-          }}
-        />
-      )}
-      {status?.listening && (
-        <SettingRow
-          title="Pair a device"
-          description={
-            status.publicOrigin
-              ? `Ready for phones at ${status.publicOrigin}.`
-              : 'Other computers can pair over SSH now. Phones need the setup above first.'
+            </>
           }
         >
-          <Button
-            variant={pair ? 'outline' : 'primary'}
-            disabled={busy}
-            onClick={() => void perform(() => createPairing(status.devices))}
-          >
-            {pair ? 'New code' : status.publicOrigin ? 'Pair a phone' : 'Create pairing code'}
-          </Button>
-        </SettingRow>
-      )}
-      {pair && (
-        <PairingView
-          key={pair.code}
-          pair={pair}
-          expires={expires}
-          origin={status?.publicOrigin ?? ''}
-        />
-      )}
-      {!!status?.devices.length && (
-        <div>
-          {status.devices.map((device) => (
-            <SettingRow
-              key={device.id}
-              title={device.name}
-              description={`Paired ${new Date(device.pairedAt).toLocaleDateString()}`}
-            >
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() =>
-                  void perform(async () => {
-                    await invokeNative('remote_revoke', { id: device.id });
-                    setStatus(await invokeNative<Status>('remote_status'));
-                  })
-                }
-              >
-                Revoke access
-              </Button>
-            </SettingRow>
-          ))}
-        </div>
-      )}
+          <SetupSteps
+            label="Share this computer"
+            steps={[
+              {
+                id: 'projects',
+                title: 'Choose the projects to share',
+                hint: 'Paired devices only see and work in these.',
+                state: stepState('projects'),
+                summary: `Sharing ${shared.charAt(0).toLowerCase()}${shared.slice(1)}`,
+                content: projects.length ? (
+                  <>
+                    <ChoiceGrid
+                      label="Projects"
+                      values={selected}
+                      onValuesChange={setSelected}
+                      disabled={busy || !status}
+                      options={projects.map((project) => ({
+                        value: project.id,
+                        title: project.name,
+                        description: hints.get(project.id),
+                        searchText: `${project.name} ${hints.get(project.id) ?? ''}`,
+                        icon: <ProjectMark project={project} />,
+                      }))}
+                    />
+                    {projectsChanged && (
+                      <Button
+                        className="justify-self-start"
+                        disabled={busy || !selected.length}
+                        loading={busy}
+                        loadingLabel="Saving…"
+                        onClick={() =>
+                          void perform(async () => {
+                            await configure(true);
+                            setNotice('Shared projects saved.');
+                          })
+                        }
+                      >
+                        Save shared projects
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <p className="task-muted">Add a project before enabling remote access.</p>
+                ),
+              },
+              {
+                id: 'on',
+                title: 'Turn on remote access',
+                hint: 'Other computers can then pair over SSH with a pairing code.',
+                state: stepState('on'),
+                summary: status?.listening
+                  ? `On, listening on port ${status.port}${status.publicOrigin ? ` and at ${status.publicOrigin}` : ''}`
+                  : undefined,
+                content: (
+                  <form
+                    className="remote-setup"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void perform(async () => {
+                        await configure(enabled);
+                        setNotice('Remote access saved.');
+                      });
+                    }}
+                  >
+                    <label className="remote-project">
+                      <Checkbox
+                        disabled={busy || !status}
+                        checked={enabled}
+                        onChange={(event) => setEnabled(event.target.checked)}
+                      />
+                      Allow paired devices
+                    </label>
+                    <Disclosure>
+                      <DisclosureSummary>Advanced</DisclosureSummary>
+                      <div className="space-y-3 pt-3">
+                        <FormField label="Local port" className="remote-field-port">
+                          <Input
+                            type="number"
+                            disabled={busy || !status}
+                            min={1024}
+                            max={65535}
+                            required
+                            value={port}
+                            onChange={(event) => setPort(Number(event.target.value))}
+                          />
+                        </FormField>
+                        <FormField
+                          className="remote-field-address"
+                          label="HTTPS address"
+                          description="Your own HTTPS address, such as a reverse proxy. Leave blank to set up Tailscale below. SSH connections use the local port."
+                        >
+                          <Input
+                            type="url"
+                            disabled={busy || !status}
+                            placeholder="https://your-host"
+                            value={address}
+                            onChange={(event) => setAddress(event.target.value)}
+                          />
+                        </FormField>
+                      </div>
+                    </Disclosure>
+                    <Button
+                      type="submit"
+                      disabled={!status || busy || (enabled && !selected.length)}
+                      loading={busy}
+                      loadingLabel="Saving…"
+                    >
+                      Save
+                    </Button>
+                  </form>
+                ),
+              },
+              {
+                id: 'phone',
+                title: 'Reach it from a phone',
+                optional: true,
+                hint: status?.publicOrigin
+                  ? `Ready for phones at ${status.publicOrigin}.`
+                  : 'Phones connect over HTTPS. Other computers don’t need this.',
+                state: stepState('phone'),
+                summary: status?.publicOrigin
+                  ? `Phones reach it at ${status.publicOrigin}`
+                  : undefined,
+                // Optional, so it never becomes current; it opens once remote access is on.
+                open: Boolean(status?.listening && !status.publicOrigin),
+                content: status?.listening && !status.publicOrigin && (
+                  <TailscaleSetup
+                    turnOn={async () => {
+                      apply(await invokeNative<Status>('remote_private_https'));
+                      setPair(null);
+                      setNotice('Private HTTPS is on. Create a pairing code for your phone.');
+                    }}
+                  />
+                ),
+              },
+              {
+                id: 'paired',
+                title: 'Pair a device',
+                hint: status?.listening
+                  ? status.publicOrigin
+                    ? 'Scan the code with the Jackalope phone app, or type it on another computer.'
+                    : 'Type the code on the other computer under Hosts → Connect a host.'
+                  : 'Turn on remote access first.',
+                state: stepState('paired'),
+                summary: devices.length
+                  ? `Paired with ${devices.map((device) => device.name).join(', ')}`
+                  : undefined,
+                editLabel: 'Manage',
+                // A code on screen stays open until it's used or expires.
+                open: Boolean(pair),
+                content: (
+                  <>
+                    {status?.listening && (
+                      <Button
+                        className="justify-self-start"
+                        variant={pair ? 'outline' : 'primary'}
+                        disabled={busy}
+                        onClick={() => void perform(() => createPairing(status.devices))}
+                      >
+                        {pair
+                          ? 'New code'
+                          : status.publicOrigin
+                            ? 'Pair a phone'
+                            : 'Create pairing code'}
+                      </Button>
+                    )}
+                    {pair && (
+                      <PairingView
+                        key={pair.code}
+                        pair={pair}
+                        expires={expires}
+                        origin={status?.publicOrigin ?? ''}
+                      />
+                    )}
+                    {!!status?.devices.length && (
+                      <div className="remote-share-devices">
+                        {status.devices.map((device) => (
+                          <SettingRow
+                            key={device.id}
+                            title={device.name}
+                            description={`Paired ${new Date(device.pairedAt).toLocaleDateString()}${
+                              device.invitedBy ? ` · invited by ${device.invitedBy}` : ''
+                            }`}
+                          >
+                            <Button
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                void perform(async () => {
+                                  await invokeNative('remote_revoke', { id: device.id });
+                                  setStatus(await invokeNative<Status>('remote_status'));
+                                })
+                              }
+                            >
+                              Revoke access
+                            </Button>
+                          </SettingRow>
+                        ))}
+                      </div>
+                    )}
+                    {status?.listening && (
+                      <Switch
+                        label="Let paired computers invite phones"
+                        description="A computer paired here can show a one-time code so your phone pairs with this computer directly. Phones a computer invited are removed when you revoke it."
+                        checked={Boolean(status.allowPhoneInvites)}
+                        disabled={busy}
+                        onCheckedChange={(allowed) =>
+                          void perform(async () =>
+                            setStatus(
+                              await invokeNative<Status>('remote_phone_invites', { allowed }),
+                            ),
+                          )
+                        }
+                      />
+                    )}
+                  </>
+                ),
+              },
+            ]}
+          />
+        </SetupLayout>
+      </div>
       {error && (
         <InlineNotice tone="error" className="mx-5 my-4">
           {error}

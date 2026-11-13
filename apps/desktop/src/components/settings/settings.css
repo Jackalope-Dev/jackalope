@@ -165,6 +165,23 @@
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
 }
+/* Toggle groups marked data-settings-tile sit two to a row on wide panes, so short cards use
+   the width instead of stacking into one long column; anything unmarked spans the row. The
+   grid gap replaces the stacked margins. */
+@container (min-width: 52rem) {
+  .settings-section:has(> [data-settings-tile]) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .settings-section:has(> [data-settings-tile]) > :not([data-settings-tile]) {
+    grid-column: 1 / -1;
+  }
+  .settings-section:has(> [data-settings-tile]) > * {
+    margin-top: 0;
+  }
+}
 .settings-input {
   min-width: 0;
   width: 220px;
@@ -417,17 +434,6 @@
   }
 }
 
-.settings-scope-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-  padding: 8px 0 24px;
-}
-.settings-scope-bar p {
-  flex-basis: 100%;
-  font-size: var(--text-xs);
-}
 .project-preferences {
   min-width: 0;
 }
@@ -436,6 +442,20 @@
 }
 .project-preferences .workspace-heading p {
   overflow-wrap: anywhere;
+}
+/* Project settings tabs: six sections that scroll sideways at narrow widths rather than wrap. */
+.project-settings-tabs > [role="tablist"] {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.project-settings-panel {
+  margin-top: 16px;
+}
+.project-settings-panel:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 4px;
+  border-radius: var(--radius-md);
 }
 /* Commands and branch names need more room than the control's content width. */
 .project-setting-input {
@@ -472,4 +492,109 @@
   .settings-nav-item {
     transition: none;
   }
+}
+
+/* A field with its live check beneath, sized to the field. */
+.settings-field-stack {
+  display: grid;
+  gap: 2px;
+  width: min(360px, 100%);
+}
+/* Shortcuts read as keycaps; recording swaps the caps for a focused capture target. */
+.shortcut-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.shortcut-keys {
+  display: inline-flex;
+  gap: 4px;
+}
+.shortcut-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font: 500 var(--text-xs) / 1 var(--font-mono, ui-monospace, monospace);
+}
+.shortcut-recorder {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px dashed var(--color-border-focus);
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+}
+.shortcut-recorder:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Privacy summary: one tile per outgoing stream, its state in words as well as colour. */
+.privacy-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.privacy-summary-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.privacy-summary-item > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+.privacy-summary-state {
+  flex-shrink: 0;
+  min-width: 32px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+}
+.privacy-summary-item[data-on] .privacy-summary-state {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+
+/* Reset spells out what it erases and what survives, side by side on wide panes. */
+.settings-reset-scope {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 12px 24px;
+  margin-bottom: 12px;
+}
+.settings-reset-scope h4 {
+  margin-bottom: 4px;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.settings-reset-scope ul {
+  display: grid;
+  gap: 2px;
+  padding-left: 1.1em;
+  list-style: disc;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.settings-reset-input {
+  max-width: 12rem;
 }

@@ -24,7 +24,6 @@ import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
-import { PromptPresets } from '../tasks/PromptPresets';
 import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { DismissButton } from '../ui/DismissButton';
@@ -402,14 +401,6 @@ ${incoming}`
                   disabled={busy}
                 />
               )}
-              <PromptPresets
-                projectId={project.id}
-                onInsert={(prompt) => {
-                  assessment.clear();
-                  setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-                  input.current?.focus();
-                }}
-              />
               <DictationButton
                 disabled={busy}
                 onText={(value) => {

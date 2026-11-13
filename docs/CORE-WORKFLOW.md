@@ -17,7 +17,7 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
-Project instructions (Project settings → Tasks) reach every task agent natively at launch,
+Project instructions (Project settings → Basics) reach every task agent natively at launch,
 whatever started the work; a resumed agent session is not given them again, and a prompt
 that already contains them (scheduled and remote tasks add them) does not repeat them.
 Optional guidelines and tool selection remain inspectable. Project connection loading must

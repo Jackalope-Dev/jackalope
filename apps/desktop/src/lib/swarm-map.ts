@@ -2,7 +2,7 @@ import { isActive, isDone } from '@jackalope/contracts/runs';
 import type { QueueView } from './queue';
 import type { TaskRun } from './run-types';
 import type { SwarmConflict, SwarmFile } from './swarm';
-import { taskTitle } from './task-title.ts';
+import { runTitle } from './task-title.ts';
 
 /** Where one piece of work sits on its way to the target branch. */
 export type SwarmPhase = 'queued' | 'working' | 'checking' | 'ready' | 'attention' | 'merged';
@@ -128,7 +128,7 @@ export function swarmMap({
     const agent: SwarmAgent = {
       id: run.id,
       runId: run.id,
-      title: fork?.title || taskTitle(run.prompt),
+      title: fork?.title || runTitle(run),
       agent: run.agent,
       phase,
       detail,

@@ -495,10 +495,15 @@ try {
   await page.getByRole('button', { name: 'More', exact: true }).waitFor();
   await navigate('mcps');
   await page.getByRole('button', { name: 'Connection options', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Custom connection', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add custom connection…', exact: true }).click();
   const connectionDialog = page.getByRole('dialog');
   await connectionDialog.getByLabel('Name', { exact: true }).fill('Fixture tool');
-  await connectionDialog.getByRole('button', { name: 'Remote URL', exact: true }).click();
+  // Connection type is a radio card group; its visually hidden radio is reached through the label.
+  await connectionDialog.getByText('Remote URL', { exact: true }).click();
+  assert.equal(
+    await connectionDialog.getByRole('radio', { name: /^Remote URL/ }).isChecked(),
+    true,
+  );
   await connectionDialog.getByLabel('Endpoint URL').fill('https://example.com/mcp');
   await connectionDialog.getByRole('button', { name: 'All projects', exact: true }).click();
   await connectionDialog.getByRole('button', { name: 'Specific agents', exact: true }).click();
@@ -542,14 +547,16 @@ try {
   );
   await permission.click();
   await page.getByRole('button', { name: 'Trail workspace', exact: true }).first().click();
+  // Project settings live on the project page; Settings is app-wide with inline overrides.
+  await navigate('project-settings');
+  await page.getByLabel('Project name', { exact: true }).fill('Trail renamed');
   await navigate('preferences');
   await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
   assert.equal(await page.getByRole('dialog').count(), 0);
-  await page.getByRole('button', { name: 'Per project', exact: true }).click();
-  await page.getByLabel('Project name', { exact: true }).fill('Trail renamed');
+  assert.equal(await page.getByRole('button', { name: 'Per project', exact: true }).count(), 0);
   await page.getByRole('button', { name: 'Appearance', exact: true }).click();
-  assert.equal(await page.getByRole('switch', { name: 'Use app theme', exact: true }).count(), 0);
-  await page.getByRole('slider', { name: 'Color field', exact: true }).focus();
+  await page.getByRole('button', { name: 'Override for Trail renamed', exact: true }).click();
+  await page.getByRole('slider', { name: 'Color field', exact: true }).last().focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(
     await page.evaluate(async () => {
@@ -558,7 +565,14 @@ try {
     }),
     true,
   );
-  await page.getByRole('button', { name: 'App-wide', exact: true }).click();
+  await page.getByRole('button', { name: 'Use app theme', exact: true }).click();
+  assert.equal(
+    await page.evaluate(async () => {
+      const { useProjectStore } = await window.storeModule('projectStore');
+      return !!useProjectStore.getState().projects[0].preferences.theme;
+    }),
+    false,
+  );
   await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
   assert.equal(
     await page
@@ -595,9 +609,11 @@ try {
     'Trail renamed',
   );
   await page.screenshot({ path: 'output/playwright/project-settings-700.png' });
-  // Schedules live under Bots rather than their own rail destination.
-  const rail = page.getByRole('navigation', { name: 'Workspace', exact: true });
-  assert.equal(await rail.getByRole('button', { name: /Automations|Schedules/ }).count(), 0);
+  // Schedules live under Bots rather than their own rail destination; Bots sits in Setup.
+  const workspaceRail = page.getByRole('navigation', { name: 'Workspace', exact: true });
+  const rail = page.getByRole('navigation', { name: 'Setup', exact: true });
+  for (const nav of [workspaceRail, rail])
+    assert.equal(await nav.getByRole('button', { name: /Automations|Schedules/ }).count(), 0);
   await rail.getByRole('button', { name: 'Bots', exact: true }).click();
   await page.getByRole('heading', { name: 'Bots', exact: true }).waitFor();
   await page

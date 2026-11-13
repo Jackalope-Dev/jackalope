@@ -1,6 +1,11 @@
-import { Button, Input } from '@jackalope/ui';
+import { Button, IconButton, Input } from '@jackalope/ui';
+import { X } from 'lucide-react';
 import { useId, useState } from 'react';
+import './outcome-editor.css';
 
+const MAX = 12;
+
+/** A short list of specific lines (outcomes, inputs or steps), numbered in the order saved. */
 export function OutcomeEditor({
   label = 'What should be true when this is done?',
   values,
@@ -14,45 +19,53 @@ export function OutcomeEditor({
   const [value, setValue] = useState('');
   const [rowIds, setRowIds] = useState(() => values.map(() => crypto.randomUUID()));
   const add = () => {
-    if (!value.trim() || values.length >= 12 || values.includes(value.trim())) return;
+    if (!value.trim() || values.length >= MAX || values.includes(value.trim())) return;
     setRowIds([...rowIds, crypto.randomUUID()]);
     onChange([...values, value.trim()]);
     setValue('');
   };
   return (
-    <fieldset className="my-4 space-y-2 outcome-editor">
-      <legend className="font-medium">{label}</legend>
-      {values.map((text, index) => (
-        <div key={rowIds[index] ?? text} className="flex gap-2 items-start">
-          <Input
-            aria-label={`${label} ${index + 1}`}
-            className="task-input flex-1 min-w-0"
-            value={text}
-            maxLength={500}
-            onChange={(e) => onChange(values.map((v, i) => (i === index ? e.target.value : v)))}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label={`Remove ${text}`}
-            onClick={() => {
-              setRowIds(rowIds.filter((_, i) => i !== index));
-              onChange(values.filter((_, i) => i !== index));
-            }}
-          >
-            Remove
-          </Button>
-        </div>
-      ))}
-      {values.length < 12 && (
-        <div className="flex gap-2">
+    <fieldset className="outcome-editor">
+      <legend>
+        {label}
+        <span className="outcome-editor-count">
+          {values.length} of {MAX}
+        </span>
+      </legend>
+      {values.length > 0 && (
+        <ol className="outcome-editor-rows">
+          {values.map((text, index) => (
+            <li key={rowIds[index] ?? text}>
+              <span className="outcome-editor-number" aria-hidden="true">
+                {index + 1}
+              </span>
+              <Input
+                aria-label={`${label} ${index + 1}`}
+                value={text}
+                maxLength={500}
+                onChange={(e) => onChange(values.map((v, i) => (i === index ? e.target.value : v)))}
+              />
+              <IconButton
+                label={`Remove ${text}`}
+                onClick={() => {
+                  setRowIds(rowIds.filter((_, i) => i !== index));
+                  onChange(values.filter((_, i) => i !== index));
+                }}
+              >
+                <X size={14} aria-hidden="true" />
+              </IconButton>
+            </li>
+          ))}
+        </ol>
+      )}
+      {values.length < MAX && (
+        <div className="outcome-editor-add">
           <Input
             id={id}
             aria-label={`Add: ${label}`}
-            className="task-input flex-1 min-w-0"
             value={value}
             maxLength={500}
-            placeholder="Add one specific requirement"
+            placeholder="Add one specific line, then press Enter"
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
@@ -64,6 +77,7 @@ export function OutcomeEditor({
           <Button
             type="button"
             variant="outline"
+            size="sm"
             disabled={!value.trim() || values.includes(value.trim())}
             onClick={add}
           >

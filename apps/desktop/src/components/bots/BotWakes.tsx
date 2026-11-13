@@ -1,6 +1,7 @@
 import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
+  ChoiceCards,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
@@ -12,15 +13,10 @@ import {
   Switch,
   Textarea,
 } from '@jackalope/ui';
-import { CalendarClock, GitCommitHorizontal, Plug } from 'lucide-react';
+import { CalendarClock, GitCommitHorizontal, Plug, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { connectionTools, describeWake } from '../../lib/bot-hub';
 import { isTauriEnvironment } from '../../lib/native/env';
-import {
-  parseScheduleTiming,
-  scheduleHourIntervals,
-  scheduleTimingExpression,
-} from '../../lib/schedules';
 import {
   BOT_WAKES_MAX,
   type BotWake,
@@ -28,6 +24,7 @@ import {
   validateWake,
   WAKE_PROMPT_MAX,
 } from '../../stores/botStore';
+import { WhenPicker } from '../schedules/WhenPicker';
 import { ActionError } from '../ui/ActionError';
 
 const INTERVALS = [
@@ -39,30 +36,31 @@ const INTERVALS = [
   { value: 1440, label: 'Once a day' },
 ];
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function newTrigger(kind: BotWakeTrigger['kind'], connectionId = ''): BotWakeTrigger {
+  return kind === 'schedule'
+    ? {
+        kind,
+        expression: '0 9 * * 1-5',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+    : kind === 'repoChange'
+      ? { kind, path: '' }
+      : { kind, connectionId, tool: '', arguments: {}, intervalMinutes: 15 };
+}
+
+const WAKE_NAMES: Record<BotWakeTrigger['kind'], string> = {
+  schedule: 'Weekday check-in',
+  repoChange: 'Project changed',
+  connection: 'New connection data',
+};
 
 function newWake(kind: BotWakeTrigger['kind'], connectionId = ''): BotWake {
-  const trigger: BotWakeTrigger =
-    kind === 'schedule'
-      ? {
-          kind,
-          expression: '0 9 * * 1-5',
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }
-      : kind === 'repoChange'
-        ? { kind, path: '' }
-        : { kind, connectionId, tool: '', arguments: {}, intervalMinutes: 15 };
   return {
     id: crypto.randomUUID(),
-    name:
-      kind === 'schedule'
-        ? 'Weekday check-in'
-        : kind === 'repoChange'
-          ? 'Project changed'
-          : 'New connection data',
+    name: WAKE_NAMES[kind],
     prompt: '',
     enabled: true,
-    trigger,
+    trigger: newTrigger(kind, connectionId),
   };
 }
 
@@ -150,6 +148,7 @@ export function BotWakes({
       )}
       {editing ? (
         <WakeForm
+          isNew={!wakes.some((wake) => wake.id === editing.id)}
           wake={editing}
           projectId={editing.projectId ?? projectId}
           projects={projects}
@@ -164,29 +163,14 @@ export function BotWakes({
         />
       ) : (
         wakes.length < BOT_WAKES_MAX && (
-          // Plain buttons: a dropdown nested in the editor dialog does not open reliably.
           <div className="bot-wake-add">
-            <Button variant="outline" type="button" onClick={() => setEditing(newWake('schedule'))}>
-              <CalendarClock size={16} aria-hidden="true" />
-              On a schedule
-            </Button>
             <Button
               variant="outline"
               type="button"
-              onClick={() => setEditing(newWake('repoChange'))}
+              onClick={() => setEditing(newWake('schedule', usable[0]?.id))}
             >
-              <GitCommitHorizontal size={16} aria-hidden="true" />
-              When the project changes
-            </Button>
-            <Button
-              variant="outline"
-              type="button"
-              disabled={!usable.length}
-              title={usable.length ? undefined : 'Add a connection this bot may use first.'}
-              onClick={() => setEditing(newWake('connection', usable[0]?.id))}
-            >
-              <Plug size={16} aria-hidden="true" />
-              When connection data changes
+              <Plus size={16} aria-hidden="true" />
+              Add a wake-up
             </Button>
           </div>
         )
@@ -196,6 +180,7 @@ export function BotWakes({
 }
 
 function WakeForm({
+  isNew,
   wake,
   projectId,
   projects,
@@ -205,6 +190,7 @@ function WakeForm({
   onCancel,
   onSave,
 }: {
+  isNew: boolean;
   wake: BotWake;
   projectId: string;
   projects: { id: string; name: string }[];
@@ -219,6 +205,43 @@ function WakeForm({
     onChange({ ...wake, trigger: { ...trigger, ...next } as BotWakeTrigger });
   return (
     <div className="bots-routine-form bot-wake-form">
+      <ChoiceCards
+        label="What wakes the bot"
+        className="bot-wake-kinds"
+        value={trigger.kind}
+        onValueChange={(kind) => {
+          if (kind === trigger.kind) return;
+          const keepName = !isNew || wake.name !== WAKE_NAMES[trigger.kind];
+          onChange({
+            ...wake,
+            name: keepName ? wake.name : WAKE_NAMES[kind],
+            trigger: newTrigger(kind, connections[0]?.id),
+          });
+        }}
+        options={[
+          {
+            value: 'schedule',
+            title: 'On a schedule',
+            description: 'At set times, like weekdays at 9.',
+            icon: <CalendarClock size={18} />,
+          },
+          {
+            value: 'repoChange',
+            title: 'When the project changes',
+            description: 'After new commits on the target branch.',
+            icon: <GitCommitHorizontal size={18} />,
+          },
+          {
+            value: 'connection',
+            title: 'When connection data changes',
+            description: connections.length
+              ? 'When a read-only tool returns something new.'
+              : 'Add a connection this bot may use first.',
+            icon: <Plug size={18} />,
+            disabled: !connections.length,
+          },
+        ]}
+      />
       <FormField label="Wake-up name">
         <Input
           value={wake.name}
@@ -243,8 +266,10 @@ function WakeForm({
         </FormField>
       )}
       {trigger.kind === 'schedule' && (
-        <ScheduleFields
+        <WhenPicker
+          key={wake.id}
           expression={trigger.expression}
+          timezone={trigger.timezone}
           onChange={(expression) => setTrigger({ expression })}
         />
       )}
@@ -289,75 +314,6 @@ function WakeForm({
           Save wake-up
         </Button>
       </div>
-    </div>
-  );
-}
-
-function ScheduleFields({
-  expression,
-  onChange,
-}: {
-  expression: string;
-  onChange: (expression: string) => void;
-}) {
-  const parsed = parseScheduleTiming(expression) ?? {
-    repeat: 'weekdays',
-    time: '09:00',
-    weekday: '1',
-    hours: '1',
-  };
-  const [timing, setTiming] = useState({ hours: '1', ...parsed });
-  const update = (next: Partial<typeof timing>) => {
-    const merged = { ...timing, ...next };
-    setTiming(merged);
-    const value = scheduleTimingExpression(
-      merged.repeat,
-      merged.time,
-      merged.weekday,
-      merged.hours,
-    );
-    if (value) onChange(value);
-  };
-  return (
-    <div className="bots-routine-timing">
-      <FormField label="Repeat">
-        <Select value={timing.repeat} onValueChange={(repeat) => update({ repeat })}>
-          <SelectItem value="hourly">Every few hours</SelectItem>
-          <SelectItem value="daily">Every day</SelectItem>
-          <SelectItem value="weekdays">Weekdays</SelectItem>
-          <SelectItem value="weekly">Every week</SelectItem>
-        </Select>
-      </FormField>
-      {timing.repeat === 'hourly' ? (
-        <FormField label="Every">
-          <Select value={timing.hours} onValueChange={(hours) => update({ hours })}>
-            {scheduleHourIntervals.map((hours) => (
-              <SelectItem key={hours} value={hours}>
-                {hours === '1' ? 'Hour' : `${hours} hours`}
-              </SelectItem>
-            ))}
-          </Select>
-        </FormField>
-      ) : (
-        <FormField label="Time">
-          <Input
-            type="time"
-            value={timing.time}
-            onChange={(event) => update({ time: event.target.value })}
-          />
-        </FormField>
-      )}
-      {timing.repeat === 'weekly' && (
-        <FormField label="Day">
-          <Select value={timing.weekday} onValueChange={(weekday) => update({ weekday })}>
-            {WEEKDAYS.map((day, index) => (
-              <SelectItem key={day} value={String(index)}>
-                {day}
-              </SelectItem>
-            ))}
-          </Select>
-        </FormField>
-      )}
     </div>
   );
 }

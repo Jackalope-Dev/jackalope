@@ -86,7 +86,7 @@ the keys from src-tauri/Info.ios.plist. iOS needs Xcode, xcodegen, the
 `aarch64-apple-ios-sim` Rust target and a simulator runtime matching the Xcode SDK; the CLI
 stops with "Xcode Simulator SDK … is not installed" otherwise. Debug builds accept a loopback
 host, so pair a simulator or `adb reverse tcp:<port> tcp:<port>` emulator with
-`http://127.0.0.1:<port>` and the pairing code from Settings → Remote access. Give a test
+`http://127.0.0.1:<port>` and the pairing code from Devices → Let devices use this one. Give a test
 desktop its own remote access port so it does not collide with an everyday instance.
 
 TestFlight builds sign with the team in tauri.conf.json and an App Store Connect API key kept

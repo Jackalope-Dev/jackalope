@@ -1,6 +1,7 @@
 mod api;
 mod client;
 mod pairing;
+pub mod projects;
 mod transport;
 pub mod wsl;
 pub use client::*;
@@ -34,6 +35,13 @@ struct Config {
     public_origin: String,
     projects: Vec<RunRequest>,
     devices: Vec<Device>,
+    /// Icons for shared projects, synced from the desktop's project list for companions.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    project_icons: std::collections::HashMap<String, projects::ProjectIcon>,
+    /// Lets a paired computer ask this host for a one-time phone pairing code. Off unless
+    /// the person turns it on here.
+    #[serde(default)]
+    allow_phone_invites: bool,
 }
 fn default_port() -> u16 {
     9472
@@ -45,6 +53,18 @@ struct Device {
     name: String,
     token_hash: String,
     paired_at: String,
+    /// "computer" for a desktop client; phones and clients before this field send none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kind: Option<String>,
+    /// The paired computer whose invitation this device used; revoking it revokes this too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    invited_by: Option<Invitation>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Invitation {
+    device_id: String,
+    name: String,
 }
 /// One pending pairing: the long code in its link and QR, and the short code shown for
 /// typing. Either pairs once; both share the expiry and the attempt limit.
@@ -53,6 +73,8 @@ struct Pairing {
     short: String,
     expires: Instant,
     attempts: u16,
+    /// Set when a paired computer requested this code for a phone.
+    invited_by: Option<Invitation>,
 }
 impl Pairing {
     /// Counts this attempt, then accepts a current code: the link's long code or the short
@@ -240,7 +262,7 @@ impl RemoteAccess {
     fn status(&self) -> Result<Value, String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         Ok(
-            json!({"enabled": inner.config.enabled, "listening": inner.stop.is_some(), "port": inner.config.port, "publicOrigin": inner.config.public_origin, "projectIds": inner.config.projects.iter().map(|p| &p.project_id).collect::<Vec<_>>(), "devices": inner.config.devices.iter().map(|d| json!({"id":d.id,"name":d.name,"pairedAt":d.paired_at})).collect::<Vec<_>>(), "error":inner.error}),
+            json!({"enabled": inner.config.enabled, "listening": inner.stop.is_some(), "port": inner.config.port, "publicOrigin": inner.config.public_origin, "projectIds": inner.config.projects.iter().map(|p| &p.project_id).collect::<Vec<_>>(), "devices": inner.config.devices.iter().map(|d| json!({"id":d.id,"name":d.name,"pairedAt":d.paired_at,"invitedBy":d.invited_by.as_ref().map(|i| &i.name)})).collect::<Vec<_>>(), "allowPhoneInvites": inner.config.allow_phone_invites, "error":inner.error}),
         )
     }
 }
@@ -259,6 +281,9 @@ macro_rules! tauri_commands {
             commands::remote::remote_host_pair,
             commands::remote::remote_host_request,
             commands::remote::remote_host_remove,
+            commands::remote::remote_host_invite_phone,
+            commands::remote::remote_project_icons,
+            commands::remote::remote_phone_invites,
         ] $($rest)*)
     };
 }
@@ -316,6 +341,8 @@ pub async fn remote_configure(
             public_origin,
             projects,
             devices: inner.config.devices.clone(),
+            project_icons: inner.config.project_icons.clone(),
+            allow_phone_invites: inner.config.allow_phone_invites,
         };
         service.save(&config)?;
         let previous = if !enabled || inner.config.port != port {
@@ -362,9 +389,10 @@ fn qr_rows(link: &str) -> Result<Vec<String>, String> {
         })
         .collect())
 }
-#[tauri::command]
-pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String> {
-    let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
+/// Starts the one pending pairing (replacing any earlier one): a code that works once,
+/// for five minutes, within [`PAIRING_ATTEMPTS`] tries, with its link and QR when the host
+/// has an HTTPS address.
+fn new_pairing(inner: &mut Inner, invited_by: Option<Invitation>) -> Result<Value, String> {
     if !inner.config.enabled || inner.stop.is_none() || inner.config.projects.is_empty() {
         return Err("Enable remote access and select a project first.".into());
     }
@@ -375,6 +403,7 @@ pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String>
         short: hash(&pairing_code(&code).unwrap_or_default()),
         expires: Instant::now() + Duration::from_secs(300),
         attempts: 0,
+        invited_by,
     });
     let link = (!inner.config.public_origin.is_empty())
         .then(|| format!("{}/#pair={long}", inner.config.public_origin));
@@ -382,18 +411,155 @@ pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String>
     Ok(json!({"code":code,"link":link,"qr":qr,"expiresIn":300}))
 }
 #[tauri::command]
+pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String> {
+    let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
+    new_pairing(&mut inner, None)
+}
+/// Turns phone invitations from paired computers on or off.
+#[tauri::command]
+pub fn remote_phone_invites(
+    allowed: bool,
+    service: State<'_, RemoteAccess>,
+) -> Result<Value, String> {
+    {
+        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
+        let mut config = inner.config.clone();
+        config.allow_phone_invites = allowed;
+        service.save(&config)?;
+        inner.config = config;
+        if !allowed
+            && inner
+                .pairing
+                .as_ref()
+                .is_some_and(|p| p.invited_by.is_some())
+        {
+            inner.pairing = None;
+        }
+    }
+    service.status()
+}
+/// Records the icons of the shared projects so companions can show them. Invalid entries
+/// are dropped rather than refused, so one bad icon never blocks the rest.
+#[tauri::command]
+pub fn remote_project_icons(
+    icons: std::collections::HashMap<String, projects::ProjectIcon>,
+    service: State<'_, RemoteAccess>,
+) -> Result<(), String> {
+    let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
+    let icons: std::collections::HashMap<_, _> = icons
+        .into_iter()
+        .filter(|(id, _)| inner.config.projects.iter().any(|p| &p.project_id == id))
+        .filter_map(|(id, icon)| Some((id, projects::valid_icon(icon)?)))
+        .collect();
+    if icons == inner.config.project_icons {
+        return Ok(());
+    }
+    let mut config = inner.config.clone();
+    config.project_icons = icons;
+    service.save(&config)?;
+    inner.config = config;
+    Ok(())
+}
+#[tauri::command]
 pub fn remote_revoke(id: String, service: State<'_, RemoteAccess>) -> Result<(), String> {
     let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
     let mut config = inner.config.clone();
-    config.devices.retain(|d| d.id != id);
+    revoke(&mut config.devices, &id);
     service.save(&config)?;
     inner.config = config;
     Ok(())
 }
 
+/// Removes a device and every device it invited, so revoking a computer also revokes the
+/// phones paired through its invitations.
+fn revoke(devices: &mut Vec<Device>, id: &str) {
+    devices.retain(|d| {
+        d.id != id
+            && d.invited_by
+                .as_ref()
+                .is_none_or(|invite| invite.device_id != id)
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn device(id: &str, kind: Option<&str>, invited_by: Option<&str>) -> Device {
+        Device {
+            id: id.into(),
+            name: id.into(),
+            token_hash: String::new(),
+            paired_at: String::new(),
+            kind: kind.map(Into::into),
+            invited_by: invited_by.map(|by| Invitation {
+                device_id: by.into(),
+                name: by.into(),
+            }),
+        }
+    }
+
+    #[test]
+    fn revoking_a_computer_revokes_the_phones_it_invited() {
+        let mut devices = vec![
+            device("laptop", Some("computer"), None),
+            device("phone-a", None, Some("laptop")),
+            device("phone-b", None, None),
+        ];
+        revoke(&mut devices, "laptop");
+        assert_eq!(
+            devices.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(),
+            ["phone-b"]
+        );
+    }
+
+    #[test]
+    fn only_paired_computers_invite_and_only_when_allowed_and_reachable() {
+        let (stop, _stopped) = tokio::sync::oneshot::channel();
+        let request: RunRequest = serde_json::from_value(json!({"id":"r","projectId":"p","projectName":"Site","projectPath":"/w/site","agent":"codex","prompt":"","isolated":true})).unwrap();
+        let mut inner = Inner {
+            config: Config {
+                enabled: true,
+                port: 9472,
+                projects: vec![request],
+                ..Default::default()
+            },
+            pairing: None,
+            error: None,
+            stop: Some(stop),
+            listener: None,
+        };
+        let laptop = device("laptop", Some("computer"), None);
+        assert!(api::invite_phone(&mut inner, &laptop)
+            .unwrap_err()
+            .contains("doesn't let paired computers invite phones"));
+        inner.config.allow_phone_invites = true;
+        for refused in [
+            device("phone", None, None),
+            device("invited", Some("computer"), Some("laptop")),
+        ] {
+            assert!(api::invite_phone(&mut inner, &refused)
+                .unwrap_err()
+                .contains("Only a computer paired with"));
+        }
+        assert_eq!(
+            api::invite_phone(&mut inner, &laptop).unwrap()["needsHttps"],
+            true
+        );
+        assert!(
+            inner.pairing.is_none(),
+            "no code is made that a phone could not reach"
+        );
+        inner.config.public_origin = "https://host.example.ts.net".into();
+        let reply = api::invite_phone(&mut inner, &laptop).unwrap();
+        assert_eq!(reply["expiresIn"], 300);
+        assert!(reply["link"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://host.example.ts.net/#pair="));
+        let pending = inner.pairing.as_ref().unwrap();
+        assert_eq!(pending.invited_by.as_ref().unwrap().device_id, "laptop");
+    }
 
     #[test]
     fn blank_project_branches_use_the_current_branch_and_errors_name_the_project() {
@@ -472,6 +638,7 @@ mod tests {
             short: hash(&pairing_code(&short).unwrap()),
             expires: now + Duration::from_secs(300),
             attempts: 0,
+            invited_by: None,
         };
         assert!(pending().admit(&short.to_lowercase(), now));
         assert!(pending().admit(&long, now));

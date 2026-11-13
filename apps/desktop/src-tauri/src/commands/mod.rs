@@ -53,6 +53,7 @@ pub mod local_ai;
 pub mod local_detection;
 pub mod managed_runtime;
 pub mod openai_endpoint;
+pub mod project_favicon;
 mod retrieval;
 
 pub mod history;

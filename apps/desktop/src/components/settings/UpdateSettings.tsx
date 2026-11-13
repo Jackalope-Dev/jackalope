@@ -211,7 +211,7 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
     </>
   );
   return showHeading ? (
-    <SettingGroup aria-label="App updates" title={'App updates'}>
+    <SettingGroup aria-label="App updates" title="App updates" data-settings-tile>
       <SettingBody>{content}</SettingBody>
     </SettingGroup>
   ) : (

@@ -7,6 +7,7 @@ import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
+import type { TerminalCommand } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
@@ -37,6 +38,8 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
+  terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
   autoVerify?: boolean;
   /** Superseded by `workspaceMode`; `false` still means current-branch work. */
@@ -108,6 +111,10 @@ export interface Project {
   description?: string;
   /** Sidebar icon key from ProjectMark's set; the initial shows when unset. */
   icon?: string;
+  /** The site icon as a data URL, shown when `icon` is `website`. */
+  iconImage?: string;
+  /** The address the site icon was fetched from, offered again when changing it. */
+  website?: string;
   preferences?: ProjectPreferences;
   /** Written by earlier versions and kept in saved projects; nothing reads it. */
   agentProvider?: string;

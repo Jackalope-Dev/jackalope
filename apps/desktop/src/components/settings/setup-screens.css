@@ -1,0 +1,16 @@
+/* Guided connection screens inside a settings card: one rhythm from the setup kit's gap. */
+.settings-setup-body {
+  display: grid;
+  gap: var(--setup-gap, 20px);
+  padding: 16px 20px 20px;
+}
+.settings-setup-flow {
+  display: grid;
+  gap: var(--setup-gap, 20px);
+  max-width: 64rem;
+}
+.settings-setup-fields {
+  display: grid;
+  gap: 12px;
+  max-width: 34rem;
+}

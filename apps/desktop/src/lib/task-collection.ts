@@ -6,8 +6,8 @@ import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
 import type { TaskRun } from './run-types.ts';
-import { taskTitle } from './task-title.ts';
-import { taskDecision, taskNextAction } from './task-workflow.ts';
+import { taskTitle, withoutLeadingId } from './task-title.ts';
+import { hasOpenQuestion, taskDecision, taskNextAction } from './task-workflow.ts';
 
 const workStages = [
   { id: 'attention', label: 'Needs you' },
@@ -38,6 +38,8 @@ export interface WorkItem {
   managed?: ManagedTask;
   statusLabel?: string;
   archiveBlocked?: string;
+  /** A question the person can answer now (see hasOpenQuestion); collection sets it. */
+  question?: boolean;
 }
 
 /**
@@ -77,12 +79,12 @@ export function workPresence(item: WorkItem): {
   action: string;
 } {
   const run = item.run;
-  const pending = !!run?.prompts?.some((prompt) => prompt.status === 'pending');
+  const question = item.question ?? (!!run && hasOpenQuestion(run));
   const agents = taskAgents(
     run,
     item.managed?.request.agent ?? item.session?.request.agent ?? item.idea?.assignedAgent,
   );
-  const state = pending
+  const state = question
     ? 'waiting'
     : (run && isActive(run)) || item.stage === 'working'
       ? 'working'
@@ -94,13 +96,15 @@ export function workPresence(item: WorkItem): {
         ? 'Review task'
         : 'Open task'
     : item.session
-      ? pending
+      ? question
         ? 'Answer question'
         : item.stage === 'attention'
-          ? 'Inspect session'
+          ? 'Inspect conversation'
           : item.stage === 'working'
             ? 'View activity'
-            : 'Open conversation'
+            : item.stage === 'review'
+              ? 'Reply'
+              : 'Open conversation'
       : run
         ? item.stage === 'finished'
           ? 'Open result'
@@ -161,6 +165,7 @@ export function collectWorkspaceWork(
         idea: ideas.find(
           (idea) => idea.runId === task.id && idea.projectId === task.request.projectId,
         ),
+        question: work.questions.length > 0,
         stage: work.integrated
           ? 'finished'
           : work.questions.length || work.failed || work.status === 'Needs attention'
@@ -180,12 +185,15 @@ export function collectWorkspaceWork(
       // Bot conversations live in the Bots view.
       if (session.persona && !nested) continue;
       const work = sessionWork(session, runs);
+      // A closed conversation can't take an answer, so a question left in it doesn't need you.
+      const question = !session.closed && work.work.some(hasOpenQuestion);
       items.push({
         id: `session:${session.id}`,
-        title: session.title,
+        title: withoutLeadingId(session.title),
         date: session.updatedAt,
+        question,
         stage:
-          work.questions.length || work.status === 'Needs attention'
+          question || work.status === 'Needs attention'
             ? 'attention'
             : work.active || work.pending
               ? 'working'
@@ -255,15 +263,17 @@ export function collectWork(
     if (!!run.archivedAt !== archived) continue;
     const idea = linkedIdeas.get(run.taskId);
     const active = isActive(run);
-    const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
+    const question = hasOpenQuestion(run);
     items.push({
       id: idea?.id ?? run.taskId,
       title: taskTitle(
         idea?.rawPrompt ?? original.get(run.taskId)?.prompt ?? run.prompt,
         idea?.title,
+        [run.projectPath, run.workspace],
       ),
+      question,
       stage:
-        pending ||
+        question ||
         run.persistenceError ||
         (!active &&
           !integratedRunIds.includes(run.id) &&
@@ -299,3 +309,33 @@ export function collectWork(
       Date.parse(b.date) - Date.parse(a.date),
   );
 }
+
+/**
+ * Statuses that a row's action already says, keyed by status; the meta line leaves them out
+ * when the action matches, and keeps anything that adds information.
+ */
+const REPEATED_STATUS: Record<string, RegExp> = {
+  'ready for your review': /^(review|reply)\b/i,
+  'ready to review': /^(review|reply)\b/i,
+  'plan ready for review': /^review\b/i,
+  'waiting for your answer': /^answer\b/i,
+  'needs input': /^answer\b/i,
+  'ready to merge': /^(merge|review and merge)\b/i,
+};
+
+/** The status worth showing beside the shape, unless the row's group or action already says it. */
+export function workRowStatus(item: WorkItem, action: string) {
+  const label = item.statusLabel?.trim();
+  if (!label || item.stage === 'finished') return undefined;
+  const key = label.toLowerCase();
+  const group = workGroups.find((stage) => stage.id === workGroup(item.stage))?.label;
+  if (key === group?.toLowerCase() || REPEATED_STATUS[key]?.test(action.trim())) return undefined;
+  return label;
+}
+
+/** Whether a stage is waiting on the person, as the sidebar's Work count reads it. */
+export const needsYou = (item: Pick<WorkItem, 'stage'>) =>
+  item.stage === 'attention' || item.stage === 'review';
+
+/** Most collapsible sections stay open; past this many items they start collapsed. */
+export const OPEN_SECTION_LIMIT = 5;

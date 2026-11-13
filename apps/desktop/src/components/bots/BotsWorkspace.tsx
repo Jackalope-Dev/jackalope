@@ -16,6 +16,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlarmClock,
   ArrowLeft,
+  ArrowRight,
   ArrowRightLeft,
   Bot as BotIcon,
   MessageSquare,
@@ -24,6 +25,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import {
   botActivity,
@@ -46,6 +48,7 @@ import {
   type WakeState,
   wakeNow,
 } from '../../lib/bot-hub';
+import { groupTemplates } from '../../lib/bot-presentation';
 import { BOT_TEMPLATES, type BotTemplate } from '../../lib/bot-templates';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -71,6 +74,7 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { BotAvatar } from './BotAvatar';
 import { BotCardView } from './BotCardView';
+import { BotCastCard, BotHello } from './BotCast';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
@@ -222,12 +226,26 @@ export function BotsWorkspace() {
     },
     [sessions],
   );
-  const startNew = (template?: BotTemplate) =>
-    setEditing({ draft: blankDraft(defaultProject, template) });
+  const [hello, setHello] = useState<Bot | null>(null);
+  const dismissHello = useCallback(() => setHello(null), []);
+  const startNew = (template?: BotTemplate, from?: HTMLElement) => {
+    carryInto(from, () => setEditing({ draft: blankDraft(defaultProject, template) }));
+  };
+  // The tab above already says Bots, so the overview's heading names what is on the page.
+  const overviewTitle = bots.length === 0 ? 'Start from a template' : 'Your bots';
   return (
     <WorkspacePage className="bots-page">
       <WorkspaceHeading
-        title={scope ? scope.name : 'Bots'}
+        title={
+          scope ? (
+            scope.name
+          ) : (
+            <>
+              <span className="ui-sr-only">Bots: </span>
+              {overviewTitle}
+            </>
+          )
+        }
         eyebrow={
           scope ? (
             <LinkButton
@@ -297,8 +315,21 @@ export function BotsWorkspace() {
         <InlineNotice>Add a project first. Each bot works inside one project.</InlineNotice>
       )}
       <ActionError error={hub.error} />
+      {hello && (
+        <BotHello
+          appearance={hello.appearance}
+          agent={hello.agent}
+          name={hello.name}
+          role={hello.role}
+          onDismiss={dismissHello}
+        />
+      )}
       {bots.length === 0 ? (
-        <BotTemplates disabled={!projects.length} onUse={(template) => startNew(template)} />
+        <BotTemplates
+          disabled={!projects.length}
+          heading={false}
+          onUse={(template, from) => startNew(template, from)}
+        />
       ) : !scope ? (
         <BotProjects
           projects={projects}
@@ -312,7 +343,7 @@ export function BotsWorkspace() {
         <BotTemplates
           disabled={!projects.length}
           title={`No bots in ${scope.name} yet. Start from a template`}
-          onUse={(template) => startNew(template)}
+          onUse={(template, from) => startNew(template, from)}
         />
       ) : (
         <div className="bots-layout">
@@ -351,7 +382,12 @@ export function BotsWorkspace() {
                     aria-label={label === bot.name ? undefined : label}
                     onClick={() => useBotStore.getState().openConversation(null, bot.id)}
                   >
-                    <BotAvatar appearance={bot.appearance} agent={bot.agent} state={activity} />
+                    <BotAvatar
+                      appearance={bot.appearance}
+                      agent={bot.agent}
+                      state={activity}
+                      unread={unread > 0}
+                    />
                     <span className="bots-roster-copy">
                       <strong>{bot.name}</strong>
                       <small title={latest?.title ?? bot.role}>
@@ -442,6 +478,7 @@ export function BotsWorkspace() {
             else {
               const id = store.create(draft);
               if (editing.proposalId) void resolveProposal(editing.proposalId, 'accept', id);
+              setHello(useBotStore.getState().bots.find((bot) => bot.id === id) ?? null);
             }
             setEditing(null);
           }}
@@ -464,6 +501,28 @@ export function BotsWorkspace() {
   );
 }
 
+/**
+ * Opens the editor, carrying the chosen template's character into the editor's preview
+ * with a view transition where the WebView supports one and motion is welcome.
+ */
+function carryInto(from: HTMLElement | undefined, open: () => void) {
+  const stage = from?.querySelector<HTMLElement>('.bots-cast-stage');
+  if (
+    !stage ||
+    !document.startViewTransition ||
+    matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    open();
+    return;
+  }
+  stage.dataset.hero = '';
+  document.startViewTransition(() => {
+    // One element holds the name at a time: the card before, the editor's preview after.
+    delete stage.dataset.hero;
+    flushSync(open);
+  });
+}
+
 function BotTemplates({
   disabled,
   onUse,
@@ -471,32 +530,50 @@ function BotTemplates({
   title = 'Start from a template',
 }: {
   disabled: boolean;
-  onUse: (template: BotTemplate) => void;
+  onUse: (template: BotTemplate, from?: HTMLElement) => void;
   heading?: boolean;
   title?: string;
 }) {
   return (
-    <section className="workspace-section workspace-stack">
+    <section className="workspace-section workspace-stack bots-templates-section">
       {heading && <WorkspaceSectionHeading title={title} />}
-      <ul className="bots-templates">
-        {BOT_TEMPLATES.map((template) => (
-          <li key={template.id}>
-            <button
-              type="button"
-              className="bots-template"
-              disabled={disabled}
-              onClick={() => onUse(template)}
-            >
-              <BotAvatar appearance={template.appearance} />
-              <span>
-                <strong>{template.name}</strong>
-                <span className="bots-template-role">{template.role}</span>
-              </span>
-              <Plus size={16} aria-hidden="true" className="bots-template-add" />
-            </button>
-          </li>
-        ))}
-      </ul>
+      {groupTemplates(BOT_TEMPLATES).map((group) => (
+        <section
+          key={group.id}
+          className="bots-template-group"
+          aria-labelledby={`bots-group-${group.id}`}
+        >
+          <h3 id={`bots-group-${group.id}`} className="bots-template-group-title">
+            {group.title}
+          </h3>
+          <ul className="bots-templates">
+            {group.templates.map((template) => (
+              <li key={template.id}>
+                <button
+                  type="button"
+                  className="bots-template"
+                  disabled={disabled}
+                  aria-label={`Use ${template.name} template`}
+                  aria-describedby={`bots-template-${template.id}`}
+                  onClick={(event) => onUse(template, event.currentTarget)}
+                >
+                  <BotCastCard
+                    appearance={template.appearance}
+                    name={template.name}
+                    line={template.role}
+                    lineId={`bots-template-${template.id}`}
+                  >
+                    <span className="bots-template-use" aria-hidden="true">
+                      Use template
+                      <ArrowRight size={14} />
+                    </span>
+                  </BotCastCard>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </section>
   );
 }

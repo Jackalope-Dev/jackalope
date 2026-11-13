@@ -1,0 +1,125 @@
+/* The heading (the project switcher) on its own row, the one-line composer full width below,
+   both on the page's 12px rhythm. */
+.work-header {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.work-header-title {
+  justify-self: start;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: 1.2;
+}
+.work-header-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  height: var(--control-height, 36px);
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.work-header-switch:hover,
+.work-header-switch[data-state="open"] {
+  background: var(--color-surface-hover);
+}
+.work-header-switch:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.work-header-switch > svg {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+/* Only very long names truncate; the full name stays in the text, so it is still the
+   accessible name, and in the tooltip. */
+.work-header-name {
+  flex: 0 1 auto;
+  min-width: min(8ch, 100%);
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The folder hint gives way well before the name does. */
+.work-header-hint {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-header-menu {
+  min-width: 240px;
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+}
+.work-header-menu .workspace-menu-item[data-state="checked"] {
+  background: var(--color-accent-subtle);
+}
+.work-header-option {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-header-check {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--color-accent-ink);
+}
+.work-compose-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: var(--control-height, 36px);
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  cursor: text;
+}
+.work-compose-bar:hover {
+  border-color: var(--color-border);
+}
+.work-compose-bar:focus-within {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.work-compose-bar input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  outline: none;
+  cursor: text;
+}
+.work-compose-bar input::placeholder {
+  color: var(--color-text-secondary);
+}
+.work-compose-agent {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}

@@ -1,8 +1,9 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { IconButton } from '@jackalope/ui';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button, IconButton } from '@jackalope/ui';
+import { ChevronLeft, ChevronRight, Shuffle } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
+import { shuffleAppearance } from '../../lib/bot-presentation';
 import { BOT_COLORS, BOT_STYLES, type BotAppearance } from '../../stores/botStore';
 import { botStyle } from './BotAvatar';
 
@@ -48,6 +49,14 @@ export function BotAppearancePicker({
       ...current,
       style: BOT_STYLES[(position + BOT_STYLES.length) % BOT_STYLES.length].id,
     });
+  const [announcement, setAnnouncement] = useState('');
+  const shuffle = () => {
+    const next = shuffleAppearance(BOT_STYLES, BOT_COLORS, current);
+    change(next);
+    const shape = BOT_STYLES.find((item) => item.id === next.style)?.name;
+    const tone = BOT_COLORS.find((item) => item.id === next.color)?.name;
+    setAnnouncement(`${shape}, ${tone}`);
+  };
   const count = BOT_STYLES.length;
   return (
     <section
@@ -102,6 +111,15 @@ export function BotAppearancePicker({
       <p className="bot-appearance-name" aria-live="polite">
         {BOT_STYLES[index].name}
       </p>
+      <div className="bot-appearance-shuffle">
+        <Button type="button" variant="ghost" size="sm" onClick={shuffle}>
+          <Shuffle size={14} aria-hidden="true" />
+          Shuffle
+        </Button>
+        <span className="sr-only" aria-live="polite">
+          {announcement && `Shuffled to ${announcement}`}
+        </span>
+      </div>
       <fieldset className="bot-appearance-colors">
         <legend className="sr-only">Colour</legend>
         {BOT_COLORS.map((color) => (

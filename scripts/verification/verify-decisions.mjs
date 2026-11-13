@@ -203,8 +203,7 @@ try {
   await page.keyboard.press('Space');
   assert.equal(await agentQuestions.isChecked(), true);
   assert.equal(assistanceProjects.alpha, undefined);
-  await page.getByRole('combobox', { name: 'Routing goal' }).click();
-  await page.getByRole('option', { name: 'Balanced', exact: true }).click();
+  await page.getByRole('radio', { name: /^Balanced/ }).check();
   await page.getByText('Model evidence (0)', { exact: true }).click();
   await page.getByRole('button', { name: 'Add model evidence' }).click();
   const modelId = page.getByLabel('Exact model ID', { exact: true });
@@ -218,6 +217,9 @@ try {
   await page
     .getByLabel('Evidence source', { exact: true })
     .fill('fixture://independent-evaluation');
+  await page
+    .getByRole('button', { name: 'Add context window, effort levels and pricing', exact: true })
+    .click();
   await page.getByRole('checkbox', { name: 'medium', exact: true }).check();
   await page.getByRole('checkbox', { name: 'high', exact: true }).check();
   await page.getByRole('button', { name: 'Save decision assistance', exact: true }).click();

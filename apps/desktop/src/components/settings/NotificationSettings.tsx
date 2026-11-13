@@ -42,7 +42,7 @@ export function NotificationSettings() {
     }
   };
   return (
-    <SettingGroup title="Notifications">
+    <SettingGroup title="Notifications" data-settings-tile>
       <SettingRow
         title="Which task updates to show"
         description="Applies to the in-app companion and to system notifications."

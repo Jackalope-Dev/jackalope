@@ -89,31 +89,18 @@ try {
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
-  // Trial passes sit in the status bar's More menu while signup is invitation-based.
-  const statusMenu = page.getByRole('button', { name: 'More', exact: true }).last();
-  const trialPasses = page.getByRole('menuitem').filter({ hasText: 'Trial passes' });
-  const passesShown = async (remaining) => {
-    await statusMenu.click();
-    await page.getByRole('menuitem', { name: 'Send feedback', exact: true }).waitFor();
-    if (remaining === null) assert.equal(await trialPasses.count(), 0);
-    else await trialPasses.filter({ hasText: `${remaining}/5` }).waitFor();
-  };
-  await passesShown(3);
-  await trialPasses.click();
+  // Trial passes live in Settings → Invitations while signup is invitation-based.
+  await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Invitations', exact: true }).click();
   await page.getByRole('heading', { name: 'Invitations', exact: true }).waitFor();
   // The fixture has no native account, which clears passes; restore them to check the page.
   await page.evaluate(() => window.coreFixture.passes(3));
   await page.getByText('of 5 Instant Access Passes available', { exact: true }).waitFor();
   await page
     .getByRole('navigation', { name: 'Workspace', exact: true })
-    .getByRole('button', { name: 'Work', exact: true })
+    .getByRole('button', { name: 'Inbox', exact: true })
     .click();
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
-  for (const remaining of [0, null, 5, 3]) {
-    await page.evaluate((value) => window.coreFixture.passes(value), remaining);
-    await passesShown(remaining);
-    await page.keyboard.press('Escape');
-  }
   for (const count of [1, 10, 100]) {
     await page.evaluate((value) => window.coreFixture.notices(value), count);
     await page
@@ -175,11 +162,11 @@ try {
     }
   }
   await page.setViewportSize({ width: 1280, height: 840 });
-  await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
-  await page.getByRole('option', { name: 'Atlas', exact: true }).click();
+  await page.locator('.work-header-switch').click();
+  await page.getByRole('menuitemradio', { name: 'Atlas', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('Export');
-  await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
-  await page.getByRole('option', { name: 'All projects', exact: true }).click();
+  await page.locator('.work-header-switch').click();
+  await page.getByRole('menuitemradio', { name: 'All projects', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('billing');
   await page.reload();
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
@@ -189,8 +176,8 @@ try {
     'billing',
   );
   await page.locator('.work-item').filter({ hasText: 'Improve billing' }).waitFor();
-  await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
-  await page.getByRole('option', { name: 'Atlas', exact: true }).click();
+  await page.locator('.work-header-switch').click();
+  await page.getByRole('menuitemradio', { name: 'Atlas', exact: true }).click();
   assert.equal(
     await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).inputValue(),
     'Export',
@@ -270,7 +257,8 @@ try {
   assert.match(repair, /- Build: FAILURE/);
   assert.match(repair, /Do not commit, push/);
   await page.getByRole('button', { name: 'More', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Ask the agent to prepare a deployment' }).click();
+  await page.getByRole('menuitem', { name: 'Ask the agent to prepare…' }).click();
+  await page.getByRole('menuitem', { name: 'Deployment', exact: true }).click();
   assert.match(await page.evaluate(() => window.coreFixture.handoff), /Do not commit, push/);
   assert.equal(
     await page.evaluate(() =>

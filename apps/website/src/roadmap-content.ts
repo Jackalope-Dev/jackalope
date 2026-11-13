@@ -186,6 +186,12 @@ export const roadmapStages = [
     link: { label: 'Explore the local workflow', href: '/tour/' },
     items: [
       {
+        title: 'Jackalope Cloud.',
+        summary: 'An always-on home for your work.',
+        detail:
+          'Today your phone and other computers reach work through the computer running it, so closing your laptop pauses what they can see. We are exploring an always-on Jackalope, on a workstation or in the cloud, that keeps coordinating work while your laptop is away, with your laptop and phone as equal clients. This is exploratory; we have not announced pricing or a release date.',
+      },
+      {
         title: 'More ways to work together.',
         summary: 'Shared workflows, team spaces, and hosting choices.',
         detail:

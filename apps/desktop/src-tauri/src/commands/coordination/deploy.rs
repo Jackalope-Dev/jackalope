@@ -401,13 +401,29 @@ pub fn launch(service: Coordinator) {
         }
     }
     tauri::async_runtime::spawn(async move {
+        let mut last = None;
         loop {
-            if let Err(error) = pass(&service).await {
-                eprintln!("deploy: {error}");
+            if let Some(line) = changed_error(&mut last, pass(&service).await.err()) {
+                eprintln!("{line}");
             }
             tokio::time::sleep(INTERVAL).await;
         }
     });
+}
+
+/// The log line for a pass whose outcome differs from the previous one. A blocked state,
+/// such as a paused dispatch, persists across passes, so it is logged once when it starts
+/// and once when it clears rather than on every pass.
+fn changed_error(last: &mut Option<String>, now: Option<String>) -> Option<String> {
+    if *last == now {
+        return None;
+    }
+    let line = match &now {
+        Some(error) => format!("deploy: {error}"),
+        None => "deploy: recovered".to_string(),
+    };
+    *last = now;
+    Some(line)
 }
 
 #[derive(Serialize)]
@@ -456,6 +472,22 @@ pub fn deploy_again(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_unchanged_error_is_logged_once() {
+        let mut last = None;
+        let paused = || Some("Dispatch paused: example".to_string());
+        assert_eq!(
+            changed_error(&mut last, paused()).as_deref(),
+            Some("deploy: Dispatch paused: example")
+        );
+        assert_eq!(changed_error(&mut last, paused()), None);
+        assert_eq!(
+            changed_error(&mut last, None).as_deref(),
+            Some("deploy: recovered")
+        );
+        assert_eq!(changed_error(&mut last, None), None);
+    }
 
     fn record(outcome: Outcome) -> DeployRecord {
         DeployRecord {

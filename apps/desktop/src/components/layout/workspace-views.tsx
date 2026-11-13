@@ -32,8 +32,8 @@ export interface ViewContext {
 
 // Pages load on demand so the first paint ships only the task workspace.
 const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
-const RemoteHosts = lazy(() =>
-  import('../remote/RemoteHosts').then((m) => ({ default: m.RemoteHosts })),
+const DevicesPage = lazy(() =>
+  import('../remote/DevicesPage').then((m) => ({ default: m.DevicesPage })),
 );
 const CodebaseMap = lazy(() =>
   import('../visualizer/CodebaseMap').then((m) => ({ default: m.CodebaseMap })),
@@ -61,6 +61,9 @@ const RunnerConnections = lazy(() =>
 );
 const AgentManager = lazy(() =>
   import('../agents/AgentManager').then((m) => ({ default: m.AgentManager })),
+);
+const RoutingPage = lazy(() =>
+  import('../agents/RoutingPage').then((m) => ({ default: m.RoutingPage })),
 );
 const BotsWorkspace = lazy(() =>
   import('../bots/BotsWorkspace').then((m) => ({ default: m.BotsWorkspace })),
@@ -126,7 +129,7 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
       }}
     />
   ),
-  'remote-hosts': (ctx) => <RemoteHosts onSetup={() => ctx.settings.open('Remote access')} />,
+  'remote-hosts': () => <DevicesPage />,
   'project-overview': (ctx) => <ProjectOverview onOpenProject={ctx.openProjectSetup} />,
   changes: (ctx) => <CommitReview key={ctx.activeProjectId} onOpenProject={ctx.openProjectSetup} />,
   worktrees: (ctx) => (
@@ -151,6 +154,7 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
       onRun={(run) => openTask(ctx, run.id)}
     />
   ),
+  routing: () => <RoutingPage />,
   mcps: (ctx) => mcpWorkspace(ctx, 'configured'),
   'mcp-marketplace': (ctx) => mcpWorkspace(ctx, 'marketplace'),
   'connected-apps': () => <ConnectedApps />,
@@ -167,7 +171,6 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
     <SettingsPage
       key={`${ctx.settings.category}:${ctx.settings.projectId ?? 'app'}`}
       initialCategory={ctx.settings.category}
-      initialScope={ctx.settings.projectId ? 'project' : 'app'}
       initialProjectId={ctx.settings.projectId}
       onClose={ctx.settings.close}
     />

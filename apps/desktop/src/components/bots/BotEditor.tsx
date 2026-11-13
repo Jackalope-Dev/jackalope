@@ -32,6 +32,7 @@ import { BrowserProfileSettings } from '../projects/BrowserProfileSettings';
 import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
 import { ActionError } from '../ui/ActionError';
 import { BotAppearancePicker } from './BotAppearancePicker';
+import { BotCastCard } from './BotCast';
 import { BotWakes } from './BotWakes';
 
 const STEPS = [
@@ -171,247 +172,261 @@ export function BotEditor({
         {/* One scroll area: the per-bot browser and computer cards sit after the form, not in it,
             so their own buttons and fields never submit the bot. */}
         <div className="bot-editor-body">
-          <form
-            id="bot-editor-form"
-            className="bot-editor-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (bot || last) save();
-              else go(step + 1);
-            }}
-          >
-            <div
-              ref={focusStep}
-              className="bot-editor-step-body"
-              data-all={bot ? true : undefined}
-              key={bot ? 'all' : STEPS[step].id}
+          <div className="bot-editor-main">
+            {/* The card this bot will show, updated as its name, look and role change. */}
+            <aside className="bot-editor-preview" aria-label="Preview">
+              <BotCastCard
+                appearance={draft.appearance}
+                agent={draft.agent}
+                name={draft.name.trim() || 'Your bot'}
+                line={draft.role.trim() || 'No role yet'}
+                hero
+              />
+            </aside>
+            <form
+              id="bot-editor-form"
+              className="bot-editor-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (bot || last) save();
+                else go(step + 1);
+              }}
             >
-              {show(0) && (
-                <>
-                  {heading(0)}
-                  <FormField label="Name">
-                    <Input
-                      value={draft.name}
-                      maxLength={BOT_NAME_MAX}
-                      required
-                      placeholder="Reviewer"
-                      onChange={(event) => patch({ name: event.target.value })}
+              <div
+                ref={focusStep}
+                className="bot-editor-step-body"
+                data-all={bot ? true : undefined}
+                key={bot ? 'all' : STEPS[step].id}
+              >
+                {show(0) && (
+                  <>
+                    {heading(0)}
+                    <FormField label="Name">
+                      <Input
+                        value={draft.name}
+                        maxLength={BOT_NAME_MAX}
+                        required
+                        placeholder="Reviewer"
+                        onChange={(event) => patch({ name: event.target.value })}
+                      />
+                    </FormField>
+                    <BotAppearancePicker
+                      appearance={draft.appearance}
+                      agent={draft.agent}
+                      onChange={(appearance) => patch({ appearance })}
                     />
-                  </FormField>
-                  <BotAppearancePicker
-                    appearance={draft.appearance}
-                    agent={draft.agent}
-                    onChange={(appearance) => patch({ appearance })}
-                  />
-                </>
-              )}
-              {show(1) && (
-                <>
-                  {heading(1)}
-                  <FormField
-                    label="Home project"
-                    description="Its chosen connections and wake-ups start here unless a wake-up picks another project."
-                  >
-                    <Select
-                      value={draft.projectId}
-                      placeholder="Choose a project"
-                      onValueChange={(projectId) =>
-                        patch({
-                          projectId,
-                          projectIds: draft.projectIds?.filter((id) => id !== projectId),
-                          connectionIds: null,
-                          agent: 'auto',
-                          model: null,
-                        })
-                      }
+                  </>
+                )}
+                {show(1) && (
+                  <>
+                    {heading(1)}
+                    <FormField
+                      label="Home project"
+                      description="Its chosen connections and wake-ups start here unless a wake-up picks another project."
                     >
-                      {projects.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </FormField>
-                  {draft.projectId && projects.length > 1 && (
-                    <fieldset className="bot-editor-field">
-                      <legend className="bot-editor-label">Also works in</legend>
+                      <Select
+                        value={draft.projectId}
+                        placeholder="Choose a project"
+                        onValueChange={(projectId) =>
+                          patch({
+                            projectId,
+                            projectIds: draft.projectIds?.filter((id) => id !== projectId),
+                            connectionIds: null,
+                            agent: 'auto',
+                            model: null,
+                          })
+                        }
+                      >
+                        {projects.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </Select>
+                    </FormField>
+                    {draft.projectId && projects.length > 1 && (
+                      <fieldset className="bot-editor-field">
+                        <legend className="bot-editor-label">Also works in</legend>
+                        <p className="form-field-description">
+                          Start conversations with it from these projects too; each runs in the
+                          project it started from.
+                        </p>
+                        <div className="bot-editor-connections">
+                          {projects
+                            .filter((item) => item.id !== draft.projectId)
+                            .map((item) => (
+                              <label key={item.id} className="bot-editor-connection">
+                                <Checkbox
+                                  checked={draft.projectIds?.includes(item.id) ?? false}
+                                  onChange={(event) => {
+                                    const projectIds = event.target.checked
+                                      ? [...(draft.projectIds ?? []), item.id]
+                                      : (draft.projectIds ?? []).filter((id) => id !== item.id);
+                                    patch({
+                                      projectIds,
+                                      // Wake-ups in a project it no longer works in move home.
+                                      wakes: draft.wakes.map((wake) =>
+                                        wake.projectId && !projectIds.includes(wake.projectId)
+                                          ? { ...wake, projectId: undefined }
+                                          : wake,
+                                      ),
+                                    });
+                                  }}
+                                />
+                                {item.name}
+                              </label>
+                            ))}
+                        </div>
+                      </fieldset>
+                    )}
+                    <div className="bot-editor-field">
+                      <span className="bot-editor-label">Agent and model</span>
+                      {project ? (
+                        <ComposerAgentPicker
+                          project={project}
+                          allowCompare={false}
+                          value={draft.agent === 'auto' ? [] : [draft.agent]}
+                          model={draft.model}
+                          onChange={(agents) => patch({ agent: agents[0] ?? 'auto' })}
+                          onModelChange={(model) => patch({ model })}
+                        />
+                      ) : (
+                        <p className="task-muted">Choose a project first.</p>
+                      )}
                       <p className="form-field-description">
-                        Start conversations with it from these projects too; each runs in the
-                        project it started from.
+                        Automatic lets Jackalope pick for each conversation.
                       </p>
-                      <div className="bot-editor-connections">
-                        {projects
-                          .filter((item) => item.id !== draft.projectId)
-                          .map((item) => (
-                            <label key={item.id} className="bot-editor-connection">
+                    </div>
+                  </>
+                )}
+                {show(2) && (
+                  <>
+                    {heading(2)}
+                    <FormField label="Role" description="One line shown in the bot list.">
+                      <Input
+                        value={draft.role}
+                        maxLength={120}
+                        placeholder="Reviews changes before they merge"
+                        onChange={(event) => patch({ role: event.target.value })}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Instructions"
+                      description={`Repeated to the agent with every message in this bot’s conversations. ${characters.toLocaleString()} of ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`}
+                    >
+                      <Textarea
+                        rows={8}
+                        value={draft.instructions}
+                        placeholder="How should this bot work? What should it always or never do?"
+                        onChange={(event) => patch({ instructions: event.target.value })}
+                      />
+                    </FormField>
+                  </>
+                )}
+                {show(3) && (
+                  <fieldset className="bot-editor-apps">
+                    {heading(3)}
+                    <legend className="sr-only">Apps and tools</legend>
+                    <label className="bot-editor-choice">
+                      <input
+                        type="radio"
+                        name="bot-connections"
+                        checked={draft.connectionIds === null}
+                        onChange={() => patch({ connectionIds: null })}
+                      />
+                      <span>
+                        <strong>Every enabled connection</strong>
+                        <small>Includes connections you add later.</small>
+                      </span>
+                    </label>
+                    <label className="bot-editor-choice">
+                      <input
+                        type="radio"
+                        name="bot-connections"
+                        checked={draft.connectionIds !== null}
+                        onChange={() =>
+                          patch({ connectionIds: connections.map((server) => server.id) })
+                        }
+                      />
+                      <span>
+                        <strong>Only the connections I choose</strong>
+                        <small>Applies when a conversation starts.</small>
+                      </span>
+                    </label>
+                    {draft.connectionIds !== null &&
+                      (connections.length ? (
+                        <div className="bot-editor-connections">
+                          {connections.map((server) => (
+                            <label key={server.id} className="bot-editor-connection">
                               <Checkbox
-                                checked={draft.projectIds?.includes(item.id) ?? false}
-                                onChange={(event) => {
-                                  const projectIds = event.target.checked
-                                    ? [...(draft.projectIds ?? []), item.id]
-                                    : (draft.projectIds ?? []).filter((id) => id !== item.id);
+                                checked={draft.connectionIds?.includes(server.id) ?? false}
+                                onChange={(event) =>
                                   patch({
-                                    projectIds,
-                                    // Wake-ups in a project it no longer works in move home.
-                                    wakes: draft.wakes.map((wake) =>
-                                      wake.projectId && !projectIds.includes(wake.projectId)
-                                        ? { ...wake, projectId: undefined }
-                                        : wake,
-                                    ),
-                                  });
-                                }}
+                                    connectionIds: event.target.checked
+                                      ? [...(draft.connectionIds ?? []), server.id]
+                                      : (draft.connectionIds ?? []).filter(
+                                          (id) => id !== server.id,
+                                        ),
+                                  })
+                                }
                               />
-                              {item.name}
+                              {server.name}
                             </label>
                           ))}
-                      </div>
-                    </fieldset>
-                  )}
-                  <div className="bot-editor-field">
-                    <span className="bot-editor-label">Agent and model</span>
-                    {project ? (
-                      <ComposerAgentPicker
-                        project={project}
-                        allowCompare={false}
-                        value={draft.agent === 'auto' ? [] : [draft.agent]}
-                        model={draft.model}
-                        onChange={(agents) => patch({ agent: agents[0] ?? 'auto' })}
-                        onModelChange={(model) => patch({ model })}
+                        </div>
+                      ) : (
+                        <p className="task-muted">
+                          No connections are enabled for this project yet. Add them in Connected
+                          apps or Connections.
+                        </p>
+                      ))}
+                  </fieldset>
+                )}
+                {show(4) && (
+                  <>
+                    {heading(4)}
+                    <label className="bot-editor-choice bot-editor-teamwork">
+                      <Switch
+                        checked={draft.collaborate}
+                        onCheckedChange={(collaborate) => patch({ collaborate })}
+                        aria-describedby="bot-teamwork-help"
                       />
-                    ) : (
-                      <p className="task-muted">Choose a project first.</p>
-                    )}
-                    <p className="form-field-description">
-                      Automatic lets Jackalope pick for each conversation.
-                    </p>
-                  </div>
-                </>
-              )}
-              {show(2) && (
-                <>
-                  {heading(2)}
-                  <FormField label="Role" description="One line shown in the bot list.">
-                    <Input
-                      value={draft.role}
-                      maxLength={120}
-                      placeholder="Reviews changes before they merge"
-                      onChange={(event) => patch({ role: event.target.value })}
-                    />
-                  </FormField>
-                  <FormField
-                    label="Instructions"
-                    description={`Repeated to the agent with every message in this bot’s conversations. ${characters.toLocaleString()} of ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`}
-                  >
-                    <Textarea
-                      rows={8}
-                      value={draft.instructions}
-                      placeholder="How should this bot work? What should it always or never do?"
-                      onChange={(event) => patch({ instructions: event.target.value })}
-                    />
-                  </FormField>
-                </>
-              )}
-              {show(3) && (
-                <fieldset className="bot-editor-apps">
-                  {heading(3)}
-                  <legend className="sr-only">Apps and tools</legend>
-                  <label className="bot-editor-choice">
-                    <input
-                      type="radio"
-                      name="bot-connections"
-                      checked={draft.connectionIds === null}
-                      onChange={() => patch({ connectionIds: null })}
-                    />
-                    <span>
-                      <strong>Every enabled connection</strong>
-                      <small>Includes connections you add later.</small>
-                    </span>
-                  </label>
-                  <label className="bot-editor-choice">
-                    <input
-                      type="radio"
-                      name="bot-connections"
-                      checked={draft.connectionIds !== null}
-                      onChange={() =>
-                        patch({ connectionIds: connections.map((server) => server.id) })
-                      }
-                    />
-                    <span>
-                      <strong>Only the connections I choose</strong>
-                      <small>Applies when a conversation starts.</small>
-                    </span>
-                  </label>
-                  {draft.connectionIds !== null &&
-                    (connections.length ? (
-                      <div className="bot-editor-connections">
-                        {connections.map((server) => (
-                          <label key={server.id} className="bot-editor-connection">
-                            <Checkbox
-                              checked={draft.connectionIds?.includes(server.id) ?? false}
-                              onChange={(event) =>
-                                patch({
-                                  connectionIds: event.target.checked
-                                    ? [...(draft.connectionIds ?? []), server.id]
-                                    : (draft.connectionIds ?? []).filter((id) => id !== server.id),
-                                })
-                              }
-                            />
-                            {server.name}
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="task-muted">
-                        No connections are enabled for this project yet. Add them in Connected apps
-                        or Connections.
+                      <span>
+                        <strong>Works with other bots</strong>
+                        <small id="bot-teamwork-help">
+                          It can find other bots, ask them for help and take their requests. Each
+                          message appears in both conversations.
+                        </small>
+                      </span>
+                    </label>
+                    <div className="bot-editor-field">
+                      <span className="bot-editor-label">Wake-ups</span>
+                      <p className="form-field-description">
+                        Wake-ups continue the bot’s latest open conversation. Conversations a bot
+                        starts pause after 20 replies until you resume them.
                       </p>
-                    ))}
-                </fieldset>
-              )}
-              {show(4) && (
-                <>
-                  {heading(4)}
-                  <label className="bot-editor-choice bot-editor-teamwork">
-                    <Switch
-                      checked={draft.collaborate}
-                      onCheckedChange={(collaborate) => patch({ collaborate })}
-                      aria-describedby="bot-teamwork-help"
-                    />
-                    <span>
-                      <strong>Works with other bots</strong>
-                      <small id="bot-teamwork-help">
-                        It can find other bots, ask them for help and take their requests. Each
-                        message appears in both conversations.
-                      </small>
-                    </span>
-                  </label>
-                  <div className="bot-editor-field">
-                    <span className="bot-editor-label">Wake-ups</span>
-                    <p className="form-field-description">
-                      Wake-ups continue the bot’s latest open conversation. Conversations a bot
-                      starts pause after 20 replies until you resume them.
-                    </p>
-                    <BotWakes
-                      wakes={draft.wakes}
-                      projectId={draft.projectId}
-                      projects={botProjectIds(draft).flatMap((id) => {
-                        const item = projects.find((candidate) => candidate.id === id);
-                        return item ? [{ id: item.id, name: item.name }] : [];
-                      })}
-                      connectionIds={draft.connectionIds}
-                      connections={connections.map((server) => ({
-                        id: server.id,
-                        name: server.name,
-                      }))}
-                      onChange={(wakes) => patch({ wakes })}
-                      onEditingChange={setWakeOpen}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-            <ActionError error={error} />
-          </form>
+                      <BotWakes
+                        wakes={draft.wakes}
+                        projectId={draft.projectId}
+                        projects={botProjectIds(draft).flatMap((id) => {
+                          const item = projects.find((candidate) => candidate.id === id);
+                          return item ? [{ id: item.id, name: item.name }] : [];
+                        })}
+                        connectionIds={draft.connectionIds}
+                        connections={connections.map((server) => ({
+                          id: server.id,
+                          name: server.name,
+                        }))}
+                        onChange={(wakes) => patch({ wakes })}
+                        onEditingChange={setWakeOpen}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              <ActionError error={error} />
+            </form>
+          </div>
           {bot && <BrowserProfileSettings owner={{ kind: 'bot', id: bot.id, name: bot.name }} />}
           {bot && <BotComputerSettings bot={{ id: bot.id, name: bot.name }} />}
         </div>

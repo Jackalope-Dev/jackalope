@@ -2,6 +2,8 @@ use super::*;
 
 /// Activity entries a run keeps; older ones are dropped.
 pub(in crate::commands) const ACTIVITY_KEPT: usize = 150;
+/// Tool calls remembered while waiting for their result; agents run a few at once.
+const PENDING_TOOLS_KEPT: usize = 64;
 
 pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
     if text.trim().is_empty() {
@@ -174,14 +176,18 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     );
                 }
             } else if item["type"] == "mcp_tool_call" {
-                activity(
-                    run,
-                    if item["status"] == "failed" {
-                        "Tool request failed"
-                    } else {
-                        "Tool finished"
-                    },
-                );
+                if item["status"] == "failed" {
+                    let step = item["tool"]
+                        .as_str()
+                        .map(|tool| super::tool_activity::label(tool, item, &run.workspace));
+                    let error = item["error"]["message"]
+                        .as_str()
+                        .or(item["error"].as_str())
+                        .unwrap_or("");
+                    activity(run, &super::tool_activity::failure(step.as_deref(), error));
+                } else {
+                    activity(run, "Tool finished");
+                }
             } else if let Some(command) = item["command"].as_str() {
                 activity(
                     run,
@@ -238,6 +244,12 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                             let label =
                                 super::tool_activity::label(name, &block["input"], &run.workspace);
                             activity(run, &label);
+                            if let Some(id) = block["id"].as_str() {
+                                if run.pending_tools.len() >= PENDING_TOOLS_KEPT {
+                                    run.pending_tools.clear();
+                                }
+                                run.pending_tools.insert(id.into(), label);
+                            }
                         }
                     }
                 }
@@ -245,8 +257,23 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         }
         (Some(Protocol::ClaudeStream), "user") => {
             for block in event["message"]["content"].as_array().into_iter().flatten() {
-                if block["type"] == "tool_result" && block["is_error"] == true {
-                    activity(run, "Tool request failed");
+                if block["type"] != "tool_result" {
+                    continue;
+                }
+                let step = block["tool_use_id"]
+                    .as_str()
+                    .and_then(|id| run.pending_tools.remove(id));
+                if block["is_error"] == true {
+                    let error = match &block["content"] {
+                        Value::String(text) => text.clone(),
+                        Value::Array(parts) => parts
+                            .iter()
+                            .filter_map(|part| part["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        _ => String::new(),
+                    };
+                    activity(run, &super::tool_activity::failure(step.as_deref(), &error));
                 }
             }
         }

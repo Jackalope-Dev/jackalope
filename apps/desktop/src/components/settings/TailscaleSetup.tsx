@@ -4,7 +4,11 @@ import { Check } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { type TailscaleStatus, tailscaleEnableLink } from '../../lib/tailscale-setup';
+import {
+  servePortMismatch,
+  type TailscaleStatus,
+  tailscaleEnableLink,
+} from '../../lib/tailscale-setup';
 
 const DOWNLOAD = 'https://tailscale.com/download';
 const DNS_SETTINGS = 'https://login.tailscale.com/admin/dns';
@@ -14,6 +18,18 @@ interface Step {
   done: boolean;
   detail?: ReactNode;
   action?: ReactNode;
+}
+
+/**
+ * Names the phones found on the tailnet. iPhones report their host name as "localhost", which
+ * tells the person nothing, so only real names are listed and the rest are counted.
+ */
+function phonesFound(phones: string[]) {
+  const named = phones.filter((name) => name.trim() && name.trim().toLowerCase() !== 'localhost');
+  if (named.length === phones.length) return `Found ${named.join(', ')}.`;
+  return named.length
+    ? `Found ${named.join(', ')} and ${phones.length - named.length} more.`
+    : `Found ${phones.length === 1 ? 'a phone' : `${phones.length} phones`} on your tailnet.`;
 }
 
 /**
@@ -56,6 +72,7 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
     }
   };
   const enableLink = tailscaleEnableLink(failure);
+  const mismatch = servePortMismatch(status);
   const link = (label: string, url: string, primary = false) => (
     <Button
       size="sm"
@@ -83,7 +100,7 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
       title: 'Install Tailscale on your phone with the same account',
       done: !!status?.phones.length,
       detail: status?.phones.length
-        ? `Found ${status.phones.join(', ')}.`
+        ? phonesFound(status.phones)
         : status?.signedIn && 'No phone on your tailnet yet.',
       action: status?.signedIn && !status.phones.length && link('Get the app', DOWNLOAD),
     },
@@ -102,7 +119,7 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
       detail: enableLink ? (
         <>
           Allow Serve for your tailnet in Tailscale, then try again.
-          <span className="remote-step-error">{failure}</span>
+          <span className="tailscale-item-error">{failure}</span>
         </>
       ) : undefined,
       action: enableLink ? (
@@ -132,34 +149,59 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
       ),
     },
   ];
+  const done = steps.filter((step) => step.done);
+  const left = steps.filter((step) => !step.done);
+  // The last step never reports done, so there is always a next one.
+  const [next, ...later] = left;
+  const goal = steps[steps.length - 1];
+  // A checklist rather than numbered steps: it sits inside a numbered setup step already.
   return (
-    <div className="remote-setup-steps px-5 py-4">
-      <h3>Connect your phone with Tailscale</h3>
-      <p className="task-muted">
-        Phones reach this computer over private HTTPS. Tailscale sets it up for free, and only your
-        devices can connect.
-      </p>
-      <ol className="remote-steps">
-        {steps.map((step, index) => (
-          <li key={step.title} data-done={step.done || undefined}>
-            <span className="remote-step-mark" aria-hidden="true">
-              {step.done ? <Check size={14} /> : index + 1}
-            </span>
-            <div className="remote-step-body">
-              <strong className="remote-step-title">
-                {step.title}
-                <span className="sr-only">{step.done ? ' (done)' : ''}</span>
-              </strong>
-              {step.detail && <p className="task-muted">{step.detail}</p>}
-              {step.action && <div className="remote-toolbar">{step.action}</div>}
-            </div>
-          </li>
-        ))}
-      </ol>
+    <div className="tailscale-setup">
+      {!!done.length && (
+        <div className="tailscale-done">
+          <p className="tailscale-progress" role="status">
+            {done.length} of {steps.length} done
+          </p>
+          <ul className="tailscale-checklist" aria-label="Done">
+            {done.map((step) => (
+              <li key={step.title}>
+                <span className="tailscale-check" aria-hidden="true">
+                  <Check size={10} strokeWidth={3} />
+                </span>
+                <span>
+                  {step.title}
+                  {step.detail && <span className="tailscale-item-detail"> – {step.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="tailscale-next">
+        <p className="tailscale-next-title">
+          <span className="tailscale-next-label">Next</span>
+          {next.title}
+        </p>
+        {next.detail && <p className="tailscale-item-detail">{next.detail}</p>}
+        {!!later.length && (
+          <p className="tailscale-item-detail">
+            After that: {later.map((step) => step.title).join(' · ')}
+          </p>
+        )}
+      </div>
+      {mismatch && (
+        <InlineNotice tone="warning">
+          Tailscale points to port {mismatch.serves}, but Jackalope listens on {mismatch.listens}.
+          Turn on private HTTPS to point it here.
+        </InlineNotice>
+      )}
       {failure && !enableLink && <InlineNotice tone="error">{failure}</InlineNotice>}
-      <div className="remote-toolbar">
+      <div className="tailscale-actions">
+        {next !== goal && next.action}
+        {/* Turning on stays reachable from any step, as Tailscale's own checks can lag. */}
+        {goal.action}
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           disabled={checking}
           loading={checking}
@@ -168,8 +210,10 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
         >
           Check again
         </Button>
-        <span>Already have an HTTPS address? Enter it under Advanced.</span>
       </div>
+      <p className="tailscale-item-detail">
+        Already have an HTTPS address? Enter it in Turn on remote access, under Advanced.
+      </p>
     </div>
   );
 }

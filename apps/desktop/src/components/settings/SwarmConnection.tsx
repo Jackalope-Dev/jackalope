@@ -3,16 +3,23 @@ import {
   Button,
   Checkbox,
   ConfirmDialog,
+  FieldCheck,
   FormField,
   InlineNotice,
   Input,
   LinkButton,
+  SecretField,
   SettingGroup,
   SettingRow,
   Stepper,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { cancelCloudflareSignIn, reauthorizeCloudflare } from '../../lib/cloudflare-artifacts';
+import { openSettings } from '../../lib/app-events';
+import {
+  artifactsStatus,
+  cancelCloudflareSignIn,
+  reauthorizeCloudflare,
+} from '../../lib/cloudflare-artifacts';
 import { openExternalUrl } from '../../lib/native/env';
 import {
   type SwarmConnection as Connection,
@@ -66,7 +73,7 @@ function SetupSteps({ run }: { run: Run }) {
  * person deployed themselves can be entered instead. Swarm builds on Artifacts, so the
  * card stays hidden until Artifacts is connected unless a Worker is already saved.
  */
-export function SwarmConnection({ artifactsConnected }: { artifactsConnected: boolean }) {
+function SwarmConnection({ artifactsConnected }: { artifactsConnected: boolean }) {
   const [status, setStatus] = useState<Connection | null>(null);
   const [manual, setManual] = useState(false);
   const [url, setUrl] = useState('');
@@ -253,16 +260,21 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
               onChange={(event) => setUrl(event.target.value)}
             />
           </FormField>
-          <FormField label="Swarm token" description="The Worker's SWARM_TOKEN secret.">
-            <Input
-              required
-              type="password"
-              autoComplete="off"
-              value={token}
-              disabled={busy}
-              onChange={(event) => setToken(event.target.value)}
-            />
-          </FormField>
+          {url.trim() && (
+            <FieldCheck tone={/^https:\/\/[^\s/]+/i.test(url.trim()) ? 'ok' : 'info'}>
+              {/^https:\/\/[^\s/]+/i.test(url.trim())
+                ? 'Connecting checks the Worker answers with this token.'
+                : 'Usually the Worker’s https:// address, such as https://jackalope-swarm.you.workers.dev.'}
+            </FieldCheck>
+          )}
+          <SecretField
+            label="Swarm token"
+            description="The Worker's SWARM_TOKEN secret."
+            required
+            value={token}
+            disabled={busy}
+            onValueChange={setToken}
+          />
           <div className="swarm-actions">
             <Button
               type="submit"
@@ -378,5 +390,35 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
         </InlineNotice>
       )}
     </SettingGroup>
+  );
+}
+
+/** Settings → Swarm: the Swarm card, with the Artifacts connection it builds on read here. */
+export function SwarmSettings() {
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    artifactsStatus()
+      .then((status) => setConnected(status.connected))
+      .catch((cause) => setError(describeError(cause)));
+  }, []);
+  if (error) return <InlineNotice tone="error">{error}</InlineNotice>;
+  if (connected === null) return null;
+  return (
+    <>
+      {!connected && (
+        <SettingGroup>
+          <SettingRow
+            title="Connect Cloudflare first"
+            description="Swarm coordinates agents across machines through Cloudflare Artifacts and a Worker on your account."
+          >
+            <Button variant="outline" onClick={() => openSettings('Cloudflare')}>
+              Open Cloudflare
+            </Button>
+          </SettingRow>
+        </SettingGroup>
+      )}
+      <SwarmConnection artifactsConnected={connected} />
+    </>
   );
 }

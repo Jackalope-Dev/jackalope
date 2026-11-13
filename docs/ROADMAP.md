@@ -20,8 +20,9 @@ representative benefit and installed-platform acceptance remain open.
 
 - One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
   activity and quota freshness. Desktop preferences include power, running services, zoom,
-  shortcuts, editor/shell choices, saved actions and optional local dictation.
-  Split terminals can retain stopped output without replaying commands. Explicit
+  shortcuts, editor/shell choices and optional local dictation. Task terminals offer each
+  project's preparation, verification and saved commands as buttons, and split terminals
+  can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
 - One workspace layout keeps recent work in a collapsible sidebar beside the open item,
   with list and board views of the work list.
@@ -194,7 +195,8 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 
 ## Further out: work across machines
 
-Managed hosting (including hosted Artifacts repositories), agent-native repository
-workflows, shared workspaces and team collaboration
-depend on validated individual remote workflows. These remain exploratory directions.
+Jackalope Cloud, an always-on host that keeps coordinating work while the laptop is away so
+phones and other computers stay useful, comes first in this direction. Managed hosting
+(including hosted Artifacts repositories), agent-native repository workflows, shared
+workspaces and team collaboration depend on validated individual remote workflows. These remain exploratory directions.
 See [BACKEND.md](BACKEND.md).

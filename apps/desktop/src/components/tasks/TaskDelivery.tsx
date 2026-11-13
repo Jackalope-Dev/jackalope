@@ -8,7 +8,17 @@ import {
   InlineNotice,
   DropdownMenu as Menu,
 } from '@jackalope/ui';
-import { ChevronDown } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ClipboardCopy,
+  GitBranch,
+  GitPullRequest,
+  ListChecks,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { useState } from 'react';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
@@ -41,6 +51,13 @@ interface DeliveryStatus {
   remoteNote: string;
   checkedAt: string;
 }
+
+/** What the agent can be asked to prepare; `goal` completes the handoff sentence. */
+const PREPARE_GOALS = [
+  { goal: 'a pull request', label: 'Pull request', icon: GitPullRequest },
+  { goal: 'CI verification', label: 'CI verification', icon: ShieldCheck },
+  { goal: 'a deployment', label: 'Deployment', icon: Rocket },
+] as const;
 
 export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string) {
   return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a PR, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
@@ -171,21 +188,35 @@ export function TaskDelivery({
               collisionPadding={12}
             >
               <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(false)}>
+                <GitBranch size={16} aria-hidden="true" />
                 Check local status
               </Menu.Item>
               <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(true)}>
+                <ListChecks size={16} aria-hidden="true" />
                 Check pull request and CI
               </Menu.Item>
               <Menu.Separator className="menu-separator" />
-              {['a pull request', 'CI verification', 'a deployment'].map((goal) => (
-                <Menu.Item
-                  key={goal}
-                  className="workspace-menu-item"
-                  onSelect={() => void prepare(goal)}
-                >
-                  Ask the agent to prepare {goal}
-                </Menu.Item>
-              ))}
+              <Menu.Sub>
+                <Menu.SubTrigger className="workspace-menu-item workspace-menu-sub">
+                  <Sparkles size={16} aria-hidden="true" />
+                  Ask the agent to prepare…
+                  <ChevronRight size={14} aria-hidden="true" />
+                </Menu.SubTrigger>
+                <Menu.Portal>
+                  <Menu.SubContent className="workspace-menu">
+                    {PREPARE_GOALS.map(({ goal, label, icon: Icon }) => (
+                      <Menu.Item
+                        key={goal}
+                        className="workspace-menu-item"
+                        onSelect={() => void prepare(goal)}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </Menu.Item>
+                    ))}
+                  </Menu.SubContent>
+                </Menu.Portal>
+              </Menu.Sub>
               <Menu.Item
                 className="workspace-menu-item"
                 onSelect={() =>
@@ -194,6 +225,7 @@ export function TaskDelivery({
                     .catch((cause) => setError(describeError(cause)))
                 }
               >
+                <ClipboardCopy size={16} aria-hidden="true" />
                 Copy delivery handoff
               </Menu.Item>
             </Menu.Content>

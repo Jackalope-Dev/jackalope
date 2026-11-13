@@ -179,3 +179,14 @@
     animation: none;
   }
 }
+/* Resource choices use the width: two columns of choice cards on wide panes. */
+.cloud-resources-choices .ui-choice-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  align-items: start;
+  gap: 8px;
+}
+/* A 40-character prefix needs no full-width field. */
+.cloud-resources-prefix {
+  max-width: 44ch;
+}

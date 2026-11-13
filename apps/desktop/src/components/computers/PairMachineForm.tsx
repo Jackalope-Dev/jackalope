@@ -1,10 +1,21 @@
-import { Button, CopyButton, FormField, Input } from '@jackalope/ui';
+import {
+  Button,
+  CopyButton,
+  Disclosure,
+  DisclosureSummary,
+  FieldCheck,
+  FlowDiagram,
+  FormField,
+  Input,
+  SetupSteps,
+} from '@jackalope/ui';
+import { Laptop, Server } from 'lucide-react';
 import { useState } from 'react';
 import { addCloudMachine, type CloudMachine, cloudMachines } from '../../lib/computers';
 import './computers.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { useNativeResource } from '../../hooks/useNativeResource';
-import { ActionError } from '../ui/ActionError';
+import '../settings/setup-screens.css';
 
 /** The tag of an image built from resources/computer on the machine itself. */
 const LOCAL_IMAGE = 'jackalope-computer';
@@ -44,9 +55,15 @@ export function PairMachineForm({
   // This version's published image; a locally built one when it is unknown.
   const image = useNativeResource(cloudMachines, []).data?.image || LOCAL_IMAGE;
   const command = runCommand(secret.trim(), image);
+  const [started, setStarted] = useState(false);
+  const [paired, setPaired] = useState(false);
+  const address = url.trim();
+  const httpsAddress = /^https:\/\/[^\s/]+/i.test(address);
+  const shown = name.trim() || defaultName;
+  const flow = busy ? 'checking' : paired ? 'connected' : error ? 'failed' : 'idle';
   return (
     <form
-      className="space-y-3"
+      className="settings-setup-flow"
       onSubmit={async (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -54,14 +71,14 @@ export function PairMachineForm({
         setBusy(true);
         setError('');
         try {
-          onPaired(
-            await addCloudMachine(
-              name.trim() || defaultName,
-              url,
-              secret.trim(),
-              viewerUrl.trim() || null,
-            ),
+          const machine = await addCloudMachine(
+            shown,
+            url,
+            secret.trim(),
+            viewerUrl.trim() || null,
           );
+          setPaired(true);
+          onPaired(machine);
         } catch (cause) {
           setError(describeError(cause));
         } finally {
@@ -69,81 +86,124 @@ export function PairMachineForm({
         }
       }}
     >
-      <FormField
-        label="Start the computer on your machine"
-        description={
-          image === LOCAL_IMAGE
-            ? 'Build the jackalope-computer image first, then put HTTPS in front of port 8765.'
-            : 'Docker downloads the computer image. Put HTTPS in front of port 8765.'
-        }
-      >
-        <div className="pair-machine-command">
-          <code>{command}</code>
-          <CopyButton text={command} label="Copy command" variant="outline" size="sm" />
-        </div>
-      </FormField>
-      <FormField label="Agent address">
-        <Input
-          required
-          type="url"
-          spellCheck={false}
-          placeholder="https://computer.example.com"
-          value={url}
-          disabled={busy}
-          onChange={(event) => setUrl(event.target.value)}
-        />
-      </FormField>
-      <FormField label="Name">
-        <Input
-          value={name}
-          maxLength={80}
-          placeholder={defaultName}
-          disabled={busy}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </FormField>
-      <FormField
-        label="Pairing secret"
-        description="Already in the command. Anyone with it can run commands on the machine."
-      >
-        <Input
-          required
-          autoComplete="off"
-          spellCheck={false}
-          className="font-mono"
-          minLength={32}
-          maxLength={512}
-          value={secret}
-          disabled={busy}
-          onChange={(event) => setSecret(event.target.value)}
-        />
-      </FormField>
-      <FormField
-        label="Viewer address"
-        description="Optional. Its noVNC page for Watch / take over."
-      >
-        <Input
-          type="url"
-          spellCheck={false}
-          value={viewerUrl}
-          disabled={busy}
-          onChange={(event) => setViewerUrl(event.target.value)}
-        />
-      </FormField>
-      <ActionError error={error} />
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="submit"
-          loading={busy}
-          loadingLabel="Checking…"
-          disabled={busy || !url.trim() || secret.trim().length < 32}
-        >
-          Pair machine
-        </Button>
-        <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
+      <FlowDiagram
+        from={{ label: 'This Mac', icon: <Laptop size={16} /> }}
+        to={{ label: shown, icon: <Server size={16} /> }}
+        via="HTTPS"
+        state={flow}
+        error={flow === 'failed' ? error : undefined}
+      />
+      <SetupSteps
+        label="Pair a cloud machine"
+        steps={[
+          {
+            id: 'start',
+            title: 'Start the computer on your machine',
+            hint:
+              image === LOCAL_IMAGE
+                ? 'Build the jackalope-computer image first, then run this and put HTTPS in front of port 8765.'
+                : 'Run this on the machine; Docker downloads the computer image. Then put HTTPS in front of port 8765.',
+            state: started ? 'done' : 'current',
+            summary: 'Started with the copied command',
+            content: (
+              <div className="settings-setup-fields">
+                <div className="pair-machine-command">
+                  <code>{command}</code>
+                  <CopyButton text={command} label="Copy command" variant="outline" size="sm" />
+                </div>
+                <div>
+                  <Button type="button" variant="secondary" onClick={() => setStarted(true)}>
+                    It's running
+                  </Button>
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: 'address',
+            title: 'Say where it is',
+            hint: 'Its HTTPS address, and a name to show here.',
+            state: !started ? 'upcoming' : 'current',
+            content: (
+              <div className="settings-setup-fields">
+                <FormField label="Agent address">
+                  <Input
+                    required
+                    type="url"
+                    spellCheck={false}
+                    placeholder="https://computer.example.com"
+                    value={url}
+                    disabled={busy}
+                    onChange={(event) => setUrl(event.target.value)}
+                  />
+                </FormField>
+                {address && (
+                  <FieldCheck tone={httpsAddress ? 'ok' : 'info'}>
+                    {httpsAddress
+                      ? 'An HTTPS address; pairing checks the computer answers there.'
+                      : 'Usually the HTTPS address in front of port 8765, starting with https://.'}
+                  </FieldCheck>
+                )}
+                <FormField label="Name">
+                  <Input
+                    value={name}
+                    maxLength={80}
+                    placeholder={defaultName}
+                    disabled={busy}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </FormField>
+                <Disclosure>
+                  <DisclosureSummary>Advanced: pairing secret and viewer</DisclosureSummary>
+                  <div className="settings-setup-fields">
+                    <FormField
+                      label="Pairing secret"
+                      description="Already in the command. Anyone with it can run commands on the machine."
+                    >
+                      <Input
+                        required
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="font-mono"
+                        minLength={32}
+                        maxLength={512}
+                        value={secret}
+                        disabled={busy}
+                        onChange={(event) => setSecret(event.target.value)}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Viewer address"
+                      description="Optional. Its noVNC page for Watch / take over."
+                    >
+                      <Input
+                        type="url"
+                        spellCheck={false}
+                        value={viewerUrl}
+                        disabled={busy}
+                        onChange={(event) => setViewerUrl(event.target.value)}
+                      />
+                    </FormField>
+                  </div>
+                </Disclosure>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="submit"
+                    loading={busy}
+                    loadingLabel="Checking…"
+                    disabled={busy || !address || secret.trim().length < 32}
+                  >
+                    Pair machine
+                  </Button>
+                  <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ),
+          },
+        ]}
+      />
     </form>
   );
 }

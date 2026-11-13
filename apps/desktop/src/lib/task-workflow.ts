@@ -2,6 +2,16 @@ import { isActive, isDone } from '@jackalope/contracts/runs';
 import type { TaskRun } from './run-types.ts';
 
 /**
+ * Whether the attempt holds a question the person can still answer: a live attempt that is
+ * not stopping or checking its result, or one that ended in review with its question open.
+ * The work list's group, row action and presence all read this, so they never disagree.
+ */
+export function hasOpenQuestion(run: TaskRun): boolean {
+  if (!run.prompts?.some((prompt) => prompt.status === 'pending')) return false;
+  return isActive(run) ? run.status !== 'stopping' && !run.finishing : run.status === 'review';
+}
+
+/**
  * The task's headline state and next action. Checks surface inside review, not here.
  * `changedFiles`, when known, keeps an attempt that changed nothing from offering a merge.
  */
@@ -17,7 +27,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
     return state('History needs saving', 'Recover saved history', 'recovery', 'warning');
   if (active) {
     if (run.status === 'stopping') return state('Stopping', 'View activity', 'activity');
-    if (!run.finishing && run.prompts?.some((p) => p.status === 'pending'))
+    if (hasOpenQuestion(run))
       return state('Waiting for your answer', 'Answer question', 'question', 'warning');
     if (run.finishing) return state('Checking result', 'View checks', 'changes');
     return state(
@@ -29,7 +39,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
   if (integrated)
     return state('Changes integrated locally', 'View delivery', 'delivery', 'success');
   if (run.status === 'interrupted') return state('Work interrupted', 'Resume', 'resume', 'warning');
-  if (run.status === 'review' && run.prompts?.some((p) => p.status === 'pending'))
+  if (hasOpenQuestion(run))
     return state('Question left open', 'Answer question', 'question', 'warning');
   if (!isDone(run))
     return state(

@@ -1,0 +1,22 @@
+/* Providers as a tile grid: each one's mark and name, wrapping to the available width. */
+.provider-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 8px;
+}
+.provider-tile.ui-button {
+  justify-content: flex-start;
+  gap: 10px;
+  height: auto;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+.provider-tile > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An address holds about forty characters; it never needs the dialog's full width. */
+.provider-address {
+  max-width: 28rem;
+}

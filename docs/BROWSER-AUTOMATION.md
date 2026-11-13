@@ -114,7 +114,7 @@ person's everyday browser and its profiles are never opened or copied.
   and the task asks **Sign in needed** (`I signed in` / `Skip sign-in`). Agent commands
   wait until the person answers; the window then closes and the agent continues
   headless and must navigate again. A skipped site is not asked again in that task.
-  People can also open the profile from Project settings → **Browser profiles**, the
+  People can also open the profile from Project settings → Integrations → **Browser profiles**, the
   bot editor, or the terminal's `/browser open [url]`; closing the window or choosing
   **Done signing in** (`/browser done`) records its sites.
 - **Closing.** Persistent Chromium is closed with `Browser.close` before its process
@@ -163,7 +163,7 @@ or captured, newest first; at most six distinct pages.
 
 ### Feature map
 
-Project settings keep an optional feature map beside the capture settings
+Project settings keep an optional feature map on their Feature map tab
 (`featureMap` in project preferences, mirrored to the native project ledger). Each
 entry has a name, a page, what working looks like, optional steps to reach it and
 project-relative source globs (`*`, `**`, `?`, `{a,b}`; a plain path also covers the

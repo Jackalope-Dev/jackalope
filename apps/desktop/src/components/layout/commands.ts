@@ -2,14 +2,18 @@ import {
   Keyboard,
   LifeBuoy,
   type LucideIcon,
+  Megaphone,
+  MessagesSquare,
   PanelLeftClose,
   Plus,
   Search,
   Settings2,
   SquareTerminal,
 } from 'lucide-react';
-import { openShortcuts } from '../../lib/app-events';
+import { openFeedback, openShortcuts } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import { DISCORD_URL } from '../../lib/community';
+import { openExternalUrl } from '../../lib/native/env';
 import { openHelp } from '../../lib/navigation';
 import type { ShortcutAction } from '../../lib/shortcuts';
 import type { Project } from '../../stores/projectStore';
@@ -27,7 +31,7 @@ export interface CommandContext {
 }
 
 export interface Command {
-  id: ShortcutAction | 'shortcuts' | 'help';
+  id: ShortcutAction | 'shortcuts' | 'help' | 'feedback' | 'discord';
   /** The label in command search. */
   label: (ctx: CommandContext) => string;
   icon: LucideIcon;
@@ -109,6 +113,20 @@ export const COMMANDS: readonly Command[] = [
     icon: LifeBuoy,
     keywords: 'help docs documentation knowledgebase faq troubleshooting guides',
     run: () => openHelp(),
+  },
+  {
+    id: 'feedback',
+    label: () => 'Send feedback',
+    icon: Megaphone,
+    keywords: 'feedback bug report idea suggestion contact',
+    run: () => openFeedback(),
+  },
+  {
+    id: 'discord',
+    label: () => 'Join the Discord',
+    icon: MessagesSquare,
+    keywords: 'discord community chat support help questions',
+    run: () => void openExternalUrl(DISCORD_URL),
   },
 ];
 

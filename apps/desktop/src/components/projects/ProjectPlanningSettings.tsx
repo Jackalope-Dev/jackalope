@@ -41,7 +41,14 @@ const TASK_AGENT = 'task';
 const AGENT_DEFAULT = 'default';
 
 /** Plan mode settings for one project: the interview limit, swarm rounds, planning agent and model, where Save to repo writes, and what agents may decide. */
-export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
+export function ProjectPlanningSettings({
+  projectId,
+  onSaved,
+}: {
+  projectId: string;
+  /** Told after each successful save, so a summary of these settings stays current. */
+  onSaved?: (settings: PlanSettings) => void;
+}) {
   const id = useId();
   const runners = useExecutionStore((state) => state.runners);
   const [settings, setSettings] = useState<PlanSettings>();
@@ -77,6 +84,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
     setError('');
     try {
       await planCommands.saveSettings(projectId, next);
+      onSaved?.(next);
     } catch (cause) {
       setSettings(previous);
       setPath(previous.exportPath);

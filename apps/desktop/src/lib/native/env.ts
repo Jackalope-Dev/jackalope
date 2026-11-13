@@ -29,3 +29,16 @@ export async function openExternalUrl(url: string): Promise<void> {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
+
+/** Shows a file or folder in the system file manager (Finder, Explorer or Files). */
+export async function revealInFileManager(path: string): Promise<void> {
+  const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+  await revealItemInDir(path);
+}
+
+/** The file manager's name for menu labels. */
+export function fileManagerName(platform = globalThis.navigator?.platform ?? ''): string {
+  if (/Mac/i.test(platform)) return 'Finder';
+  if (/Win/i.test(platform)) return 'Explorer';
+  return 'Files';
+}

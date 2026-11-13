@@ -133,3 +133,54 @@ test('marking a notice read persists acknowledgment without resolving or deletin
   assert.equal(state().sources.save, undefined);
   delete globalThis.localStorage;
 });
+
+const notice = (id, kind = 'attention', title = id) => ({ id, kind, title, detail: '' });
+
+test('only notices that arrive after the first load are announced, never launch-time state', async () => {
+  const { freshNotices } = await import('../src/lib/companion-announce.ts');
+  const existing = [notice('task:a:review', 'success'), notice('task:b:failed')];
+  // Before history settles nothing is fresh, so pre-existing review and failure stay quiet.
+  assert.deepEqual(freshNotices(existing, new Set(), false), []);
+  // After seeding with what was there at launch, only a new transition is fresh.
+  const announced = new Set(existing.map((item) => item.id));
+  const later = [...existing, notice('task:c:question:q1')];
+  assert.deepEqual(
+    freshNotices(later, announced, true).map((item) => item.id),
+    ['task:c:question:q1'],
+  );
+  // A state change is a new transition; the same state again is not.
+  assert.deepEqual(freshNotices([notice('task:a:failed')], announced, true).length, 1);
+  assert.deepEqual(freshNotices([notice('task:a:review', 'success')], announced, true), []);
+});
+
+test('several arrivals coalesce into one summary bubble that joins a bubble still showing', async () => {
+  const { coalesce, hintStillRelevant } = await import('../src/lib/companion-announce.ts');
+  assert.equal(coalesce([]), null);
+  const one = coalesce([notice('task:a:review', 'success', 'Ready for your review')]);
+  assert.equal(one.title, 'Ready for your review');
+  assert.deepEqual(one.ids, ['task:a:review']);
+  const many = coalesce([notice('task:b:failed'), notice('plan:p:needs-you')], one);
+  assert.equal(many.title, '3 things need you');
+  assert.equal(many.kind, 'attention');
+  assert.deepEqual(many.ids, ['task:a:review', 'task:b:failed', 'plan:p:needs-you']);
+  assert.equal(coalesce([notice('x', 'success'), notice('y', 'info')]).title, '2 updates');
+  // A bubble clears once nothing it announced is still waiting.
+  assert.equal(hintStillRelevant(many, [notice('task:b:failed')]), true);
+  assert.equal(hintStillRelevant(many, []), false);
+});
+
+test('the mascot badge counts what needs the person, not every task notice ever raised', async () => {
+  const { companionBadge } = await import('../src/lib/companion-announce.ts');
+  const notices = [
+    // Fourteen old task notices used to make the badge read 14 beside a Work count of 3.
+    ...Array.from({ length: 14 }, (_, index) => notice(`task:${index}:review`, 'success')),
+    notice('plan:p:needs-you'),
+    notice('save:one'),
+    notice('referrals:me', 'success'),
+  ];
+  assert.equal(
+    companionBadge({ needsYou: 3, notices, readIds: ['save:one'], proposals: 1 }),
+    3 + 1 + 1,
+  );
+  assert.equal(companionBadge({ needsYou: 0, notices: [], readIds: [], proposals: 0 }), 0);
+});
