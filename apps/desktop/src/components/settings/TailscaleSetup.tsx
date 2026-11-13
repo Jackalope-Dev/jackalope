@@ -191,10 +191,8 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
       </div>
       {mismatch && (
         <InlineNotice tone="warning">
-          Tailscale sends HTTPS to port {mismatch.serves}, but Jackalope here listens on{' '}
-          {mismatch.listens}, so phones reach another app, or nothing if it isn't running. Turn on
-          private HTTPS to point it here; anything else using port {mismatch.serves} stops getting
-          it.
+          Tailscale points to port {mismatch.serves}, but Jackalope listens on {mismatch.listens}.
+          Turn on private HTTPS to point it here.
         </InlineNotice>
       )}
       {failure && !enableLink && <InlineNotice tone="error">{failure}</InlineNotice>}

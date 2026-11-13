@@ -249,8 +249,8 @@ export function RemoteAccess() {
             <>
               <SetupIntro
                 icon={<Share2 size={20} />}
-                title="Let a phone or another computer use this one"
-                description="Paired devices can follow work, start tasks and answer questions in the projects you choose. Keep Jackalope running here."
+                title="Use this computer from elsewhere"
+                description="Paired phones and computers can follow work and answer questions in the projects you share."
                 action={quickPair}
               />
               <FlowDiagram

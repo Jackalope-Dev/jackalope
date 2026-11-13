@@ -28,7 +28,6 @@ import {
   ListChecks,
   MonitorSmartphone,
   Server,
-  Share2,
   Smartphone,
   Terminal,
   Wifi,
@@ -134,7 +133,7 @@ function PhoneAccess({ id, name }: { id: string; name: string }) {
 }
 
 /** Devices → Use other computers: pair with hosts and work on them from here. */
-export function RemoteHosts({ onShare }: { onShare: () => void }) {
+export function RemoteHosts() {
   const [hosts, setHosts] = useState<RemoteHost[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState('');
@@ -488,14 +487,7 @@ export function RemoteHosts({ onShare }: { onShare: () => void }) {
             <SetupIntro
               icon={<Server size={20} />}
               title="Work on another computer from here"
-              description="Pair with a computer running Jackalope to follow its work, start tasks and answer questions without leaving this one."
-              action={
-                <Button variant="outline" onClick={onShare}>
-                  <Share2 size={16} aria-hidden="true" />
-                  Share this computer instead
-                  <span className="remote-intro-destination">Let devices use this one</span>
-                </Button>
-              }
+              description="Pair with a computer running Jackalope to follow its work, start tasks and answer questions from here."
             />
             <SetupLayout
               aside={

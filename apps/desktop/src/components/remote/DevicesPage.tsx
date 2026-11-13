@@ -24,7 +24,7 @@ export function DevicesPage() {
           <WorkspaceTabs.Trigger value="share">Let devices use this one</WorkspaceTabs.Trigger>
         </WorkspaceTabs.List>
         <WorkspaceTabs.Content value="use" className="devices-panel">
-          <RemoteHosts onShare={() => setTab('share')} />
+          <RemoteHosts />
         </WorkspaceTabs.Content>
         <WorkspaceTabs.Content value="share" className="devices-panel">
           <RemoteAccess />
