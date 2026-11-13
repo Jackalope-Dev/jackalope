@@ -103,7 +103,13 @@ impl Connection {
                     let saved = api
                         .json(Method::GET, &format!("/session/{id}"), None)
                         .await
-                        .map_err(lost_session)?;
+                        .map_err(|error| match lost_session(&error) {
+                            Some(lost) => {
+                                runtime.update(run_id, |run| super::resume::refused(run, &error));
+                                lost
+                            }
+                            None => error,
+                        })?;
                     if saved["id"] != id || !same_workspace(saved["directory"].as_str(), workspace)
                     {
                         return Err(
@@ -247,12 +253,8 @@ impl Connection {
 }
 
 /// OpenCode answers 404 for a session its store does not hold.
-fn lost_session(error: String) -> String {
-    if error.starts_with("OpenCode /session/") && error.ends_with("returned HTTP 404.") {
-        "OpenCode no longer has this task's earlier conversation; its session is not in OpenCode's store. Start a new task with the relevant context.".into()
-    } else {
-        error
-    }
+fn lost_session(error: &str) -> Option<String> {
+    (error.starts_with("OpenCode /session/") && error.ends_with("returned HTTP 404.")).then(|| "OpenCode no longer has this task's earlier conversation; its session is not in OpenCode's store. Start a new task with the relevant context.".into())
 }
 
 fn same_workspace(directory: Option<&str>, workspace: &str) -> bool {

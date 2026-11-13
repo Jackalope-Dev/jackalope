@@ -26,6 +26,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         quota_failure: None,
         failure_kind: None,
         provider_error: None,
+        session_refused: None,
         contract: Default::default(),
         understanding: None,
         monitor_change: None,

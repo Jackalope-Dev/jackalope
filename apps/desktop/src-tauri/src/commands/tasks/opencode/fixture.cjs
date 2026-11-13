@@ -3,7 +3,9 @@ const http = require('node:http');
 const port = Number(process.argv[process.argv.indexOf('--port') + 1]);
 const sessionID = 'ses_fixture';
 const childID = 'ses_child';
-const resumed = fs.existsSync('fixture-messages.json');
+// A session the store no longer holds: GET /session/<id> answers 404.
+const forgotten = fs.existsSync(`${__dirname}/forget-session`);
+const resumed = fs.existsSync('fixture-messages.json') && !forgotten;
 const oldChild = {
   id: 'old_child',
   sessionID: childID,
@@ -53,6 +55,10 @@ const server = http.createServer((req, res) => {
       }
       return reply({ healthy: true });
     }
+    if (forgotten && req.method === 'GET' && route === `/session/${sessionID}`) {
+      res.writeHead(404).end();
+      return;
+    }
     if (route === '/session' || route === `/session/${sessionID}`)
       return reply({ id: sessionID, directory: process.cwd() });
     if (route === '/session/status') return reply({});
@@ -84,6 +90,7 @@ const server = http.createServer((req, res) => {
         return;
       }
       res.writeHead(204).end();
+      fs.writeFileSync(`${__dirname}/prompt.txt`, body.parts.map((part) => part.text).join(''));
       askQuestion = body.parts.some((part) => part.text?.includes('Question fixture'));
       denialMode = ['Continue', 'Repeat', 'Limit'].find((mode) =>
         body.parts.some((part) => part.text?.includes(`${mode} fixture`)),

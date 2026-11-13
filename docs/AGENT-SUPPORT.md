@@ -23,7 +23,10 @@ code. A turn whose only answer is a printed provider error (Claude Code's
 reaching review; an error the CLI retried past keeps the later answer. Beside the
 message, `tasks/failure.rs` records a kind (authentication, quota exhausted, rate
 limited, provider refused, model unavailable, context too long or agent exited).
-Authentication is judged on the message's first line only. The kind is descriptive;
+Authentication is judged on the message's first line only. Claude Code's rejected
+`rate_limit_event` means a five-hour, weekly or extra-usage window is used up: it is
+recorded as quota exhausted, naming the window and, when the event carries `resetsAt`,
+when it resets. A 429 or "too many requests" stays rate limited. The kind is descriptive;
 quota handoff still requires a provider quota event.
 
 The requested model is saved separately from the model the agent reports serving.
@@ -173,10 +176,14 @@ session starts a new conversation in the same workspace, with the earlier reques
 the quota handoff's progress context in the prompt, and the attempt's activity says so.
 A store without the expected `sessions/` directory, or one too large to read, leaves
 the decision to the CLI. Codex reporting a different thread on resume is recorded in
-activity. Claude Code, OpenCode's server and ACP agents refuse an unknown session
-themselves; the attempt fails as a lost conversation and asks for a new task. Gemini CLI
-and Antigravity fail when a different session comes back. Continuations on a computer
-rely on the CLI there.
+activity. Claude Code (`No conversation found with session ID`), OpenCode's server (HTTP
+404 for the session) and ACP agents (a failed `session/load`) refuse an unknown session
+themselves. On this device the attempt then starts once more as a new conversation with
+the same earlier request and progress; activity keeps the CLI's own refusal and says so.
+It starts over at most once, and a failure of the new conversation fails the attempt
+with its own error. A continuation of a session from outside Jackalope never starts
+over: a lost session fails it as a lost conversation. Gemini CLI and Antigravity fail
+when a different session comes back. Continuations on a computer rely on the CLI there.
 
 Gemini account setup uses `GEMINI_CLI_HOME` as the parent of `.gemini` and
 `GEMINI_FORCE_FILE_STORAGE=true` to isolate credentials from the shared keychain.
