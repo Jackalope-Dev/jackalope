@@ -1,6 +1,6 @@
 import { Badge, Button, EmptyState, InlineNotice, LoadingState } from '@jackalope/ui';
-import { ChevronRight, Inbox, MessageCircle, Monitor, Plus, Settings2 } from 'lucide-react';
-import { type CSSProperties, useMemo } from 'react';
+import { ChevronRight, Inbox, MessageCircle, Monitor, Plus, Settings2, X } from 'lucide-react';
+import { type CSSProperties, useMemo, useState } from 'react';
 import { Avatar, Bar, Character } from './Bar';
 import { MascotHeader } from './Mascot';
 import type { Host } from './native';
@@ -248,6 +248,10 @@ export function Work({
   );
   const groups = groupWork(rows);
   const unreachable = shown.filter((host) => computers[host.id]?.error);
+  // Hidden per computer and error; a different error brings the notice back. The computer's
+  // chip and its read-only rows still show it's offline.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const noticeKey = (host: Host) => `${host.id}\n${computers[host.id]?.error ?? ''}`;
   const loading = shown.every((host) => !computers[host.id]);
   // New work goes to the first computer that can take it; New work's form can switch.
   const target = shown.find((host) => computers[host.id]?.snapshot?.projects.length);
@@ -283,6 +287,7 @@ export function Work({
         </InlineNotice>
       )}
       {unreachable.map((host) => {
+        if (hidden.has(noticeKey(host))) return null;
         const state = computers[host.id];
         const known = workRows(state?.snapshot ?? null).length > 0;
         return (
@@ -291,9 +296,19 @@ export function Work({
             tone="warning"
             className="mobile-offline"
             action={
-              <Button variant="outline" size="sm" onClick={() => onRetry(host)}>
-                Retry
-              </Button>
+              <span className="mobile-offline-actions">
+                <Button variant="outline" size="sm" onClick={() => onRetry(host)}>
+                  Retry
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Dismiss ${host.label} offline notice`}
+                  onClick={() => setHidden((current) => new Set(current).add(noticeKey(host)))}
+                >
+                  <X size={18} aria-hidden="true" />
+                </Button>
+              </span>
             }
           >
             <strong className="mobile-offline-title">

@@ -975,3 +975,13 @@
     transform: none;
   }
 }
+
+.mobile-offline-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mobile-offline-actions .ui-button[data-size="icon"] {
+  width: 44px;
+  height: 44px;
+}
