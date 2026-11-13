@@ -315,6 +315,8 @@ fn used_up(info: &Value) -> String {
     match info["resetsAt"]
         .as_i64()
         .filter(|seconds| *seconds > 0)
+        // Unix seconds; a value in milliseconds would otherwise read as a far-future date.
+        .map(|at| if at > 100_000_000_000 { at / 1000 } else { at })
         .and_then(|seconds| chrono::TimeZone::timestamp_opt(&chrono::Local, seconds, 0).single())
     {
         Some(at) => format!(
