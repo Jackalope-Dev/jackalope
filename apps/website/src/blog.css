@@ -286,6 +286,27 @@
   }
 }
 
+/* Cover artwork a post brings with it keeps its own aspect ratio. */
+.article-cover {
+  margin: 48px 0 0;
+}
+.article-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl, 18px);
+  background: var(--color-surface-sunken);
+}
+@media (max-width: 760px) {
+  .article-cover {
+    margin-top: 32px;
+  }
+  .article-cover img {
+    border-radius: var(--radius-xl, 14px);
+  }
+}
+
 /* A signed post links its byline to the author's page. */
 .article-byline {
   align-items: center;
