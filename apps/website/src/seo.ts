@@ -1,7 +1,7 @@
 import { guideMarkdown, guidePath, knowledgeFiles, knowledgeGuides } from '@jackalope/knowledge';
 import { type Author, authorPath, authors, findAuthor } from './authors.ts';
 import benchmarks from './benchmark-summary.json' with { type: 'json' };
-import { serializeBlogPost } from './blog-types.ts';
+import { blogImageSize, serializeBlogPost } from './blog-types.ts';
 import {
   changelogReleases,
   company,
@@ -84,6 +84,14 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const description = page?.description || 'Find your way back to Jackalope.';
   const url = `${origin}${normalized}`;
   const isArticle = Boolean(post || guide || comparison || normalized.startsWith('/guides/'));
+  // A post's own cover replaces the site image in link previews and its structured data.
+  const socialImage = post?.image?.url ?? `${origin}${SOCIAL_IMAGE}`;
+  const socialImageAlt = post?.image?.alt ?? SOCIAL_IMAGE_ALT;
+  const socialImageSize = post?.image ? blogImageSize(post.image) : { width: 1200, height: 630 };
+  const postSchemaImage =
+    post?.image && socialImageSize
+      ? { '@type': 'ImageObject', url: socialImage, ...socialImageSize }
+      : socialImage;
   const graph: Record<string, unknown>[] = [
     {
       '@type': 'Organization',
@@ -151,7 +159,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
                 ? personSchema(postAuthor, origin)
                 : { '@type': 'Organization', name: company.name, url: company.url },
               publisher: { '@id': `${origin}/#organization` },
-              image: `${origin}${SOCIAL_IMAGE}`,
+              image: postSchemaImage,
               mainEntityOfPage: url,
             }
           : profile
@@ -292,16 +300,20 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:url" content="${escapeHtml(url)}" />`,
-    `<meta property="og:image" content="${origin}${SOCIAL_IMAGE}" />`,
-    `<meta property="og:image:width" content="1200" />`,
-    `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
+    `<meta property="og:image" content="${escapeHtml(socialImage)}" />`,
+    ...(socialImageSize
+      ? [
+          `<meta property="og:image:width" content="${socialImageSize.width}" />`,
+          `<meta property="og:image:height" content="${socialImageSize.height}" />`,
+        ]
+      : []),
+    `<meta property="og:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:site" content="@JackalopeDotDev" />`,
-    `<meta name="twitter:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
-    `<meta name="twitter:image" content="${origin}${SOCIAL_IMAGE}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(socialImage)}" />`,
     ...(post
       ? [
           `<meta property="article:published_time" content="${post.date}T12:00:00Z" />`,
