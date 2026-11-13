@@ -1,5 +1,6 @@
 import { Button, Disclosure, DisclosureBody, DisclosureSummary, InlineNotice } from '@jackalope/ui';
-import { useReducer } from 'react';
+import { ChevronDown, X } from 'lucide-react';
+import { useId, useReducer, useState } from 'react';
 import {
   type DispatchPaused,
   describeDispatchPaused,
@@ -75,7 +76,8 @@ export function DispatchPausedNotice({
 
 /**
  * Every paused dispatch on a page as one notice: a single pause reads as above, while
- * several stack into one summary with a compact row per project, so they never fill the page.
+ * several collapse into a stack (one card with the others' edges peeking out). Opening it
+ * lists each project as a quiet row: the row shows that project's work, and × dismisses it.
  */
 export function DispatchPausedNotices({
   messages,
@@ -86,6 +88,8 @@ export function DispatchPausedNotices({
 }) {
   const projects = useProjectStore((state) => state.projects);
   const [, rerender] = useReducer((count: number) => count + 1, 0);
+  const [open, setOpen] = useState(false);
+  const listId = useId();
   const visible = messages
     .filter((message) => !dismissed.has(message))
     .map((message) => ({ message, paused: parseDispatchPaused(message) }))
@@ -98,65 +102,90 @@ export function DispatchPausedNotices({
     for (const item of items) dismissed.add(item);
     rerender();
   };
-  const { title, body } = describeSeveralPaused(visible.length);
+  const { title, body, fix } = describeSeveralPaused(visible.length);
   return (
-    <InlineNotice
-      tone="warning"
-      className="dispatch-paused"
-      action={
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => dismiss(...visible.map((entry) => entry.message))}
-        >
-          Dismiss all
-        </Button>
-      }
-    >
-      <p className="dispatch-paused-title">{title}</p>
-      <p>{body}</p>
-      <ul className="dispatch-paused-list">
-        {visible.map(({ message, paused }) => {
-          const project = projects.find((entry) => samePath(entry.path, paused.projectPath));
-          const hint = project && hints.get(project.id);
-          const name = project
-            ? `${project.name}${hint ? ` (${hint})` : ''}`
-            : pathLabel(paused.projectPath);
-          return (
-            <li key={message}>
-              <span className="dispatch-paused-name">{name}</span>
-              <span className="dispatch-paused-where">
-                {[paused.branch, paused.commit && `commit ${paused.commit}`]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-              {project && onShowProject && (
-                <Button size="sm" variant="ghost" onClick={() => onShowProject(project.id)}>
-                  Show work
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Dismiss ${name}`}
-                onClick={() => dismiss(message)}
-              >
-                Dismiss
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-      <Disclosure>
-        <DisclosureSummary>Details</DisclosureSummary>
-        <DisclosureBody>
-          {visible.map(({ message }) => (
-            <code key={message} className="dispatch-paused-raw">
-              {message}
-            </code>
-          ))}
-        </DisclosureBody>
-      </Disclosure>
-    </InlineNotice>
+    <div className="dispatch-paused-stack" data-open={open || undefined}>
+      <InlineNotice tone="warning" className="dispatch-paused">
+        <p className="dispatch-paused-title">{title}</p>
+        <p>{body}</p>
+        <div className="dispatch-paused-toggles">
+          <button
+            type="button"
+            className="dispatch-paused-toggle"
+            aria-expanded={open}
+            aria-controls={listId}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? 'Hide projects' : `Show ${visible.length} projects`}
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="dispatch-paused-toggle"
+            onClick={() => dismiss(...visible.map((entry) => entry.message))}
+          >
+            Dismiss all
+          </button>
+        </div>
+        {open && <p className="dispatch-paused-fix">{fix}</p>}
+        {open && (
+          <ul id={listId} className="dispatch-paused-list">
+            {visible.map(({ message, paused }) => {
+              const project = projects.find((entry) => samePath(entry.path, paused.projectPath));
+              const hint = project && hints.get(project.id);
+              const name = project
+                ? `${project.name}${hint ? ` (${hint})` : ''}`
+                : pathLabel(paused.projectPath);
+              const where = [paused.branch, paused.commit && `commit ${paused.commit}`]
+                .filter(Boolean)
+                .join(' · ');
+              const label = (
+                <>
+                  <span className="dispatch-paused-name">{name}</span>
+                  <span className="dispatch-paused-where">{where}</span>
+                </>
+              );
+              return (
+                <li key={message}>
+                  {project && onShowProject ? (
+                    <button
+                      type="button"
+                      className="dispatch-paused-row"
+                      title={`Show work in ${name}`}
+                      onClick={() => onShowProject(project.id)}
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    <span className="dispatch-paused-row">{label}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="dispatch-paused-dismiss"
+                    aria-label={`Dismiss ${name}`}
+                    title="Dismiss"
+                    onClick={() => dismiss(message)}
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {open && (
+          <Disclosure>
+            <DisclosureSummary>Details</DisclosureSummary>
+            <DisclosureBody>
+              {visible.map(({ message }) => (
+                <code key={message} className="dispatch-paused-raw">
+                  {message}
+                </code>
+              ))}
+            </DisclosureBody>
+          </Disclosure>
+        )}
+      </InlineNotice>
+    </div>
   );
 }

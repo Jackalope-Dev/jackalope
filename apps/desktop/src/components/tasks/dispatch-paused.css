@@ -6,6 +6,8 @@
 /* Leading inset matches the composer's text column (16px padding + 6px textarea padding). */
 .dispatch-paused.inline-notice {
   padding-inline: 22px 14px;
+  /* The same hairline as the stacked slivers below, so the pile reads as one set of cards. */
+  border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent);
 }
 .dispatch-paused-title {
   font-weight: 600;
@@ -29,20 +31,97 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* Several pauses: one row each, name first, then where, then its actions. */
+/* Several pauses collapse into a stack: the card on top, with two edges of the cards
+   beneath peeking out, like a pile of notifications. Opening it flattens the stack. */
+.dispatch-paused-stack {
+  position: relative;
+  padding-bottom: 12px;
+}
+/* Two slivers below the card, each a little narrower, so the stack never covers the text. */
+.dispatch-paused-stack::before,
+.dispatch-paused-stack::after {
+  content: "";
+  position: absolute;
+  height: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 20%, transparent);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 7%, var(--color-surface));
+  transition:
+    opacity var(--motion-base, 160ms) var(--ease-out, ease),
+    transform var(--motion-base, 160ms) var(--ease-out, ease);
+}
+.dispatch-paused-stack::before {
+  right: 10px;
+  bottom: 6px;
+  left: 10px;
+}
+.dispatch-paused-stack::after {
+  right: 22px;
+  bottom: 0;
+  left: 22px;
+  opacity: 0.6;
+}
+.dispatch-paused-stack[data-open] {
+  padding-bottom: 0;
+}
+.workspace-page-layout > .dispatch-paused-stack {
+  margin-top: 12px;
+}
+.dispatch-paused-stack[data-open]::before,
+.dispatch-paused-stack[data-open]::after {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.dispatch-paused-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 6px;
+}
+.dispatch-paused-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.dispatch-paused-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.dispatch-paused-toggle:hover {
+  text-decoration: underline;
+}
 .dispatch-paused-list {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   margin-block: 8px;
 }
 .dispatch-paused-list > li {
-  display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
-  gap: 4px 12px;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+}
+.dispatch-paused-list > li:hover,
+.dispatch-paused-list > li:focus-within {
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+}
+.dispatch-paused-row {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
   min-height: var(--control-height-compact, 32px);
+  padding: 6px 8px;
+  text-align: left;
 }
 .dispatch-paused-name {
+  flex-shrink: 0;
+  max-width: 50%;
   overflow: hidden;
   color: var(--color-text-primary);
   font-weight: 500;
@@ -50,12 +129,52 @@
   white-space: nowrap;
 }
 .dispatch-paused-where {
+  min-width: 0;
   overflow: hidden;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Dismiss stays out of the way until the row is hovered or focused; touch always shows it. */
+.dispatch-paused-dismiss {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  opacity: 0;
+}
+.dispatch-paused-list > li:hover .dispatch-paused-dismiss,
+.dispatch-paused-dismiss:focus-visible,
+.dispatch-paused-list > li:focus-within .dispatch-paused-dismiss {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .dispatch-paused-dismiss {
+    opacity: 1;
+  }
+}
+.dispatch-paused-dismiss:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+  color: var(--color-text-primary);
+}
+:is(.dispatch-paused-toggle, .dispatch-paused-row, .dispatch-paused-dismiss):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
 .dispatch-paused-raw + .dispatch-paused-raw {
+  margin-top: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dispatch-paused-stack::before,
+  .dispatch-paused-stack::after {
+    transition: none;
+  }
+}
+.dispatch-paused-fix {
   margin-top: 8px;
 }

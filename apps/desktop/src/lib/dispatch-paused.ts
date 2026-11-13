@@ -68,6 +68,7 @@ export function describeDispatchPaused(paused: DispatchPaused, project: string) 
 export function describeSeveralPaused(count: number) {
   return {
     title: `Dependent work is paused in ${count} projects`,
-    body: "Each project's branch no longer includes a merge Jackalope made earlier, so tasks that build on it won't start. Merge the listed commit back into that branch, or reset the branch to a commit that includes it.",
+    body: "Their branches lost a merge Jackalope made earlier, so tasks that build on it won't start.",
+    fix: 'Merge each listed commit back into its branch, or reset the branch to a commit that includes it.',
   };
 }

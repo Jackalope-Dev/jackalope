@@ -65,7 +65,8 @@ test('paused dispatch messages come from the queue view and dispatch errors, onc
 });
 
 test('several pauses read as one summary that counts the projects', () => {
-  const { title, body } = describeSeveralPaused(4);
+  const { title, body, fix } = describeSeveralPaused(4);
   assert.equal(title, 'Dependent work is paused in 4 projects');
-  assert.match(body, /Merge the listed commit back/);
+  assert.match(body, /won't start/);
+  assert.match(fix, /Merge each listed commit back/);
 });
