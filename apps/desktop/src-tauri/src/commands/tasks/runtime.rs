@@ -197,24 +197,18 @@ impl TaskRuntime {
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
         let mut resume = previous;
+        // A session from outside Jackalope is the point of its continuation, so a lost one
+        // is never replaced by a new conversation.
+        let continues = self
+            .run_snapshot(id)
+            .is_some_and(|run| run.continues.is_some());
         if let (None, Some(continued)) = (&resume, &request.continues) {
-            let continued = self.continued_run(id, &request, continued);
-            if super::resume::lost(&continued) {
-                return Err(format!(
-                    "{} no longer has this conversation in {}.",
-                    crate::commands::agents::name(&continued.agent),
-                    continued
-                        .account_binding
-                        .as_ref()
-                        .map_or_else(String::new, |binding| binding
-                            .directory
-                            .display()
-                            .to_string())
-                ));
-            }
-            resume = Some(continued);
+            resume = Some(self.continued_run(id, &request, continued));
         }
         if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
+            if continues {
+                return Err(super::resume::gone(old));
+            }
             let adapter = old
                 .account_binding
                 .as_ref()
@@ -225,6 +219,8 @@ impl TaskRuntime {
             self.update_checked(id, |run| activity(run, &super::resume::restarted(adapter)))?;
             resume = None;
         }
+        // A session the CLI itself refuses to resume starts over the same way, once.
+        let mut refusable = resume.clone().filter(|_| !continues);
         let mut routed = true;
         loop {
             if !self.is_running(id) {
@@ -259,14 +255,62 @@ impl TaskRuntime {
                 .get(id)
                 .cloned()
                 .ok_or("Attempt not found")?;
-            if run.status != RunStatus::Starting
-                || run.routing.is_none()
-                || run.quota_failure.is_none()
-            {
+            if run.status != RunStatus::Starting {
                 return Ok(());
             }
-            request = self.handoff(req, &run)?;
+            if run.routing.is_some() && run.quota_failure.is_some() {
+                request = self.handoff(req, &run)?;
+                continue;
+            }
+            let Some(refusal) = run.session_refused else {
+                return Ok(());
+            };
+            let old = refusable
+                .take()
+                .ok_or_else(|| run.error.clone().unwrap_or_else(|| refusal.clone()))?;
+            let adapter = self.policy()?.adapter(&request.agent)?;
+            request
+                .prompt
+                .push_str(&super::resume::earlier_progress(&adapter, &old));
+            self.relaunch(id, |run| {
+                // The refusal is kept in activity; a failure of the new conversation is its own.
+                run.diagnostics.clear();
+                for line in super::resume::restarted_after(&adapter, &refusal) {
+                    activity(run, &line);
+                }
+            })?;
         }
+    }
+
+    /// Returns attempt `id` to starting for a new agent conversation in the same workspace,
+    /// after `change`: what the last turn reported is cleared, and its tool connections and
+    /// browser close so the next turn gets its own.
+    pub(super) fn relaunch(
+        &self,
+        id: &str,
+        change: impl FnOnce(&mut TaskRun),
+    ) -> Result<(), String> {
+        self.update_checked(id, |run| {
+            change(run);
+            run.session_id = None;
+            run.result.clear();
+            run.error = None;
+            run.quota_failure = None;
+            run.failure_kind = None;
+            run.provider_error = None;
+            run.session_refused = None;
+            run.model_mismatch = None;
+            run.model_reported = false;
+            run.usage = Usage::default();
+            run.usage_observations.clear();
+            run.exit_code = None;
+            run.ended_at = None;
+            run.status = RunStatus::Starting;
+        })?;
+        self.mcp_broker.close(id);
+        crate::commands::browser::close(id);
+        crate::commands::browser::register(id);
+        Ok(())
     }
 
     /// Places the project's Jackalope context into this attempt's workspace, every
@@ -1461,7 +1505,10 @@ impl TaskRuntime {
                 })?;
             }
         }
-        if self.is_running(id) && !quota_stopped {
+        let restarting = self
+            .run_snapshot(id)
+            .is_some_and(|run| run.session_refused.is_some() && run.continues.is_none());
+        if self.is_running(id) && !quota_stopped && !restarting {
             let current = self
                 .integration_runs()?
                 .into_iter()
@@ -1486,7 +1533,7 @@ impl TaskRuntime {
             r.ended_at = Some(Utc::now().to_rfc3339());
             r.status = if canceled || r.status == RunStatus::Stopping {
                 RunStatus::Stopped
-            } else if r.routing.is_some() && r.quota_failure.is_some() {
+            } else if (r.routing.is_some() && r.quota_failure.is_some()) || restarting {
                 r.ended_at = None;
                 RunStatus::Starting
             } else if success && r.error.is_none() && !r.result.is_empty() {
@@ -2261,6 +2308,7 @@ impl TaskRuntime {
                 quota_failure: None,
                 failure_kind: None,
                 provider_error: None,
+                session_refused: None,
                 contract,
                 understanding: None,
                 monitor_change: previous

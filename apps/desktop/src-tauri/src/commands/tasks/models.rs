@@ -98,6 +98,10 @@ pub struct TaskRun {
     /// A provider error the agent printed as assistant text, used if the turn ends unanswered.
     #[serde(skip)]
     pub provider_error: Option<String>,
+    /// The CLI's own refusal to resume a session it no longer has. The attempt then starts
+    /// once more as a new conversation, unless it continues a session from outside Jackalope.
+    #[serde(skip)]
+    pub session_refused: Option<String>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     /// The agent's own restatement of the task, reported once at the start.
@@ -461,6 +465,7 @@ impl TaskRun {
             quota_failure: self.quota_failure.clone(),
             failure_kind: self.failure_kind,
             provider_error: None,
+            session_refused: None,
             contract: self.contract.clone(),
             understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),

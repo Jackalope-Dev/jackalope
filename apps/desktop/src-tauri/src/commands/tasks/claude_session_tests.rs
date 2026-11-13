@@ -4,11 +4,17 @@ use super::*;
 /// pid and arguments to processes.jsonl. Every user message is one turn: it streams two
 /// text deltas, then sends any hook callbacks the message names and records Jackalope's
 /// replies, then reports a result whose cost is cumulative for the process, as Claude's is.
+/// While forget-sessions exists beside it, it refuses `--resume` as Claude Code does.
 const FAKE_CLAUDE: &str = r#"
 const fs = require('node:fs');
 const readline = require('node:readline');
 const log = (file, value) => fs.appendFileSync(file, JSON.stringify(value) + '\n');
 log('processes.jsonl', { pid: process.pid, args: process.argv.slice(2) });
+const resume = process.argv.indexOf('--resume');
+if (resume >= 0 && fs.existsSync(`${__dirname}/forget-sessions`)) {
+  process.stderr.write(`No conversation found with session ID: ${process.argv[resume + 1]}\n`);
+  process.exit(1);
+}
 const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
 const pending = new Map();
 let next = 0;
@@ -837,6 +843,108 @@ fn a_session_from_outside_jackalope_resumes_in_the_folder_it_ran_in() {
     assert_eq!(follow.status, RunStatus::Review, "{:?}", follow.error);
     assert_eq!(Path::new(&follow.workspace), worktree);
     assert!(follow.continues.is_some());
+}
+
+#[test]
+fn a_session_claude_code_no_longer_has_starts_over_once_as_a_new_conversation() {
+    let project = "claude-session-lost";
+    let fixture = Fixture::new(project, persistent());
+    let first = fixture.finish(fixture.request(project, "claude-lost-one", "First", None));
+    assert_eq!(first.status, RunStatus::Review, "{:?}", first.error);
+    fixture.runtime.claude_sessions.clear();
+    std::fs::write(fixture.folder.join("forget-sessions"), "").unwrap();
+
+    let second = fixture.finish(fixture.request(
+        project,
+        "claude-lost-two",
+        "Second",
+        Some("claude-lost-one"),
+    ));
+    assert_eq!(
+        second.status,
+        RunStatus::Review,
+        "{:?} {:?}",
+        second.error,
+        second.activity
+    );
+    assert_eq!(second.result, "Turn 1 done");
+    let refused = second
+        .activity
+        .iter()
+        .position(|line| {
+            line == "Claude Code could not resume the earlier conversation: No conversation found with session ID: fixture-session"
+        })
+        .expect("refusal in activity");
+    assert!(second.activity[refused + 1]
+        .starts_with("Claude Code no longer had this task's earlier conversation"));
+    assert!(second.diagnostics.is_empty(), "{:?}", second.diagnostics);
+    let processes = fixture.lines("processes.jsonl");
+    assert_eq!(processes.len(), 3);
+    let args = |index: usize| -> Vec<String> {
+        serde_json::from_value(processes[index]["args"].clone()).unwrap()
+    };
+    assert!(args(1).iter().any(|arg| arg == "--resume"));
+    assert!(!args(2).iter().any(|arg| arg == "--resume"));
+    let turns = fixture.lines("turns.jsonl");
+    let text = turns.last().unwrap()["text"].as_str().unwrap();
+    assert!(text.contains("Earlier request:\nFirst"), "{text}");
+
+    // The new conversation is resumed normally by the next follow-up.
+    std::fs::remove_file(fixture.folder.join("forget-sessions")).unwrap();
+    let third = fixture.finish(fixture.request(
+        project,
+        "claude-lost-three",
+        "Third",
+        Some("claude-lost-two"),
+    ));
+    assert_eq!(third.status, RunStatus::Review, "{:?}", third.error);
+    assert!(!third
+        .activity
+        .iter()
+        .any(|line| line.contains("could not resume")));
+}
+
+#[test]
+fn a_session_from_outside_jackalope_that_is_gone_never_starts_over() {
+    let project = "claude-session-external-lost";
+    let fixture = Fixture::new(project, persistent());
+    let worktree = fixture.folder.join(".worktrees").join("mine");
+    git(
+        &fixture.root,
+        &["worktree", "add", "-b", "mine", worktree.to_str().unwrap()],
+    )
+    .unwrap();
+    let worktree = dunce::canonicalize(&worktree).unwrap();
+    let home = crate::commands::agent_profiles::bind_cli_account(
+        &fixture.runtime.profiles_root(),
+        "claude",
+    )
+    .unwrap()
+    .directory;
+    std::fs::write(fixture.folder.join("forget-sessions"), "").unwrap();
+    let run = fixture.finish(RunRequest {
+        agent: "claude-fixture".into(),
+        agent_profile_id: Some("__default".into()),
+        continues: Some(ContinuedSession {
+            adapter: "claude".into(),
+            session_id: "0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f".into(),
+            workspace: worktree.to_string_lossy().into_owned(),
+            home,
+        }),
+        ..fixture.request(project, "claude-external-lost", "Carry on", None)
+    });
+    assert_eq!(run.status, RunStatus::Failed);
+    let error = run.error.unwrap();
+    assert!(
+        error.starts_with("Claude Code no longer has this task's earlier conversation: No conversation found with session ID: 0c1d2e3f"),
+        "{error}"
+    );
+    assert!(!run
+        .activity
+        .iter()
+        .any(|line| line.contains("could not resume")));
+    let processes = std::fs::read_to_string(worktree.join("processes.jsonl")).unwrap();
+    assert_eq!(processes.lines().count(), 1);
 }
 
 #[test]
