@@ -899,3 +899,35 @@
     transition: none;
   }
 }
+
+.bots-team-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(560px, calc(100vw - 40px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+.bots-team-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bots-team-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--control-height);
+  min-width: 0;
+}
+.bots-team-name {
+  flex: none;
+  font-weight: 500;
+}
+.bots-team-role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

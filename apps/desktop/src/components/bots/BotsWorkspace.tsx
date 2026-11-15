@@ -77,6 +77,7 @@ import { BotCardView } from './BotCardView';
 import { BotCastCard, BotHello } from './BotCast';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
+import { ImportBotsDialog, ShareBotsDialog } from './BotTeamDialogs';
 import './bots.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { agentAdapter } from '../../lib/agent-catalog';
@@ -184,6 +185,7 @@ export function BotsWorkspace() {
     })),
   );
   const [pickingTemplate, setPickingTemplate] = useState(false);
+  const [team, setTeam] = useState<'share' | 'import' | null>(null);
   const open = sessions.find((session) => session.id === openId && session.persona);
   useEffect(observeLiveSessions, []);
   // Reading a conversation, including replies that arrive while it is open, marks it read.
@@ -285,11 +287,13 @@ export function BotsWorkspace() {
                 </Menu.Portal>
               </Menu.Root>
             )}
-            {bots.length > 0 && (
+            {(bots.length > 0 || scope) && (
               <HubMenu
-                paused={hub.paused}
+                paused={hub.paused || bots.length === 0}
                 disabled={!projects.length}
                 onTemplate={() => setPickingTemplate(true)}
+                onShare={scope && roster.length ? () => setTeam('share') : undefined}
+                onImport={scope ? () => setTeam('import') : undefined}
               />
             )}
             <Button onClick={() => startNew()} disabled={!projects.length}>
@@ -484,6 +488,12 @@ export function BotsWorkspace() {
           }}
         />
       )}
+      {team === 'share' && scope && (
+        <ShareBotsDialog project={scope} bots={roster} onClose={() => setTeam(null)} />
+      )}
+      {team === 'import' && scope && (
+        <ImportBotsDialog project={scope} onClose={() => setTeam(null)} />
+      )}
       {deleting && (
         <ConfirmDialog
           open
@@ -583,10 +593,15 @@ function HubMenu({
   paused,
   disabled,
   onTemplate,
+  onShare,
+  onImport,
 }: {
   paused: boolean;
   disabled: boolean;
   onTemplate: () => void;
+  /** Sharing and importing work on one project's bots, so they appear inside a project. */
+  onShare?: () => void;
+  onImport?: () => void;
 }) {
   return (
     <Menu.Root>
@@ -600,6 +615,16 @@ function HubMenu({
           <Menu.Item className="workspace-menu-item" disabled={disabled} onSelect={onTemplate}>
             New bot from template…
           </Menu.Item>
+          {onImport && (
+            <Menu.Item className="workspace-menu-item" onSelect={onImport}>
+              Import bots…
+            </Menu.Item>
+          )}
+          {onShare && (
+            <Menu.Item className="workspace-menu-item" onSelect={onShare}>
+              Share these bots…
+            </Menu.Item>
+          )}
           {!paused && (
             <>
               <Menu.Separator className="menu-separator" />
