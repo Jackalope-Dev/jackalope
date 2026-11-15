@@ -18,10 +18,13 @@
       var(--color-accent) 22%,
       color-mix(in srgb, var(--color-text-primary) 10%, transparent)
     );
-    --button-lip: light-dark(rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.1));
+    /* The theme sets both per scheme; the fallbacks are the light values. Do not use
+       the light-dark function here; the production build rewrites it and breaks every button
+       body. */
+    --button-lip: var(--plastic-lip, rgb(255 255 255 / 0.5));
     --button-highlight: radial-gradient(
       120% 90% at 16% 0%,
-      light-dark(rgb(255 255 255 / 0.26), rgb(255 255 255 / 0.06)),
+      var(--plastic-sheen, rgb(255 255 255 / 0.26)),
       transparent 46%
     );
     display: inline-flex;
