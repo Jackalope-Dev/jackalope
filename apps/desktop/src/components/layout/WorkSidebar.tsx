@@ -22,8 +22,7 @@ import { type Editor, editorName } from '../../lib/editor';
 import { fileManagerName } from '../../lib/native/env';
 import { type ActiveTab, workspaceView } from '../../lib/navigation';
 import { projectNameHints } from '../../lib/project-name-hints';
-import { pullRequestPhaseView } from '../../lib/pull-requests';
-import { type WorkItem, workPresence } from '../../lib/task-collection';
+import { attentionReason, type WorkItem, workPresence } from '../../lib/task-collection';
 import {
   openExternalSession,
   openWork,
@@ -62,22 +61,6 @@ function useExternalByProject() {
 
 /** Finished rows shown per project before the rest are left to the Work page. */
 const RECENT_PER_PROJECT = 3;
-
-/** Why a row needs you, when its status alone would only say "Needs attention". */
-function attentionReason(item: WorkItem): string | undefined {
-  const run = item.run;
-  if (run?.prompts?.some((prompt) => prompt.status === 'pending')) return 'Question waiting';
-  // A pull request that placed the row here is the reason.
-  if (item.pullRequest && item.statusLabel === pullRequestPhaseView(item.pullRequest.phase).label)
-    return item.statusLabel;
-  if (run?.persistenceError) return 'History needs saving';
-  if (run?.verificationError || run?.verification?.result.success === false) return 'Check failed';
-  const error = item.session?.error || run?.error;
-  if (error) return `Failed · ${error.split('\n')[0]}`;
-  if (run?.status === 'stopped') return 'Stopped before finishing';
-  if (run?.status === 'interrupted') return 'Interrupted';
-  return undefined;
-}
 
 /** What a closed row must change from to come back: its stage, activity or open questions. */
 function closedState(item: WorkItem) {

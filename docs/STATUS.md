@@ -227,6 +227,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   restores the task branch. Both draft the commit message from the changes and push only
   when chosen. Worktree tasks keep their guarded integration. Publishing and deployment
   remain explicit user-approved steps; a local merge does not establish either.
+- The board view shows Needs you, Working, In review, Drafts and Finished as side-by-side
+  lanes that scroll sideways in a narrow window instead of wrapping, and stack below 640
+  pixels. Work rows and cards say why they need the person (a waiting question, a failed
+  check, a failure message, stopped or interrupted work) rather than a general status.
+- Replies in a conversation offer Read aloud, which speaks the reply with the system voice
+  on this computer after naming code blocks and dropping tables and link addresses. It
+  appears only where the webview has speech synthesis and has not been accepted in the
+  installed app on each platform.
 - A pull request a task opens, or one found on its branch by Check pull request and CI, is
   followed on this device: the GitHub CLI is read every 45 seconds while checks run and
   every three minutes otherwise (half as often while the window is hidden), one pull

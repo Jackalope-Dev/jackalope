@@ -54,6 +54,7 @@ import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
 import { isPopOutPane, PopOutButton, useWorkspaceActions } from '../tasks/WorkTools';
 import { ChatOptions } from './ChatOptions';
+import { ReadAloudButton } from './ReadAloudButton';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
@@ -706,6 +707,7 @@ export function LiveSessionView({
                                 text={run.result}
                                 label="Copy reply"
                               />
+                              <ReadAloudButton className="live-copy" text={run.result} />
                             </div>
                           )}
                         </div>

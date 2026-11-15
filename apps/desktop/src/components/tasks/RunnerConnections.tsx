@@ -6,6 +6,7 @@ import {
   DialogHeader,
   EmptyState,
   InlineNotice,
+  LinkButton,
   LoadingState,
   RefreshIcon,
   SegmentedControl,
@@ -360,16 +361,11 @@ export function RunnerConnections({
             <p className="task-muted text-xs">Account list unavailable. Open Configure to retry.</p>
           )}
           {taskToOpen && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="agent-task-action"
-              onClick={() => onRun(taskToOpen)}
-            >
+            <LinkButton className="agent-task-action" onClick={() => onRun(taskToOpen)}>
               {waitingRun ? 'Respond to task' : working ? 'View task' : 'Review task'}
               {taskToOpen.projectId !== project?.id && ` in ${taskToOpen.projectName}`}
-              <ArrowRight size={14} />
-            </Button>
+              <ArrowRight size={14} aria-hidden="true" />
+            </LinkButton>
           )}
         </div>
 

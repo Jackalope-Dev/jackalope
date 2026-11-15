@@ -63,6 +63,10 @@ of a list with `NoticeRow` (quiet surface, info icon, arrow), not an underlined 
 link. Conversations put the person's messages on the right as tinted bubbles and
 replies on the left beside the speaker's character, with agent Markdown rendered.
 
+The board lays the work stages out as lanes on a sunken surface with cards on the raised
+one; lanes never wrap under each other. A card's secondary action, such as archive, sits
+in its corner and appears with hover or focus rather than taking a row.
+
 Everything in the work list is work; label its shape (Conversation, Task, Planned task or
 Draft) rather than giving it its own place. Say "conversation" in copy, never "chat" or
 "session", and open work through `openWork` (built on `selectWork`) so only one item is open at a time and its project is focused.

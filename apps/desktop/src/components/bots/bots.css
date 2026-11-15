@@ -832,14 +832,6 @@
   color: var(--color-text-muted);
 }
 
-.bots-project-mark {
-  flex-shrink: 0;
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-}
-
 .bots-project-crew {
   display: flex;
   align-items: center;

@@ -342,6 +342,22 @@ export function collectWork(
   );
 }
 
+/** Why a row needs the person, when its status alone would only say it needs attention. */
+export function attentionReason(item: WorkItem): string | undefined {
+  const run = item.run;
+  if (run?.prompts?.some((prompt) => prompt.status === 'pending')) return 'Question waiting';
+  // A pull request that placed the row here is the reason.
+  if (item.pullRequest && item.statusLabel === pullRequestPhaseView(item.pullRequest.phase).label)
+    return item.statusLabel;
+  if (run?.persistenceError) return 'History needs saving';
+  if (run?.verificationError || run?.verification?.result.success === false) return 'Check failed';
+  const error = item.session?.error || run?.error;
+  if (error) return `Failed · ${error.split('\n')[0]}`;
+  if (run?.status === 'stopped') return 'Stopped before finishing';
+  if (run?.status === 'interrupted') return 'Interrupted';
+  return undefined;
+}
+
 /**
  * Statuses that a row's action already says, keyed by status; the meta line leaves them out
  * when the action matches, and keeps anything that adds information.
@@ -351,13 +367,15 @@ const REPEATED_STATUS: Record<string, RegExp> = {
   'ready to review': /^(review|reply)\b/i,
   'plan ready for review': /^review\b/i,
   'waiting for your answer': /^answer\b/i,
+  'question waiting': /^answer\b/i,
   'needs input': /^answer\b/i,
   'ready to merge': /^(merge|review and merge)\b/i,
 };
 
 /** The status worth showing beside the shape, unless the row's group or action already says it. */
 export function workRowStatus(item: WorkItem, action: string) {
-  const label = item.statusLabel?.trim();
+  // What blocks the row says more than its general status.
+  const label = (needsYou(item) && attentionReason(item)) || item.statusLabel?.trim();
   if (!label || item.stage === 'finished') return undefined;
   const key = label.toLowerCase();
   const group = workGroups.find((stage) => stage.id === workGroup(item.stage))?.label;
