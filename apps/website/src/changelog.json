@@ -1,5 +1,17 @@
 [
   {
+    "id": "a-clearer-board-better-defaults-and-a-button-fix",
+    "date": "2026-11-15",
+    "title": "A clearer board, better defaults and a button fix",
+    "description": "A round of polish across the work board, project setup and first-run defaults.",
+    "items": [
+      "The board shows Needs you, Working, In review, Drafts and Finished as side-by-side lanes, and rows say why they need you, such as a failed check.",
+      "Finished work is checked automatically, your computer stays awake while agents work, and updates download in the background. Each can be turned off.",
+      "Replies can be read aloud, and a conversation can be copied as Markdown.",
+      "Fixed primary buttons, including Connect account, showing a faint label in installed builds."
+    ]
+  },
+  {
     "id": "follow-pull-requests-from-the-work-list",
     "date": "2026-11-15",
     "title": "Follow pull requests from the work list",
