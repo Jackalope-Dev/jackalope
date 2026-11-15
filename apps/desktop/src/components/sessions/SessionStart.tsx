@@ -10,6 +10,7 @@ import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
+import { checksAutomatically } from '../../lib/project-automation';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { isQuestionOnly } from '../../lib/question-intent';
 import type { RunRequest } from '../../lib/run-types';
@@ -278,7 +279,7 @@ ${incoming}`
             ? undefined
             : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
-        autoVerify: !origin.readOnly && (project.preferences?.autoVerify ?? true),
+        autoVerify: !origin.readOnly && checksAutomatically(project.preferences),
         contextSelection: context,
       };
       if (choice === 'interview') {

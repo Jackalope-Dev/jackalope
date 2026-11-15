@@ -75,13 +75,16 @@ interface PreferenceStorage {
 }
 export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStorage) {
   let autoCheck = true;
-  let autoDownload = false;
+  // On unless turned off: a found update is ready when the person next restarts. Installing
+  // still waits for idle work and their Restart to update.
+  let autoDownload = true;
   try {
     storage ??= localStorage;
     autoCheck = storage.getItem('jackalope-auto-update-check') !== 'false';
-    autoDownload = storage.getItem('jackalope-auto-update-download') === 'true';
+    autoDownload = storage.getItem('jackalope-auto-update-download') !== 'false';
   } catch {
     autoCheck = false;
+    autoDownload = false;
   }
   let loading: Promise<void> | undefined;
   return create<UpdateState>()((set, get) => ({

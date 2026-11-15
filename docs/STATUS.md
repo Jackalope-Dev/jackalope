@@ -42,7 +42,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   explicit Run action. Optional dictation inserts editable text through a separately
   configured loopback transcription service and never sends the task automatically.
 - Idle-sleep prevention supports off, active-work and app-open modes using native
-  Windows, macOS and Linux APIs. macOS retains native traffic lights and application
+  Windows, macOS and Linux APIs, and starts on active work, so an agent run is not cut
+  short by the computer idling to sleep. macOS retains native traffic lights and application
   menus, with an unread Dock count. Notifications can be marked unread again.
   Native platform acceptance remains open.
 - Windows can pair with an already running Linux Jackalope host inside a selected
@@ -227,6 +228,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   restores the task branch. Both draft the commit message from the changes and push only
   when chosen. Worktree tasks keep their guarded integration. Publishing and deployment
   remain explicit user-approved steps; a local merge does not establish either.
+- Finished work is checked with the project's saved check command by default, in every
+  place work starts and in Project settings alike; turning off Check results automatically
+  stops it. The Balanced automation preset includes it.
 - The board view shows Needs you, Working, In review, Drafts and Finished as side-by-side
   lanes that scroll sideways in a narrow window instead of wrapping, and stack below 640
   pixels. Work rows and cards say why they need the person (a waiting question, a failed
@@ -669,7 +673,7 @@ media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling uses Windows Store MSIX and macOS/Linux Cloud candidates.
 Store builds offer in-app update checks and user-initiated installation through
 Microsoft Store; Store-managed background delivery remains independent. Other desktop builds
-can optionally download a found update in the background; installation still waits
+download a found update in the background unless that is turned off; installation still waits
 for idle work and the title bar's Restart to update action. Store members can request
 beta flight membership in the app; the operator applies it in Partner Center from
 the admin console's request list. Branch-based

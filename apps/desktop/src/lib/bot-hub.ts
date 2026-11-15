@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { Bot, BotWake } from '../stores/botStore.ts';
 import { invokeNative } from './native/transport.ts';
 import { observeRefresh } from './observe-refresh.ts';
+import { checksAutomatically } from './project-automation.ts';
 import type { RunRequest } from './run-types.ts';
 import { parseScheduleTiming } from './schedules.ts';
 
@@ -124,7 +125,7 @@ export function botRequest(
     verifyCommand: project.preferences?.verifyCommand,
     prepareCommand: conversation ? undefined : project.preferences?.prepareCommand,
     setupFiles: project.preferences?.setupFiles,
-    autoVerify: conversation ? false : (project.preferences?.autoVerify ?? true),
+    autoVerify: conversation ? false : checksAutomatically(project.preferences),
   };
 }
 

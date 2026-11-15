@@ -72,7 +72,7 @@ export function ProjectAutomationPreset({
   const write = async (values: AutomationValues) => {
     const { preferences, plan: nextPlan } = automationWrites(
       values,
-      plan ?? { questionCap: 3, exportPath: '' },
+      plan ?? { questionCap: 5, exportPath: '' },
     );
     useProjectStore.getState().updateProjectPreferences(project.id, preferences);
     if (plan && isTauriEnvironment()) {

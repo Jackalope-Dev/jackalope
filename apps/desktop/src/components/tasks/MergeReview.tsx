@@ -128,7 +128,7 @@ export function MergeReview({
       const next = await prepareIntegration(chosen, message);
       setPlan(next);
       setPreparedMessage(message);
-      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
+      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? true);
       await load();
     } catch (error) {
       setError(describeError(error));

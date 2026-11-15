@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
+import { checksAutomatically } from '../../lib/project-automation';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
 import { runTitle } from '../../lib/task-title';
@@ -269,7 +270,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   savedVerify ? (
                     <>
                       <code>{savedVerify}</code>
-                      {project.preferences?.autoVerify
+                      {checksAutomatically(project.preferences)
                         ? ' · runs after each task'
                         : ' · runs when you ask'}
                     </>

@@ -201,8 +201,14 @@ Show every step in the progress list and preserve saved setup on reload.
 Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including
 empty commands, and ignore stale results after changing projects or leaving setup.
-Detected defaults are provisional until entry and must not run commands or enable
-automatic checks. Inspection failure must not block setup.
+Detected defaults are provisional until entry and never run commands during setup.
+Inspection failure must not block setup.
+
+Defaults aim at the best first experience and stay easy to turn off: a new project checks
+finished work with its saved check command (`checksAutomatically` is the one reader of
+that setting), keeps the computer awake while agents work, and downloads a found update
+for the next restart. A default that spends an account's quota, publishes, shares data
+beyond what sign-in disclosed, or starts something at login stays off until chosen.
 
 App appearance/privacy and account access precede the project setup steps.
 Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.

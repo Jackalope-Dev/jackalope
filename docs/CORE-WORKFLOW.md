@@ -181,7 +181,9 @@ skipped and reported as skipped rather than run again. A preparation command tha
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
 
-Automatic verification is explicitly enabled in Project defaults. Its saved command
+Automatic verification is on for a project unless Check results automatically is turned
+off in Project settings, and does nothing until the project has a check command. Every
+launcher and the settings switch read it through `checksAutomatically`. Its saved command
 and authorization travel with the task, queue item or schedule and survive account
 or preference changes. After a successful agent result the task remains active
 while native verification reserves its workspace and uses separate check capacity. Navigating away does not

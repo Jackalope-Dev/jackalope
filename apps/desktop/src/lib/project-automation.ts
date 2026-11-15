@@ -16,6 +16,14 @@ export interface AutomationValues {
 }
 
 /**
+ * Whether finished work runs the project's check by itself. On unless turned off, so every
+ * place that starts work and every place that shows the setting agree; it does nothing
+ * until the project has a check command.
+ */
+export const checksAutomatically = (preferences: { autoVerify?: boolean } | undefined) =>
+  preferences?.autoVerify !== false;
+
+/**
  * Concrete values per preset. Balanced matches the defaults, so a project nobody has tuned
  * reads as Balanced. Review screenshots stay out: they depend on a preview command.
  */
@@ -34,7 +42,7 @@ export const AUTOMATION_PRESETS: Record<AutomationPreset, AutomationValues> = {
   balanced: {
     autoApprove: true,
     automaticSubtasks: true,
-    autoVerify: false,
+    autoVerify: true,
     learnAutomatically: true,
     agentReflection: false,
     decideQuestions: false,
@@ -84,7 +92,7 @@ export function automationValues(
   return {
     autoApprove: preferences?.autoApprove !== false,
     automaticSubtasks: preferences?.automaticSubtasks !== false,
-    autoVerify: preferences?.autoVerify === true,
+    autoVerify: checksAutomatically(preferences),
     learnAutomatically: preferences?.learnAutomatically !== false,
     agentReflection: preferences?.agentReflection === true,
     decideQuestions: decide.questions === true,

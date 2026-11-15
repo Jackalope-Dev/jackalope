@@ -10,8 +10,9 @@ use tauri::{Manager, State};
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum AwakeMode {
-    #[default]
     Off,
+    /// The default: an agent run should not die because the computer idled to sleep.
+    #[default]
     Working,
     Always,
 }

@@ -5,8 +5,17 @@ import {
   automationChanges,
   automationValues,
   automationWrites,
+  checksAutomatically,
   matchingPreset,
 } from '../src/lib/project-automation.ts';
+
+test('finished work is checked automatically unless that was turned off', () => {
+  assert.equal(checksAutomatically(undefined), true);
+  assert.equal(checksAutomatically({}), true);
+  assert.equal(checksAutomatically({ autoVerify: true }), true);
+  assert.equal(checksAutomatically({ autoVerify: false }), false);
+  assert.equal(automationValues({ autoVerify: false }, undefined).autoVerify, false);
+});
 
 test('an untuned project reads as Balanced, from each setting default', () => {
   assert.equal(matchingPreset(automationValues(undefined, undefined)), 'balanced');
@@ -24,7 +33,7 @@ test('each preset round-trips through its stored fields', () => {
 });
 
 test('one switch away from a preset reads as Custom', () => {
-  const values = automationValues({ autoVerify: true }, undefined);
+  const values = automationValues({ autoVerify: false }, undefined);
   assert.equal(matchingPreset(values), 'custom');
 });
 
@@ -36,6 +45,7 @@ test('changes list only what a preset would change, with labels', () => {
     [
       ['autoApprove', false],
       ['automaticSubtasks', false],
+      ['autoVerify', false],
       ['learnAutomatically', false],
       ['askBeforeRounds', true],
     ],

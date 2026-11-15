@@ -20,6 +20,7 @@ import {
 import { Laptop, Share2, Smartphone } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
+import { checksAutomatically } from '../../lib/project-automation';
 import { projectNameHints } from '../../lib/project-name-hints';
 import { thisComputerLabel } from '../../lib/remote-checks';
 import { syncProjectIcons } from '../../lib/remote-project-icons';
@@ -179,7 +180,7 @@ export function RemoteAccess() {
           verifyCommand: project.preferences?.verifyCommand,
           prepareCommand: project.preferences?.prepareCommand,
           setupFiles: project.preferences?.setupFiles,
-          autoVerify: project.preferences?.autoVerify ?? true,
+          autoVerify: checksAutomatically(project.preferences),
         };
       });
     const next = await invokeNative<Status>('remote_configure', {

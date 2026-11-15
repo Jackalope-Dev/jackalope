@@ -19,6 +19,7 @@ import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
 import { syncsLessons } from '../../lib/lesson-sync';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { type PlanSettings, planCommands } from '../../lib/plan-mode';
+import { checksAutomatically } from '../../lib/project-automation';
 import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
@@ -455,7 +456,7 @@ export function ProjectPreferences({
               >
                 <Switch
                   label="Check results automatically"
-                  checked={project.preferences?.autoVerify === true}
+                  checked={checksAutomatically(project.preferences)}
                   onCheckedChange={(autoVerify) =>
                     updateProjectPreferences(project.id, { autoVerify })
                   }

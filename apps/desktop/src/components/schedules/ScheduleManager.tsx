@@ -19,6 +19,7 @@ import { agentAdapter } from '../../lib/agent-catalog';
 import { describeWake } from '../../lib/bot-hub';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { checksAutomatically } from '../../lib/project-automation';
 import type { RunRequest } from '../../lib/run-types';
 import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
 import {
@@ -218,7 +219,7 @@ export function ScheduleManager(props: {
             verifyCommand: project.preferences?.verifyCommand,
             prepareCommand: project.preferences?.prepareCommand,
             setupFiles: project.preferences?.setupFiles,
-            autoVerify: project.preferences?.autoVerify === true,
+            autoVerify: checksAutomatically(project.preferences),
           },
         },
       });
