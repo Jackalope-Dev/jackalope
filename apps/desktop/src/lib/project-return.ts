@@ -3,6 +3,7 @@ import type { TaskTicket } from '../stores/taskStore.ts';
 import { trailHandoff } from './decision-trail.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
+import type { TrackedPullRequest } from './pull-requests.ts';
 import type { QueueView } from './queue.ts';
 import type { TaskRun } from './run-types.ts';
 import { collectWorkspaceWork, type WorkItem, workPresence } from './task-collection.ts';
@@ -16,13 +17,21 @@ export function returnToProject(
     ideas = [],
     sessions = [],
     queue,
-  }: { ideas?: TaskTicket[]; sessions?: LiveSession[]; queue?: QueueView } = {},
+    pullRequests,
+  }: {
+    ideas?: TaskTicket[];
+    sessions?: LiveSession[];
+    queue?: QueueView;
+    /** Followed pull requests by task, so a merged one no longer counts as unfinished. */
+    pullRequests?: Record<string, TrackedPullRequest>;
+  } = {},
 ) {
   return collectWorkspaceWork(projectId, runs, {
     ideas,
     sessions,
     queue,
     integratedRunIds: integratedIds,
+    pullRequests,
   }).filter((item) => item.stage !== 'ideas' && item.stage !== 'finished');
 }
 

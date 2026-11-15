@@ -29,6 +29,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { IssuePicker } from '../tasks/IssuePicker';
@@ -90,10 +91,18 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     };
   }, [project?.path, fetchReadiness]);
 
+  const pullRequests = usePullRequestStore((state) => state.tracked);
   const unfinished = useMemo(
     () =>
-      project ? returnToProject(allRuns, project.id, integrated, { ideas, sessions, queue }) : [],
-    [allRuns, project, integrated, ideas, sessions, queue],
+      project
+        ? returnToProject(allRuns, project.id, integrated, {
+            ideas,
+            sessions,
+            queue,
+            pullRequests,
+          })
+        : [],
+    [allRuns, project, integrated, ideas, sessions, queue, pullRequests],
   );
   const openTask = (item: WorkItem) => {
     // A task opens through its list row rather than straight to its page.

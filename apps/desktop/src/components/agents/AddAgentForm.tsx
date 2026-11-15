@@ -141,11 +141,14 @@ export function AddAgentForm({ onAdded, onCancel }: { onAdded: () => void; onCan
               onValueChange={(value) => setAdapter(value as typeof adapter)}
             >
               <SelectItem value="acp">ACP agent</SelectItem>
-              {builtinAgents.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.name}
-                </SelectItem>
-              ))}
+              {builtinAgents
+                // The catalog's generic ACP entry is the option above.
+                .filter((agent) => agent.id !== 'acp')
+                .map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
             </Select>
           </label>
         )}
