@@ -233,7 +233,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   request at a time, until it merges or closes. The work list, board and sidebar place the
   task by it: failed checks, requested changes and conflicts under Needs you, a pull
   request waiting on checks or reviewers in an In review lane, an approved, mergeable one
-  as Ready to merge, and a merged one as finished. Moving into a failing, changes-requested,
+  as PR ready to merge, and a merged one as finished. Moving into a failing, changes-requested,
   conflicting, ready or merged state raises a notification under the existing preferences.
   Delivery shows the pull request with its checks and one next step: an editable follow-up
   to the task's own agent for failed checks, review threads (read through the CLI) or a

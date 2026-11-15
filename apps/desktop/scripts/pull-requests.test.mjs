@@ -142,7 +142,7 @@ test('a tracked pull request places finished work', () => {
   assert.equal(place('review').stage, 'inReview');
   assert.equal(place('checking').stage, 'inReview');
   assert.equal(place('ready').stage, 'review');
-  assert.equal(workPresence(place('ready')).action, 'Merge');
+  assert.equal(workPresence(place('ready')).action, 'Merge pull request');
   assert.equal(place('merged').stage, 'finished');
   // A closed pull request leaves the task where it was.
   assert.deepEqual(

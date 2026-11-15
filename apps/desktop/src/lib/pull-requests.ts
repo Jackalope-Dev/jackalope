@@ -151,7 +151,12 @@ const PHASES: Record<PullRequestPhase, PhaseView> = {
     action: 'View pull request',
     tone: 'default',
   },
-  ready: { label: 'Ready to merge', stage: 'review', action: 'Merge', tone: 'success' },
+  ready: {
+    label: 'PR ready to merge',
+    stage: 'review',
+    action: 'Merge pull request',
+    tone: 'success',
+  },
   merged: {
     label: 'Pull request merged',
     stage: 'finished',
