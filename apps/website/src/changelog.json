@@ -1,5 +1,17 @@
 [
   {
+    "id": "follow-pull-requests-from-the-work-list",
+    "date": "2026-11-15",
+    "title": "Follow pull requests from the work list",
+    "description": "Jackalope keeps watching a pull request after a task opens it, so you can see what it needs without checking GitHub.",
+    "items": [
+      "The work list and board show whether a pull request is waiting on checks or review, needs a fix, or is ready to merge, and notify you when that changes.",
+      "One click drafts a fix for failed checks, review comments or a conflict for the task's own agent; pushing the update and merging each ask first.",
+      "Add agent lists known ACP agents such as Cursor, GitHub Copilot CLI, Goose and Qwen Code, and fills in the ones installed on your computer.",
+      "Share a project's bots as one file and import a shared file after reviewing it."
+    ]
+  },
+  {
     "id": "a-cleaner-guided-jackalope-on-desktop-and-phone",
     "date": "2026-11-12",
     "title": "A cleaner, guided Jackalope on desktop and phone",

@@ -227,6 +227,22 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   restores the task branch. Both draft the commit message from the changes and push only
   when chosen. Worktree tasks keep their guarded integration. Publishing and deployment
   remain explicit user-approved steps; a local merge does not establish either.
+- A pull request a task opens, or one found on its branch by Check pull request and CI, is
+  followed on this device: the GitHub CLI is read every 45 seconds while checks run and
+  every three minutes otherwise (half as often while the window is hidden), one pull
+  request at a time, until it merges or closes. The work list, board and sidebar place the
+  task by it: failed checks, requested changes and conflicts under Needs you, a pull
+  request waiting on checks or reviewers in an In review lane, an approved, mergeable one
+  as Ready to merge, and a merged one as finished. Moving into a failing, changes-requested,
+  conflicting, ready or merged state raises a notification under the existing preferences.
+  Delivery shows the pull request with its checks and one next step: an editable follow-up
+  to the task's own agent for failed checks, review threads (read through the CLI) or a
+  conflict, Push update (commits remaining changes and pushes, after confirmation) and
+  Merge pull request with a chosen method, after confirmation. Nothing is sent to an agent,
+  pushed or merged automatically. Pull requests opened from the terminal command or the
+  phone are not followed until Delivery finds them, required-review rules are read only as
+  GitHub's review decision, and following has not been accepted against a live repository
+  in an installed app.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. Chat
   starts a session from the first message and groups history automatically.
@@ -255,6 +271,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.
   An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
+  Add agent lists known ACP CLIs by name (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
+  Auggie, Kiro, Hermes Agent and Command Code), marks the ones found on this computer and
+  fills in their path and arguments, which stay editable. None of these has been run
+  through Jackalope in an installed app.
   First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
@@ -497,6 +517,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   preparation and automatic checks and open only on the Bots page. Bots keep up to 30
   notes for later conversations and recall how their latest conversations ended; the
   roster shows real activity and unread replies.
+  A project's bots can be saved as one file (Share these bots) and added to another
+  project or computer after a review (Import bots). The file holds names, descriptions,
+  instructions, looks and schedule or project-change wake-ups; credential-shaped text is
+  removed and reported. Imported bots use Automatic, have no connections and arrive with
+  wake-ups off. Bot rows have a right-click menu matching their options menu, with Mark as
+  read and Mark as unread.
   Bots wake themselves on schedules, project changes or new results from a read-only
   connection tool, message each other with replies routed back, show decision, input,
   action, source and update cards, and suggest new bots for the person to review. Every

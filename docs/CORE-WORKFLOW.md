@@ -257,6 +257,17 @@ still only records a review. Merging does not push. Source cleanup follows the m
 choice and defaults on. Integrated work continues through a new task based on the
 updated target, with the earlier result attached.
 
+A pull request opened from Delivery, or found on the task branch by its GitHub check, is
+followed per task in renderer storage (`stores/pullRequestStore.ts`) and re-read through
+`task_pull_request_status` on a schedule until it merges or closes. `lib/pull-requests.ts`
+reduces GitHub's record to one state, most blocking first: failed checks, requested
+changes, conflict, checks running, draft, waiting for review, ready to merge, merged or
+closed. That state places finished work in the work list (Needs you, In review, Ready to
+merge or Finished) and never moves work that is running, blocked on a question or failed
+on its own. A failed read keeps the last state and says so. Fix requests are editable
+follow-ups in the task's own composer; pushing an update and merging on GitHub each need
+their own confirmation, and no state change sends, pushes or merges by itself.
+
 Paused Chat sessions use the same integration controls for their latest batch after
 queued messages are run or canceled. Applied receipts block reopening or sending into
 the old workspace. Optional review positions show changes since an explicitly marked

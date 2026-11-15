@@ -69,7 +69,7 @@ fn view_pull_request(path: &Path, url: Option<&str>) -> Result<Option<Value>, St
                 .is_some_and(|url| url.starts_with("https://")) =>
         {
             Ok(Some(value))
-        },
+        }
         _ => Err("GitHub returned an unreadable PR record. Retry the check.".into()),
     }
 }
@@ -444,7 +444,9 @@ mod tests {
         );
         assert_eq!(created_url("warning only"), None);
         assert!(pull_request_url("https://github.com/o/r/pull/7"));
-        assert!(pull_request_url("https://github.example.com/o/r.git/pull/7/"));
+        assert!(pull_request_url(
+            "https://github.example.com/o/r.git/pull/7/"
+        ));
         for url in [
             "http://github.com/o/r/pull/7",
             "https://github.com/o/r/pull/0",

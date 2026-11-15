@@ -359,7 +359,9 @@ pub struct AgentProbeResponse {
 /// Finds which of the named CLIs are installed, for offering known agents by name.
 /// Returns each found command with its absolute path; nothing is run.
 #[tauri::command]
-pub async fn agent_locate_executables(names: Vec<String>) -> Result<HashMap<String, String>, String> {
+pub async fn agent_locate_executables(
+    names: Vec<String>,
+) -> Result<HashMap<String, String>, String> {
     if names.len() > 64 {
         return Err("Too many commands to look for.".into());
     }

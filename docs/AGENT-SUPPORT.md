@@ -276,8 +276,18 @@ Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/ki
 
 An installed CLI that speaks the Agent Client Protocol can be added from Agents with its
 executable path and arguments. Jackalope starts that process over ACP and keeps the CLI's
-own sign-in. It does not probe that sign-in. Copilot and other agents without ACP or a
-native adapter cannot execute tasks.
+own sign-in. It does not probe that sign-in. Agents without ACP or a native adapter
+cannot execute tasks.
+
+Add agent offers known ACP CLIs by name from `lib/acp-presets.ts`, with the command and
+arguments each CLI's own documentation gives: Cursor (`cursor-agent acp`), GitHub Copilot
+CLI (`copilot --acp`, 1.0.93 or newer), Goose (`goose acp`), Qwen Code (`qwen --acp`,
+0.16 or newer), Auggie (`auggie --acp`), Kiro (`kiro-cli acp`), Hermes Agent
+(`hermes acp`) and Command Code (`cmd acp`, `cmdc acp` on Windows). `agent_locate_executables`
+looks for those commands on PATH and in the usual install folders without running them, and
+a preset found there fills in its path. A preset is only a starting point for the form: it
+runs as a generic ACP agent, with the same permission, question and session handling, and
+has not been accepted with each CLI.
 
 A loopback OpenAI-compatible server, such as LM Studio or vLLM, is saved as an OpenCode
 account after `GET /v1/models` succeeds. Only `127.0.0.1`, `localhost` and `::1` are accepted.
