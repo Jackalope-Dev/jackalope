@@ -1,9 +1,12 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
+import type { ActiveTab } from '../lib/navigation';
 import { observeRefresh } from '../lib/observe-refresh';
-import { nativeTask, type RunUsage } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
-import { syncAgentConfig, useAgentConfigStore } from './agentConfigStore';
+import type { RunUsage } from '../lib/run-types';
+import { useAgentConfigStore } from './agentConfigStore';
 import { useExecutionStore } from './executionStore';
 import { useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
@@ -38,7 +41,8 @@ export interface HelperView {
 interface HelperState {
   view: HelperView;
   draft: string;
-  screen: string;
+  /** The open workspace view, shared with the helper as app context. */
+  screen: ActiveTab;
   sharePreferences: boolean;
   shareProjects: boolean;
   error: string | null;
@@ -58,7 +62,7 @@ async function syncHelperContext(force = false): Promise<void> {
   const context = helperContext();
   const signature = JSON.stringify(context);
   if (!force && signature === syncedContext && Date.now() - syncedAt < 8000) return;
-  syncing = nativeTask<void>('helper_sync', {
+  syncing = invokeNative<void>('helper_sync', {
     context: signature === syncedContext && !force ? null : context,
   });
   try {
@@ -74,7 +78,7 @@ export const useHelperStore = create<HelperState>()(
     (set, get) => ({
       view: { turns: [], actions: [], connected: false, error: null },
       draft: '',
-      screen: 'tasks',
+      screen: 'kanban',
       sharePreferences: true,
       shareProjects: true,
       error: null,
@@ -84,11 +88,11 @@ export const useHelperStore = create<HelperState>()(
         if (!isTauriEnvironment()) return;
         try {
           await syncHelperContext();
-          const view = await nativeTask<HelperView>('helper_snapshot');
+          const view = await invokeNative<HelperView>('helper_snapshot');
           if (JSON.stringify(view) !== JSON.stringify(get().view) || get().syncError)
             set({ view, syncError: null });
         } catch (error) {
-          set({ syncError: String(error) });
+          set({ syncError: describeError(error) });
         }
       },
       send: async () => {
@@ -97,12 +101,11 @@ export const useHelperStore = create<HelperState>()(
         if (!prompt) return;
         set({ sending: true, error: null });
         try {
-          await syncAgentConfig();
           await syncHelperContext(true);
-          const view = await nativeTask<HelperView>('helper_send', { prompt });
+          const view = await invokeNative<HelperView>('helper_send', { prompt });
           set({ view, draft: '', error: null });
         } catch (error) {
-          set({ error: String(error) });
+          set({ error: describeError(error) });
         } finally {
           set({ sending: false });
         }
@@ -178,7 +181,7 @@ export function observeHelper() {
     clearTimeout(contextTimer);
     contextTimer = setTimeout(() => {
       void syncHelperContext().catch((error) =>
-        useHelperStore.setState({ syncError: String(error) }),
+        useHelperStore.setState({ syncError: describeError(error) }),
       );
     }, 100);
   };

@@ -40,8 +40,8 @@ RUN mkdir -p /usr/share/doc/jackalope-computer \
         'under its own terms.' \
         > /usr/share/doc/jackalope-computer/NOTICE
 
-COPY start.sh agent.py /opt/jackalope/
-RUN chmod 0755 /opt/jackalope/start.sh && chmod 0644 /opt/jackalope/agent.py
+COPY start.sh agent.py protocol.json /opt/jackalope/
+RUN chmod 0755 /opt/jackalope/start.sh     && chmod 0644 /opt/jackalope/agent.py /opt/jackalope/protocol.json
 
 ENV PATH=/home/bot/.local/bin:$PATH \
     DISPLAY=:1 \

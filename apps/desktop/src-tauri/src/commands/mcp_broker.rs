@@ -388,7 +388,10 @@ impl Broker {
         input: results::ReadInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
         if input.output.is_some()
-            && !crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on")
+            && !crate::commands::experiments::is(
+                crate::commands::experiments::Experiment::ResultQueries,
+                "on",
+            )
         {
             return Err("Captured-result queries are not enabled.".into());
         }

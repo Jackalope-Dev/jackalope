@@ -55,20 +55,26 @@ test('saved ideas join the parent without duplicate rows or manufactured attempt
     createdAt: '2026-09-16',
     updatedAt: '2026-09-16',
   };
-  const items = collectWorkspaceWork('project', [idea], runs, [], [], false, queue);
+  const items = collectWorkspaceWork('project', runs, {
+    ideas: [idea],
+    integratedRunIds: [],
+    queue,
+  });
   assert.equal(items.length, 1);
   assert.equal(items[0].idea, idea);
   assert.equal(items[0].managed, task);
   assert.equal(items[0].run.id, 'new');
-  const unavailable = collectWorkspaceWork('project', [idea], [], [], [], false, {
-    ...queue,
-    managedTasks: [],
+  const unavailable = collectWorkspaceWork('project', [], {
+    ideas: [idea],
+    integratedRunIds: [],
+    queue: { ...queue, managedTasks: [] },
   });
   assert.equal(unavailable.length, 1);
   assert.equal(unavailable[0].idea, idea);
   const crossProject = { ...idea, id: 'other-idea', projectId: 'other' };
   assert.equal(
-    collectWorkspaceWork(null, [idea, crossProject], runs, [], [], false, queue).length,
+    collectWorkspaceWork(null, runs, { ideas: [idea, crossProject], integratedRunIds: [], queue })
+      .length,
     2,
   );
 });
@@ -94,7 +100,7 @@ test('retries remain in one parent and usage history without duplicate inbox row
     ['plan', 'old', 'new'],
   );
   assert.equal(work.failed, false);
-  const items = collectWorkspaceWork('project', [], runs, [], [], false, queue);
+  const items = collectWorkspaceWork('project', runs, { integratedRunIds: [], queue });
   assert.equal(items.length, 1);
   assert.equal(items[0].id, 'managed:parent');
   assert.equal(items[0].stage, 'working');
@@ -106,10 +112,13 @@ test('a completed worker does not hide a managed task blocker in its list badge'
     { ...runs[2], status: 'review', verification: { tree: 'tree', result: { success: true } } },
   ];
   const blocked = { ...queue, managedTasks: [{ ...task, error: 'The target branch changed.' }] };
-  const item = collectWorkspaceWork('project', [], completed, [], [], false, blocked)[0];
+  const item = collectWorkspaceWork('project', completed, {
+    integratedRunIds: [],
+    queue: blocked,
+  })[0];
   assert.equal(item.stage, 'attention');
   assert.equal(item.statusLabel, 'Needs attention');
-  const ready = collectWorkspaceWork('project', [], completed, [], [], false, queue)[0];
+  const ready = collectWorkspaceWork('project', completed, { integratedRunIds: [], queue })[0];
   assert.equal(ready.stage, 'review');
   assert.equal(ready.statusLabel, 'Ready to review');
 });
@@ -385,4 +394,37 @@ test('finished implementation moves to checks even when verification failed', ()
   assert.equal(work.status, 'Needs attention');
   assert.equal(managedTaskProgress(blocked, work).stage, 2);
   assert.equal(managedTaskProgress(task, managedTaskWork(task, queue, runs)).stage, 1);
+});
+
+test('command search lists worker runs, agent reviews and bot conversations on their own', () => {
+  const review = {
+    id: 'review',
+    taskId: 'review',
+    status: 'review',
+    startedAt: '2026-09-16T00:03:00Z',
+    projectId: 'project',
+    challengeOf: { kind: 'review', runId: 'new' },
+  };
+  const bot = {
+    id: 'bot',
+    title: 'Support bot',
+    persona: { name: 'Helper' },
+    request: { projectId: 'project' },
+    updatedAt: '2026-09-16',
+    messages: [],
+    batches: [],
+    closed: false,
+    paused: false,
+  };
+  const listed = (nested) =>
+    collectWorkspaceWork('project', [...runs, review], {
+      sessions: [bot],
+      integratedRunIds: [],
+      queue,
+      nested,
+    }).map((item) => item.id);
+  assert.deepEqual(listed(false), ['managed:parent']);
+  const everything = listed(true);
+  for (const id of ['managed:parent', 'old', 'new', 'review', 'session:bot'])
+    assert.ok(everything.includes(id), id);
 });

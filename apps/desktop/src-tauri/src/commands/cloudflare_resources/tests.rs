@@ -72,11 +72,9 @@ async fn server(
         axum::serve(listener, router).await.unwrap();
     });
     let api = Api {
-        root,
+        cloudflare: crate::commands::cloudflare::api::Api::at(root, "fixture-token"),
         account_id: "acct".into(),
-        token: "fixture-token".into(),
         oauth,
-        client: reqwest::Client::new(),
     };
     (api, fake, task)
 }
@@ -580,14 +578,10 @@ fn oauth_grants_without_a_resource_scope_ask_for_it_first() {
     assert_eq!(failure.recovery, Some(Recovery::Reauthorize));
     assert_eq!(failure.scopes, ["workers-r2-storage.write", "d1.write"]);
     assert!(failure.message.contains("an R2 bucket and a D1 database"));
-    // Every requested scope maps back to the permission an API token would need.
+    // Every kind's scope is one Connect Cloudflare may request.
     for kind in KINDS {
-        if let Some(scope) = kind.scope() {
-            assert_eq!(permission_for_scope(scope), Some(kind.permission()));
-        }
+        assert_eq!(scopes::find(kind.scope().name), Some(kind.scope()));
     }
-    assert_eq!(permission_for_scope("workers-scripts.write"), None);
-    assert_eq!(permission_for_scope("account-settings.read"), None);
 }
 
 #[test]

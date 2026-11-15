@@ -77,8 +77,13 @@ test('auto-download fetches a found update once and marks it ready to install', 
       downloads.push({ version, channel });
     },
   });
+  assert.equal(f.store.getState().autoDownload, true, 'on by default');
+  f.store.getState().setAutoDownload(false);
   await f.store.getState().check();
-  assert.equal(f.store.getState().downloadedVersion, null, 'off by default');
+  await new Promise((resolve) => setTimeout(resolve));
+  assert.equal(f.store.getState().downloadedVersion, null, 'turned off, nothing downloads');
+  // The choice is saved, so the next launch keeps it.
+  assert.equal(createUpdateStore(f.bridge, f.storage).getState().autoDownload, false);
   f.store.getState().setAutoDownload(true);
   await new Promise((resolve) => setTimeout(resolve));
   assert.equal(f.store.getState().downloadedVersion, '0.2.0');

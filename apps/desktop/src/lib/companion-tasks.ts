@@ -1,7 +1,8 @@
+import { isActive, needsAttention } from '@jackalope/contracts/runs';
 import type { CompanionNotice } from '../stores/companionStore.ts';
 import { getAgentMetadata } from './agent-catalog.ts';
-import { isActive, type TaskRun } from './task-runtime.ts';
-import { taskTitle } from './task-title.ts';
+import type { TaskRun } from './run-types.ts';
+import { runTitle } from './task-title.ts';
 
 /** Notices for tasks that need the person; none for `viewing`, whose page already shows it. */
 export function taskNotices(
@@ -14,7 +15,7 @@ export function taskNotices(
   for (const run of [...runs].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))) {
     const key = `${run.projectId}:${run.taskId}`;
     latest.set(key, run);
-    if (!titles.has(key)) titles.set(key, taskTitle(run.prompt));
+    if (!titles.has(key)) titles.set(key, runTitle(run));
   }
   return [...latest.values()].reverse().flatMap((run): CompanionNotice[] => {
     if (run.archivedAt || run.id === viewing) return [];
@@ -41,7 +42,7 @@ export function taskNotices(
           onOpen,
         },
       ];
-    if (run.status === 'failed' || run.status === 'interrupted')
+    if (needsAttention(run))
       return [
         {
           id: `task:${run.id}:${run.status}`,

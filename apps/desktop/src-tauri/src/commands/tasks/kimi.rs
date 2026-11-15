@@ -21,30 +21,6 @@ fn send(input: &mut impl Write, value: &Value) -> Result<(), String> {
         .map_err(|_| "Could not send a request to Kimi.".into())
 }
 
-#[cfg(test)]
-fn drive(
-    output: impl BufRead,
-    input: &mut impl Write,
-    workspace: &str,
-    previous: Option<&str>,
-    model: Option<&str>,
-    prompt: &str,
-    observe: impl FnMut(&Value),
-    permission: impl FnMut(&Value) -> Value,
-) -> Result<(), String> {
-    drive_with_servers(
-        output,
-        input,
-        workspace,
-        previous,
-        model,
-        prompt,
-        &[],
-        observe,
-        permission,
-    )
-}
-
 fn prompt_request(id: u64, session: &str, prompt: &str) -> Value {
     json!({"jsonrpc":"2.0","id":id,"method":"session/prompt","params":{"sessionId":session,"prompt":[{"type":"text","text":prompt}]}})
 }
@@ -235,6 +211,14 @@ pub(super) fn drive_with_servers(
             observe(
                 &json!({"sessionUpdate":"jackalope_error","type":"error","error":event["error"]}),
             );
+            if expected == 1 && previous.is_some() {
+                let error = &event["error"];
+                observe(&json!({
+                    "sessionUpdate": "jackalope_session_refused",
+                    "message": error["message"].as_str().map_or_else(|| error.to_string(), str::to_owned),
+                }));
+                return Err("The agent could not load this task's earlier conversation; its session store may no longer have it. Start a new task with the relevant context.".into());
+            }
             return Err(format!("Kimi rejected ACP request {expected}. Check its sign-in, model and CLI version, then retry."));
         }
         let Some(result) = event.get("result").filter(|value| value.is_object()) else {
@@ -433,6 +417,9 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
             }
         }
         "jackalope_session" => run.session_id = update["sessionId"].as_str().map(str::to_string),
+        "jackalope_session_refused" => {
+            super::resume::refused(run, update["message"].as_str().unwrap_or_default())
+        }
         "agent_message_chunk" => {
             if let Some(text) = update["content"]["text"]
                 .as_str()
@@ -454,7 +441,10 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
                 update["status"].as_str().unwrap_or("pending")
             ),
         ),
-        "current_model_update" => run.model = update["currentModelId"].as_str().map(str::to_string),
+        "current_model_update" => match update["currentModelId"].as_str() {
+            Some(model) => super::served_model::observe(run, model),
+            None => run.model = None,
+        },
         _ => {}
     }
 }
@@ -511,8 +501,8 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
             crate::commands::permission_risk::label("", &tool_call["rawInput"])
                 .trim_start_matches(": ")
         );
-        match crate::commands::permission_risk::decide(runtime, run_id, &label, |workspace| {
-            crate::commands::permission_risk::assess_acp(tool_call, workspace)
+        match crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
+            crate::commands::permission_risk::assess_acp(tool_call, scope)
         }) {
             crate::commands::permission_risk::Decision::Approve => {
                 return json!({"outcome":"selected","optionId":allow_once});
@@ -572,15 +562,10 @@ fn wait_for_answer(
     runtime.record_prompt(&prompt);
     let started = std::time::Instant::now();
     while started.elapsed() < Duration::from_secs(600) {
-        let inner = runtime.inner.lock().unwrap();
-        if inner.canceled.contains(run_id)
-            || inner
-                .processes
-                .get(run_id)
-                .is_none_or(|child| child.lock().unwrap().try_wait().ok().flatten().is_some())
-        {
+        if !runtime.process_alive(run_id) {
             break;
         }
+        let inner = runtime.inner.lock().unwrap();
         if let Some(answer) = inner
             .runs
             .get(run_id)
@@ -598,6 +583,29 @@ fn wait_for_answer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn drive(
+        output: impl BufRead,
+        input: &mut impl Write,
+        workspace: &str,
+        previous: Option<&str>,
+        model: Option<&str>,
+        prompt: &str,
+        observe: impl FnMut(&Value),
+        permission: impl FnMut(&Value) -> Value,
+    ) -> Result<(), String> {
+        drive_with_servers(
+            output,
+            input,
+            workspace,
+            previous,
+            model,
+            prompt,
+            &[],
+            observe,
+            permission,
+        )
+    }
 
     fn transcript(events: &[Value]) -> std::io::Cursor<Vec<u8>> {
         std::io::Cursor::new(
@@ -764,6 +772,7 @@ mod tests {
             json!({"id":1,"error":{"message":"private provider diagnostic"}}),
             json!({"id":1,"result":{}}),
         ] {
+            let refused = tail.get("error").is_some();
             let mut sent = Vec::new();
             let result = drive(
                 transcript(&[
@@ -778,8 +787,13 @@ mod tests {
                 |_| {},
                 |_| json!({"outcome":"cancelled"}),
             );
-            assert!(result.is_err());
-            assert!(!result.unwrap_err().contains("private provider"));
+            let error = result.unwrap_err();
+            assert!(!error.contains("private provider"));
+            assert_eq!(
+                error.contains("could not load this task's earlier conversation"),
+                refused,
+                "{error}"
+            );
             assert!(!String::from_utf8(sent).unwrap().contains("session/new"));
         }
         for tail in [
@@ -803,6 +817,48 @@ mod tests {
             )
             .is_err());
         }
+    }
+
+    #[test]
+    fn kimi_refusing_to_load_a_session_is_recorded_in_its_own_words_for_the_restart() {
+        let mut run = TaskRun::default();
+        let error = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true}}}),
+                json!({"id":1,"error":{"code":-32603,"message":"Session not found: saved"}}),
+            ]),
+            &mut Vec::new(),
+            "C:/workspace",
+            Some("saved"),
+            None,
+            "Continue",
+            |event| consume(&mut run, event),
+            |_| panic!("Unexpected permission"),
+        )
+        .unwrap_err();
+        assert!(error.contains("could not load this task's earlier conversation"));
+        assert_eq!(
+            run.session_refused.as_deref(),
+            Some("Session not found: saved")
+        );
+
+        // A new session that fails to start is not a refused resume.
+        let mut fresh = TaskRun::default();
+        assert!(drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"error":{"message":"Session not found"}}),
+            ]),
+            &mut Vec::new(),
+            "C:/workspace",
+            None,
+            None,
+            "Task",
+            |event| consume(&mut fresh, event),
+            |_| panic!("Unexpected permission"),
+        )
+        .is_err());
+        assert!(fresh.session_refused.is_none());
     }
 
     #[test]
@@ -850,6 +906,147 @@ mod tests {
             )
             .is_err());
         }
+    }
+
+    #[test]
+    fn kimi_follow_up_whose_session_is_gone_starts_over_as_a_new_session() {
+        use crate::commands::agent_policy::{AgentPolicy, CustomAgent};
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-kimi-lost-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let root = folder.to_str().unwrap();
+        git(root, &["init", "-b", "master"]).unwrap();
+        std::fs::write(folder.join(".gitignore"), "*\n").unwrap();
+        git(
+            root,
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Fixture",
+            ],
+        )
+        .unwrap();
+        std::fs::write(folder.join("fixture.cjs"), r#"
+const fs = require('fs');
+const send = value => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...value})+'\n');
+const sessionId = 'kimi-fixture-session';
+require('readline').createInterface({input:process.stdin}).on('line', line => {
+ const r=JSON.parse(line);
+ fs.appendFileSync(`${__dirname}/requests.jsonl`, line+'\n');
+ if(r.method==='initialize') send({id:r.id,result:{protocolVersion:1,agentCapabilities:{loadSession:true}}});
+ else if(r.method==='session/new') send({id:r.id,result:{sessionId}});
+ else if(r.method==='session/load') send({id:r.id,error:{code:-32603,message:`Session not found: ${r.params.sessionId}`}});
+ else if(r.method==='session/prompt') {
+   send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Fixture complete'}}}});
+   send({id:r.id,result:{stopReason:'end_turn'}});
+ }
+});
+setInterval(()=>{},1000);
+"#).unwrap();
+        #[cfg(windows)]
+        let executable = {
+            let path = folder.join("fixture.cmd");
+            std::fs::write(&path, "@echo off\r\nnode \"%~dp0fixture.cjs\" %*\r\n").unwrap();
+            path
+        };
+        #[cfg(unix)]
+        let executable = {
+            use std::os::unix::fs::PermissionsExt;
+            let path = folder.join("fixture");
+            std::fs::write(
+                &path,
+                "#!/bin/sh\nexec node \"$(dirname \"$0\")/fixture.cjs\" \"$@\"\n",
+            )
+            .unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+            path
+        };
+        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let mut policy = AgentPolicy::default();
+        policy.custom_agents.push(CustomAgent {
+            id: "kimi-fixture".into(),
+            name: "Kimi fixture".into(),
+            command: executable.to_string_lossy().into(),
+            adapter: Some("kimi".into()),
+            args: Vec::new(),
+        });
+        std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
+        std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+        let mut request: RunRequest = serde_json::from_value(json!({"id":"kimi-lost-first","projectId":"fixture","projectName":"Fixture","projectPath":root,"agent":"kimi-fixture","isolated":false,"prompt":"First fixture","autoVerify":false})).unwrap();
+        let finish = |request: &RunRequest| {
+            runtime.start(request.clone()).unwrap();
+            let deadline = std::time::Instant::now() + Duration::from_secs(20);
+            loop {
+                let run = runtime.run_snapshot(&request.id).unwrap();
+                if !run.status.is_active() {
+                    return run;
+                }
+                if std::time::Instant::now() > deadline {
+                    runtime.stop_all();
+                    panic!("Kimi fixture timed out: {:?}", run.activity);
+                }
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        };
+        let first = finish(&request);
+        assert_eq!(first.status, RunStatus::Review, "{:?}", first.error);
+        request.previous_run_id = Some(request.id.clone());
+        request.id = "kimi-lost-next".into();
+        request.prompt = "Next fixture".into();
+        let next = finish(&request);
+        assert_eq!(
+            next.status,
+            RunStatus::Review,
+            "{:?} {:?}",
+            next.error,
+            next.activity
+        );
+        assert_eq!(next.result, "Fixture complete");
+        let refused = next
+            .activity
+            .iter()
+            .position(|line| {
+                line == "Kimi Code could not resume the earlier conversation: Session not found: kimi-fixture-session"
+            })
+            .expect("refusal in activity");
+        assert!(
+            next.activity[refused + 1].contains("no longer had this task's earlier conversation")
+        );
+        let requests: Vec<Value> = std::fs::read_to_string(folder.join("requests.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let methods: Vec<&str> = requests
+            .iter()
+            .filter_map(|request| request["method"].as_str())
+            .filter(|method| method.starts_with("session/"))
+            .collect();
+        assert_eq!(
+            methods,
+            [
+                "session/new",
+                "session/prompt",
+                "session/load",
+                "session/new",
+                "session/prompt"
+            ]
+        );
+        let prompt = requests.last().unwrap()["params"]["prompt"][0]["text"]
+            .as_str()
+            .unwrap();
+        assert!(
+            prompt.contains("Earlier request:\nFirst fixture"),
+            "{prompt}"
+        );
+        runtime.stop_all();
+        drop(runtime);
+        let _ = std::fs::remove_dir_all(folder);
     }
 
     #[test]
@@ -911,6 +1108,7 @@ setInterval(()=>{},1000);
         std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
         let mut request = RunRequest {
             retry_of: None,
+            continues: None,
             live_session_id: None,
             effort: None,
             codex_speed: None,
@@ -948,7 +1146,7 @@ setInterval(()=>{},1000);
                     .into_iter()
                     .find(|run| run.id == request.id)
                     .unwrap();
-                if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                if !run.status.is_active() {
                     break run;
                 }
                 for prompt in &run.prompts {
@@ -958,7 +1156,7 @@ setInterval(()=>{},1000);
                             .unwrap();
                     }
                 }
-                if attempt == 2 && run.session_id.is_some() && run.status == "running" {
+                if attempt == 2 && run.session_id.is_some() && run.status == RunStatus::Running {
                     runtime.stop(&run.id).unwrap();
                 }
                 if std::time::Instant::now() > deadline {
@@ -969,7 +1167,11 @@ setInterval(()=>{},1000);
             };
             assert_eq!(
                 completed.status,
-                if attempt == 2 { "stopped" } else { "review" },
+                if attempt == 2 {
+                    RunStatus::Stopped
+                } else {
+                    RunStatus::Review
+                },
                 "{:?}",
                 completed.error
             );

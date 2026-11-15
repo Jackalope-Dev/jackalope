@@ -10,9 +10,10 @@ isolated parallel work, coordination and review before integration.
 Task review and preview open beside the task on windows at least 1280 pixels wide and
 take the full width on narrower ones; the toggle is saved per task. Conversations
 instead switch the whole view between Conversation, Review, Preview, Terminal and
-Screen tabs. Their options menu holds Task context (workspace, branch and saved
-checks), Topics and a Workspace submenu for editors, separate task windows and copying
-the path or branch. The task toolbar shows the branch and changes since a
+Screen tabs. Their options menu holds the preferred editor, Task context (workspace,
+branch and saved checks), Topics and an Open in… submenu for the other editor and copying
+the path or branch. Review, Preview and Terminal each pop out to a separate window from
+the button at the end of the tabs. The task toolbar shows the branch and changes since a
 previous visit, with the same Task context and Workspace tools. Terminal opens a shell
 view in that exact workspace. New task branches and worktree folders are named after the
 request with a short id suffix, such as `jackalope/fix-login-bug-909b03`.
@@ -40,7 +41,7 @@ selected agent account.
 **Queue message** saves input for the next batch. **Stop and send** pauses dispatch,
 waits for actual shutdown and saves the message before resuming. Failed saves retain
 the draft. A paused queue keeps new messages until explicitly resumed.
-Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
+Use the pop-out button beside the tabs for a separate window; its pin controls always-on-top. Closing the
 window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.
 
@@ -91,8 +92,8 @@ when the project's fallback is explicitly Agent-powered; both calls retain usage
 Sessions with batch or
 cost limits retain their existing serial flow.
 
-**Automatic subtasks** are on by default (Project settings → Tasks → Split work
-into subtasks). When parallel planning is available, a request is planned and started
+**Automatic subtasks** are on by default (Project settings → Automation → Split
+work into subtasks). When parallel planning is available, a request is planned and started
 without a review click if a model assessment recommends parallel or investigative
 work, or local rules find a request they do not classify as small. A model's one-lead
 choice and small requests start one agent as before. The planner may still return a
@@ -107,7 +108,9 @@ development agent. The agent receives the complete request and checks repository
 boundaries before proposing one to four assignments, or up to eight when the
 concurrency limit is higher. Each assignment includes a planner briefing (key files,
 patterns, contracts, checks and pitfalls, under 1,500 characters) that the worker
-receives so it can skip repeated discovery; workers are told to confirm it. Review ownership and
+receives so it can skip repeated discovery; workers are told to confirm it. Every worker
+also receives the complete request after its assignment, so the planner does not copy it
+into assignments. Review ownership and
 dependencies, then choose **Start reviewed plan**. Native validation rejects cycles,
 escaping paths and independent assignments with overlapping scopes, for automatic and
 reviewed plans alike. A changed planner attempt requires another review. Planning
@@ -116,6 +119,13 @@ workspaces must remain unchanged before implementation starts.
 Planning considers integration and review effort, shared contracts, generated files,
 manifests and lockfiles. Shared changes have one owner or an explicit dependency.
 Tightly coupled work stays together; a small request can remain one assignment.
+Assignments are sized for one agent session: a request spanning many independent
+areas, screens or files, or a long verification checklist, is split into separately
+verifiable assignments, each saying how its result is checked. Work that must first
+discover the current state (an audit, sweep or investigation) starts with a read-only
+audit assignment that reports its findings, and later assignments depend on it.
+Shared groundwork, such as a shared component, is a prerequisite its consumers depend
+on. There is no minimum assignment count.
 
 Planning accounts for repeated discovery, setup and checks in each assignment.
 Dispatch prioritizes prerequisites on the longest remaining dependency chains,

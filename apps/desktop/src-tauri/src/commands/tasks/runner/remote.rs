@@ -126,16 +126,9 @@ impl AttemptRunner for RemoteRunner {
             &root,
             bridge.map(|b| b.endpoint.as_str()),
         )?;
-        {
-            let inner = runtime.inner.lock().unwrap();
-            if inner.canceled.contains(id) {
-                drop(inner);
-                runtime.mark_stopped(id);
-                return Ok(Step::Stopped);
-            }
-            if workspace_in_use(&inner, id, workspace) {
-                return Err(WORKSPACE_IN_USE.into());
-            }
+        if !runtime.claim_workspace(id, workspace)? {
+            runtime.mark_stopped(id);
+            return Ok(Step::Stopped);
         }
         runtime.update_checked(id, |run| {
             run.remote = Some(RemoteExecution {
@@ -219,8 +212,8 @@ impl AttemptRunner for RemoteRunner {
             crate::commands::project_secrets::Place::Computer,
         )
         .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+        let names: Vec<String> = secrets.iter().map(|(name, _)| name.clone()).collect();
         if !secrets.is_empty() {
-            let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
             runtime.update(id, |run| {
                 activity(
                     run,
@@ -233,6 +226,13 @@ impl AttemptRunner for RemoteRunner {
             });
         }
         runs::add_secrets(&mut env, secrets);
+        let protected = crate::commands::redaction::injected(
+            env.iter().map(|(name, value)| (name, value)),
+            &names,
+        );
+        if !protected.is_empty() {
+            runtime.update_checked(id, |run| run.protect(protected))?;
+        }
         self.argv = argv;
         self.env = env;
         // Where each tool runs follows the runner's capabilities; desktop
@@ -336,8 +336,8 @@ impl AttemptRunner for RemoteRunner {
         let browser = !self.access.tool_unavailable("browser_navigate");
         let read_only = self.read_only;
         runtime.update_checked(id, |r| {
-            if r.status == "starting" {
-                r.status = "running".into();
+            if r.status == RunStatus::Starting {
+                r.status = RunStatus::Running;
             }
             r.progress = None;
             activity(
@@ -729,13 +729,13 @@ impl TaskRuntime {
             let line = match session.fetch_artifacts(Path::new(workspace), &collected.artifacts) {
                 Ok(written) if collected.truncated => format!(
                     "Brought back {written} saved output file(s) from {source}; it listed only part of the output under {}.",
-                    computers::sync::ARTIFACT_FOLDER
+                    crate::commands::artifacts::FOLDER
                 ),
                 Ok(0) => String::new(),
                 Ok(written) => format!(
                     "Brought back {written} saved output file{} from {source} under {}.",
                     if written == 1 { "" } else { "s" },
-                    computers::sync::ARTIFACT_FOLDER
+                    crate::commands::artifacts::FOLDER
                 ),
                 Err(error) => {
                     format!("The agent's saved output from {source} could not be brought back: {error}")
@@ -934,7 +934,10 @@ fn connection_plan(
 /// Leaves tools whose experiment is off out of the runner's `local` request,
 /// as this device leaves them out of the tool list.
 fn without_disabled_tools(mut local: serde_json::Value) -> serde_json::Value {
-    if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
+    if !crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ContextRead,
+        "on",
+    ) {
         if let Some(tools) = local["tools"].as_array_mut() {
             tools.retain(|tool| tool != "read_context");
         }

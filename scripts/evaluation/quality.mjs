@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { release } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
+import { root } from '../lib/paths.mjs';
 import { aggregateAttempts, reconcileProviderUsage } from './attempts.mjs';
 import {
   experimentEnvironment,
@@ -23,7 +23,6 @@ import { qualitySummary } from './quality-metrics.mjs';
 import { providerStopReason, requireEvaluationPass } from './readiness.mjs';
 import { checkScope } from './scope.mjs';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
 const value = (name, fallback) =>
   args.find((a) => a.startsWith(`${name}=`))?.slice(name.length + 1) ?? fallback;

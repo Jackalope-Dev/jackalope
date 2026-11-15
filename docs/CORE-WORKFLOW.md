@@ -17,7 +17,7 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
-Project instructions (Project settings → Tasks) reach every task agent natively at launch,
+Project instructions (Project settings → Basics) reach every task agent natively at launch,
 whatever started the work; a resumed agent session is not given them again, and a prompt
 that already contains them (scheduled and remote tasks add them) does not repeat them.
 Optional guidelines and tool selection remain inspectable. Project connection loading must
@@ -181,7 +181,9 @@ skipped and reported as skipped rather than run again. A preparation command tha
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
 
-Automatic verification is explicitly enabled in Project defaults. Its saved command
+Automatic verification is on for a project unless Check results automatically is turned
+off in Project settings, and does nothing until the project has a check command. Every
+launcher and the settings switch read it through `checksAutomatically`. Its saved command
 and authorization travel with the task, queue item or schedule and survive account
 or preference changes. After a successful agent result the task remains active
 while native verification reserves its workspace and uses separate check capacity. Navigating away does not
@@ -207,6 +209,36 @@ later attempt. It continues in the previous attempt's worktree only when that wo
 still exists, no other attempt owns it, and the agent left no uncommitted changes;
 otherwise a fresh worktree is cut and the earlier one is kept for inspection.
 
+An interrupted attempt keeps its workspace until the person resumes it. Resume lists
+processes still running in the workspace (on macOS and Linux) so anything the attempt
+started outside its own process group, such as a dev server, can be stopped first.
+Confirming records the attempt as stopped, then continues its agent session with a
+note that Jackalope restarted, or retries it when no session was recorded.
+
+## Conversations from outside Jackalope
+
+Claude Code and Codex keep each conversation in their own session files: Claude Code under
+`projects/` of its configuration directory, Codex as rollouts under `sessions/` and
+`archived_sessions/` of its home (compressed once idle). Jackalope reads the stores of the
+accounts it uses for each CLI (the CLI's own sign-in and any added accounts) and lists a
+conversation under a project when it ran in the project folder or a worktree of the same
+repository, in a read-only Outside Jackalope group. Its own attempts are left out by the
+session IDs they recorded, by its data folder and by the `.worktrees/<name>` folders on
+`jackalope/<name>` branches it creates. A background index keyed by file path, modification
+time and size reads only new and changed files and skips lines and files it does not
+recognize; a file watch and periodic refresh keep it current. Opening one shows its
+transcript with tool names; subagent work is not shown. Reading is local and nothing is
+uploaded; Settings → Privacy turns it off and deletes the index.
+
+Continue in Jackalope starts a conversation whose first attempt resumes the CLI's own
+session (`codex exec resume`, `claude --resume`) under the account directory it was saved
+in, directly in the checkout or worktree it ran in, reserving that folder like in-place
+work. It is unavailable, with the reason shown, when that directory is not one of
+Jackalope's accounts for the CLI, the account or agent is turned off for the project, the
+folder is gone, the conversation started in a subfolder, or the project runs agents on a
+computer. Its changes stay in that folder: merge review and retry refuse it, and follow-ups
+continue in the conversation.
+
 ## Iteration and delivery
 
 Follow-ups use the same native session, workspace and saved account. During active
@@ -226,6 +258,17 @@ snapshots, check requirements, conflict handling and receipt recovery. Mark revi
 still only records a review. Merging does not push. Source cleanup follows the merge
 choice and defaults on. Integrated work continues through a new task based on the
 updated target, with the earlier result attached.
+
+A pull request opened from Delivery, or found on the task branch by its GitHub check, is
+followed per task in renderer storage (`stores/pullRequestStore.ts`) and re-read through
+`task_pull_request_status` on a schedule until it merges or closes. `lib/pull-requests.ts`
+reduces GitHub's record to one state, most blocking first: failed checks, requested
+changes, conflict, checks running, draft, waiting for review, ready to merge, merged or
+closed. That state places finished work in the work list (Needs you, In review, Ready to
+merge or Finished) and never moves work that is running, blocked on a question or failed
+on its own. A failed read keeps the last state and says so. Fix requests are editable
+follow-ups in the task's own composer; pushing an update and merging on GitHub each need
+their own confirmation, and no state change sends, pushes or merges by itself.
 
 Paused Chat sessions use the same integration controls for their latest batch after
 queued messages are run or canceled. Applied receipts block reopening or sending into

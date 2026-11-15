@@ -1,7 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
+import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { type QueueView, queueSnapshot } from '../lib/queue';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 
 const empty: QueueView = {
   items: [],
@@ -30,7 +31,7 @@ export const useManagedTaskStore = create<ManagedState>((set) => ({
     if (!refreshing)
       refreshing = queueSnapshot()
         .then((queue) => set({ queue, error: null }))
-        .catch((error) => set({ error: String(error) }))
+        .catch((error) => set({ error: describeError(error) }))
         .finally(() => {
           refreshing = undefined;
         });

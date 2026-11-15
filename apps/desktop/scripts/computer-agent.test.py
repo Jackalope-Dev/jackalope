@@ -100,6 +100,23 @@ class Harness(unittest.TestCase):
         self.fail("The run did not finish.")
 
 
+class SharedProtocol(Harness):
+    def test_named_keys_have_an_xdotool_name(self):
+        self.assertEqual(set(self.agent.KEYS), set(self.agent.SHARED["namedKeys"]))
+
+    def test_local_routes_name_served_tools(self):
+        served = set(self.agent.WORKSPACE_TOOLS) | set(self.agent.BROWSER_TOOLS)
+        self.assertTrue(set(self.agent.LOCAL_ROUTES.values()) <= served)
+
+    def test_failures_carry_a_shared_code(self):
+        codes = {self.agent.FAILED, self.agent.UNSUPPORTED, self.agent.PERMANENT}
+        self.assertEqual(codes, set(self.agent.SHARED["errorCodes"]))
+        missing = self.agent.respond({"id": 1, "action": "artifact_get", "sha256": "0" * 64})
+        self.assertEqual((missing["ok"], missing["code"]), (False, self.agent.PERMANENT))
+        invalid = self.agent.respond({"id": 2, "action": "artifact_get", "sha256": "x"})
+        self.assertEqual((invalid["ok"], invalid["code"]), (False, self.agent.FAILED))
+
+
 class RunProtocol(Harness):
     def test_round_trip_returns_patch_of_changes(self):
         base = self.upload("r1", archive({"a.txt": b"one\n", "dir/b.txt": b"keep\n"}))
@@ -607,18 +624,13 @@ class Runner(unittest.TestCase):
                 return page["exit"], stdout.decode(), calls
         self.fail("The run did not finish.")
 
-    def test_capabilities_are_one_list_reported_with_the_protocol(self):
-        self.assertEqual(self.agent.RUNS_PROTOCOL, 4)
-        self.assertEqual(self.agent.CAPABILITIES,
-                         ["local-bridge", "browser", "workspace-tools", "policy-callbacks",
-                          "git-sync", "artifacts"])
+    def test_capabilities_are_reported_with_the_protocol(self):
         # Without agent-browser, the browser capability is not reported.
         self.assertEqual(self.agent.capabilities(),
-                         ["local-bridge", "workspace-tools", "policy-callbacks",
-                          "git-sync", "artifacts"])
+                         [name for name in self.agent.CAPABILITIES if name != "browser"])
         status = self.call(action="run_status", run="c1")
         self.assertEqual((status["runs"], status["capabilities"]),
-                         (4, self.agent.capabilities()))
+                         (self.agent.RUNS_PROTOCOL, self.agent.capabilities()))
 
     def test_slots_follow_the_machine_size_unless_overridden(self):
         agent = self.agent
@@ -1086,7 +1098,6 @@ class SyncProtocol(Harness):
         status = self.call(action="run_status", run="s1")
         self.assertIn("git-sync", status["capabilities"])
         self.assertIn("artifacts", status["capabilities"])
-        self.assertEqual(status["runs"], 4)
         path = self.local()
         self.assertEqual(self.call(action="sync_status", repo="p1")["have"], [])
         base, snapshot, bundle = self.snapshot(path)

@@ -1,5 +1,6 @@
 import type { ScheduledTask } from '../stores/scheduleStore.ts';
-import type { Runner, RunRequest } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
+import type { Runner, RunRequest } from './run-types.ts';
 
 export const scheduleHourIntervals = ['1', '2', '3', '4', '6', '8', '12'];
 
@@ -49,6 +50,62 @@ export interface ScheduleDefinition {
   enabled: boolean;
   request: RunRequest;
 }
+
+/** Mirrors `OutcomeKind` in src-tauri/src/commands/schedules.rs. */
+type ScheduleOutcomeKind =
+  | 'reserved'
+  | 'started'
+  | 'failedToStart'
+  | 'signedOut'
+  | 'overlap'
+  | 'busy'
+  | 'missed'
+  | 'paused'
+  | 'starting'
+  | 'invalid'
+  | 'monitorAttention'
+  | 'unrelated'
+  | 'baseline'
+  | 'unchanged'
+  | 'changeDetected'
+  | 'interruptedDispatch';
+
+/** Outcomes that ask the person to look at the schedule. */
+const ACTIONABLE_OUTCOMES: ReadonlySet<ScheduleOutcomeKind> = new Set([
+  'failedToStart',
+  'changeDetected',
+  'monitorAttention',
+  'interruptedDispatch',
+]);
+
+export const needsAction = (event: ScheduleOccurrence) =>
+  !!event.kind && ACTIONABLE_OUTCOMES.has(event.kind);
+
+interface ScheduleOccurrence {
+  dueAt: string;
+  runId: string | null;
+  /** Display text, shown as written. */
+  outcome: string;
+  kind?: ScheduleOutcomeKind;
+  change?: { before: string; after: string; path: string; branch: string } | null;
+}
+
+interface SavedSchedule {
+  localChecks?: number;
+  quietChecks?: number;
+  webhook?: { createdAt: string } | null;
+  lastNotice?: ScheduleOccurrence | null;
+  definition: ScheduleDefinition;
+  nextAt: string;
+  history: ScheduleOccurrence[];
+}
+
+export interface ScheduleLedger {
+  schedules: SavedSchedule[];
+  error: string | null;
+}
+
+export const listSchedules = () => invokeNative<ScheduleLedger>('schedule_list');
 
 export function savedPlanDraft(
   plan: ScheduledTask,

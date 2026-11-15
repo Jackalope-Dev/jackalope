@@ -7,6 +7,8 @@ import {
   knowledgeGuides,
 } from '../../../packages/knowledge/src/index.ts';
 import { helperPreferencePatch, helperTheme, sameHelperValue } from '../src/lib/helper-actions.ts';
+import destinations from '../src/lib/helper-destinations.json' with { type: 'json' };
+import { helperView, WORKSPACE_VIEWS } from '../src/lib/navigation.ts';
 
 test('helper theme changes preserve saved palette and automatic appearance', () => {
   const base = { ...DEFAULT_THEME, appearance: 'automatic', harmony: 'trio', atmosphere: 31 };
@@ -60,4 +62,16 @@ test('agent-readable docs preserve callouts, code and source attribution', () =>
   assert.match(markdown, /```\nliteral code\n```/);
   assert.match(markdown, /> A meaningful limit/);
   assert.equal(Object.keys(knowledgeFiles('https://jackalope.dev')).length, knowledgeGuides.length);
+});
+
+test('every helper destination the native helper accepts opens exactly one view', () => {
+  for (const destination of destinations)
+    assert.equal(
+      WORKSPACE_VIEWS.filter((view) => view.helper === destination).length,
+      1,
+      destination,
+    );
+  const named = WORKSPACE_VIEWS.flatMap((view) => (view.helper ? [view.helper] : []));
+  assert.deepEqual(named.toSorted(), [...destinations].sort());
+  assert.equal(helperView('settings'), 'preferences');
 });

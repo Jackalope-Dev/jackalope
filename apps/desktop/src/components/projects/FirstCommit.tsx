@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, ConfirmDialog, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -32,7 +33,7 @@ export function FirstCommit({
     try {
       setPreview(await firstCommitPreview(projectPath));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, [projectPath]);
   useEffect(() => {

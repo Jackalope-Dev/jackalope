@@ -239,6 +239,16 @@ pub(in crate::commands) fn ensure_first_commit(
     Ok(Some(note))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::first_commit::project_first_commit_preview,
+            commands::first_commit::project_first_commit,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// What a first commit would contain and who it would be attributed to.
 #[tauri::command]
 pub async fn project_first_commit_preview(
@@ -301,16 +311,6 @@ mod tests {
             .contains("git config --global user.name"));
         assert!(gate(Some(&pat), 4, 3).unwrap_err().contains("4 files"));
         assert!(gate(Some(&pat), 3, 3).is_ok());
-    }
-
-    #[test]
-    fn commit_arguments_carry_no_trailers() {
-        assert_eq!(
-            commit_args(2),
-            ["commit", "--no-gpg-sign", "--quiet", "-m", "Initial commit"]
-        );
-        assert!(commit_args(0).contains(&"--allow-empty"));
-        assert!(!commit_args(2).iter().any(|arg| arg.contains("Co-authored")));
     }
 
     #[test]

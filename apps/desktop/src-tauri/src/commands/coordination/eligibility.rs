@@ -42,27 +42,7 @@ pub(super) fn ordered_plan(items: Vec<PlanEntry>) -> Result<Vec<PlanEntry>, Stri
     Ok(ordered)
 }
 
-pub(super) fn active(status: &str) -> bool {
-    ["starting", "running", "stopping"].contains(&status)
-}
-
-pub(super) fn overlaps(a: &[String], b: &[String]) -> bool {
-    a.iter().any(|a| {
-        b.iter().any(|b| {
-            a == "."
-                || b == "."
-                || a == b
-                || a.starts_with(&format!("{b}/"))
-                || b.starts_with(&format!("{a}/"))
-        })
-    })
-}
-
-fn covered(paths: &[String], path: &str) -> bool {
-    paths
-        .iter()
-        .any(|p| p == "." || p == path || path.starts_with(&format!("{p}/")))
-}
+use crate::commands::scope_path::{self, any_contains, ScopePath};
 
 /// Whether two items own a common path that neither handed to a subtask.
 pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> bool {
@@ -70,16 +50,14 @@ pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> boo
     let right = agreements::effective_scopes(ledger, b);
     left.iter().any(|x| {
         right.iter().any(|y| {
-            let deeper = if x == "." {
+            let deeper = if scope_path::contains(x, y) {
                 y
-            } else if y == "." || x == y || x.starts_with(&format!("{y}/")) {
+            } else if scope_path::contains(y, x) {
                 x
-            } else if y.starts_with(&format!("{x}/")) {
-                y
             } else {
                 return false;
             };
-            !covered(&a.excluded_scopes, deeper) && !covered(&b.excluded_scopes, deeper)
+            !any_contains(&a.excluded_scopes, deeper) && !any_contains(&b.excluded_scopes, deeper)
         })
     })
 }
@@ -90,13 +68,18 @@ pub(super) fn scopes(values: Vec<String>) -> Result<Vec<String>, String> {
             "Name the files or folders this task owns (use . for the whole project).".into(),
         );
     }
-    values.into_iter().map(|value| {
-        let value = value.trim().replace('\\', "/").trim_end_matches('/').to_lowercase();
-        if value.is_empty() || value.chars().any(char::is_control) || value.len() > 500 || value.starts_with('/') || value.contains(':') || value.contains('*') || value.split('/').any(|p| p == ".." || (p == "." && value != ".") || p.is_empty()) {
-            return Err("Scopes must be relative file or folder paths, without wildcards or parent traversal.".into());
-        }
-        Ok(value)
-    }).collect()
+    values
+        .into_iter()
+        .map(|value| {
+            ScopePath::parse(&value)
+                .filter(|path| !path.as_str().contains('*'))
+                .map(|path| path.key())
+                .ok_or_else(|| {
+                    "Scopes must be relative file or folder paths, without wildcards or parent traversal."
+                        .into()
+                })
+        })
+        .collect()
 }
 
 fn dependency_priority(items: &[QueueItem]) -> HashMap<String, usize> {
@@ -165,7 +148,7 @@ pub(super) fn host_load(
     runs: &[crate::commands::tasks::TaskRun],
 ) -> HashMap<String, usize> {
     let mut load = HashMap::new();
-    for run in runs.iter().filter(|r| active(&r.status) && !r.finishing) {
+    for run in runs.iter().filter(|r| r.status.is_active() && !r.finishing) {
         *load.entry(host_of(inner, run)).or_default() += 1;
     }
     load
@@ -192,7 +175,7 @@ pub(super) fn placed_items(
     runs: &[crate::commands::tasks::TaskRun],
     merged: &[String],
 ) -> Vec<(QueueItem, Result<pool::RunHost, String>)> {
-    let active_runs: Vec<_> = runs.iter().filter(|r| active(&r.status)).collect();
+    let active_runs: Vec<_> = runs.iter().filter(|r| r.status.is_active()).collect();
     let mut load = host_load(inner, runs);
     let limits = pool::Limits {
         device: inner.concurrency,
@@ -234,11 +217,8 @@ pub(super) fn placed_items(
                                 || other.canceled
                                 || other.run_id.as_ref().is_some_and(|id| {
                                     runs.iter().find(|run| &run.id == id).is_none_or(|run| {
-                                        !active(&run.status)
-                                            && (!matches!(
-                                                run.status.as_str(),
-                                                "review" | "reviewed"
-                                            ) || run.error.is_some()
+                                        !run.status.is_active()
+                                            && (!run.status.is_done() || run.error.is_some()
                                                 || run.persistence_error.is_some()
                                                 || run.dependency_invalidated
                                                 || run.verification_error.is_some()
@@ -294,7 +274,7 @@ pub(super) fn placed_items(
                         || (item.staged_dependencies
                             && runs.iter().any(|run| {
                                 &run.id == id
-                                && ["review", "reviewed"].contains(&run.status.as_str())
+                                && run.status.is_done()
                                 && run.error.is_none()
                                 && crate::commands::integration::dependencies::checked_or_unchecked(
                                     run,
@@ -393,6 +373,7 @@ pub(super) fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String
 #[cfg(test)]
 mod scheduling_tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
     fn item(id: &str, project: &str, deps: &[&str]) -> QueueItem {
         serde_json::from_value(serde_json::json!({"id":id,"projectId":project,"projectName":project,"projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":[id],"dependencies":deps,"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
     }
@@ -568,7 +549,7 @@ mod scheduling_tests {
         let running = crate::commands::tasks::TaskRun {
             id: "busy".into(),
             project_id: "p".into(),
-            status: "running".into(),
+            status: RunStatus::Running,
             host: Some(pool::RunHost::device(String::new())),
             ..Default::default()
         };

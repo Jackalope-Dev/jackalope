@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { detectSkillsFromPrompt, getSkillById, VETTED_SKILLS } from '../src/lib/skills/catalog.ts';
+import { detectSkillsFromPrompt } from '../src/lib/skills/catalog.ts';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
-import { getToolById, VETTED_TOOLS } from '../src/lib/skills/tool-registry.ts';
 
 test('default final-phase guidance preserves diagnostics and explicit instructions', () => {
   const options = {
@@ -15,19 +14,6 @@ test('default final-phase guidance preserves diagnostics and explicit instructio
   assert.match(candidate, /explicit user or repository instructions/);
   assert.match(candidate, /final verification/);
   assert.match(candidate, /Fix the scheduler/);
-});
-
-test('vetted skills catalog contains all core development domains and harness skills', () => {
-  assert.equal(VETTED_SKILLS.length, 9);
-  const categories = new Set(VETTED_SKILLS.map((s) => s.category));
-  assert.ok(categories.has('debugging'));
-  assert.ok(categories.has('feature'));
-  assert.ok(categories.has('refactor'));
-  assert.ok(categories.has('testing'));
-  assert.ok(categories.has('security'));
-  assert.ok(categories.has('performance'));
-  assert.ok(categories.has('git'));
-  assert.ok(categories.has('browser'));
 });
 
 test('detectSkillsFromPrompt classifies real-world developer intents accurately', () => {
@@ -120,15 +106,4 @@ test('automatic guidance distinguishes token domains and avoids negated or copy-
   assert.ok(ids('Validate refresh tokens').includes('security-audit'));
   assert.ok(ids('Fix spelling and runtime regression').includes('systematic-debugging'));
   assert.deepEqual(ids('Example only:\n```\nadd tests and fix security\n```'), []);
-});
-
-test('getToolById and getSkillById retrieve registered definitions', () => {
-  assert.ok(VETTED_TOOLS.length >= 5);
-  const fsTool = getToolById('filesystem');
-  assert.ok(fsTool);
-  assert.equal(fsTool.name, 'Scoped Filesystem MCP');
-
-  const debugSkill = getSkillById('systematic-debugging');
-  assert.ok(debugSkill);
-  assert.equal(debugSkill.shortLabel, 'Debug & Triage');
 });

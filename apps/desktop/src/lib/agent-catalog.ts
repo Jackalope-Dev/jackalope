@@ -1,124 +1,97 @@
+import catalog from './agents.json' with { type: 'json' };
+
+/**
+ * The agent catalog the native side reads too (`src-tauri/src/commands/agents.rs`). Lookups
+ * that also cover custom agents take them as an argument; `stores/agentConfigStore.ts` names
+ * agents with the saved custom agents.
+ */
+export type BuiltinAgentId = keyof typeof catalog;
+type CatalogEntry = (typeof catalog)[BuiltinAgentId];
+type CustomAgents = readonly { id: string; adapter?: string }[];
+
 export interface AgentMetadata {
-  id: string;
+  id: BuiltinAgentId;
   name: string;
   vendor: string;
   description: string;
-  strengths: readonly string[];
-  installCommand?: string;
+  installCommand: string;
   installUrl: string;
   defaultBinary: string;
-  accountEnvVar?: string;
-  loginCommand?: string;
+  loginCommand: string;
 }
 
-export const builtinAgents = [
-  {
-    id: 'codex',
-    name: 'Codex',
-    vendor: 'OpenAI',
-    description:
-      'Specialized in fast, precise code generation, Python, systems, and deep codebase changes.',
-    strengths: ['backend', 'systems', 'python', 'refactoring', 'fast-edits'],
-    installCommand: 'npm install -g @openai/codex',
-    installUrl: 'https://learn.chatgpt.com/docs/app-server',
-    defaultBinary: 'codex',
-    accountEnvVar: 'CODEX_HOME',
-    loginCommand: 'codex login',
-  },
-  {
-    id: 'claude',
-    name: 'Claude Code',
-    vendor: 'Anthropic',
-    description:
-      'Exceptional for complex architecture, deep reasoning, frontend/UI, documentation, and multi-file refactoring.',
-    strengths: ['frontend', 'architecture', 'react', 'css', 'documentation', 'reasoning'],
-    installCommand: 'npm install -g @anthropic-ai/claude-code',
-    installUrl: 'https://code.claude.com/docs/en/overview',
-    defaultBinary: 'claude',
-    accountEnvVar: 'CLAUDE_CONFIG_DIR',
-    loginCommand: 'claude auth login',
-  },
-  {
-    id: 'grok',
-    name: 'Grok',
-    vendor: 'xAI',
-    description:
-      'High-speed reasoning, fast multi-step iteration, web-augmented research, and code verification.',
-    strengths: ['reasoning', 'verification', 'testing', 'search', 'algorithms'],
-    installCommand: 'npm install -g @xai/grok-cli',
-    installUrl: 'https://docs.x.ai',
-    defaultBinary: 'grok',
-    accountEnvVar: 'GROK_HOME',
-    loginCommand: 'grok login',
-  },
-  {
-    id: 'kimi',
-    name: 'Kimi Code',
-    vendor: 'Moonshot AI',
-    description: 'Coding agent with project tools, model selection, and resumable task sessions.',
-    strengths: ['coding', 'reasoning', 'multi-file'],
-    installCommand: 'npm install -g @moonshot-ai/kimi-code',
-    installUrl: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
-    defaultBinary: 'kimi',
-    accountEnvVar: 'KIMI_CODE_HOME',
-    loginCommand: 'kimi login',
-  },
-  {
-    id: 'opencode',
-    name: 'OpenCode',
-    vendor: 'OpenCode AI',
-    description:
-      'Open-source agent supporting local, offline, and customizable multi-provider models.',
-    strengths: ['local-models', 'offline', 'custom-providers', 'budget-conscious'],
-    installCommand: 'npm install -g opencode-ai',
-    installUrl: 'https://opencode.ai/docs/',
-    defaultBinary: 'opencode',
-    accountEnvVar: 'XDG_DATA_HOME',
-    loginCommand: 'opencode auth login',
-  },
-  {
-    id: 'antigravity',
-    name: 'Antigravity',
-    vendor: 'Google DeepMind',
-    description:
-      'Advanced agentic coding with high-level planning, subagent orchestration, and native tools.',
-    strengths: ['planning', 'orchestration', 'subagents', 'complex-workflows'],
-    installCommand: '',
-    installUrl: 'https://antigravity.google/docs/cli/install/',
-    defaultBinary: 'agy',
-    accountEnvVar: 'HOME',
-    loginCommand: 'agy',
-  },
-  {
-    id: 'gemini',
-    name: 'Gemini CLI',
-    vendor: 'Google',
-    description:
-      'Powered by Gemini models for rapid code generation, large context inspection, and multimodal tasks.',
-    strengths: ['large-context', 'multimodal', 'documentation', 'fast-prototyping'],
-    installCommand: 'npm install -g @google/gemini-cli',
-    installUrl: 'https://github.com/google-gemini/gemini-cli',
-    defaultBinary: 'gemini',
-    accountEnvVar: 'GEMINI_CLI_HOME',
-    loginCommand: 'gemini',
-  },
-  {
-    id: 'acp',
-    name: 'ACP (Generic)',
-    vendor: 'Agent Client Protocol',
-    description:
-      'Connect any agent that speaks the Agent Client Protocol (ACP) over stdio JSON-RPC.',
-    strengths: ['interop', 'custom-agents', 'protocol-standard'],
-    installCommand: '',
-    installUrl: 'https://github.com/anthropics/agent-client-protocol',
-    defaultBinary: '',
-    accountEnvVar: '',
-    loginCommand: '',
-  },
-] as const;
+const entries = Object.entries(catalog) as [BuiltinAgentId, CatalogEntry][];
+const idsWhere = (test: (agent: CatalogEntry) => boolean) =>
+  entries.filter(([, agent]) => test(agent)).map(([id]) => id);
 
-export type BuiltinAgentId = (typeof builtinAgents)[number]['id'];
+/** Every catalog agent in display order. */
+export const builtinAgents: readonly AgentMetadata[] = entries.map(([id, agent]) => ({
+  id,
+  name: agent.name,
+  vendor: agent.vendor,
+  description: agent.description,
+  installCommand: agent.npmPackage ? `npm install -g ${agent.npmPackage}` : '',
+  installUrl: agent.installUrl,
+  defaultBinary: agent.binary ?? '',
+  loginCommand: agent.binary ? [agent.binary, ...agent.loginArgs].join(' ') : '',
+}));
 
 export function getAgentMetadata(id: string): AgentMetadata | undefined {
-  return (builtinAgents as readonly AgentMetadata[]).find((agent) => agent.id === id);
+  return builtinAgents.find((agent) => agent.id === id);
+}
+
+/** The catalog entry for a catalog agent or adapter id. */
+export function catalogEntry(adapter: string): CatalogEntry | undefined {
+  return catalog[adapter as BuiltinAgentId];
+}
+
+/** The model family an agent runs by default, or null for multi-provider agents. */
+export function agentFamily(id: string): string | null {
+  return catalogEntry(id)?.family ?? null;
+}
+
+/** The adapter an agent runs on: a custom agent's adapter, or the agent itself. */
+export function agentAdapter(agent: string, customAgents: CustomAgents) {
+  return customAgents.find((a) => a.id === agent)?.adapter ?? agent;
+}
+
+/** Agents that can route work, answer helper requests and keep separate profiles. */
+export const ORCHESTRATING_AGENTS: readonly string[] = idsWhere((agent) => agent.orchestrates);
+
+/** Agents that can sign in to an HTTP connection interactively. */
+export const MCP_SIGN_IN_AGENTS: readonly string[] = idsWhere((agent) => agent.mcpSignIn);
+
+/** Agents that keep their own MCP configuration file. */
+export const MCP_CONFIG_AGENTS: readonly BuiltinAgentId[] = idsWhere(
+  (agent) => agent.mcpConfig !== null,
+);
+
+/** Whether an agent on `agent`'s adapter can route work and answer helper requests. */
+export function canOrchestrate(agent: string, customAgents: CustomAgents) {
+  return catalogEntry(agentAdapter(agent, customAgents))?.orchestrates ?? false;
+}
+
+/** Whether Jackalope runs tasks on `agent`'s adapter (its own executable, out of development). */
+export function runsTasks(agent: string, customAgents: CustomAgents) {
+  const spec = catalogEntry(agentAdapter(agent, customAgents));
+  return !!spec?.binary && !spec.tasksInDevelopment;
+}
+
+/** Catalog display names as prose: "A, B or C". */
+export function agentNames(ids: readonly string[], last = 'or') {
+  const names = ids.map((id) => getAgentMetadata(id)?.name ?? id);
+  return names.length > 1
+    ? `${names.slice(0, -1).join(', ')} ${last} ${names.at(-1)}`
+    : names.join('');
+}
+
+/** Why `adapter` cannot use a connection over `transport`, or null when it can. */
+export function connectionSupport(adapter: string, transport: string, discovery: boolean) {
+  const support = catalogEntry(adapter);
+  if (!support) return 'Choose a supported agent adapter.';
+  if (discovery && support.discovery && transport !== 'sse') return null;
+  if (!discovery && (support.direct as string[]).includes(transport)) return null;
+  return transport === 'sse'
+    ? 'Choose an agent that supports legacy SSE, or use a Streamable HTTP connection with on-demand tools.'
+    : 'Enable on-demand tools for this connection to use it with this agent.';
 }

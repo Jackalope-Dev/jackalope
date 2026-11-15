@@ -1,5 +1,10 @@
-import type { TaskRun } from './task-runtime';
-import { agents, type Metric, type TaskState, type TelemetryAgent } from './telemetry.ts';
+import {
+  TELEMETRY_AGENTS as agents,
+  type Metric,
+  type TaskState,
+  type TelemetryAgent,
+} from '@jackalope/contracts/telemetry';
+import type { TaskRun } from './run-types';
 
 interface Snapshot {
   status: TaskRun['status'];

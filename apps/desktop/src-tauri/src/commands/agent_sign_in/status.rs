@@ -1,6 +1,6 @@
 use super::super::{
     agent_profiles::{self, AccountBinding},
-    capacity::client::Client,
+    cli_rpc::Client,
 };
 use chrono::Utc;
 use serde::Serialize;

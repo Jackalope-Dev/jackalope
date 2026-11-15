@@ -1,6 +1,7 @@
 use crate::commands::{
     account_storage,
     decisions::{settings, DecisionMode},
+    experiments::{self, Experiment},
     tasks::TaskRuntime,
 };
 
@@ -8,7 +9,7 @@ pub(super) struct Fixture(std::path::PathBuf);
 
 impl Fixture {
     pub(super) fn configure(runtime: &TaskRuntime, learning: bool) -> Result<Option<Self>, String> {
-        let questions = std::env::var("JACKALOPE_JEV_QUESTIONS").is_ok_and(|value| value == "on");
+        let questions = experiments::is(Experiment::JevQuestions, "on");
         if !learning && !questions {
             return Ok(None);
         }

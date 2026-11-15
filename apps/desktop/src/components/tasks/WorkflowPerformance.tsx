@@ -1,4 +1,4 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import {
   clearPerformanceSamples,
@@ -6,7 +6,6 @@ import {
   performanceSummary,
   setPerformanceRecording,
 } from '../../lib/workbench-performance';
-import { Button } from '../ui/button';
 
 export function WorkflowPerformance() {
   const [recording, setRecording] = useState(isPerformanceRecording);

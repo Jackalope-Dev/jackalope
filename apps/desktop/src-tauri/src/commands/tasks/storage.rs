@@ -22,7 +22,7 @@ impl TaskRuntime {
             .truncate(false)
             .read(true)
             .write(true)
-            .open(directory.join("runtime.lock"))
+            .open(directory.join(crate::cli_protocol::profile::RUNTIME_LOCK))
             .map_err(|e| e.to_string())?;
         // The `jackalope` command briefly takes a shared lock to ask whether
         // the app is starting, and a relaunch can overlap the previous exit;
@@ -61,7 +61,9 @@ impl TaskRuntime {
             .iter()
             .filter(|path| {
                 path.extension().is_some_and(|ext| ext == "json")
-                    && path.file_name().is_none_or(|name| name != "schedules.json")
+                    && path
+                        .file_name()
+                        .is_none_or(|name| name != crate::cli_protocol::profile::SCHEDULES)
             })
             .collect();
         let mut loaded: HashMap<_, _> = std::thread::scope(|scope| {
@@ -84,7 +86,7 @@ impl TaskRuntime {
         for path in paths {
             if path
                 .file_name()
-                .is_some_and(|name| name == "schedules.json")
+                .is_some_and(|name| name == crate::cli_protocol::profile::SCHEDULES)
             {
                 continue;
             }
@@ -155,13 +157,13 @@ impl TaskRuntime {
                         if crate::commands::previews::review::recover(&mut run) {
                             let _ = runtime.save(&run);
                         }
-                        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                        if run.status.is_active() {
+                            settle_usage(&mut run);
                             run.status = if cfg!(windows) && run.process_contained {
-                                "stopped"
+                                RunStatus::Stopped
                             } else {
-                                "interrupted"
-                            }
-                            .into();
+                                RunStatus::Interrupted
+                            };
                             run.error = Some("Jackalope closed before this attempt finished. Review its workspace before continuing; work was not automatically rerun.".into());
                             run.ended_at = Some(Utc::now().to_rfc3339());
                             if let Err(error) = runtime.save(&run) {
@@ -209,7 +211,7 @@ impl TaskRuntime {
                 .runs
                 .values()
                 .filter(|run| {
-                    run.status == "reviewed"
+                    run.status == RunStatus::Reviewed
                         && run.persistence_error.is_none()
                         && run.live_session_id.is_none()
                         && run.archived_at.is_none()
@@ -247,10 +249,7 @@ impl TaskRuntime {
                 .values()
                 .filter(|run| run.task_id == current.task_id)
             {
-                if !["review", "reviewed", "failed", "stopped"].contains(&run.status.as_str())
-                    || run.finishing
-                    || run.live_session_id.is_some()
-                {
+                if !run.status.is_terminal() || run.finishing || run.live_session_id.is_some() {
                     return Err("Finish or resolve all attempts before archiving this task. Live session tasks stay with their session.".into());
                 }
                 if run.persistence_error.is_some() || self.writer.error(&run.id).is_some() {
@@ -363,21 +362,20 @@ impl TaskRuntime {
             return Err("The task record has an invalid identifier.".into());
         }
         if let Some(existing) = self.inner.lock().unwrap().runs.get(&run.id) {
-            return Err(
-                if ["starting", "running", "stopping"].contains(&existing.status.as_str()) {
-                    "A running task already uses this identifier."
-                } else {
-                    "This task is already in your history."
-                }
-                .into(),
-            );
+            return Err(if existing.status.is_active() {
+                "A running task already uses this identifier."
+            } else {
+                "This task is already in your history."
+            }
+            .into());
         }
         if self.directory.join(format!("{}.json", run.id)).exists() {
             return Err("A history file with this identifier already exists.".into());
         }
         run.persistence_error = None;
-        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
-            run.status = "interrupted".into();
+        if run.status.is_active() {
+            settle_usage(&mut run);
+            run.status = RunStatus::Interrupted;
             run.error.get_or_insert_with(|| {
                 "Restored from a recovery copy of an unfinished attempt; it was not rerun.".into()
             });
@@ -393,7 +391,9 @@ impl TaskRuntime {
     }
 
     pub(super) fn save(&self, run: &TaskRun) -> Result<(), String> {
-        journal::Writer::wait(self.writer.submit(run.clone(), true)?)
+        let mut run = run.clone();
+        run.redact_secrets();
+        journal::Writer::wait(self.writer.submit(run, true)?)
     }
 
     pub(in crate::commands) fn update_output(
@@ -418,7 +418,8 @@ impl TaskRuntime {
     }
 
     fn bound_output(run: &mut TaskRun) {
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        run.redact_secrets();
+        if !run.status.is_active() {
             run.progress = None;
         }
         if run.result.len() > 128_000 {
@@ -437,8 +438,9 @@ impl TaskRuntime {
         if run.screenshots.len() > 100 {
             run.screenshots.drain(..run.screenshots.len() - 100);
         }
-        if run.activity.len() > 150 {
-            run.activity.drain(..run.activity.len() - 150);
+        if run.activity.len() > events::ACTIVITY_KEPT {
+            run.activity
+                .drain(..run.activity.len() - events::ACTIVITY_KEPT);
         }
         if run.diagnostics.len() > 150 {
             run.diagnostics.drain(..run.diagnostics.len() - 150);

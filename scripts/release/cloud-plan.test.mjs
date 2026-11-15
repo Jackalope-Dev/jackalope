@@ -9,9 +9,8 @@ import { root } from './catalog.mjs';
 test('workflow planning maps release branches, isolates rehearsals and fails before builds when signing is unavailable', async (t) => {
   const directory = await mkdtemp(resolve(tmpdir(), 'jackalope-release-plan-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  await cp(resolve(root, 'scripts/release'), resolve(directory, 'scripts/release'), {
-    recursive: true,
-  });
+  for (const folder of ['scripts/release', 'scripts/lib', 'packages/contracts/src'])
+    await cp(resolve(root, folder), resolve(directory, folder), { recursive: true });
   const files = {
     'package.json': '{"version":"0.1.0"}',
     'apps/desktop/package.json': '{"version":"0.1.0"}',

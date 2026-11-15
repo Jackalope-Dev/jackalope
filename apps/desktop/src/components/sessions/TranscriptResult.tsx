@@ -1,5 +1,5 @@
+import { Button } from '@jackalope/ui';
 import { lazy, Suspense, useState } from 'react';
-import { Button } from '../ui/button';
 
 const TaskMarkdown = lazy(() => import('../tasks/TaskMarkdown'));
 

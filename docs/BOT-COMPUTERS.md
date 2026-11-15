@@ -14,7 +14,7 @@ paired) or **Agent37** (a machine on the person's own Agent37 account). A task g
 only when its agent calls `computer_request` and the person answers **Allow a sandbox
 computer** or **Allow, and share this project read-only**; the computer then belongs to
 that task and is reused by its later attempts. A project can have one too, chosen in
-Project settings under **Agents run on**; its task agents then run there (see
+Project settings → Integrations under **Agents run on**; its task agents then run there (see
 [agents on a computer](#agents-on-a-computer)). Settings → Computers lists every
 computer, paired cloud machine, the Agent37 connection, agent sign-ins for computers and
 Docker's readiness.
@@ -99,7 +99,7 @@ The first start pulls this version's [published image](#the-image) and tags it
 definition, no network, or an arm64 host, since only amd64 is published) it builds the
 image from `apps/desktop/src-tauri/resources/computer` (bundled with the app) with
 `docker build`. The status shows the latest pull or build line. The tag follows the
-content of `Dockerfile`, `start.sh` and `agent.py`, so a changed definition builds a new
+content of `Dockerfile`, `start.sh`, `agent.py` and `protocol.json`, so a changed definition builds a new
 image. A local build is for the host's architecture, so Apple Silicon gets an arm64
 image.
 
@@ -276,7 +276,7 @@ Planned and swarm work (each assignment of an approved plan or automatic subtask
 combined review and a swarm round's work) is placed across a capacity pool: this device
 and the computers that support runs (local sandboxes, cloud machines and Agent37
 computers). The pool holds the project's own computer, which the project pins, and any
-other computers the person adds under **Swarms run on** in Project settings (saved per
+other computers the person adds under **Swarms run on** in Project settings → Integrations (saved per
 project in `computers/pool.json`). **Swarms run on** chooses **Anywhere**, **Computers
 only** or **This device only**; a project that never chose runs anywhere, which without
 added computers places every fork where it ran before the pool existed: on the project's
@@ -491,9 +491,8 @@ that the call ran and to ask for less (for an answer), not as a timeout or trans
 failure. Answers of tools the runner serves do not pass through the relay, so its limits
 do not apply to them.
 
-Each bridge tool declares in one table (`computers::runner::TOOLS`) whether it executes
-with the workspace or on the control plane; `coordination_mcp`'s tests keep the table
-complete. With the runner's capabilities it gives the agent's tool list, what the relay
+Each bridge tool declares in the bridge's one tool table (`bridge::tools`) whether it
+executes with the workspace or on the control plane. With the runner's capabilities it gives the agent's tool list, what the relay
 refuses, the agent's instructions and the attempt's activity line, which names the
 runner's protocol and capabilities, the tools that run on the computer and those that
 are unavailable there. Unavailable tools are left out of the tool list and refused when
@@ -549,7 +548,7 @@ version this app bundles) on the computer's own Chromium, so a server the agent 
 there is reachable at `localhost`. They take the same requests and give the same answers
 as here. Before opening a site, and on the page each command ends on, the runner asks
 this device through `POST /v1/policy` with kind `site`; the computer's own pages
-(`localhost`, `127.0.0.1`, `::1`) and non-web addresses are not asked about. This device
+(the protocol's loopback hosts) and non-web addresses are not asked about. This device
 answers with the computer's per-site questions and saved decisions (allow for this task,
 always allow, decline, never allow, saved under the project), and a page with a visible
 password field asks the person to sign in through **Watch / take over** instead; while a
@@ -735,9 +734,16 @@ of `git-sync`, `computers/artifacts.rs` the artifact transfers,
 `tasks/runner/remote.rs` the attempt side of an agent on a computer, one of the two
 runners behind `tasks/runner.rs` (see [the runner](#the-runner)).
 `desktop_control/computer.rs` runs desktop actions on a computer and
-`computers/browser.rs` attaches the computer's browser to the task browser through
-`browser::set_router`, gated by the same site questions, which also answer a runner's
+`computers/browser.rs` attaches the computer's browser to the task browser before the
+bridge's browser tools first start it (`browser::route`), gated by the same site questions, which also answer a runner's
 `site` callbacks.
+
+`protocol.json` holds the values both sides of the protocol read: protocol numbers,
+capability and run action names, transfer and relay limits, the runner-served tools and
+routes, the Git identity, repository search bounds, the browser page probe and limits,
+loopback hosts, the screenshot folder, named keys and the error codes a failed request
+carries beside its message (`failed`, `unsupported`, `permanent`). The desktop reads it
+from the bundled resources and `agent.py` from beside itself in the image.
 
 `agent.py` uses only Debian's Python with Pillow, pyatspi, `xdotool`, `wmctrl`, `xclip`,
 `scrot`, and agent-browser for the runner's browser tools. It answers the helper protocol's `hello` (`protocol: 1`) and `list`,
@@ -798,8 +804,9 @@ version (`UV_SHA256`, copied from that release's published `.sha256` assets and
 a new uv release means updating the version and both hashes together. The image has no
 Docker.
 
-The image's definition hash covers `Dockerfile`, `start.sh` and `agent.py`, so any
-change to the runner or the image definition, including the uv pin, gives a new
+The image's definition hash covers `Dockerfile`, `start.sh`, `agent.py` and
+`protocol.json`, so any change to the runner or the image definition, including the uv
+pin, gives a new
 `<version>-<hash>` tag. A local sandbox pulls or builds the new image and is recreated
 from it at its next start, Agent37 gets a new template (see each provider above), and a
 cloud machine keeps its old image until its owner runs the new tag.
@@ -840,8 +847,7 @@ deliver the same input apart from the placement instructions and place every too
 the same table, and `tasks::runner::record` that both record the same tool events;
 `mcp::tests` covers the connection policy for computers (where each connection runs,
 command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
-kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts
-and that every bridge tool has a placement; `computers::runner` covers capability
+kept out of `Debug`); `bridge::permission` covers which tools the approval route accepts; `computers::runner` covers capability
 negotiation, including the protocol 3 fallback and reported `slots` and their bounds,
 the device runner and attached placements,
 and where each tool runs and which reach the

@@ -1,8 +1,11 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import type { Bot, BotWake } from '../stores/botStore.ts';
+import { invokeNative } from './native/transport.ts';
 import { observeRefresh } from './observe-refresh.ts';
+import { checksAutomatically } from './project-automation.ts';
+import type { RunRequest } from './run-types.ts';
 import { parseScheduleTiming } from './schedules.ts';
-import type { RunRequest } from './task-runtime.ts';
 
 /** A card a bot showed the person: a decision, a request for input, an action, sources or an update. */
 export interface BotCard {
@@ -122,7 +125,7 @@ export function botRequest(
     verifyCommand: project.preferences?.verifyCommand,
     prepareCommand: conversation ? undefined : project.preferences?.prepareCommand,
     setupFiles: project.preferences?.setupFiles,
-    autoVerify: conversation ? false : (project.preferences?.autoVerify ?? true),
+    autoVerify: conversation ? false : checksAutomatically(project.preferences),
   };
 }
 
@@ -215,39 +218,34 @@ interface HubState extends HubSnapshot {
   refresh: () => Promise<void>;
 }
 
-async function invoke<T>(command: string, args?: Record<string, unknown>) {
-  const { nativeTask } = await import('./task-runtime.ts');
-  return nativeTask<T>(command, args);
-}
-
 export const useBotHubStore = create<HubState>((set) => ({
   ...EMPTY,
   loaded: false,
   refresh: async () => {
     try {
-      set({ ...(await invoke<HubSnapshot>('bot_hub_snapshot')), loaded: true });
+      set({ ...(await invokeNative<HubSnapshot>('bot_hub_snapshot')), loaded: true });
     } catch (error) {
-      set({ error: String(error), loaded: true });
+      set({ error: describeError(error), loaded: true });
     }
   },
 }));
 
 export const answerCard = async (id: string, option?: number, text?: string) => {
-  await invoke('bot_hub_card', { id, action: 'answer', option, text });
+  await invokeNative('bot_hub_card', { id, action: 'answer', option, text });
   await useBotHubStore.getState().refresh();
 };
 export const dismissCard = async (id: string) => {
-  await invoke('bot_hub_card', { id, action: 'dismiss' });
+  await invokeNative('bot_hub_card', { id, action: 'dismiss' });
   await useBotHubStore.getState().refresh();
 };
 export const resolveProposal = async (id: string, action: 'accept' | 'dismiss', botId?: string) => {
-  await invoke('bot_hub_proposal', { id, action, botId });
+  await invokeNative('bot_hub_proposal', { id, action, botId });
   await useBotHubStore.getState().refresh();
 };
 /** Failures surface in the hub error so menu actions never fail silently. */
 export const setWakeUpsPaused = async (paused: boolean) => {
   try {
-    await invoke('bot_hub_pause', { paused });
+    await invokeNative('bot_hub_pause', { paused });
     await useBotHubStore.getState().refresh();
   } catch (error) {
     useBotHubStore.setState({
@@ -256,13 +254,13 @@ export const setWakeUpsPaused = async (paused: boolean) => {
   }
 };
 export const forgetNote = async (id: string) => {
-  await invoke('bot_hub_forget_note', { id });
+  await invokeNative('bot_hub_forget_note', { id });
   await useBotHubStore.getState().refresh();
 };
 export const wakeNow = (botId: string, wakeId: string) =>
-  invoke<string>('bot_hub_wake_now', { botId, wakeId });
+  invokeNative<string>('bot_hub_wake_now', { botId, wakeId });
 export const connectionTools = (projectId: string, connectionId: string) =>
-  invoke<{ name: string; description?: string }[]>('bot_hub_connection_tools', {
+  invokeNative<{ name: string; description?: string }[]>('bot_hub_connection_tools', {
     projectId,
     connectionId,
   });

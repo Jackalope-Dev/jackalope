@@ -100,10 +100,6 @@ fn open(record: &PlanRecord) -> bool {
             .is_some_and(|round| round.verdict.is_empty())
 }
 
-fn active(status: &str) -> bool {
-    ["starting", "running", "stopping", "routing", "queued"].contains(&status)
-}
-
 /// The current round's proposed assignments wait for a decision.
 fn proposed(record: &PlanRecord) -> bool {
     open(record)
@@ -211,12 +207,7 @@ pub fn parse_verdict(text: &str) -> Result<Verdict, String> {
 }
 
 fn protected(scope: &str) -> bool {
-    let scope = scope
-        .trim()
-        .replace('\\', "/")
-        .trim_start_matches("./")
-        .to_ascii_lowercase();
-    scope == ".jackalope" || scope.starts_with(".jackalope/")
+    crate::commands::scope_path::contains(".jackalope", scope)
 }
 
 /// The next round's assignments in the managed-task JSON shape, so the usual
@@ -286,10 +277,10 @@ pub enum Outcome {
 /// A done verdict stands only when the plan's check passed on the integrated
 /// tree in the orchestrator's own attempt.
 pub fn decide(doc: &PlanDocument, round: u32, run: &TaskRun, check: Option<&str>) -> Outcome {
-    if !matches!(run.status.as_str(), "review" | "reviewed") || run.error.is_some() {
+    if !run.status.is_done() || run.error.is_some() {
         return Outcome::Retry(format!(
             "The orchestrator attempt ended without a verdict ({}).",
-            run.error.as_deref().unwrap_or(&run.status)
+            run.error.as_deref().unwrap_or(run.status.as_str())
         ));
     }
     match parse_verdict(&run.result) {
@@ -386,7 +377,7 @@ fn attempt_step(last: Option<&String>, handled: &[String], runs: &[TaskRun]) -> 
             "The orchestrator attempt is missing from task history. Resume to review the round again."
                 .into(),
         ),
-        Some(run) if active(&run.status) || run.finishing => Step::Wait,
+        Some(run) if run.status.is_active() || run.finishing => Step::Wait,
         Some(_) => Step::Read(id.clone()),
     }
 }
@@ -464,16 +455,8 @@ fn normalize(scope: &str) -> String {
 
 /// Whether two scopes can touch the same files: equal, nested, or the root.
 pub fn overlaps(a: &str, b: &str) -> bool {
-    let (a, b) = (
-        normalize(a).to_ascii_lowercase(),
-        normalize(b).to_ascii_lowercase(),
-    );
-    let root = |scope: &str| scope.is_empty() || scope == ".";
-    root(a.as_str())
-        || root(b.as_str())
-        || a == b
-        || a.starts_with(&format!("{b}/"))
-        || b.starts_with(&format!("{a}/"))
+    let root = |scope: &str| normalize(scope).is_empty();
+    root(a) || root(b) || crate::commands::scope_path::overlaps(a, b)
 }
 
 /// Splits a plan into at most `most` review areas by its tasks' scopes,
@@ -700,7 +683,7 @@ pub struct RoundsView {
 fn live(run_id: Option<&String>, runs: &[TaskRun]) -> bool {
     run_id
         .and_then(|id| runs.iter().find(|run| &run.id == id))
-        .is_some_and(|run| active(&run.status) || run.finishing)
+        .is_some_and(|run| run.status.is_active() || run.finishing)
 }
 
 pub fn view(
@@ -1485,7 +1468,7 @@ pub fn action(
         let runs = coordinator.runtime.integration_runs()?;
         for run in runs
             .iter()
-            .filter(|run| round.review_run_ids.contains(&run.id) && active(&run.status))
+            .filter(|run| round.review_run_ids.contains(&run.id) && run.status.is_active())
         {
             coordinator.runtime.stop(&run.id)?;
         }

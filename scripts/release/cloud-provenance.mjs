@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { appendFile } from 'node:fs/promises';
+import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 
 const id = process.env.CANDIDATE_RUN;
 const branch = process.env.GITHUB_REF_NAME;
 const repo = process.env.GITHUB_REPOSITORY;
-if (!/^\d+$/.test(id ?? '') || !['beta', 'stable'].includes(branch))
+if (!/^\d+$/.test(id ?? '') || !isReleaseChannel(branch))
   throw new Error('Select a completed candidate run from beta or stable');
 const api = (path) =>
   JSON.parse(

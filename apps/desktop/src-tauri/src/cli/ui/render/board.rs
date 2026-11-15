@@ -10,7 +10,7 @@ use super::super::pickers::{Action, Picker};
 use super::super::{App, Click};
 use super::hit;
 use crate::brand::{self, Surface};
-use crate::protocol::{self, SessionSummary};
+use crate::protocol::{self, RunStatus, SessionSummary};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -23,28 +23,43 @@ const AGENT_WIDTH: usize = 14;
 
 /// A conversation's state as a glyph, a label and its colour.
 fn state(app: &App, session: &SessionSummary) -> (&'static str, &'static str, Color) {
-    let unicode = brand::unicode();
     if needs_you(session) {
         (
-            if unicode { "◆" } else { "!" },
+            brand::mark_glyph(brand::Mark::Question),
             "NEEDS YOU",
             brand::warning(),
         )
-    } else if protocol::working(session.status.as_deref()) {
+    } else if protocol::working(session.status.as_ref()) {
         (brand::spinner(app.tick), "WORKING", brand::accent())
     } else if session.paused {
-        (if unicode { "‖" } else { "=" }, "PAUSED", brand::muted())
+        (
+            brand::mark_glyph(brand::Mark::Paused),
+            "PAUSED",
+            brand::muted(),
+        )
     } else {
-        match session.status.as_deref() {
-            Some("review") => (if unicode { "✓" } else { "+" }, "READY", brand::success()),
-            Some("reviewed") => (if unicode { "✓" } else { "+" }, "REVIEWED", brand::muted()),
-            Some("failed" | "error") => {
-                (if unicode { "✗" } else { "x" }, "FAILED", brand::danger())
-            }
-            Some(status) if protocol::STOPPED.contains(&status) => {
-                (if unicode { "■" } else { "#" }, "STOPPED", brand::muted())
-            }
-            _ => (if unicode { "○" } else { "o" }, "IDLE", brand::muted()),
+        match &session.status {
+            Some(RunStatus::Review) => (
+                brand::mark_glyph(brand::Mark::Done),
+                "READY",
+                brand::success(),
+            ),
+            Some(RunStatus::Reviewed) => (
+                brand::mark_glyph(brand::Mark::Done),
+                "REVIEWED",
+                brand::muted(),
+            ),
+            Some(RunStatus::Failed) => (
+                brand::mark_glyph(brand::Mark::Failed),
+                "FAILED",
+                brand::danger(),
+            ),
+            Some(status) if status.is_stopped() => (
+                brand::mark_glyph(brand::Mark::Stopped),
+                "STOPPED",
+                brand::muted(),
+            ),
+            _ => (brand::mark_glyph(brand::Mark::Idle), "IDLE", brand::muted()),
         }
     }
 }
@@ -55,11 +70,11 @@ fn doing(app: &App, session: &SessionSummary) -> String {
         "asking a question".to_string()
     } else if let Some(error) = protocol::present(session.error.as_deref()) {
         error.lines().next().unwrap_or_default().to_string()
-    } else if protocol::working(session.status.as_deref()) {
+    } else if protocol::working(session.status.as_ref()) {
         session.step.clone().unwrap_or_else(|| "working".into())
     } else {
-        match session.status.as_deref() {
-            Some("review") => "ready to review".into(),
+        match session.status {
+            Some(RunStatus::Review) => "ready to review".into(),
             _ => String::new(),
         }
     };
@@ -107,7 +122,7 @@ pub fn draw(frame: &mut Frame, app: &App, picker: &Picker, area: Rect) {
     let working = app
         .sessions
         .iter()
-        .filter(|session| !needs_you(session) && protocol::working(session.status.as_deref()))
+        .filter(|session| !needs_you(session) && protocol::working(session.status.as_ref()))
         .count();
     let mut header = vec![
         Span::styled(

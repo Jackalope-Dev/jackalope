@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.34"
+version = "0.1.35"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -45,7 +45,7 @@ chrono = { version = "0.4", features = ["serde"] }
 portable-pty = "0.9"
 axum = "0.8"
 uuid = { version = "1", features = ["v4"] }
-rmcp = { version = "=3.8.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
+rmcp = { version = "=3.9.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
 
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
@@ -65,6 +65,9 @@ notify-debouncer-mini = "=0.7.0"
 gix = { version = "=0.90.0", default-features = false, features = ["sha1", "sha256"] }
 flate2 = "1.1.10"
 tar = "0.4.46"
+# Reads Codex session rollouts that Codex compresses once idle. Decoding only;
+# frame checksums are not verified, so the hash dependency stays out.
+ruzstd = { version = "0.9.1", default-features = false, features = ["std"] }
 # Terminal UI for the `jackalope` binary. Only the crossterm backend is used;
 # the termwiz and termina backends would add dependencies and licence notices
 # for code that never runs. `unstable-rendered-line-info` measures wrapped

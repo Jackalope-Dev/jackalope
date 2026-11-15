@@ -1,8 +1,7 @@
-import { RefreshIcon, SearchField, SearchIcon } from '@jackalope/ui';
+import { Button, RefreshIcon, SearchField, SearchIcon } from '@jackalope/ui';
 import { ArrowRight, CheckCheck, FileCode2, FileQuestion, Info, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { CodebaseReference, CodebaseSnapshot } from '../../lib/codebase';
-import { Button } from '../ui/button';
 export function CodebaseChecks({
   snapshot,
   cycles,

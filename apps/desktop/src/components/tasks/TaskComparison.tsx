@@ -1,8 +1,23 @@
+import {
+  durationLabel,
+  elapsedLabel,
+  isActive,
+  isDone,
+  statusLabel,
+} from '@jackalope/contracts/runs';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  InlineNotice,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Columns2, Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { getAgentMetadata } from '../../lib/agent-catalog';
+import { agentAdapter, getAgentMetadata } from '../../lib/agent-catalog';
 import {
   attemptLabel,
   buildCombinePrompt,
@@ -12,32 +27,20 @@ import {
   pickJudgeAgent,
 } from '../../lib/compare-judge';
 import { startComparisonJudge } from '../../lib/compare-launch';
-import {
-  durationLabel,
-  elapsedLabel,
-  isActive,
-  nativeTask,
-  statusLabel,
-  type TaskRun,
-} from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { ChangeStats, TaskRun } from '../../lib/run-types';
 import { latestAttempt } from '../../lib/task-workflow';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { type Comparison, comparisonForTask, useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
-
-interface Stats {
-  files: number;
-  added: number;
-  removed: number;
-}
+import { describeError } from '@jackalope/contracts/errors';
+import { taskChangeStats } from '../../lib/task-client';
+import { ActionError } from '../ui/ActionError';
 
 function duration(run: TaskRun) {
   if (run.durationMs != null) return durationLabel(run.durationMs / 1000);
@@ -55,8 +58,6 @@ function plainText(markdown: string) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-
-const isFinished = (run: TaskRun) => ['review', 'reviewed'].includes(run.status);
 
 function checkLabel(run: TaskRun) {
   if (!run.verification) return run.verifyCommand ? 'Not run' : 'No check';
@@ -79,8 +80,7 @@ export function TaskComparison({ run }: { run: TaskRun }) {
     .map((taskId) => latestAttempt(runs, taskId))
     .filter((member): member is TaskRun => !!member);
   if (members.length < 2 && !comparison.failures?.length) return null;
-  const adapter = (agent: string) =>
-    customAgents.find((custom) => custom.id === agent)?.adapter ?? agent;
+  const adapter = (agent: string) => agentAdapter(agent, customAgents);
   const name = (agent: string) =>
     runners.find((runner) => runner.id === agent)?.name ??
     customAgents.find((custom) => custom.id === agent)?.name ??
@@ -166,14 +166,14 @@ function ComparisonDialog({
   onClose: () => void;
 }) {
   const { id: comparisonId, prompt, chosenTaskId, judge } = comparison;
-  const [stats, setStats] = useState<Record<string, Stats | 'error'>>({});
+  const [stats, setStats] = useState<Record<string, ChangeStats | 'error'>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const runners = useExecutionStore(useShallow((state) => state.runners));
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === comparison.projectId),
   );
-  const finished = members.filter(isFinished);
+  const finished = members.filter(isDone);
   const judgeOptions = runners
     .filter((runner) => runner.available)
     .map((runner) => ({ id: runner.id, name: runner.name, adapter: adapter(runner.id) }));
@@ -191,13 +191,13 @@ function ComparisonDialog({
     .filter((attempt): attempt is LabelledAttempt => !!attempt);
   const labelFor = (taskId: string) =>
     attempts.find((attempt) => attempt.run.taskId === taskId)?.label;
-  const judgeDone = judgeRun && isFinished(judgeRun) ? judgeRun.id : '';
+  const judgeDone = judgeRun && isDone(judgeRun) ? judgeRun.id : '';
   const [fetched, setFetched] = useState<{ id: string; result: string }>();
   // Run summaries omit the final answer, so read the finished judge's full record once.
   useEffect(() => {
     if (!judgeDone) return;
     let canceled = false;
-    nativeTask<TaskRun[]>('task_runs', { detailId: judgeDone })
+    invokeNative<TaskRun[]>('task_runs', { detailId: judgeDone })
       .then((all) => {
         const result = all.find((item) => item.id === judgeDone)?.result ?? '';
         if (!canceled) setFetched({ id: judgeDone, result });
@@ -250,7 +250,7 @@ function ComparisonDialog({
       });
       setSkippedPorts(new Set());
     } catch (cause) {
-      setError(`The judge could not start. ${String(cause)}`);
+      setError(`The judge could not start. ${describeError(cause)}`);
     } finally {
       setJudging(false);
     }
@@ -281,7 +281,7 @@ function ComparisonDialog({
     let canceled = false;
     const ids = finishedIds.split(',').filter(Boolean);
     if (ids.length)
-      nativeTask<Record<string, Stats>>('task_change_stats', { ids })
+      taskChangeStats(ids)
         .then((result) => {
           if (!canceled) setStats(Object.fromEntries(ids.map((id) => [id, result[id] ?? 'error'])));
         })
@@ -299,9 +299,9 @@ function ComparisonDialog({
     for (const member of members) {
       if (member.taskId === winner.taskId || isActive(member) || member.archivedAt) continue;
       try {
-        await nativeTask('task_set_archived', { id: member.id, archived: true });
+        await invokeNative('task_set_archived', { id: member.id, archived: true });
       } catch (cause) {
-        failures.push(`${name(member.agent)}: ${String(cause)}`);
+        failures.push(`${name(member.agent)}: ${describeError(cause)}`);
       }
     }
     useCompareStore.getState().choose(comparisonId, winner.taskId);
@@ -434,13 +434,13 @@ function ComparisonDialog({
                 >
                   Open
                 </Button>
-                <Button disabled={busy || !isFinished(member)} onClick={() => void keep(member)}>
+                <Button disabled={busy || !isDone(member)} onClick={() => void keep(member)}>
                   Keep this one
                 </Button>
                 {ports.length > 0 && (
                   <Button
                     variant="outline"
-                    disabled={busy || !isFinished(member)}
+                    disabled={busy || !isDone(member)}
                     onClick={() => void keep(member, ports)}
                   >
                     Keep and combine
@@ -451,7 +451,7 @@ function ComparisonDialog({
           );
         })}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <DialogFooter>
         <p className="task-comparison-footnote">
           Keeping one archives the other finished attempts. Archived work, branches and worktrees

@@ -1,18 +1,57 @@
 use super::*;
 
+/// Activity entries a run keeps; older ones are dropped.
+pub(in crate::commands) const ACTIVITY_KEPT: usize = 150;
+/// Tool calls remembered while waiting for their result; agents run a few at once.
+const PENDING_TOOLS_KEPT: usize = 64;
+
 pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
     if text.trim().is_empty() {
         return;
     }
+    // Redacted before it is shortened, so the cut cannot leave part of a value.
+    let text = match &run.secrets {
+        Some(secrets) => secrets.redacted(text),
+        None => std::borrow::Cow::Borrowed(text),
+    };
     let bounded: String = text.chars().take(6000).collect();
     run.activity.push(bounded);
-    if run.activity.len() > 150 {
+    if run.activity.len() > ACTIVITY_KEPT {
         run.activity.remove(0);
     }
 }
 
 pub(super) fn num(value: &Value, key: &str) -> u64 {
     value[key].as_u64().unwrap_or(0)
+}
+
+/// Totals the per-call usage an attempt observed when its agent ended without reporting
+/// its own total (stopped, failed, or interrupted when Jackalope closed), so the attempt
+/// still records what it used. Each call counts once, subagent calls included; calls the
+/// agent made after its last observation, and the cost, stay unknown.
+pub(in crate::commands) fn settle_usage(run: &mut TaskRun) {
+    if run.usage.reported || run.usage_observations.is_empty() {
+        return;
+    }
+    let mut usage = Usage {
+        reported: true,
+        ..Usage::default()
+    };
+    for observed in &run.usage_observations {
+        usage.input = usage.input.saturating_add(observed.input);
+        usage.output = usage.output.saturating_add(observed.output);
+        usage.cache_read = usage.cache_read.saturating_add(observed.cache_read);
+        usage.cache_write = usage.cache_write.saturating_add(observed.cache_write);
+    }
+    run.usage = usage;
+    let calls = run.usage_observations.len();
+    activity(
+        run,
+        &format!(
+            "Usage totals the {calls} model call{} observed; the agent ended without reporting its own total or cost.",
+            if calls == 1 { "" } else { "s" }
+        ),
+    );
 }
 
 #[cfg(test)]
@@ -31,11 +70,12 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
     if let Some(failure) = super::routing::quota_failure(&event) {
         run.quota_failure = Some(failure);
     }
-    if adapter == "opencode" {
+    let protocol = crate::commands::agents::find(adapter).map(|agent| agent.protocol);
+    if protocol == Some(Protocol::Opencode) {
         consume_opencode_event(run, &event, kind);
         return;
     }
-    if adapter == "kimi" || adapter == "acp" {
+    if protocol == Some(Protocol::Acp) {
         if event["role"] == "tool"
             || event["tool_calls"]
                 .as_array()
@@ -51,20 +91,26 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         return;
     }
     let child = event["parent_tool_use_id"].as_str();
-    if ["claude", "grok"].contains(&adapter) && event["type"] == "assistant" {
+    if protocol == Some(Protocol::ClaudeStream) && event["type"] == "assistant" {
         let message = &event["message"];
         let usage = &message["usage"];
         if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {
             if usage["input_tokens"].is_u64() && usage["output_tokens"].is_u64() {
+                let (read, write) = (
+                    num(usage, "cache_read_input_tokens"),
+                    num(usage, "cache_creation_input_tokens"),
+                );
                 let observation = UsageObservation {
                     session_id: None,
                     message_id: id.to_string(),
                     parent_tool_use_id: child.map(str::to_string),
                     model: message["model"].as_str().map(str::to_string),
                     input: num(usage, "input_tokens")
-                        .saturating_add(num(usage, "cache_read_input_tokens"))
-                        .saturating_add(num(usage, "cache_creation_input_tokens")),
+                        .saturating_add(read)
+                        .saturating_add(write),
                     output: num(usage, "output_tokens"),
+                    cache_read: read,
+                    cache_write: write,
                 };
                 if let Some(old) = run
                     .usage_observations
@@ -89,10 +135,10 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         .as_str()
         .or(event["message"]["model"].as_str())
     {
-        run.model = Some(model.into());
+        super::served_model::observe(run, model);
     }
-    match (adapter, kind) {
-        ("codex", "item.started") => {
+    match (protocol, kind) {
+        (Some(Protocol::Codex), "item.started") => {
             let item = &event["item"];
             let name = match item["type"].as_str() {
                 Some("command_execution") => "command_execution",
@@ -103,7 +149,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
             let label = super::tool_activity::label(name, item, &run.workspace);
             activity(run, &label);
         }
-        ("codex", "item.completed") => {
+        (Some(Protocol::Codex), "item.completed") => {
             let item = &event["item"];
             if item["type"] == "agent_message" {
                 run.result = item["text"]
@@ -130,14 +176,18 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     );
                 }
             } else if item["type"] == "mcp_tool_call" {
-                activity(
-                    run,
-                    if item["status"] == "failed" {
-                        "Tool request failed"
-                    } else {
-                        "Tool finished"
-                    },
-                );
+                if item["status"] == "failed" {
+                    let step = item["tool"]
+                        .as_str()
+                        .map(|tool| super::tool_activity::label(tool, item, &run.workspace));
+                    let error = item["error"]["message"]
+                        .as_str()
+                        .or(item["error"].as_str())
+                        .unwrap_or("");
+                    activity(run, &super::tool_activity::failure(step.as_deref(), error));
+                } else {
+                    activity(run, "Tool finished");
+                }
             } else if let Some(command) = item["command"].as_str() {
                 activity(
                     run,
@@ -159,7 +209,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 );
             }
         }
-        ("codex", "turn.completed") => {
+        (Some(Protocol::Codex), "turn.completed") => {
             let u = &event["usage"];
             if u["input_tokens"].is_u64() && u["output_tokens"].is_u64() {
                 run.usage = Usage {
@@ -180,38 +230,76 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     .into(),
             );
         }
-        ("claude" | "grok", "assistant") => {
+        (Some(Protocol::ClaudeStream), "assistant") => {
             if let Some(content) = event["message"]["content"].as_array() {
                 for block in content {
                     if let Some(text) = block["text"].as_str() {
                         activity(run, text);
+                        if let Some(error) = super::failure::provider_error_text(text) {
+                            run.provider_error = Some(error);
+                        }
                     }
                     if block["type"] == "tool_use" {
                         if let Some(name) = block["name"].as_str() {
                             let label =
                                 super::tool_activity::label(name, &block["input"], &run.workspace);
                             activity(run, &label);
+                            if let Some(id) = block["id"].as_str() {
+                                if run.pending_tools.len() >= PENDING_TOOLS_KEPT {
+                                    run.pending_tools.clear();
+                                }
+                                run.pending_tools.insert(id.into(), label);
+                            }
                         }
                     }
                 }
             }
         }
-        ("claude" | "grok", "user") => {
+        (Some(Protocol::ClaudeStream), "user") => {
             for block in event["message"]["content"].as_array().into_iter().flatten() {
-                if block["type"] == "tool_result" && block["is_error"] == true {
-                    activity(run, "Tool request failed");
+                if block["type"] != "tool_result" {
+                    continue;
+                }
+                let step = block["tool_use_id"]
+                    .as_str()
+                    .and_then(|id| run.pending_tools.remove(id));
+                if block["is_error"] == true {
+                    let error = match &block["content"] {
+                        Value::String(text) => text.clone(),
+                        Value::Array(parts) => parts
+                            .iter()
+                            .filter_map(|part| part["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        _ => String::new(),
+                    };
+                    activity(run, &super::tool_activity::failure(step.as_deref(), &error));
                 }
             }
         }
-        ("claude" | "grok", "result") => {
+        (Some(Protocol::ClaudeStream), "result") => {
             run.result = event["result"]
                 .as_str()
                 .unwrap_or("")
                 .chars()
                 .take(120_000)
                 .collect();
+            // The CLI retries a provider error it printed mid-turn; only an unanswered
+            // turn fails with it.
+            let printed = super::failure::provider_error_text(&run.result).or_else(|| {
+                run.provider_error
+                    .take()
+                    .filter(|_| run.result.trim().is_empty())
+            });
             if event["is_error"] == true {
-                run.error = Some(extract_error_message(&event, adapter));
+                run.error = Some(
+                    printed
+                        .or_else(|| reported_error(&event))
+                        .unwrap_or_else(|| unexplained_error(&event, adapter)),
+                );
+            } else if let Some(error) = printed {
+                run.result.clear();
+                run.error = Some(error);
             }
             let u = &event["usage"];
             if u["input_tokens"].is_u64() && u["output_tokens"].is_u64() {
@@ -236,7 +324,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     .take(8)
                     .collect();
                 activity(run, &format!("{} tool request(s) were denied by the agent's permission policy: {}. Review the result before continuing.", denials.len(), tools.join(", ")));
-                run.error.get_or_insert("Claude Code was denied a required permission. Allow the operation and continue the task, or review what was blocked.".into());
+                run.error.get_or_insert(format!("{} was denied a required permission. Allow the operation and continue the task, or review what was blocked.", crate::commands::agents::name(adapter)));
             }
         }
         _ => {}
@@ -288,6 +376,8 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
                 model: run.model.clone(),
                 input,
                 output,
+                cache_read: read,
+                cache_write: write,
             });
             run.usage.input = run.usage.input.saturating_add(input);
             run.usage.output = run.usage.output.saturating_add(output);
@@ -315,7 +405,12 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
     }
 }
 
-fn extract_error_message(event: &Value, adapter: &str) -> String {
+fn short_name(adapter: &str) -> &str {
+    crate::commands::agents::find(adapter).map_or(adapter, |agent| agent.short_name.as_str())
+}
+
+/// The error a result event names, from its most specific field.
+fn reported_error(event: &Value) -> Option<String> {
     if let Some(errors) = event["errors"].as_array() {
         let messages: Vec<_> = errors
             .iter()
@@ -327,54 +422,29 @@ fn extract_error_message(event: &Value, adapter: &str) -> String {
             .filter(|s| !s.trim().is_empty() && *s != "null")
             .collect();
         if !messages.is_empty() {
-            return messages.join("\n");
+            return Some(messages.join("\n"));
         }
     }
-    if let Some(err_str) = event["errors"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return err_str.to_string();
-    }
-    if let Some(err_str) = event["error"]["message"]
-        .as_str()
-        .or_else(|| event["error"]["data"]["message"].as_str())
-        .or_else(|| event["error"].as_str())
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return err_str.to_string();
-    }
-    if let Some(msg) = event["message"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return msg.to_string();
-    }
-    if let Some(result) = event["result"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty() && *s != "null")
-    {
-        return result.to_string();
-    }
+    [
+        &event["errors"],
+        &event["error"]["message"],
+        &event["error"]["data"]["message"],
+        &event["error"],
+        &event["message"],
+        &event["result"],
+    ]
+    .into_iter()
+    .filter_map(Value::as_str)
+    .find(|s| !s.trim().is_empty() && *s != "null")
+    .map(str::to_string)
+}
+
+fn unexplained_error(event: &Value, adapter: &str) -> String {
     if let Some(subtype) = event["subtype"]
         .as_str()
         .filter(|s| !s.trim().is_empty() && *s != "null")
     {
-        return format!(
-            "{} error: {subtype}",
-            if adapter == "claude" {
-                "Claude"
-            } else {
-                "Grok"
-            }
-        );
+        return format!("{} error: {subtype}", short_name(adapter));
     }
-    format!(
-        "{} reported an error.",
-        if adapter == "claude" {
-            "Claude"
-        } else {
-            "Grok"
-        }
-    )
+    format!("{} reported an error.", short_name(adapter))
 }

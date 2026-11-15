@@ -10,7 +10,9 @@
 
 use super::swarm_setup::Removal;
 use super::*;
-use crate::commands::{account_storage, cloudflare_artifacts, tasks::TaskRun};
+use crate::commands::{
+    account_storage, cloudflare::connection, cloudflare_artifacts, tasks::TaskRun,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -85,13 +87,10 @@ fn storage(runtime: &TaskRuntime) -> std::path::PathBuf {
 }
 
 pub(super) fn connection(runtime: &TaskRuntime) -> Result<Option<Connection>, String> {
-    account_storage::read(&storage(runtime))?
-        .map(|bytes| {
-            serde_json::from_slice(&bytes).map_err(|_| {
-                "The saved swarm connection could not be read. Remove it and connect again.".into()
-            })
-        })
-        .transpose()
+    account_storage::read_json(
+        &storage(runtime),
+        "The saved swarm connection could not be read. Remove it and connect again.",
+    )
 }
 
 /// Whether a swarm Worker is connected; plans offer the swarm shape only then.
@@ -128,11 +127,7 @@ pub(super) fn validate(connection: &Connection) -> Result<String, String> {
 }
 
 fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
+    crate::commands::http::client(Duration::from_secs(60))
 }
 
 pub(super) async fn call(
@@ -419,9 +414,7 @@ pub(super) fn status_value(runtime: &TaskRuntime) -> Result<Value, String> {
     let Some(connection) = connection(runtime)? else {
         return Ok(json!({"configured": false}));
     };
-    let cloudflare = cloudflare_artifacts::workers_access_saved(runtime)
-        .ok()
-        .flatten();
+    let cloudflare = connection::workers_access_saved(runtime).ok().flatten();
     let update = match (&connection.deployment, &cloudflare) {
         (Some(deployment), Some(access)) => update_available(
             deployment,
@@ -457,10 +450,7 @@ pub(super) async fn check_and_save(
         None,
     )
     .await?;
-    account_storage::write(
-        &storage(&service.runtime),
-        &serde_json::to_vec(&candidate).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&storage(&service.runtime), &candidate)?;
     let service = service.clone();
     tauri::async_runtime::spawn(async move {
         let _ = sync(&service).await;

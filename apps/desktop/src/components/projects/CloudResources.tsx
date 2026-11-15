@@ -9,12 +9,15 @@ import {
   InlineNotice,
   Input,
   LinkButton,
+  LoadingState,
+  SecretField,
   Stepper,
   type StepperStep,
   Textarea,
 } from '@jackalope/ui';
 import { Cloud, MoreHorizontal } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { openProjectSettings, openSettings } from '../../lib/app-events';
 import {
   CLOUD_RESOURCES,
   type CloudResourceKind,
@@ -29,9 +32,7 @@ import {
 } from '../../lib/cloud-resources-plan';
 import {
   ARTIFACTS_TOKEN_URL,
-  beginCloudflareSignIn,
   cancelCloudflareSignIn,
-  completeCloudflareSignIn,
   reauthorizeCloudflare,
 } from '../../lib/cloudflare-artifacts';
 import {
@@ -46,14 +47,14 @@ import {
   provisionCloudResources,
   turnstileSecret,
 } from '../../lib/cloudflare-resources';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CloudResourcesDraft, useCloudResourcesStore } from '../../stores/cloudResourcesStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { openProjectSettings, openSettings } from '../layout/navigation';
-import { LoadingState } from '../ui/LoadingState';
+import { useActiveProject } from '../../stores/projectStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';
+import { describeError, errorCode } from '@jackalope/contracts/errors';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
 
 interface Run {
   kinds: CloudResourceKind[];
@@ -64,14 +65,17 @@ interface Run {
   failure?: CloudResourcesFailure;
 }
 
-const signInFailure = (message: string): CloudResourcesFailure => ({
-  step: 'account',
-  message,
-  recovery: message.includes('API token') ? 'token' : null,
-  link: message.includes('API token') ? ARTIFACTS_TOKEN_URL : null,
-  scopes: [],
-  permissions: [],
-});
+const signInFailure = (cause: unknown): CloudResourcesFailure => {
+  const token = errorCode(cause) === 'apiToken';
+  return {
+    step: 'account',
+    message: describeError(cause),
+    recovery: token ? 'token' : null,
+    link: token ? ARTIFACTS_TOKEN_URL : null,
+    scopes: [],
+    permissions: [],
+  };
+};
 
 function runSteps(run: Run): StepperStep[] {
   const ids: CloudResourceStep[] = ['account', ...run.kinds, 'manifest'];
@@ -96,9 +100,7 @@ function runSteps(run: Run): StepperStep[] {
  * are kept across Back, retry and reload until setup succeeds.
  */
 export function CloudResources() {
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const savedDraft = useCloudResourcesStore((state) =>
     project ? state.drafts[project.id] : undefined,
   );
@@ -109,7 +111,7 @@ export function CloudResources() {
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const signingIn = useRef(false);
+  const cloudflareSignIn = useCloudflareSignIn();
   const projectPath = project?.path;
 
   const draft: CloudResourcesDraft = savedDraft ?? {
@@ -135,14 +137,8 @@ export function CloudResources() {
         const drafted = project?.id && useCloudResourcesStore.getState().drafts[project.id];
         setView((current) => current ?? (next?.manifest && !drafted ? 'result' : 'choose'));
       })
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, [refresh, project?.id]);
-  useEffect(
-    () => () => {
-      if (signingIn.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
 
   if (!project) {
     return (
@@ -154,7 +150,7 @@ export function CloudResources() {
   }
   const projectId = project.id;
   const open = (link: string) =>
-    void openExternalUrl(link).catch((cause) => setError(String(cause)));
+    void openExternalUrl(link).catch((cause) => setError(describeError(cause)));
 
   const kinds = orderedKinds(draft.kinds);
   const needsPostgres =
@@ -172,16 +168,11 @@ export function CloudResources() {
   const toggle = (kind: CloudResourceKind, on: boolean) =>
     update({ kinds: on ? [...draft.kinds, kind] : draft.kinds.filter((item) => item !== kind) });
 
-  /** Connect Cloudflare again for the same account, asking for `scopes` as well. */
+  /** Connect Cloudflare again for the same account, asking for `scopes` as well. False when canceled. */
   const allow = async (scopes: string[]) => {
-    signingIn.current = true;
-    try {
-      await openExternalUrl(await beginCloudflareSignIn({ scopes }));
-      await completeCloudflareSignIn();
-      await reauthorizeCloudflare();
-    } finally {
-      signingIn.current = false;
-    }
+    if (!(await cloudflareSignIn({ scopes }))) return false;
+    await reauthorizeCloudflare();
+    return true;
   };
 
   const start = async (allowFirst?: string[]) => {
@@ -205,13 +196,13 @@ export function CloudResources() {
         if (scopes) {
           show({ ...state, current: 'account', signingIn: true, failure: undefined });
           try {
-            await allow(scopes);
-          } catch (cause) {
-            const message = String(cause);
-            if (message.includes('canceled')) {
+            if (!(await allow(scopes))) {
               setRun(null);
               setView('choose');
-            } else show({ ...state, signingIn: false, failure: signInFailure(message) });
+              return;
+            }
+          } catch (cause) {
+            show({ ...state, signingIn: false, failure: signInFailure(cause) });
             return;
           }
           scopes = undefined;
@@ -242,7 +233,7 @@ export function CloudResources() {
         return;
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setRun(null);
       setView('choose');
     } finally {
@@ -258,7 +249,7 @@ export function CloudResources() {
       const next = await refresh();
       if (!next?.manifest) setView('choose');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
 
@@ -329,6 +320,7 @@ export function CloudResources() {
             }
           >
             <Input
+              className="cloud-resources-prefix"
               value={draft.prefix}
               spellCheck={false}
               maxLength={40}
@@ -354,24 +346,26 @@ export function CloudResources() {
                       </span>
                     </label>
                     {checked && option.needs === 'postgres' && (
-                      <FormField
+                      <SecretField
                         className="cloud-resources-input"
                         label="Postgres connection string"
                         description="Kept in this computer’s protected storage and sent only to Cloudflare."
-                      >
-                        <Input
-                          type="password"
-                          autoComplete="off"
-                          spellCheck={false}
-                          value={postgresUrl}
-                          placeholder={
-                            needsPostgres
-                              ? 'postgres://user:password@host:5432/database'
-                              : 'Saved. Leave empty to keep it.'
-                          }
-                          onChange={(event) => setPostgresUrl(event.target.value)}
-                        />
-                      </FormField>
+                        value={postgresUrl}
+                        placeholder={
+                          needsPostgres
+                            ? 'postgres://user:password@host:5432/database'
+                            : 'Saved. Leave empty to keep it.'
+                        }
+                        onValueChange={setPostgresUrl}
+                        check={(value) =>
+                          /^postgres(ql)?:\/\/[^\s]+@[^\s]+/i.test(value.trim())
+                            ? { tone: 'ok', message: 'Looks like a Postgres connection string.' }
+                            : {
+                                tone: 'info',
+                                message: 'Usually postgres://user:password@host:5432/database.',
+                              }
+                        }
+                      />
                     )}
                     {checked && option.needs === 'domains' && (
                       <FormField
@@ -564,17 +558,23 @@ function ResourceRow({
             </IconButton>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end">
-              <DropdownMenu.Item onSelect={onForget}>Remove from Jackalope</DropdownMenu.Item>
+            <DropdownMenu.Content className="workspace-menu" align="end">
+              <DropdownMenu.Item className="workspace-menu-item" onSelect={onForget}>
+                Remove from Jackalope
+              </DropdownMenu.Item>
               {isProvisioned(resource.kind) && (
-                <DropdownMenu.Item
-                  onSelect={() => {
-                    setAcknowledged(false);
-                    setConfirming(true);
-                  }}
-                >
-                  Delete from Cloudflare…
-                </DropdownMenu.Item>
+                <>
+                  <DropdownMenu.Separator className="menu-separator" />
+                  <DropdownMenu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      setAcknowledged(false);
+                      setConfirming(true);
+                    }}
+                  >
+                    Delete from Cloudflare…
+                  </DropdownMenu.Item>
+                </>
               )}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

@@ -1,3 +1,4 @@
+import { isAccessToken } from '@jackalope/contracts/links';
 import { Button, Textarea } from '@jackalope/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessRequest } from './access-api';
@@ -36,7 +37,7 @@ export function FeedbackPage() {
       if (fragment.has('unsubscribe')) setUnsubscribe(true);
       else if (fragment.has('token')) setUnsubscribe(false);
       history.replaceState(null, '', location.pathname);
-      if (!/^[a-f0-9]{64}$/.test(value)) {
+      if (!isAccessToken(value)) {
         setError(
           'Open the private link in your feedback invitation. You can also send feedback from the app’s Updates & support settings.',
         );
@@ -209,7 +210,7 @@ export function FeedbackPage() {
       {error && (
         <div role="alert">
           <p>{error}</p>
-          {/^[a-f0-9]{64}$/.test(token) && (
+          {isAccessToken(token) && (
             <Button
               variant="secondary"
               type="button"

@@ -29,4 +29,4 @@ export async function buildAdmin() {
   );
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await buildAdmin();
+if (import.meta.main) await buildAdmin();

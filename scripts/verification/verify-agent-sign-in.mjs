@@ -75,7 +75,6 @@ try {
           const { default: React } = await import('/node_modules/.vite/deps/react.js');
           const { default: ReactDOM } = await import('/node_modules/.vite/deps/react-dom_client.js');
           await import('/src/index.css');
-          await import('/src/components/ui/experience.css');
           await import('/src/components/tasks/task-workspace.css');
           await import('/src/components/agents/agent-manager.css');
           const { useThemeStore } = await import('/src/stores/themeStore.ts');

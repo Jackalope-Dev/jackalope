@@ -1,11 +1,13 @@
+import { DiscordIcon, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
 import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { DISCORD_URL } from '../../lib/community';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { openHelp } from '../../lib/navigation';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { Tooltip } from '../ui/Tooltip';
 
 const isMac = isMacPlatform();
 
@@ -129,18 +131,36 @@ export function TitleBar({
             </button>
           </Tooltip>
         )}
-        <Tooltip content="Help Center">
-          <button
-            type="button"
-            className={`app-titlebar-button app-titlebar-help ${isMac ? 'app-titlebar-help-last' : ''}`}
-            aria-label="Help and knowledgebase"
-            onMouseDown={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
-          >
-            <LifeBuoy size={16} />
-          </button>
-        </Tooltip>
+        <Menu.Root>
+          <Tooltip content="Help and community">
+            <Menu.Trigger asChild>
+              <button
+                type="button"
+                className={`app-titlebar-button app-titlebar-help ${isMac ? 'app-titlebar-help-last' : ''}`}
+                aria-label="Help and community"
+                onMouseDown={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                <LifeBuoy size={16} />
+              </button>
+            </Menu.Trigger>
+          </Tooltip>
+          <Menu.Portal>
+            <Menu.Content className="workspace-menu min-w-52" align="end" sideOffset={8}>
+              <Menu.Item className="workspace-menu-item" onSelect={() => void openHelp()}>
+                <LifeBuoy size={16} aria-hidden="true" />
+                Help Center
+              </Menu.Item>
+              <Menu.Item
+                className="workspace-menu-item"
+                onSelect={() => void openExternalUrl(DISCORD_URL)}
+              >
+                <DiscordIcon size={16} aria-hidden="true" />
+                Join the Discord
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
         {native && !isMac && (
           <>
             <button

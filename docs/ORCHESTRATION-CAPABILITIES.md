@@ -23,6 +23,17 @@ use permitted HTTP calls. The same bridge implements project awareness, messages
 user questions and saved answers, browser evidence, validation and selected
 on-demand connection discovery. No transport bypasses a denied permission.
 
+Each tool is defined once, so the MCP tool and its HTTP route take the same input,
+run the same handler and fail the same way. An HTTP error is a status with a JSON
+`{"error": ...}` body. A question (`ask_user`, `request_human_action`) waits up to a
+minute for an answer over MCP before it returns pending; over HTTP it returns at once,
+since an agent's shell command may time out sooner and a retried command would ask
+again, and the agent polls `user_response`. An answer saved after the question returned
+pending is owed to the agent until `user_response` returns it; in a persistent Claude Code
+session it also arrives once as context after the agent's next tool call, so an agent that
+stopped polling still receives it. `GET /v1/help` lists each tool's HTTP
+contract; a lean attempt gets a short form unless it asks for `?full=true`.
+
 Project awareness includes manual tasks, queued assignments, latest attempts,
 declared scopes and dependencies. Manual scopes are explicitly unknown. Inventory
 covers loaded history; archived runs are excluded. Agents read it before editing
@@ -54,9 +65,10 @@ their existing APIs.
 If another launch owns the coordinator, optional delivery defers to the next
 checkpoint without consuming messages or delaying the completed tool result.
 
-This is delivery at Jackalope tool-response boundaries, not arbitrary shell or
-provider-tool calls. Non-JSON, streaming and responses over 8 MB remain unchanged;
-no polling model turns, automatic follow-ups or interruptions are introduced.
+This is delivery at Jackalope tool-response boundaries (and `GET /v1/help`), not
+arbitrary shell or provider-tool calls, and it does not depend on whether the MCP
+response streams. A computer runner's callbacks never carry updates, since no agent
+reads them. No polling model turns, automatic follow-ups or interruptions are introduced.
 Agents should still check the inbox before shared-interface changes when they have
 not used the harness recently. A transport interruption can lose a delivered excerpt;
 the durable inbox remains authoritative. Bridge unavailability blocks new launches
@@ -112,8 +124,9 @@ question the local classifier flags, reaches the person with an `escalation` rea
 [agent decisions](PLAN-MODE.md#agent-decisions).
 `request_human_action` asks the person to sign in, pay, create an account, add a secret or
 take another manual step: `kind` (`secret`, `sign_in`, `payment`, `account` or `other`), a
-`title` up to 120 characters, numbered `instructions` up to 2,000, an optional https `url`
-and, for a secret, a `secretName` shaped like an environment variable. It is never routed
+`title` up to 120 characters, numbered `instructions` up to 2,000, an optional `url`
+(https, or an `x-apple.systempreferences:` pane identifier that the desktop opens in macOS
+System Settings; other schemes and spaces are refused) and, for a secret, a `secretName` shaped like an environment variable. It is never routed
 to an agent. The app and the phone companion show it as a **Needs you** card with the steps,
 the link, a hint to add a secret under Project settings → Secrets, an optional note and
 **Done** or **I can't do this**; the agent waits like `ask_user` and reads `Done` or
@@ -125,8 +138,9 @@ restatement once at the start. See [task outcomes](TASK-OUTCOMES.md#evidence-lev
 `plan_deviation` is accepted only from attempts working on an approved plan, records the
 departure for the person and pauses that plan's dispatch; agents never edit the plan.
 
-HTTP messages use recipientTaskId; the MCP schema uses recipient_task_id. Omit it
-for broadcasts. Agents can see project broadcasts, their received messages and
+Messages name a recipient with `recipient_task_id` (`recipientTaskId` is also
+accepted); omit it for broadcasts. A message kind is `progress`, `blocker`, `handoff`,
+`dependency`, `interface`, `completion` or `waiting`. Agents can see project broadcasts, their received messages and
 their own sent messages. The user sees all project messages and acknowledgment
 counts. The retained journal is bounded to 2,000 messages; expired cursors require
 rereading and deduplicating retained messages. There is no infinite audit archive.
@@ -389,7 +403,7 @@ when builds are running to avoid locking Cargo's linker output.
 
 ## Cloud resources
 
-**Project settings → Cloud resources** (or **Cloud resources** on Project → Swarm) creates
+**Project settings → Integrations → Cloud resources** (or **Cloud resources** on Project → Swarm) creates
 what a project's Worker binds to in the Cloudflare account connected under Settings →
 Cloudflare. Without a connection the card links there instead. The screen offers R2, D1,
 KV, Queues, Durable Objects, Workers, Hyperdrive and Turnstile; R2, KV, Queues and Durable
@@ -445,8 +459,8 @@ defaults and validation. Neither reaches Cloudflare.
 Agent Configuration shows the selected adapter's support and limitations. Task
 options describe tool delivery, and incompatible selected connections show an
 explanation before launch. Custom agents inherit their configured adapter.
-The shared agent-capabilities.json drives frontend checks and native direct
-connection validation.
+The shared agent catalog (`src/lib/agents.json`) drives frontend checks and
+native direct connection validation.
 
 | Capability | Codex | Claude | Grok | OpenCode | Kimi | Antigravity | Gemini CLI |
 | --- | --- | --- | --- | --- | --- | --- | --- |

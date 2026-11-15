@@ -63,16 +63,17 @@ mod tests {
             ("Dockerfile", "FROM scratch\n"),
             ("start.sh", "#!/bin/sh\n"),
             ("agent.py", "print(1)\n"),
+            ("protocol.json", "{}\n"),
         ] {
             std::fs::write(directory.join(name), body).unwrap();
         }
         assert_eq!(
             super::super::docker::image_tag(&directory).unwrap(),
-            "jackalope-computer:a2510b669187"
+            "jackalope-computer:d8ea7fb8a163"
         );
         assert!(published(&directory)
             .unwrap()
-            .ends_with(&format!("{}-a2510b669187", env!("CARGO_PKG_VERSION"))));
+            .ends_with(&format!("{}-d8ea7fb8a163", env!("CARGO_PKG_VERSION"))));
         let _ = std::fs::remove_dir_all(&directory);
     }
 }

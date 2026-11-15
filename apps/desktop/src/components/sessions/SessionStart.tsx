@@ -1,41 +1,40 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Select, SelectItem, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { startComparison } from '../../lib/compare-launch';
-import type { ContextSelection } from '../../lib/knowledge';
+import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
-import { ATTACH_TO_COMPOSER, appendAttachments } from '../../lib/prompt-attachments';
+import { checksAutomatically } from '../../lib/project-automation';
+import { appendAttachments } from '../../lib/prompt-attachments';
 import { isQuestionOnly } from '../../lib/question-intent';
+import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
-import type { RunRequest } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { workspaceRequest } from '../../lib/workspace-mode';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { usePlanStore } from '../../stores/planStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
-import { navigateWorkspace } from '../layout/navigation';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
-import { PromptPresets } from '../tasks/PromptPresets';
 import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ChatOptions } from './ChatOptions';
 import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './ComposerAgentPicker';
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { selectWork } from '../../lib/work-selection';
 
 /** Saved work handed to the composer: a draft, an idea or an agent choice. */
 export interface ComposerSeed {
@@ -146,17 +145,12 @@ export function SessionStart({
   });
   const clearAssessment = useRef(assessment.clear);
   clearAssessment.current = assessment.clear;
-  useEffect(() => {
-    const receive = (event: Event) => {
-      const references = (event as CustomEvent<string[]>).detail;
-      if (!Array.isArray(references)) return;
-      clearAssessment.current();
-      setText((current) => appendAttachments(current, references));
-      input.current?.focus();
-    };
-    window.addEventListener(ATTACH_TO_COMPOSER, receive);
-    return () => window.removeEventListener(ATTACH_TO_COMPOSER, receive);
-  }, []);
+  useAppEvent('attach-to-composer', (references) => {
+    if (!Array.isArray(references)) return;
+    clearAssessment.current();
+    setText((current) => appendAttachments(current, references));
+    input.current?.focus();
+  });
   const latest = useRef(text);
   const sharpen = useSharpen({
     draft: text,
@@ -240,7 +234,6 @@ ${incoming}`
     setBusy(true);
     setError('');
     try {
-      await syncAgentConfig();
       if (comparing && choice !== 'interview') {
         const comparison = await startComparison({
           project,
@@ -262,7 +255,7 @@ ${incoming}`
         const first = useExecutionStore
           .getState()
           .runs.find((run) => run.taskId === comparison.taskIds[0]);
-        if (first) useExecutionStore.getState().select(first.id);
+        if (first) selectWork({ task: first.id });
         return;
       }
       const lead = chosen[0];
@@ -286,7 +279,7 @@ ${incoming}`
             ? undefined
             : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
-        autoVerify: !origin.readOnly && (project.preferences?.autoVerify ?? true),
+        autoVerify: !origin.readOnly && checksAutomatically(project.preferences),
         contextSelection: context,
       };
       if (choice === 'interview') {
@@ -326,7 +319,7 @@ ${incoming}`
       localStorage.removeItem(`${draftKey}:context`);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
+      if (mounted.current) setError(describeError(cause));
     } finally {
       sending.current = false;
       if (mounted.current) setBusy(false);
@@ -409,14 +402,6 @@ ${incoming}`
                   disabled={busy}
                 />
               )}
-              <PromptPresets
-                projectId={project.id}
-                onInsert={(prompt) => {
-                  assessment.clear();
-                  setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-                  input.current?.focus();
-                }}
-              />
               <DictationButton
                 disabled={busy}
                 onText={(value) => {

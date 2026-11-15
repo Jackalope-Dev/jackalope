@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 export type DeployOutcome = 'deployed' | 'failed' | 'check-failed' | 'rolled-back';
 
@@ -25,9 +25,9 @@ export interface DeployStatus {
 }
 
 export const deployStatus = (projectPath: string) =>
-  nativeTask<DeployStatus>('deploy_status', { projectPath });
+  invokeNative<DeployStatus>('deploy_status', { projectPath });
 export const deployAgain = (projectPath: string) =>
-  nativeTask<void>('deploy_again', { projectPath });
+  invokeNative<void>('deploy_again', { projectPath });
 
 export const DEPLOY_OUTCOME: Record<DeployOutcome, string> = {
   deployed: 'Deployed',

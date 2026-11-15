@@ -1,11 +1,18 @@
 import { findAuthor } from './authors.ts';
-import type { BlogPost, BlogSection, EditorialCover } from './blog-types.ts';
+import {
+  type BlogImage,
+  type BlogPost,
+  type BlogSection,
+  blogImageKinds,
+  type EditorialCover,
+} from './blog-types.ts';
 
 /**
  * Posts LopeBase publishes as `apps/website/content/blog/<slug>.md`: front matter with
  * JSON-quoted title, description, slug and tags, an unquoted YYYY-MM-DD date and
  * optional updated date, an optional one-line JSON faq ([{"q","a"}]), an optional
- * author (a slug from authors.ts, for the byline and author page), then the Markdown
+ * author (a slug from authors.ts, for the byline and author page), an optional cover
+ * (image: an https URL, image_alt, image_kind: title_card or artwork), then the Markdown
  * body. A file that does not parse throws, so the build (and the CI gate
  * that auto-merges these posts) fails instead of publishing a broken page.
  */
@@ -64,7 +71,31 @@ function frontMatter(file: string, source: string) {
   return { fields, body: source.slice(match[0].length) };
 }
 
-function parsePost(file: string, source: string): BlogPost {
+function parseImage(file: string, fields: Record<string, unknown>, title: string) {
+  const { image, image_alt: alt, image_kind: kind } = fields;
+  if (image === undefined) {
+    if (kind !== undefined || alt !== undefined)
+      throw new Error(`${file}: image_alt and image_kind need an image.`);
+    return undefined;
+  }
+  let url: URL | undefined;
+  try {
+    url = typeof image === 'string' ? new URL(image) : undefined;
+  } catch {}
+  if (url?.protocol !== 'https:' || url.username || url.password)
+    throw new Error(`${file}: image must be an https URL.`);
+  if (alt !== undefined && typeof alt !== 'string')
+    throw new Error(`${file}: image_alt must be text.`);
+  if (kind !== undefined && !blogImageKinds.includes(kind as never))
+    throw new Error(`${file}: image_kind must be ${blogImageKinds.join(' or ')}.`);
+  return {
+    url: url.href,
+    alt: alt?.trim() || title,
+    kind: kind as BlogImage['kind'],
+  } satisfies BlogImage;
+}
+
+export function parsePost(file: string, source: string): BlogPost {
   const { fields, body } = frontMatter(file, source);
   const { title, description, slug, date } = fields;
   const tags = Array.isArray(fields.tags) ? fields.tags.map(String) : [];
@@ -91,6 +122,7 @@ function parsePost(file: string, source: string): BlogPost {
       answer: String(pair?.a ?? '').trim(),
     }))
     .filter((pair) => pair.question && pair.answer);
+  const image = parseImage(file, fields, title);
 
   // A leading H1 repeats the title, which the page already renders.
   const lines = body.replace(/^\s*#\s+.*\r?\n/, '').split(/\r?\n/);
@@ -127,6 +159,7 @@ function parsePost(file: string, source: string): BlogPost {
     readingTime: `${Math.max(1, Math.round(words / 230))} min read`,
     description,
     cover: { ...covers[hash % covers.length], label: label[0].toUpperCase() + label.slice(1) },
+    image,
     intro: intro.join('\n').trim() || undefined,
     sections,
     faq: faq.length ? faq : undefined,

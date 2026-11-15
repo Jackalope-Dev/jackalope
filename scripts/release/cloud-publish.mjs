@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { httpsUrl, isReleaseChannel } from '../../packages/contracts/src/platform.ts';
+import { CLOUD_ORIGIN, cloudUpdateUrl } from '../../packages/contracts/src/release.ts';
 import { compare, root, sha256 } from './catalog.mjs';
 import { validateCloudFiles } from './cloud-artifacts.mjs';
 import { targets } from './cloud-targets.mjs';
@@ -26,7 +27,7 @@ export async function collectCandidates(
   directory,
   { expectedTargets, source, channel, publicKey },
 ) {
-  if (!/^[a-f0-9]{40}$/.test(source) || !['beta', 'stable'].includes(channel) || !publicKey)
+  if (!/^[a-f0-9]{40}$/.test(source) || !isReleaseChannel(channel) || !publicKey)
     throw new Error('Expected source, channel and updater key are required');
   const packages = [];
   const entries = await readdir(directory, { withFileTypes: true });
@@ -207,7 +208,7 @@ export async function publishCloud(
 async function assetHash(id) {
   if (typeof id !== 'string' || !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(id))
     throw new Error('Unrecognized asset ID');
-  return downloadHash(`https://cdn.crabnebula.app/asset/${id}`);
+  return downloadHash(`${CLOUD_ORIGIN}/asset/${id}`);
 }
 
 async function downloadHash(url) {
@@ -226,33 +227,31 @@ export async function verifyUpdateFeeds(
   { fetcher = fetch, readDownloadHash = downloadHash } = {},
 ) {
   for (const asset of plan.assets.filter((item) => item.updatePlatform)) {
-    const response = await fetcher(
-      `https://cdn.crabnebula.app/update/${application}/${asset.updatePlatform}/0.0.0?channel=${plan.channel}`,
-      { signal: AbortSignal.timeout(30000), redirect: 'error' },
-    );
+    const response = await fetcher(cloudUpdateUrl(asset.updatePlatform, plan.channel), {
+      signal: AbortSignal.timeout(30000),
+      redirect: 'error',
+    });
     if (response.status !== 200)
       throw new Error(
         `Update feed not ready for ${asset.updatePlatform}; retry publication verification`,
       );
     const manifest = await response.json();
-    const url = new URL(manifest.url);
+    const url = httpsUrl(manifest.url, { query: true });
     if (
       manifest.version !== plan.version ||
       manifest.signature !== asset.signature ||
-      url.origin !== 'https://cdn.crabnebula.app' ||
+      !url ||
+      url.origin !== CLOUD_ORIGIN ||
       // Cloud appends a `from` parameter describing the request; any other
       // query could redirect or alter the download.
       [...url.searchParams.keys()].some((key) => key !== 'from') ||
-      url.hash ||
-      url.username ||
-      url.password ||
       (await readDownloadHash(url.href)) !== asset.sha256
     )
       throw new Error(`Published update feed does not match ${asset.updatePlatform}`);
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   const directory = resolve(process.argv[2] ?? '');
   const publishing = process.argv[3] === 'publish';
   if (!process.argv[2] || !['draft', 'publish'].includes(process.argv[3]))

@@ -30,10 +30,15 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-settings-sync.mjs | Desktop 5179 | Sync consent, conflicts and theme rollback |
 | verify-connected-desktops.mjs | Starts its own website server on 5189 | Device metadata, legacy records and scoped revocation |
 | verify-feedback.mjs | Desktop 5297 and website 5296, VITE_ACCESS_API=https://feedback-fixture.invalid | Feedback forms, delivery states and opt-out |
-| verify-waitlist.mjs | Website 5198, VITE_ACCESS_API=https://api.jackalope.test | Waitlist, referrals, passes and admin fixtures |
+| verify-waitlist.mjs | Website 5198, VITE_ACCESS_API=https://api.jackalope.test | Waitlist, referrals, passes and email fixtures |
 | verify-passes-desktop.mjs | Desktop 5199 | Pass view, clipboard and keyboard |
 | verify-task-detail.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Task states, live step progress, preparation failure detail and retry dispatch |
+| verify-pull-requests.mjs | Desktop 5192; JACKALOPE_PREVIEW_URL override | Followed pull request lanes, the Delivery card, fix drafts, merge confirmation and stop following |
+| capture-walkthrough.mjs [--theme dark] [--width 960] | Desktop 5192; JACKALOPE_PREVIEW_URL override | Asserts nothing: saves a screenshot of every workspace page, tab, settings section and main menu plus contact sheets under output/playwright/walkthrough, for reviewing spacing, copy and flow |
 | verify-core-flows.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Project scope, unified work, keyboard search, preview readiness and delivery drafts |
+| verify-decisions.mjs | Desktop 5198; JACKALOPE_PREVIEW_URL override | Decision settings, project inheritance, key retry and removal |
+| verify-external-sessions.mjs | Desktop 5193; JACKALOPE_PREVIEW_URL override | Outside Jackalope sidebar group, transcript, continue and unavailable states, keyboard and appearance |
+| verify-task-cleanup.mjs | Desktop 5199; JACKALOPE_PREVIEW_URL override | Bulk archive and restore, undo, saved ideas and focus |
 | performance.mjs --production | Builds and starts its own fixture | History lists, output, rich rendering and production CSP |
 
 Some scripts create temporary entry files and remove them on completion. If one
@@ -56,7 +61,8 @@ fixture prerequisites before invoking them through a Playwright CLI session.
 - [Native development](SELF-DEVELOPMENT.md): disposable profiles, process ownership
   and actual window inspection.
 - [Agent support](AGENT-SUPPORT.md#run-opt-in-validation): installed CLI lifecycle
-  with the selected account/model. Real providers may consume quota.
+  with the selected account/model, and the opt-in agent × model scenario matrix.
+  Real providers may consume quota.
 - [Quality evaluation](AGENT-QUALITY.md): matched native executables and frozen
   prompt fixtures. Retain all failures and missing usage.
 - [Execution evaluation](EXECUTION-EVALUATION.md): single/serial/staged task trials.

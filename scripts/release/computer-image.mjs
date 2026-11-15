@@ -4,7 +4,6 @@
 import { createHash } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { root } from './catalog.mjs';
 
 const tauri = resolve(root, 'apps/desktop/src-tauri');
@@ -17,12 +16,12 @@ async function sourceValue(path, pattern) {
   return match[1];
 }
 
-export const repository = () =>
+const repository = () =>
   sourceValue('src/commands/computers/image.rs', /const REPOSITORY: &str = "([^"]+)";/);
 
 export const appVersion = () => sourceValue('Cargo.toml', /^version = "([^"]+)"$/m);
 
-export async function imageFiles() {
+async function imageFiles() {
   const list = await sourceValue(
     'src/commands/computers/docker.rs',
     /const IMAGE_FILES: &\[&str\] = &\[([^\]]+)\];/,
@@ -68,7 +67,7 @@ export async function plan(sha) {
   return { ...values, tags: tags(values) };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (import.meta.main) {
   const sha = process.env.GITHUB_SHA;
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) throw new Error('GITHUB_SHA must be a commit SHA');
   const result = await plan(sha);

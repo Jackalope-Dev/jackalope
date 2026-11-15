@@ -30,7 +30,7 @@ are never listed or controllable.
 
 App questions offer "Always allow <app> in <project>", and the Screen view offers the
 same for an active window or app grant. Remembered grants are stored per project in
-`preferences/desktop-grants.json`, listed under Project settings, Desktop control, and
+`preferences/desktop-grants.json`, listed under Project settings → Integrations → Desktop control, and
 removable there. A remembered grant answers a later request only when the agent names
 that app; a window request is answered only when the app has exactly one window, and an
 app request only by a remembered app grant. Unknown scopes written by a newer app are
@@ -55,7 +55,8 @@ include `site`. The first time a grant reaches a host, Jackalope asks whether to
 it for this task, always allow it in the project, decline it, or never allow it in the
 project. Page content is withheld until the answer. Saved decisions apply to subdomains,
 the nearest saved parent wins, and Project settings lists and removes them. Unreadable
-addresses and internal pages are not gated. Full-desktop grants are not gated by site.
+addresses and internal pages are not gated; loopback pages are asked about like any other
+site. Full-desktop grants are not gated by site.
 
 Querying the document through UI Automation makes Chromium build its full web
 accessibility tree; on macOS the helper also sets `AXManualAccessibility` on browser
@@ -162,9 +163,11 @@ its coordinates; no automatic retries occur after uncertain or partial input.
 
 ## Implementation and acceptance
 
-`commands/desktop_control.rs` owns sessions, task checks, fresh snapshots, artifacts and
-the action log. `desktop_control/grant.rs` owns grant levels, the access and website
-questions and the remembered-permission store; `actions.rs` validates requests and key
+`commands/desktop_control.rs` owns sessions, task checks, fresh snapshots and the action
+log; `artifacts.rs` saves screenshot evidence. `site_gate.rs` asks the website question
+for every browser an agent drives (desktop windows, computers and browser profiles) and
+`desktop_control/grant.rs` owns grant levels, the access question and the
+remembered-permission store; `actions.rs` validates requests and key
 chords; `elements.rs` normalizes accessibility trees and resolves element refs.
 
 `desktop_control/portal.rs` selects the Linux backend and holds the portal session
@@ -211,7 +214,18 @@ acceptance; those remain separate [native release checks](SELF-DEVELOPMENT.md).
 Settings → Devices reports native-control readiness. On macOS, **Set up macOS
 permissions** explicitly requests Accessibility, Screen Recording and Input
 Monitoring. Complete the OS prompts, restart Jackalope and refresh. Permission
-checks alone never grant an agent a window. Development launches may attribute
+checks alone never grant an agent a window.
+
+Agents see the permissions still missing as `desktopControlMissing` in the `project`
+snapshot's capabilities (empty when none are missing or off macOS). When a
+`desktop_control` call fails because macOS lacks one, the agent is told which and that
+granting takes effect only after a restart, and the attempt records them
+(`desktopPermissions`, cleared by the next successful call). The task and conversation
+views then show a dismissible notice, while this Mac still reports them missing, with a
+button per System Settings pane and **Restart Jackalope**, which is disabled while that
+work runs; the restart itself still refuses while any work or terminal runs. Agents may
+link a pane in `request_human_action` with an `x-apple.systempreferences:` URL, which the
+desktop opens natively because the webview's opener allows only web links. Development launches may attribute
 permissions to the launching application or helper; verify attribution again from
 the eventual app bundle. No permission bypass or automatic resume is provided.
 

@@ -1,8 +1,9 @@
+import { draftKey } from '@jackalope/contracts/remote';
+
 /** Where a computer's work keeps its state on this phone, drafts included. */
 export const workspaceKey = (hostId: string) => `jackalope-mobile:${hostId}`;
 
-/** The draft key new work uses on a computer, matching useRemoteWorkspace's own. */
-const newWorkDraftKey = (hostId: string) => `${workspaceKey(hostId)}:draft:new`;
+const newWorkDraftKey = (hostId: string) => draftKey(workspaceKey(hostId), { newWork: true });
 
 /**
  * Moves the new-work draft typed so far to another computer. Only the text moves: the

@@ -31,6 +31,7 @@ export * from './SearchField';
 export * from './Segmented';
 export * from './Select';
 export * from './Setting';
+export * from './Setup';
 export * from './Stepper';
 export * from './Switch';
 export * as Tabs from './Tabs';

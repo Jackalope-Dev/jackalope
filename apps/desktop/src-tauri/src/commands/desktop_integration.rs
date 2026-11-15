@@ -10,8 +10,9 @@ use tauri::{Manager, State};
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum AwakeMode {
-    #[default]
     Off,
+    /// The default: an agent run should not die because the computer idled to sleep.
+    #[default]
     Working,
     Always,
 }
@@ -38,6 +39,12 @@ pub struct DesktopIntegration {
     status: Mutex<DesktopStatus>,
     stop: Mutex<Option<mpsc::Sender<()>>>,
     worker: Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+impl crate::services::Service for DesktopIntegration {
+    fn shutdown(&self) {
+        DesktopIntegration::shutdown(self)
+    }
 }
 
 impl DesktopIntegration {
@@ -101,6 +108,18 @@ pub fn launch(app: tauri::AppHandle) {
     });
     *app.state::<DesktopIntegration>().worker.lock().unwrap() = Some(worker);
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::desktop_integration::desktop_activity,
+            commands::desktop_integration::desktop_keep_awake,
+            commands::desktop_integration::desktop_unread_badge,
+            commands::desktop_integration::desktop_zoom,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub fn desktop_activity(service: State<'_, DesktopIntegration>) -> DesktopStatus {

@@ -125,7 +125,7 @@ fn cleanup_preserves_running_versions_and_recovers_abandoned_downloads() {
 }
 
 #[test]
-fn cleanup_preserves_unknown_contents_and_rejects_links() {
+fn cleanup_preserves_unknown_contents() {
     let root = Temporary::new();
     let path = activate(&root.0, b"fixture");
     fs::write(path.parent().unwrap().join("user-file"), b"keep").unwrap();

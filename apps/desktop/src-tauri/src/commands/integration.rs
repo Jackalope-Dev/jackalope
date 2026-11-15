@@ -1,4 +1,5 @@
 pub(in crate::commands) mod dependencies;
+use super::repo::{self, Identity, Policy::Snapshot, Seed, Untracked};
 use super::tasks::{TaskRun, TaskRuntime};
 use chrono::Utc;
 pub use dependencies::{prepare_dependencies, validate_dependencies, DependencySnapshot};
@@ -6,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Command, Output},
     sync::{
         atomic::{AtomicU64, Ordering},
         Mutex,
@@ -17,14 +17,21 @@ use tauri::State;
 static INTEGRATION_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
-/// Serializes launch, integration, cleanup and update installation.
-/// Lock order: coordinator state, execution guard, then runtime state.
-pub fn execution_guard() -> Result<std::sync::MutexGuard<'static, ()>, String> {
-    let guard = INTEGRATION_LOCK.lock().map_err(|e| e.to_string())?;
+/// Held while launching, integrating, cleaning up or installing an update, so
+/// those never interleave. Functions that need it take `&ExecutionGuard`.
+///
+/// Lock order: coordinator state (taken through `Coordinator::transact`), this
+/// guard, then runtime state. The guard is not reentrant.
+pub struct ExecutionGuard {
+    _held: std::sync::MutexGuard<'static, ()>,
+}
+
+pub fn execution_guard() -> Result<ExecutionGuard, String> {
+    let held = INTEGRATION_LOCK.lock().map_err(|e| e.to_string())?;
     if super::release::installing() {
         return Err("Wait for the app update to finish before changing work.".into());
     }
-    Ok(guard)
+    Ok(ExecutionGuard { _held: held })
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -78,25 +85,6 @@ fn legacy_target_branch() -> String {
     "master".into()
 }
 
-fn command(path: &Path, args: &[&str]) -> Command {
-    let mut command = super::git_command::command(path, args, super::git_command::Policy::Isolated);
-    command.env("GIT_NO_REPLACE_OBJECTS", "1");
-    command
-}
-
-fn output_text(output: Output) -> Result<String, String> {
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .trim_end()
-        .to_string())
-}
-
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    output_text(command(path, args).output().map_err(|e| e.to_string())?)
-}
-
 fn unique_id() -> String {
     format!(
         "{}-{}-{}",
@@ -115,53 +103,40 @@ fn canonical(path: &str) -> Result<PathBuf, String> {
 }
 
 fn common_dir(path: &Path) -> Result<PathBuf, String> {
-    canonical(&git(
+    canonical(&repo::git(
         path,
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        Snapshot,
     )?)
-}
-
-struct TemporaryIndex(PathBuf);
-
-impl Drop for TemporaryIndex {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.0);
-        let _ = fs::remove_file(self.0.with_extension("index.lock"));
-    }
 }
 
 pub(super) fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String> {
     let workspace = canonical(&run.workspace)?;
-    let head = git(&workspace, &["rev-parse", "HEAD"])?;
-    let status = git(
+    let head = repo::git(&workspace, &["rev-parse", "HEAD"], Snapshot)?;
+    let status = repo::git(
         &workspace,
         &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        Snapshot,
     )?;
-    if !git(&workspace, &["ls-files", "--unmerged"])?.is_empty() {
+    if !repo::git(&workspace, &["ls-files", "--unmerged"], Snapshot)?.is_empty() {
         return Err("Resolve the task worktree's existing merge conflicts first.".into());
     }
-    let index = TemporaryIndex(directory.join(format!("{}.index", unique_id())));
-    let source_index = git(
+    let tree = repo::with_temp_index(
         &workspace,
-        &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+        directory,
+        Seed::CurrentIndex,
+        Snapshot,
+        |index| {
+            index.git(&["add", "--all", "--", "."])?;
+            index.git(&["write-tree"])
+        },
     )?;
-    fs::copy(&source_index, &index.0)
-        .map_err(|e| format!("Cannot snapshot the task index: {e}"))?;
-    let indexed = |args: &[&str]| -> Result<String, String> {
-        output_text(
-            command(&workspace, args)
-                .env("GIT_INDEX_FILE", &index.0)
-                .output()
-                .map_err(|e| e.to_string())?,
-        )
-    };
-    indexed(&["add", "--all", "--", "."])?;
-    let tree = indexed(&["write-tree"])?;
-    if head != git(&workspace, &["rev-parse", "HEAD"])?
+    if head != repo::git(&workspace, &["rev-parse", "HEAD"], Snapshot)?
         || status
-            != git(
+            != repo::git(
                 &workspace,
                 &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+                Snapshot,
             )?
     {
         return Err(
@@ -169,7 +144,12 @@ pub(super) fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSou
         );
     }
     Ok(IntegrationSource {
-        branch: git(&workspace, &["symbolic-ref", "--quiet", "--short", "HEAD"]).ok(),
+        branch: repo::git(
+            &workspace,
+            &["symbolic-ref", "--quiet", "--short", "HEAD"],
+            Snapshot,
+        )
+        .ok(),
         run_id: run.id.clone(),
         workspace: run.workspace.clone(),
         head,
@@ -201,29 +181,45 @@ pub(super) fn snapshot_commit(
     Ok((source.tree, commit))
 }
 
+const REVIEW_IDENTITY: Identity = Identity {
+    name: "Jackalope review",
+    email: "review@jackalope.invalid",
+};
+
+// Stable synthetic parents preserve ancestry when a dependent edits predecessor files.
 fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Result<String, String> {
-    let name = "Jackalope review";
-    let email = "review@jackalope.invalid";
-    let mut cmd = command(path, &["commit-tree", tree]);
-    for parent in parents {
-        cmd.args(["-p", parent]);
-    }
-    // Stable synthetic parents preserve ancestry when a dependent edits predecessor files.
-    cmd.args(["-m", message])
-        .env("GIT_AUTHOR_DATE", "2000-01-01T00:00:00Z")
-        .env("GIT_COMMITTER_DATE", "2000-01-01T00:00:00Z")
-        .env("GIT_AUTHOR_NAME", &name)
-        .env("GIT_COMMITTER_NAME", &name)
-        .env("GIT_AUTHOR_EMAIL", &email)
-        .env("GIT_COMMITTER_EMAIL", &email);
-    output_text(cmd.output().map_err(|e| e.to_string())?)
+    repo::synthetic_commit(path, tree, parents, message, REVIEW_IDENTITY, Snapshot)
+}
+
+/// Plans live in their own folder: other features keep files of their own in
+/// the integration directory.
+fn plan_path(directory: &Path, id: &str) -> PathBuf {
+    directory.join("plans").join(format!("{id}.json"))
+}
+
+/// Where plans were saved before they had their own folder. Still read, and
+/// moved to [`plan_path`] the next time the plan is saved.
+fn legacy_plan_path(directory: &Path, id: &str) -> PathBuf {
+    directory.join(format!("{id}.json"))
 }
 
 fn save(directory: &Path, plan: &IntegrationPlan) -> Result<(), String> {
+    let path = plan_path(directory, &plan.id);
+    fs::create_dir_all(directory.join("plans")).map_err(|e| e.to_string())?;
+    if let Ok(mut cache) = APPLIED.lock() {
+        cache.retain(|(saved, _)| saved != directory);
+    }
     super::history::write_atomic(
-        &directory.join(format!("{}.json", plan.id)),
+        &path,
         &serde_json::to_vec_pretty(plan).map_err(|e| e.to_string())?,
-    )
+    )?;
+    match fs::remove_file(legacy_plan_path(directory, &plan.id)) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(format!(
+            "Saved integration {} but could not remove its earlier copy: {error}",
+            plan.id
+        )),
+        _ => Ok(()),
+    }
 }
 
 fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, String> {
@@ -241,7 +237,7 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
                 "Save the task's latest history before preparing or applying integration.".into(),
             );
         }
-        if !["review", "reviewed"].contains(&run.status.as_str()) {
+        if !run.status.is_done() {
             return Err(
                 "Only completed tasks awaiting review or already reviewed can be integrated."
                     .into(),
@@ -253,6 +249,14 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
         if workspace == canonical(&run.project_path)? {
             return Err("Integration requires an isolated task worktree.".into());
         }
+        // Its folder is the person's own checkout or worktree, so the changes are already
+        // where they work; merging it would also offer to remove that folder.
+        if run.continues.is_some() {
+            return Err(format!(
+                "This work continued a conversation from outside Jackalope directly in {}. Commit its changes there.",
+                run.workspace
+            ));
+        }
         if selected
             .iter()
             .any(|other| canonical(&other.workspace).ok().as_ref() == Some(&workspace))
@@ -262,9 +266,7 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
         if runs.iter().any(|other| {
             (other.task_id == run.task_id
                 || canonical(&other.workspace).ok().as_ref() == Some(&workspace))
-                && (["starting", "running", "stopping", "interrupted"]
-                    .contains(&other.status.as_str())
-                    || other.started_at > run.started_at)
+                && (other.status.is_live() || other.started_at > run.started_at)
         }) {
             return Err("This task has a newer, active, or interrupted attempt. Review its latest completed attempt first.".into());
         }
@@ -283,12 +285,16 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
 }
 
 fn preview(path: &Path, base: &str, target: &str) -> Result<(Vec<String>, String), String> {
-    let files = git(path, &["diff", "--name-only", "-z", base, target, "--"])?
-        .split('\0')
-        .filter(|name| !name.is_empty())
-        .map(str::to_string)
-        .collect();
-    let patch = git(
+    let files = repo::git(
+        path,
+        &["diff", "--name-only", "-z", base, target, "--"],
+        Snapshot,
+    )?
+    .split('\0')
+    .filter(|name| !name.is_empty())
+    .map(str::to_string)
+    .collect();
+    let patch = repo::git(
         path,
         &[
             "diff",
@@ -299,6 +305,7 @@ fn preview(path: &Path, base: &str, target: &str) -> Result<(Vec<String>, String
             target,
             "--",
         ],
+        Snapshot,
     )?;
     let mut clipped: String = patch.chars().take(180_000).collect();
     if clipped.len() < patch.len() {
@@ -378,9 +385,10 @@ pub(in crate::commands) fn prepare_with_message(
         project.to_str().ok_or("Invalid project path")?,
         Some(&target_branch),
     )?;
-    let master = git(
+    let master = repo::git(
         &project,
         &["rev-parse", &format!("refs/heads/{target_branch}")],
+        Snapshot,
     )?;
     let policy = super::project_git::read(&project)?;
     policy.validate()?;
@@ -465,7 +473,7 @@ pub(in crate::commands) fn prepare_with_message(
             require_verification(run, &source.tree)?;
             if run.id == resolver.id {
                 dependencies::verified(run, &source.tree)?;
-                let output = command(
+                let output = repo::output(
                     &project,
                     &[
                         "grep",
@@ -476,9 +484,8 @@ pub(in crate::commands) fn prepare_with_message(
                         &source.tree,
                         "--",
                     ],
-                )
-                .output()
-                .map_err(|e| e.to_string())?;
+                    Snapshot,
+                )?;
                 if output.status.code() != Some(1) {
                     return Err("Resolve remaining conflict markers before integration.".into());
                 }
@@ -490,13 +497,14 @@ pub(in crate::commands) fn prepare_with_message(
     for run in selected.iter().filter(|_| resolution.is_none()) {
         let source = snapshot(run, directory)?;
         require_verification(run, &source.tree)?;
-        let base = git(
+        let base = repo::git(
             &project,
             &[
                 "rev-parse",
                 "--verify",
                 &format!("{}^{{commit}}", run.base_head),
             ],
+            Snapshot,
         )?;
         let source_commit = commit_tree(
             &project,
@@ -505,7 +513,7 @@ pub(in crate::commands) fn prepare_with_message(
             &format!("feat: integrate completed task {}", run.id),
         )?;
         plan.sources.push(source);
-        let output = command(
+        let output = repo::output(
             &project,
             &[
                 "merge-tree",
@@ -514,9 +522,8 @@ pub(in crate::commands) fn prepare_with_message(
                 &combined,
                 &source_commit,
             ],
-        )
-        .output()
-        .map_err(|e| e.to_string())?;
+            Snapshot,
+        )?;
         if !output.status.success() && output.status.code() != Some(1) {
             return Err(String::from_utf8_lossy(&output.stderr).trim().into());
         }
@@ -547,7 +554,7 @@ pub(in crate::commands) fn prepare_with_message(
     }
     (plan.files, plan.patch) = preview(&project, &plan.master_head, &preview_target)?;
     if plan.status == "ready" {
-        let mut cmd = command(
+        let mut cmd = repo::command(
             &project,
             &[
                 "commit-tree",
@@ -557,16 +564,18 @@ pub(in crate::commands) fn prepare_with_message(
                 "-m",
                 &message,
             ],
+            Snapshot,
         );
         policy.environment(&mut cmd, &agents);
-        combined = output_text(cmd.output().map_err(|e| e.to_string())?)?;
-        git(
+        combined = repo::run(cmd)?;
+        repo::git(
             &project,
             &[
                 "update-ref",
                 &format!("refs/jackalope/integrations/{}", plan.id),
                 &combined,
             ],
+            Snapshot,
         )?;
         plan.integration_head = Some(combined);
     }
@@ -578,10 +587,14 @@ pub(in crate::commands) fn load(directory: &Path, id: &str) -> Result<Integratio
     if !valid_id(id) {
         return Err("Invalid integration ID.".into());
     }
-    serde_json::from_slice(
-        &fs::read(directory.join(format!("{id}.json"))).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| format!("Could not read integration plan: {e}"))
+    let bytes = match fs::read(plan_path(directory, id)) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            fs::read(legacy_plan_path(directory, id))
+        }
+        read => read,
+    }
+    .map_err(|e| e.to_string())?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("Could not read integration plan: {e}"))
 }
 
 pub(in crate::commands) fn recover_applied(
@@ -595,7 +608,7 @@ pub(in crate::commands) fn recover_applied(
     }
     if plan.status == "applying"
         && plan.integration_head.as_ref().is_some_and(|head| {
-            command(
+            repo::succeeds(
                 Path::new(&plan.project_path),
                 &[
                     "merge-base",
@@ -603,9 +616,8 @@ pub(in crate::commands) fn recover_applied(
                     head,
                     &format!("refs/heads/{}", plan.target_branch),
                 ],
+                Snapshot,
             )
-            .output()
-            .is_ok_and(|o| o.status.success())
         })
     {
         return apply(directory, runs, id).map(Some);
@@ -634,12 +646,15 @@ pub(in crate::commands) fn apply(
         .ok_or("Integration commit is missing.")?;
     let project = canonical(&plan.project_path)?;
     let reference = format!("refs/heads/{}", plan.target_branch);
-    let current = git(&project, &["rev-parse", &reference])?;
+    let current = repo::git(&project, &["rev-parse", &reference], Snapshot)?;
     if plan.status == "applying"
-        && command(&project, &["merge-base", "--is-ancestor", &head, &current])
-            .status()
-            .map_err(|e| e.to_string())?
-            .success()
+        && repo::output(
+            &project,
+            &["merge-base", "--is-ancestor", &head, &current],
+            Snapshot,
+        )?
+        .status
+        .success()
     {
         plan.status = "applied".into();
         plan.applied_at = Some(Utc::now().to_rfc3339());
@@ -651,18 +666,13 @@ pub(in crate::commands) fn apply(
             "The target branch changed since this review. Prepare a fresh integration.".into(),
         );
     }
-    if git(&project, &["symbolic-ref", "--quiet", "HEAD"])? != reference {
+    if repo::git(&project, &["symbolic-ref", "--quiet", "HEAD"], Snapshot)? != reference {
         return Err(format!(
             "Switch the project checkout to {} before applying this integration.",
             plan.target_branch
         ));
     }
-    if !git(
-        &project,
-        &["status", "--porcelain=v1", "--untracked-files=all"],
-    )?
-    .is_empty()
-    {
+    if repo::is_dirty(&project, Untracked::All, Snapshot)? {
         return Err("The target checkout has local changes. Review and commit or move them before integration; Jackalope will not stash them.".into());
     }
     if let Some(policy) = &plan.commit_policy {
@@ -671,7 +681,7 @@ pub(in crate::commands) fn apply(
         }
     }
     if runs.iter().any(|run| {
-        ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
+        run.status.is_live()
             && canonical(&run.workspace)
                 .ok()
                 .is_some_and(|workspace| project.starts_with(&workspace))
@@ -702,19 +712,20 @@ pub(in crate::commands) fn apply(
             return Err("A task worktree changed since review. Prepare a fresh integration before applying it.".into());
         }
     }
-    if git(
+    if repo::git(
         &project,
         &[
             "rev-parse",
             &format!("refs/jackalope/integrations/{}", plan.id),
         ],
+        Snapshot,
     )? != head
     {
         return Err("The integration reference changed. Prepare a fresh review.".into());
     }
     plan.status = "applying".into();
     save(directory, &plan)?;
-    git(
+    repo::git(
         &project,
         &[
             "merge",
@@ -724,6 +735,7 @@ pub(in crate::commands) fn apply(
             "--no-overwrite-ignore",
             &head,
         ],
+        Snapshot,
     )?;
     plan.status = "applied".into();
     plan.applied_at = Some(Utc::now().to_rfc3339());
@@ -750,7 +762,7 @@ fn cleanup_sources(
                 .integration_head
                 .as_deref()
                 .ok_or("Missing integration commit.")?;
-            if !command(
+            if !repo::output(
                 project,
                 &[
                     "merge-base",
@@ -758,9 +770,8 @@ fn cleanup_sources(
                     head,
                     &format!("refs/heads/{}", plan.target_branch),
                 ],
-            )
-            .output()
-            .map_err(|e| e.to_string())?
+                Snapshot,
+            )?
             .status
             .success()
             {
@@ -772,15 +783,17 @@ fn cleanup_sources(
                     .any(|entry| entry.path == source.workspace)
             {
                 if let Some(branch) = &source.branch {
-                    if git(
+                    if repo::git(
                         project,
                         &["show-ref", "--verify", &format!("refs/heads/{branch}")],
+                        Snapshot,
                     )
                     .is_ok()
                     {
-                        let target = git(
+                        let target = repo::git(
                             project,
                             &["rev-parse", &format!("refs/heads/{}", plan.target_branch)],
+                            Snapshot,
                         )?;
                         super::worktree_cleanup::delete_merged_branch(
                             &plan.project_path,
@@ -812,9 +825,10 @@ fn cleanup_sources(
                 .iter()
                 .find(|entry| canonical(&entry.path).ok() == canonical(&source.workspace).ok())
                 .ok_or("Worktree registration missing. Inspect the remaining folder manually.")?;
-            let target = git(
+            let target = repo::git(
                 project,
                 &["rev-parse", &format!("refs/heads/{}", plan.target_branch)],
+                Snapshot,
             )?;
             super::worktree_cleanup::remove(
                 &plan.project_path,
@@ -839,38 +853,186 @@ fn cleanup_sources(
     Ok(())
 }
 
-pub fn plans(runtime: &TaskRuntime) -> Result<Vec<IntegrationPlan>, String> {
-    let directory = runtime.integration_directory();
-    if !directory.exists() {
-        return Ok(vec![]);
-    }
-    let mut plans = Vec::new();
-    for entry in fs::read_dir(&directory).map_err(|e| e.to_string())? {
-        let path = entry.map_err(|e| e.to_string())?.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let id = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .ok_or("Invalid integration record.")?;
-            plans.push(load(&directory, id)?);
+/// The saved plan files with their size and modification time, which change
+/// whenever a plan is saved. Plan ids are digits and dashes, which keeps other
+/// files in the integration directory out.
+fn plan_files(
+    directory: &Path,
+) -> Result<Vec<(String, u64, Option<std::time::SystemTime>)>, String> {
+    let mut files = Vec::new();
+    for folder in [directory.join("plans"), directory.to_path_buf()] {
+        let entries = match fs::read_dir(&folder) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        for entry in entries {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+            let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if !valid_id(id) || files.iter().any(|(saved, _, _)| saved == id) {
+                continue;
+            }
+            let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+            files.push((id.to_string(), metadata.len(), metadata.modified().ok()));
         }
     }
+    files.sort();
+    Ok(files)
+}
+
+pub fn plans(runtime: &TaskRuntime) -> Result<Vec<IntegrationPlan>, String> {
+    let directory = runtime.integration_directory();
+    let mut plans = plan_files(&directory)?
+        .into_iter()
+        .map(|(id, _, _)| load(&directory, &id))
+        .collect::<Result<Vec<_>, _>>()?;
     plans.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     Ok(plans)
 }
 
-pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
-    reachable_run_ids(plans(runtime)?, &runtime.integration_runs()?)
+/// What [`applied_run_ids`] last read from one integration directory: the
+/// plan files it saw, the target branch heads the applied plans were checked
+/// against, and the attempts they merged.
+struct AppliedCheck {
+    files: Vec<(String, u64, Option<std::time::SystemTime>)>,
+    targets: Vec<(String, String, Option<String>)>,
+    sources: Vec<Vec<String>>,
+    stale: Vec<PausedIntegration>,
 }
 
-fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Vec<String>, String> {
-    let mut ids = Vec::new();
-    for plan in plans.into_iter().filter(|plan| plan.status == "applied") {
+/// An applied integration whose merge is no longer on its target branch. Work that depends
+/// on it stays paused until the merge is back; `message` is the full native explanation.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PausedIntegration {
+    pub plan_id: String,
+    pub project_path: String,
+    pub target_branch: String,
+    pub commit: String,
+    pub message: String,
+}
+
+static APPLIED: Mutex<Vec<(PathBuf, AppliedCheck)>> = Mutex::new(Vec::new());
+
+fn branch_head(project: &str, branch: &str) -> Option<String> {
+    repo::git(
+        Path::new(project),
+        &[
+            "rev-parse",
+            "--verify",
+            "-q",
+            &format!("refs/heads/{branch}"),
+        ],
+        Snapshot,
+    )
+    .ok()
+}
+
+/// Attempts whose work an applied integration brought onto its target branch,
+/// with the earlier attempts of the same tasks. Reading every plan and asking
+/// Git about each is slow, so the answer is reused until a plan is saved or a
+/// target branch moves. Any stale integration fails the call, which keeps
+/// dispatch paused until the merge is restored.
+pub fn applied_run_ids(runtime: &TaskRuntime) -> Result<Vec<String>, String> {
+    let (sources, stale) = applied_check(runtime)?;
+    if let Some(paused) = stale.first() {
+        return Err(paused.message.clone());
+    }
+    Ok(with_earlier_attempts(sources, &runtime.integration_runs()?))
+}
+
+/// The same answer for display: the run ids every reachable integration merged, and
+/// the integrations that are paused, so one stale merge does not hide every plan.
+pub fn applied_view(
+    runtime: &TaskRuntime,
+) -> Result<(Vec<String>, Vec<PausedIntegration>), String> {
+    let (sources, stale) = applied_check(runtime)?;
+    Ok((
+        with_earlier_attempts(sources, &runtime.integration_runs()?),
+        stale,
+    ))
+}
+
+type AppliedSources = (Vec<Vec<String>>, Vec<PausedIntegration>);
+
+fn applied_check(runtime: &TaskRuntime) -> Result<AppliedSources, String> {
+    let directory = runtime.integration_directory();
+    let files = plan_files(&directory)?;
+    let mut cache = APPLIED.lock().map_err(|e| e.to_string())?;
+    let cached = cache.iter().position(|(path, check)| {
+        path == &directory
+            && check.files == files
+            && check
+                .targets
+                .iter()
+                .all(|(project, branch, head)| &branch_head(project, branch) == head)
+    });
+    if let Some(index) = cached {
+        let check = &cache[index].1;
+        return Ok((check.sources.clone(), check.stale.clone()));
+    }
+    let applied: Vec<_> = plans(runtime)?
+        .into_iter()
+        .filter(|plan| plan.status == "applied")
+        .collect();
+    let mut targets: Vec<(String, String, Option<String>)> = Vec::new();
+    for plan in &applied {
+        if !targets.iter().any(|(project, branch, _)| {
+            project == &plan.project_path && branch == &plan.target_branch
+        }) {
+            targets.push((
+                plan.project_path.clone(),
+                plan.target_branch.clone(),
+                branch_head(&plan.project_path, &plan.target_branch),
+            ));
+        }
+    }
+    // A failure may be transient (Git could not start, or a lock), so only a
+    // completed check is reused. A stale merge is a completed answer: it holds
+    // until a plan is saved or the target branch moves, which invalidates it.
+    let (sources, stale) = classify_sources(applied)?;
+    cache.retain(|(path, _)| path != &directory);
+    if cache.len() >= 16 {
+        cache.remove(0);
+    }
+    cache.push((
+        directory,
+        AppliedCheck {
+            files,
+            targets,
+            sources: sources.clone(),
+            stale: stale.clone(),
+        },
+    ));
+    Ok((sources, stale))
+}
+
+/// The attempts each applied plan merged, provided its target branch still contains it.
+#[cfg(test)]
+fn reachable_sources(plans: Vec<IntegrationPlan>) -> Result<Vec<Vec<String>>, String> {
+    let (sources, stale) = classify_sources(plans)?;
+    match stale.into_iter().next() {
+        Some(paused) => Err(paused.message),
+        None => Ok(sources),
+    }
+}
+
+/// Splits applied plans into those whose merge is still on the target branch and
+/// those that are paused. Errors only when Git cannot answer.
+fn classify_sources(plans: Vec<IntegrationPlan>) -> Result<AppliedSources, String> {
+    let mut sources = Vec::new();
+    let mut stale = Vec::new();
+    for plan in plans {
         let head = plan
             .integration_head
             .as_deref()
             .ok_or("An applied integration is missing its Git reference.")?;
-        let result = command(
+        let result = repo::output(
             Path::new(&plan.project_path),
             &[
                 "merge-base",
@@ -878,13 +1040,31 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
                 head,
                 &format!("refs/heads/{}", plan.target_branch),
             ],
-        )
-        .output()
-        .map_err(|e| e.to_string())?;
-        if !result.status.success() {
-            return Err(format!("Dispatch paused: the target branch in {} no longer contains integration {}. Restore that integration before running dependent work.", plan.project_path, plan.id));
+            Snapshot,
+        )?;
+        if result.status.success() {
+            sources.push(plan.run_ids);
+            continue;
         }
-        for id in plan.run_ids {
+        let commit = head.get(..12).unwrap_or(head).to_string();
+        stale.push(PausedIntegration {
+            message: format!(
+                "Dispatch paused: the target branch {} in {} no longer contains integration {} (commit {commit}). Merge that commit back into {}, or reset {} to a commit that includes it, before running dependent work.",
+                plan.target_branch, plan.project_path, plan.id, plan.target_branch, plan.target_branch
+            ),
+            plan_id: plan.id,
+            project_path: plan.project_path,
+            target_branch: plan.target_branch,
+            commit,
+        });
+    }
+    Ok((sources, stale))
+}
+
+fn with_earlier_attempts(sources: Vec<Vec<String>>, runs: &[TaskRun]) -> Vec<String> {
+    let mut ids = Vec::new();
+    for run_ids in sources {
+        for id in run_ids {
             if let Some(source) = runs.iter().find(|run| run.id == id) {
                 ids.extend(
                     runs.iter()
@@ -901,8 +1081,19 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
     }
     ids.sort();
     ids.dedup();
-    Ok(ids)
+    ids
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::integration::integration_prepare,
+            commands::integration::integration_apply,
+            commands::integration::integration_plans,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn integration_prepare(
@@ -1013,6 +1204,7 @@ pub async fn integration_plans(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
 
     struct Fixture {
         root: PathBuf,
@@ -1027,18 +1219,24 @@ mod tests {
             let project = root.join("project");
             let plans = root.join("plans");
             fs::create_dir_all(&project).unwrap();
-            git(&project, &["init", "--initial-branch=master"]).unwrap();
-            git(&project, &["config", "core.autocrlf", "false"]).unwrap();
-            git(&project, &["config", "user.name", "Integration Test"]).unwrap();
-            git(
+            repo::git(&project, &["init", "--initial-branch=master"], Snapshot).unwrap();
+            repo::git(&project, &["config", "core.autocrlf", "false"], Snapshot).unwrap();
+            repo::git(
+                &project,
+                &["config", "user.name", "Integration Test"],
+                Snapshot,
+            )
+            .unwrap();
+            repo::git(
                 &project,
                 &["config", "user.email", "integration@example.test"],
+                Snapshot,
             )
             .unwrap();
             fs::write(project.join("shared.txt"), "original\n").unwrap();
-            git(&project, &["add", "."]).unwrap();
-            git(&project, &["commit", "-m", "test fixture"]).unwrap();
-            let base = git(&project, &["rev-parse", "HEAD"]).unwrap();
+            repo::git(&project, &["add", "."], Snapshot).unwrap();
+            repo::git(&project, &["commit", "-m", "test fixture"], Snapshot).unwrap();
+            let base = repo::git(&project, &["rev-parse", "HEAD"], Snapshot).unwrap();
             Self {
                 root,
                 project,
@@ -1049,7 +1247,7 @@ mod tests {
 
         fn run(&self, number: u32, filename: &str, content: &str) -> TaskRun {
             let workspace = self.root.join(format!("task-{number}"));
-            git(
+            repo::git(
                 &self.project,
                 &[
                     "worktree",
@@ -1059,6 +1257,7 @@ mod tests {
                     workspace.to_str().unwrap(),
                     &self.base,
                 ],
+                Snapshot,
             )
             .unwrap();
             fs::write(workspace.join(filename), content).unwrap();
@@ -1109,9 +1308,10 @@ mod tests {
             dependencies::reconciliation_input(&f.plans, &runs, &ids, "first-combination").unwrap();
         let mut combined = f.run(13, "temporary", "");
         fs::remove_file(Path::new(&combined.workspace).join("temporary")).unwrap();
-        git(
+        repo::git(
             Path::new(&combined.workspace),
             &["reset", "--hard", &input.base],
+            Snapshot,
         )
         .unwrap();
         combined.base_head = input.base.clone();
@@ -1127,7 +1327,12 @@ mod tests {
         let base =
             prepare_dependencies(&f.plans, &runs, &[combined.id.clone()], "consumer").unwrap();
         assert_eq!(
-            git(&f.project, &["show", &format!("{}:shared.txt", base.base)]).unwrap(),
+            repo::git(
+                &f.project,
+                &["show", &format!("{}:shared.txt", base.base)],
+                Snapshot
+            )
+            .unwrap(),
             "both features"
         );
         let mut c = f.run(14, "independent.txt", "third feature\n");
@@ -1137,18 +1342,20 @@ mod tests {
         let final_input =
             dependencies::reconciliation_input(&f.plans, &runs, &ids, "final-combination").unwrap();
         assert_eq!(
-            git(
+            repo::git(
                 &f.project,
-                &["show", &format!("{}:shared.txt", final_input.base)]
+                &["show", &format!("{}:shared.txt", final_input.base)],
+                Snapshot
             )
             .unwrap(),
             "both features"
         );
         let mut final_run = f.run(15, "temporary", "");
         fs::remove_file(Path::new(&final_run.workspace).join("temporary")).unwrap();
-        git(
+        repo::git(
             Path::new(&final_run.workspace),
             &["reset", "--hard", &final_input.base],
+            Snapshot,
         )
         .unwrap();
         final_run.base_head = final_input.base.clone();
@@ -1157,7 +1364,10 @@ mod tests {
         ids.push(final_run.id.clone());
         runs.push(final_run);
         let plan = prepare(&f.plans, &runs, &ids).unwrap();
-        assert_eq!(git(&f.project, &["rev-parse", "HEAD"]).unwrap(), f.base);
+        assert_eq!(
+            repo::git(&f.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
+            f.base
+        );
         fs::write(
             Path::new(&a.workspace).join("shared.txt"),
             "unexpected edit\n",
@@ -1200,16 +1410,20 @@ mod tests {
             dependencies::reconciliation_input(&f.plans, &originals, &ids, "reconciliation-test")
                 .unwrap();
         assert!(input.reconciles);
-        assert_eq!(git(&f.project, &["rev-parse", "HEAD"]).unwrap(), f.base);
+        assert_eq!(
+            repo::git(&f.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
+            f.base
+        );
         assert_eq!(
             fs::read_to_string(Path::new(&a.workspace).join("shared.txt")).unwrap(),
             "feature a\n"
         );
         let mut resolver = f.run(3, "temporary", "");
         fs::remove_file(Path::new(&resolver.workspace).join("temporary")).unwrap();
-        git(
+        repo::git(
             Path::new(&resolver.workspace),
             &["reset", "--hard", &input.base],
+            Snapshot,
         )
         .unwrap();
         resolver.base_head = input.base.clone();
@@ -1267,21 +1481,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             fixture.base
         );
         assert_eq!(
-            git(
+            repo::git(
                 &fixture.project,
-                &["show", &format!("{}:parent.txt", dependency.base)]
+                &["show", &format!("{}:parent.txt", dependency.base)],
+                Snapshot
             )
             .unwrap(),
             "verified parent"
         );
         let mut child = fixture.run(2, "child.txt", "child\n");
-        git(
+        repo::git(
             Path::new(&child.workspace),
             &["reset", "--hard", &dependency.base],
+            Snapshot,
         )
         .unwrap();
         fs::write(
@@ -1330,12 +1546,17 @@ mod tests {
 
     #[test]
     fn checkpoints_and_single_commit_merge_enforce_all_attribution_modes() {
-        use crate::commands::project_git::{Attribution, CommitPolicy};
+        use crate::{cli_protocol::Attribution, commands::project_git::CommitPolicy};
         for attribution in [Attribution::User, Attribution::CoAuthor, Attribution::Agent] {
             let f = Fixture::new();
             let mut run = f.run(1, "feature.txt", "done\n");
             run.branch = "jackalope/task-1".into();
-            git(Path::new(&run.workspace), &["branch", "-m", &run.branch]).unwrap();
+            repo::git(
+                Path::new(&run.workspace),
+                &["branch", "-m", &run.branch],
+                Snapshot,
+            )
+            .unwrap();
             run.result = "Implemented feature.\n\nCommit message: Add the requested feature".into();
             let policy = CommitPolicy {
                 attribution: attribution.clone(),
@@ -1344,7 +1565,7 @@ mod tests {
                 cleanup_after_merge: true,
                 auto_checkpoint: true,
             };
-            git(
+            repo::git(
                 &f.project,
                 &[
                     "config",
@@ -1352,31 +1573,41 @@ mod tests {
                     "jackalope.commitPolicy",
                     &serde_json::to_string(&policy).unwrap(),
                 ],
+                Snapshot,
             )
             .unwrap();
             let checkpoint = crate::commands::checkpoint::create(&run, &f.plans)
                 .unwrap()
                 .unwrap();
             assert!(checkpoint.message.starts_with("Add the requested feature"));
-            assert!(git(Path::new(&run.workspace), &["status", "--porcelain"])
-                .unwrap()
-                .is_empty());
+            assert!(repo::git(
+                Path::new(&run.workspace),
+                &["status", "--porcelain"],
+                Snapshot
+            )
+            .unwrap()
+            .is_empty());
             assert!(crate::commands::checkpoint::create(&run, &f.plans)
                 .unwrap()
                 .is_none());
-            assert_eq!(git(&f.project, &["rev-parse", "HEAD"]).unwrap(), f.base);
+            assert_eq!(
+                repo::git(&f.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
+                f.base
+            );
             let plan = prepare(&f.plans, &[run.clone()], &[run.id.clone()]).unwrap();
             assert!(plan.commit_message.starts_with("Add the requested feature"));
             let mut applied = apply(&f.plans, &[run.clone()], &plan.id).unwrap();
             assert_eq!(
-                git(
+                repo::git(
                     &f.project,
-                    &["rev-list", "--count", &format!("{}..HEAD", f.base)]
+                    &["rev-list", "--count", &format!("{}..HEAD", f.base)],
+                    Snapshot
                 )
                 .unwrap(),
                 "1"
             );
-            let author = git(&f.project, &["log", "-1", "--format=%an <%ae>"]).unwrap();
+            let author =
+                repo::git(&f.project, &["log", "-1", "--format=%an <%ae>"], Snapshot).unwrap();
             assert_eq!(
                 author,
                 if attribution == Attribution::Agent {
@@ -1396,13 +1627,14 @@ mod tests {
                 applied.cleanup_results
             );
             assert!(!Path::new(&run.workspace).exists());
-            assert!(git(
+            assert!(repo::git(
                 &f.project,
                 &[
                     "show-ref",
                     "--verify",
                     &format!("refs/heads/{}", run.branch)
-                ]
+                ],
+                Snapshot
             )
             .is_err());
             cleanup_sources(&f.plans, &[run], &mut applied).unwrap();
@@ -1429,24 +1661,31 @@ mod tests {
         let mut run = f.run(1, "new.txt", "working\n");
         run.branch = "jackalope/task-1".into();
         let path = Path::new(&run.workspace);
-        git(path, &["branch", "-m", &run.branch]).unwrap();
-        git(path, &["add", "new.txt"]).unwrap();
+        repo::git(path, &["branch", "-m", &run.branch], Snapshot).unwrap();
+        repo::git(path, &["add", "new.txt"], Snapshot).unwrap();
         fs::write(path.join("new.txt"), "later edit\n").unwrap();
         assert!(crate::commands::checkpoint::create(&run, &f.plans)
             .unwrap_err()
             .contains("Staged content"));
-        assert_eq!(git(path, &["show", ":new.txt"]).unwrap(), "working");
-        git(path, &["add", "new.txt"]).unwrap();
-        let index = git(
+        assert_eq!(
+            repo::git(path, &["show", ":new.txt"], Snapshot).unwrap(),
+            "working"
+        );
+        repo::git(path, &["add", "new.txt"], Snapshot).unwrap();
+        let index = repo::git(
             path,
             &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+            Snapshot,
         )
         .unwrap();
         let lock = format!("{index}.lock");
         fs::write(&lock, "owned elsewhere").unwrap();
         assert!(crate::commands::checkpoint::create(&run, &f.plans).is_err());
         assert_eq!(fs::read_to_string(&lock).unwrap(), "owned elsewhere");
-        assert_eq!(git(path, &["rev-parse", "HEAD"]).unwrap(), f.base);
+        assert_eq!(
+            repo::git(path, &["rev-parse", "HEAD"], Snapshot).unwrap(),
+            f.base
+        );
     }
 
     #[test]
@@ -1454,7 +1693,12 @@ mod tests {
         let f = Fixture::new();
         let run = f.run(1, "new.txt", "done\n");
         let plan = prepare(&f.plans, &[run.clone()], &[run.id.clone()]).unwrap();
-        git(&f.project, &["config", "user.name", "Changed name"]).unwrap();
+        repo::git(
+            &f.project,
+            &["config", "user.name", "Changed name"],
+            Snapshot,
+        )
+        .unwrap();
         assert!(apply(&f.plans, &[run.clone()], &plan.id)
             .unwrap_err()
             .contains("settings changed"));
@@ -1479,7 +1723,7 @@ mod tests {
             .unwrap()
             .contains("changed after review"));
         assert_eq!(
-            git(&f.project, &["log", "-1", "--format=%s"]).unwrap(),
+            repo::git(&f.project, &["log", "-1", "--format=%s"], Snapshot).unwrap(),
             "Add the feature"
         );
         assert!(Path::new(&run.workspace).exists());
@@ -1490,24 +1734,25 @@ mod tests {
     fn main_and_custom_targets_remain_bound_when_the_checkout_changes() {
         for branch in ["main", "feature/release"] {
             let fixture = Fixture::new();
-            git(&fixture.project, &["branch", "-m", branch]).unwrap();
+            repo::git(&fixture.project, &["branch", "-m", branch], Snapshot).unwrap();
             let mut run = fixture.run(1, "first.txt", "first\n");
             run.target_branch = Some(branch.into());
             let runs = vec![run.clone()];
             let plan = prepare(&fixture.plans, &runs, &[run.id]).unwrap();
             assert_eq!(plan.target_branch, branch);
-            git(&fixture.project, &["checkout", "-b", "unrelated"]).unwrap();
+            repo::git(&fixture.project, &["checkout", "-b", "unrelated"], Snapshot).unwrap();
             assert!(apply(&fixture.plans, &runs, &plan.id)
                 .unwrap_err()
                 .contains("Switch the project checkout"));
-            git(&fixture.project, &["checkout", branch]).unwrap();
+            repo::git(&fixture.project, &["checkout", branch], Snapshot).unwrap();
             apply(&fixture.plans, &runs, &plan.id).unwrap();
             assert_eq!(
                 fs::read_to_string(fixture.project.join("first.txt")).unwrap(),
                 "first\n"
             );
             assert!(
-                reachable_run_ids(vec![load(&fixture.plans, &plan.id).unwrap()], &runs)
+                reachable_sources(vec![load(&fixture.plans, &plan.id).unwrap()])
+                    .map(|sources| with_earlier_attempts(sources, &runs))
                     .unwrap()
                     .contains(&runs[0].id)
             );
@@ -1587,21 +1832,26 @@ mod tests {
         let fixture = Fixture::new();
         let a = fixture.run(1, "first.txt", "first\n");
         let b = fixture.run(2, "second.txt", "second\n");
-        git(Path::new(&a.workspace), &["add", "first.txt"]).unwrap();
-        let before = git(Path::new(&a.workspace), &["diff", "--cached"]).unwrap();
+        repo::git(Path::new(&a.workspace), &["add", "first.txt"], Snapshot).unwrap();
+        let before = repo::git(Path::new(&a.workspace), &["diff", "--cached"], Snapshot).unwrap();
         let runs = vec![a, b];
         let ids: Vec<_> = runs.iter().map(|run| run.id.clone()).collect();
         let plan = prepare(&fixture.plans, &runs, &ids).unwrap();
         assert_eq!(plan.status, "ready");
         assert_eq!(plan.files, vec!["first.txt", "second.txt"]);
         assert_eq!(
-            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             fixture.base
         );
         assert!(!fixture.project.join("first.txt").exists());
         assert_eq!(
             before,
-            git(Path::new(&runs[0].workspace), &["diff", "--cached"]).unwrap()
+            repo::git(
+                Path::new(&runs[0].workspace),
+                &["diff", "--cached"],
+                Snapshot
+            )
+            .unwrap()
         );
         let applied = apply(&fixture.plans, &runs, &plan.id).unwrap();
         assert_eq!(applied.status, "applied");
@@ -1613,16 +1863,24 @@ mod tests {
             fs::read_to_string(fixture.project.join("second.txt")).unwrap(),
             "second\n"
         );
-        assert!(git(&fixture.project, &["status", "--porcelain"])
-            .unwrap()
-            .is_empty());
+        assert!(
+            repo::git(&fixture.project, &["status", "--porcelain"], Snapshot)
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(
-            git(&fixture.project, &["log", "-1", "--format=%an <%ae>"]).unwrap(),
+            repo::git(
+                &fixture.project,
+                &["log", "-1", "--format=%an <%ae>"],
+                Snapshot
+            )
+            .unwrap(),
             "Integration Test <integration@example.test>"
         );
-        assert!(!git(
+        assert!(!repo::git(
             &fixture.project,
-            &["log", "--format=%B", &format!("{}..HEAD", fixture.base)]
+            &["log", "--format=%B", &format!("{}..HEAD", fixture.base)],
+            Snapshot
         )
         .unwrap()
         .contains("Co-authored-by"));
@@ -1647,7 +1905,7 @@ mod tests {
             .unwrap_err()
             .contains("conflicts"));
         assert_eq!(
-            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             fixture.base
         );
         assert_eq!(
@@ -1670,7 +1928,7 @@ mod tests {
             .unwrap_err()
             .contains("worktree changed"));
         assert_eq!(
-            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             fixture.base
         );
     }
@@ -1688,8 +1946,8 @@ mod tests {
             fs::read_to_string(fixture.project.join("untracked.txt")).unwrap(),
             "user work"
         );
-        git(&fixture.project, &["add", "."]).unwrap();
-        git(&fixture.project, &["commit", "-m", "user change"]).unwrap();
+        repo::git(&fixture.project, &["add", "."], Snapshot).unwrap();
+        repo::git(&fixture.project, &["commit", "-m", "user change"], Snapshot).unwrap();
         assert!(apply(&fixture.plans, &runs, &plan.id)
             .unwrap_err()
             .contains("target branch changed"));
@@ -1703,13 +1961,14 @@ mod tests {
         let mut plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
         plan.status = "applying".into();
         save(&fixture.plans, &plan).unwrap();
-        git(
+        repo::git(
             &fixture.project,
             &[
                 "merge",
                 "--ff-only",
                 plan.integration_head.as_ref().unwrap(),
             ],
+            Snapshot,
         )
         .unwrap();
         let recovered = apply(&fixture.plans, &[], &plan.id).unwrap();
@@ -1724,7 +1983,7 @@ mod tests {
         let mut continuation = original.clone();
         continuation.id = "run-continue".into();
         continuation.started_at = "2026-09-04T01:00:00Z".into();
-        continuation.status = "running".into();
+        continuation.status = RunStatus::Running;
         continuation.workspace.clear();
         let ids = vec![original.id.clone()];
         assert!(prepare(&fixture.plans, &[original, continuation], &ids)
@@ -1738,7 +1997,7 @@ mod tests {
         let mut run = fixture.run(1, "new.txt", "task\n");
         let ids = vec![run.id.clone()];
         let plan = prepare(&fixture.plans, &[run.clone()], &ids).unwrap();
-        let before = git(&fixture.project, &["rev-parse", "HEAD"]).unwrap();
+        let before = repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap();
         run.persistence_error = Some("Storage unavailable".into());
         assert!(prepare(&fixture.plans, &[run.clone()], &ids)
             .unwrap_err()
@@ -1747,7 +2006,7 @@ mod tests {
             .unwrap_err()
             .contains("latest history"));
         assert_eq!(
-            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             before
         );
     }
@@ -1757,9 +2016,10 @@ mod tests {
         let fixture = Fixture::new();
         fs::write(fixture.project.join(".git/info/exclude"), "private.txt\n").unwrap();
         let run = fixture.run(1, "private.txt", "task version\n");
-        git(
+        repo::git(
             Path::new(&run.workspace),
             &["add", "--force", "private.txt"],
+            Snapshot,
         )
         .unwrap();
         let ids = vec![run.id.clone()];
@@ -1777,7 +2037,7 @@ mod tests {
             "private local version\n"
         );
         assert_eq!(
-            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             fixture.base
         );
     }
@@ -1789,11 +2049,46 @@ mod tests {
         let plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
         let applied = apply(&fixture.plans, &runs, &plan.id).unwrap();
         assert_eq!(
-            reachable_run_ids(vec![applied.clone()], &runs).unwrap(),
+            reachable_sources(vec![applied.clone()])
+                .map(|sources| with_earlier_attempts(sources, &runs))
+                .unwrap(),
             vec![runs[0].id.clone()]
         );
-        git(&fixture.project, &["reset", "--hard", &fixture.base]).unwrap();
-        assert!(reachable_run_ids(vec![applied], &runs)
+        repo::git(
+            &fixture.project,
+            &["reset", "--hard", &fixture.base],
+            Snapshot,
+        )
+        .unwrap();
+        assert!(reachable_sources(vec![applied])
+            .map(|sources| with_earlier_attempts(sources, &runs))
+            .unwrap_err()
+            .contains("no longer contains integration"));
+    }
+
+    #[test]
+    fn a_stale_integration_is_reported_alongside_reachable_ones_but_still_blocks_dependents() {
+        let fixture = Fixture::new();
+        let runs = vec![fixture.run(1, "first.txt", "first\n")];
+        let plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
+        let stale = apply(&fixture.plans, &runs, &plan.id).unwrap();
+        repo::git(
+            &fixture.project,
+            &["reset", "--hard", &fixture.base],
+            Snapshot,
+        )
+        .unwrap();
+        let more = vec![fixture.run(2, "second.txt", "second\n")];
+        let plan = prepare(&fixture.plans, &more, &[more[0].id.clone()]).unwrap();
+        let reachable = apply(&fixture.plans, &more, &plan.id).unwrap();
+
+        let (sources, paused) = classify_sources(vec![stale.clone(), reachable.clone()]).unwrap();
+        assert_eq!(sources, vec![reachable.run_ids.clone()]);
+        assert_eq!(paused.len(), 1);
+        assert_eq!(paused[0].plan_id, stale.id);
+        assert!(paused[0].message.contains("no longer contains integration"));
+        // Dispatch keeps treating any stale merge as a reason to wait.
+        assert!(reachable_sources(vec![stale, reachable])
             .unwrap_err()
             .contains("no longer contains integration"));
     }

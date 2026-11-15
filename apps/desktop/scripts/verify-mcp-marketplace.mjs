@@ -16,10 +16,10 @@ import { useThemeStore } from '/src/stores/themeStore.ts';
 import { useSettingsStore } from '/src/stores/settingsStore.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 useProjectStore.setState({projects:[{id:'fixture',name:'Sample project',path:'C:/fixture',agentProvider:'codex'}],activeProjectId:'fixture'});
 useSettingsStore.setState({useMcpMarketplace:true});
 window.storeModule = name => import('/src/stores/'+name+'.ts');
+window.curatedCount = () => import('/src/components/mcp/curated-servers.ts').then(m => m.recommendedServers.length);
 const theme = useThemeStore.getState();
 theme.setTheme({...theme.currentTheme,appearance:'manual',isDark:false});
 createRoot(document.getElementById('root')).render(React.createElement(McpWorkspace));
@@ -75,7 +75,9 @@ try {
   );
   await page.getByRole('button', { name: 'Add tools', exact: true }).click();
   await page.getByRole('heading', { name: 'MCP marketplace', exact: true }).waitFor();
-  assert.equal(await page.locator('.mcp-market-card').count(), 11);
+  const curatedCount = await page.evaluate(() => window.curatedCount());
+  assert.ok(curatedCount > 0);
+  assert.equal(await page.locator('.mcp-market-card').count(), curatedCount);
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const isDark of [false, true]) {
@@ -158,7 +160,7 @@ try {
   assert.equal(await page.getByRole('article', { name: 'GitHub', exact: true }).count(), 1);
   await page.getByRole('searchbox', { name: 'Search MCP marketplace' }).fill('');
   await page.getByRole('button', { name: 'Connection options', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Custom connection', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add custom connection…', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Name', { exact: true }).fill('Sample tools');
   await dialog.getByLabel('Endpoint URL').fill('https://example.com/mcp');
@@ -211,7 +213,7 @@ try {
   assert.ok(!copied.includes('fixture-token'));
   assert.ok(!copied.includes('Bearer'));
   await page.getByRole('button', { name: 'Connection options', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Custom connection', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add custom connection…', exact: true }).click();
   await dialog.getByLabel('Name', { exact: true }).fill('Sample tools');
   await dialog.getByLabel('Endpoint URL').fill('https://example.com/mcp');
   await dialog.getByRole('button', { name: 'All projects', exact: true }).click();
@@ -227,7 +229,7 @@ try {
   assert.equal(await page.locator('.mcp-market-card').count(), 0);
   const before = directoryRequests.length;
   await page.getByRole('button', { name: 'Enable Marketplace', exact: true }).click();
-  assert.equal(await page.locator('.mcp-market-card').count(), 11);
+  assert.equal(await page.locator('.mcp-market-card').count(), curatedCount);
   assert.equal(directoryRequests.length, before);
   assert.deepEqual(errors, []);
   console.log(

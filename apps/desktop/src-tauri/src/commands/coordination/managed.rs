@@ -1,5 +1,10 @@
 use super::*;
-use crate::commands::{task_strategy, tasks::TaskRun};
+use crate::commands::scope_path::any_overlap;
+use crate::commands::{
+    repo::{self, Policy, Untracked},
+    task_strategy,
+    tasks::TaskRun,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -143,7 +148,7 @@ pub(super) fn reconcile_attempts(ledger: &mut Ledger, runs: &[TaskRun]) -> bool 
 }
 
 fn planning_prompt(request: &str, limit: usize) -> String {
-    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–{limit} assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), outcomes (reviewable requirements) and briefing. The briefing gives that worker what you learned so it can skip repository discovery: key files and symbols, patterns to follow, contracts it must honor, the commands that check it and pitfalls, as facts under 1500 characters. Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract and dependency change one owner; put it in a prerequisite and name the contract in consumer instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
+    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–{limit} assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), outcomes (reviewable requirements) and briefing. The briefing gives that worker what you learned so it can skip repository discovery: key files and symbols, patterns to follow, contracts it must honor, the commands that check it and pitfalls, as facts under 1500 characters. Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract, shared component and dependency change one owner; put it in a prerequisite that its consumers list in dependsOn, and name the contract in their instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Size each assignment for one agent session: keep a small or focused change in one assignment, and split a request spanning many independent areas, screens or files, or a long verification checklist, into separately verifiable assignments. When the current state must be discovered first (an audit, sweep or investigation), the first assignment is a read-only audit that publishes its findings in its completion report, and later assignments depend on it. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Jackalope gives every worker the complete request after its prompt, so do not copy the request into prompts; each prompt must identify its exact responsibility and say how its result is checked.\n\nComplete request:\n{request}")
 }
 
 /// Assignments for an approved plan, with the plan-aware review appended.
@@ -278,7 +283,9 @@ pub(super) fn parse_plan_entries(
             prompt: format!(
                 "{}{}\n\nJackalope owns this task's worker count. Do not launch other agents; propose_subtask is the only way to split off work.\n\nComplete request (shared context; perform only your assigned work):\n{}",
                 step.prompt,
-                if step.briefing.trim().is_empty() {
+                // An approved plan's request already renders each task's briefing.
+                if step.briefing.trim().is_empty() || request.prompt.contains(step.briefing.trim())
+                {
                     String::new()
                 } else {
                     format!(
@@ -308,7 +315,7 @@ pub(super) fn parse_plan_entries(
                     .get(&prior.key)
                     .is_some_and(|set| set.contains(&item.key))
                 && ancestors.contains_key(&prior.key)
-                && overlaps(&prior.scopes, &item.scopes)
+                && any_overlap(&prior.scopes, &item.scopes)
             {
                 return Err("Independent assignments overlap. Ask the planner to give shared files one owner and make dependent work sequential.".into());
             }
@@ -351,7 +358,7 @@ fn auto_start_ready(ledger: &Ledger, runs: &[TaskRun]) -> Vec<(String, String)> 
         .filter(|task| task.auto_start && !task.started && task.error.is_none())
         .filter_map(|task| {
             let planner = latest_planner(task, runs)?;
-            (matches!(planner.status.as_str(), "review" | "reviewed")
+            (planner.status.is_done()
                 && !planner.finishing
                 && planner.error.is_none()
                 && planner.persistence_error.is_none())
@@ -399,11 +406,11 @@ impl Coordinator {
             started: false,
             error: None,
             auto_start,
-            max_assignments: assignment_limit(self.inner.lock().unwrap().concurrency),
+            max_assignments: assignment_limit(self.state().concurrency),
             plan: None,
         };
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.state();
             if let Some(saved) = inner
                 .ledger
                 .managed_tasks
@@ -419,10 +426,10 @@ impl Coordinator {
             if inner.ledger.managed_tasks.len() >= 500 {
                 return Err("The managed task history limit has been reached.".into());
             }
-            let mut ledger = inner.ledger.clone();
-            ledger.managed_tasks.push(task.clone());
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(&mut inner, |ledger| {
+                ledger.managed_tasks.push(task.clone());
+                Ok::<_, String>(())
+            })?;
         }
         self.launch_planner(&task)?;
         Ok(task.id)
@@ -437,16 +444,16 @@ impl Coordinator {
         planning.verify_command = None;
         planning.context_selection.outcomes.clear();
         if let Err(error) = self.start_manual(planning) {
-            let mut inner = self.inner.lock().unwrap();
-            let mut ledger = inner.ledger.clone();
-            ledger
-                .managed_tasks
-                .iter_mut()
-                .find(|item| item.id == task.id)
-                .unwrap()
-                .error = Some(error);
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            let mut inner = self.state();
+            self.commit(&mut inner, |ledger| {
+                ledger
+                    .managed_tasks
+                    .iter_mut()
+                    .find(|item| item.id == task.id)
+                    .unwrap()
+                    .error = Some(error);
+                Ok::<_, String>(())
+            })?;
         }
         Ok(())
     }
@@ -468,19 +475,20 @@ impl Coordinator {
         let runs = self.runtime.integration_runs()?;
         let run = latest_planner(&task, &runs)
             .ok_or("The planning attempt is unavailable. Inspect task recovery before retrying.")?;
-        if active(&run.status) || run.finishing {
+        if run.status.is_active() || run.finishing {
             return Err("The lead is still preparing this plan.".into());
         }
-        if !matches!(run.status.as_str(), "review" | "reviewed")
-            || run.error.is_some()
-            || run.persistence_error.is_some()
-        {
+        if !run.status.is_done() || run.error.is_some() || run.persistence_error.is_some() {
             return Err("The planning attempt needs attention before work can start.".into());
         }
-        let changed = crate::commands::tasks::git(&run.workspace, &["status", "--porcelain"])?;
-        let committed =
-            crate::commands::tasks::git(&run.workspace, &["diff", "--name-only", &run.base_head])?;
-        if !changed.is_empty() || !committed.is_empty() {
+        let workspace = std::path::Path::new(&run.workspace);
+        let changed = repo::is_dirty(workspace, Untracked::Normal, Policy::Inspection)?;
+        let committed = repo::git(
+            workspace,
+            &["diff", "--name-only", &run.base_head],
+            Policy::Inspection,
+        )?;
+        if changed || !committed.is_empty() {
             return Err("The planning agent changed files. Inspect its workspace before starting implementation.".into());
         }
         parse_plan(&run.result, &task.request, task.max_assignments)
@@ -541,32 +549,32 @@ impl Coordinator {
             review_only,
             items,
         })?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         if inner.url.is_none() {
             return Err("The coordination bridge is unavailable. Retry when it is ready.".into());
         }
-        let mut ledger = inner.ledger.clone();
-        let task = ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|task| task.id == id)
-            .unwrap();
-        task.started = true;
-        task.error = None;
-        let planned_at = latest_planner(task, &runs).and_then(|run| run.ended_at.clone());
-        let auto_started = task.auto_start;
-        if let Some(delivery) = &mut task.delivery {
-            delivery.planned_at = planned_at;
-            delivery.started_at = Some(Utc::now().to_rfc3339());
-            delivery.assignment_count = count.saturating_sub(usize::from(count > 1));
-            delivery.auto_started = auto_started;
-            delivery.final_item = created.last().cloned();
-            if count > 1 {
-                delivery.integration_items = created.last().cloned().into_iter().collect();
+        self.commit(&mut inner, |ledger| {
+            let task = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| task.id == id)
+                .unwrap();
+            task.started = true;
+            task.error = None;
+            let planned_at = latest_planner(task, &runs).and_then(|run| run.ended_at.clone());
+            let auto_started = task.auto_start;
+            if let Some(delivery) = &mut task.delivery {
+                delivery.planned_at = planned_at;
+                delivery.started_at = Some(Utc::now().to_rfc3339());
+                delivery.assignment_count = count.saturating_sub(usize::from(count > 1));
+                delivery.auto_started = auto_started;
+                delivery.final_item = created.last().cloned();
+                if count > 1 {
+                    delivery.integration_items = created.last().cloned().into_iter().collect();
+                }
             }
-        }
-        self.save(&ledger)?;
-        inner.ledger = ledger;
+            Ok::<_, String>(())
+        })?;
         inner.enabled.insert(dispatch_key(id));
         Ok(())
     }
@@ -577,7 +585,7 @@ impl Coordinator {
     pub(super) fn auto_start_managed(&self) -> Result<(), String> {
         let runs = self.runtime.integration_runs()?;
         let ready = {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.state();
             if inner.url.is_none() {
                 return Ok(());
             }
@@ -588,18 +596,23 @@ impl Coordinator {
         }
         for (id, planner_run_id) in ready {
             if let Err(error) = self.start_managed(&id, &planner_run_id) {
-                let mut inner = self.inner.lock().unwrap();
-                let mut ledger = inner.ledger.clone();
-                if let Some(task) = ledger.managed_tasks.iter_mut().find(|task| task.id == id) {
-                    if task.started {
-                        continue;
-                    }
-                    task.error = Some(format!(
-                        "Subtasks did not start automatically: {error} Review the plan to continue."
-                    ));
+                let mut inner = self.state();
+                if inner
+                    .ledger
+                    .managed_tasks
+                    .iter()
+                    .any(|task| task.id == id && task.started)
+                {
+                    continue;
                 }
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                self.commit(&mut inner, |ledger| {
+                    if let Some(task) = ledger.managed_tasks.iter_mut().find(|task| task.id == id) {
+                        task.error = Some(format!(
+                            "Subtasks did not start automatically: {error} Review the plan to continue."
+                        ));
+                    }
+                    Ok::<_, String>(())
+                })?;
             }
         }
         Ok(())
@@ -607,7 +620,7 @@ impl Coordinator {
 
     pub(super) fn managed_action(&self, id: &str, action: &str) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         let task = inner
             .ledger
             .managed_tasks
@@ -619,21 +632,21 @@ impl Coordinator {
             "retry-repair" => {
                 self.runtime.access.ensure()?;
                 task_strategy::validate_source(&task.request, &task.assessment.source_head)?;
-                let mut ledger = inner.ledger.clone();
-                let saved = ledger
-                    .managed_tasks
-                    .iter_mut()
-                    .find(|saved| saved.id == id)
-                    .unwrap();
-                let delivery = saved
-                    .delivery
-                    .as_mut()
-                    .ok_or("This task uses the earlier review flow.")?;
-                delivery.repair_limit = delivery.repairs.len() + 1;
-                delivery.interventions += 1;
-                saved.error = None;
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                self.commit(&mut inner, |ledger| {
+                    let saved = ledger
+                        .managed_tasks
+                        .iter_mut()
+                        .find(|saved| saved.id == id)
+                        .unwrap();
+                    let delivery = saved
+                        .delivery
+                        .as_mut()
+                        .ok_or("This task uses the earlier review flow.")?;
+                    delivery.repair_limit = delivery.repairs.len() + 1;
+                    delivery.interventions += 1;
+                    saved.error = None;
+                    Ok::<_, String>(())
+                })?;
                 inner.enabled.insert(dispatch_key(id));
             }
             "retry-plan" => {
@@ -644,24 +657,23 @@ impl Coordinator {
                 let runs = self.runtime.integration_runs()?;
                 if runs.iter().any(|run| {
                     (run.id == task.planner_run_id || task.run_ids.contains(&run.id))
-                        && (active(&run.status) || run.status == "interrupted" || run.finishing)
+                        && (run.status.is_live() || run.finishing)
                 }) {
                     return Err(
                         "Resolve active or interrupted planning attempts before retrying.".into(),
                     );
                 }
-                let mut ledger = inner.ledger.clone();
-                let saved = ledger
-                    .managed_tasks
-                    .iter_mut()
-                    .find(|task| task.id == id)
-                    .unwrap();
-                saved.run_ids.push(saved.planner_run_id.clone());
-                saved.planner_run_id = Uuid::new_v4().to_string();
-                saved.error = None;
-                let next = saved.clone();
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                let next = self.commit(&mut inner, |ledger| {
+                    let saved = ledger
+                        .managed_tasks
+                        .iter_mut()
+                        .find(|task| task.id == id)
+                        .unwrap();
+                    saved.run_ids.push(saved.planner_run_id.clone());
+                    saved.planner_run_id = Uuid::new_v4().to_string();
+                    saved.error = None;
+                    Ok::<_, String>(saved.clone())
+                })?;
                 drop(inner);
                 return self.launch_planner(&next);
             }
@@ -680,12 +692,14 @@ impl Coordinator {
                 if task.started {
                     return Err("Subtasks have already started.".into());
                 }
-                let mut ledger = inner.ledger.clone();
-                if let Some(saved) = ledger.managed_tasks.iter_mut().find(|saved| saved.id == id) {
-                    saved.auto_start = false;
-                }
-                self.save(&ledger)?;
-                inner.ledger = ledger;
+                self.commit(&mut inner, |ledger| {
+                    if let Some(saved) =
+                        ledger.managed_tasks.iter_mut().find(|saved| saved.id == id)
+                    {
+                        saved.auto_start = false;
+                    }
+                    Ok::<_, String>(())
+                })?;
             }
             "pause" | "stop" => {
                 inner.enabled.remove(&dispatch_key(id));
@@ -707,7 +721,7 @@ impl Coordinator {
                         .collect();
                     let active_ids: Vec<_> = runs
                         .iter()
-                        .filter(|run| task_ids.contains(&run.task_id) && active(&run.status))
+                        .filter(|run| task_ids.contains(&run.task_id) && run.status.is_active())
                         .map(|run| run.id.clone())
                         .collect();
                     for run_id in active_ids {
@@ -734,28 +748,27 @@ pub async fn task_plan_review_time(
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         service.ensure_storage_loaded()?;
-        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
-        let mut ledger = inner.ledger.clone();
-        let task = ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|task| task.id == id)
-            .ok_or("Task not found.")?;
-        let delivery = task
-            .delivery
-            .as_mut()
-            .ok_or("This task has no review measurements.")?;
-        if delivery.review_samples.contains(&sample_id) {
-            return Ok(());
-        }
-        delivery.review_seconds =
-            Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
-        delivery.review_samples.push(sample_id);
-        let excess = delivery.review_samples.len().saturating_sub(1000);
-        delivery.review_samples.drain(..excess);
-        service.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+        let mut inner = service.state();
+        service.commit(&mut inner, |ledger| {
+            let task = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| task.id == id)
+                .ok_or("Task not found.")?;
+            let delivery = task
+                .delivery
+                .as_mut()
+                .ok_or("This task has no review measurements.")?;
+            if delivery.review_samples.contains(&sample_id) {
+                return Ok(());
+            }
+            delivery.review_seconds =
+                Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
+            delivery.review_samples.push(sample_id);
+            let excess = delivery.review_samples.len().saturating_sub(1000);
+            delivery.review_samples.drain(..excess);
+            Ok(())
+        })
     })
     .await
     .map_err(|error| error.to_string())?
@@ -905,6 +918,56 @@ mod tests {
         assert!(planning_prompt("x", 6).contains("briefing"));
     }
     #[test]
+    fn planning_sizes_assignments_to_the_request() {
+        let prompt = planning_prompt("x", 4);
+        // Small changes stay whole; broad work, audits and shared groundwork split.
+        for guidance in [
+            "keep a small or focused change in one assignment",
+            "Do not split a short change just to fill available slots",
+            "many independent areas, screens or files, or a long verification checklist",
+            "the first assignment is a read-only audit",
+            "put it in a prerequisite that its consumers list in dependsOn",
+            "say how its result is checked",
+            "do not copy the request into prompts",
+        ] {
+            assert!(prompt.contains(guidance), "{guidance}");
+        }
+    }
+    #[test]
+    fn approved_plan_workers_read_each_briefing_once() {
+        use crate::commands::planning::{artifact, handoff, interview};
+        let doc = artifact::PlanDocument {
+            title: "Export".into(),
+            approach: "Add a serializer and a button.".into(),
+            tasks: ["csv", "button"]
+                .iter()
+                .map(|key| artifact::PlanTask {
+                    key: (*key).into(),
+                    title: format!("Build {key}"),
+                    scopes: vec![format!("src/{key}")],
+                    briefing: format!("{key} follows src/json.ts; run pnpm test {key}."),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let mut task = task();
+        task.request.prompt = interview::execution_brief(&doc);
+        for shape in ["subtasks", "single"] {
+            let link = PlanLink {
+                plan_id: "plan".into(),
+                revision: 1,
+                assignments: handoff::assignments(&doc, shape).unwrap(),
+                reviewer_agent: None,
+                review_brief: String::new(),
+            };
+            for item in plan_entries(&link, &task).unwrap() {
+                assert!(!item.prompt.contains("Planner briefing"), "{shape}");
+                assert_eq!(item.prompt.matches("csv follows src/json.ts").count(), 1);
+            }
+        }
+    }
+    #[test]
     fn one_assignment_avoids_an_unnecessary_extra_worker() {
         let plan = parse_plan(
             r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]}]"#,
@@ -956,7 +1019,7 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("managed-restart-{}", Uuid::new_v4()));
         let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
         let service = Coordinator::new(folder.join("queue"), runtime.clone()).unwrap();
-        service.save(&inner.ledger).unwrap();
+        service.commit(&mut inner, |_| Ok::<_, String>(())).unwrap();
         drop(service);
         let restarted = Coordinator::new(folder.join("queue"), runtime.clone()).unwrap();
         assert!(restarted.view().unwrap().enabled_projects.is_empty());

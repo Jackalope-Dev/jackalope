@@ -192,18 +192,6 @@ fn a_paired_machine_belongs_to_one_bot() {
 }
 
 #[test]
-fn hosted_computers_refuse_every_operation() {
-    let root = root();
-    let mut computer = bot(&root, "b1");
-    computer.provider = HOSTED.into();
-    let hosted = provider(HOSTED).unwrap();
-    assert!(hosted.available(&root, &computer).is_err());
-    assert!(hosted.start(&root, &computer, &|_| {}).is_err());
-    assert!(hosted.transport(&root, &computer).is_err());
-    assert!(hosted.delete(&root, &computer).is_ok());
-}
-
-#[test]
 fn docker_detection_explains_each_unavailable_state() {
     let running = r#"{"Client":{"Version":"27.1.1"},"Server":{"Version":"27.1.1","Os":"linux","Arch":"arm64"}}"#;
     let status = docker::interpret(Ok(running), "desktop-linux");
@@ -296,7 +284,7 @@ fn the_image_tag_follows_the_bundled_definition() {
     assert!(tag.starts_with("jackalope-computer:"));
     assert_eq!(tag, docker::image_tag(&directory).unwrap());
     let copy = root();
-    for name in ["Dockerfile", "start.sh", "agent.py"] {
+    for name in docker::IMAGE_FILES {
         std::fs::copy(directory.join(name), copy.join(name)).unwrap();
     }
     assert_eq!(docker::image_tag(&copy).unwrap(), tag);
@@ -528,8 +516,8 @@ fn local_docker_computer_round_trip() {
                 &["bash".into(), "-c".into(), script.into()],
                 &[
                     ("EXAMPLE".into(), "1".into()),
-                    ("JACKALOPE_BRIDGE_URL".into(), runs::RELAY_URL.into()),
-                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::RELAY_TOKEN.into()),
+                    ("JACKALOPE_BRIDGE_URL".into(), runs::relay_url().into()),
+                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::relay_token().into()),
                 ],
                 "hello\n",
                 true,

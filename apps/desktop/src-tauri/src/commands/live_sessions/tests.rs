@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use std::process::Command;
 
 #[test]
@@ -374,7 +375,7 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
         id: Uuid::new_v4().to_string(),
         task_id: Uuid::new_v4().to_string(),
         live_session_id: Some(id.clone()),
-        status: "review".into(),
+        status: RunStatus::Review,
         workspace: repo.to_string_lossy().into_owned(),
         project_path: repo.to_string_lossy().into_owned(),
         base_head: base.clone(),
@@ -500,7 +501,7 @@ fn session_integration_requires_paused_latest_work_and_survives_restart() {
         base_head: base.clone(),
         branch: "session-work".into(),
         target_branch: Some("main".into()),
-        status: "review".into(),
+        status: RunStatus::Review,
         prompt: "A useful result".into(),
         started_at: Utc::now().to_rfc3339(),
         ..Default::default()
@@ -601,7 +602,7 @@ fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
     let run = TaskRun {
         id: Uuid::new_v4().to_string(),
         live_session_id: Some(id.clone()),
-        status: "failed".into(),
+        status: RunStatus::Failed,
         error: Some("Agent failed".into()),
         ..Default::default()
     };
@@ -671,7 +672,7 @@ process.stdin.on('end',()=>{
         let active = snapshot
             .runs
             .iter()
-            .filter(|run| ["starting", "running", "stopping"].contains(&run.status.as_str()))
+            .filter(|run| run.status.is_active())
             .count();
         assert!(active <= 1);
         if active == 1 && !sent_followup {
@@ -699,7 +700,7 @@ process.stdin.on('end',()=>{
             assert_eq!(snapshot.runs.len(), 2);
             let workspace = &snapshot.runs[0].workspace;
             assert!(snapshot.runs.iter().all(|run| &run.workspace == workspace
-                && run.status == "review"
+                && run.status == RunStatus::Review
                 && run.checkpoint.is_none()));
             assert_eq!(
                 std::fs::read_to_string(std::path::Path::new(workspace).join("changes.txt"))

@@ -12,7 +12,8 @@
 //! caller leaves them unchanged.
 
 use super::*;
-use crate::commands::git_command::{command, Policy};
+use crate::commands::repo::{self, Identity, Policy, Seed};
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use rmcp::schemars;
 use serde::Serialize;
@@ -71,7 +72,7 @@ pub struct Peer {
     pub run_id: String,
     pub title: String,
     pub agent: String,
-    pub status: String,
+    pub status: RunStatus,
     pub scopes: Vec<String>,
     pub tree: Option<String>,
     pub files: Vec<PeerFile>,
@@ -86,7 +87,7 @@ pub struct Peer {
 pub struct LiveRun {
     pub task_id: String,
     pub run_id: String,
-    pub status: String,
+    pub status: RunStatus,
     pub snapshot: bool,
     pub files: usize,
     pub added: u64,
@@ -129,16 +130,6 @@ pub struct PeerReadInput {
     pub limit: Option<usize>,
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = command(path, args, Policy::Inspection)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
-
 /// Latest attempt per task in this project that has isolated, unintegrated work.
 fn candidates<'a>(runs: &'a [TaskRun], view: &QueueView, project_id: &str) -> Vec<&'a TaskRun> {
     let mut latest: Vec<&TaskRun> = Vec::new();
@@ -148,7 +139,7 @@ fn candidates<'a>(runs: &'a [TaskRun], view: &QueueView, project_id: &str) -> Ve
             && !r.base_head.is_empty()
             && !r.workspace.is_empty()
             && r.workspace != r.project_path
-            && (active(&r.status) || ["review", "reviewed"].contains(&r.status.as_str()))
+            && (r.status.is_active() || r.status.is_done())
             && !view.merged_run_ids.contains(&r.id)
     }) {
         if runs
@@ -189,7 +180,7 @@ fn tree_of(view: &QueueView, run: &TaskRun) -> Option<String> {
 
 fn files(run: &TaskRun, tree: &str) -> Result<(Vec<PeerFile>, usize), String> {
     let workspace = Path::new(&run.workspace);
-    let statuses = git(
+    let statuses = repo::git_exact(
         workspace,
         &[
             "diff",
@@ -200,8 +191,9 @@ fn files(run: &TaskRun, tree: &str) -> Result<(Vec<PeerFile>, usize), String> {
             tree,
             "--",
         ],
+        Policy::Inspection,
     )?;
-    let numstat = git(
+    let numstat = repo::git_exact(
         workspace,
         &[
             "diff",
@@ -212,32 +204,23 @@ fn files(run: &TaskRun, tree: &str) -> Result<(Vec<PeerFile>, usize), String> {
             tree,
             "--",
         ],
+        Policy::Inspection,
     )?;
-    let mut counts = HashMap::new();
-    for record in numstat.split('\0').filter(|r| !r.is_empty()) {
-        let mut parts = record.splitn(3, '\t');
-        let (Some(added), Some(removed), Some(path)) = (parts.next(), parts.next(), parts.next())
-        else {
-            continue;
-        };
-        counts.insert(path.to_string(), (added.parse().ok(), removed.parse().ok()));
-    }
-    let fields = statuses
-        .split('\0')
-        .filter(|f| !f.is_empty())
-        .collect::<Vec<_>>();
+    let counts: HashMap<_, _> = repo::parse_numstat(&numstat)
+        .into_iter()
+        .map(|entry| (entry.path, (entry.added, entry.removed)))
+        .collect();
     let mut result = Vec::new();
-    for pair in fields.chunks(2) {
-        let [status, path] = pair else { continue };
-        let (added, removed) = counts.get(*path).copied().unwrap_or((None, None));
+    for change in repo::parse_name_status(&statuses) {
+        let (added, removed) = counts.get(&change.path).copied().unwrap_or((None, None));
         result.push(PeerFile {
-            path: (*path).into(),
-            status: match *status {
-                "A" => "added",
-                "D" => "deleted",
+            status: match change.status {
+                'A' => "added",
+                'D' => "deleted",
                 _ => "modified",
             }
             .into(),
+            path: change.path,
             added,
             removed,
         });
@@ -247,32 +230,20 @@ fn files(run: &TaskRun, tree: &str) -> Result<(Vec<PeerFile>, usize), String> {
     Ok((result, omitted))
 }
 
+const PEER_IDENTITY: Identity = Identity {
+    name: "Jackalope peers",
+    email: "peers@jackalope.invalid",
+};
+
 pub(super) fn synthetic_commit(workspace: &Path, tree: &str, base: &str) -> Result<String, String> {
-    let output = command(
+    repo::synthetic_commit(
         workspace,
-        &[
-            "commit-tree",
-            tree,
-            "-p",
-            base,
-            "-m",
-            "jackalope peer snapshot",
-        ],
+        tree,
+        &[base],
+        "jackalope peer snapshot",
+        PEER_IDENTITY,
         Policy::Inspection,
     )
-    // Fixed metadata makes repeated checks reuse the same object.
-    .env("GIT_AUTHOR_DATE", "2000-01-01T00:00:00Z")
-    .env("GIT_COMMITTER_DATE", "2000-01-01T00:00:00Z")
-    .env("GIT_AUTHOR_NAME", "Jackalope peers")
-    .env("GIT_COMMITTER_NAME", "Jackalope peers")
-    .env("GIT_AUTHOR_EMAIL", "peers@jackalope.invalid")
-    .env("GIT_COMMITTER_EMAIL", "peers@jackalope.invalid")
-    .output()
-    .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().into())
 }
 
 /// Paths Git cannot merge automatically between two snapshots.
@@ -293,7 +264,7 @@ fn conflicts(left: (&TaskRun, &str), right: (&TaskRun, &str)) -> Result<Vec<Stri
     {
         return Ok(found);
     }
-    let output = command(
+    let output = repo::command(
         workspace,
         &["merge-tree", "--write-tree", "--name-only", &a, &b],
         Policy::Inspection,
@@ -346,7 +317,8 @@ pub(super) fn unchanged_adoptions(
             "--",
         ];
         args.extend(adoption.paths.iter().map(String::as_str));
-        let Ok(changed) = git(Path::new(&run.workspace), &args) else {
+        let Ok(changed) = repo::git_exact(Path::new(&run.workspace), &args, Policy::Inspection)
+        else {
             continue;
         };
         let changed: HashSet<_> = changed.split('\0').filter(|p| !p.is_empty()).collect();
@@ -362,7 +334,7 @@ pub(super) fn unchanged_adoptions(
 }
 
 fn blob(workspace: &Path, tree: &str, path: &str) -> Option<String> {
-    git(
+    repo::git_exact(
         workspace,
         &[
             "rev-parse",
@@ -370,6 +342,7 @@ fn blob(workspace: &Path, tree: &str, path: &str) -> Option<String> {
             "--quiet",
             &format!("{tree}:{path}"),
         ],
+        Policy::Inspection,
     )
     .ok()
     .map(|id| id.trim().to_string())
@@ -399,8 +372,12 @@ pub(super) fn adopt(
         .ok_or(
             "That task has no unintegrated isolated work in this project. Use peers for task IDs.",
         )?;
-    let peer_tree = tree_of(view, peer)
-        .ok_or("No snapshot yet. Jackalope records one about every ten seconds.")?;
+    let peer_tree = tree_of(view, peer).ok_or_else(|| {
+        format!(
+            "No snapshot yet. Jackalope records one {}.",
+            snapshot_cadence()
+        )
+    })?;
     let workspace = Path::new(&caller.workspace);
     let previously_adopted = unchanged_adoptions(&view.adoptions, caller, caller_tree);
     for path in &paths {
@@ -420,43 +397,36 @@ pub(super) fn adopt(
             return Err(format!("{path} is a folder in your worktree."));
         }
     }
-    let index = std::env::temp_dir().join(format!("jackalope-adopt-{}.index", Uuid::new_v4()));
-    let result = (|| {
-        let indexed = |args: &[&str]| -> Result<(), String> {
-            let output = command(workspace, args, Policy::Isolated)
-                .env("GIT_INDEX_FILE", &index)
-                .output()
-                .map_err(|e| e.to_string())?;
-            if !output.status.success() {
-                return Err(String::from_utf8_lossy(&output.stderr).trim().into());
+    repo::with_temp_index(
+        workspace,
+        &std::env::temp_dir(),
+        Seed::Empty,
+        Policy::Isolated,
+        |index| {
+            index.git(&["read-tree", &peer_tree])?;
+            let present = paths
+                .iter()
+                .filter(|path| blob(workspace, &peer_tree, path).is_some())
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            if !present.is_empty() {
+                let mut args = vec!["checkout-index", "-f", "--"];
+                args.extend(present);
+                index.git(&args)?;
             }
             Ok(())
-        };
-        indexed(&["read-tree", &peer_tree])?;
-        let present = paths
-            .iter()
-            .filter(|path| blob(workspace, &peer_tree, path).is_some())
-            .map(String::as_str)
-            .collect::<Vec<_>>();
-        if !present.is_empty() {
-            let mut args = vec!["checkout-index", "-f", "--"];
-            args.extend(present);
-            indexed(&args)?;
+        },
+    )?;
+    for path in paths
+        .iter()
+        .filter(|path| blob(workspace, &peer_tree, path).is_none())
+    {
+        match std::fs::remove_file(workspace.join(path)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("Could not remove {path}: {error}")),
         }
-        for path in paths
-            .iter()
-            .filter(|path| blob(workspace, &peer_tree, path).is_none())
-        {
-            match std::fs::remove_file(workspace.join(path)) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(format!("Could not remove {path}: {error}")),
-            }
-        }
-        Ok(())
-    })();
-    let _ = std::fs::remove_file(&index);
-    result?;
+    }
     Ok(Adoption {
         run_id: caller.id.clone(),
         source_run_id: peer.id.clone(),
@@ -508,7 +478,7 @@ pub(super) fn notify_conflicts(ledger: &mut Ledger, runs: &[TaskRun], merged: &[
             .collect::<Vec<_>>();
         for (index, (left, left_tree)) in live.iter().enumerate() {
             for (right, right_tree) in &live[index + 1..] {
-                if !active(&left.status) && !active(&right.status) {
+                if !left.status.is_active() && !right.status.is_active() {
                     continue;
                 }
                 let Ok(paths) = conflicts((left, left_tree), (right, right_tree)) else {
@@ -527,7 +497,7 @@ pub(super) fn notify_conflicts(ledger: &mut Ledger, runs: &[TaskRun], merged: &[
                 );
                 if !ledger.live_conflicts.contains(&signature) {
                     for (run, other) in [(pair[0], pair[1]), (pair[1], pair[0])] {
-                        if !active(&run.status) {
+                        if !run.status.is_active() {
                             continue;
                         }
                         ledger.messages.push(CoordinationMessage {
@@ -618,8 +588,10 @@ pub(super) fn peers(view: &QueueView, runs: &[TaskRun], caller: &TaskRun) -> Vec
         };
         match &tree {
             None => {
-                peer.error =
-                    Some("No snapshot yet. Jackalope records one about every ten seconds.".into())
+                peer.error = Some(format!(
+                    "No snapshot yet. Jackalope records one {}.",
+                    snapshot_cadence()
+                ))
             }
             Some(tree) => {
                 peer.changed_since_last_read = seen.get(&run.id) != Some(tree);
@@ -645,19 +617,10 @@ pub(super) fn peers(view: &QueueView, runs: &[TaskRun], caller: &TaskRun) -> Vec
 }
 
 fn valid_path(path: &str) -> Result<String, String> {
-    let path = path.trim().replace('\\', "/");
-    if path.is_empty()
-        || path.len() > 500
-        || path.starts_with('/')
-        || path.contains(':')
-        || path.chars().any(char::is_control)
-        || path
-            .split('/')
-            .any(|part| part.is_empty() || part == "." || part == "..")
-    {
-        return Err("Use a repository-relative file path without parent traversal.".into());
-    }
-    Ok(path)
+    crate::commands::scope_path::ScopePath::parse(path)
+        .filter(|path| !path.is_root())
+        .map(|path| path.as_str().to_string())
+        .ok_or_else(|| "Use a repository-relative file path without parent traversal.".into())
 }
 
 fn window(text: &str, offset: usize, limit: Option<usize>) -> serde_json::Value {
@@ -687,11 +650,15 @@ pub(super) fn read(
         .ok_or(
             "That task has no unintegrated isolated work in this project. Use peers for task IDs.",
         )?;
-    let tree = tree_of(view, run)
-        .ok_or("No snapshot yet. Jackalope records one about every ten seconds.")?;
+    let tree = tree_of(view, run).ok_or_else(|| {
+        format!(
+            "No snapshot yet. Jackalope records one {}.",
+            snapshot_cadence()
+        )
+    })?;
     let workspace = Path::new(&run.workspace);
     let text = if input.diff {
-        git(
+        repo::git_exact(
             workspace,
             &[
                 "diff",
@@ -702,24 +669,26 @@ pub(super) fn read(
                 "--",
                 &path,
             ],
+            Policy::Inspection,
         )?
     } else {
         let object = format!("{tree}:{path}");
-        let kind = git(workspace, &["cat-file", "-t", &object])
+        let kind = repo::git_exact(workspace, &["cat-file", "-t", &object], Policy::Inspection)
             .map_err(|_| "That path does not exist in the peer's snapshot.".to_string())?;
         if kind.trim() != "blob" {
             return Err(
                 "That path is a folder. Read individual files from peers' file lists.".into(),
             );
         }
-        let size: u64 = git(workspace, &["cat-file", "-s", &object])?
-            .trim()
-            .parse()
-            .unwrap_or(u64::MAX);
+        let size: u64 =
+            repo::git_exact(workspace, &["cat-file", "-s", &object], Policy::Inspection)?
+                .trim()
+                .parse()
+                .unwrap_or(u64::MAX);
         if size > MAX_BLOB_BYTES {
             return Err("That file is too large to read through peers.".into());
         }
-        let output = command(
+        let output = repo::command(
             workspace,
             &["cat-file", "blob", &object],
             Policy::Inspection,
@@ -803,65 +772,54 @@ pub(super) fn combination(
     }
 }
 
-pub(in crate::commands) async fn bridge_peers(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    let caller = service.authorized_run(&headers)?;
-    let view = service
-        .view()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let runs = service
+/// `peers`: other tasks' live, unintegrated work in the caller's project.
+pub(in crate::commands) async fn list_peers(call: Call) -> Result<serde_json::Value, ToolError> {
+    let view = call.service.view().map_err(ToolError::failed)?;
+    let runs = call
+        .service
         .runtime
         .integration_runs()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ToolError::failed)?;
+    let caller = call.caller.run;
     let peers = tauri::async_runtime::spawn_blocking(move || peers(&view, &runs, &caller))
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(serde_json::json!({
+        .map_err(|e| ToolError::failed(e.to_string()))?;
+    Ok(serde_json::json!({
         "peers": peers,
-        "note": "Snapshots refresh about every ten seconds. Read peers' files to build against their interfaces; edit only your own paths and use agreement or message to change shared contracts. conflicts lists files Git cannot merge with your current work.",
-    })))
+        "note": format!("Snapshots refresh {}. Read peers' files to build against their interfaces; edit only your own paths and use agreement or message to change shared contracts. conflicts lists files Git cannot merge with your current work.", snapshot_cadence()),
+    }))
 }
 
-pub(in crate::commands) async fn bridge_peer_read(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<PeerReadInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let caller = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let view = service
-        .view()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-    let runs = service
+/// `peer_read`: a file or diff from another task's latest snapshot.
+pub(in crate::commands) async fn peer_read(
+    call: Call,
+    input: PeerReadInput,
+) -> Result<serde_json::Value, ToolError> {
+    let view = call.service.view().map_err(ToolError::failed)?;
+    let runs = call
+        .service
         .runtime
         .integration_runs()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+        .map_err(ToolError::failed)?;
+    let caller = call.caller.run;
     tauri::async_runtime::spawn_blocking(move || read(&view, &runs, &caller, &input))
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .map(Json)
-        .map_err(|error| (StatusCode::BAD_REQUEST, error))
+        .map_err(|e| ToolError::failed(e.to_string()))?
+        .map_err(ToolError::refused)
 }
 
-pub(in crate::commands) async fn bridge_peer_adopt(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<PeerAdoptInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let caller = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let worker = service.clone();
+/// `peer_adopt`: copies files a peer changed into the caller's worktree.
+pub(in crate::commands) async fn peer_adopt(
+    call: Call,
+    input: PeerAdoptInput,
+) -> Result<serde_json::Value, ToolError> {
+    let worker = call.service;
+    let caller = call.caller.run;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = worker.inner.lock().unwrap();
-        let _guard = crate::commands::integration::execution_guard()?;
+        worker.transact(|inner, _guard| {
         crate::commands::verification::ensure_idle(&caller.workspace)?;
         crate::commands::previews::ensure_idle(&caller.workspace)?;
         let directory = worker.runtime.integration_directory();
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let caller_tree = crate::commands::integration::workspace_tree(&caller, &directory)?;
         let merged = crate::commands::integration::applied_run_ids(&worker.runtime)?;
         let runs = worker.runtime.integration_runs()?;
@@ -874,21 +832,21 @@ pub(in crate::commands) async fn bridge_peer_adopt(
             ..Default::default()
         };
         let adoption = adopt(&view, &runs, &caller, &caller_tree, &input)?;
-        let mut ledger = inner.ledger.clone();
-        record_adoption(&mut ledger, adoption.clone());
-        worker.save(&ledger)?;
-        inner.ledger = ledger;
+        worker.commit(inner, |ledger| {
+            record_adoption(ledger, adoption.clone());
+            Ok::<_, String>(())
+        })?;
         Ok::<_, String>(serde_json::json!({
             "adopted": adoption.paths,
             "fromTaskId": adoption.source_task_id,
             "sourceTree": adoption.source_tree,
             "note": "These files now match the peer's snapshot. Keep them unchanged so they stay the peer's work; if the peer changes them again you will receive a live conflict and can adopt again.",
         }))
+        })
     })
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .map(Json)
-    .map_err(|error| (StatusCode::BAD_REQUEST, error))
+    .map_err(|e| ToolError::failed(e.to_string()))?
+    .map_err(ToolError::refused)
 }
 
 #[tauri::command]
@@ -979,7 +937,7 @@ mod tests {
         run.project_path = root.to_string_lossy().into();
         run.workspace = workspace.to_string_lossy().into();
         run.base_head = base;
-        run.status = "running".into();
+        run.status = RunStatus::Running;
         run.agent = "codex".into();
         run.started_at = "2026-10-01T00:00:00Z".into();
         (run, tree)
@@ -1242,7 +1200,7 @@ mod tests {
             .iter()
             .cloned()
             .map(|mut run| {
-                run.status = "review".into();
+                run.status = RunStatus::Review;
                 run
             })
             .collect::<Vec<_>>();

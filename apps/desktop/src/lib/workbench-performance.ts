@@ -7,7 +7,6 @@ const nativeMetrics = new Set([
   'task_review',
   'task_verify',
   'task_start',
-  'task_continue',
   'task_terminal_start',
   'task_work_window',
   'project_readiness',

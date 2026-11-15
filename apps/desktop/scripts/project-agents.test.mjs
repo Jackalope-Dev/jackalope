@@ -9,12 +9,10 @@ globalThis.window = {
     removeItem: (key) => values.delete(key),
   },
 };
-const { useAgentConfigStore: agents, syncAgentConfig } = await import(
+const { useAgentConfigStore: agents, agentPolicySaved } = await import(
   '../src/stores/agentConfigStore.ts'
 );
-const { useProjectStore: projects, isAgentAllowedForProject } = await import(
-  '../src/stores/projectStore.ts'
-);
+const { useProjectStore: projects } = await import('../src/stores/projectStore.ts');
 const project = (id, preferences) => ({
   id,
   name: id,
@@ -107,7 +105,7 @@ test('native policy receives each project list, default and account restrictions
     },
   };
   try {
-    await syncAgentConfig();
+    await agentPolicySaved();
     assert.deepEqual(saved.projects.work, work);
     assert.deepEqual(saved.projects.personal, { ...personal, disabledAccounts: {} });
     assert.equal(saved.defaultMetaAgent, 'codex');
@@ -116,42 +114,22 @@ test('native policy receives each project list, default and account restrictions
   }
 });
 
-test('usage and quota accounts filter only includes agents enabled on the active project', () => {
-  const records = [
-    { agent: 'codex', status: 'connected', windows: [{ poolId: '1' }] },
-    { agent: 'claude', status: 'connected', windows: [{ poolId: '2' }] },
-    { agent: 'grok', status: 'connected', windows: [{ poolId: '3' }] },
-    { agent: 'uninstalled', status: 'notInstalled', windows: [{ poolId: '4' }] },
-  ];
-  projects.setState({
-    activeProjectId: 'work',
-    projects: [project('work', { allowedAgents: ['claude'] }), project('personal')],
-  });
-  agents.setState({
-    enabledAgents: { codex: true, claude: true, grok: false },
-  });
-
-  const filterAccounts = (activeProjectId) => {
-    const active = projects.getState().projects.find((p) => p.id === activeProjectId);
-    const enabled = agents.getState().enabledAgents;
-    const isAgentEnabled = (id) =>
-      (enabled[id] ?? true) &&
-      (!activeProjectId || (Boolean(active) && isAgentAllowedForProject(active, id)));
-    return records.filter(
-      (r) => r.status !== 'notInstalled' && isAgentEnabled(r.agent) && r.windows.length > 0,
-    );
+test('commands that read the agent policy save the current policy first', async () => {
+  const { invokeNative } = await import('../src/lib/native/transport.ts');
+  const calls = [];
+  window.__TAURI_INTERNALS__ = {
+    invoke: async (command, args) => {
+      calls.push(
+        command === 'agent_save_policy' ? `${command}:${args.policy.defaultMetaAgent}` : command,
+      );
+    },
   };
-
-  assert.deepEqual(
-    filterAccounts('work').map((r) => r.agent),
-    ['claude'],
-  );
-  assert.deepEqual(
-    filterAccounts('personal').map((r) => r.agent),
-    ['codex', 'claude'],
-  );
-  assert.deepEqual(
-    filterAccounts(undefined).map((r) => r.agent),
-    ['codex', 'claude'],
-  );
+  try {
+    agents.setState({ defaultMetaAgent: 'claude' });
+    await invokeNative('task_start', { request: {} });
+    await invokeNative('task_list');
+    assert.deepEqual(calls, ['agent_save_policy:claude', 'task_start', 'task_list']);
+  } finally {
+    delete window.__TAURI_INTERNALS__;
+  }
 });

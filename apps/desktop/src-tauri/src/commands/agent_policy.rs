@@ -88,20 +88,19 @@ impl AgentPolicy {
                 .find(|custom| custom.id == agent)
                 .and_then(|custom| custom.adapter.as_deref())
                 .unwrap_or(agent);
-            if self.agent_allowed(project, agent)
-                && matches!(
-                    adapter,
-                    "codex" | "claude" | "grok" | "opencode" | "kimi" | "acp"
-                )
-            {
+            if self.agent_allowed(project, agent) && super::agents::orchestrates(adapter) {
                 return Ok(agent);
             }
         }
-        Err("Choose an enabled Codex, Claude, Grok, OpenCode, Kimi Code or ACP agent for this project in Settings → Agents.".into())
+        Err(format!(
+            "Choose an enabled {} agent for this project in Settings → Agents.",
+            super::agents::orchestrator_names()
+        ))
     }
 
     pub(super) fn model_for_account(
         &self,
+        profiles_root: &std::path::Path,
         agent: &str,
         requested: Option<&str>,
         binding: &super::agent_profiles::AccountBinding,
@@ -113,7 +112,7 @@ impl AgentPolicy {
             }
             self.model(agent, Some(&id))
         } else {
-            let preferred = super::agent_profiles::preferred_model(binding)?;
+            let preferred = super::agent_profiles::preferred_model(profiles_root, binding)?;
             let model = self.model(
                 agent,
                 requested
@@ -170,7 +169,7 @@ impl AgentPolicy {
         }
         let custom = self.custom_agents.iter().find(|a| a.id == agent);
         let adapter = custom.and_then(|a| a.adapter.as_deref()).unwrap_or(agent);
-        if !super::tasks::BUILTIN_AGENTS.contains(&adapter) && adapter != "acp" {
+        if !super::agents::is_executable(adapter) {
             return Err("Choose a supported CLI adapter for this manually added agent.".into());
         }
         Ok(adapter.to_string())
@@ -261,11 +260,8 @@ impl TaskRuntime {
             }
             let agent = policy.routing_agent(&request.project_id)?;
             let (adapter, _) = policy.resolve(agent)?;
-            if !matches!(
-                adapter.as_str(),
-                "codex" | "claude" | "grok" | "opencode" | "kimi"
-            ) {
-                return Err("Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator in Settings → Agents. Antigravity is available as a worker.".into());
+            if !super::agents::orchestrates(&adapter) {
+                return Err(format!("Choose {} as the default orchestrator in Settings → Agents. Other agents are available as workers.", super::agents::orchestrator_names()));
             }
             if adapter != "opencode" {
                 policy.model(agent, None)?;
@@ -313,6 +309,17 @@ impl TaskRuntime {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_policy::agent_save_policy,
+            commands::agent_policy::agent_probe_executable,
+            commands::agent_policy::agent_locate_executables,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn agent_save_policy(
     policy: AgentPolicy,
@@ -322,7 +329,7 @@ pub async fn agent_save_policy(
     let mut ids = std::collections::HashSet::new();
     for agent in &policy.custom_agents {
         if agent.id.is_empty()
-            || super::tasks::BUILTIN_AGENTS.contains(&agent.id.as_str())
+            || super::agents::is_builtin(&agent.id)
             || agent.id == "default"
             || agent.id == "auto"
             || !ids.insert(&agent.id)
@@ -347,6 +354,36 @@ pub struct AgentProbeResponse {
     pub valid: bool,
     pub version: Option<String>,
     pub error: Option<String>,
+}
+
+/// Finds which of the named CLIs are installed, for offering known agents by name.
+/// Returns each found command with its absolute path; nothing is run.
+#[tauri::command]
+pub async fn agent_locate_executables(
+    names: Vec<String>,
+) -> Result<HashMap<String, String>, String> {
+    if names.len() > 64 {
+        return Err("Too many commands to look for.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        names
+            .into_iter()
+            .filter(|name| {
+                !name.is_empty()
+                    && name.len() <= 40
+                    && !name.starts_with('-')
+                    && name
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+            })
+            .filter_map(|name| {
+                let path = super::tasks::locate(&name)?;
+                Some((name, path.to_string_lossy().into_owned()))
+            })
+            .collect()
+    })
+    .await
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

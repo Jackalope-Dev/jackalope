@@ -71,14 +71,14 @@ pub(super) fn waiting(runs: &[TaskRun]) -> Vec<&TaskRun> {
                 return false;
             };
             left.on_host
-                && run.status == "failed"
+                && run.status == RunStatus::Failed
                 && (left.recovered_at.is_some() || left.tries < TRIES)
                 && runs
                     .iter()
                     .any(|other| other.retry_of.as_deref() == Some(run.id.as_str()))
                 && !runs.iter().any(|other| {
                     other.id != run.id
-                        && ["starting", "running", "stopping"].contains(&other.status.as_str())
+                        && other.status.is_active()
                         && same_run(other, &host.id, &run.workspace)
                 })
         })

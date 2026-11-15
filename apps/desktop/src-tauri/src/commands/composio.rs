@@ -67,14 +67,10 @@ fn path(runtime: &TaskRuntime) -> PathBuf {
 }
 
 fn saved(runtime: &TaskRuntime) -> Result<Option<Saved>, String> {
-    account_storage::read(&path(runtime))?
-        .map(|bytes| {
-            serde_json::from_slice(&bytes).map_err(|_| {
-                "The saved Composio connection could not be read. Remove it and add the key again."
-                    .into()
-            })
-        })
-        .transpose()
+    account_storage::read_json(
+        &path(runtime),
+        "The saved Composio connection could not be read. Remove it and add the key again.",
+    )
 }
 
 fn require(runtime: &TaskRuntime) -> Result<Saved, String> {
@@ -213,6 +209,21 @@ fn connection(saved: &Saved) -> mcp::McpServerConfig {
     }
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::composio::composio_status,
+            commands::composio::composio_save_key,
+            commands::composio::composio_remove_key,
+            commands::composio::composio_catalog,
+            commands::composio::composio_accounts,
+            commands::composio::composio_authorize,
+            commands::composio::composio_disconnect,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn composio_status(state: State<'_, TaskRuntime>) -> Result<Status, String> {
     let saved = saved(&state)?;
@@ -255,10 +266,7 @@ pub async fn composio_save_key(
         session_id,
         mcp_url,
     };
-    account_storage::write(
-        &path(&state),
-        &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&path(&state), &next)?;
     mcp::mcp_save_server(connection(&next)).await?;
     *CATALOG.lock().map_err(|e| e.to_string())? = None;
     composio_status(state).await
@@ -414,10 +422,7 @@ pub async fn composio_authorize(
                 mcp_url,
                 ..saved.clone()
             };
-            account_storage::write(
-                &path(&state),
-                &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-            )?;
+            account_storage::write_json(&path(&state), &next)?;
             mcp::mcp_save_server(connection(&next)).await?;
             send(link(&next.session_id)?, &next.api_key).await?
         }

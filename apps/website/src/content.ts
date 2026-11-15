@@ -1,3 +1,4 @@
+import { guidePath, knowledgeGuides } from '@jackalope/knowledge';
 import { authorPath, authors } from './authors.ts';
 import { practicalPosts } from './blog-content.ts';
 import { markdownPosts } from './blog-markdown.ts';
@@ -5,7 +6,6 @@ import type { BlogPost } from './blog-types.ts';
 import changelog from './changelog.json' with { type: 'json' };
 import { type ReleaseMap, withReleases } from './changelog.ts';
 import { growthPost } from './growth-content.ts';
-import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
 import { recentPosts } from './recent-posts.ts';
 
@@ -281,7 +281,7 @@ export const pages: SitePage[] = [
     description: post.description,
   })),
   ...knowledgeGuides.map((guide) => ({
-    path: `/knowledge/${guide.slug}/`,
+    path: guidePath(guide.slug),
     title: `${guide.shortTitle} | Jackalope`,
     description: guide.description,
   })),

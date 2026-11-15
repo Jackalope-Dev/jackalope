@@ -231,7 +231,7 @@ initialization budget and a four-tool, 6 KB limit. Partial, failed or larger cat
 retain ordinary discovery. Metadata remains untrusted and each call still validates
 the live schema and permissions. Include initialization and prompt bytes in comparisons.
 
-Settings → Decisions includes an off-by-default Jev tool-discovery experiment.
+Agents → Routing includes an off-by-default Jev tool-discovery experiment.
 In Jev mode it can promote strongly relevant tools for ambiguous searches using
 the query, at most 4,000 task characters and 32 descriptions capped at 1,200
 characters each. Exact tool names, empty-query browsing and nonempty local results

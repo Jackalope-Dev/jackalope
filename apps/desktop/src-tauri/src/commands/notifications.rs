@@ -1,4 +1,5 @@
 use super::tasks::TaskRuntime;
+use crate::commands::tasks::RunStatus;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -48,7 +49,7 @@ pub struct Snapshot {
     pub task_id: String,
     pub project_id: String,
     pub started_at: String,
-    pub status: String,
+    pub status: RunStatus,
     pub questions: Vec<String>,
     /// The attempt an agent reviewer reviewed; its notice opens that attempt.
     pub review_of: Option<String>,
@@ -67,7 +68,7 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
     let mut reviews = Vec::new();
     for run in runs {
         if let Some(author) = &run.review_of {
-            if run.status == "review" {
+            if run.status == RunStatus::Review {
                 reviews.push(Notice {
                     key: format!("{}:review", run.id),
                     run_id: author.clone(),
@@ -85,7 +86,7 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
     latest
         .values()
         .flat_map(|run| {
-            if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if run.status.is_active() {
                 return run
                     .questions
                     .iter()
@@ -97,17 +98,17 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
                     })
                     .collect::<Vec<_>>();
             }
-            let title = match run.status.as_str() {
-                "failed" => "A task needs attention",
-                "interrupted" => "A task was interrupted",
-                "review" => "A task is ready for review",
+            let title = match run.status {
+                RunStatus::Failed => "A task needs attention",
+                RunStatus::Interrupted => "A task was interrupted",
+                RunStatus::Review => "A task is ready for review",
                 _ => return vec![],
             };
             vec![Notice {
                 key: format!("{}:{}", run.id, run.status),
                 run_id: run.id.clone(),
                 title,
-                attention: run.status != "review",
+                attention: run.status != RunStatus::Review,
             }]
         })
         .chain(reviews)
@@ -169,6 +170,12 @@ fn permitted(preferences: &Preferences, notice: &Notice, focused: bool) -> bool 
             || (preferences.level == "failures-only" && notice.attention))
 }
 
+impl crate::services::Service for Notifications {
+    fn shutdown(&self) {
+        Notifications::shutdown(self)
+    }
+}
+
 impl Notifications {
     pub fn load(path: PathBuf) -> Self {
         let (preferences, error) = if path.exists() {
@@ -213,9 +220,12 @@ impl Notifications {
 pub fn launch(app: tauri::AppHandle) {
     let initial = app.state::<TaskRuntime>().notification_snapshot();
     tauri::async_runtime::spawn(async move {
+        // Everything already waiting at launch counts as announced, plans included, so only
+        // later transitions notify.
         let mut seen: HashSet<String> = notices(&initial)
             .into_iter()
             .chain(bot_notices())
+            .chain(plan_notices())
             .map(|notice| notice.key)
             .collect();
         loop {
@@ -331,6 +341,19 @@ async fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Re
     result
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::notifications::notification_status,
+            commands::notifications::notification_configure,
+            commands::notifications::notification_test,
+            commands::notifications::notification_pull_request,
+            commands::notifications::notification_take_open,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn notification_status(service: State<'_, Notifications>) -> NotificationStatus {
     service.status()
@@ -356,6 +379,43 @@ pub fn notification_configure(
 #[tauri::command]
 pub async fn notification_test(app: tauri::AppHandle) -> Result<(), String> {
     show(&app, "Task notifications are ready", None).await
+}
+
+/// Announces that a task's pull request moved to a state worth knowing about, under the
+/// same preferences as task notices. Activation opens the task.
+#[tauri::command]
+pub async fn notification_pull_request(
+    phase: String,
+    run_id: String,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let (title, attention) = match phase.as_str() {
+        "failing" => ("A pull request's checks failed", true),
+        "changes" => ("A pull request has changes requested", true),
+        "conflict" => ("A pull request has conflicts", true),
+        "ready" => ("A pull request is ready to merge", false),
+        "merged" => ("A pull request was merged", false),
+        _ => return Err("Unknown pull request state.".into()),
+    };
+    let notice = Notice {
+        key: String::new(),
+        run_id,
+        title,
+        attention,
+    };
+    let focused = app.get_webview_window("main").is_some_and(|window| {
+        window.is_focused().unwrap_or(false) && window.is_visible().unwrap_or(false)
+    });
+    let preferences = app
+        .state::<Notifications>()
+        .preferences
+        .lock()
+        .unwrap()
+        .clone();
+    if permitted(&preferences, &notice, focused) {
+        show(&app, notice.title, Some(notice.run_id)).await?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

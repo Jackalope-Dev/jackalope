@@ -1,14 +1,19 @@
+import {
+  Badge,
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MessageSquare } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { type ReleaseNotes, shouldShowReleaseNotes } from '../../lib/release-notes';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useUpdateStore } from '../../stores/updateStore';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { welcomePending } from './WelcomeDialog';
 
 const SEEN_KEY = 'jackalope.whats-new.seen-version';

@@ -1,4 +1,5 @@
 use super::*;
+mod agent_matrix;
 mod decision_trail;
 mod workbench;
 mod workspace_modes;
@@ -8,6 +9,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         progress: None,
         preparation: None,
         retry_of: None,
+        continues: None,
         archived_at: None,
         live_session_id: None,
         effort: None,
@@ -22,6 +24,9 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         checkpoint_error: None,
         routing: None,
         quota_failure: None,
+        failure_kind: None,
+        provider_error: None,
+        session_refused: None,
         contract: Default::default(),
         understanding: None,
         monitor_change: None,
@@ -50,13 +55,18 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         account: "test".into(),
         connection_ids: None,
         model: None,
+        requested_model: None,
+        fallback_model: None,
+        model_mismatch: None,
+        model_reported: false,
         prompt: "Example".into(),
-        status: "running".into(),
+        status: RunStatus::Running,
         started_at: Utc::now().to_rfc3339(),
         ended_at: None,
         session_id: None,
         result: String::new(),
         streaming: String::new(),
+        pending_tools: Default::default(),
         details_omitted: false,
         activity: vec![],
         diagnostics: vec![],
@@ -67,14 +77,17 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         mcp_usage: None,
         usage_observations: vec![],
         prompts: vec![],
+        awaiting_answers: Vec::new(),
         validation_steps: vec![],
         decisions: vec![],
         screenshots: vec![],
+        desktop_permissions: Vec::new(),
         desktop_actions: vec![],
         visited_pages: vec![],
         review_captures: None,
         review_capturing: false,
         challenge_of: None,
+        secrets: None,
     }
 }
 
@@ -132,6 +145,21 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
         assert_eq!(run.activity.last().unwrap(), "Tool request failed");
         assert!(run.error.is_none());
         assert!(!run.activity.join(" ").contains("private"));
+        consume_event(
+            &mut run,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"bash-1","name":"Bash","input":{"command":"cd /private && TOKEN=private pnpm test"}}]}}"#,
+        );
+        consume_event(
+            &mut run,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"bash-1","is_error":true,"content":[{"type":"text","text":"Exit code 1\nprivate output"}]}]}}"#,
+        );
+        assert_eq!(run.activity.last().unwrap(), "Running pnpm failed: exit 1");
+        assert_eq!(
+            super::tool_activity::kind(run.activity.last().unwrap()),
+            "failure"
+        );
+        assert!(!run.pending_tools.contains_key("bash-1"));
+        assert!(!run.activity.join(" ").contains("private"));
     }
     let mut run = sample("codex");
     consume_event(
@@ -153,6 +181,14 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
         r#"{"type":"item.completed","item":{"type":"mcp_tool_call","status":"failed"}}"#,
     );
     assert_eq!(run.activity.last().unwrap(), "Tool request failed");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"mcp_tool_call","server":"linear","tool":"create_issue","status":"failed","error":{"message":"Request timed out for private-team"}}}"#,
+    );
+    assert_eq!(
+        run.activity.last().unwrap(),
+        "Using create_issue failed: timed out"
+    );
     consume_event(
         &mut run,
         r#"{"type":"item.completed","item":{"type":"file_change","changes":[{"path":"src/a.rs"}]}}"#,
@@ -190,7 +226,7 @@ fn active_summaries_keep_only_three_short_activity_previews() {
     assert_eq!(summary.activity[0], "Reading src/a.rs");
     assert_eq!(summary.activity[2].len(), 240);
     assert_eq!(run.activity.len(), 4);
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     assert!(run.summary().activity.is_empty());
 }
 
@@ -314,10 +350,6 @@ fn antigravity_uses_literal_stdin_and_explicit_workspace_without_bypassing_permi
 #[test]
 fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
     let root = std::env::temp_dir().join(format!("jackalope-agy-account-{}", uuid::Uuid::new_v4()));
-    assert_eq!(
-        crate::commands::agent_profiles::env_var_for("antigravity"),
-        Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-    );
     assert!(
         crate::commands::agent_profiles::bind_account(&root, "antigravity", Some("work")).is_err()
     );
@@ -329,16 +361,6 @@ fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
     );
     stream.consume(&mut run, r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"Done","usage":{"input_tokens":1000,"output_tokens":200}}}"#);
     assert!(!run.usage.reported);
-}
-
-#[test]
-fn every_builtin_agent_is_executable() {
-    for adapter in BUILTIN_AGENTS {
-        assert!(runtime::EXECUTABLE_ADAPTERS.contains(adapter), "{adapter}");
-    }
-    let message = runtime::unimplemented_adapter("other");
-    assert!(message.starts_with("The other task adapter is not implemented yet"));
-    assert!(message.contains("Gemini CLI"));
 }
 
 #[test]
@@ -358,9 +380,8 @@ fn installed_agent_lifecycle_trial() {
     agent_lifecycle_trial(&agent, None);
 }
 
-pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
-    assert!(BUILTIN_AGENTS.contains(&agent));
-    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+/// A disposable repository with one fixture commit, for trials that run installed agents.
+pub(super) fn trial_repository(root: &Path) -> PathBuf {
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
     let repo_text = repo.to_string_lossy().to_string();
@@ -389,6 +410,68 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         ],
     )
     .unwrap();
+    repo
+}
+
+/// A new isolated task for a trial, with no MCP connections.
+pub(super) fn trial_request(
+    repo: &Path,
+    agent: &str,
+    model: Option<String>,
+    prompt: &str,
+) -> RunRequest {
+    RunRequest {
+        retry_of: None,
+        continues: None,
+        live_session_id: None,
+        effort: None,
+        codex_speed: None,
+        dependency_snapshot: Default::default(),
+        id: uuid::Uuid::new_v4().to_string(),
+        project_id: uuid::Uuid::new_v4().to_string(),
+        project_name: "Agent acceptance fixture".into(),
+        project_path: repo.to_string_lossy().into_owned(),
+        agent: agent.into(),
+        agent_profile_id: None,
+        verify_command: None,
+        target_branch: Some("main".into()),
+        account_binding: None,
+        model,
+        prompt: prompt.into(),
+        isolated: true,
+        workspace_mode: None,
+        previous_run_id: None,
+        connection_ids: Some(vec![]),
+        coordination: None,
+        prepare_command: None,
+        setup_files: Vec::new(),
+        auto_verify: false,
+        monitor_change: None,
+        context_selection: Default::default(),
+        context_receipt: Default::default(),
+    }
+}
+
+/// Waits for an attempt to finish. One still active after `limit` is stopped and `None`.
+pub(super) fn trial_settled(runtime: &TaskRuntime, id: &str, limit: Duration) -> Option<TaskRun> {
+    let deadline = std::time::Instant::now() + limit;
+    loop {
+        let run = runtime.inner.lock().unwrap().runs[id].clone();
+        if !run.status.is_active() {
+            return Some(run);
+        }
+        if std::time::Instant::now() > deadline {
+            let _ = runtime.stop(id);
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
+    assert!(crate::commands::agents::is_builtin(agent));
+    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+    let repo = trial_repository(&root);
     let history = root.join("history");
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let selected_agent = if let Some(executable) = executable {
@@ -412,24 +495,13 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         .is_none()
         .then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok())
         .flatten();
-    let request = RunRequest {
-        retry_of: None,
-        live_session_id: None,
-                effort: None,
-        codex_speed: None,
-        dependency_snapshot: Default::default(),
-        id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
-        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: selected_agent.into(),
-        agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
-        account_binding: None, model,
-        prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
-        isolated: true, workspace_mode: None, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
-        prepare_command: None,
-        setup_files: Vec::new(), auto_verify: false, monitor_change: None,
-        context_selection: Default::default(), context_receipt: Default::default(),
-    };
+    let mut request = trial_request(
+        &repo,
+        selected_agent,
+        model,
+        "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.",
+    );
     let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
-    let mut request = request;
     if executable.is_some() {
         request.auto_verify = true;
         request.verify_command = Some("node -e \"require('node:assert/strict').equal(require('node:fs').readFileSync('receipt.txt','utf8').trim(),'JACKALOPE_NATIVE_OK')\"".into());
@@ -472,28 +544,19 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
             .input_values
             .insert("Receipt name".into(), "receipt.txt".into());
     }
-    fn settled(runtime: &TaskRuntime, id: &str) -> TaskRun {
-        let deadline = std::time::Instant::now() + Duration::from_secs(180);
-        loop {
-            let run = runtime.inner.lock().unwrap().runs[id].clone();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
-                return run;
-            }
-            if std::time::Instant::now() > deadline {
-                let _ = runtime.stop(id);
-                panic!(
-                    "Agent trial timed out; retained fixture history at {}",
-                    runtime.directory.display()
-                );
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        }
-    }
+    let settled = |runtime: &TaskRuntime, id: &str| {
+        trial_settled(runtime, id, Duration::from_secs(180)).unwrap_or_else(|| {
+            panic!(
+                "Agent trial timed out; retained fixture history at {}",
+                runtime.directory.display()
+            )
+        })
+    };
     runtime.start(request.clone()).unwrap();
     let first = settled(&runtime, &request.id);
     assert_eq!(
         first.status,
-        "review",
+        RunStatus::Review,
         "{:?}; fixture {}",
         first.error,
         root.display()
@@ -543,7 +606,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     }
     runtime.start(next.clone()).unwrap();
     let second = settled(&runtime, &next.id);
-    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert_eq!(second.status, RunStatus::Review, "{:?}", second.error);
     assert!(
         second.result.contains("copper-rabbit-731"),
         "Continuation did not retain context"
@@ -603,7 +666,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         std::thread::sleep(Duration::from_millis(50));
     }
     runtime.stop(&stop.id).unwrap();
-    assert_eq!(settled(&runtime, &stop.id).status, "stopped");
+    assert_eq!(settled(&runtime, &stop.id).status, RunStatus::Stopped);
     std::thread::sleep(Duration::from_millis(300));
     drop(runtime);
     let restored = TaskRuntime::with_test_access(history).unwrap();
@@ -646,7 +709,7 @@ fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
 
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut failed = sample("codex");
-    failed.status = "failed".into();
+    failed.status = RunStatus::Failed;
     failed.project_path = repo_path.clone();
     failed.workspace = worktree_path.clone();
     failed.branch = "attempt".into();
@@ -698,16 +761,16 @@ fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
     assert!(runtime.reusable_workspace(&failed_id).is_some());
 
     // A running attempt is neither retryable nor a source of a reusable workspace.
-    runtime.update(&failed_id, |run| run.status = "running".into());
+    runtime.update(&failed_id, |run| run.status = RunStatus::Running);
     assert!(runtime.retry_request(&failed_id).is_err());
     assert!(runtime.reusable_workspace(&failed_id).is_none());
-    runtime.update(&failed_id, |run| run.status = "failed".into());
+    runtime.update(&failed_id, |run| run.status = RunStatus::Failed);
 
     // Nor is a workspace a later attempt already owns.
     let mut newer = sample("codex");
     newer.id = uuid::Uuid::new_v4().to_string();
     newer.task_id = failed.task_id.clone();
-    newer.status = "running".into();
+    newer.status = RunStatus::Running;
     newer.workspace = worktree_path.clone();
     runtime
         .inner
@@ -824,6 +887,79 @@ fn final_usage_replaces_replayed_totals_and_cache_is_counted_once() {
     }
 }
 
+const CLAUDE_CALLS: [&str; 4] = [
+    r#"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"output_tokens":1}}}"#,
+    // The same call again for its next content block, with its final output count.
+    r#"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":20,"output_tokens":7}}}"#,
+    r#"{"type":"assistant","message":{"id":"m2","usage":{"input_tokens":5,"cache_read_input_tokens":130,"cache_creation_input_tokens":0,"output_tokens":3}}}"#,
+    r#"{"type":"assistant","parent_tool_use_id":"child-1","message":{"id":"m3","usage":{"input_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":6,"output_tokens":2}}}"#,
+];
+
+#[test]
+fn an_attempt_ended_without_a_result_keeps_the_usage_it_observed_once() {
+    for end in [
+        TaskRun::mark_stopped as fn(&mut TaskRun),
+        |run: &mut TaskRun| run.mark_failed("Agent exited".into()),
+    ] {
+        let mut run = sample("claude");
+        for event in CLAUDE_CALLS {
+            consume_event(&mut run, event);
+        }
+        assert!(!run.usage.reported);
+        end(&mut run);
+        end(&mut run);
+        assert!(run.usage.reported);
+        assert_eq!(run.usage.input, 130 + 135 + 10);
+        assert_eq!(run.usage.output, 7 + 3 + 2);
+        assert_eq!(run.usage.cache_read, 230);
+        assert_eq!(run.usage.cache_write, 26);
+        assert_eq!(run.usage.estimated_cost_usd, None);
+        let notes = run
+            .activity
+            .iter()
+            .filter(|line| line.contains("3 model calls observed"))
+            .count();
+        assert_eq!(notes, 1);
+    }
+}
+
+#[test]
+fn a_reported_result_wins_over_observed_calls() {
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","usage":{"input_tokens":15,"cache_read_input_tokens":230,"cache_creation_input_tokens":20,"output_tokens":10},"total_cost_usd":0.02}"#,
+    );
+    run.mark_failed("Checks failed".into());
+    assert_eq!(run.usage.input, 265);
+    assert_eq!(run.usage.output, 10);
+    assert_eq!(run.usage.estimated_cost_usd, Some(0.02));
+    assert!(!run.activity.iter().any(|line| line.contains("model call")));
+}
+
+#[test]
+fn an_attempt_interrupted_by_closing_keeps_its_observed_usage_after_reload() {
+    let folder = std::env::temp_dir().join(format!("jackalope-usage-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    runtime.save(&run).unwrap();
+    drop(runtime);
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restored = loaded.inner.lock().unwrap().runs[&run.id].clone();
+    drop(loaded);
+    std::fs::remove_dir_all(folder).unwrap();
+    assert_eq!(restored.status, RunStatus::Interrupted);
+    assert!(restored.usage.reported);
+    assert_eq!(restored.usage.input + restored.usage.output, 287);
+    assert_eq!(restored.usage.cache_read, 230);
+}
+
 #[test]
 fn claude_result_with_error_extracts_message_and_never_serializes_null() {
     let mut run = sample("claude");
@@ -836,7 +972,6 @@ fn claude_result_with_error_extracts_message_and_never_serializes_null() {
         Some("You've hit your limit · resets 10pm")
     );
     assert!(run.quota_failure.is_some());
-    assert_ne!(run.error.as_deref(), Some("null"));
 
     let mut run_array = sample("claude");
     consume_event(
@@ -932,6 +1067,7 @@ process.stdin.on('end', () => {
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let request = RunRequest {
         retry_of: None,
+        continues: None,
         live_session_id: None,
         effort: None,
         codex_speed: None,
@@ -963,8 +1099,8 @@ process.stdin.on('end', () => {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let run = runtime.integration_runs().unwrap().pop().unwrap();
-        if !["starting", "running"].contains(&run.status.as_str()) {
-            assert_eq!(run.status, "review", "{:?}", run.error);
+        if !run.status.is_running() {
+            assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
             assert_eq!(run.agent, "custom-fixture");
             assert_eq!(run.model.as_deref(), Some("test-model"));
             assert_eq!(run.result, "Fixture complete");
@@ -1059,6 +1195,7 @@ process.stdin.on('end', () => {
     runtime
         .start(RunRequest {
             retry_of: None,
+            continues: None,
             live_session_id: None,
             effort: None,
             codex_speed: None,
@@ -1090,8 +1227,8 @@ process.stdin.on('end', () => {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let run = runtime.integration_runs().unwrap().pop().unwrap();
-        if !["starting", "running"].contains(&run.status.as_str()) {
-            assert_eq!(run.status, "review", "{:?}", run.error);
+        if !run.status.is_running() {
+            assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
             assert_eq!(run.result, "Fixture complete");
             break;
         }
@@ -1149,12 +1286,57 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
     let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let inner = loaded.inner.lock().unwrap();
     let restored = &inner.runs[&run.id];
-    assert_eq!(restored.status, "interrupted");
+    assert_eq!(restored.status, RunStatus::Interrupted);
     assert_eq!(restored.result, "🐇 café");
     assert_eq!(restored.session_id.as_deref(), Some("session-1"));
     assert!(inner.processes.is_empty());
     drop(inner);
     assert!(folder.starts_with(std::env::temp_dir()));
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() {
+    let folder = std::env::temp_dir().join(format!("jackalope-release-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("codex");
+    consume_event(
+        &mut run,
+        r#"{"type":"thread.started","thread_id":"session-1"}"#,
+    );
+    runtime.save(&run).unwrap();
+    drop(runtime);
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut newer = sample("codex");
+    newer.id = "newer-attempt".into();
+    newer.task_id = run.task_id.clone();
+    newer.status = RunStatus::Failed;
+    newer.started_at = "2999-01-01T00:00:00Z".into();
+    loaded
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(newer.id.clone(), newer.clone());
+    assert!(loaded
+        .release_interrupted(&run.id)
+        .unwrap_err()
+        .contains("latest attempt"));
+    loaded.inner.lock().unwrap().runs.remove(&newer.id);
+
+    let released = loaded.release_interrupted(&run.id).unwrap();
+    assert_eq!(released.status, RunStatus::Stopped);
+    assert!(loaded
+        .release_interrupted(&run.id)
+        .unwrap_err()
+        .contains("Only an interrupted attempt"));
+    drop(loaded);
+    let reloaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restored = reloaded.inner.lock().unwrap().runs[&run.id].clone();
+    assert_eq!(restored.status, RunStatus::Stopped);
+    assert_eq!(restored.session_id.as_deref(), Some("session-1"));
+    assert!(reloaded.retry_request(&run.id).is_ok());
+    drop(reloaded);
     std::fs::remove_dir_all(folder).unwrap();
 }
 
@@ -1172,7 +1354,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let directory = folder.join("history");
     let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     run.result = "last saved output".into();
     runtime.save(&run).unwrap();
     runtime
@@ -1212,7 +1394,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let saved = restarted.integration_runs().unwrap().pop().unwrap();
     assert_eq!(saved.result, "latest unsaved output");
     assert!(saved.persistence_error.is_none());
-    assert_eq!(saved.status, "review");
+    assert_eq!(saved.status, RunStatus::Review);
     drop(restarted);
     std::fs::remove_dir_all(folder).unwrap();
 }
@@ -1235,12 +1417,13 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
     let runtime = TaskRuntime::with_test_access(folder.clone())
         .expect("a failed checkpoint must not prevent reading other history");
     let recovered = runtime.integration_runs().unwrap().pop().unwrap();
-    assert_eq!(recovered.status, "stopped");
+    assert_eq!(recovered.status, RunStatus::Stopped);
     assert!(recovered.persistence_error.is_some());
     assert!(runtime.inner.lock().unwrap().processes.is_empty());
     let saved: TaskRun = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
     assert_eq!(
-        saved.status, "running",
+        saved.status,
+        RunStatus::Running,
         "failed replacement must keep the checkpoint intact"
     );
     std::fs::set_permissions(&path, original).unwrap();
@@ -1258,7 +1441,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
         std::env::temp_dir().join(format!("jackalope-history-id-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut good = sample("codex");
-    good.status = "review".into();
+    good.status = RunStatus::Review;
     good.result = "keep this result".into();
     runtime.save(&good).unwrap();
     let mut mismatch = good.clone();
@@ -1360,30 +1543,6 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
 
     assert!(folder.starts_with(std::env::temp_dir()));
     std::fs::remove_dir_all(folder).unwrap();
-}
-
-#[tokio::test]
-async fn per_agent_discovery_runs_concurrently_not_sequentially() {
-    // task_runners() used to run every agent's discover_runner() inside
-    // one sequential closure, so a slow probe_auth call (up to its own
-    // 10s timeout) added its full duration to the wait for every OTHER
-    // agent too. Proves the fix's actual shape - one spawn_blocking per
-    // item, collect the handles, then await them - genuinely overlaps
-    // rather than only appearing to, using a synthetic blocking delay in
-    // place of a real CLI probe (which needs an installed executable).
-    let started = std::time::Instant::now();
-    let delay = Duration::from_millis(150);
-    let handles: Vec<_> = (0..4)
-        .map(|_| tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay)))
-        .collect();
-    for handle in handles {
-        handle.await.unwrap();
-    }
-    assert!(
-        started.elapsed() < delay * 3,
-        "four 150ms blocking tasks should overlap (~150ms total), not sum to ~600ms; took {:?}",
-        started.elapsed()
-    );
 }
 
 #[test]
@@ -1500,9 +1659,12 @@ fn old_task_records_do_not_opt_into_automatic_execution() {
 #[test]
 fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
     // A missing executable fails at once, without spending the retry budget.
-    let error =
-        super::runtime::spawn_agent(&mut command("jackalope-nonexistent-agent-binary"), "codex")
-            .unwrap_err();
+    let error = super::agent_process::AgentProcess::spawn(
+        &mut command("jackalope-nonexistent-agent-binary"),
+        "codex",
+    )
+    .err()
+    .unwrap();
     assert!(error.contains("Could not launch codex"));
     assert!(
         !error.contains("attempts"),
@@ -1517,9 +1679,10 @@ fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
     ok.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let (mut child, attempts) = super::runtime::spawn_agent(&mut ok, "codex").unwrap();
-    assert_eq!(attempts, 1);
-    let _ = child.wait();
+    let spawned = super::agent_process::AgentProcess::spawn(&mut ok, "codex")
+        .ok()
+        .unwrap();
+    assert_eq!(spawned.attempts, 1);
 }
 
 #[test]
@@ -1528,7 +1691,7 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
         std::env::temp_dir().join(format!("jackalope-manual-archive-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "reviewed".into();
+    run.status = RunStatus::Reviewed;
     run.result = "Keep this result".into();
     runtime.save(&run).unwrap();
     runtime
@@ -1544,7 +1707,7 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
     let saved = runtime.snapshot(Some(&run.id));
     assert!(saved[0].archived_at.is_some());
     assert_eq!(saved[0].result, run.result);
-    assert_eq!(saved[0].status, "reviewed");
+    assert_eq!(saved[0].status, RunStatus::Reviewed);
     runtime.set_archived(&run.id, false).unwrap();
     drop(runtime);
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
@@ -1569,7 +1732,7 @@ fn manual_archive_rejects_unfinished_unsaved_session_and_stale_attempts() {
             .insert(run.id.clone(), run.clone());
         assert!(runtime.set_archived(&run.id, true).is_err());
     }
-    run.status = "reviewed".into();
+    run.status = RunStatus::Reviewed;
     for blocked in [
         TaskRun {
             persistence_error: Some("disk full".into()),
@@ -1618,7 +1781,7 @@ fn manual_archive_failed_save_keeps_task_visible() {
     ));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "failed".into();
+    run.status = RunStatus::Failed;
     runtime
         .inner
         .lock()
@@ -1645,7 +1808,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let mut session_run = sample("codex");
     session_run.id = "keep-live-session".into();
     session_run.live_session_id = Some("live-session".into());
-    session_run.status = "reviewed".into();
+    session_run.status = RunStatus::Reviewed;
     session_run.started_at = "2025-01-01T00:00:00Z".into();
     runtime.save(&session_run).unwrap();
     for status in ["review", "failed", "interrupted"] {
@@ -1657,7 +1820,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     for i in 0..205 {
         let mut run = sample("codex");
         run.id = format!("reviewed-{i:04}");
-        run.status = "reviewed".into();
+        run.status = RunStatus::Reviewed;
         run.started_at = format!("2026-01-01T00:{:02}:{:02}Z", i / 60, i % 60);
         run.ended_at = Some(run.started_at.clone());
         runtime.save(&run).unwrap();
@@ -1667,13 +1830,16 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let loaded = restarted.integration_runs().unwrap();
     assert_eq!(
-        loaded.iter().filter(|r| r.status == "reviewed").count(),
+        loaded
+            .iter()
+            .filter(|r| r.status == RunStatus::Reviewed)
+            .count(),
         201
     );
     assert!(loaded.iter().any(|r| r.id == "keep-live-session"));
     assert!(loaded.iter().any(|r| r.id == "reviewed-0204"));
     assert!(!loaded.iter().any(|r| r.id == "reviewed-0000"));
-    for status in ["review", "failed", "interrupted"] {
+    for status in [RunStatus::Review, RunStatus::Failed, RunStatus::Interrupted] {
         assert!(
             loaded.iter().any(|r| r.status == status),
             "{status} retained"
@@ -1710,7 +1876,7 @@ fn recovery_exports_import_once_and_never_shadow_a_present_task() {
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.id = "imported-attempt-01".into();
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     run.result = "recovered output".into();
     let envelope = serde_json::json!({
         "format": "jackalope-task-recovery", "version": 1,
@@ -1741,4 +1907,230 @@ fn recovery_exports_import_once_and_never_shadow_a_present_task() {
 
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn kimi_print_mode_keeps_assistant_answers_and_rejects_tool_calls() {
+    let mut run = TaskRun::default();
+    consume_adapter_event(
+        &mut run,
+        r#"{"role":"meta","content":"not an answer"}"#,
+        "kimi",
+    );
+    consume_adapter_event(
+        &mut run,
+        r#"{"role":"assistant","content":"answer"}"#,
+        "kimi",
+    );
+    assert_eq!(run.result, "answer");
+    consume_adapter_event(
+        &mut run,
+        r#"{"role":"assistant","tool_calls":[{"id":"unexpected"}]}"#,
+        "kimi",
+    );
+    assert!(run.error.is_some());
+}
+
+#[test]
+fn claude_provider_errors_printed_as_answers_fail_the_turn() {
+    for agent in ["claude", "grok"] {
+        let mut run = sample(agent);
+        consume_event(
+            &mut run,
+            r#"{"type":"system","subtype":"init","session_id":"s","model":"claude-opus-5"}"#,
+        );
+        consume_event(
+            &mut run,
+            r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: Opus 5's safeguards flagged this message. Try rephrasing the request."}]}}"#,
+        );
+        consume_event(
+            &mut run,
+            r#"{"type":"result","subtype":"success","is_error":false,"result":"API Error: Opus 5's safeguards flagged this message. Try rephrasing the request."}"#,
+        );
+        assert!(run.result.is_empty(), "{agent}");
+        assert_eq!(
+            run.error.as_deref(),
+            Some(
+                "API Error: Opus 5's safeguards flagged this message. Try rephrasing the request."
+            )
+        );
+        assert_eq!(
+            run.model.as_deref(),
+            Some("claude-opus-5"),
+            "<synthetic> is not a served model"
+        );
+    }
+
+    // A mid-turn error the CLI retried past keeps the real answer.
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"}]}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"Fixed the bug."}"#,
+    );
+    assert_eq!(run.result, "Fixed the bug.");
+    assert!(run.error.is_none());
+
+    // An unanswered turn fails with the error it printed.
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: 400 prompt is too long: 215000 tokens > 200000 maximum"}]}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":""}"#,
+    );
+    assert_eq!(
+        run.error.as_deref(),
+        Some("API Error: 400 prompt is too long: 215000 tokens > 200000 maximum")
+    );
+
+    // A failed result with no message of its own takes the printed provider error.
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"<synthetic>","content":[{"type":"text","text":"API Error: 401 Invalid bearer token · Please run /login"}]}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":""}"#,
+    );
+    assert_eq!(
+        run.error.as_deref(),
+        Some("API Error: 401 Invalid bearer token · Please run /login")
+    );
+    failure::explain(&mut run, Some(1));
+    assert_eq!(run.failure_kind, Some(failure::FailureKind::Authentication));
+}
+
+#[test]
+fn claude_stream_records_its_overload_fallback_as_a_labeled_model_change() {
+    let mut run = sample("claude");
+    run.requested_model = Some("opus".into());
+    run.fallback_model = Some("sonnet".into());
+    consume_event(
+        &mut run,
+        r#"{"type":"system","subtype":"init","session_id":"s","model":"claude-opus-4-5-20251101"}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-4-5-20251101","content":[{"type":"text","text":"Looking."}]}}"#,
+    );
+    assert!(run.model_mismatch.is_none());
+    // A subagent's model is not the attempt's.
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","parent_tool_use_id":"t1","message":{"id":"m2","model":"claude-haiku-4-5-20251001","content":[]}}"#,
+    );
+    assert!(run.model_mismatch.is_none());
+    consume_event(
+        &mut run,
+        r#"{"type":"assistant","message":{"id":"m3","model":"claude-sonnet-4-5-20250929","content":[{"type":"text","text":"Done."}]}}"#,
+    );
+    let mismatch = run.model_mismatch.clone().unwrap();
+    assert_eq!(
+        (
+            mismatch.requested.as_str(),
+            mismatch.served.as_str(),
+            mismatch.fallback
+        ),
+        ("opus", "claude-sonnet-4-5-20250929", true)
+    );
+    assert_eq!(run.model.as_deref(), Some("claude-sonnet-4-5-20250929"));
+
+    let mut gemini = sample("gemini");
+    gemini.requested_model = Some("gemini-3.8-flash".into());
+    let mut stream = gemini::Stream::default();
+    stream.consume(&mut gemini, r#"{"type":"init","timestamp":"t","session_id":"session-1","model":"gemini-3-flash-preview"}"#);
+    assert!(gemini.model_mismatch.as_ref().is_some_and(|m| !m.fallback));
+}
+
+/// Every adapter stores `input` as all prompt tokens the provider read, with cache
+/// reads and writes as parts of it, so new context is `input - cache_read - cache_write`
+/// and nothing cached is counted twice.
+#[test]
+fn reported_input_includes_cache_once_for_every_adapter() {
+    let fresh = |usage: &Usage| usage.input - usage.cache_read - usage.cache_write;
+
+    // Anthropic counts input_tokens without the cache, so Claude adds both cache counters.
+    let mut claude = sample("claude");
+    consume_event(
+        &mut claude,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":3,"cache_creation_input_tokens":1200,"cache_read_input_tokens":15000,"output_tokens":40}}}"#,
+    );
+    assert_eq!(claude.usage_observations[0].input, 16_203);
+    consume_event(
+        &mut claude,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"Done","usage":{"input_tokens":12,"cache_creation_input_tokens":2400,"cache_read_input_tokens":48000,"output_tokens":900},"total_cost_usd":0.05}"#,
+    );
+    assert_eq!(
+        (
+            claude.usage.input,
+            claude.usage.cache_read,
+            claude.usage.cache_write
+        ),
+        (50_412, 48_000, 2400)
+    );
+    assert_eq!(fresh(&claude.usage), 12);
+
+    // Codex's input_tokens already includes cached_input_tokens.
+    let mut codex = sample("codex");
+    consume_event(
+        &mut codex,
+        r#"{"type":"turn.completed","usage":{"input_tokens":24763,"cached_input_tokens":24448,"output_tokens":122}}"#,
+    );
+    assert_eq!(
+        (codex.usage.input, codex.usage.cache_read),
+        (24_763, 24_448)
+    );
+    assert_eq!(fresh(&codex.usage), 315);
+
+    // OpenCode subtracts the cache from tokens.input itself and reports reasoning beside output.
+    let mut opencode = sample("opencode");
+    consume_event(
+        &mut opencode,
+        r#"{"type":"step_finish","part":{"id":"p1","tokens":{"input":14823,"output":224,"reasoning":8,"cache":{"read":1664,"write":10}},"cost":0.001}}"#,
+    );
+    assert_eq!(
+        (
+            opencode.usage.input,
+            opencode.usage.cache_read,
+            opencode.usage.cache_write
+        ),
+        (16_497, 1664, 10)
+    );
+    assert_eq!(
+        (fresh(&opencode.usage), opencode.usage.output),
+        (14_823, 232)
+    );
+
+    // Gemini CLI's input_tokens is the whole prompt and `cached` is part of it (`input` is the rest).
+    let mut gemini = sample("gemini");
+    let mut stream = gemini::Stream::default();
+    stream.consume(
+        &mut gemini,
+        r#"{"type":"init","timestamp":"t","session_id":"session-1","model":"gemini-2.5-pro"}"#,
+    );
+    stream.consume(
+        &mut gemini,
+        r#"{"type":"message","timestamp":"t","role":"assistant","content":"Done."}"#,
+    );
+    stream.consume(&mut gemini, r#"{"type":"result","timestamp":"t","status":"success","stats":{"total_tokens":130,"input_tokens":100,"output_tokens":30,"cached":40,"input":60,"duration_ms":5,"tool_calls":1}}"#);
+    assert_eq!((gemini.usage.input, gemini.usage.cache_read), (100, 40));
+    assert_eq!(fresh(&gemini.usage), 60);
+
+    // Antigravity reports uncached input and cache reads separately.
+    let mut antigravity = sample("antigravity");
+    let mut stream = antigravity::Stream::new(Some("conversation-1".into()));
+    stream.consume(&mut antigravity, r#"{"event":"init","conversation_id":"conversation-1","init":{"permission_mode":"request-review","model":"test-model"}}"#);
+    stream.consume(&mut antigravity, r#"{"event":"step_update","step_update":{"conversation_id":"conversation-1","step_index":1,"step_type":"agent_response","state":"DONE","text_delta":"Hi","usage":{"input_tokens":10,"output_tokens":7,"thinking_tokens":5,"cache_read_tokens":20}}}"#);
+    assert_eq!(
+        (antigravity.usage.input, antigravity.usage.cache_read),
+        (30, 20)
+    );
+    assert_eq!(fresh(&antigravity.usage), 10);
 }

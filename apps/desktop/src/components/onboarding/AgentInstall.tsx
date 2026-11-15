@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, CopyButton, InlineNotice, LinkButton } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -9,7 +10,7 @@ import {
 } from '../../lib/agent-install';
 import { pollSignIn, stopSignIn } from '../../lib/agent-profiles';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
 import { ManagedRuntimeProgress } from '../agents/ManagedRuntimeProgress';
 
 type Run =
@@ -75,7 +76,7 @@ export function AgentInstall({
     try {
       id = await startAgentInstall(agentId);
     } catch (cause) {
-      fail(String(cause));
+      fail(describeError(cause));
       return;
     }
     if (!alive.current) {
@@ -108,7 +109,7 @@ export function AgentInstall({
         return;
       } catch (cause) {
         session.current = null;
-        fail(String(cause));
+        fail(describeError(cause));
         return;
       }
     }
@@ -120,7 +121,7 @@ export function AgentInstall({
       await runner.prepare(false);
       await succeed();
     } catch (cause) {
-      fail(String(cause));
+      fail(describeError(cause));
     }
   };
 

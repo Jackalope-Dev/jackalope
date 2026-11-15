@@ -77,8 +77,14 @@ export async function verifySeo(directory, pages, origin) {
       );
     }
     const image = single(/<meta property="og:image" content="([^"]*)"/g, 'social image');
-    assert.equal(new URL(image).origin, origin);
-    await readFile(resolve(directory, new URL(image).pathname.slice(1)));
+    // Posts may carry their own cover from LopeBase; every other image is a site file.
+    if (new URL(image).origin === origin)
+      await readFile(resolve(directory, new URL(image).pathname.slice(1)));
+    else
+      assert.ok(
+        /^\/blog\/[^/]+\/$/.test(page.path) && new URL(image).protocol === 'https:',
+        `${page.path}: social image must be a site file or a post's https cover`,
+      );
     for (const [name, expected] of [
       ['title', title],
       ['description', description],

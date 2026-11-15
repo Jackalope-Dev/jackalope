@@ -1,8 +1,6 @@
 import { getSkillById } from './catalog.ts';
 import { getToolById } from './tool-registry.ts';
 
-export const PROMPT_VERSION = 4;
-
 export interface PromptAssemblyOptions {
   rawPrompt: string;
   selectedSkillIds?: string[];

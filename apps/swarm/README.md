@@ -29,7 +29,7 @@ machine through its existing guarded merge.
 ## Set up from Jackalope
 
 You need a Cloudflare account on the Workers Paid plan with Artifacts, connected in
-Settings → Cloudflare. Under Jackalope Swarm, **Set up Swarm**:
+Settings → Cloudflare. In Settings → Swarm, **Set up Swarm**:
 
 1. checks the account and its workers.dev subdomain (choose one in the dashboard if
    the account has none);

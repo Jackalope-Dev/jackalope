@@ -19,6 +19,7 @@ import {
   useDialogFocus,
 } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
+import type { Mail as MailMessage } from '../src/access/mail-templates';
 import {
   audienceLabel,
   date,
@@ -58,6 +59,17 @@ function filtersFrom(search: string) {
     sort: 'priority',
   };
 }
+const emailPreviews: Record<Exclude<MailMessage['kind'], 'feedback_request'>, string> = {
+  waitlist: 'Waitlist verification',
+  invite: 'Instant Access Pass',
+  referral: 'Referral milestone',
+  passes_ready: 'Passes ready',
+  pass_claimed: 'Pass claimed',
+  pass_expired: 'Pass expired',
+  welcome: 'Approval email',
+  login: 'Sign-in email',
+};
+
 export function People({ search }: { search: string }) {
   const [filters, setFilters] = useState(() => filtersFrom(search));
   const [query, setQuery] = useState('');
@@ -725,16 +737,7 @@ export function Setup() {
         <Disclosure>
           <DisclosureSummary>Browse email previews</DisclosureSummary>
           <nav aria-label="Email previews">
-            {[
-              ['waitlist', 'Waitlist verification'],
-              ['invite', 'Instant Access Pass'],
-              ['referral', 'Referral milestone'],
-              ['passes_ready', 'Passes ready'],
-              ['pass_claimed', 'Pass claimed'],
-              ['pass_expired', 'Pass expired'],
-              ['welcome', 'Approval email'],
-              ['login', 'Sign-in email'],
-            ].map(([kind, label]) => (
+            {Object.entries(emailPreviews).map(([kind, label]) => (
               <a
                 key={kind}
                 href={`/admin/access/email-preview?kind=${kind}`}

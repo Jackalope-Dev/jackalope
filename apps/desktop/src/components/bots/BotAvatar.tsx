@@ -12,6 +12,11 @@ export function botStyle(appearance: { style: string } | undefined, agent = 'aut
   return BOT_STYLES.some((item) => item.id === fallback) ? fallback : BOT_STYLES[0].id;
 }
 
+/** The bot's chosen colour as a CSS value, or undefined for the text colour. */
+export function botColor(appearance: { color?: string } | undefined): string | undefined {
+  return BOT_COLORS.find((item) => item.id === appearance?.color)?.value;
+}
+
 /** Every bot's character, drawn from its chosen style and colour. */
 export function BotAvatar({
   appearance,
@@ -19,15 +24,18 @@ export function BotAvatar({
   size = 'md',
   state = 'idle',
   gaze,
+  unread = false,
 }: {
   appearance?: BotAppearance;
   agent?: string;
   size?: 'md' | 'lg' | 'xl';
   state?: 'idle' | 'working' | 'waiting';
   gaze?: AgentGaze;
+  /** A real unread reply: a small speech bubble on the character. */
+  unread?: boolean;
 }) {
   const style = botStyle(appearance, agent);
-  const color = BOT_COLORS.find((item) => item.id === appearance?.color)?.value;
+  const color = botColor(appearance);
   return (
     <span
       className="bots-avatar"
@@ -36,6 +44,7 @@ export function BotAvatar({
       aria-hidden="true"
     >
       <AgentCharacter provider={style} state={state} gaze={gaze} />
+      {unread && <span className="bots-avatar-bubble" />}
     </span>
   );
 }

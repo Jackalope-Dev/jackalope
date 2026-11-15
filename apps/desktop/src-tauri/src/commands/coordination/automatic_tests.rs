@@ -1,5 +1,6 @@
-use super::automatic::*;
 use super::*;
+use crate::commands::bridge;
+use crate::commands::tasks::RunStatus;
 use serde_json::{json, Value};
 
 mod claude;
@@ -33,8 +34,9 @@ impl Fixture {
     }
 
     fn running(&self, id: &str) {
-        self.runtime.update(id, |run| run.status = "running".into());
-        let mut inner = self.service.inner.lock().unwrap();
+        self.runtime
+            .update(id, |run| run.status = RunStatus::Running);
+        let mut inner = self.service.state();
         inner.grants.insert(id.into(), (id.into(), id.into()));
         inner.ledger.lifecycle.as_mut().unwrap().remove(id);
         self.service.register_launch(&mut inner, id).unwrap();
@@ -42,20 +44,15 @@ impl Fixture {
     }
 
     async fn message(&self, text: &str, recipient: Option<&str>) -> CoordinationMessage {
-        bridge_message(
-            WebState(self.service.clone()),
-            headers("writer-run"),
-            Json(MessageRequest {
-                report: None,
-                resolves: None,
-                kind: "blocker".into(),
-                text: text.into(),
-                recipient_task_id: recipient.map(str::to_string),
-            }),
+        let sent = bridge::call(
+            &self.service,
+            &headers("writer-run"),
+            "message",
+            json!({"kind":"blocker","text":text,"recipient_task_id":recipient}),
         )
         .await
-        .unwrap()
-        .0
+        .unwrap();
+        serde_json::from_value(sent).unwrap()
     }
 }
 
@@ -75,24 +72,16 @@ fn headers(id: &str) -> HeaderMap {
 async fn jev_questions_require_the_attempt_credential_and_explicit_opt_in() {
     let f = Fixture::new();
     f.running("reader-run");
-    let input = || {
-        Json(serde_json::from_value(json!({"state":{"ready":true},"questions":{"ready":{"type":"noul","instructions":"Is input.ready true?"}}})).unwrap())
-    };
-    assert!(
-        bridge_jev_questions(WebState(f.service.clone()), HeaderMap::new(), input())
+    let input = || json!({"state":{"ready":true},"questions":{"ready":{"type":"noul","instructions":"Is input.ready true?"}}});
+    for credential in [
+        HeaderMap::new(),
+        headers("foreign-run"),
+        headers("reader-run"),
+    ] {
+        assert!(bridge::call(&f.service, &credential, "ask_jev", input())
             .await
-            .is_err()
-    );
-    assert!(
-        bridge_jev_questions(WebState(f.service.clone()), headers("foreign-run"), input())
-            .await
-            .is_err()
-    );
-    assert!(
-        bridge_jev_questions(WebState(f.service.clone()), headers("reader-run"), input())
-            .await
-            .is_err()
-    );
+            .is_err());
+    }
     assert!(crate::commands::decisions::evaluation::records(&f.runtime)
         .unwrap()
         .is_empty());
@@ -113,49 +102,29 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
             .unwrap(),
         );
     });
-    let state = || WebState(f.service.clone());
-    let input = || {
-        Json(super::super::verification::output::OutputRequest {
-            check_id: Some("check-1".into()),
-            stream: "stdout".into(),
-            offset: 0,
-            limit: None,
-        })
+    let service = &f.service;
+    let output = |credential: HeaderMap| async move {
+        bridge::call(
+            service,
+            &credential,
+            "verification_output",
+            json!({"check_id":"check-1","stream":"stdout","offset":0}),
+        )
+        .await
     };
-    assert!(
-        bridge_help(state(), headers("reader-run"), Query(HelpQuery::default()))
-            .await
-            .is_ok()
-    );
-    assert!(
-        bridge_help(state(), headers("invalid"), Query(HelpQuery::default()))
-            .await
-            .is_err()
-    );
+    assert!(bridge::help(&f.service, &headers("reader-run"), false).is_ok());
+    assert!(bridge::help(&f.service, &headers("invalid"), false).is_err());
     assert_eq!(
-        bridge_verification_output(state(), headers("reader-run"), input())
-            .await
-            .unwrap()
-            .0["text"],
+        output(headers("reader-run")).await.unwrap()["text"],
         "reader output"
     );
-    assert!(
-        bridge_verification_output(state(), headers("writer-run"), input())
-            .await
-            .is_err()
-    );
+    assert!(output(headers("writer-run")).await.is_err());
     let mut browser = headers("reader-run");
     browser.insert("origin", "https://example.invalid".parse().unwrap());
-    assert!(bridge_help(state(), browser, Query(HelpQuery::default()))
-        .await
-        .is_err());
+    assert!(bridge::help(&f.service, &browser, false).is_err());
     f.runtime
-        .update("reader-run", |run| run.status = "review".into());
-    assert!(
-        bridge_verification_output(state(), headers("reader-run"), input())
-            .await
-            .is_err()
-    );
+        .update("reader-run", |run| run.status = RunStatus::Review);
+    assert!(output(headers("reader-run")).await.is_err());
 }
 
 #[tokio::test]
@@ -166,7 +135,7 @@ async fn agent_verification_cannot_add_or_replace_a_saved_command() {
         command: "node".into(),
         args: vec!["--test".into(), "unexpected-argument".into()],
     };
-    let run = || f.service.authorized_run(&headers("reader-run")).unwrap();
+    let run = || f.service.caller(&headers("reader-run")).unwrap().run;
     assert!(
         super::super::verification::agent_verify(f.runtime.clone(), run(), input())
             .await
@@ -196,35 +165,30 @@ async fn project_exposes_only_the_authorized_attempts_verification_command() {
     f.runtime.update("writer-run", |run| {
         run.verify_command = Some("different saved command".into());
     });
-    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
-        .await
-        .unwrap()
-        .0;
+    let service = &f.service;
+    let project =
+        || async move { bridge::call(service, &headers("reader-run"), "project", json!({})).await };
+    let snapshot = project().await.unwrap();
     assert_eq!(
-        project["verification"]["command"],
+        snapshot["verification"]["command"],
         "node --check one.mjs && node --check two.mjs"
     );
-    assert_eq!(project["verification"]["automatic"], true);
-    assert_eq!(project["verification"]["arguments"], json!({}));
+    assert_eq!(snapshot["verification"]["automatic"], true);
+    assert_eq!(snapshot["verification"]["arguments"], json!({}));
+    let capabilities = &snapshot["capabilities"];
+    assert!(capabilities["desktopControl"].is_boolean());
+    assert!(capabilities["desktopControlMissing"].is_array());
     f.runtime
         .update("reader-run", |run| run.verify_command = None);
-    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
-        .await
-        .unwrap()
-        .0;
-    assert!(project["verification"]["command"].is_null());
+    assert!(project().await.unwrap()["verification"]["command"].is_null());
     assert!(
-        bridge_project(WebState(f.service.clone()), headers("invalid"))
+        bridge::call(&f.service, &headers("invalid"), "project", json!({}))
             .await
             .is_err()
     );
     f.runtime
-        .update("reader-run", |run| run.status = "review".into());
-    assert!(
-        bridge_project(WebState(f.service.clone()), headers("reader-run"))
-            .await
-            .is_err()
-    );
+        .update("reader-run", |run| run.status = RunStatus::Review);
+    assert!(project().await.is_err());
 }
 
 fn request(previous: Option<&str>) -> RunRequest {
@@ -243,7 +207,7 @@ fn lifecycle_baselines_history_and_persists_one_start_and_outcome() {
     assert!(messages[0].text.contains("unknown scope"));
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "review".into());
+        .update("writer-run", |run| run.status = RunStatus::Review);
     fixture.service.reconcile().unwrap();
     fixture.service.reconcile().unwrap();
     let saved: Ledger = serde_json::from_slice(
@@ -256,7 +220,7 @@ fn lifecycle_baselines_history_and_persists_one_start_and_outcome() {
     assert!(saved.messages.iter().all(|m| m.acknowledged_by.is_empty()));
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "reviewed".into());
+        .update("writer-run", |run| run.status = RunStatus::Reviewed);
     fixture.service.reconcile().unwrap();
     assert_eq!(fixture.service.view().unwrap().messages.len(), 2);
 }
@@ -265,7 +229,7 @@ fn lifecycle_baselines_history_and_persists_one_start_and_outcome() {
 fn queue_snapshot_prioritizes_active_work_and_bounds_large_scopes() {
     let fixture = Fixture::new();
     fixture.running("writer-run");
-    let mut inner = fixture.service.inner.lock().unwrap();
+    let mut inner = fixture.service.state();
     for index in 0..100 {
         let item: QueueItem = serde_json::from_value(json!({"id":format!("queued-{index}"),"projectId":"p","projectName":"Fixture","projectPath":"","title":format!("Queued work {index}"),"prompt":"Work","agent":"codex","scopes":vec!["x".repeat(500); 30],"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap();
         inner.ledger.items.push(item);
@@ -301,7 +265,7 @@ fn failed_lifecycle_save_does_not_consume_event_and_retry_is_idempotent() {
     std::fs::create_dir(&path).unwrap();
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "stopped".into());
+        .update("writer-run", |run| run.status = RunStatus::Stopped);
     assert!(fixture.service.reconcile().is_err());
     assert_eq!(fixture.service.view().unwrap().messages.len(), 1);
     std::fs::remove_dir(&path).unwrap();
@@ -317,13 +281,13 @@ fn failed_lifecycle_save_does_not_consume_event_and_retry_is_idempotent() {
 #[test]
 fn rejected_launch_does_not_announce_work_or_leave_a_reservation() {
     let fixture = Fixture::new();
-    fixture.service.inner.lock().unwrap().url = Some("http://127.0.0.1:1".into());
+    fixture.service.state().url = Some("http://127.0.0.1:1".into());
     let mut input = request(None);
     input.id = Uuid::new_v4().to_string();
     input.prompt.clear();
     let id = input.id.clone();
     assert!(fixture.service.start_manual(input).is_err());
-    let inner = fixture.service.inner.lock().unwrap();
+    let inner = fixture.service.state();
     assert!(inner.ledger.messages.is_empty());
     assert!(!inner.ledger.lifecycle.as_ref().unwrap().contains_key(&id));
     assert!(!inner.delivered.contains_key(&id));
@@ -341,7 +305,7 @@ async fn checkpoints_skip_historical_broadcasts_but_keep_unread_direct_messages(
         .message("historical direct", Some("reader-run-task"))
         .await;
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         for message in inner
             .ledger
             .messages
@@ -375,7 +339,7 @@ async fn duplicate_launch_snapshot_does_not_consume_updates_for_the_running_atte
     let mut input = request(None);
     input.id = "reader-run".into();
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         fixture.service.startup(&mut inner, &input, None).unwrap();
     }
     let update = fixture
@@ -396,7 +360,7 @@ async fn busy_coordinator_defers_updates_without_blocking_or_consuming_them() {
         .message("deliver after launch", Some("reader-run-task"))
         .await;
     {
-        let _launch_guard = fixture.service.inner.lock().unwrap();
+        let _launch_guard = fixture.service.state();
         assert!(fixture
             .service
             .checkpoint(&headers("reader-run"))
@@ -415,7 +379,7 @@ async fn busy_coordinator_defers_updates_without_blocking_or_consuming_them() {
 fn quick_failure_emits_start_and_failure_and_restart_emits_recovery_once() {
     let fixture = Fixture::new();
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         inner
             .ledger
             .lifecycle
@@ -429,7 +393,7 @@ fn quick_failure_emits_start_and_failure_and_restart_emits_recovery_once() {
     }
     fixture
         .runtime
-        .update("writer-run", |run| run.status = "failed".into());
+        .update("writer-run", |run| run.status = RunStatus::Failed);
     fixture.service.reconcile().unwrap();
     let messages = fixture.service.view().unwrap().messages;
     assert_eq!(messages.len(), 2);
@@ -469,7 +433,7 @@ async fn startup_uses_stable_continuation_identity_and_filters_private_messages(
     fixture
         .message("private-to-writer", Some("writer-run-task"))
         .await;
-    let mut inner = fixture.service.inner.lock().unwrap();
+    let mut inner = fixture.service.state();
     let text = fixture
         .service
         .startup(&mut inner, &request(Some("reader-run")), None)
@@ -517,14 +481,9 @@ async fn checkpoint_deduplicates_delivery_without_acknowledging_and_respects_sco
         .messages
         .iter()
         .all(|m| m.acknowledged_by.is_empty()));
-    let inbox = inbox::bridge_inbox(
-        WebState(fixture.service.clone()),
-        headers("reader-run"),
-        axum::extract::Query(inbox::InboxQuery::default()),
-    )
-    .await
-    .unwrap()
-    .0;
+    let inbox = bridge::call(&fixture.service, &headers("reader-run"), "inbox", json!({}))
+        .await
+        .unwrap();
     assert!(inbox["messages"]
         .as_array()
         .unwrap()
@@ -535,7 +494,7 @@ async fn checkpoint_deduplicates_delivery_without_acknowledging_and_respects_sco
     assert!(fixture.service.checkpoint(&origin).is_err());
     fixture
         .runtime
-        .update("reader-run", |run| run.status = "review".into());
+        .update("reader-run", |run| run.status = RunStatus::Review);
     assert!(fixture.service.checkpoint(&headers("reader-run")).is_err());
 }
 
@@ -576,16 +535,7 @@ async fn http_and_native_mcp_responses_deliver_updates_and_preserve_tool_results
     fixture.running("reader-run");
     fixture.running("writer-run");
     fixture.service.checkpoint(&headers("reader-run")).unwrap();
-    let router = Router::new()
-        .route("/v1/validation-step", post(bridge_validation_step))
-        .with_state(fixture.service.clone())
-        .merge(crate::commands::coordination_mcp::router(
-            fixture.service.clone(),
-        ))
-        .layer(axum::middleware::from_fn_with_state(
-            fixture.service.clone(),
-            deliver,
-        ));
+    let router = bridge::router(fixture.service.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = format!("http://{}", listener.local_addr().unwrap());
     let server = tokio::spawn(async move {
@@ -675,7 +625,7 @@ async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
     input.project_id = "empty-project".into();
     input.isolated = true;
     {
-        let mut inner = fixture.service.inner.lock().unwrap();
+        let mut inner = fixture.service.state();
         assert!(fixture
             .service
             .startup(&mut inner, &input, None)
@@ -698,7 +648,7 @@ async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
     fixture.running("writer-run");
     let message = fixture.message("pending coordination", None).await;
     input.project_id = "empty-project".into();
-    let mut inner = fixture.service.inner.lock().unwrap();
+    let mut inner = fixture.service.state();
     inner
         .ledger
         .messages
@@ -711,4 +661,55 @@ async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
         .startup(&mut inner, &input, None)
         .unwrap()
         .contains("routine project/inbox checks"));
+}
+
+#[tokio::test]
+async fn a_late_answer_is_owed_to_the_agent_until_user_response_reads_it() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    let asked = bridge::call(
+        &f.service,
+        &headers("reader-run"),
+        "request_human_action",
+        json!({"kind":"other","title":"Allow Accessibility for Jackalope",
+            "instructions":"1. Turn on Jackalope in Accessibility.",
+            "url":"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(asked["status"], "pending");
+    let id = asked["id"].as_str().unwrap().to_owned();
+    let owed = |f: &Fixture| {
+        f.runtime
+            .run_snapshot("reader-run")
+            .unwrap()
+            .awaiting_answers
+    };
+    assert_eq!(owed(&f), vec![id.clone()]);
+    let unanswered = bridge::call(
+        &f.service,
+        &headers("reader-run"),
+        "user_response",
+        json!({ "id": id }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(unanswered["status"], "pending");
+    assert_eq!(
+        owed(&f),
+        vec![id.clone()],
+        "a pending read delivers nothing"
+    );
+    assert!(f.runtime.respond_prompt("reader-run", &id, "Done").unwrap());
+    let read = bridge::call(
+        &f.service,
+        &headers("reader-run"),
+        "user_response",
+        json!({ "id": id }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(read["answer"], "Done");
+    assert!(owed(&f).is_empty());
+    assert!(f.runtime.take_late_answers("reader-run", None).is_empty());
 }

@@ -170,6 +170,8 @@ interface BotState {
   /** Shows a conversation on the Bots page, selecting its bot. */
   openConversation: (sessionId: string | null, botId?: string) => void;
   markSeen: (sessionId: string) => void;
+  /** Shows a read conversation's latest reply as new again. */
+  markUnread: (sessionId: string) => void;
   create: (draft: BotDraft) => string;
   update: (id: string, patch: Partial<BotDraft>) => void;
   duplicate: (id: string) => string | null;
@@ -212,6 +214,8 @@ export const useBotStore = create<BotState>()(
               delete seen[id];
           return { seen };
         }),
+      // Sorts before every timestamp, so the latest reply counts as arriving after it.
+      markUnread: (sessionId) => set((state) => ({ seen: { ...state.seen, [sessionId]: '0' } })),
       create: (draft) => {
         const error = validateBot(draft);
         if (error) throw new Error(error);

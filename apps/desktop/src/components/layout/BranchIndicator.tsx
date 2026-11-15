@@ -1,18 +1,16 @@
-import { CopyButton, Popover } from '@jackalope/ui';
+import { Button, CopyButton, Popover } from '@jackalope/ui';
 import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
-import { selectWork } from '../../lib/work-selection';
+import { openWork, selectWork, useWorkspaceWork } from '../../lib/work-selection';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { navigateWorkspace } from './navigation';
-import { selectWorkItem, useWorkspaceWork } from './WorkSidebar';
+import { useActiveProject } from '../../stores/projectStore';
 
 /**
  * The project, remote host and the work in focus: the selected task, plan or
@@ -32,9 +30,7 @@ export function useFocusedWork() {
   const { queue, selectedId: selectedManaged } = useManagedTaskStore(
     useShallow((s) => ({ queue: s.queue, selectedId: s.selectedId })),
   );
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const session = sessions.find(
     (item) => item.id === selectedSession && item.request.projectId === project?.id,
   );
@@ -64,9 +60,7 @@ const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replac
  */
 function useSwitchTargets(checkout: string) {
   const work = useWorkspaceWork();
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   if (!project) return [];
   const existing = project.worktrees ?? [];
   const seen = new Set([checkout]);
@@ -97,14 +91,14 @@ function useSwitchTargets(checkout: string) {
       key: path,
       branch: run.branch || 'Branch unknown',
       label: item.title,
-      open: () => selectWorkItem(item),
+      open: () => openWork(item),
     });
     if (targets.length >= MAX_SWITCH_TARGETS) break;
   }
   return targets;
 }
 
-/** The branch in focus, in the status bar beside the project name, with where it lives and what to do with it. */
+/** The branch in focus, in the status bar; the page header names the scope, so the trigger names the project only in its label. */
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
   const targets = useSwitchTargets(checkout);
@@ -122,7 +116,12 @@ export function BranchIndicator() {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
+        <button
+          type="button"
+          className="chrome-branch"
+          title={`${project.name} · Branch: ${branch}`}
+          aria-label={`${project.name}, branch ${branch}`}
+        >
           <GitBranch size={14} aria-hidden="true" />
           <span className="chrome-branch-name">{branchLabel(branch)}</span>
           <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />

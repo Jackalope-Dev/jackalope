@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { applyCommunityConfig } from '../../apps/server/scripts/community-config.mjs';
+import { parseJsonc } from '../lib/jsonc.mjs';
 import { origin, root } from './catalog.mjs';
 import { assertServiceReadiness, expectedIngestion } from './service-readiness.mjs';
 
@@ -26,7 +27,7 @@ if (process.argv[2] === 'verify') {
     database.startsWith('00000000-')
   )
     throw new Error('Configure the provisioned environment D1 UUID');
-  const config = JSON.parse(await readFile(resolve(root, 'apps/server/wrangler.jsonc'), 'utf8'));
+  const config = parseJsonc(await readFile(resolve(root, 'apps/server/wrangler.jsonc'), 'utf8'));
   delete config.$schema;
   delete config.account_id;
   config.main = resolve(root, 'apps/server', config.main);

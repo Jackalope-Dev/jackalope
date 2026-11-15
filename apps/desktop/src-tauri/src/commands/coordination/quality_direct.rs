@@ -1,3 +1,4 @@
+use crate::commands::tasks::RunStatus;
 use crate::commands::{
     agent_profiles,
     process_control::ProcessTree,
@@ -42,7 +43,6 @@ pub(super) fn run(
         None
     };
     cmd.env_remove("JACKALOPE_QUALITY_SPEC");
-    cmd.env_remove("JACKALOPE_JEV_TEST_KEY");
     agent_profiles::apply_binding(&mut cmd, &binding)?;
     let effort = serde_json::from_value(spec["effort"].clone()).map_err(|e| e.to_string())?;
     if adapter == "codex" {
@@ -71,15 +71,16 @@ pub(super) fn run(
     } else {
         return Err("Direct trials support Codex, Claude, OpenCode and Antigravity tasks".into());
     }
-    let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, effort);
+    let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, Some(model), effort);
     if let Some(servers) = spec["fixtureMcp"].as_object() {
         if adapter == "codex" {
             for value in crate::commands::mcp::codex_overrides(servers)? {
                 cmd.args(["-c", &value]);
             }
         } else if adapter == "opencode" {
-            let config = crate::commands::mcp::opencode_config(servers, &cmd)?;
-            cmd.env("OPENCODE_CONFIG_CONTENT", config);
+            let mut config = tasks::OpenCodeConfig::read(&cmd)?;
+            config.add_mcp(servers, &cmd)?;
+            config.apply(&mut cmd);
         } else if adapter == "claude" {
             cmd.args([
                 "--mcp-config",
@@ -101,16 +102,7 @@ pub(super) fn run(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    crate::commands::process_control::isolated(&mut cmd);
     let run = Arc::new(Mutex::new(TaskRun {
         agent: agent.into(),
         model: Some(model.into()),
@@ -121,7 +113,7 @@ pub(super) fn run(
         account: binding.label.clone(),
         account_binding: Some(binding),
         workspace: repo.to_string_lossy().into(),
-        status: "running".into(),
+        status: RunStatus::Running,
         started_at: chrono::Utc::now().to_rfc3339(),
         ..Default::default()
     }));

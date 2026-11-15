@@ -1,75 +1,11 @@
 use super::*;
+use crate::commands::scope_path::any_overlap;
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
-use axum::{
-    body::{to_bytes, Body, HttpBody},
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
 use serde_json::{json, Value};
 
 const TASK_BYTES: usize = 10_000;
 const UPDATE_BYTES: usize = 6_000;
-
-pub(super) async fn deliver(
-    WebState(service): WebState<Coordinator>,
-    request: Request,
-    next: Next,
-) -> Response {
-    let headers = request.headers().clone();
-    let is_mcp = request.uri().path().starts_with("/mcp");
-    let response = next.run(request).await;
-    if !response.status().is_success()
-        || !response
-            .headers()
-            .get("content-type")
-            .is_some_and(|v| v.as_bytes().starts_with(b"application/json"))
-        || response
-            .body()
-            .size_hint()
-            .upper()
-            .is_none_or(|size| size > 8_000_000)
-    {
-        return response;
-    }
-    let (mut parts, body) = response.into_parts();
-    let bytes = match to_bytes(body, 8_000_000).await {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::empty())
-                .unwrap()
-        }
-    };
-    let mut value: Value = match serde_json::from_slice(&bytes) {
-        Ok(value) => value,
-        Err(_) => return Response::from_parts(parts, Body::from(bytes)),
-    };
-    let result = if is_mcp {
-        &mut value["result"]
-    } else {
-        &mut value
-    };
-    if !result.is_object() || (is_mcp && !result["content"].is_array()) {
-        return Response::from_parts(parts, Body::from(bytes));
-    }
-    let update = match service.checkpoint(&headers) {
-        Ok(Some(update)) => update,
-        Ok(None) => return Response::from_parts(parts, Body::from(bytes)),
-        Err(_) => {
-            json!({"notice":"Project updates are temporarily unavailable. Read inbox at your next checkpoint. Do not retry the completed tool operation to retrieve updates."})
-        }
-    };
-    if let Some(content) = result["content"].as_array_mut() {
-        content
-            .push(json!({"type":"text","text":format!("Jackalope coordinationUpdates: {update}")}));
-    } else {
-        result["coordinationUpdates"] = update;
-    }
-    parts.headers.remove("content-length");
-    Response::from_parts(parts, Body::from(value.to_string()))
-}
 
 fn excerpt(text: &str, limit: usize) -> String {
     let mut result: String = text.chars().take(limit).collect();
@@ -80,12 +16,12 @@ fn excerpt(text: &str, limit: usize) -> String {
 }
 
 fn phase(run: &TaskRun) -> &str {
-    if active(&run.status) {
+    if run.status.is_active() {
         "active"
-    } else if run.status == "reviewed" {
+    } else if run.status == RunStatus::Reviewed {
         "review"
     } else {
-        &run.status
+        run.status.as_str()
     }
 }
 
@@ -108,7 +44,7 @@ fn related(items: &[QueueItem], a: &str, b: &str) -> bool {
         (Some(a), Some(b)) => {
             a.dependencies.contains(&b.id)
                 || b.dependencies.contains(&a.id)
-                || overlaps(&a.scopes, &b.scopes)
+                || any_overlap(&a.scopes, &b.scopes)
         }
         _ => true,
     }
@@ -169,7 +105,7 @@ fn updates(
 impl Coordinator {
     pub(super) fn reconcile(&self) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let mut inner = self.state();
         self.reconcile_locked(&mut inner)
     }
 
@@ -272,12 +208,14 @@ impl Coordinator {
         let excess = ledger.messages.len().saturating_sub(2000);
         ledger.messages.drain(..excess);
         if changed {
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(inner, |saved| {
+                *saved = ledger;
+                Ok::<_, String>(())
+            })?;
         }
         inner
             .delivered
-            .retain(|id, _| runs.iter().any(|r| &r.id == id && active(&r.status)));
+            .retain(|id, _| runs.iter().any(|r| &r.id == id && r.status.is_active()));
         let retained: HashSet<_> = inner.ledger.messages.iter().map(|m| m.id.clone()).collect();
         for ids in inner.delivered.values_mut() {
             ids.retain(|id| retained.contains(id));
@@ -304,7 +242,7 @@ impl Coordinator {
         let mut tasks = inventory(&inner.ledger.items, &runs, &merged, &request.project_id);
         tasks.retain(|t| {
             t["id"] != task
-                && (active(t["status"].as_str().unwrap_or(""))
+                && (RunStatus::from(t["status"].as_str().unwrap_or("")).is_active()
                     || t["status"] == "queued"
                     || t["status"] == "review"
                     || assigned
@@ -312,7 +250,7 @@ impl Coordinator {
         });
         tasks.sort_by_key(|t| {
             (
-                !active(t["status"].as_str().unwrap_or("")),
+                !RunStatus::from(t["status"].as_str().unwrap_or("")).is_active(),
                 !related(&inner.ledger.items, task, t["id"].as_str().unwrap_or("")),
                 t["id"].as_str().unwrap_or("").to_string(),
             )
@@ -365,19 +303,24 @@ impl Coordinator {
     }
 
     pub(super) fn register_launch(&self, inner: &mut Inner, id: &str) -> Result<(), String> {
-        let mut ledger = inner.ledger.clone();
-        ledger
-            .lifecycle
-            .get_or_insert_with(HashMap::new)
-            .entry(id.into())
-            .or_insert_with(|| "reserved".into());
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+        self.commit(inner, |ledger| {
+            ledger
+                .lifecycle
+                .get_or_insert_with(HashMap::new)
+                .entry(id.into())
+                .or_insert_with(|| "reserved".into());
+            Ok(())
+        })
     }
 
-    pub(super) fn checkpoint(&self, headers: &HeaderMap) -> Result<Option<Value>, String> {
-        if headers.contains_key("origin") {
+    /// Project updates the attempt `headers` authenticate has not received yet,
+    /// marked delivered. None while the coordinator is busy.
+    pub(in crate::commands) fn checkpoint(
+        &self,
+        headers: &HeaderMap,
+    ) -> Result<Option<Value>, String> {
+        let token = super::service::bearer(headers);
+        if token == Err(StatusCode::FORBIDDEN) {
             return Err("Browser origins cannot access coordination".into());
         }
         let mut inner = match self.inner.try_lock() {
@@ -385,11 +328,7 @@ impl Coordinator {
             Err(std::sync::TryLockError::WouldBlock) => return Ok(None),
             Err(error) => return Err(error.to_string()),
         };
-        let token = headers
-            .get("authorization")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or("Coordination is unavailable for this attempt")?;
+        let token = token.map_err(|_| "Coordination is unavailable for this attempt")?;
         let token = crate::commands::tasks::bridge_token(token);
         let (_, run_id) = inner
             .grants
@@ -399,7 +338,7 @@ impl Coordinator {
             .runtime
             .integration_runs()?
             .into_iter()
-            .find(|r| &r.id == run_id && active(&r.status))
+            .find(|r| &r.id == run_id && r.status.is_active())
             .ok_or("Coordination is unavailable for this attempt")?;
         self.reconcile_locked(&mut inner)?;
         let runs = self.runtime.integration_runs()?;

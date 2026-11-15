@@ -3,91 +3,66 @@ use reqwest::Method;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 
+mod config;
+mod server;
+
+pub(in crate::commands) use config::OpenCodeConfig;
+pub(super) use server::{valid_id, Endpoint, HELPER_STARTUP};
+
 const MAX_RESPONSE: usize = 4_000_000;
 
+/// Adds the native output plugin when that experiment is on.
 pub(super) fn configure_tools(
     command: &mut Command,
+    config: &mut Option<OpenCodeConfig>,
     directory: &Path,
     id: &str,
 ) -> Result<(), String> {
-    if !crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "output") {
+    if !crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::NativeTools,
+        "output",
+    ) {
         return Ok(());
     }
-    configure_tool_plugin(command, directory, id)
+    let config = OpenCodeConfig::get(config, command)?;
+    configure_tool_plugin(command, config, directory, id)
 }
 
-fn configure_tool_plugin(command: &mut Command, directory: &Path, id: &str) -> Result<(), String> {
-    let mut config: Value = serde_json::from_str(&crate::commands::mcp::opencode_config(
-        &serde_json::Map::new(),
-        command,
-    )?)
-    .map_err(|_| "Invalid OpenCode configuration.")?;
-    if config.get("plugin").is_some_and(|value| !value.is_array()) {
-        return Err("OpenCode plugins must be an array.".into());
-    }
+fn configure_tool_plugin(
+    command: &mut Command,
+    config: &mut OpenCodeConfig,
+    directory: &Path,
+    id: &str,
+) -> Result<(), String> {
+    config.check_plugins()?;
     let plugin = directory.join(format!("{id}.native-tools.mjs"));
     std::fs::write(&plugin, include_str!("opencode/tools.mjs")).map_err(|e| e.to_string())?;
     let url = reqwest::Url::from_file_path(&plugin)
         .map_err(|_| "The OpenCode plugin path must be absolute.")?;
-    if config.get("plugin").is_none() {
-        config["plugin"] = json!([]);
-    }
-    config["plugin"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!(url.as_str()));
-    command
-        .env("OPENCODE_CONFIG_CONTENT", config.to_string())
-        .env("JACKALOPE_NATIVE_TOOLS", "output")
-        .env(
-            "JACKALOPE_NATIVE_TOOLS_RECEIPT",
-            directory.join(format!("{id}.native-tools.jsonl")),
-        );
+    config.add_plugin(url.as_str())?;
+    command.env("JACKALOPE_NATIVE_TOOLS", "output").env(
+        "JACKALOPE_NATIVE_TOOLS_RECEIPT",
+        directory.join(format!("{id}.native-tools.jsonl")),
+    );
     Ok(())
 }
 
 pub(super) struct Connection {
     listener: Option<std::net::TcpListener>,
-    url: String,
-    password: String,
+    endpoint: Endpoint,
 }
 
 impl Connection {
-    pub fn configure(command: &mut Command) -> Result<Self, String> {
-        let mut config: Value = serde_json::from_str(&crate::commands::mcp::opencode_config(
-            &serde_json::Map::new(),
-            command,
-        )?)
-        .map_err(|_| "Invalid OpenCode configuration.")?;
-        if config
-            .get("experimental")
-            .is_some_and(|value| !value.is_object())
-        {
-            return Err("OpenCode experimental configuration must be an object.".into());
-        }
-        if config.get("experimental").is_none() {
-            config["experimental"] = json!({});
-        }
-        config["experimental"]["continue_loop_on_deny"] = json!(true);
-        command.env("OPENCODE_CONFIG_CONTENT", config.to_string());
-        let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
-            .map_err(|e| e.to_string())?;
-        let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-        let password = uuid::Uuid::new_v4().to_string();
-        command.args([
-            "serve",
-            "--hostname",
-            "127.0.0.1",
-            "--port",
-            &port.to_string(),
-        ]);
-        command
-            .env("OPENCODE_SERVER_PASSWORD", &password)
-            .env("OPENCODE_SERVER_USERNAME", "jackalope");
+    pub fn configure(
+        command: &mut Command,
+        config: &mut Option<OpenCodeConfig>,
+    ) -> Result<Self, String> {
+        OpenCodeConfig::get(config, command)?.continue_on_deny()?;
+        let (listener, endpoint) = Endpoint::reserve()?;
+        endpoint.serve(command, &[]);
         Ok(Self {
             listener: Some(listener),
-            url: format!("http://127.0.0.1:{port}"),
-            password,
+            endpoint,
         })
     }
 
@@ -107,37 +82,34 @@ impl Connection {
         launched: std::time::Instant,
     ) -> Result<(), String> {
         tauri::async_runtime::block_on(async {
-            let client = reqwest::Client::builder()
-                .no_proxy()
-                .redirect(reqwest::redirect::Policy::none())
-                .connect_timeout(Duration::from_secs(2))
-                .build()
-                .map_err(|e| e.to_string())?;
+            let client = Endpoint::client(&server::TASK_STARTUP)?;
             let api = Api {
                 connection: &self,
                 client,
                 workspace,
             };
             let operation = async {
-                let started = std::time::Instant::now();
-                loop {
-                    if api
-                        .json(Method::GET, "/global/health", None)
-                        .await
-                        .is_ok_and(|v| v["healthy"] == true)
-                    {
-                        break;
-                    }
-                    if started.elapsed() > Duration::from_secs(20) {
-                        return Err("OpenCode's local server did not become ready. Update or repair the selected runner and retry.".into());
-                    }
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                if !self
+                    .endpoint
+                    .wait_ready(&api.client, Some(workspace), &server::TASK_STARTUP, || {
+                        false
+                    })
+                    .await
+                {
+                    return Err("OpenCode's local server did not become ready. Update or repair the selected runner and retry.".into());
                 }
                 let session = if let Some(id) = previous {
                     valid_id(id)?;
                     let saved = api
                         .json(Method::GET, &format!("/session/{id}"), None)
-                        .await?;
+                        .await
+                        .map_err(|error| match lost_session(&error) {
+                            Some(lost) => {
+                                runtime.update(run_id, |run| super::resume::refused(run, &error));
+                                lost
+                            }
+                            None => error,
+                        })?;
                     if saved["id"] != id || !same_workspace(saved["directory"].as_str(), workspace)
                     {
                         return Err(
@@ -181,15 +153,19 @@ impl Connection {
                         .ok_or("OpenCode model IDs must use provider/model.")?;
                     body["model"] = json!({"providerID":provider,"modelID":name});
                     if let Some(effort) = effort.filter(|_| {
-                        !crate::commands::experiments::is("JACKALOPE_PROVIDER_EFFORT", "off")
+                        !crate::commands::experiments::is(
+                            crate::commands::experiments::Experiment::ProviderEffort,
+                            "off",
+                        )
                     }) {
-                        let effort =
-                            if crate::commands::experiments::is("JACKALOPE_PROVIDER_EFFORT", "low")
-                            {
-                                effort::TaskEffort::Quick
-                            } else {
-                                effort
-                            };
+                        let effort = if crate::commands::experiments::is(
+                            crate::commands::experiments::Experiment::ProviderEffort,
+                            "low",
+                        ) {
+                            effort::TaskEffort::Quick
+                        } else {
+                            effort
+                        };
                         let providers = api.json(Method::GET, "/config/providers", None).await?;
                         if let Some(variant) = select_variant(&providers, provider, name, effort) {
                             body["variant"] = json!(variant);
@@ -265,14 +241,7 @@ impl Connection {
             };
             let stopped = async {
                 loop {
-                    let alive = {
-                        let inner = runtime.inner.lock().unwrap();
-                        !inner.canceled.contains(run_id)
-                            && inner.processes.get(run_id).is_some_and(|p| {
-                                p.lock().unwrap().try_wait().ok().flatten().is_none()
-                            })
-                    };
-                    if !alive {
+                    if !runtime.process_alive(run_id) {
                         break;
                     }
                     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -283,23 +252,16 @@ impl Connection {
     }
 }
 
+/// OpenCode answers 404 for a session its store does not hold.
+fn lost_session(error: &str) -> Option<String> {
+    (error.starts_with("OpenCode /session/") && error.ends_with("returned HTTP 404.")).then(|| "OpenCode no longer has this task's earlier conversation; its session is not in OpenCode's store. Start a new task with the relevant context.".into())
+}
+
 fn same_workspace(directory: Option<&str>, workspace: &str) -> bool {
     directory
         .and_then(|p| std::fs::canonicalize(p).ok())
         .zip(std::fs::canonicalize(workspace).ok())
         .is_some_and(|(left, right)| left == right)
-}
-
-fn valid_id(value: &str) -> Result<&str, String> {
-    if value.is_empty()
-        || value.len() > 160
-        || !value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-    {
-        return Err("OpenCode returned an invalid identifier.".into());
-    }
-    Ok(value)
 }
 
 fn select_variant<'a>(
@@ -374,13 +336,11 @@ impl Api<'_> {
     }
 
     fn request(&self, method: Method, route: &str) -> reqwest::RequestBuilder {
-        let mut url = reqwest::Url::parse(&format!("{}{route}", self.connection.url))
-            .expect("fixed local OpenCode URL");
+        let endpoint = &self.connection.endpoint;
+        let mut url = endpoint.url(route);
         url.query_pairs_mut()
             .append_pair("directory", self.workspace);
-        self.client
-            .request(method, url)
-            .basic_auth("jackalope", Some(&self.connection.password))
+        endpoint.request(&self.client, method, url)
     }
 
     async fn json(
@@ -389,9 +349,7 @@ impl Api<'_> {
         route: &str,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let timeout = if route == "/global/health" {
-            1
-        } else if route == "/session"
+        let timeout = if route == "/session"
             || route
                 .strip_prefix("/session/")
                 .is_some_and(|tail| !tail.contains('/'))
@@ -516,12 +474,12 @@ impl Api<'_> {
             let decision = if scopes.iter().any(|scope| denials.scopes.contains(scope)) {
                 crate::commands::permission_risk::Decision::Ask(None)
             } else {
-                crate::commands::permission_risk::decide(runtime, run_id, &label, |workspace| {
+                crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
                     crate::commands::permission_risk::assess_opencode(
                         permission,
                         &patterns,
                         &request["metadata"],
-                        workspace,
+                        scope,
                     )
                 })
             };
@@ -885,7 +843,7 @@ impl Stream {
                         .map(|(p, m)| format!("{p}/{m}"));
                     if info["sessionID"] == self.root {
                         if let Some(model) = &model {
-                            run.model = Some(model.clone());
+                            super::served_model::observe(run, model);
                         }
                     }
                     let before = run.usage_observations.len();

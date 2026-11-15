@@ -1,14 +1,35 @@
-import { DefinitionList, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
-import { ChevronDown } from 'lucide-react';
+import { describeError } from '@jackalope/contracts/errors';
+import { isActive } from '@jackalope/contracts/runs';
+import {
+  Button,
+  DefinitionList,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
+import {
+  ChevronDown,
+  ChevronRight,
+  ClipboardCopy,
+  GitBranch,
+  GitPullRequest,
+  ListChecks,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { useState } from 'react';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import { checkName, isOpenPullRequest, type PullRequestView } from '../../lib/pull-requests';
+import type { TaskRun } from '../../lib/run-types';
 import { mergeDestination } from '../../lib/task-workflow';
-import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
+import { ActionError } from '../ui/ActionError';
 import { CreatePullRequest } from './CreatePullRequest';
 import { LocalDelivery } from './LocalDelivery';
+import { TaskPullRequest } from './TaskPullRequest';
 
 interface DeliveryStatus {
   head: string;
@@ -17,67 +38,40 @@ interface DeliveryStatus {
   upstream: string | null;
   ahead: number | null;
   behind: number | null;
-  pullRequest: {
-    url: string;
-    state: string;
-    headRefOid: string;
-    statusCheckRollup: {
-      name?: string;
-      context?: string;
-      status?: string;
-      conclusion?: string;
-      state?: string;
-    }[];
-  } | null;
+  pullRequest: PullRequestView | null;
   remoteNote: string;
   checkedAt: string;
 }
 
+/** What the agent can be asked to prepare; `goal` completes the handoff sentence. */
+const PREPARE_GOALS = [
+  { goal: 'a pull request', label: 'Pull request', icon: GitPullRequest },
+  { goal: 'CI verification', label: 'CI verification', icon: ShieldCheck },
+  { goal: 'a deployment', label: 'Deployment', icon: Rocket },
+] as const;
+
 export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string) {
   return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a PR, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
-}
-
-type CiCheck = NonNullable<DeliveryStatus['pullRequest']>['statusCheckRollup'][number];
-const FAILED_CHECKS = [
-  'FAILURE',
-  'ERROR',
-  'CANCELLED',
-  'TIMED_OUT',
-  'ACTION_REQUIRED',
-  'STARTUP_FAILURE',
-];
-const checkName = (check: CiCheck) => check.name || check.context || 'Check';
-const failedChecks = (checks: CiCheck[] = []) =>
-  checks.filter((check) =>
-    FAILED_CHECKS.includes((check.conclusion || check.state || '').toUpperCase()),
-  );
-
-/** A follow-up asking the agent to repair the PR's failing checks locally, without pushing. */
-function ciRepairHandoff(run: TaskRun, prUrl: string, failing: CiCheck[]) {
-  return [
-    `Fix the failing CI checks on this task's pull request: ${prUrl}`,
-    '',
-    'Failing checks:',
-    ...failing.map((check) => `- ${checkName(check)}: ${check.conclusion || check.state}`),
-    '',
-    `Read their logs with \`gh pr checks ${prUrl}\` and \`gh run view <run id> --log-failed\`, reproduce each failure in this task's workspace (${run.workspace}), fix the cause and run the project's checks. Preserve unrelated work. Do not commit, push or change the pull request until I approve that concrete action; report what failed, what you changed and how you confirmed it.`,
-  ].join('\n');
 }
 
 export function TaskDelivery({
   run,
   integrated = false,
   onHandoff,
+  onFollowUp,
 }: {
   run: TaskRun;
   integrated?: boolean;
   onHandoff: (text: string) => void | Promise<void>;
+  /** Drafts a follow-up for this task's own agent; pull request fixes prefer it. */
+  onFollowUp?: (text: string) => void | Promise<void>;
 }) {
   const [status, setStatus] = useState<DeliveryStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [created, setCreated] = useState('');
   const [landed, setLanded] = useState('');
+  const pullRequest = usePullRequestStore((state) => state.tracked[run.taskId]);
+  const ids = { taskId: run.taskId, runId: run.id };
   const project = useProjectStore((state) => state.projects.find((p) => p.id === run.projectId));
   const target = run.targetBranch?.trim() || mergeDestination(run, project);
   const path = (value: string) => value.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
@@ -90,15 +84,17 @@ export function TaskDelivery({
     setBusy(true);
     setError('');
     try {
-      setStatus(
-        await nativeTask<DeliveryStatus>('task_delivery_status', {
-          id: run.id,
-          project: integrated,
-          remote,
-        }),
-      );
+      const next = await invokeNative<DeliveryStatus>('task_delivery_status', {
+        id: run.id,
+        project: integrated,
+        remote,
+      });
+      setStatus(next);
+      // A pull request found on the branch is followed from here on.
+      if (next.pullRequest)
+        usePullRequestStore.getState().track(ids, next.pullRequest.url, next.pullRequest);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -108,11 +104,19 @@ export function TaskDelivery({
     try {
       await onHandoff(deliveryHandoff(run, integrated, goal));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   return (
     <section className="task-delivery space-y-4" aria-label="Delivery">
+      {pullRequest && (
+        <TaskPullRequest
+          run={run}
+          pullRequest={pullRequest}
+          disabled={busy || isActive(run)}
+          onHandoff={onFollowUp ?? onHandoff}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         {onTarget && !integrated && (
           <LocalDelivery
@@ -138,13 +142,14 @@ export function TaskDelivery({
             }}
           />
         )}
-        {!status?.pullRequest && !onTarget && (
+        {!(pullRequest && isOpenPullRequest(pullRequest)) && !onTarget && (
           <CreatePullRequest
             run={run}
             disabled={busy || isActive(run)}
             onCreated={(url) => {
-              setCreated(url);
-              void inspect(true);
+              const store = usePullRequestStore.getState();
+              store.track(ids, url);
+              void store.refresh(run.taskId);
             }}
           />
         )}
@@ -162,29 +167,44 @@ export function TaskDelivery({
               collisionPadding={12}
             >
               <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(false)}>
+                <GitBranch size={16} aria-hidden="true" />
                 Check local status
               </Menu.Item>
               <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(true)}>
+                <ListChecks size={16} aria-hidden="true" />
                 Check pull request and CI
               </Menu.Item>
               <Menu.Separator className="menu-separator" />
-              {['a pull request', 'CI verification', 'a deployment'].map((goal) => (
-                <Menu.Item
-                  key={goal}
-                  className="workspace-menu-item"
-                  onSelect={() => void prepare(goal)}
-                >
-                  Ask the agent to prepare {goal}
-                </Menu.Item>
-              ))}
+              <Menu.Sub>
+                <Menu.SubTrigger className="workspace-menu-item workspace-menu-sub">
+                  <Sparkles size={16} aria-hidden="true" />
+                  Ask the agent to prepare…
+                  <ChevronRight size={14} aria-hidden="true" />
+                </Menu.SubTrigger>
+                <Menu.Portal>
+                  <Menu.SubContent className="workspace-menu">
+                    {PREPARE_GOALS.map(({ goal, label, icon: Icon }) => (
+                      <Menu.Item
+                        key={goal}
+                        className="workspace-menu-item"
+                        onSelect={() => void prepare(goal)}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </Menu.Item>
+                    ))}
+                  </Menu.SubContent>
+                </Menu.Portal>
+              </Menu.Sub>
               <Menu.Item
                 className="workspace-menu-item"
                 onSelect={() =>
                   void navigator.clipboard
                     .writeText(deliveryHandoff(run, integrated, 'a delivery handoff'))
-                    .catch((cause) => setError(String(cause)))
+                    .catch((cause) => setError(describeError(cause)))
                 }
               >
+                <ClipboardCopy size={16} aria-hidden="true" />
                 Copy delivery handoff
               </Menu.Item>
             </Menu.Content>
@@ -215,43 +235,6 @@ export function TaskDelivery({
           </p>
           {status.pullRequest && (
             <div className="space-y-2">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  void openExternalUrl(status.pullRequest?.url ?? '').catch((cause) =>
-                    setError(String(cause)),
-                  )
-                }
-              >
-                Open PR · {status.pullRequest.state}
-              </Button>
-              {(() => {
-                const failing = failedChecks(status.pullRequest?.statusCheckRollup);
-                const url = status.pullRequest?.url ?? '';
-                return failing.length ? (
-                  <InlineNotice
-                    tone="warning"
-                    action={
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setError('');
-                          void Promise.resolve(onHandoff(ciRepairHandoff(run, url, failing))).catch(
-                            (cause) => setError(String(cause)),
-                          );
-                        }}
-                      >
-                        Ask the agent to fix
-                      </Button>
-                    }
-                  >
-                    {failing.length === 1
-                      ? '1 CI check failed'
-                      : `${failing.length} CI checks failed`}
-                    : {failing.map(checkName).join(', ')}
-                  </InlineNotice>
-                ) : null;
-              })()}
               {status.pullRequest.headRefOid !== status.head && (
                 <InlineNotice>
                   The PR head differs from the inspected local revision. Its checks do not verify
@@ -279,27 +262,8 @@ export function TaskDelivery({
           )}
         </>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      <div className="space-y-2">
-        {landed && <InlineNotice tone="success">{landed}</InlineNotice>}
-        {created && (
-          <InlineNotice
-            tone="success"
-            action={
-              <Button
-                variant="outline"
-                onClick={() =>
-                  void openExternalUrl(created).catch((cause) => setError(String(cause)))
-                }
-              >
-                Open pull request
-              </Button>
-            }
-          >
-            Pull request opened.
-          </InlineNotice>
-        )}
-      </div>
+      <ActionError error={error} />
+      {landed && <InlineNotice tone="success">{landed}</InlineNotice>}
     </section>
   );
 }

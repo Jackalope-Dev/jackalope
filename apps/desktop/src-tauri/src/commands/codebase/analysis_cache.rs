@@ -81,43 +81,4 @@ mod tests {
             first.1
         );
     }
-
-    #[test]
-    #[ignore = "Measures local syntax analysis only; no model calls"]
-    fn local_analysis_cache_trial() {
-        let mut parser = Parser::new();
-        parser
-            .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
-            .unwrap();
-        let text = (0..300)
-            .map(|i| {
-                format!("export function function{i}(input: number) {{ return input + {i}; }}\n")
-            })
-            .collect::<String>();
-        let expected = super::super::analyze(&mut parser, "measured.ts", &text, false);
-        let mut timings = Vec::new();
-        for repetition in 0..21 {
-            for reuse in if repetition % 2 == 0 {
-                [false, true]
-            } else {
-                [true, false]
-            } {
-                let started = Instant::now();
-                let value = if reuse {
-                    cached(&mut parser, "measured.ts", &text, false)
-                } else {
-                    super::super::analyze(&mut parser, "measured.ts", &text, false)
-                };
-                let elapsed = started.elapsed().as_secs_f64() * 1000.0;
-                assert_eq!(value, expected);
-                if repetition > 0 {
-                    timings.push(serde_json::json!({"repetition":repetition,"variant":if reuse {"cached"} else {"parsed"},"elapsedMs":elapsed}));
-                }
-            }
-        }
-        println!(
-            "Optimization measurement: {}",
-            serde_json::json!({"scope":"Local unchanged TypeScript analysis microbenchmark, content hashing included; filesystem traversal, file reading and model work excluded. Twenty pairs after warmup. Identical reference/symbol outputs required.","timings":timings})
-        );
-    }
 }

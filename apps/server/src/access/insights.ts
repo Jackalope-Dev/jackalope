@@ -1,3 +1,8 @@
+import {
+  PREFERENCE_AGENTS,
+  PREFERENCE_PLATFORMS,
+  PREFERENCE_PRIORITIES,
+} from '@jackalope/contracts/access';
 import { z } from 'zod';
 import { tokenHash } from './crypto';
 
@@ -7,19 +12,9 @@ const choices = <T extends string>(values: [T, ...T[]]) =>
     .max(values.length)
     .transform((items) => [...new Set(items)]);
 export const preferencesSchema = z.strictObject({
-  platforms: choices(['macos', 'windows', 'linux']),
-  agents: choices([
-    'codex',
-    'claude',
-    'opencode',
-    'grok',
-    'antigravity',
-    'cursor',
-    'gemini',
-    'other',
-    'exploring',
-  ]),
-  priorities: choices(['parallel', 'review', 'context', 'accounts', 'recurring', 'remote']),
+  platforms: choices([...PREFERENCE_PLATFORMS]),
+  agents: choices([...PREFERENCE_AGENTS]),
+  priorities: choices([...PREFERENCE_PRIORITIES]),
 });
 const campaignValue = z
   .string()

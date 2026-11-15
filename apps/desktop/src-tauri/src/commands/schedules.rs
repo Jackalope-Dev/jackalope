@@ -36,6 +36,64 @@ pub struct Occurrence {
     pub due_at: DateTime<Utc>,
     pub run_id: Option<String>,
     pub outcome: String,
+    /// What `outcome` describes. Occurrences saved before this field existed get it from
+    /// their text when the ledger loads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<OutcomeKind>,
+}
+
+/// The kind of an [`Outcome`], saved beside its text so the app can act on it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OutcomeKind {
+    Reserved,
+    Started,
+    FailedToStart,
+    SignedOut,
+    Overlap,
+    Busy,
+    Missed,
+    Paused,
+    Starting,
+    Invalid,
+    MonitorAttention,
+    Unrelated,
+    Baseline,
+    Unchanged,
+    ChangeDetected,
+    /// A reserved occurrence whose dispatch never finished before the app stopped.
+    InterruptedDispatch,
+}
+
+impl OutcomeKind {
+    /// Reads the kind of an occurrence saved with text only.
+    fn from_saved_text(text: &str) -> Option<Self> {
+        const PREFIXES: [(&str, OutcomeKind); 16] = [
+            ("Reserved", OutcomeKind::Reserved),
+            ("Started", OutcomeKind::Started),
+            ("Failed to start", OutcomeKind::FailedToStart),
+            ("Skipped: sign in", OutcomeKind::SignedOut),
+            ("Skipped: earlier run", OutcomeKind::Overlap),
+            ("Skipped: three tasks", OutcomeKind::Busy),
+            ("Skipped: missed", OutcomeKind::Missed),
+            ("Skipped: schedule is paused", OutcomeKind::Paused),
+            (
+                "Skipped: Jackalope is still starting",
+                OutcomeKind::Starting,
+            ),
+            ("Paused: this schedule is invalid", OutcomeKind::Invalid),
+            (ATTENTION, OutcomeKind::MonitorAttention),
+            ("Unrelated change", OutcomeKind::Unrelated),
+            ("Baseline recorded", OutcomeKind::Baseline),
+            ("Unchanged", OutcomeKind::Unchanged),
+            ("Change detected", OutcomeKind::ChangeDetected),
+            ("Interrupted dispatch", OutcomeKind::InterruptedDispatch),
+        ];
+        PREFIXES
+            .iter()
+            .find(|(prefix, _)| text.starts_with(*prefix))
+            .map(|(_, kind)| *kind)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -125,6 +183,12 @@ pub struct Scheduler {
     webhook_port: Arc<std::sync::atomic::AtomicU16>,
 }
 
+impl crate::services::Service for Scheduler {
+    fn shutdown(&self) {
+        Scheduler::shutdown(self)
+    }
+}
+
 impl Scheduler {
     pub fn new(path: PathBuf, coordinator: Coordinator) -> Self {
         let loaded = if path.exists() {
@@ -145,7 +209,14 @@ impl Scheduler {
                 if event.outcome == "Reserved" {
                     event.outcome =
                         "Interrupted dispatch; inspect task history before retrying".into();
+                    event.kind = Some(OutcomeKind::InterruptedDispatch);
                 }
+                if event.kind.is_none() {
+                    event.kind = OutcomeKind::from_saved_text(&event.outcome);
+                }
+            }
+            if let Some(event) = schedule.last_notice.as_mut().filter(|e| e.kind.is_none()) {
+                event.kind = OutcomeKind::from_saved_text(&event.outcome);
             }
         }
         Self {
@@ -205,11 +276,23 @@ impl Scheduler {
             if !saved.definition.enabled || saved.next_at > now {
                 continue;
             }
-            let next = next_at(
+            let next = match next_at(
                 &saved.definition.expression,
                 &saved.definition.timezone,
                 now,
-            )?;
+            ) {
+                Ok(next) => next,
+                Err(error) => {
+                    let mut updated = ledger.clone();
+                    let current = &mut updated.schedules[index];
+                    current.definition.enabled = false;
+                    let due_at = current.next_at;
+                    record(current, due_at, None, None, Outcome::Invalid(error));
+                    self.persist(&updated)?;
+                    *ledger = updated;
+                    continue;
+                }
+            };
             let monitor_only = saved
                 .definition
                 .monitor
@@ -303,9 +386,9 @@ impl Scheduler {
                     });
                 }
             }
-            let Some(saved) = ledger.schedules.get(index) else {
+            if index >= ledger.schedules.len() {
                 continue;
-            };
+            }
             if let Some(result) = observation
                 .as_ref()
                 .filter(|r| r.is_err() || quiet || monitor_only || filtered)
@@ -313,7 +396,7 @@ impl Scheduler {
                 let mut updated = ledger.clone();
                 let current = &mut updated.schedules[index];
                 let outcome = match result {
-                    Err(error) => format!("Monitor needs attention: {error}"),
+                    Err(error) => Outcome::MonitorAttention(error.clone()),
                     Ok(revision) => {
                         current.local_checks += 1;
                         let first = current.observed_revision.is_none();
@@ -322,23 +405,25 @@ impl Scheduler {
                             current.quiet_checks += 1;
                         }
                         if filtered {
-                            "Unrelated change · Jev assessment; no agent used".into()
+                            Outcome::Unrelated
                         } else if first {
-                            "Baseline recorded · no agent used".into()
+                            Outcome::Baseline
                         } else if quiet {
-                            "Unchanged · no agent used".into()
+                            Outcome::Unchanged
                         } else {
-                            "Change detected · no agent used".into()
+                            Outcome::ChangeDetected
                         }
                     }
                 };
+                let notice = matches!(outcome, Outcome::ChangeDetected);
                 let event = Occurrence {
                     change,
                     due_at: current.next_at,
                     run_id: None,
-                    outcome,
+                    outcome: outcome.text(),
+                    kind: Some(outcome.kind()),
                 };
-                if event.outcome.starts_with("Change detected")
+                if notice
                     || (result.is_err()
                         && current
                             .last_notice
@@ -350,117 +435,42 @@ impl Scheduler {
                     && current
                         .last_notice
                         .as_ref()
-                        .is_some_and(|e| e.outcome.starts_with("Monitor needs attention"))
+                        .is_some_and(|e| e.kind == Some(OutcomeKind::MonitorAttention))
                 {
                     current.last_notice = None;
                 }
-                current.history.push(event);
+                push(current, event);
                 current.next_at = next;
-                if current.history.len() > 200 {
-                    current.history.remove(0);
-                }
                 self.persist(&updated)?;
                 *ledger = updated;
                 continue;
             }
-            let runs = self.coordinator.runtime.integration_runs()?;
-            let overlap = saved.last_run_id.iter().any(|id| {
-                runs.iter().any(|run| {
-                    (&run.id == id || &run.task_id == id)
-                        && ["starting", "running", "stopping", "interrupted"]
-                            .contains(&run.status.as_str())
-                })
-            });
-            let capacity_busy = runs
-                .iter()
-                .filter(|r| {
-                    ["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-                })
-                .count()
-                >= 3;
-            let access_denied = self.coordinator.runtime.access.ensure().is_err();
-            let skip = access_denied
-                || overlap
-                || capacity_busy
-                || (late && saved.definition.missed == "skip");
-            if !skip && saved.account.is_some() && !self.coordinator.bridge_ready() {
-                continue;
-            }
-            let mut request = saved.definition.request.clone();
-            request.monitor_change = change.clone();
-            request.id = uuid::Uuid::new_v4().to_string();
-            let event = Occurrence {
+            let trigger = Trigger::Due {
+                next,
+                late,
                 change,
-                due_at: saved.next_at,
-                run_id: (!skip).then(|| request.id.clone()),
-                outcome: if access_denied {
-                    "Skipped: sign in to Jackalope to start new work"
-                } else if overlap {
-                    "Skipped: earlier run is active or interrupted"
-                } else if capacity_busy {
-                    "Skipped: three tasks already active or interrupted"
-                } else if skip {
-                    "Skipped: missed while unavailable"
-                } else {
-                    "Reserved"
-                }
-                .into(),
+                observation,
             };
-            let mut updated = ledger.clone();
-            updated.schedules[index].next_at = next;
-            updated.schedules[index].history.push(event);
-            if observation.as_ref().is_some_and(|r| r.is_ok()) {
-                updated.schedules[index].local_checks += 1;
-            }
-            if !skip {
-                updated.schedules[index].last_run_id = Some(request.id.clone());
-                if let Some(Ok(revision)) = observation {
-                    updated.schedules[index].observed_revision = Some(revision);
-                }
-            }
-            if updated.schedules[index].history.len() > 200 {
-                updated.schedules[index].history.remove(0);
-            }
-            self.persist(&updated)?;
-            *ledger = updated;
-            if skip {
-                continue;
-            }
-            let start = (|| {
-                let account = ledger.schedules[index]
-                    .account
-                    .as_ref()
-                    .ok_or("Re-save this schedule to bind its account.")?;
-                super::agent_profiles::validate_binding(
-                    &self.coordinator.runtime.profiles_root(),
-                    account,
-                )?;
-                let current = super::agent_profiles::bind_account(
-                    &self.coordinator.runtime.profiles_root(),
-                    &account.adapter,
-                    request.agent_profile_id.as_deref(),
-                )?;
-                if current.directory != account.directory
-                    || current.profile_id != account.profile_id
-                {
-                    return Err("The selected account changed. Re-save the schedule to approve this account.".into());
-                }
-                self.coordinator.start_manual(request)
-            })();
-            let outcome = match start {
-                Ok(_) => "Started".to_string(),
-                Err(error) => format!("Failed to start: {error}"),
-            };
-            ledger.schedules[index].history.last_mut().unwrap().outcome = outcome;
-            if ledger.schedules[index].definition.monitor.is_some() {
-                ledger.schedules[index].last_notice =
-                    ledger.schedules[index].history.last().cloned();
-            }
-            self.persist(&ledger)?;
+            self.dispatch(&mut ledger, index, trigger)?;
         }
         Ok(())
     }
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::schedules::schedule_list,
+            commands::schedules::schedule_inspect_change,
+            commands::schedules::schedule_save,
+            commands::schedules::schedule_remove,
+            commands::schedules::schedule_set_enabled,
+            commands::schedules::schedule_webhook_enable,
+            commands::schedules::schedule_webhook_disable,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub fn schedule_list(service: State<'_, Scheduler>) -> ScheduleLedger {
@@ -726,12 +736,12 @@ impl Scheduler {
         let response = match webhook_request(&bytes[..read]) {
             Some((id, token)) => match self.trigger_webhook(&id, &token) {
                 Ok(outcome) => {
-                    let status = if outcome.starts_with("Started") {
+                    let status = if outcome == Outcome::Started {
                         "200 OK"
                     } else {
                         "202 Accepted"
                     };
-                    http_json(status, &outcome)
+                    http_json(status, &outcome.text())
                 }
                 Err(error)
                     if error == "Schedule not found"
@@ -754,7 +764,7 @@ impl Scheduler {
             .map_err(|error| error.to_string())
     }
 
-    fn trigger_webhook(&self, id: &str, token: &str) -> Result<String, String> {
+    fn trigger_webhook(&self, id: &str, token: &str) -> Result<Outcome, String> {
         let mut ledger = self.ledger.lock().map_err(|error| error.to_string())?;
         let index = ledger
             .schedules
@@ -771,48 +781,85 @@ impl Scheduler {
             return Err("Unauthorized".into());
         }
         if !saved.definition.enabled {
-            return Ok("Skipped: schedule is paused".into());
+            return Ok(Outcome::Paused);
         }
+        Ok(self
+            .dispatch(&mut ledger, index, Trigger::Webhook)?
+            .unwrap_or(Outcome::Starting))
+    }
+
+    /// Starts schedule `index`'s task, whether it fell due or its webhook was
+    /// called, unless a check skips it, and records what happened. `None`
+    /// when the task must wait for the bridge, which a due schedule does
+    /// silently until the next tick.
+    fn dispatch(
+        &self,
+        ledger: &mut std::sync::MutexGuard<'_, ScheduleLedger>,
+        index: usize,
+        trigger: Trigger,
+    ) -> Result<Option<Outcome>, String> {
+        let saved = &ledger.schedules[index];
         let runs = self.coordinator.runtime.integration_runs()?;
-        let overlap = saved.last_run_id.iter().any(|run_id| {
-            runs.iter().any(|run| {
-                (&run.id == run_id || &run.task_id == run_id)
-                    && ["starting", "running", "stopping", "interrupted"]
-                        .contains(&run.status.as_str())
-            })
+        let overlap = saved.last_run_id.iter().any(|id| {
+            runs.iter()
+                .any(|run| (&run.id == id || &run.task_id == id) && run.status.is_live())
         });
+        let capacity_busy = runs.iter().filter(|r| r.status.is_live()).count() >= 3;
+        let missed =
+            matches!(trigger, Trigger::Due { late: true, .. }) && saved.definition.missed == "skip";
+        let skip = if self.coordinator.runtime.access.ensure().is_err() {
+            Some(Outcome::SignedOut)
+        } else if overlap {
+            Some(Outcome::Overlap)
+        } else if capacity_busy {
+            Some(Outcome::Busy)
+        } else if missed {
+            Some(Outcome::Missed)
+        } else {
+            None
+        };
+        if skip.is_none() && saved.account.is_some() && !self.coordinator.bridge_ready() {
+            return Ok(None);
+        }
         let mut request = saved.definition.request.clone();
         request.id = uuid::Uuid::new_v4().to_string();
-        let skipped = overlap || saved.account.is_none();
-        let outcome = if overlap {
-            "Skipped: earlier run is active or interrupted"
-        } else if saved.account.is_none() {
-            "Skipped: re-save this schedule to bind its account"
-        } else {
-            "Reserved"
+        let due = matches!(trigger, Trigger::Due { .. });
+        let (change, observation, next, due_at) = match trigger {
+            Trigger::Due {
+                next,
+                change,
+                observation,
+                ..
+            } => (change, observation, Some(next), saved.next_at),
+            Trigger::Webhook => (None, None, None, Utc::now()),
         };
+        request.monitor_change = change.clone();
         let mut updated = ledger.clone();
         let current = &mut updated.schedules[index];
-        current.history.push(Occurrence {
-            change: None,
-            due_at: Utc::now(),
-            run_id: (!skipped).then(|| request.id.clone()),
-            outcome: outcome.into(),
-        });
-        if !skipped {
+        if let Some(next) = next {
+            current.next_at = next;
+        }
+        if observation.as_ref().is_some_and(|r| r.is_ok()) {
+            current.local_checks += 1;
+        }
+        if skip.is_none() {
             current.last_run_id = Some(request.id.clone());
+            if let Some(Ok(revision)) = observation {
+                current.observed_revision = Some(revision);
+            }
         }
-        if current.history.len() > 200 {
-            current.history.remove(0);
-        }
+        let run_id = skip.is_none().then(|| request.id.clone());
+        record(
+            current,
+            due_at,
+            change,
+            run_id,
+            skip.clone().unwrap_or(Outcome::Reserved),
+        );
         self.persist(&updated)?;
-        *ledger = updated;
-        if skipped {
-            return Ok(ledger.schedules[index]
-                .history
-                .last()
-                .map(|event| event.outcome.clone())
-                .unwrap_or_else(|| "Skipped".into()));
+        **ledger = updated;
+        if let Some(skip) = skip {
+            return Ok(Some(skip));
         }
         let start = (|| {
             let account = ledger.schedules[index]
@@ -837,12 +884,122 @@ impl Scheduler {
             self.coordinator.start_manual(request)
         })();
         let outcome = match start {
-            Ok(_) => "Started".to_string(),
-            Err(error) => format!("Failed to start: {error}"),
+            Ok(_) => Outcome::Started,
+            Err(error) => Outcome::FailedToStart(error),
         };
-        ledger.schedules[index].history.last_mut().unwrap().outcome = outcome.clone();
-        self.persist(&ledger)?;
-        Ok(outcome)
+        let current = &mut ledger.schedules[index];
+        let event = current.history.last_mut().unwrap();
+        event.outcome = outcome.text();
+        event.kind = Some(outcome.kind());
+        if due && current.definition.monitor.is_some() {
+            current.last_notice = current.history.last().cloned();
+        }
+        self.persist(ledger)?;
+        Ok(Some(outcome))
+    }
+}
+
+/// Why a schedule is being dispatched.
+enum Trigger {
+    /// It fell due, `late` when more than a minute ago. A monitor reports what
+    /// changed and the revision it observed.
+    Due {
+        next: DateTime<Utc>,
+        late: bool,
+        change: Option<super::monitors::MonitorChange>,
+        observation: Option<Result<String, String>>,
+    },
+    Webhook,
+}
+
+/// What happened when a schedule fell due or was called. Saved in each
+/// occurrence as its [`Outcome::text`], which the app shows as written, and its [`OutcomeKind`].
+#[derive(Clone, Debug, PartialEq)]
+enum Outcome {
+    Reserved,
+    Started,
+    FailedToStart(String),
+    SignedOut,
+    Overlap,
+    Busy,
+    Missed,
+    Paused,
+    /// The bridge was not ready for a webhook call.
+    Starting,
+    Invalid(String),
+    MonitorAttention(String),
+    Unrelated,
+    Baseline,
+    Unchanged,
+    ChangeDetected,
+}
+
+const ATTENTION: &str = "Monitor needs attention: ";
+
+impl Outcome {
+    fn text(&self) -> String {
+        match self {
+            Self::Reserved => "Reserved".into(),
+            Self::Started => "Started".into(),
+            Self::FailedToStart(error) => format!("Failed to start: {error}"),
+            Self::SignedOut => "Skipped: sign in to Jackalope to start new work".into(),
+            Self::Overlap => "Skipped: earlier run is active or interrupted".into(),
+            Self::Busy => "Skipped: three tasks already active or interrupted".into(),
+            Self::Missed => "Skipped: missed while unavailable".into(),
+            Self::Paused => "Skipped: schedule is paused".into(),
+            Self::Starting => "Skipped: Jackalope is still starting; try again shortly".into(),
+            Self::Invalid(error) => format!("Paused: this schedule is invalid: {error}"),
+            Self::MonitorAttention(error) => format!("{ATTENTION}{error}"),
+            Self::Unrelated => "Unrelated change · Jev assessment; no agent used".into(),
+            Self::Baseline => "Baseline recorded · no agent used".into(),
+            Self::Unchanged => "Unchanged · no agent used".into(),
+            Self::ChangeDetected => "Change detected · no agent used".into(),
+        }
+    }
+
+    fn kind(&self) -> OutcomeKind {
+        match self {
+            Self::Reserved => OutcomeKind::Reserved,
+            Self::Started => OutcomeKind::Started,
+            Self::FailedToStart(_) => OutcomeKind::FailedToStart,
+            Self::SignedOut => OutcomeKind::SignedOut,
+            Self::Overlap => OutcomeKind::Overlap,
+            Self::Busy => OutcomeKind::Busy,
+            Self::Missed => OutcomeKind::Missed,
+            Self::Paused => OutcomeKind::Paused,
+            Self::Starting => OutcomeKind::Starting,
+            Self::Invalid(_) => OutcomeKind::Invalid,
+            Self::MonitorAttention(_) => OutcomeKind::MonitorAttention,
+            Self::Unrelated => OutcomeKind::Unrelated,
+            Self::Baseline => OutcomeKind::Baseline,
+            Self::Unchanged => OutcomeKind::Unchanged,
+            Self::ChangeDetected => OutcomeKind::ChangeDetected,
+        }
+    }
+}
+
+/// Appends an occurrence, keeping the latest 200.
+fn record(
+    current: &mut SavedSchedule,
+    due_at: DateTime<Utc>,
+    change: Option<super::monitors::MonitorChange>,
+    run_id: Option<String>,
+    outcome: Outcome,
+) {
+    let event = Occurrence {
+        change,
+        due_at,
+        run_id,
+        outcome: outcome.text(),
+        kind: Some(outcome.kind()),
+    };
+    push(current, event);
+}
+
+fn push(current: &mut SavedSchedule, event: Occurrence) {
+    current.history.push(event);
+    if current.history.len() > 200 {
+        current.history.remove(0);
     }
 }
 
@@ -914,6 +1071,7 @@ mod monitor_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
     #[test]
     fn a_webhook_request_needs_a_schedule_id_and_bearer_token() {
         let id = uuid::Uuid::new_v4();
@@ -959,6 +1117,52 @@ mod tests {
             });
         (directory, scheduler)
     }
+    #[test]
+    fn a_webhook_call_passes_the_same_checks_as_a_due_schedule() {
+        let (directory, mut scheduler) = fixture("once");
+        scheduler.coordinator.runtime.access =
+            Arc::new(super::super::execution_access::ExecutionAccess::new());
+        scheduler.ledger.lock().unwrap().schedules[0].webhook = Some(ScheduleWebhook {
+            token_hash: token_hash("fixture-token"),
+            created_at: Utc::now().to_rfc3339(),
+        });
+        let id = scheduler.ledger.lock().unwrap().schedules[0]
+            .definition
+            .id
+            .clone();
+        assert_eq!(
+            scheduler.trigger_webhook(&id, "fixture-token").unwrap(),
+            Outcome::SignedOut
+        );
+        let ledger = scheduler.ledger.lock().unwrap().clone();
+        assert!(ledger.schedules[0].history[0].run_id.is_none());
+        assert!(ledger.schedules[0].last_run_id.is_none());
+        drop(scheduler);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn an_invalid_schedule_is_paused_without_stopping_the_others() {
+        let (directory, scheduler) = fixture("once");
+        let now = Utc::now();
+        {
+            let mut ledger = scheduler.ledger.lock().unwrap();
+            let mut broken = ledger.schedules[0].clone();
+            broken.definition.expression = "not a schedule".into();
+            broken.next_at = now;
+            ledger.schedules.insert(0, broken);
+            ledger.schedules[1].next_at = now;
+        }
+        scheduler.tick(now).unwrap();
+        let ledger = scheduler.ledger.lock().unwrap().clone();
+        assert!(ledger.error.is_none());
+        assert!(!ledger.schedules[0].definition.enabled);
+        assert!(ledger.schedules[0].history[0].outcome.starts_with("Paused"));
+        assert_eq!(ledger.schedules[1].history.len(), 1);
+        drop(scheduler);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn execution_access_denial_skips_the_occurrence_without_creating_a_run() {
         let (directory, mut scheduler) = fixture("once");
@@ -1077,8 +1281,8 @@ mod tests {
         loop {
             let runs = scheduler.coordinator.runtime.integration_runs().unwrap();
             assert_eq!(runs.len(), 1);
-            if !["starting", "running"].contains(&runs[0].status.as_str()) {
-                assert_eq!(runs[0].status, "review", "{:?}", runs[0].error);
+            if !runs[0].status.is_running() {
+                assert_eq!(runs[0].status, RunStatus::Review, "{:?}", runs[0].error);
                 assert_eq!(runs[0].result, "Scheduled fixture complete");
                 assert_ne!(runs[0].workspace, repo.to_string_lossy());
                 break;

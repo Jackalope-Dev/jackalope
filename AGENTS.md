@@ -1,9 +1,11 @@
 # Agent guidance
 
 - Commit your own work on a branch under .worktrees/<task>, as the configured git user,
-  with no Co-Authored-By or agent trailers. Stage only the files you changed. Never
-  commit to master, push unless asked, force-push, reset --hard or clean. Releases
-  follow the jackalope-release skill, which does not commit.
+  with no Co-Authored-By or agent trailers. Stage only the files you changed. Commit
+  or push to master directly only with the owner's approval (see "Deploys need the
+  owner's go-ahead"); otherwise push the branch and open a PR. Never force-push,
+  reset --hard or clean. Releases follow the jackalope-release skill, which does not
+  commit.
 - Read docs/STATUS.md, docs/TODO.md and docs/UI-GUIDELINES.md before changes. Check git
   status and worktree list; preserve existing work.
 - Start isolated concurrent work from current master under .worktrees/<task>.
@@ -59,10 +61,26 @@ Quick facts that trip people up:
   paths only resolve at runtime.
 - Pushing to master deploys the production API and the website, and pushing to
   beta deploys the staging API, through Cloudflare Workers Builds; there is no
-  GitHub Actions deploy.
+  GitHub Actions deploy. A push or merge to master therefore needs the owner's
+  approval (see "Deploys need the owner's go-ahead").
 
 Read docs/PARALLEL-WORKFLOWS.md for integration rules and docs/SELF-DEVELOPMENT.md for
 native testing. Repository skills point to these shared guides.
+
+## Deploys need the owner's go-ahead
+
+Pushing or merging to `master` deploys to production. Direct pushes to `master` are welcome,
+but only when the repository owner has approved that specific change in the current
+session (for example "push it", "deploy it", "merge that").
+
+- Without that approval: commit on a branch in `.worktrees/<task>`, push the branch,
+  open a PR, and ask. Don't merge it yourself.
+- An approval covers the change it was given for, not later ones, and never carries over
+  to a new session or to another agent.
+- The same rule covers deploy commands (`pnpm run deploy`, `wrangler deploy`), production
+  database migrations or writes, and secret changes.
+- With approval: run every gate first. Never `--no-verify`, force-push, or use admin
+  rights to skip required checks.
 
 ## Worktrees and keeping master current
 

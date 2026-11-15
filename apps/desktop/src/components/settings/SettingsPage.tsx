@@ -1,128 +1,74 @@
-import { FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
-  Cloud,
-  Cpu,
-  Database,
-  FolderCog,
-  Gavel,
-  History,
-  KeyRound,
-  LifeBuoy,
-  type LucideIcon,
-  Monitor,
-  Palette,
-  Plug,
-  Radio,
-  Server,
-  Settings2,
-  Shield,
-  UserRound,
-  Zap,
-} from 'lucide-react';
+  Button,
+  FormField,
+  Input,
+  SearchField,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
+import { ArrowUpRight, KeyRound } from 'lucide-react';
 
-import { useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { navigateWorkspace, openDevices } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
-import { ProjectPreferences } from '../projects/ProjectPreferences';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
+import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
-import { RoutingPreferences } from './RoutingSetup';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
+import { describeError } from '@jackalope/contracts/errors';
 import { useShallow } from 'zustand/react/shallow';
+import {
+  SETTINGS_CATEGORIES,
+  SETTINGS_GROUPS,
+  type SettingsCategory,
+  settingsCategory,
+  sidebarCategory,
+} from '../../lib/settings-categories';
 import { ArtifactsConnection } from './ArtifactsConnection';
 import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
-import { RemoteAccess } from './RemoteAccess';
-import { SavedActions } from './SavedActions';
+import { SwarmSettings } from './SwarmConnection';
+
+/** Opens the page a settings entry stands for; Devices lands on sharing this computer. */
+function openCategoryPage(category: SettingsCategory) {
+  const page = settingsCategory(category).page;
+  if (page === 'remote-hosts') openDevices('share');
+  else if (page) navigateWorkspace(page);
+}
 
 interface SettingsPageProps {
   onClose: () => void;
-  initialScope?: 'app' | 'project';
+  /** The project a project link (openProjectSettings) asked about. */
   initialProjectId?: string;
   initialCategory?: SettingsCategory;
 }
-const categories = [
-  'Project',
-  'General',
-  'Appearance',
-  'Desktop',
-  'Saved actions',
-  'Decisions',
-  'Connected work',
-  'Computers',
-  'Cloudflare',
-  'Jackalope account',
-  'Invitations',
-  'Remote access',
-  'Privacy',
-  'Updates & support',
-  'System',
-  'Diagnostics',
-  'Data & reset',
-] as const;
-export type SettingsCategory = (typeof categories)[number];
 /**
- * Sidebar sections; categories keep the order above within each. Advanced holds
- * routing and diagnostics that most people never change.
+ * App-wide settings. Project links redirect: a project's settings open its page's Settings
+ * tab, its routing opens Agents → Routing scoped to it, and its appearance opens here with
+ * that project's override.
  */
-const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
-  {
-    label: 'Workspace',
-    categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
-  },
-  { label: 'Connections', categories: ['Connected work', 'Computers', 'Cloudflare'] },
-  { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
-  { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
-  { label: 'Advanced', categories: ['Decisions', 'Diagnostics', 'System'] },
-];
-const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
-  Project: FolderCog,
-  General: Settings2,
-  Appearance: Palette,
-  Desktop: Monitor,
-  'Saved actions': Zap,
-  Decisions: Gavel,
-  'Connected work': Plug,
-  Computers: Server,
-  Cloudflare: Cloud,
-  Diagnostics: History,
-  System: Cpu,
-  'Jackalope account': UserRound,
-  'Remote access': Radio,
-  Privacy: Shield,
-  'Updates & support': LifeBuoy,
-  'Data & reset': Database,
-};
-const settingsGroup = (category: SettingsCategory): SettingsCategory =>
-  category === 'Invitations' ? 'Jackalope account' : category;
-
-export function SettingsPage({
-  onClose,
-  initialScope = 'app',
-  initialCategory,
-  initialProjectId,
-}: SettingsPageProps) {
+export function SettingsPage({ onClose, initialCategory, initialProjectId }: SettingsPageProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -130,25 +76,25 @@ export function SettingsPage({
   const settings = useSettingsStore();
   const agents = useAgentConfigStore();
   const { currentTheme } = useThemeStore(useShallow((s) => ({ currentTheme: s.currentTheme })));
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const [scope, setScope] = useState<'app' | 'project'>(initialScope);
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    initialProjectId ?? activeProjectId ?? '',
-  );
-  const project = projects.find((project) => project.id === selectedProjectId);
-  const scopedCategories =
-    scope === 'project'
-      ? categories.filter((c) => ['Project', 'Appearance', 'Decisions'].includes(c))
-      : categories.filter((c) => c !== 'Project');
+  const selectProject = useProjectStore((s) => s.selectProject);
+  const redirect =
+    initialProjectId && (initialCategory === 'Project' || initialCategory === 'Routing');
+  useLayoutEffect(() => {
+    if (!initialProjectId || !redirect) return;
+    selectProject(initialProjectId);
+    if (initialCategory === 'Routing') {
+      useAgentScopeStore.getState().setScope('project');
+      navigateWorkspace('routing');
+    } else navigateWorkspace('project-settings');
+  }, [initialProjectId, initialCategory, redirect, selectProject]);
+  const categories = SETTINGS_CATEGORIES.map((entry) => entry.id);
   const [category, setCategory] = useState<SettingsCategory>(
-    initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
+    initialCategory && !redirect ? initialCategory : 'General',
   );
   const selectedSection = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (settingsGroup(category) !== category)
+    if (sidebarCategory(category) !== category)
       selectedSection.current?.scrollIntoView({ block: 'start' });
     // The content panel scrolls on its own, so a new page starts at its top.
     else content.current?.scrollTo({ top: 0 });
@@ -158,38 +104,15 @@ export function SettingsPage({
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [resetting, setResetting] = useState(false);
-  const matches = (section: SettingsCategory, words: string) =>
+  const matches = (section: SettingsCategory) =>
     query.trim()
-      ? `${section} ${words}`.toLowerCase().includes(query.trim().toLowerCase())
-      : settingsGroup(section) === settingsGroup(category);
-  const visible = scopedCategories.filter((c) =>
-    matches(
-      c,
-      {
-        System: 'device computer operating system architecture git',
-        'Jackalope account':
-          'connect sign in email membership account invitations disconnect device',
-        Invitations: 'invite referral share link email accepted connected',
-        Diagnostics: 'activity log routing events errors codebase',
-        General:
-          'window close exit system tray background quit minimize launch login startup guided setup onboarding notifications system quiet test',
-        Desktop:
-          'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
-        'Saved actions': 'prompt presets commands shortcuts reuse global project',
-        Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
-        'Connected work': 'GitHub Linear Jira issues pull requests API token',
-        Computers: 'bot computer sandbox Docker Colima cloud machine VM remote desktop VNC hosted',
-        Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
-        'Remote access': 'hosts phone companion SSH pairing Tailscale device',
-        Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
-        Privacy: 'marketplace MCP network telemetry crash reporting',
-        Project: 'repository name path agent instructions verification command',
-        'Updates & support':
-          'version automatic install release notes help feedback diagnostics report community discord',
-        'Data & reset':
-          'export clipboard erase delete nuke reset first time setup history local data',
-      }[c],
-    ),
+      ? `${section} ${settingsCategory(section).keywords}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase())
+      : sidebarCategory(section) === sidebarCategory(category);
+  // Search-only entries (hidden) appear for a query, never as the open page.
+  const visible = categories.filter(
+    (c) => matches(c) && (query.trim() !== '' || !('hidden' in settingsCategory(c))),
   );
   const exportConfig = async () => {
     try {
@@ -198,7 +121,7 @@ export function SettingsPage({
           {
             settings: JSON.parse(settings.exportSettings()),
             theme: currentTheme,
-            desktop: isTauriEnvironment() ? await nativeTask('desktop_settings') : undefined,
+            desktop: isTauriEnvironment() ? await invokeNative('desktop_settings') : undefined,
             agents: JSON.parse(JSON.stringify(agents)),
           },
           null,
@@ -207,7 +130,7 @@ export function SettingsPage({
       );
       setMessage('Preferences copied to clipboard.');
     } catch (error) {
-      setMessage(`Could not copy preferences: ${String(error)}`);
+      setMessage(`Could not copy preferences: ${describeError(error)}`);
     }
   };
   const reset = async () => {
@@ -215,14 +138,14 @@ export function SettingsPage({
     setResetting(true);
     setMessage('');
     try {
-      if (isTauriEnvironment()) await nativeTask('app_reset', { confirmation });
+      if (isTauriEnvironment()) await invokeNative('app_reset', { confirmation });
       else {
         for (const key of Object.keys(localStorage))
           if (key.startsWith('jackalope-')) localStorage.removeItem(key);
         window.location.reload();
       }
     } catch (error) {
-      setMessage(`Reset failed: ${String(error)}`);
+      setMessage(`Reset failed: ${describeError(error)}`);
       setResetting(false);
     }
   };
@@ -245,56 +168,43 @@ export function SettingsPage({
         General, appearance, agents, privacy, project preferences and local data. Changes save
         immediately unless a Save button is shown.
       </p>
-      <div className="settings-scope-bar">
-        <SegmentedControl
-          label="Settings scope"
-          value={scope}
-          onChange={(value) => {
-            setScope(value);
-            setCategory(value === 'app' ? 'General' : 'Project');
-            setQuery('');
-          }}
-          items={[
-            { id: 'app', label: 'App-wide' },
-            { id: 'project', label: 'Per project' },
-          ]}
-        />
-        {scope === 'project' && (
-          <Select
-            aria-label="Project to configure"
-            value={selectedProjectId || '__none'}
-            onValueChange={setSelectedProjectId}
-          >
-            {!projects.length && (
-              <SelectItem value="__none" disabled>
-                No projects added
-              </SelectItem>
-            )}
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </Select>
-        )}
-        {scope === 'project' && <p className="task-muted">App-wide restrictions still apply.</p>}
-      </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
-          {navigationGroups.map((group) => {
-            const items = group.categories.filter((c) => scopedCategories.includes(c));
+          {SETTINGS_GROUPS.map((group) => {
+            const items = SETTINGS_CATEGORIES.filter(
+              (entry) => entry.group === group && !('within' in entry) && !('hidden' in entry),
+            );
             if (!items.length) return null;
             return (
-              <div key={group.label} className="settings-nav-group">
-                <span className="settings-nav-label">{group.label}</span>
-                {items.map((c) => {
-                  const Icon = navigationIcons[c] ?? KeyRound;
+              <div key={group} className="settings-nav-group">
+                <span className="settings-nav-label">{group}</span>
+                {items.map((entry) => {
+                  const c = entry.id;
+                  const Icon = ('icon' in entry && entry.icon) || KeyRound;
+                  const opensPage = 'page' in entry;
+                  if (opensPage)
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        className="settings-nav-item settings-nav-link"
+                        onClick={() => openCategoryPage(c)}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {c}
+                        <ArrowUpRight
+                          size={14}
+                          aria-hidden="true"
+                          className="settings-nav-link-icon"
+                        />
+                      </button>
+                    );
                   return (
                     <button
                       key={c}
                       type="button"
-                      className={`settings-nav-item ${settingsGroup(category) === c && !query ? 'is-active' : ''}`}
-                      aria-current={settingsGroup(category) === c && !query ? 'page' : undefined}
+                      className={`settings-nav-item ${sidebarCategory(category) === c && !query ? 'is-active' : ''}`}
+                      aria-current={sidebarCategory(category) === c && !query ? 'page' : undefined}
                       onClick={() => {
                         setCategory(c);
                         setQuery('');
@@ -321,30 +231,34 @@ export function SettingsPage({
               ref={c === category ? selectedSection : undefined}
             >
               <WorkspaceSectionHeading title={c === 'Project' ? 'Project settings' : c} />
+              {settingsCategory(c).page && (
+                <SettingGroup>
+                  <SettingRow title={c} description={settingsCategory(c).summary}>
+                    <Button variant="outline" onClick={() => openCategoryPage(c)}>
+                      Open {c === 'Project' ? 'project settings' : c}
+                      <ArrowUpRight size={14} aria-hidden="true" />
+                    </Button>
+                  </SettingRow>
+                </SettingGroup>
+              )}
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
               {c === 'Connected work' && <IssueConnections />}
               {c === 'Computers' && <ComputersSettings />}
               {c === 'Cloudflare' && <ArtifactsConnection />}
-              {c === 'Desktop' && <DesktopPreferences />}
-              {c === 'Saved actions' && <SavedActions />}
-              {c === 'Remote access' && <RemoteAccess />}
+              {c === 'Swarm' && <SwarmSettings />}
+              {c === 'Editor & terminal' && <DesktopPreferences />}
+              {c === 'Keyboard shortcuts' && <KeyboardShortcuts />}
               {c === 'Invitations' && (
                 <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
-              )}
-              {c === 'Decisions' && (
-                <RoutingPreferences
-                  key={scope === 'project' ? project?.id : 'app'}
-                  projectId={scope === 'project' ? project?.id : undefined}
-                />
               )}
               {c === 'General' && (
                 <>
                   <WindowBehaviorSettings />
                   <NotificationSettings />
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Guided setup"
                       description="Walk through project and agent setup again. Your saved work stays."
                     >
@@ -357,62 +271,53 @@ export function SettingsPage({
                       >
                         Open guided setup
                       </Button>
-                    </Setting>
+                    </SettingRow>
                   </SettingGroup>
                 </>
               )}
-              {c === 'Appearance' && (scope === 'app' || project) && (
-                <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />
-              )}
-              {c === 'Privacy' && (
-                <>
-                  <PrivacySettings />
-                  <SettingGroup>
-                    <Setting
-                      title="Use MCP marketplace"
-                      description="Allow searches and server details from allmcps.com."
-                    >
-                      <Switch
-                        label="Use MCP marketplace"
-                        checked={settings.useMcpMarketplace}
-                        onCheckedChange={settings.setUseMcpMarketplace}
-                      />
-                    </Setting>
-                    <SettingBody>
-                      <p className="settings-row-description">
-                        Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
-                        which publicly logs requests. Your connected agents and MCP servers use
-                        their own services.
-                      </p>
-                    </SettingBody>
-                  </SettingGroup>
-                </>
-              )}
-              {c === 'Project' && (
-                <ProjectPreferences embedded projectId={project?.id ?? '__none'} />
-              )}
+              {c === 'Appearance' && <AppearancePreferences overrideProjectId={initialProjectId} />}
+              {c === 'Privacy' && <PrivacySettings />}
               {c === 'System' && <SystemInfoView />}
               {c === 'Diagnostics' && <AuditLogWorkspace />}
-              {c === 'Updates & support' && <ReleaseSupport />}
+              {c === 'Help & community' && <ReleaseSupport />}
               {c === 'Data & reset' && (
                 <>
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Preferences"
                       description="Copy this profile's preferences as JSON, for support or to compare settings."
                     >
                       <Button variant="outline" onClick={() => void exportConfig()}>
                         Copy preferences
                       </Button>
-                    </Setting>
+                    </SettingRow>
                   </SettingGroup>
                   <ArchivedHistory />
                   <SettingGroup
                     tone="danger"
                     title="Reset Jackalope"
-                    description="Erase this profile's projects, task history, drafts, queue, audit log, agent selections and appearance. Jackalope restarts for first-time setup. Repositories, worktrees, external agent sign-ins and agent MCP configuration files are preserved."
+                    description="Start this profile over. Jackalope restarts for first-time setup."
                   >
                     <SettingBody>
+                      <div className="settings-reset-scope">
+                        <div>
+                          <h4>Erased</h4>
+                          <ul>
+                            <li>Projects and their settings</li>
+                            <li>Task history, drafts and queue</li>
+                            <li>Audit log</li>
+                            <li>Agent selections and appearance</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4>Kept</h4>
+                          <ul>
+                            <li>Your repositories and worktrees</li>
+                            <li>Agent sign-ins outside Jackalope</li>
+                            <li>Agent MCP configuration files</li>
+                          </ul>
+                        </div>
+                      </div>
                       <p className="settings-row-description">
                         Stop active tasks and pause queues before resetting. Existing worktrees will
                         remain on disk and can be managed after reopening the repository.
@@ -421,6 +326,7 @@ export function SettingsPage({
                         <FormField label="Type RESET to confirm permanent deletion">
                           <Input
                             id="reset-confirmation"
+                            className="settings-reset-input"
                             autoComplete="off"
                             value={confirmation}
                             disabled={resetting}

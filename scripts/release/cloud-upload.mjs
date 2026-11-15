@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { compare, root, sha256 } from './catalog.mjs';
 import { validateCloudFiles } from './cloud-artifacts.mjs';
 import { application } from './crabnebula-config.mjs';
@@ -131,7 +130,7 @@ export async function uploadCandidate(
   return checkpoint;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   const directory = resolve(process.argv[2] ?? '');
   if (!process.argv[2]) throw new Error('Pass the candidate directory');
   const cli = process.env.CN_CLI ?? resolve(root, 'output/release-tools/cn.exe');

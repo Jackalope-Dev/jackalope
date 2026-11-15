@@ -1,7 +1,7 @@
+import { Button } from '@jackalope/ui';
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
-import { Button } from '../ui/button';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { recommendationFor } from './curated-servers';
 import { McpServerIcon } from './McpServerIcon';

@@ -1,26 +1,38 @@
-import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { isActive, isDone } from '@jackalope/contracts/runs';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { agentAdapter } from '../../lib/agent-catalog';
 import {
   authorFollowUp,
   type MergedFinding,
   mergeFindings,
   reviewerReport,
 } from '../../lib/challenge-review';
+import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { agentAdapter } from './CrossModelReviewPanel';
 import './challenge-review.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { ActionError } from '../ui/ActionError';
 
 const NONE = 'none';
 
@@ -54,7 +66,13 @@ export function ChallengeDialog({
 }) {
   const runners = useExecutionStore((state) => state.runners);
   const project = useProjectStore((state) => state.projects.find((p) => p.id === run.projectId));
-  const ranked = useMemo(() => rankReviewers(runners, authorOf(run), agentAdapter), [runners, run]);
+  const ranked = useMemo(
+    () =>
+      rankReviewers(runners, authorOf(run), (id) =>
+        agentAdapter(id, useAgentConfigStore.getState().customAgents),
+      ),
+    [runners, run],
+  );
   const [first, setFirst] = useState(ranked[0]?.id ?? '');
   const [second, setSecond] = useState(NONE);
   const [busy, setBusy] = useState(false);
@@ -67,10 +85,9 @@ export function ChallengeDialog({
     setError('');
     const failures: string[] = [];
     try {
-      await syncAgentConfig();
       for (const agent of agents)
         try {
-          await nativeTask<string>('task_start_challenge', {
+          await invokeNative<string>('task_start_challenge', {
             sourceRunId: run.id,
             request: {
               id: crypto.randomUUID(),
@@ -78,7 +95,10 @@ export function ChallengeDialog({
               projectName: run.projectName,
               projectPath: run.projectPath,
               agent,
-              agentProfileId: agentAccountFor(project, agentAdapter(agent)),
+              agentProfileId: agentAccountFor(
+                project,
+                agentAdapter(agent, useAgentConfigStore.getState().customAgents),
+              ),
               prompt: '',
               isolated: true,
               targetBranch: run.targetBranch ?? project?.preferences?.baseBranch,
@@ -90,13 +110,13 @@ export function ChallengeDialog({
             },
           });
         } catch (cause) {
-          failures.push(`${name(agent)}: ${String(cause)}`);
+          failures.push(`${name(agent)}: ${describeError(cause)}`);
         }
       await useExecutionStore.getState().refresh();
       if (failures.length < agents.length) onStarted();
       if (failures.length) setError(failures.join(' '));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -157,7 +177,7 @@ export function ChallengeDialog({
               Connect an agent in Agents to challenge work.
             </InlineNotice>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
               Cancel
@@ -201,7 +221,7 @@ function FindingCard({
   const reviewerRunId = finding.sources[0].runId;
   useEffect(() => {
     let current = true;
-    nativeTask<Rerun[]>('task_challenge_reruns', { id: reviewerRunId })
+    invokeNative<Rerun[]>('task_challenge_reruns', { id: reviewerRunId })
       .then((saved) => {
         const latest = saved.find((entry) => entry.command === finding.command.trim());
         if (current && latest) setRerun((shown) => shown ?? latest);
@@ -216,13 +236,13 @@ function FindingCard({
     setError('');
     try {
       setRerun(
-        await nativeTask<Rerun>('task_challenge_rerun', {
+        await invokeNative<Rerun>('task_challenge_rerun', {
           id: reviewerRunId,
           command: finding.command,
         }),
       );
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -275,7 +295,7 @@ function FindingCard({
           </p>
         )}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {output && (
         <Disclosure>
           <DisclosureSummary className="task-summary">Output from the new run</DisclosureSummary>
@@ -318,7 +338,7 @@ export function ChallengeFindings({
     let alive = true;
     for (const entry of finishedKey.split('|')) {
       const id = entry.slice(0, entry.indexOf(':'));
-      nativeTask<string>('task_challenge_reply', { id })
+      invokeNative<string>('task_challenge_reply', { id })
         .then((reply) => {
           if (alive) setReplies((current) => ({ ...current, [id]: reply }));
         })
@@ -329,9 +349,7 @@ export function ChallengeFindings({
     };
   }, [finishedKey]);
   const agentName = (agent: string) => runners.find((runner) => runner.id === agent)?.name ?? agent;
-  const finished = reviewers.filter(
-    (reviewer) => !isActive(reviewer) && ['review', 'reviewed'].includes(reviewer.status),
-  );
+  const finished = reviewers.filter((reviewer) => !isActive(reviewer) && isDone(reviewer));
   const reports = finished.map((reviewer) => ({
     run: reviewer,
     report: reviewerReport(reviewer, replies[reviewer.id]),
@@ -353,7 +371,7 @@ export function ChallengeFindings({
       await onCorrect(authorFollowUp(chosen, agentName));
       document.getElementById('task-reply')?.focus();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSending(false);
     }
@@ -383,7 +401,7 @@ export function ChallengeFindings({
                 {' · '}
                 {isActive(reviewer)
                   ? 'Reviewing…'
-                  : ['review', 'reviewed'].includes(reviewer.status)
+                  : isDone(reviewer)
                     ? 'Finished'
                     : `Did not finish${reviewer.error ? `: ${reviewer.error}` : ''}`}
               </span>
@@ -399,7 +417,7 @@ export function ChallengeFindings({
           This attempt can’t take a follow-up, so findings can’t be sent from here.
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {findings.length > 0 ? (
         <ol className="challenge-findings" aria-label="Proven findings">
           {findings.map((finding) => (

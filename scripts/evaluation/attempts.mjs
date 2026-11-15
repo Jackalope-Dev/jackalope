@@ -1,3 +1,5 @@
+import { sum } from '../lib/stats.mjs';
+
 export function aggregateAttempts(report) {
   const runs = report?.attempts ?? (report?.run ? [report.run] : []);
   const ids = new Set(runs.map((run) => run.id));
@@ -9,10 +11,6 @@ export function aggregateAttempts(report) {
     ).values(),
   ];
   const helperUsages = helpers.map((record) => record.decision?.usage ?? { reported: false });
-  const sum = (values) =>
-    values.length && values.every((value) => Number.isFinite(value) && value >= 0)
-      ? values.reduce((a, b) => a + b, 0)
-      : null;
   const aggregate = (usages) => {
     const measured = usages.every(
       (usage) =>

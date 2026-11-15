@@ -1,11 +1,12 @@
-import { LinkButton, Textarea } from '@jackalope/ui';
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
+import { Button, LinkButton, Textarea } from '@jackalope/ui';
 import { Check, Hand } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import type { PendingUserPrompt } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import './agent-decision.css';
 import './task-experience.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { isSystemSettingsLink } from '../../lib/native/env';
+import { ActionError } from '../ui/ActionError';
 
 const DONE = 'Done';
 const DECLINED = 'Declined';
@@ -61,7 +62,7 @@ export function HumanActionCard({
       await onAnswer(value);
       setSent(value);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setSending(null);
@@ -69,6 +70,8 @@ export function HumanActionCard({
   };
   const open = (url: string) =>
     onOpenLink ? onOpenLink(url) : window.open(url, '_blank', 'noopener,noreferrer');
+  // Views of another device's work pass no onOpenLink, and its System Settings are not here.
+  const settingsLink = !!action.url && isSystemSettingsLink(action.url);
   return (
     <section
       className="agent-question"
@@ -102,10 +105,10 @@ export function HumanActionCard({
               . Never paste a secret into a conversation.
             </p>
           )}
-          {action.url && (
+          {action.url && (!settingsLink || onOpenLink) && (
             <p>
               <LinkButton external onClick={() => open(action.url ?? '')}>
-                Open {linkHost(action.url)}
+                {settingsLink ? 'Open System Settings' : `Open ${linkHost(action.url)}`}
               </LinkButton>
             </p>
           )}
@@ -133,7 +136,7 @@ export function HumanActionCard({
               placeholder="Anything it should know, such as which account you used"
             />
           </label>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <div className="agent-question-footer">
             <span className="task-experience-muted">
               {agentName ?? 'The agent'} waits until you finish.

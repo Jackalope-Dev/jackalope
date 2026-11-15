@@ -16,7 +16,7 @@ fn decision_trail_is_append_only_checked_at_the_end_and_survives_restart_and_exp
     let directory = folder.join("history");
     let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
     let mut run = sample("codex");
-    run.status = "running".into();
+    run.status = RunStatus::Running;
     run.workspace = folder.to_string_lossy().into();
     runtime.save(&run).unwrap();
     runtime
@@ -53,7 +53,7 @@ fn decision_trail_is_append_only_checked_at_the_end_and_survives_restart_and_exp
 
     check_evidence(&runtime, &run.id);
     runtime
-        .update_checked(&run.id, |r| r.status = "review".into())
+        .update_checked(&run.id, |r| r.status = RunStatus::Review)
         .unwrap();
     assert!(
         record(&runtime, &run, decision(None, &[])).is_err(),

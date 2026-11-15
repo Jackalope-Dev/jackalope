@@ -49,6 +49,24 @@ steps; editing shows the same sections on one page, followed by the bot's browse
 and its optional [computer](BOT-COMPUTERS.md), both kept natively by bot ID rather than in
 the renderer's bot record.
 
+## Sharing bots
+
+**Share these bots** in a project's Bots menu saves that project's bots as one
+`.jackalope-bots.json` file (or copies it as text), and **Import bots** adds a file's bots
+to the open project after listing them. `lib/bot-team.ts` owns the format, which is an
+allowlist: a team name and, per bot, name, description, instructions, appearance, whether
+it works with other bots, and schedule or project-change wake-ups. It has no field for an
+agent, model, project, connection, browser profile, computer, note or conversation.
+Wake-ups that watch a connection are left out and named in the dialog. Text that looks
+like a key, token or password is replaced with `[removed]` before the file is written,
+and the dialog says where.
+
+Import reads only those fields, bounded to the editor's limits, and ignores everything
+else. Imported bots use Automatic for their agent, have an empty connection list, get
+new IDs and arrive with every wake-up off; a wake-up that fails the editor's validation
+is dropped and counted. Names that clash with saved bots get a number. Nothing in a file
+changes an existing bot.
+
 ## Native hub
 
 The renderer mirrors bots whose project still exists into `commands/bot_hub.rs` through
@@ -178,7 +196,8 @@ saved check.
 
 ## Verification
 
-`scripts/bots.test.mjs` covers validation, migration, roster order, run requests, the
+`scripts/bot-team.test.mjs` covers what a shared file may hold, credential removal, and
+import bounds and defaults. `scripts/bots.test.mjs` covers validation, migration, roster order, run requests, the
 hub directory, waiting counts, which conversation a message continues, unread replies,
 activity and batch limits. Native `bot_hub` tests cover sync validation, schedule and
 observer evaluation, messaging limits, reply routing, cards, suggestions, notes, persona

@@ -1,6 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 export function reviewResults(
   assignments,
@@ -68,7 +67,7 @@ export function reviewResults(
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   const [directory, answers, output, metadata] = process.argv.slice(2);
   if (!directory || !answers || !output)
     throw new Error(

@@ -34,9 +34,10 @@ pub fn repository(request: &RunRequest) -> Value {
         })
         .collect::<Vec<_>>();
     let head = crate::commands::task_strategy::source_head(request).ok();
-    let diff = crate::commands::tasks::git(
-        &request.project_path,
+    let diff = crate::commands::repo::git(
+        std::path::Path::new(&request.project_path),
         &["diff", "--no-ext-diff", "--no-textconv", "HEAD", "--stat"],
+        crate::commands::repo::Policy::Inspection,
     )
     .ok();
     let map = crate::commands::codebase::map::task_map(root, &request.prompt, &[], 6000);

@@ -66,7 +66,7 @@ fn source(root: &Path, input: &BlockRequest) -> Result<Value, String> {
     let mut content = String::new();
     let mut count = 0;
     for line in lines.iter().skip(start - 1).take(limit) {
-        if content.len() + line.len() > 8_000 {
+        if content.len() + line.len() > super::search().block_bytes {
             break;
         }
         content.push_str(line);

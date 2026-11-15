@@ -56,7 +56,7 @@ export interface SettingsState {
   exportSettings: () => string;
 }
 
-export const DEFAULT_SETTINGS: Omit<
+const DEFAULT_SETTINGS: Omit<
   SettingsState,
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {
@@ -71,7 +71,7 @@ export const DEFAULT_SETTINGS: Omit<
   terminalShell: 'default',
   preferredEditor: 'vscode',
   terminalLinks: true,
-  retainTerminalOutput: false,
+  retainTerminalOutput: true,
   shortcuts: {},
   dictationEndpoint: '',
   dictationModel: 'whisper-1',

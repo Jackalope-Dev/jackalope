@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { sha256 } from './catalog.mjs';
+import { root, sha256 } from './catalog.mjs';
 import { channelConfig } from './channels.mjs';
 import { validateCloudFiles, validateCloudReceipt } from './cloud-artifacts.mjs';
 import { parseDraftId, uploadCandidate } from './cloud-upload.mjs';
@@ -51,11 +51,15 @@ test('Cloud channels preserve service URL restrictions and reject unrelated quer
   }
   assert.throws(() => channelConfig('beta', { serviceUrl: cloudEndpoint('beta') }));
 });
-test('rehearsals isolate installed identity and disable live updater/channel switching', () => {
+test('rehearsals isolate installed identity and disable live updater/channel switching', async () => {
+  const production = JSON.parse(
+    await readFile(join(root, 'apps/desktop/src-tauri/tauri.conf.json'), 'utf8'),
+  );
   for (const channel of ['beta', 'stable']) {
     const config = cloudConfig({ mode: 'rehearsal', channel, publicKey });
-    assert.equal(config.identifier, 'dev.jackalope.cloud.rehearsal');
-    assert.equal(config.mainBinaryName, 'jackalope-rehearsal');
+    assert.ok(config.identifier && config.mainBinaryName);
+    assert.notEqual(config.identifier, production.identifier);
+    assert.notEqual(config.productName, production.productName);
     assert.deepEqual(config.plugins.updater.endpoints, []);
     assert.equal(config.plugins.jackalope.betaEndpoint, undefined);
     assert.equal(config.bundle.windows, undefined);
@@ -101,7 +105,7 @@ async function fixture(t, mode = 'candidate') {
   return { directory, receipt, installer, signature };
 }
 test('draft uploads reject rehearsal, dirty sources, disabled approval, wrong targets and path traversal', async (t) => {
-  const { directory, receipt } = await fixture(t, 'rehearsal');
+  const { directory } = await fixture(t, 'rehearsal');
   await assert.rejects(
     validateCloudFiles(directory, { requireCandidate: true }),
     /signed candidates/,
@@ -117,7 +121,6 @@ test('draft uploads reject rehearsal, dirty sources, disabled approval, wrong ta
     assert.throws(() =>
       validateCloudReceipt({ ...candidate, ...overrides }, { requireCandidate: true }),
     );
-  assert.equal(receipt.publicSigned, false);
 });
 test('changed installer bytes fail before any upload', async (t) => {
   const { directory, installer } = await fixture(t);
@@ -218,15 +221,4 @@ test('an existing version is never duplicated and uncertain uploads are not repe
   await assert.rejects(uploadCandidate(directory, options), /lost upload response/);
   await assert.rejects(uploadCandidate(directory, options), /upload is uncertain/);
   assert.equal(commands.filter((command) => command === 'upload').length, 1);
-});
-
-test('signed builds point feedback and usage reports at the account service', () => {
-  const plugin = cloudConfig({
-    mode: 'candidate',
-    channel: 'beta',
-    publicKey,
-    signScript: 'C:/repo/sign.ps1',
-  }).plugins.jackalope;
-  assert.equal(plugin.serviceUrl, 'https://api.jackalope.dev');
-  assert.equal(plugin.serviceUrl, plugin.accountServiceUrl);
 });

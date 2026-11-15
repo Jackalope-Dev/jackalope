@@ -2,8 +2,11 @@ export * from './content.ts';
 
 import { type KnowledgeGuide, knowledgeGuides } from './content.ts';
 
+/** A guide's page on the website. */
+export const guidePath = (slug: string) => `/knowledge/${slug}/`;
+
 export function guideMarkdown(guide: KnowledgeGuide, origin: string) {
-  return `# ${guide.title}\n\n${origin}/knowledge/${guide.slug}/\n\n${guide.description}\n\n${guide.sections
+  return `# ${guide.title}\n\n${origin}${guidePath(guide.slug)}\n\n${guide.description}\n\n${guide.sections
     .map((section) =>
       [
         `## ${section.question}`,

@@ -1,7 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModelEvidence } from './decisions';
-import { nativeTask } from './task-runtime';
-import { isTauriEnvironment } from './tauri-bridge';
+import { isTauriEnvironment } from './native/env';
+import { invokeNative } from './native/transport';
 
 export interface ModelCatalog {
   models: { id: string; name: string; isDefault: boolean; metadata?: ModelEvidence }[];
@@ -10,6 +11,11 @@ export interface ModelCatalog {
   checkedAt: string;
   detail: string;
 }
+
+export const agentModels = (
+  agent: string,
+  options: { agentProfileId?: string; refresh: boolean },
+) => invokeNative<ModelCatalog>('agent_models', { agent, ...options });
 
 export function useAgentModels(agentId: string, revision = 0, agentProfileId?: string) {
   const [catalog, setCatalog] = useState<ModelCatalog>();
@@ -30,18 +36,14 @@ export function useAgentModels(agentId: string, revision = 0, agentProfileId?: s
       }
       setLoading(true);
       try {
-        const result = await nativeTask<ModelCatalog>('agent_models', {
-          agent: agentId,
-          agentProfileId,
-          refresh: force,
-        });
+        const result = await agentModels(agentId, { agentProfileId, refresh: force });
         if (version === request.current) {
           setCatalog(result);
           setLoadedKey(key);
         }
       } catch (cause) {
         if (version === request.current) {
-          setError(String(cause));
+          setError(describeError(cause));
           setLoadedKey(key);
         }
       } finally {

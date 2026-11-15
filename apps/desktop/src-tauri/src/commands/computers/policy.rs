@@ -5,7 +5,7 @@
 //! the bridge relay, and reports what its workspace tools did through
 //! `POST /v1/runner/event`. Decisions reuse this device's own logic: tools go
 //! through the permission prompt's rules, auto-approval and question
-//! (`coordination_mcp::approve_computer_tool`), websites through the
+//! (`bridge::approve_computer_tool`), websites through the
 //! computer's per-site questions and saved decisions ([`super::browser`]),
 //! and secrets through the project's secrets available to computers. Every
 //! answer is `{"behavior":"allow"}` or `{"behavior":"deny","message":…}`; the
@@ -63,9 +63,7 @@ pub(crate) async fn decide(
         return Err("Only an agent on a computer asks Jackalope this way.".into());
     }
     match Kind::parse(&body)? {
-        Kind::Tool => {
-            crate::commands::coordination_mcp::approve_computer_tool(service, run, body).await
-        }
+        Kind::Tool => crate::commands::bridge::approve_computer_tool(service, run, body).await,
         Kind::Site => {
             let url = body["url"].as_str().unwrap_or_default();
             if url.is_empty() || url.len() > 8000 {
@@ -190,8 +188,9 @@ fn parse_event(event: &Value) -> Result<ToolEvent, String> {
 }
 
 /// New screenshots in a patch brought back from the computer: files added
-/// under `.jackalope/artifacts/screenshots`.
+/// directly in the screenshot evidence folder.
 pub(crate) fn patch_screenshots(patch: &[u8]) -> Vec<String> {
+    let folder = format!("{}/", crate::commands::artifacts::screenshot_folder());
     let text = String::from_utf8_lossy(patch);
     let mut found = Vec::new();
     let mut current: Option<String> = None;
@@ -201,10 +200,9 @@ pub(crate) fn patch_screenshots(patch: &[u8]) -> Vec<String> {
                 .split_once(" b/")
                 .map(|(path, _)| path.to_string())
                 .filter(|path| {
-                    path.starts_with(".jackalope/artifacts/screenshots/")
-                        && path.ends_with(".png")
-                        && !path.contains("..")
-                        && path.matches('/').count() == 3
+                    path.strip_prefix(&folder).is_some_and(|name| {
+                        name.ends_with(".png") && !name.contains('/') && !name.contains("..")
+                    })
                 });
         } else if line.starts_with("new file mode") {
             if let Some(path) = current.take() {

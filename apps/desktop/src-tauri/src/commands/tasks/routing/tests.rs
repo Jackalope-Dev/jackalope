@@ -209,8 +209,8 @@ fn main() {
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
     policy.automatic_quota_handoff = Some(enabled);
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for (id, adapter) in [("fixture-a", "codex"), ("fixture-b", "claude")] {
@@ -239,7 +239,7 @@ fn main() {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         assert!(
@@ -250,7 +250,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(50));
     };
     if !enabled {
-        assert_eq!(settled.status, "failed");
+        assert_eq!(settled.status, RunStatus::Failed);
         assert!(settled
             .error
             .as_deref()
@@ -266,7 +266,7 @@ fn main() {
     }
     assert_eq!(
         settled.status,
-        "review",
+        RunStatus::Review,
         "{:?} / {:?} at {}",
         settled.error,
         settled.activity,
@@ -300,7 +300,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(20));
     }
     restored.stop(&cancel_id).unwrap();
-    while restored.inner.lock().unwrap().runs[&cancel_id].status != "stopped" {
+    while restored.inner.lock().unwrap().runs[&cancel_id].status != RunStatus::Stopped {
         assert!(std::time::Instant::now() < deadline, "Router did not stop");
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -308,6 +308,42 @@ fn main() {
     let canceled = restored.inner.lock().unwrap().runs[&cancel_id].clone();
     assert!(canceled.routing.as_ref().unwrap().decisions.is_empty());
     assert!(!Path::new(&canceled.workspace).join("partial.txt").exists());
+}
+
+#[test]
+fn claude_rejecting_requests_names_the_used_up_window_and_when_it_resets() {
+    // Field names as the Claude Agent SDK types SDKRateLimitInfo; resetsAt is Unix seconds.
+    let event = |info: serde_json::Value| {
+        quota_failure(&serde_json::json!({"type":"rate_limit_event","rate_limit_info":info,"uuid":"0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f","session_id":"5f0e1d2c-3b4a-4958-a6b7-c8d9e0f1a2b3"}))
+            .unwrap()
+    };
+    let resets = chrono::TimeZone::timestamp_opt(&chrono::Local, 1_794_520_800, 0)
+        .unwrap()
+        .format("%b %-d at %-I:%M %p")
+        .to_string();
+    let weekly = event(
+        serde_json::json!({"status":"rejected","resetsAt":1_794_520_800,"rateLimitType":"seven_day","utilization":1.0}),
+    );
+    assert_eq!(
+        weekly.message,
+        format!("Claude's weekly usage limit is used up. It resets {resets}.")
+    );
+    assert!(!weekly.model_only);
+    assert_eq!(
+        event(serde_json::json!({"status":"rejected","rateLimitType":"five_hour"})).message,
+        "Claude's five-hour usage limit is used up until it resets."
+    );
+    assert_eq!(
+        event(
+            serde_json::json!({"status":"rejected","rateLimitType":"seven_day_opus","resetsAt":0})
+        )
+        .message,
+        "Claude's weekly Opus usage limit is used up until it resets."
+    );
+    assert_eq!(
+        event(serde_json::json!({"status":"rejected"})).message,
+        "Claude's usage limit is used up until it resets."
+    );
 }
 
 #[test]
@@ -366,7 +402,7 @@ fn routing_reserves_active_account_headroom_and_releases_finished_work() {
     run.account_binding = Some(option.binding.clone());
     reserve_active_headroom(&mut option, &[run.clone(), run.clone()], "new-task");
     assert_eq!(option.remaining_percent, Some(30.0));
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     reserve_active_headroom(&mut option, &[run], "new-task");
     assert_eq!(option.remaining_percent, Some(30.0));
 }
@@ -400,8 +436,8 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "codex".into();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), *id == "codex");
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), id == "codex");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -412,7 +448,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let deadline = std::time::Instant::now() + Duration::from_secs(180);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         if std::time::Instant::now() >= deadline {
@@ -423,7 +459,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     };
     assert_eq!(
         settled.status,
-        "review",
+        RunStatus::Review,
         "{:?} / {:?} at {}",
         settled.error,
         settled.activity,
@@ -492,14 +528,18 @@ fn a_routing_agent_routes_on_a_fast_model_at_its_lowest_effort() {
     assert_eq!(routing_model("codex", None), None);
     let args = |adapter: &str| {
         let mut command = Command::new("fixture");
-        routing_effort(&mut command, adapter);
+        routing_effort(
+            &mut command,
+            adapter,
+            routing_model(adapter, None).as_deref(),
+        );
         command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
     };
     assert_eq!(args("claude"), ["--effort", "low"]);
-    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"minimal\""]);
+    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"low\""]);
     assert!(args("opencode").is_empty());
 }
 
@@ -558,8 +598,8 @@ fn main() {
     .unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for id in ["fixture-a", "fixture-b"] {
@@ -587,7 +627,7 @@ fn main() {
     let deadline = started + Duration::from_secs(25);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         assert!(
@@ -598,9 +638,11 @@ fn main() {
         std::thread::sleep(Duration::from_millis(50));
     };
     assert_eq!(
-        settled.status, "review",
+        settled.status,
+        RunStatus::Review,
         "{:?} / {:?}",
-        settled.error, settled.activity
+        settled.error,
+        settled.activity
     );
     let routing = settled.routing.as_ref().unwrap();
     let decision = routing.decisions.last().unwrap();
@@ -611,7 +653,10 @@ fn main() {
         .and_then(|receipt| receipt.fallback_reason.clone())
         .unwrap_or_default();
     assert!(
-        reason.contains("did not answer within 8 seconds"),
+        reason.contains(&format!(
+            "did not answer within {} seconds",
+            super::process::ROUTING_BUDGET.as_secs()
+        )),
         "{reason}"
     );
     assert!(routing
@@ -630,15 +675,15 @@ fn main() {
 
 #[test]
 fn computers_only_routing_offers_only_agents_that_run_on_computers() {
-    for adapter in ["claude", "codex"] {
-        assert!(
-            routable(adapter, false) && routable(adapter, true),
-            "{adapter}"
-        );
+    let mut offered = 0;
+    for agent in crate::commands::agents::all() {
+        let id = agent.id.as_str();
+        if routable(id, true) {
+            offered += 1;
+            assert!(routable(id, false), "{id}");
+            assert!(crate::commands::agents::runs_on_computers(id), "{id}");
+        }
     }
-    for adapter in ["gemini", "kimi", "opencode"] {
-        assert!(routable(adapter, false), "{adapter}");
-        assert!(!routable(adapter, true), "{adapter}");
-    }
+    assert!(offered > 0);
     assert!(!routable("unknown", false));
 }

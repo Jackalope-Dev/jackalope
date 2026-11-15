@@ -38,7 +38,8 @@ pnpm tauri dev
 ```
 
 Run each development server in its own terminal. The desktop preview uses port
-5173 and the website uses 5180. Browser previews cannot execute native tasks;
+5173 and the website uses 5180. `pnpm tauri dev` starts the desktop preview itself,
+so run `pnpm dev` on its own only for a browser preview. Browser previews cannot execute native tasks;
 the component lab at `/design-lab.html` contains explicitly fictional UI fixtures.
 For a separate static lab build, use `pnpm --filter @jackalope/desktop build:lab`.
 Ordinary desktop builds exclude that entry point.
@@ -57,10 +58,14 @@ development is independent and requires no Cloudflare login; see its
 
 ## Checks
 
-Use `pnpm test` for the release, desktop JavaScript and server suites. Desktop
-tests are discovered from `apps/desktop/scripts/*.test.mjs`; new suites do not
-need a package script entry. Desktop tests also retain the shared release-config
-and update-manifest checks used by release builds.
+Use `pnpm test` for every suite: `pnpm test:scripts` runs the repository script
+tests (`scripts/*.test.mjs` and `scripts/release/*.test.mjs`), then each package
+runs its own `test`. `pnpm verify` and CI run the same suites: every workspace
+package with a `test` script is included, so a new package only needs that
+script. Within a package, suites are discovered from their folders (for example
+`apps/desktop/scripts/*.test.mjs` and `apps/website/test/*.test.mjs`), so a new
+test file needs no script entry. `pnpm typecheck` checks every
+package, including the server and the swarm Worker.
 
 For a single suite or test name, pass Node test-runner arguments to `test:file`:
 
@@ -168,7 +173,10 @@ separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates
 the [dependency inventory](docs/DEPENDENCIES.md) after dependency changes.
 
-CI also runs `pnpm check:dependencies` against current advisory databases. To run
+CI also runs `pnpm check:dependencies` against current advisory databases. Pull
+requests and merge queue entries run it only when they change a manifest, lockfile or
+audit input (`scripts/change-scope.mjs`), so a new advisory against master does not
+block unrelated pull requests; pushes and the weekly schedule always run it. To run
 it locally, install `cargo-audit` 0.22.2 with
 `cargo install cargo-audit --version 0.22.2 --locked`. The offline vendored-patch
 integrity check is included in `pnpm verify`; the full advisory check needs network

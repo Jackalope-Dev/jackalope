@@ -28,9 +28,10 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
-  # Decides once which suites a pull request can affect; pushes, merge groups and
-  # manual runs always run everything. If this job fails, its outputs are empty
-  # and the platform jobs run everything.
+  # Decides once which suites a pull request or merge group can affect; pushes and
+  # manual runs always run everything. The merge queue squashes, so a merge group's
+  # HEAD^1 is the queue entry before it and the diff is that pull request alone.
+  # If this job fails, its outputs are empty and the platform jobs run everything.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -44,17 +45,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
+          fetch-depth: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 2 || 1 }}
       # The Rust cache key is the lockfile the build starts from (the base
-      # branch's for a pull request), so a pull request restores master's cache
-      # exactly instead of uploading its own copy, and master uploads only when
-      # its lockfile changes. Cargo still rebuilds whatever the change touched.
+      # branch's for a pull request or merge group), so a pull request restores
+      # master's cache exactly instead of uploading its own copy, and master uploads
+      # only when its lockfile changes. Cargo still rebuilds whatever the change touched.
       - name: Decide which suites the change affects
         id: scope
         run: |
-          node scripts/change-scope.mjs ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+          node scripts/change-scope.mjs ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'HEAD^1' || '' }}
           echo "release=${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/stable' || github.base_ref == 'beta' || github.base_ref == 'stable' }}" >> "$GITHUB_OUTPUT"
-          echo "lock=$(git rev-parse ${{ github.event_name == 'pull_request' && 'HEAD^1' || 'HEAD' }}:apps/desktop/src-tauri/Cargo.lock)" >> "$GITHUB_OUTPUT"
+          echo "lock=$(git rev-parse ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'HEAD^1' || 'HEAD' }}:apps/desktop/src-tauri/Cargo.lock)" >> "$GITHUB_OUTPUT"
   verify:
     needs: changes
     if: ${{ !cancelled() }}

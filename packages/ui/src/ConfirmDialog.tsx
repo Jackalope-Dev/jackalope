@@ -75,6 +75,7 @@ export function ConfirmDialog({
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <DialogContent
         {...focus}
+        layer="confirm"
         onCloseAutoFocus={onCloseAutoFocus ?? focus.onCloseAutoFocus}
         className={className}
         overlayClassName={overlayClassName}

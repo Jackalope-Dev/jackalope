@@ -31,11 +31,24 @@ var SwarmError = class extends Error {
     __name(this, "SwarmError");
   }
 };
+async function settle(work) {
+  try {
+    return { ok: true, value: await work() };
+  } catch (cause) {
+    if (cause instanceof SwarmError)
+      return { ok: false, status: cause.status, error: cause.message };
+    const error = cause instanceof Error ? cause.message : String(cause);
+    return { ok: false, status: /not found/i.test(error) ? 404 : 502, error };
+  }
+}
+__name(settle, "settle");
+var REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+var forkPrefix = /* @__PURE__ */ __name((repo) => `${repo.slice(0, 80)}--`, "forkPrefix");
 function forkName(repo, attemptId) {
   const suffix = attemptId.replace(/[^A-Za-z0-9]/g, "").slice(0, 12).toLowerCase();
   if (suffix.length < 6)
     throw new SwarmError("Use an attempt ID with at least six letters or digits.");
-  return `${repo.slice(0, 80)}--${suffix}`;
+  return `${forkPrefix(repo)}${suffix}`;
 }
 __name(forkName, "forkName");
 var text = /* @__PURE__ */ __name((value, limit, fallback = "") => typeof value === "string" ? value.trim().slice(0, limit) : fallback, "text");
@@ -284,7 +297,6 @@ __name(repoInfo, "repoInfo");
 
 // src/swarm.ts
 var HASH = /^[0-9a-f]{40}$/;
-var REPO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 var TOKEN_TTL = 86400;
 var Swarm = class extends DurableObject {
   static {
@@ -301,7 +313,10 @@ var Swarm = class extends DurableObject {
     const stored = await this.ctx.storage.list({ prefix: "fork:" });
     return [...stored.values()].sort((a, b) => a.registeredAt.localeCompare(b.registeredAt));
   }
-  async state(repo) {
+  state(repo) {
+    return settle(() => this.snapshot(repo));
+  }
+  async snapshot(repo) {
     return {
       repo,
       forks: await this.records(),
@@ -310,8 +325,11 @@ var Swarm = class extends DurableObject {
     };
   }
   /** Creates the attempt's fork and returns a write token for pushing to it. */
-  async register(repo, input) {
-    if (!REPO.test(repo)) throw new SwarmError("Unknown repository name.");
+  register(repo, input) {
+    return settle(() => this.createFork(repo, input));
+  }
+  async createFork(repo, input) {
+    if (!REPO_NAME.test(repo)) throw new SwarmError("Unknown repository name.");
     const attemptId = text(input.attemptId, 80);
     const baseCommit = text(input.baseCommit, 40).toLowerCase();
     if (!HASH.test(baseCommit))
@@ -366,7 +384,10 @@ var Swarm = class extends DurableObject {
     });
   }
   /** A new write token for an existing fork; tokens expire after a day. */
-  async token(fork) {
+  token(fork) {
+    return settle(() => this.writeToken(fork));
+  }
+  async writeToken(fork) {
     if (!await this.ctx.storage.get(`fork:${fork}`)) throw new SwarmError("Unknown fork.", 404);
     const handle = await this.env.ARTIFACTS.get(fork);
     const token = await handle.createToken("write", TOKEN_TTL);
@@ -374,7 +395,10 @@ var Swarm = class extends DurableObject {
     return { fork, remote, token: token.plaintext, tokenExpiresAt: token.expiresAt };
   }
   /** Re-reads one fork after a push and recomputes conflicts across all forks. */
-  async analyze(repo, fork) {
+  analyze(repo, fork) {
+    return settle(() => this.reanalyze(repo, fork));
+  }
+  reanalyze(repo, fork) {
     return this.serial(async () => {
       const record = await this.ctx.storage.get(`fork:${fork}`);
       if (!record) throw new SwarmError("Unknown fork.", 404);
@@ -422,7 +446,10 @@ var Swarm = class extends DurableObject {
     });
   }
   /** Stops tracking a fork, optionally deleting its repository. */
-  async release(repo, fork, remove) {
+  release(repo, fork, remove) {
+    return settle(() => this.untrack(repo, fork, remove));
+  }
+  untrack(repo, fork, remove) {
     return this.serial(async () => {
       await this.ctx.storage.delete(`fork:${fork}`);
       if (remove) await this.env.ARTIFACTS.delete(fork).catch(() => false);
@@ -439,7 +466,7 @@ var Swarm = class extends DurableObject {
     await this.ctx.storage.put({ updatedAt: (/* @__PURE__ */ new Date()).toISOString(), repo });
   }
   async broadcast(repo) {
-    const state = await this.state(repo);
+    const state = await this.snapshot(repo);
     const message = JSON.stringify({ type: "state", state });
     for (const socket of this.ctx.getWebSockets()) {
       try {
@@ -474,7 +501,7 @@ async function body(request) {
   }
 }
 __name(body, "body");
-var NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+var reply = /* @__PURE__ */ __name((result, status = 200) => result.ok ? json(result.value, status) : json({ error: result.error }, result.status), "reply");
 var index_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -486,9 +513,9 @@ var index_default = {
     );
     if (!match) return json({ error: "Not found." }, 404);
     const [, repo, section, fork, action] = match;
-    if (!NAME.test(repo) || fork && !NAME.test(fork))
+    if (!REPO_NAME.test(repo) || fork && !REPO_NAME.test(fork))
       return json({ error: "Invalid name." }, 400);
-    if (fork && !fork.startsWith(`${repo.slice(0, 80)}--`))
+    if (fork && !fork.startsWith(forkPrefix(repo)))
       return json({ error: "That fork does not belong to this repository." }, 400);
     const namespace = env.SWARM;
     const swarm = namespace.get(namespace.idFromName(repo));
@@ -500,21 +527,18 @@ var index_default = {
           new Request(`https://swarm/live?repo=${encodeURIComponent(repo)}`, request)
         );
       }
-      if (!section && request.method === "GET") return json(await swarm.state(repo));
+      if (!section && request.method === "GET") return reply(await swarm.state(repo));
       if (section === "forks" && !fork && request.method === "POST")
-        return json(await swarm.register(repo, await body(request)), 201);
+        return reply(await swarm.register(repo, await body(request)), 201);
       if (fork && action === "analyze" && request.method === "POST")
-        return json(await swarm.analyze(repo, fork));
+        return reply(await swarm.analyze(repo, fork));
       if (fork && action === "token" && request.method === "POST")
-        return json(await swarm.token(fork));
+        return reply(await swarm.token(fork));
       if (fork && !action && request.method === "DELETE")
-        return json(await swarm.release(repo, fork, url.searchParams.get("delete") === "1"));
+        return reply(await swarm.release(repo, fork, url.searchParams.get("delete") === "1"));
       return json({ error: "Not found." }, 404);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      const known = cause instanceof SwarmError || /^(Unknown|Send|Use|That|The fork)/.test(message);
-      if (/^Unknown fork|not found/i.test(message)) return json({ error: message }, 404);
-      return json({ error: message }, known ? 400 : 502);
+      return json({ error: cause instanceof Error ? cause.message : String(cause) }, 502);
     }
   }
 };

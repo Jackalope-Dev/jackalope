@@ -1,12 +1,12 @@
 //! The command's files in the profile's preferences, and the environment
 //! switches it reads.
 
-use crate::protocol::profile_root;
+use crate::protocol::ProfilePaths;
 use std::path::PathBuf;
 
-/// `task-runs-v1/preferences/<name>` in the active profile.
+/// `<name>` in the active profile's preferences.
 pub fn path(name: &str) -> Option<PathBuf> {
-    Some(profile_root()?.join("task-runs-v1/preferences").join(name))
+    Some(ProfilePaths::active()?.preferences().join(name))
 }
 
 pub fn read_json<T: serde::de::DeserializeOwned>(name: &str) -> Option<T> {

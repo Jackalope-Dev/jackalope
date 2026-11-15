@@ -1,4 +1,4 @@
-import type { TaskRun } from './task-runtime.ts';
+import type { TaskRun } from './run-types.ts';
 
 export function recordedOutcome(run: TaskRun): 'accepted' | 'changes' | null {
   const requirements = run.contract?.requirements.filter((item) => !item.checkpoint) ?? [];

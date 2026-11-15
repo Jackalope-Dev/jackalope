@@ -5,23 +5,27 @@ import {
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
+  FlowDiagram,
   FormField,
-  Input,
+  InlineNotice,
   Select,
   SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
 } from '@jackalope/ui';
-import { Check, ExternalLink, KeyRound, Route, SlidersHorizontal, Zap } from 'lucide-react';
+import { ExternalLink, KeyRound, Laptop, Route, SlidersHorizontal, Zap } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { JevFallback } from '../../lib/decisions';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import {
   type RoutingMode,
   type RoutingSettings,
   routingSettings,
 } from '../../lib/routing-settings';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { SettingActions, SettingBody, SettingGroup } from './Setting';
 import './routing.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { CredentialStep } from '../agents/CredentialStep';
 import { DecisionOptions } from './DecisionOptions';
 
 function RoutingCircuit({ mode }: { mode: RoutingMode }) {
@@ -97,6 +101,9 @@ function RoutingSetup({
   const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [replacing, setReplacing] = useState(false);
+  // The key check is a real billable request; the TypeSafe link shows it and its result.
+  const [connecting, setConnecting] = useState(false);
+  const [keyFailed, setKeyFailed] = useState(false);
   const operation = useRef(false);
   const onChangeRef = useRef(onSettingsChange);
   onChangeRef.current = onSettingsChange;
@@ -108,7 +115,7 @@ function RoutingSetup({
       setSettings(value);
       onChangeRef.current?.(value);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setLoading(false);
     }
@@ -133,6 +140,8 @@ function RoutingSetup({
     if (!settings || operation.current) return;
     operation.current = true;
     setPending(true);
+    setConnecting(true);
+    setKeyFailed(false);
     setError('');
     try {
       const value = await routingSettings.connect(key.trim(), settings.revision, projectId);
@@ -141,8 +150,10 @@ function RoutingSetup({
       setKey('');
       setReplacing(false);
     } catch (error) {
-      setError(String(error));
+      setKeyFailed(true);
+      setError(describeError(error));
     } finally {
+      setConnecting(false);
       operation.current = false;
       setPending(false);
     }
@@ -159,7 +170,7 @@ function RoutingSetup({
       onModeChange(value.mode);
       setKey('');
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       operation.current = false;
       setPending(false);
@@ -276,7 +287,12 @@ function RoutingSetup({
           )}
           {settings?.connected && !replacing ? (
             <div className="routing-connected" role="status">
-              <Check size={17} />
+              <FlowDiagram
+                from={{ label: 'This computer', icon: <Laptop size={16} /> }}
+                to={{ label: 'TypeSafe Jev', icon: <Zap size={16} /> }}
+                via="API key"
+                state="connected"
+              />
               <span>API key connected</span>
               <Button
                 variant="ghost"
@@ -294,19 +310,17 @@ function RoutingSetup({
                 void connect();
               }}
             >
-              <FormField label="TypeSafe API key">
-                <Input
-                  id={`${id}-key`}
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={key}
-                  maxLength={8192}
-                  placeholder="Paste your API key"
-                  disabled={!desktop || pending || loading || disabled}
-                  onChange={(event) => setKey(event.target.value)}
-                />
-              </FormField>
+              <CredentialStep
+                providerName="TypeSafe Jev"
+                providerIcon={<Zap size={16} />}
+                label="TypeSafe API key"
+                description="Kept in protected local storage on this computer."
+                value={key}
+                onValueChange={setKey}
+                state={connecting ? 'checking' : keyFailed ? 'failed' : 'idle'}
+                error={keyFailed ? error : undefined}
+                disabled={!desktop || pending || loading || disabled}
+              />
               <div className="routing-key-actions">
                 <Button
                   type="submit"
@@ -355,7 +369,7 @@ function RoutingSetup({
           Loading your routing preference…
         </p>
       )}
-      {error && (
+      {error && !keyFailed && (
         <InlineNotice tone="error">
           {error}
           <Button
@@ -420,7 +434,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
       );
       setMessage('Routing preference saved.');
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setSaving(false);
     }
@@ -478,7 +492,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
                       setJevFallback(value.jevFallback);
                       setMessage('Using the app default.');
                     })
-                    .catch((error) => setError(String(error)))
+                    .catch((error) => setError(describeError(error)))
                     .finally(() => setSaving(false));
                 }}
               >

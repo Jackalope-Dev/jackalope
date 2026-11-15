@@ -96,6 +96,9 @@ pub struct LiveSession {
     pub pinned: bool,
     #[serde(default)]
     pub last_learned_message_id: Option<String>,
+    /// The session from outside Jackalope its first batch resumes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues: Option<super::tasks::ContinuedSession>,
     pub id: String,
     pub title: String,
     pub request: RunRequest,
@@ -228,6 +231,12 @@ pub struct LiveSessions {
     /// Counts changes the dispatch loop makes, such as a batch starting or
     /// failing before any task exists. Task history alone cannot report those.
     changes: Arc<tokio::sync::watch::Sender<u64>>,
+}
+
+impl crate::services::Service for LiveSessions {
+    fn shutdown(&self) {
+        LiveSessions::shutdown(self)
+    }
 }
 
 impl LiveSessions {
@@ -382,10 +391,61 @@ impl LiveSessions {
         &self,
         id: String,
         title: String,
+        request: RunRequest,
+        first_message: Option<FirstMessage>,
+        limits: SessionLimits,
+        persona: Option<SessionPersona>,
+    ) -> Result<String, String> {
+        self.create_session(id, title, request, first_message, limits, persona, None)
+    }
+
+    /// A conversation whose first message continues `continues` where it ran. It keeps
+    /// that session's title.
+    pub(super) fn create_continuing(
+        &self,
+        id: String,
+        title: String,
+        request: RunRequest,
+        first_message: FirstMessage,
+        continues: super::tasks::ContinuedSession,
+    ) -> Result<String, String> {
+        self.create_session(
+            id,
+            title,
+            request,
+            Some(first_message),
+            SessionLimits::default(),
+            None,
+            Some(continues),
+        )
+    }
+
+    /// The external sessions conversations continue, including any whose first batch
+    /// has not started yet.
+    pub(super) fn continued_sessions(&self) -> Vec<String> {
+        self.inner.lock().map_or_else(
+            |_| Vec::new(),
+            |inner| {
+                inner
+                    .ledger
+                    .sessions
+                    .iter()
+                    .filter_map(|session| Some(session.continues.as_ref()?.session_id.clone()))
+                    .collect()
+            },
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn create_session(
+        &self,
+        id: String,
+        title: String,
         mut request: RunRequest,
         first_message: Option<FirstMessage>,
         limits: SessionLimits,
         persona: Option<SessionPersona>,
+        continues: Option<super::tasks::ContinuedSession>,
     ) -> Result<String, String> {
         limits.validate()?;
         if let Some(persona) = &persona {
@@ -401,6 +461,7 @@ impl LiveSessions {
         // Wake-ups and card answers keep the title naming what started them.
         let title = first_message
             .as_ref()
+            .filter(|_| continues.is_none())
             .filter(|message| {
                 message
                     .origin
@@ -481,6 +542,7 @@ impl LiveSessions {
                 integrated_run_id: None,
                 pinned: false,
                 last_learned_message_id: None,
+                continues,
                 id: id.clone(),
                 title: title.trim().into(),
                 request,
@@ -878,14 +940,14 @@ impl LiveSessions {
             };
             if let Some(batch) = snapshot.batches.last().filter(|b| !b.settled) {
                 if let Some(run) = runs.iter().find(|r| r.id == batch.run_id) {
-                    if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                    if run.status.is_active() {
                         continue;
                     }
                     self.update(|ledger| {
                         let session = Self::session(ledger, &id)?;
                         let batch = session.batches.last_mut().ok_or("Batch not found")?;
                         batch.settled = true;
-                        if !["review", "reviewed"].contains(&run.status.as_str())
+                        if !run.status.is_done()
                             || run.verification_error.is_some()
                             || run.verification.as_ref().is_some_and(|v| !v.result.success)
                         {
@@ -1046,6 +1108,9 @@ impl LiveSessions {
             request.live_session_id = Some(id.clone());
             request.prompt = batch.prompt.clone();
             request.previous_run_id = batch.previous_run_id.clone();
+            if request.previous_run_id.is_none() {
+                request.continues = latest.continues.clone();
+            }
             if let Some(previous) = runs
                 .iter()
                 .find(|r| Some(&r.id) == batch.previous_run_id.as_ref())
@@ -1075,10 +1140,11 @@ impl LiveSessions {
                     request.prompt = format!("{history}\n{}", request.prompt);
                 }
             }
-            if let Err(error) = self.coordinator.start_manual(request) {
-                if error == "Session is waiting for execution capacity." {
-                    continue;
-                }
+            let started = self.coordinator.start_session(request);
+            if let Ok(super::coordination::SessionStart::Waiting) = started {
+                continue;
+            }
+            if let Err(error) = started {
                 self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
                     if let Some(batch) = session
@@ -1163,6 +1229,9 @@ fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory
         prompt.push_str(super::bot_hub::BOT_GUIDANCE);
         prompt.push_str(memory);
     }
+    if session.continues.is_some() {
+        prompt.push_str("The person started this conversation outside Jackalope and continues it here. You are working directly in their own checkout, not in a worktree Jackalope made.\n");
+    }
     if !session.request.isolated && session.request.target_branch.is_none() {
         prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");
     }
@@ -1186,6 +1255,25 @@ fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory
     }
     prompt
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::live_sessions::live_session_snapshot,
+            commands::live_sessions::live_session_create,
+            commands::live_sessions::live_session_send,
+            commands::live_sessions::live_session_draft,
+            commands::live_sessions::live_session_action,
+            commands::live_sessions::live_session_window,
+            commands::live_sessions::live_session_topics,
+            commands::live_sessions::live_session_window_pin,
+            commands::live_sessions::live_session_review,
+            commands::live_sessions::live_session_recover,
+            commands::live_sessions::live_session_limits,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn live_session_snapshot(
@@ -1390,11 +1478,10 @@ impl LiveSessions {
                     .find(|r| r.id == batch.run_id && !r.workspace.is_empty())
             })
             .ok_or("No workspace is available yet")?;
-        if runs.iter().any(|other| {
-            other.workspace == run.workspace
-                && ["starting", "running", "stopping", "interrupted"]
-                    .contains(&other.status.as_str())
-        }) {
+        if runs
+            .iter()
+            .any(|other| other.workspace == run.workspace && other.status.is_live())
+        {
             return Err(
                 "Finish active work and resolve interrupted ownership before exporting changes."
                     .into(),

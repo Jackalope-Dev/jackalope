@@ -1,5 +1,5 @@
 import type { CloudResourceKind } from './cloud-resources-plan';
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 
 export type CloudResourceStep = 'account' | CloudResourceKind | 'manifest';
 
@@ -53,23 +53,23 @@ export interface CloudResourcesRequest {
 }
 
 export const cloudResourcesStatus = (projectPath: string) =>
-  nativeTask<CloudResourcesStatus>('cloudflare_resources_status', { projectPath });
+  invokeNative<CloudResourcesStatus>('cloudflare_resources_status', { projectPath });
 
 /** Finds or creates each resource and writes the manifest; retrying reuses what exists. */
 export const provisionCloudResources = (projectPath: string, request: CloudResourcesRequest) =>
-  nativeTask<ProvisionResult>('cloudflare_resources_provision', { projectPath, request });
+  invokeNative<ProvisionResult>('cloudflare_resources_provision', { projectPath, request });
 
 /** Removes a resource from the manifest; Cloudflare keeps it. */
 export const forgetCloudResource = (projectPath: string, kind: CloudResourceKind) =>
-  nativeTask<CloudResourceManifest | null>('cloudflare_resources_forget', { projectPath, kind });
+  invokeNative<CloudResourceManifest | null>('cloudflare_resources_forget', { projectPath, kind });
 
 /** Deletes the resource from Cloudflare, then removes it from the manifest. */
 export const deleteCloudResource = (projectPath: string, kind: CloudResourceKind) =>
-  nativeTask<CloudResourceManifest | null>('cloudflare_resources_delete', { projectPath, kind });
+  invokeNative<CloudResourceManifest | null>('cloudflare_resources_delete', { projectPath, kind });
 
 /** Reads the Turnstile secret key from Cloudflare; it is never saved. */
 export const turnstileSecret = (projectPath: string) =>
-  nativeTask<string>('cloudflare_resources_turnstile_secret', { projectPath });
+  invokeNative<string>('cloudflare_resources_turnstile_secret', { projectPath });
 
 export async function onCloudResourcesProgress(
   listener: (progress: { projectPath: string; step: CloudResourceStep }) => void,

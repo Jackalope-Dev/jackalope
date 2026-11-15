@@ -39,9 +39,6 @@ pub(crate) const KINDS: &[Kind] = &[
     },
 ];
 
-/// Agents that can run on a computer.
-pub(crate) const REMOTE_ADAPTERS: &[&str] = &["claude", "codex"];
-
 #[derive(Default, Serialize, Deserialize)]
 struct Saved {
     #[serde(default)]
@@ -99,10 +96,7 @@ pub(crate) fn set(root: &Path, id: &str, value: Option<&str>) -> Result<(), Stri
         }
     }
     std::fs::create_dir_all(root.join("secrets")).map_err(|e| e.to_string())?;
-    account_storage::write(
-        &path(root),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
-    )
+    account_storage::write_json(&path(root), &saved)
 }
 
 /// The environment for `adapter` on a computer, from its first saved credential.

@@ -1,18 +1,16 @@
-import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
+import { Badge, Button, LoadingState, Panel, RefreshIcon } from '@jackalope/ui';
 import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowName } from '../../lib/capacity-display';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 import { ProviderMark } from '../agents/ProviderMark';
+import { ActionError } from '../ui/ActionError';
 
 const agentName = (agent: string) =>
   agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
@@ -129,7 +127,7 @@ export function CapacityPanel() {
           </Button>
         }
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {loading && (
         <LoadingState
           label={records.length ? 'Updating account limits…' : 'Reading available account limits…'}

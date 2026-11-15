@@ -70,10 +70,7 @@ export function speedReport(comparison, reviews = {}) {
   };
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1]).href
-) {
+if (import.meta.main) {
   const [input, reviews, output] = process.argv.slice(2);
   if (!input)
     throw new Error('Usage: pnpm evaluate:speed comparison.json [reviews.json] [report.json]');

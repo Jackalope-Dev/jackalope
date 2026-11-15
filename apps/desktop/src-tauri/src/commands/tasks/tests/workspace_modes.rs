@@ -31,7 +31,7 @@ fn running(runtime: &TaskRuntime, id: &str, repo: &str) {
     let mut run = sample("codex");
     run.id = id.into();
     run.task_id = id.into();
-    run.status = "running".into();
+    run.status = RunStatus::Running;
     run.project_path = repo.into();
     run.workspace.clear();
     runtime.inner.lock().unwrap().runs.insert(id.into(), run);
@@ -73,7 +73,7 @@ fn in_place_modes_hold_the_checkout_and_never_discard_changes() {
     assert!(busy.contains("Another task"), "{busy}");
 
     // Once it finishes, current-branch work still requires the target branch.
-    runtime.update("branch-task", |run| run.status = "review".into());
+    runtime.update("branch-task", |run| run.status = RunStatus::Review);
     let moved = runtime
         .prepare_workspace(
             "second-task",
@@ -104,7 +104,7 @@ fn in_place_modes_hold_the_checkout_and_never_discard_changes() {
     );
 
     // A new branch refuses to carry or discard those edits.
-    runtime.update("second-task", |run| run.status = "review".into());
+    runtime.update("second-task", |run| run.status = RunStatus::Review);
     running(&runtime, "third-task", &repo);
     let dirty = runtime
         .prepare_workspace("third-task", &request("third-task", &repo, "branch"), None)
@@ -157,7 +157,7 @@ fn ask_each_time_waits_for_the_person_and_honors_the_choice() {
             }
             std::thread::sleep(Duration::from_millis(25));
         }
-        answering.update("asked-task", |run| run.status = "stopping".into());
+        answering.update("asked-task", |run| run.status = RunStatus::Stopping);
         panic!("no workspace question was asked");
     });
     runtime
@@ -175,7 +175,7 @@ fn ask_each_time_waits_for_the_person_and_honors_the_choice() {
     let stopper = runtime.clone();
     let stop = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(200));
-        stopper.update("stopped-task", |run| run.status = "stopping".into());
+        stopper.update("stopped-task", |run| run.status = RunStatus::Stopping);
     });
     runtime
         .prepare_workspace("stopped-task", &request("stopped-task", &repo, "ask"), None)

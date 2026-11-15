@@ -10,7 +10,7 @@
 //! the computer deletes its instance.
 
 use super::{remote, Computer, MachineState, Provider, Transport};
-use crate::commands::account_storage;
+use crate::commands::{account_storage, http};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -146,22 +146,11 @@ fn secret(root: &Path, computer: &Computer) -> Result<InstanceSecret, String> {
             uuid::Uuid::new_v4().simple(),
             uuid::Uuid::new_v4().simple()
         ),
-        vnc_password: uuid::Uuid::new_v4().simple().to_string()[..8].to_string(),
+        vnc_password: super::vnc_password(),
     };
     std::fs::create_dir_all(root.join("secrets")).map_err(|e| e.to_string())?;
-    account_storage::write(
-        &path,
-        &serde_json::to_vec(&secret).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&path, &secret)?;
     Ok(secret)
-}
-
-fn client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(timeout)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
 }
 
 /// One management API call. `Ok(None)` is a 404.
@@ -171,7 +160,7 @@ async fn request(
     path: &str,
     body: Option<Value>,
 ) -> Result<Option<Value>, String> {
-    let mut call = client(Duration::from_secs(120))?
+    let mut call = http::client(Duration::from_secs(120))?
         .request(method, format!("{API}{path}"))
         .bearer_auth(key);
     if let Some(body) = body {
@@ -292,7 +281,7 @@ fn import_template(
     progress("Importing the computer image on Agent37");
     let body = import_body(name, image);
     let answer = remote::block(async {
-        let response = client(IMPORT_WAIT)?
+        let response = http::client(IMPORT_WAIT)?
             .post(format!("{API}/v1/templates"))
             .bearer_auth(key)
             .json(&body)
@@ -350,7 +339,7 @@ fn ensure_template(key: &str, progress: &dyn Fn(&str)) -> Result<String, String>
         .ok_or("Agent37 did not return an upload address.")?
         .to_string();
     remote::block(async {
-        let response = client(Duration::from_secs(300))?
+        let response = http::client(Duration::from_secs(300))?
             .put(upload)
             .header("Content-Type", "application/gzip")
             .body(context)
@@ -718,6 +707,6 @@ mod tests {
                     .into_owned()
             })
             .collect();
-        assert_eq!(names, ["Dockerfile", "start.sh", "agent.py"]);
+        assert_eq!(names, super::super::docker::IMAGE_FILES);
     }
 }

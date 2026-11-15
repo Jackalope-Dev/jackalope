@@ -1,37 +1,41 @@
 import {
   Badge,
   Button,
+  ChoiceCards,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
+  FlowDiagram,
   FormField,
+  InlineNotice,
   Input,
   LinkButton,
+  SecretField,
   Select,
   SelectItem,
+  SettingGroup,
+  SettingRow,
 } from '@jackalope/ui';
-import { Cloud as CloudIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Cloud as CloudIcon, Laptop } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ARTIFACTS_DOCS_URL,
   ARTIFACTS_TOKEN_URL,
   type ArtifactsJurisdiction,
   type ArtifactsStatus,
   artifactsStatus,
-  beginCloudflareSignIn,
   type CloudflareAccount,
   cancelCloudflareSignIn,
   cloudflareTokenAccounts,
-  completeCloudflareSignIn,
   connectArtifacts,
   connectCloudflareAccount,
   disconnectArtifacts,
 } from '../../lib/cloudflare-artifacts';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
-import { SwarmConnection } from './SwarmConnection';
+import { openExternalUrl } from '../../lib/native/env';
 import './artifacts-connection.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { useCloudflareSignIn } from '../../hooks/useCloudflareSignIn';
+import { ActionError } from '../ui/ActionError';
 
 export function ArtifactsTitle() {
   return (
@@ -71,15 +75,9 @@ export function ArtifactsConnectForm({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const waiting = useRef(false);
-  const open = (url: string) => void openExternalUrl(url).catch((cause) => setError(String(cause)));
-  // Leaving the form abandons an unfinished browser sign-in and its listener.
-  useEffect(
-    () => () => {
-      if (waiting.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
+  const cloudflareSignIn = useCloudflareSignIn();
+  const open = (url: string) =>
+    void openExternalUrl(url).catch((cause) => setError(describeError(cause)));
   const finish = async (accountId: string) =>
     onConnected(
       await connectCloudflareAccount({
@@ -92,26 +90,23 @@ export function ArtifactsConnectForm({
     setError('');
     setBusy(true);
     try {
-      const url = await beginCloudflareSignIn();
-      setStage({ kind: 'waiting', url });
-      waiting.current = true;
-      await openExternalUrl(url);
-      const accounts = await completeCloudflareSignIn();
-      waiting.current = false;
+      const accounts = await cloudflareSignIn({}, (url) => setStage({ kind: 'waiting', url }));
+      if (!accounts) {
+        setStage({ kind: 'start' });
+        return;
+      }
       const only = accounts.length === 1 ? accounts[0] : undefined;
       if (only) {
         try {
           await finish(only.id);
           return;
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         }
       }
       setStage({ kind: 'choose', accounts, accountId: accounts[0]?.id ?? '' });
     } catch (cause) {
-      waiting.current = false;
-      const message = String(cause);
-      if (!message.includes('canceled')) setError(message);
+      setError(describeError(cause));
       setStage({ kind: 'start' });
     } finally {
       setBusy(false);
@@ -135,24 +130,39 @@ export function ArtifactsConnectForm({
           label="Data location"
           description="Applies when Jackalope creates the namespace and cannot be changed later."
         >
-          <Select
+          <ChoiceCards
+            label="Data location"
             value={jurisdiction || 'any'}
             disabled={busy || disabled}
             onValueChange={(value) =>
               setJurisdiction(value === 'any' ? '' : (value as ArtifactsJurisdiction))
             }
-          >
-            <SelectItem value="any">No restriction</SelectItem>
-            <SelectItem value="eu">European Union</SelectItem>
-            <SelectItem value="us">United States</SelectItem>
-          </Select>
+            options={[
+              {
+                value: 'any',
+                title: 'No restriction',
+                description: 'Cloudflare picks the location.',
+              },
+              { value: 'eu', title: 'European Union', description: 'Data stays in the EU.' },
+              { value: 'us', title: 'United States', description: 'Data stays in the US.' },
+            ]}
+          />
         </FormField>
       </DisclosureBody>
     </Disclosure>
   );
+  const flow = (
+    <FlowDiagram
+      from={{ label: 'This Mac', icon: <Laptop size={16} /> }}
+      to={{ label: 'Cloudflare', icon: <CloudIcon size={16} /> }}
+      via={stage.kind === 'token' ? 'API token' : 'Sign-in'}
+      state={busy || stage.kind === 'waiting' ? 'checking' : error ? 'failed' : 'idle'}
+    />
+  );
   if (stage.kind === 'start' || stage.kind === 'waiting')
     return (
       <div className={className}>
+        {flow}
         <p className="settings-row-description">
           Needs a Cloudflare account on the Workers Paid plan, which Cloudflare bills for Artifacts
           usage.
@@ -163,10 +173,7 @@ export function ArtifactsConnectForm({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  waiting.current = false;
-                  void cancelCloudflareSignIn().catch(() => {});
-                }}
+                onClick={() => void cancelCloudflareSignIn().catch(() => {})}
               >
                 Cancel
               </Button>
@@ -204,7 +211,7 @@ export function ArtifactsConnectForm({
           </div>
         )}
         {stage.kind === 'start' && fields}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     );
   if (stage.kind === 'choose')
@@ -220,7 +227,7 @@ export function ArtifactsConnectForm({
           try {
             await finish(stage.accountId);
           } catch (cause) {
-            setError(String(cause));
+            setError(describeError(cause));
           } finally {
             setBusy(false);
           }
@@ -229,19 +236,33 @@ export function ArtifactsConnectForm({
         <p className="settings-row-description">
           Signed in. Choose the account for your repositories.
         </p>
-        <FormField label="Cloudflare account">
-          <Select
+        {stage.accounts.length <= 6 ? (
+          <ChoiceCards
+            label="Cloudflare account"
             value={stage.accountId}
             disabled={busy || disabled}
             onValueChange={(value) => setStage({ ...stage, accountId: value })}
-          >
-            {stage.accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </Select>
-        </FormField>
+            options={stage.accounts.map((account) => ({
+              value: account.id,
+              title: account.name,
+              icon: <CloudIcon size={18} />,
+            }))}
+          />
+        ) : (
+          <FormField label="Cloudflare account">
+            <Select
+              value={stage.accountId}
+              disabled={busy || disabled}
+              onValueChange={(value) => setStage({ ...stage, accountId: value })}
+            >
+              {stage.accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </Select>
+          </FormField>
+        )}
         {fields}
         <div className="flex flex-wrap gap-2">
           <Button
@@ -264,7 +285,7 @@ export function ArtifactsConnectForm({
             Start over
           </Button>
         </div>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </form>
     );
   const tokenStage = stage;
@@ -308,32 +329,36 @@ export function ArtifactsConnectForm({
           setAccountId(accounts[0]?.id ?? '');
           setStage({ kind: 'token', accounts });
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         } finally {
           setBusy(false);
         }
       }}
     >
-      <p className="settings-row-description">
-        Create an API token with Account → Artifacts → Edit for the account you want to use.
-      </p>
-      <FormField label="API token">
-        <Input
-          required
-          type="password"
-          autoComplete="off"
-          value={token}
-          disabled={busy || disabled}
-          maxLength={8192}
-          onChange={(event) => {
-            setToken(event.target.value);
-            if (tokenStage.accounts) {
-              setAccountId('');
-              setStage({ kind: 'token' });
-            }
-          }}
-        />
-      </FormField>
+      {flow}
+      <SecretField
+        label="API token"
+        description="Create one with Account → Artifacts → Edit for the account you want to use. Jackalope checks it with Cloudflare before saving."
+        required
+        value={token}
+        disabled={busy || disabled}
+        onValueChange={(value) => {
+          setToken(value);
+          if (tokenStage.accounts) {
+            setAccountId('');
+            setStage({ kind: 'token' });
+          }
+        }}
+        check={(value) =>
+          /^[A-Za-z0-9_-]{40}$/.test(value.trim())
+            ? { tone: 'ok', message: 'Looks like a Cloudflare API token.' }
+            : {
+                tone: 'info',
+                message:
+                  'Cloudflare API tokens are usually 40 characters. Connecting will check it.',
+              }
+        }
+      />
       {tokenStage.accounts && (
         <FormField label="Cloudflare account">
           <Select value={accountId} disabled={busy || disabled} onValueChange={setAccountId}>
@@ -385,7 +410,7 @@ export function ArtifactsConnectForm({
           Connect Cloudflare instead
         </Button>
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </form>
   );
 }
@@ -398,17 +423,17 @@ export function ArtifactsConnection() {
     setStatus(await artifactsStatus());
   }, []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   return (
     <>
       <SettingGroup>
-        <Setting
+        <SettingRow
           title={<ArtifactsTitle />}
           description="Create projects on Artifacts, or move an existing repository there from Project settings."
         />
         {status?.connected ? (
-          <Setting
+          <SettingRow
             title="Your Cloudflare account"
             description={`${status.method === 'oauth' ? 'Signed in with Cloudflare' : 'API token'} · Namespace ${status.namespace}${
               status.jurisdiction ? ` · ${status.jurisdiction.toUpperCase()} data location` : ''
@@ -426,7 +451,7 @@ export function ArtifactsConnection() {
                   await disconnectArtifacts();
                   await refresh();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }
@@ -434,7 +459,7 @@ export function ArtifactsConnection() {
             >
               Disconnect
             </Button>
-          </Setting>
+          </SettingRow>
         ) : (
           status && <ArtifactsConnectForm onConnected={setStatus} />
         )}
@@ -444,9 +469,8 @@ export function ArtifactsConnection() {
           </InlineNotice>
         )}
       </SettingGroup>
-      {status && <SwarmConnection artifactsConnected={status.connected} />}
       <SettingGroup aria-disabled="true">
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Jackalope Cloud <Badge>Coming soon</Badge>

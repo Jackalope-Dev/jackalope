@@ -63,9 +63,13 @@ of a list with `NoticeRow` (quiet surface, info icon, arrow), not an underlined 
 link. Conversations put the person's messages on the right as tinted bubbles and
 replies on the left beside the speaker's character, with agent Markdown rendered.
 
+The board lays the work stages out as lanes on a sunken surface with cards on the raised
+one; lanes never wrap under each other. A card's secondary action, such as archive, sits
+in its corner and appears with hover or focus rather than taking a row.
+
 Everything in the work list is work; label its shape (Conversation, Task, Planned task or
 Draft) rather than giving it its own place. Say "conversation" in copy, never "chat" or
-"session", and select work through `selectWork` so only one item is open at a time.
+"session", and open work through `openWork` (built on `selectWork`) so only one item is open at a time and its project is focused.
 
 Task titles should be short objectives, with original instructions in task details under Activity.
 Results lead with output. Review gives the changed-file browser the full content
@@ -111,7 +115,7 @@ Derive colors, typography, surfaces and motion from packages/brand and shared
 controls from `@jackalope/ui`. Its Button, Input, Textarea, Select, FormField,
 InlineNotice and Dialog components are browser-safe and include their CSS without
 requiring Tailwind. Keep native bridges, API clients and app state out of this package.
-Desktop compatibility exports can retain existing import paths. Use the local font stacks and established size tokens. Favor clear
+Desktop imports these controls from `@jackalope/ui` directly. Use the local font stacks and established size tokens. Favor clear
 hierarchy, generous space and restrained surfaces over repeated metric cards.
 
 Use semantic action and accent tokens with their matching text colors, and
@@ -151,13 +155,33 @@ material (Acrylic on Windows 11, vibrancy on macOS) and sets `data-window-glass`
 Frosted window setting is off; other platforms and reduced transparency keep the opaque look.
 On glass, text and icons sit only on panes or title bar capsules tinted enough to keep 4.5:1
 over any backdrop: at least 85% where text is primary, secondary or accent and 90% where muted
-text appears. The shared values sit a step above those floors (90% panes, 94% dense panes and
-pages) so busy windows behind stay quiet. Use the shared `--glass-*` values; screens without
+text appears. Panes and pages use `--glass-pane` and `--glass-page` at the 90% floor. Window chrome
+(sidebar, status bar, title bar capsules) uses `--glass-chrome` at 85% and maps muted text to
+secondary inside it. Use the shared `--glass-*` values; screens without
 `WindowGlass` paint an opaque background.
+Buttons share one translucent plastic material from `@jackalope/ui`: theme-tinted bodies the
+page shows through, a hairline moulded lip, a faint corner highlight and fine grain, with no
+glow. Primary is tinted plastic with a dense core: a see-through rim and a 90% band of the action
+colour, shaded 10% away from `--color-on-action`, behind the label, which holds 4.5:1 on every
+preset; don't thin the band. Secondary and outline are clear plastic, and
+ghost keeps a hairline edge at rest, so every button reads as a button; text-only actions
+inline with copy use `LinkButton`. Unavailable primaries turn neutral rather than fading the
+accent. Reduced transparency drops the blur and forced colours drop the grain.
+
+Setup and settings screens that walk through a task use the `@jackalope/ui` setup kit.
+`SetupLayout` keeps the steps at a reading measure and, on wide panes, puts the intro, a
+`FlowDiagram` of the real connection state and a `SetupSummary` of the choices so far in a
+sticky aside on the right; narrow panes stack it on top. Done steps fold to a summary that
+states the choice, with a Change button; upcoming steps show their title and hint; optional
+steps carry a tag and never hold the flow. Don't nest numbered steps inside a step; use a
+checklist. Pick several items from a `ChoiceGrid` of tiles rather than a column of checkboxes,
+and size inputs to what they hold, such as a short code.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
-for menu rows, segments and dense navigation; coarse pointers raise both to 44px. Prefer
-compact layouts that keep projects, work and agents in view over extra padding. Native
+for menu rows, segments and dense navigation; coarse pointers raise both to 44px. The sidebar
+leads with Inbox (work across projects that needs the person), then projects with only their
+live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
+compact layouts that keep this in view over extra padding. Native
 window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
 small windows. Respect reduced motion, including preference changes while open.
 
@@ -177,8 +201,17 @@ Show every step in the progress list and preserve saved setup on reload.
 Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including
 empty commands, and ignore stale results after changing projects or leaving setup.
-Detected defaults are provisional until entry and must not run commands or enable
-automatic checks. Inspection failure must not block setup.
+Detected defaults are provisional until entry and never run commands during setup.
+Inspection failure must not block setup.
+
+Defaults aim at the best first experience and stay easy to turn off: a new project checks
+finished work with its saved check command (`checksAutomatically` is the one reader of
+that setting), reflects on finished work with the default agent within its hourly and
+daily caps, keeps the computer awake while agents work, restores a stopped terminal's
+output, and downloads a found update for the next restart. People rarely find a setting
+that starts off, so a useful one starts on. What stays off until chosen: anything that
+writes into the person's repository, publishes, shares data beyond what sign-in
+disclosed, lets an agent decide in the person's place, or starts something at login.
 
 App appearance/privacy and account access precede the project setup steps.
 Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.
@@ -238,8 +271,8 @@ WorkspaceSubnavigation and RunStatus for their app-specific context. Component
 ownership and runtime boundaries are documented in the architecture guide.
 
 Standard dialogs compose DialogContent, DialogHeader, DialogCloseButton and
-DialogFooter. ConfirmDialog owns pending guards, failure feedback and focus return
-for a single confirmation; its children can collect feature-specific acknowledgments.
+DialogFooter. ConfirmDialog owns pending guards, failure feedback, focus return and stacking above
+other dialogs and the command palette (`layer="confirm"` on DialogContent) for a single confirmation; its children can collect feature-specific acknowledgments.
 The feature supplies the actual operation and eligibility. Custom dialogs retain
 their own dismissal and focus-return policies. Use contained layout for editors with a scrolling body
 and fixed actions. Specialized canvases and command palettes may retain their
@@ -252,7 +285,7 @@ title, description and action for a card heading, SettingBody for forms, pickers
 inside a card, SettingActions for a card's buttons and `tone="danger"` for destructive
 settings. Do not place loose headings, rows or buttons between cards. Use InlineNotice for inline feedback, choosing
 the tone from the actual outcome; use its action slot for recovery controls.
-WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
+WorkspaceToolbar owns filter/action wrapping and spacing. SegmentedControl represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
 Every row of peer choices uses the shared segmented track: SegmentedControl for
 filters, SegmentedNav for views (it marks the open view with aria-current) and

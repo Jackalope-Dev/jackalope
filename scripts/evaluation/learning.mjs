@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
   hash,
   promotionDecision,
@@ -138,7 +137,7 @@ const write = async (directory, filename, value) => {
   });
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   const [mode, ...inputs] = process.argv.slice(2);
   if (mode === 'prepare' && inputs.length === 3) {
     const [suite, training, output] = inputs;

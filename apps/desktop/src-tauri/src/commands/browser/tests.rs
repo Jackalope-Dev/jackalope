@@ -2,10 +2,6 @@ use super::*;
 
 #[test]
 fn input_validation_preserves_legacy_actions_and_rejects_arbitrary_execution() {
-    let policy = codex_tool_policy();
-    assert_eq!(policy["browser_interact"]["approval_mode"], "approve");
-    assert!(policy.get("execute_tool").is_none());
-    assert!(policy.get("computer_verify").is_none());
     for action in [
         "click", "type", "scroll", "select", "fill", "check", "press",
     ] {

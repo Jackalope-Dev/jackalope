@@ -4,8 +4,8 @@
 //! creates, starts or deletes the machine itself; deleting the computer only
 //! forgets the pairing. The secret is kept in protected storage.
 
-use super::{Computer, MachineState, Provider, Transport};
-use crate::commands::account_storage;
+use super::{AgentError, Computer, MachineState, Provider, Transport};
+use crate::commands::{account_storage, http};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -113,19 +113,12 @@ pub(crate) fn validate_secret(secret: &str) -> Result<(), String> {
 }
 
 pub(crate) fn token(root: &Path, id: &str) -> Result<String, String> {
-    let bytes = account_storage::read(&secret_path(root, id))?
-        .ok_or("This machine's pairing secret is missing. Pair it again.")?;
-    serde_json::from_slice::<MachineSecret>(&bytes)
-        .map(|secret| secret.token)
-        .map_err(|_| "This machine's pairing secret could not be read. Pair it again.".into())
-}
-
-fn client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(timeout)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
+    account_storage::read_json::<MachineSecret>(
+        &secret_path(root, id),
+        "This machine's pairing secret could not be read. Pair it again.",
+    )?
+    .map(|secret| secret.token)
+    .ok_or_else(|| "This machine's pairing secret is missing. Pair it again.".into())
 }
 
 /// Health of a paired machine, as Settings → Computers shows it.
@@ -147,7 +140,7 @@ pub(crate) async fn hello_with(
     token: &str,
     headers: &[(&'static str, String)],
 ) -> Result<Value, String> {
-    let mut request = client(Duration::from_secs(15))?
+    let mut request = http::client(Duration::from_secs(15))?
         .get(format!("{url}/v1/health"))
         .bearer_auth(token);
     for (name, value) in headers {
@@ -165,7 +158,10 @@ pub(crate) async fn hello_with(
         .json()
         .await
         .map_err(|_| "The address answered, but not as a Jackalope computer.".to_string())?;
-    if !status.is_success() || body["ok"] != true || body["result"]["protocol"] != 1 {
+    if !status.is_success()
+        || body["ok"] != true
+        || body["result"]["protocol"] != super::protocol::protocol().hello
+    {
         return Err("The address answered, but not as a Jackalope computer.".into());
     }
     Ok(body["result"].clone())
@@ -213,12 +209,11 @@ pub(crate) async fn add(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     std::fs::create_dir_all(root.join("machines")).map_err(|e| e.to_string())?;
-    account_storage::write(
+    account_storage::write_json(
         &secret_path(root, &machine.id),
-        &serde_json::to_vec(&MachineSecret {
+        &MachineSecret {
             token: secret.trim().into(),
-        })
-        .map_err(|e| e.to_string())?,
+        },
     )?;
     let _guard = lock().lock().map_err(|e| e.to_string())?;
     let mut saved = read(root)?;
@@ -336,7 +331,7 @@ impl Transport for Http {
         payload: &Value,
         timeout: Duration,
         canceled: &AtomicBool,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, AgentError> {
         if canceled.load(std::sync::atomic::Ordering::SeqCst) {
             return Err("The computer request was canceled.".into());
         }
@@ -347,7 +342,10 @@ impl Transport for Http {
         let token = self.token.clone();
         let headers = self.headers.clone();
         let body: Value = block(async move {
-            let mut post = client(timeout)?.post(url).bearer_auth(token).json(&request);
+            let mut post = http::client(timeout)?
+                .post(url)
+                .bearer_auth(token)
+                .json(&request);
             for (name, value) in headers {
                 post = post.header(name, value);
             }
@@ -371,15 +369,11 @@ impl Transport for Http {
                 .await
                 .map_err(|_| "The machine returned an invalid response.".to_string())
         })?;
-        if body["ok"] == true {
-            Ok(body["result"].clone())
-        } else {
-            Err(body["error"]
-                .as_str()
-                .unwrap_or("The computer failed.")
-                .chars()
-                .take(1200)
-                .collect())
-        }
+        crate::commands::desktop_control::helper::answer(&body, "The computer failed.").map_err(
+            |error| AgentError {
+                code: error.code,
+                message: error.message,
+            },
+        )
     }
 }

@@ -1,87 +1,29 @@
+import { PLATFORMS, RELEASE_CHANNELS, SEMVER } from '@jackalope/contracts/platform';
+import {
+  ERROR_CODES,
+  FEATURES,
+  OPERATION_OUTCOMES,
+  OPERATIONS,
+  TASK_STATES,
+  TELEMETRY_AGENTS,
+  WORKFLOWS,
+} from '@jackalope/contracts/telemetry';
 import { z } from 'zod';
 
 const uuid = z.uuid({ version: 'v4' });
-const version = z
-  .string()
-  .max(32)
-  .regex(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/);
-const os = z.enum(['windows', 'macos', 'linux']);
-const common = { id: uuid, appVersion: version, os, channel: z.enum(['stable', 'beta']) };
-const feature = z.enum([
-  'tasks',
-  'chat',
-  'project',
-  'knowledge',
-  'worktrees',
-  'agents',
-  'usage',
-  'codebase',
-  'settings',
-  'connections',
-  'schedules',
-  'browser',
-  'queue',
-]);
-const operation = z.enum([
-  'task_start',
-  'task_retry',
-  'task_stop',
-  'task_verify',
-  'task_respond_prompt',
-  'task_outcome_review',
-  'task_preview_start',
-  'task_preview_inspect',
-  'task_retry_save',
-  'task_export_recovery',
-  'task_import_recovery',
-  'live_session_create',
-  'live_session_send',
-  'live_session_review',
-  'live_session_pause',
-  'live_session_resume',
-  'live_session_retry',
-  'live_session_finish',
-  'live_session_limits',
-  'live_session_window',
-  'queue_add',
-  'queue_import',
-  'queue_dispatch',
-  'integration_prepare',
-  'integration_apply',
-  'schedule_save',
-  'schedule_set_enabled',
-  'knowledge_save',
-  'knowledge_search',
-  'mcp_save_server',
-  'mcp_probe_server',
-  'mcp_authenticate',
-  'git_create_worktree',
-  'git_cleanup_worktree',
-  'git_archive_worktree',
-  'agent_profile_create',
-  'agent_profile_sign_in',
-  'local_ai_connect',
-  'helper_send',
-  'helper_action',
-]);
+const version = z.string().max(32).regex(SEMVER);
+const os = z.enum(PLATFORMS);
+const common = { id: uuid, appVersion: version, os, channel: z.enum(RELEASE_CHANNELS) };
+const feature = z.enum(FEATURES);
+const operation = z.enum(OPERATIONS);
 const event = z.discriminatedUnion('name', [
   z.strictObject({ ...common, name: z.literal('app_opened') }),
   z.strictObject({
     ...common,
     name: z.literal('task_state'),
-    agent: z
-      .enum(['codex', 'claude', 'grok', 'opencode', 'kimi', 'antigravity', 'gemini', 'other'])
-      .optional(),
-    workflow: z.enum(['task', 'chat']).optional(),
-    state: z.enum([
-      'starting',
-      'running',
-      'review',
-      'reviewed',
-      'failed',
-      'stopped',
-      'interrupted',
-    ]),
+    agent: z.enum(TELEMETRY_AGENTS).optional(),
+    workflow: z.enum(WORKFLOWS).optional(),
+    state: z.enum(TASK_STATES),
   }),
   z.strictObject({
     ...common,
@@ -93,26 +35,13 @@ const event = z.discriminatedUnion('name', [
     name: z.literal('app_error'),
     feature: feature.optional(),
     operation: operation.optional(),
-    code: z.enum([
-      'history_save_failed',
-      'verification_failed',
-      'update_failed',
-      'ui_error',
-      'ui_rejection',
-      'ui_render_error',
-      'history_load_failed',
-      'agent_discovery_failed',
-      'checkpoint_failed',
-      'verification_error',
-      'operation_failed',
-      'task_failed',
-    ]),
+    code: z.enum(ERROR_CODES),
   }),
   z.strictObject({
     ...common,
     name: z.literal('operation_result'),
     operation,
-    outcome: z.enum(['accepted', 'failed', 'blocked', 'partial', 'canceled']),
+    outcome: z.enum(OPERATION_OUTCOMES),
   }),
 ]);
 export const telemetrySchema = z.strictObject({

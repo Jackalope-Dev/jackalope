@@ -1,4 +1,4 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, InlineNotice } from '@jackalope/ui';
 import { animate, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotionPreference } from '../../hooks/useReducedMotionPreference';
@@ -10,7 +10,6 @@ import {
   EscalationNote,
 } from '../tasks/AgentDecision';
 import { OverrideAnswer } from '../tasks/AgentQuestion';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 const kindLabels: Record<AutonomyEntry['kind'], string> = {

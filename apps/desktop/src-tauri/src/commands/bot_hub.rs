@@ -372,6 +372,12 @@ pub(super) fn clip(text: &str, limit: usize) -> String {
     clipped
 }
 
+impl crate::services::Service for BotHub {
+    fn shutdown(&self) {
+        BotHub::shutdown(self)
+    }
+}
+
 impl BotHub {
     pub fn new(path: PathBuf, runtime: TaskRuntime, sessions: LiveSessions) -> Self {
         let loaded = if path.exists() {
@@ -1178,6 +1184,22 @@ pub(super) fn validate_wake(bot: &HubBot, wake: &WakeDefinition) -> Result<(), S
     }
     Ok(())
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::bot_hub::bot_hub_sync,
+            commands::bot_hub::bot_hub_snapshot,
+            commands::bot_hub::bot_hub_pause,
+            commands::bot_hub::bot_hub_card,
+            commands::bot_hub::bot_hub_proposal,
+            commands::bot_hub::bot_hub_wake_now,
+            commands::bot_hub::bot_hub_forget_note,
+            commands::bot_hub::bot_hub_connection_tools,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn bot_hub_sync(hub: State<'_, BotHub>, bots: Vec<HubBot>) -> Result<(), String> {

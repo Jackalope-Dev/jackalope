@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
+import { describeError } from '@jackalope/contracts/errors';
+import { InlineNotice, SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
+import { useState } from 'react';
+import { useNativeResource } from '../../hooks/useNativeResource';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 
 interface DesktopSettings {
   closeToTray: boolean;
@@ -12,36 +12,26 @@ interface DesktopSettings {
 }
 
 export function WindowBehaviorSettings() {
-  const [settings, setSettings] = useState<DesktopSettings>();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const native = isTauriEnvironment();
-
-  useEffect(() => {
-    if (!native) return;
-    let active = true;
-    nativeTask<DesktopSettings>('desktop_settings').then(
-      (value) => {
-        if (active) setSettings(value);
-      },
-      (reason) => {
-        if (active) setError(String(reason));
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [native]);
+  const {
+    data: settings,
+    setData: setSettings,
+    error,
+    setError,
+  } = useNativeResource(() => invokeNative<DesktopSettings>('desktop_settings'), [], {
+    enabled: native,
+  });
 
   const update = async (enabled: boolean) => {
     if (!settings || saving) return;
     setSaving(true);
     setError('');
     try {
-      await nativeTask('desktop_set_close_to_tray', { enabled });
+      await invokeNative('desktop_set_close_to_tray', { enabled });
       setSettings({ ...settings, closeToTray: enabled });
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setSaving(false);
     }
@@ -52,18 +42,18 @@ export function WindowBehaviorSettings() {
     setSaving(true);
     setError('');
     try {
-      await nativeTask('desktop_set_launch_at_login', { enabled });
+      await invokeNative('desktop_set_launch_at_login', { enabled });
       setSettings({ ...settings, launchAtLogin: enabled });
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <SettingGroup title="Window & startup">
-      <Setting
+    <SettingGroup title="Window & startup" data-settings-tile>
+      <SettingRow
         title="Close to system tray"
         controlId="close-to-tray"
         descriptionId="close-to-tray-description"
@@ -77,8 +67,8 @@ export function WindowBehaviorSettings() {
           disabled={!settings?.trayAvailable || saving}
           onCheckedChange={update}
         />
-      </Setting>
-      <Setting
+      </SettingRow>
+      <SettingRow
         title="Launch at login"
         controlId="launch-at-login"
         descriptionId="launch-at-login-description"
@@ -92,7 +82,7 @@ export function WindowBehaviorSettings() {
           disabled={!settings || saving}
           onCheckedChange={updateLaunchAtLogin}
         />
-      </Setting>
+      </SettingRow>
       {((settings && !settings.trayAvailable) || error) && (
         <SettingBody>
           {settings && !settings.trayAvailable && (

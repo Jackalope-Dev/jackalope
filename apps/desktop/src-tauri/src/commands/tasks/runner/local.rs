@@ -8,7 +8,9 @@
 //! [`TaskRuntime::stop`] can end its process tree, and a persistent Claude Code
 //! session is driven through [`TaskRuntime::run_claude_session`].
 
-use super::super::{antigravity, claude_session, gemini, kimi, opencode};
+use super::super::{
+    agent_process::AgentProcess, antigravity, claude_session, gemini, kimi, opencode, resume,
+};
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -27,15 +29,15 @@ pub(in crate::commands::tasks) struct LocalRunner {
     opencode: Option<opencode::Connection>,
     acp_servers: Vec<serde_json::Value>,
     persistent: Option<Persistent>,
-    /// Keeps a managed runtime in use while its agent runs.
-    lease: Option<crate::commands::managed_runtime::UseGuard>,
+    /// Keeps a managed runtime installed from launch until the agent's own
+    /// process holds it.
+    _lease: Option<crate::commands::managed_runtime::UseGuard>,
     process: Option<Process>,
 }
 
 /// The running agent process and its readers.
 struct Process {
-    child: Arc<Mutex<std::process::Child>>,
-    tree: crate::commands::process_control::ProcessTree,
+    process: Arc<AgentProcess>,
     reader: std::thread::JoinHandle<()>,
     diagnostics: std::thread::JoinHandle<()>,
     /// An ACP or server transport's turn completed.
@@ -63,7 +65,7 @@ impl LocalRunner {
             opencode,
             acp_servers,
             persistent,
-            lease,
+            _lease: lease,
             process: None,
         }
     }
@@ -74,7 +76,6 @@ impl AttemptRunner for LocalRunner {
         &self.access
     }
 
-    /// The worktree is used as it is.
     fn prepare(&mut self, _: &TaskRuntime, _: &mut Launch) -> Result<Step, String> {
         Ok(Step::Ready)
     }
@@ -86,6 +87,7 @@ impl AttemptRunner for LocalRunner {
         }
         let (id, req, adapter, workspace) =
             (launch.id, launch.req, launch.adapter, launch.workspace);
+        let spec = crate::commands::agents::find(adapter).ok_or("Unsupported agent")?;
         let cmd = &mut launch.cmd;
         cmd.current_dir(workspace)
             .stdin(Stdio::piped())
@@ -95,69 +97,46 @@ impl AttemptRunner for LocalRunner {
                 Stdio::piped()
             })
             .stderr(Stdio::piped());
-        // The check and the spawn hold the runtime lock together, so no other
-        // attempt can take the workspace in between.
-        let mut inner = runtime.inner.lock().unwrap();
-        if inner.canceled.contains(id) {
-            drop(inner);
+        let launched = std::time::Instant::now();
+        let opencode = &mut self.opencode;
+        let server = opencode.is_some();
+        let Some(spawned) = runtime.register_process(id, Some(workspace), || {
+            if let Some(connection) = opencode {
+                connection.release_port();
+            }
+            let spawned = AgentProcess::spawn(cmd, &req.agent)?;
+            if spawned.stdin.is_none() {
+                return Err("Missing agent input".into());
+            }
+            if spawned.stdout.is_none() && !server {
+                return Err("Missing agent output".into());
+            }
+            if spawned.stderr.is_none() {
+                return Err("Missing agent diagnostics".into());
+            }
+            Ok((Some(spawned.process.clone()), spawned))
+        })?
+        else {
             runtime.mark_stopped(id);
             return Ok(Step::Stopped);
-        }
-        if workspace_in_use(&inner, id, workspace) {
-            return Err(WORKSPACE_IN_USE.into());
-        }
-        let launched = std::time::Instant::now();
-        if let Some(connection) = &mut self.opencode {
-            connection.release_port();
-        }
-        let spawned = super::super::runtime::spawn_agent(cmd, &req.agent);
-        let spawn_elapsed = launched.elapsed();
-        let (mut child, spawn_attempts) = spawned?;
-        let tree = match crate::commands::process_control::ProcessTree::attach(&child) {
-            Ok(tree) => tree,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(error);
-            }
         };
-        let mut stdin = child.stdin.take().ok_or("Missing agent input")?;
-        let stdout = child.stdout.take();
-        if stdout.is_none() && self.opencode.is_none() {
-            tree.terminate();
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("Missing agent output".into());
-        }
-        let stderr = child.stderr.take().ok_or("Missing agent diagnostics")?;
-        let process = Arc::new(Mutex::new(child));
-        inner.processes.insert(id.into(), process.clone());
-        drop(inner);
-        runtime.update_checked(id, |r| {
-            r.efficiency.timing("processSpawn", spawn_elapsed);
-            r.process_contained = cfg!(windows);
-            if r.status == "starting" {
-                r.status = "running".into();
-            }
-            // The agent is live now; its own activity replaces the startup step.
-            r.progress = None;
-            if spawn_attempts > 1 {
-                activity(
-                    r,
-                    &format!("The agent process started after {spawn_attempts} attempts."),
-                );
-            }
-        })?;
+        let process = spawned.process;
+        let (mut stdin, stdout, stderr) = (
+            spawned.stdin.unwrap(),
+            spawned.stdout,
+            spawned.stderr.unwrap(),
+        );
+        runtime.process_started(id, spawned.elapsed, spawned.attempts, |_| {})?;
         let opencode_connection = self.opencode.take();
         let server_transport = opencode_connection.is_some();
         let input = std::mem::take(&mut launch.input);
-        let input_result =
-            if adapter == "grok" || adapter == "kimi" || adapter == "acp" || server_transport {
-                Ok(())
-            } else {
-                stdin.write_all(input.as_bytes())
-            };
-        let mut acp_input = (adapter == "kimi" || adapter == "acp").then_some(stdin);
+        let input_result = if spec.prompt != Prompt::Stdin || server_transport {
+            Ok(())
+        } else {
+            stdin.write_all(input.as_bytes())
+        };
+        let protocol = spec.protocol;
+        let mut acp_input = (protocol == Protocol::Acp).then_some(stdin);
         if let Err(error) = input_result {
             let _ = runtime.stop(id);
             return Err(format!("Could not deliver task: {error}"));
@@ -195,7 +174,7 @@ impl AttemptRunner for LocalRunner {
                 return;
             }
             let stdout = stdout.unwrap();
-            if output_adapter == "kimi" || output_adapter == "acp" {
+            if protocol == Protocol::Acp {
                 let result = kimi::drive_with_servers(
                     BufReader::new(stdout),
                     &mut acp_input.take().unwrap(),
@@ -230,12 +209,12 @@ impl AttemptRunner for LocalRunner {
                 }
                 return;
             }
+            let mut watch = resume::Watch::new(&output_adapter, resumed_session.as_deref());
             let mut gemini_stream = gemini::Stream::new(resumed_session.clone());
             let mut stream = antigravity::Stream::new(resumed_session);
             let mut partials = claude_session::Partials::new(launched);
-            if let Err(error) = crate::commands::process_control::bounded_lines(
-                BufReader::new(stdout),
-                1_000_000,
+            if let Err(error) = super::super::agent_process::read_lines(
+                stdout,
                 |line, truncated| {
                     if output_adapter == "claude"
                         && !truncated
@@ -249,12 +228,11 @@ impl AttemptRunner for LocalRunner {
                     }
                     if truncated {
                         activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
-                        if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
-                        if output_adapter == "gemini" { r.error.get_or_insert("Gemini CLI returned an oversized protocol event; the result could not be fully verified.".into()); }
+                        if matches!(protocol, Protocol::Antigravity | Protocol::Gemini) { r.error.get_or_insert(format!("{} returned an oversized protocol event; the result could not be fully verified.", spec.name)); }
                     }
-                    else if output_adapter == "antigravity" { stream.consume(r, &line); }
-                    else if output_adapter == "gemini" { gemini_stream.consume(r, &line); }
-                    else { consume_adapter_event(r, &line, &output_adapter); }
+                    else if protocol == Protocol::Antigravity { stream.consume(r, &line); }
+                    else if protocol == Protocol::Gemini { gemini_stream.consume(r, &line); }
+                    else { consume_adapter_event(r, &line, &output_adapter); watch.observe(r); }
                 });
                 },
             ) {
@@ -265,10 +243,10 @@ impl AttemptRunner for LocalRunner {
             if output_adapter == "claude" {
                 partials.complete(&runtime, &event_id);
             }
-            if output_adapter == "antigravity" {
+            if protocol == Protocol::Antigravity {
                 runtime.update(&event_id, |run| stream.finish(run));
             }
-            if output_adapter == "gemini" {
+            if protocol == Protocol::Gemini {
                 runtime.update(&event_id, |run| gemini_stream.finish(run));
             }
         });
@@ -277,27 +255,18 @@ impl AttemptRunner for LocalRunner {
         let diagnostics_adapter = adapter.to_string();
         let diagnostics = std::thread::spawn(move || {
             let runtime = diagnostics_runtime;
-            let _ = crate::commands::process_control::bounded_lines(
-                BufReader::new(stderr),
-                6000,
-                |mut line, truncated| {
-                    if truncated {
-                        line.push_str(" [truncated]");
+            super::super::agent_process::read_diagnostics(stderr, |line| {
+                let _ = runtime.update_output(&event_id, |r| {
+                    if diagnostics_adapter == "antigravity" && antigravity::permission_denied(&line)
+                    {
+                        antigravity::mark_permission_denied(r);
                     }
-                    let _ = runtime.update_output(&event_id, |r| {
-                        if diagnostics_adapter == "antigravity"
-                            && antigravity::permission_denied(&line)
-                        {
-                            antigravity::mark_permission_denied(r);
-                        }
-                        r.diagnostics.push(line);
-                    });
-                },
-            );
+                    r.diagnostics.push(line);
+                });
+            });
         });
         self.process = Some(Process {
-            child: process,
-            tree,
+            process,
             reader,
             diagnostics,
             turn_succeeded,
@@ -313,6 +282,7 @@ impl AttemptRunner for LocalRunner {
         launch: &mut Launch,
     ) -> Result<Option<Outcome>, String> {
         let (id, adapter) = (launch.id, launch.adapter);
+        let spec = crate::commands::agents::find(adapter).ok_or("Unsupported agent")?;
         if let Some(persistent) = self.persistent.take() {
             let outcome = runtime.run_claude_session(claude_session::Launch {
                 id,
@@ -323,9 +293,10 @@ impl AttemptRunner for LocalRunner {
                 previous_session: self.resumed_session.clone(),
                 settings: persistent.settings,
                 final_check: persistent.final_check,
-                context_by_hook: persistent.settings.hooks.context,
-                runner_lease: self.lease.take(),
             })?;
+            runtime.update(id, |run| {
+                resume::explain_refusal(run, adapter, self.resumed_session.as_deref())
+            });
             return Ok(outcome.map(|outcome| Outcome {
                 success: outcome.success,
                 exit_code: outcome.exit_code,
@@ -335,43 +306,35 @@ impl AttemptRunner for LocalRunner {
         let Some(process) = self.process.as_ref() else {
             return Err("The agent did not start.".into());
         };
-        let (child, server_transport) = (process.child.clone(), process.server_transport);
+        let (child, server_transport) = (process.process.clone(), process.server_transport);
         let started = std::time::Instant::now();
         let mut timed_out = false;
         let mut quota_stopped = false;
         let exit = loop {
-            if let Some(exit) = child
-                .lock()
-                .unwrap()
-                .try_wait()
-                .map_err(|e| e.to_string())?
-            {
+            if let Some(exit) = child.try_wait().map_err(|e| e.to_string())? {
                 break exit;
             }
             let process = self.process.as_ref().unwrap();
-            if (adapter == "kimi" || adapter == "acp" || server_transport)
-                && process.reader.is_finished()
+            if (spec.protocol == Protocol::Acp || server_transport) && process.reader.is_finished()
             {
-                process.tree.terminate();
-                let mut child = child.lock().unwrap();
-                let _ = child.kill();
-                break child.wait().map_err(|error| error.to_string())?;
+                break child.finish().map_err(|error| error.to_string())?;
             }
             let probe = *process.usage_probe.lock().unwrap();
             if let Some((began, after_turn)) = probe {
                 if began.elapsed() > Duration::from_secs(15) {
                     if !after_turn {
-                        runtime.update(id, |run| run.error = Some("Kimi's usage command timed out before the task started. Update the CLI and retry.".into()));
+                        runtime.update(id, |run| run.error = Some(format!("{}'s usage command timed out before the task started. Update the CLI and retry.", spec.short_name)));
                     }
                     self.stop()?;
                 }
             }
-            if (matches!(adapter, "antigravity" | "kimi" | "acp" | "gemini") || server_transport)
+            if (spec.attempt_limit || server_transport)
                 && !timed_out
-                && started.elapsed() > antigravity::TIMEOUT
+                && started.elapsed() > crate::commands::agents::ATTEMPT_LIMIT
             {
                 timed_out = true;
-                runtime.update(id, |run| run.error = Some(format!("{adapter} exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.")));
+                let minutes = crate::commands::agents::ATTEMPT_LIMIT.as_secs() / 60;
+                runtime.update(id, |run| run.error = Some(format!("{} exceeded the {minutes}-minute attempt limit. Inspect the saved work and continue the task.", spec.name)));
                 self.stop()?;
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -381,9 +344,12 @@ impl AttemptRunner for LocalRunner {
             }
         };
         let process = self.process.take().unwrap();
-        process.tree.terminate();
+        process.process.terminate();
         let _ = process.reader.join();
         let _ = process.diagnostics.join();
+        runtime.update(id, |run| {
+            resume::explain_refusal(run, adapter, self.resumed_session.as_deref())
+        });
         if adapter == "gemini" && !exit.success() {
             runtime.update(id, |run| {
                 for line in run.diagnostics.clone() {
@@ -392,15 +358,15 @@ impl AttemptRunner for LocalRunner {
             });
         }
         // ACP completion is the turn receipt; its persistent server is stopped by the owner.
-        let success = if adapter == "kimi" || adapter == "acp" || server_transport {
+        let success = if spec.protocol == Protocol::Acp || server_transport {
             process.turn_succeeded.load(Ordering::SeqCst) && !timed_out
         } else {
             exit.success()
         };
-        if adapter == "grok" {
+        if spec.prompt == Prompt::File {
             let _ = std::fs::remove_file(runtime.directory.join(format!("{id}.prompt")));
         }
-        runtime.inner.lock().unwrap().processes.remove(id);
+        runtime.unregister_process(id);
         Ok(Some(Outcome {
             success,
             exit_code: exit.code(),
@@ -408,15 +374,12 @@ impl AttemptRunner for LocalRunner {
         }))
     }
 
-    /// Ends the agent's process tree.
     fn stop(&mut self) -> Result<(), String> {
         if let Some(process) = &self.process {
-            process.tree.terminate();
-            let _ = process.child.lock().unwrap().kill();
+            process.process.terminate();
         }
         Ok(())
     }
 
-    /// The agent edited the worktree itself.
     fn collect(&mut self, _: &TaskRuntime, _: &mut Launch, _: &Outcome) {}
 }

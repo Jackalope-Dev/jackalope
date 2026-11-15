@@ -105,7 +105,7 @@ impl Indicator {
         let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo,[string]$r.scope,[string]$r.app,[string]$r.label)",include_str!("indicator.cs"));
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
-        let mut command = super::native_command(
+        let mut command = super::platform::native_command(
             &script,
             Some(
                 json!({"window":indicator_window(grant),"scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
@@ -131,23 +131,8 @@ impl Indicator {
                 directory: directory.clone(),
             },
         };
-        for _ in 0..100 {
-            if result.exited()? {
-                return Err(format!(
-                    "Desktop indicator could not start: {}",
-                    std::fs::read_to_string(directory.join("error.log"))
-                        .unwrap_or_default()
-                        .chars()
-                        .take(1200)
-                        .collect::<String>()
-                ));
-            }
-            if result.state().is_ok() {
-                return Ok(result);
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        Err("Desktop indicator did not become ready. No input was enabled.".into())
+        result.ready(&directory)?;
+        Ok(result)
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -201,23 +186,8 @@ impl Indicator {
                 directory: directory.clone(),
             },
         };
-        for _ in 0..100 {
-            if result.exited()? {
-                return Err(format!(
-                    "Desktop indicator could not start: {}",
-                    std::fs::read_to_string(directory.join("error.log"))
-                        .unwrap_or_default()
-                        .chars()
-                        .take(1200)
-                        .collect::<String>()
-                ));
-            }
-            if result.state().is_ok() {
-                return Ok(result);
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        Err("Desktop indicator did not become ready. No input was enabled.".into())
+        result.ready(&directory)?;
+        Ok(result)
     }
 
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
@@ -244,6 +214,41 @@ impl Indicator {
                 Ok(child.try_wait().map_err(|e| e.to_string())?.is_some())
             }
             Kind::Portal(_) => Ok(false),
+        }
+    }
+
+    /// Waits up to ten seconds for a started bar to report its state.
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    fn ready(&mut self, directory: &std::path::Path) -> Result<(), String> {
+        let ready = crate::commands::platform::poll_until(
+            Instant::now() + Duration::from_secs(10),
+            Duration::from_millis(100),
+            || {
+                if self.exited()? {
+                    return Err(format!(
+                        "Desktop indicator could not start: {}",
+                        std::fs::read_to_string(directory.join("error.log"))
+                            .unwrap_or_default()
+                            .chars()
+                            .take(1200)
+                            .collect::<String>()
+                    ));
+                }
+                Ok(self.state().is_ok().then_some(()))
+            },
+        )?;
+        ready.ok_or_else(|| "Desktop indicator did not become ready. No input was enabled.".into())
+    }
+
+    /// Whether the person closed the bar, which ends control.
+    pub fn closed(&mut self) -> bool {
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+        {
+            self.exited().unwrap_or(false)
+        }
+        #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+        {
+            false
         }
     }
 

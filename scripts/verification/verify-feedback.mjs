@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { accessEmail } from '../../apps/server/src/access/mail-templates.ts';
 
@@ -28,7 +28,6 @@ import {useThemeStore} from './src/stores/themeStore';
 import './src/index.css';
 import './src/components/settings/settings.css';
 import './src/components/tasks/task-workspace.css';
-import './src/components/ui/experience.css';
 let sample={enabled:false,promptsEnabled:true,completed:false,nextPromptAt:0,promptCount:0,eligible:false,claimed:false};
 window.calls=[];
 window.__TAURI_INTERNALS__={invoke:async(command,args)=>{
@@ -203,9 +202,6 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
     });
     await page.close();
   }
-  const admin = readFileSync('apps/server/src/access/admin-page.ts', 'utf8');
-  const script = admin.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
-  if (script) new Function(script);
   console.log(
     'Feedback fixtures passed: desktop 1280/960, website 1280/960/390, light/dark, reduced motion, keyboard/focus, safe preview, retry idempotency, explicit unsubscribe, and overflow. No native execution or email delivery claimed.',
   );

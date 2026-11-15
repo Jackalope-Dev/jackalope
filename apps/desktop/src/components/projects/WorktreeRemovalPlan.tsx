@@ -1,5 +1,6 @@
+import { LoadingState } from '@jackalope/ui';
 import { FolderX, GitBranch } from 'lucide-react';
-import { LoadingState } from '../ui/LoadingState';
+import './worktrees.css';
 
 /**
  * What a confirm is about to remove, and which step it is on once it runs:

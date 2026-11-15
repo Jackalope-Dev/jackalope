@@ -2,18 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { agentProvider, taskAgents } from '../src/lib/agent-provider.ts';
 import { taskNotices } from '../src/lib/companion-tasks.ts';
-import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { returnToProject } from '../src/lib/project-return.ts';
+import { waitForStoppedAttempt } from '../src/lib/task-client.ts';
 import {
   collectWork,
   collectWorkspaceWork,
   matchesWorkFilter,
+  needsYou,
+  OPEN_SECTION_LIMIT,
   workGroup,
-  workGroups,
   workPresence,
+  workRowStatus,
 } from '../src/lib/task-collection.ts';
 import {
+  hasOpenQuestion,
   latestAttempt,
   looksLikePlan,
   mergeDestination,
@@ -59,10 +62,6 @@ test('Needs you includes review and blockers without changing their specific nex
     needsYou,
   );
   assert.equal(workGroup('review'), 'attention');
-  assert.deepEqual(
-    workGroups.map((group) => group.label),
-    ['Needs you', 'Working', 'Drafts', 'Finished'],
-  );
 });
 
 test('checks stay inside review instead of replacing the review and merge action', () => {
@@ -124,13 +123,19 @@ test('unified work includes live sessions once and respects project scope and ar
     status: 'running',
     prompts: [{ status: 'pending' }],
   };
-  const items = collectWorkspaceWork('a', [], [run, liveRun], [session]);
+  const items = collectWorkspaceWork('a', [run, liveRun], { sessions: [session] });
   assert.equal(items.length, 2);
   assert.equal(items[0].session.id, 'live');
   assert.equal(items[0].stage, 'attention');
-  assert.equal(collectWorkspaceWork('b', [], [run, liveRun], [session]).length, 0);
-  assert.equal(collectWorkspaceWork('a', [], [run, liveRun], [session], [], true).length, 0);
-  assert.equal(collectWorkspaceWork('a', [], [], [{ ...session, batches: [] }])[0].stage, 'ideas');
+  assert.equal(collectWorkspaceWork('b', [run, liveRun], { sessions: [session] }).length, 0);
+  assert.equal(
+    collectWorkspaceWork('a', [run, liveRun], { sessions: [session], archived: true }).length,
+    0,
+  );
+  assert.equal(
+    collectWorkspaceWork('a', [], { sessions: [{ ...session, batches: [] }] })[0].stage,
+    'ideas',
+  );
 });
 
 test('global work prioritizes decisions, review, running work and saved projectless ideas', () => {
@@ -265,43 +270,40 @@ test('stop and send waits for actual termination and refuses interrupted or miss
   const finished = await waitForStoppedAttempt(
     'run',
     async () => ({ ...run, status: ++reads < 3 ? 'stopping' : 'stopped' }),
-    async () => {
-      waits++;
-    },
+    { saved: 'follow-up', resumable: true, wait: async () => void waits++ },
   );
   assert.equal(finished.status, 'stopped');
   assert.equal(waits, 2);
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => ({ ...run, status: 'interrupted' }),
-      async () => {},
-    ),
+    waitForStoppedAttempt('run', async () => ({ ...run, status: 'interrupted' }), {
+      saved: 'follow-up',
+      resumable: true,
+      wait: async () => {},
+    }),
     /ownership/,
   );
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => undefined,
-      async () => {},
-    ),
+    waitForStoppedAttempt('run', async () => undefined, {
+      saved: 'follow-up',
+      resumable: true,
+      wait: async () => {},
+    }),
     /unavailable/,
   );
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => ({ ...run, sessionId: null }),
-      async () => {},
-    ),
+    waitForStoppedAttempt('run', async () => ({ ...run, sessionId: null }), {
+      saved: 'follow-up',
+      resumable: true,
+      wait: async () => {},
+    }),
     /resumable/,
   );
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => ({ ...run, status: 'stopping' }),
-      async () => {},
-      2,
-    ),
+    waitForStoppedAttempt('run', async () => ({ ...run, status: 'stopping' }), {
+      saved: 'follow-up',
+      wait: async () => {},
+      attempts: 2,
+    }),
     /still stopping/,
   );
 });
@@ -362,4 +364,96 @@ test('routing and interrupted workers retain separate account usage without dupl
     ]).length,
     1,
   );
+});
+
+test('one open-question rule decides the group, the row action and the waiting state', () => {
+  const asked = [{ id: 'q', status: 'pending' }];
+  assert.equal(hasOpenQuestion({ ...run, status: 'running', prompts: asked }), true);
+  assert.equal(hasOpenQuestion({ ...run, status: 'review', prompts: asked }), true);
+  assert.equal(
+    hasOpenQuestion({ ...run, status: 'running', finishing: true, prompts: asked }),
+    false,
+  );
+  assert.equal(hasOpenQuestion({ ...run, status: 'stopping', prompts: asked }), false);
+  assert.equal(hasOpenQuestion({ ...run, status: 'interrupted', prompts: asked }), false);
+  assert.equal(
+    hasOpenQuestion({ ...run, status: 'running', prompts: [{ status: 'answered' }] }),
+    false,
+  );
+
+  const session = {
+    id: 'chat',
+    title: 'Chat',
+    request: { projectId: 'a' },
+    updatedAt: '2026-09-02',
+    messages: [],
+    batches: [{ runId: 'chat-run' }],
+    closed: false,
+    paused: false,
+  };
+  const chatRun = { ...run, id: 'chat-run', taskId: 'chat-task', liveSessionId: 'chat' };
+  // A live question: the conversation needs you and asks for the answer.
+  const [asking] = collectWorkspaceWork('a', [{ ...chatRun, status: 'running', prompts: asked }], {
+    sessions: [session],
+  });
+  assert.equal(workGroup(asking.stage), 'attention');
+  assert.equal(workPresence(asking).action, 'Answer question');
+  assert.equal(workPresence(asking).state, 'waiting');
+  // A question left open on an attempt in review, with a follow-up queued: this used to sit
+  // under Working while offering "Answer question".
+  const [leftOpen] = collectWorkspaceWork('a', [{ ...chatRun, status: 'review', prompts: asked }], {
+    sessions: [{ ...session, messages: [{ id: 'm', text: 'Next' }] }],
+  });
+  assert.equal(workGroup(leftOpen.stage), 'attention');
+  assert.equal(workPresence(leftOpen).action, 'Answer question');
+  // A closed conversation can't take an answer, so a question left in it is finished work.
+  const [closed] = collectWorkspaceWork('a', [{ ...chatRun, status: 'review', prompts: asked }], {
+    sessions: [{ ...session, closed: true }],
+  });
+  assert.equal(closed.stage, 'finished');
+  assert.notEqual(workPresence(closed).action, 'Answer question');
+  // An attempt checking its result is working; its pending prompt is not answerable yet.
+  const [checking] = collectWorkspaceWork(
+    'a',
+    [{ ...chatRun, status: 'running', finishing: true, prompts: asked }],
+    { sessions: [session] },
+  );
+  assert.equal(checking.stage, 'working');
+  assert.equal(workPresence(checking).action, 'View activity');
+  assert.notEqual(workPresence(checking).state, 'waiting');
+});
+
+test('row meta leaves out a status the action or section already says', () => {
+  const row = (stage, statusLabel) => ({ id: 'w', title: 't', date: '', stage, statusLabel });
+  assert.equal(workRowStatus(row('review', 'Ready for your review'), 'Review result'), undefined);
+  assert.equal(workRowStatus(row('review', 'Ready to review'), 'Reply'), undefined);
+  assert.equal(
+    workRowStatus(row('attention', 'Waiting for your answer'), 'Answer question'),
+    undefined,
+  );
+  assert.equal(workRowStatus(row('review', 'Ready to merge'), 'Merge into main'), undefined);
+  assert.equal(workRowStatus(row('working', 'Working'), 'View activity'), undefined);
+  assert.equal(
+    workRowStatus(row('attention', 'Question left open'), 'Answer question'),
+    'Question left open',
+  );
+  assert.equal(
+    workRowStatus(row('attention', 'Failed · exit 1'), 'Inspect task'),
+    'Failed · exit 1',
+  );
+  assert.equal(workRowStatus(row('working', 'Checking result'), 'View checks'), 'Checking result');
+  // The same status stays when the action does not repeat it.
+  assert.equal(
+    workRowStatus(row('review', 'Ready for your review'), 'Open draft'),
+    'Ready for your review',
+  );
+  assert.equal(workRowStatus(row('finished', 'Integrated'), 'Open result'), undefined);
+});
+
+test('needs-you matches the sidebar count and small sections start open', () => {
+  assert.deepEqual(
+    ['attention', 'review', 'working', 'finished', 'ideas'].map((stage) => needsYou({ stage })),
+    [true, true, false, false, false],
+  );
+  assert.equal(OPEN_SECTION_LIMIT, 5);
 });

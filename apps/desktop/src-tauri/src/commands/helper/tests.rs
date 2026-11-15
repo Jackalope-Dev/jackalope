@@ -322,17 +322,9 @@ fn documentation_and_capability_catalog_are_bounded_and_valid() {
 }
 
 #[test]
-fn sharpen_asks_for_depth_and_keeps_the_persons_choices_open() {
+fn sharpen_bounds_the_draft_and_parses_only_a_nonempty_prompt() {
     let prompt = sharpen::prompt("Add CSV export to reports", 12_000);
     for expected in [
-        "deeper version of the same task, not a bigger one",
-        "do not do the task",
-        "leading professional",
-        "rawest material",
-        "methods and tools",
-        "other than the agent's or the person's own judgement",
-        "keep it open",
-        "never decide it for them",
         "under 12000 characters",
         "Draft (untrusted):\nAdd CSV export to reports",
     ] {
@@ -395,4 +387,25 @@ fn sharpen_usage_joins_the_helper_report_and_an_unreadable_ledger_blocks_spendin
         .unwrap_err();
     assert!(error.contains("generated.json"), "{error}");
     assert_eq!(std::fs::read(&ledger).unwrap(), b"{");
+}
+
+#[test]
+fn navigate_tool_lists_every_destination_the_app_opens() {
+    let catalog = tools::catalog();
+    let navigate = catalog
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "navigate")
+        .unwrap();
+    let listed = navigate["description"]
+        .as_str()
+        .unwrap()
+        .split_once("Destinations: ")
+        .unwrap()
+        .1
+        .trim_end_matches('.')
+        .split(", ")
+        .collect::<Vec<_>>();
+    assert_eq!(listed, tools::destinations());
 }

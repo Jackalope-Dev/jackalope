@@ -1,21 +1,9 @@
-import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { root } from './lib/paths.mjs';
+import { git, run } from './lib/proc.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-function run(command, args, capture = false) {
-  const result = spawnSync(command, args, {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: capture ? 'pipe' : 'inherit',
-    windowsHide: true,
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited ${result.status}`);
-  return result.stdout;
-}
 /**
  * Modes:
  * - no argument: every commit on every ref, then the working files (CI, releases).
@@ -52,7 +40,7 @@ const snapshot = mkdtempSync(path.join(tmpdir(), 'jackalope-secrets-'));
 if (path.dirname(path.resolve(snapshot)) !== path.resolve(tmpdir()))
   throw new Error('Unexpected scan directory');
 try {
-  const files = run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], true)
+  const files = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
     .split('\0')
     .filter(Boolean);
   for (const file of new Set(files)) {

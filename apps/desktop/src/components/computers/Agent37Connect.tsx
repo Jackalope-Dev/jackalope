@@ -1,10 +1,19 @@
-import { Badge, FormField, Input } from '@jackalope/ui';
+import { describeError } from '@jackalope/contracts/errors';
+import {
+  Badge,
+  Button,
+  FlowDiagram,
+  InlineNotice,
+  SecretField,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
+import { Cloud, Laptop } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import '../settings/setup-screens.css';
 import { agent37Status, agent37Usage, setAgent37Key } from '../../lib/computers';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 
 const KEYS_URL = 'https://www.agent37.com/';
 
@@ -32,9 +41,11 @@ export function Agent37KeyForm({
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [connected, setConnected] = useState(false);
+  const flow = busy ? 'checking' : connected ? 'connected' : error ? 'failed' : 'idle';
   return (
     <form
-      className="space-y-3"
+      className="settings-setup-fields"
       onSubmit={(event) => {
         event.preventDefault();
         setBusy(true);
@@ -42,13 +53,21 @@ export function Agent37KeyForm({
         void setAgent37Key(key)
           .then(() => {
             setKey('');
+            setConnected(true);
             onConnected();
           })
-          .catch((cause) => setError(String(cause)))
+          .catch((cause) => setError(describeError(cause)))
           .finally(() => setBusy(false));
       }}
     >
-      <FormField
+      <FlowDiagram
+        from={{ label: 'This Mac', icon: <Laptop size={16} /> }}
+        to={{ label: 'Agent37', icon: <Cloud size={16} /> }}
+        via="API key"
+        state={flow}
+        error={flow === 'failed' ? error : undefined}
+      />
+      <SecretField
         label={
           beta ? (
             <span className="inline-flex items-center gap-2">
@@ -58,24 +77,29 @@ export function Agent37KeyForm({
             'Agent37 API key'
           )
         }
-        description="Computers run and bill on your own Agent37 account."
-      >
-        <Input
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="sk_live_…"
-          value={key}
-          onChange={(event) => setKey(event.target.value)}
-        />
-      </FormField>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        description="Computers run and bill on your own Agent37 account. Jackalope checks the key with Agent37 before saving it."
+        placeholder="sk_live_…"
+        value={key}
+        disabled={busy}
+        onValueChange={(value) => {
+          setKey(value);
+          if (error) setError('');
+        }}
+        check={(value) =>
+          value.trim().startsWith('sk_')
+            ? { tone: 'ok', message: 'Looks like an Agent37 key.' }
+            : {
+                tone: 'info',
+                message: 'Agent37 keys usually start with sk_. Connecting will check it.',
+              }
+        }
+      />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" loading={busy} loadingLabel="Connecting…" disabled={!key.trim()}>
+        <Button type="submit" loading={busy} loadingLabel="Checking…" disabled={!key.trim()}>
           Connect
         </Button>
-        <Button type="button" variant="outline" onClick={() => void openExternalUrl(KEYS_URL)}>
-          Open Agent37
+        <Button type="button" variant="secondary" onClick={() => void openExternalUrl(KEYS_URL)}>
+          Get a key from Agent37
         </Button>
       </div>
     </form>
@@ -105,7 +129,7 @@ export function Agent37Settings() {
       }
     >
       {connected ? (
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Agent37 <Badge variant="accent">Connected</Badge>
@@ -126,13 +150,13 @@ export function Agent37Settings() {
               setError('');
               void setAgent37Key(null)
                 .then(() => setConnected(false))
-                .catch((cause) => setError(String(cause)))
+                .catch((cause) => setError(describeError(cause)))
                 .finally(() => setBusy(false));
             }}
           >
             Disconnect
           </Button>
-        </Setting>
+        </SettingRow>
       ) : (
         <SettingBody>
           <Agent37KeyForm onConnected={() => setConnected(true)} />

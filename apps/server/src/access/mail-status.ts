@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { ServiceError } from '../errors';
 import { providerJson } from './provider';
-import { AccessError } from './service';
 
 export async function checkMailDelivery(env: Env, id: string, request = fetch, now = Date.now()) {
   const row = await env.DB.prepare(
@@ -12,11 +12,11 @@ export async function checkMailDelivery(env: Env, id: string, request = fetch, n
       delivery_status: string | null;
       delivery_checked_at: number | null;
     }>();
-  if (!row) throw new AccessError(404, 'mail_not_found');
-  if (!row.provider_send_id) throw new AccessError(409, 'delivery_unavailable');
+  if (!row) throw new ServiceError(404, 'mail_not_found');
+  if (!row.provider_send_id) throw new ServiceError(409, 'delivery_unavailable');
   if (row.delivery_checked_at && row.delivery_checked_at > now - 30000)
     return { status: row.delivery_status, checkedAt: row.delivery_checked_at };
-  if (!env.SEQUENZY_API_KEY) throw new AccessError(503, 'mail_not_configured');
+  if (!env.SEQUENZY_API_KEY) throw new ServiceError(503, 'mail_not_configured');
   try {
     const response = await request(
       `https://api.sequenzy.com/api/v1/email-sends/${encodeURIComponent(row.provider_send_id)}`,
@@ -53,6 +53,6 @@ export async function checkMailDelivery(env: Env, id: string, request = fetch, n
       .run();
     return { status, checkedAt: now };
   } catch {
-    throw new AccessError(502, 'delivery_check_failed');
+    throw new ServiceError(502, 'delivery_check_failed');
   }
 }

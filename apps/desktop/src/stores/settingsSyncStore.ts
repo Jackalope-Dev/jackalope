@@ -1,5 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import {
   portableSettings,
   type SyncedSettings,
@@ -8,8 +11,6 @@ import {
   syncDecision,
   syncedTheme,
 } from '../lib/settings-sync';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
 
@@ -34,7 +35,7 @@ let paused = false;
 let retryAction: 'sync' | 'enable' | 'disable' | 'delete' = 'sync';
 const snapshot = () =>
   portableSettings(useThemeStore.getState().appTheme, useSettingsStore.getState());
-const invoke = (action: object) => nativeTask<SyncView>('app_settings_sync', { action });
+const invoke = (action: object) => invokeNative<SyncView>('app_settings_sync', { action });
 function apply(settings: SyncedSettings) {
   useThemeStore.getState().setAppTheme(syncedTheme(settings));
   useSettingsStore.getState().updateSettings({
@@ -77,7 +78,7 @@ export const useSettingsSyncStore = create<SyncState>()(
         } catch (error) {
           if (generation === epoch)
             set({
-              error: `Could not delete saved settings. Retry Delete synced settings when online. ${String(error)}`,
+              error: `Could not delete saved settings. Retry Delete synced settings when online. ${describeError(error)}`,
             });
         } finally {
           if (generation === epoch) set({ busy: false });
@@ -98,7 +99,7 @@ export const useSettingsSyncStore = create<SyncState>()(
           set({ enabled: view.enabled, available: view.available });
           paused = false;
         } catch (error) {
-          if (generation === epoch) set({ error: String(error) });
+          if (generation === epoch) set({ error: describeError(error) });
         } finally {
           if (generation === epoch) set({ busy: false });
         }
@@ -170,7 +171,7 @@ export const useSettingsSyncStore = create<SyncState>()(
               set({ base: remote.settings, lastSynced: Date.now() });
             }
           } catch (error) {
-            if (generation === epoch) set({ error: String(error) });
+            if (generation === epoch) set({ error: describeError(error) });
           } finally {
             if (generation === epoch) set({ busy: false });
           }
@@ -224,7 +225,7 @@ export const useSettingsSyncStore = create<SyncState>()(
             set({ base: result.settings, conflict: null, lastSynced: Date.now() });
           }
         } catch (error) {
-          if (generation === epoch) set({ error: String(error) });
+          if (generation === epoch) set({ error: describeError(error) });
         } finally {
           if (generation === epoch) set({ busy: false });
         }

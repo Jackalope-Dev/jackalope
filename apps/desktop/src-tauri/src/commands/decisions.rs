@@ -13,6 +13,17 @@ mod strategy;
 pub use contracts::*;
 pub use strategy::{assess_strategy, StrategyEvaluation};
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::decisions::options::decision_options,
+            commands::decisions::options::decision_options_save,
+            commands::decisions::evaluation::decision_history,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 pub fn policy(runtime: &TaskRuntime, project_id: &str) -> Result<DecisionPolicy, String> {
     let _guard = settings::LOCK
         .lock()

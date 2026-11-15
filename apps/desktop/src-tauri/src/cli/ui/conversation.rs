@@ -5,7 +5,7 @@ use super::feed::Tone;
 use super::pickers::PickerKind;
 use super::{App, Signal};
 use crate::prefs;
-use crate::protocol::{self, Question, Request, SessionSummary, SessionView};
+use crate::protocol::{self, Question, Request, RunStatus, SessionSummary, SessionView};
 use crossterm::terminal::SetTitle;
 use std::io::Write;
 use std::time::Duration;
@@ -19,7 +19,7 @@ impl App {
         self.view.as_ref().is_some_and(|view| {
             protocol::present(view.error.as_deref()).is_none()
                 && view.questions.is_empty()
-                && protocol::working(view.status.as_deref())
+                && protocol::working(view.status.as_ref())
         })
     }
 
@@ -60,12 +60,15 @@ impl App {
         let state = view
             .step
             .clone()
-            .or_else(|| view.status.as_deref().map(status_label))
+            .or_else(|| view.status.as_ref().map(status_label))
             .unwrap_or_else(|| "ready".into());
-        let status = view.status.as_deref().unwrap_or_default();
         let tone = if self.working() {
             Tone::Muted
-        } else if protocol::FAILED.contains(&status) || protocol::STOPPED.contains(&status) {
+        } else if view
+            .status
+            .as_ref()
+            .is_some_and(|status| *status == RunStatus::Failed || status.is_stopped())
+        {
             Tone::Danger
         } else {
             Tone::Success
@@ -138,7 +141,7 @@ impl App {
     pub(super) fn ended_on(&self, question: &Question) -> Option<String> {
         let view = self.view.as_ref()?;
         (view.run_id.as_deref() == Some(question.run_id.as_str())
-            && !protocol::working(view.status.as_deref()))
+            && !protocol::working(view.status.as_ref()))
         .then(|| self.session.clone())
         .flatten()
     }
@@ -410,19 +413,12 @@ impl App {
 }
 
 /// A run status in words for the status line.
-fn status_label(status: &str) -> String {
+fn status_label(status: &RunStatus) -> String {
     match status {
-        "review" => "done · ready to review",
-        "reviewed" => "done · reviewed",
-        "running" => "working",
-        "starting" => "starting",
-        "routing" => "choosing an agent",
-        "queued" => "queued",
-        "stopping" => "stopping",
-        "stopped" | "cancelled" | "canceled" => "stopped",
-        "interrupted" => "interrupted",
-        "failed" | "error" => "failed",
-        other => other,
+        RunStatus::Review => "done · ready to review",
+        RunStatus::Reviewed => "done · reviewed",
+        RunStatus::Running => "working",
+        other => other.as_str(),
     }
     .into()
 }

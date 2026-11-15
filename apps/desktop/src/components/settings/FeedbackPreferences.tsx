@@ -1,10 +1,7 @@
+import { Button, InlineNotice, SettingBody, SettingGroup, SettingRow, Switch } from '@jackalope/ui';
 import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useFeedbackStore } from '../../stores/feedbackStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 export function FeedbackPreferences() {
   const { view, busy, error, request } = useFeedbackStore(
@@ -19,7 +16,7 @@ export function FeedbackPreferences() {
       title="Help shape Jackalope"
       description="Occasional, quiet invitations after you’ve had time to use the app. You can always send feedback in Updates & support."
     >
-      <Setting
+      <SettingRow
         title="Allow in-app feedback invitations"
         description="At most two in-app invitations, synced across desktops. Later pauses them for 14 days; sending feedback ends this round."
       >
@@ -31,7 +28,7 @@ export function FeedbackPreferences() {
             void request({ action: 'preferences', enabled: view?.enabled ?? false, promptsEnabled })
           }
         />
-      </Setting>
+      </SettingRow>
       {(view?.completed || error) && (
         <SettingBody>
           {view?.completed && (

@@ -520,7 +520,7 @@ fn artifact_paths_stay_inside_the_artifact_folder() {
         assert!(parse_artifacts(&listed).is_err(), "{bad}");
     }
     assert!(safe_artifact_path(".jackalope/artifacts/screenshots/a.png"));
-    let too_big = json!([{ "path": ".jackalope/artifacts/a", "sha256": "a".repeat(64), "size": ARTIFACT_BYTES + 1 }]);
+    let too_big = json!([{ "path": ".jackalope/artifacts/a", "sha256": "a".repeat(64), "size": protocol().sync.result_artifact_bytes + 1 }]);
     assert!(parse_artifacts(&too_big).is_err());
 }
 
@@ -533,7 +533,12 @@ struct Remote {
 }
 
 impl Transport for Remote {
-    fn call(&mut self, payload: &Value, _: Duration, _: &AtomicBool) -> Result<Value, String> {
+    fn call(
+        &mut self,
+        payload: &Value,
+        _: Duration,
+        _: &AtomicBool,
+    ) -> Result<Value, crate::commands::computers::AgentError> {
         let mut store = self.store.lock().unwrap();
         if let Some(result) = Fake::answer(&mut store, payload) {
             return result;
@@ -582,7 +587,7 @@ impl Transport for Remote {
                     "artifacts": [{"path": ".jackalope/artifacts/screenshots/s.png", "sha256": shot_digest.sha256, "size": 3}],
                 }))
             }
-            other => Err(format!("Unsupported action {other}")),
+            other => Err(format!("Unsupported action {other}").into()),
         }
     }
 }

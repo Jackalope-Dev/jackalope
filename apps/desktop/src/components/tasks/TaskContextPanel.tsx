@@ -1,8 +1,6 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, SettingRow, Switch } from '@jackalope/ui';
 import { Check, FileText, Layers } from 'lucide-react';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
-import { Setting } from '../settings/Setting';
-import { Switch } from '../ui/Switch';
 import { CodeSurface } from './CodeSurface';
 import './task-experience.css';
 
@@ -40,7 +38,7 @@ export function TaskContextPanel({
       </Heading>
       <div className="task-context-body">
         {onAutomaticChange && (
-          <Setting
+          <SettingRow
             title="Choose guidelines automatically"
             description={
               automatic
@@ -53,7 +51,7 @@ export function TaskContextPanel({
               checked={automatic === true}
               onCheckedChange={onAutomaticChange}
             />
-          </Setting>
+          </SettingRow>
         )}
         <div className="task-context-guidelines">
           {VETTED_SKILLS.map((skill) => {

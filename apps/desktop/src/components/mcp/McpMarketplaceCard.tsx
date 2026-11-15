@@ -1,6 +1,6 @@
+import { Button } from '@jackalope/ui';
 import { ArrowRight, Check, Shield, Star } from 'lucide-react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
-import { Button } from '../ui/button';
 import { recommendationFor } from './curated-servers';
 import { McpServerIcon } from './McpServerIcon';
 import {

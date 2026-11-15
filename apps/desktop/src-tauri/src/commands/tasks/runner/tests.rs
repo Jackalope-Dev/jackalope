@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::commands::computers::runner::{
-    Access, Placement, Where, BROWSER, LOCAL_BRIDGE, POLICY_CALLBACKS, TOOLS, WORKSPACE_TOOLS,
+    Access, Placement, Where, BROWSER, LOCAL_BRIDGE, POLICY_CALLBACKS, WORKSPACE_TOOLS,
 };
 use base64::Engine;
 use serde_json::json;
@@ -30,7 +30,7 @@ impl computers::Transport for StandIn {
         payload: &serde_json::Value,
         _: Duration,
         _: &AtomicBool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, computers::AgentError> {
         let engine = base64::engine::general_purpose::STANDARD;
         Ok(match payload["action"].as_str().unwrap() {
             "run_status" => json!({"exists": false, "runs": 4, "capabilities": CAPABILITIES}),
@@ -56,7 +56,7 @@ impl computers::Transport for StandIn {
                 "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             }),
             "run_remove" => json!({}),
-            other => return Err(format!("Unsupported action {other}")),
+            other => return Err(format!("Unsupported action {other}").into()),
         })
     }
 }
@@ -64,6 +64,7 @@ impl computers::Transport for StandIn {
 fn request(id: &str, workspace: &Path) -> RunRequest {
     RunRequest {
         retry_of: None,
+        continues: None,
         live_session_id: None,
         effort: None,
         codex_speed: None,
@@ -110,7 +111,7 @@ fn drive(
     let id = uuid::Uuid::new_v4().to_string();
     let mut run = super::super::tests::sample("codex");
     run.id = id.clone();
-    run.status = "starting".into();
+    run.status = RunStatus::Starting;
     run.workspace = workspace.to_string_lossy().into_owned();
     runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
     let req = request(&id, workspace);
@@ -141,7 +142,8 @@ fn both_runners_place_tools_from_one_table() {
         devtools: false,
         read_only: false,
     };
-    for tool in TOOLS {
+    let tools = crate::commands::bridge::tools();
+    for tool in tools {
         let (here, there) = (local.access().tool(tool.name), remote.tool(tool.name));
         match tool.placement {
             // Only tools that need this device's own workspace or sign-ins differ.
@@ -171,17 +173,17 @@ fn both_runners_place_tools_from_one_table() {
             }
         }
     }
-    let names = TOOLS.iter().map(|tool| tool.name);
+    let names = tools.iter().map(|tool| tool.name);
     assert_eq!(
         computers::runner::offered(local.access(), names.clone()),
         names.clone().collect::<Vec<_>>()
     );
     assert_eq!(
-        computers::runner::offered(&remote, names.clone()),
-        names
-            .filter(
-                |name| !["browser_open_profile", "peer_adopt", "permission_prompt"].contains(name)
-            )
+        computers::runner::offered(&remote, names),
+        tools
+            .iter()
+            .filter(|tool| !matches!(tool.placement, Placement::DeviceOnly))
+            .map(|tool| tool.name)
             .collect::<Vec<_>>()
     );
     // An agent on this device is told nothing about where its tools act.
@@ -208,7 +210,7 @@ fn one_launch_records_the_same_result_through_both_runners() {
     )
     .unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
-    credentials::set(
+    computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
         Some("sk-fixture-0123456789abcdef"),
@@ -299,7 +301,7 @@ impl computers::Transport for Unreachable {
         _: &serde_json::Value,
         _: Duration,
         _: &AtomicBool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, computers::AgentError> {
         Err("connection refused".into())
     }
 }
@@ -309,7 +311,7 @@ fn insert_run(runtime: &TaskRuntime, workspace: &Path) -> String {
     let mut run = super::super::tests::sample("codex");
     run.id = id.clone();
     run.project_id = "fixture".into();
-    run.status = "starting".into();
+    run.status = RunStatus::Starting;
     run.workspace = workspace.to_string_lossy().into_owned();
     runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
     id
@@ -465,7 +467,7 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
         .placed_target(&strict, &gemini(&strict), "gemini", None)
         .unwrap_err();
     assert!(
-        error.contains("swarms run only on computers") && error.contains(COMPUTERS_ONLY_FIX),
+        error.contains("swarms run only on computers") && error.contains(&computers_only_fix()),
         "{error}"
     );
     let run = runtime.run_snapshot(&strict).unwrap();
@@ -484,10 +486,10 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
         Some(computer.id.clone())
     );
     let mut policy = crate::commands::agent_policy::AgentPolicy::default();
-    for agent in super::super::BUILTIN_AGENTS {
+    for agent in crate::commands::agents::builtin_ids() {
         policy
             .enabled_agents
-            .insert((*agent).into(), *agent == "gemini");
+            .insert(agent.into(), agent == "gemini");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -500,7 +502,7 @@ fn computers_only_never_runs_a_placed_fork_on_this_device() {
     let error = runtime.route(&mut auto).unwrap_err();
     assert!(
         error.starts_with("No enabled agent that can run on Box")
-            && error.contains(COMPUTERS_ONLY_FIX),
+            && error.contains(&computers_only_fix()),
         "{error}"
     );
     assert_eq!(auto.agent, "auto");
@@ -539,7 +541,7 @@ fn a_computer_that_does_not_answer_is_a_lost_host() {
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
-    credentials::set(
+    computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
         Some("sk-fixture-0123456789abcdef"),
@@ -601,7 +603,7 @@ impl computers::Transport for Leftover {
         payload: &serde_json::Value,
         _: Duration,
         _: &AtomicBool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, computers::AgentError> {
         use sha2::Digest;
         let action = payload["action"].as_str().unwrap().to_string();
         self.calls.lock().unwrap().push(action.clone());
@@ -627,7 +629,7 @@ impl computers::Transport for Leftover {
                 json!({})
             }
             "workspace_put" => json!({}),
-            other => return Err(format!("Unsupported action {other}")),
+            other => return Err(format!("Unsupported action {other}").into()),
         })
     }
 }
@@ -635,7 +637,7 @@ impl computers::Transport for Leftover {
 /// A failed attempt that lost `computer` mid-run, leaving its changes there.
 fn lost_attempt(runtime: &TaskRuntime, workspace: &Path, computer: &Computer) -> String {
     let id = placed_on(runtime, workspace, computer);
-    runtime.update(&id, |run| run.status = "failed".into());
+    runtime.update(&id, |run| run.status = RunStatus::Failed);
     runtime.host_lost(&id, &computer.id, &computer.name, "Lost contact with Box");
     runtime.changes_left(&id);
     id
@@ -677,7 +679,7 @@ fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
     let retry = insert_run(&runtime, &folder);
     runtime.update(&retry, |run| {
         run.retry_of = Some(lost.clone());
-        run.status = "review".into();
+        run.status = RunStatus::Review;
     });
     let runs = all(&runtime);
     let due: Vec<&str> = recovery::waiting(&runs)
@@ -687,9 +689,9 @@ fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
     assert_eq!(due, [lost.as_str()]);
     // Not while a run of the same workspace is active on that computer.
     let busy = placed_on(&runtime, &folder, &computer);
-    runtime.update(&busy, |run| run.status = "running".into());
+    runtime.update(&busy, |run| run.status = RunStatus::Running);
     assert!(recovery::waiting(&all(&runtime)).is_empty());
-    runtime.update(&busy, |run| run.status = "review".into());
+    runtime.update(&busy, |run| run.status = RunStatus::Review);
 
     let transport = Leftover::default();
     let mut session = runs::Session::with_transport(
@@ -770,7 +772,7 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
-    credentials::set(
+    computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
         Some("sk-fixture-0123456789abcdef"),

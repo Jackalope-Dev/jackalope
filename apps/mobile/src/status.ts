@@ -1,46 +1,13 @@
-import type { BadgeProps } from '@jackalope/ui';
 import {
   latestTasks,
-  type RemoteSession,
-  type RemoteTask,
   type Snapshot,
+  sessionStatus,
+  taskStatus,
+  type WorkStatus,
   waitingSessions,
-} from '../../desktop/src/components/remote/useRemoteWorkspace.ts';
-
-export interface WorkStatus {
-  label: string;
-  variant: NonNullable<BadgeProps['variant']>;
-  /** Work waiting on the person sorts first and counts toward its computer's summary. */
-  needsYou: boolean;
-  working: boolean;
-}
-
-/** One label per state, in the desktop's words, so the phone reads like the sidebar. */
-export function taskStatus(task: RemoteTask): WorkStatus {
-  const active = ['starting', 'running', 'stopping'].includes(task.status);
-  // A question left by an attempt that ended can no longer be answered there. Hosts that
-  // predate unanswered questions in their lists send none, so those rows read Working.
-  if (active && task.prompts.some((prompt) => prompt.status === 'pending'))
-    return { label: 'Needs your answer', variant: 'warning', needsYou: true, working: false };
-  if (active) return { label: 'Working', variant: 'accent', needsYou: false, working: true };
-  if (task.status === 'review')
-    return { label: 'Ready to review', variant: 'success', needsYou: true, working: false };
-  if (task.status === 'reviewed')
-    return { label: 'Done', variant: 'default', needsYou: false, working: false };
-  if (task.error || ['failed', 'interrupted'].includes(task.status))
-    return { label: 'Needs attention', variant: 'danger', needsYou: true, working: false };
-  if (task.status === 'stopped')
-    return { label: 'Stopped', variant: 'default', needsYou: false, working: false };
-  return { label: 'Queued', variant: 'default', needsYou: false, working: false };
-}
-
-export function sessionStatus(session: RemoteSession): WorkStatus {
-  if (session.error)
-    return { label: 'Needs attention', variant: 'danger', needsYou: true, working: false };
-  if (session.paused)
-    return { label: 'Paused', variant: 'default', needsYou: false, working: false };
-  return { label: 'Queued', variant: 'default', needsYou: false, working: false };
-}
+  workTitle,
+} from '@jackalope/contracts/remote';
+import { withoutLeadingId } from '../../desktop/src/lib/task-title.ts';
 
 /** "now", "5m", "3h", "2d": short enough for a list row. */
 export function since(iso: string, now = Date.now()) {
@@ -52,76 +19,45 @@ export function since(iso: string, now = Date.now()) {
   return `${Math.round(hours / 24)}d`;
 }
 
-const LIVE_SESSION = /^\s*Live session:\s*/;
-/** The line a live session's batch puts before each message: its author, then its id. */
-const BATCH_MESSAGE =
-  /^(?:User message|User answer \(.*\)|Wake-up \(.*\)|(?:Message from|Reply from) bot .*) [0-9a-f-]{36}:$/i;
-
-/**
- * What the person asked. A live session's prompt is its title, the host's batch
- * instructions, then each message, so only the messages are kept; the short list title
- * stops before them, so it falls back to the session title.
- */
-export function requestText(prompt: string) {
-  if (!LIVE_SESSION.test(prompt)) return prompt.trim();
-  const messages: string[][] = [];
-  for (const line of prompt.split(/\r?\n/)) {
-    if (BATCH_MESSAGE.test(line)) messages.push([]);
-    else messages.at(-1)?.push(line);
-  }
-  const asked = messages
-    .map((lines) => lines.join('\n').trim())
-    .filter(Boolean)
-    .join('\n\n');
-  return asked || (prompt.replace(LIVE_SESSION, '').split(/\r?\n/)[0] ?? '').trim();
-}
-
-/** Markdown that opens a line (headings, quotes, bullets) and bold or code markers. */
-const LINE_START = /^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)+/;
-const INLINE_MARKS = /\*\*|`/g;
-
-/**
- * A short title from the request's first line. A heading such as "### Objective" names a
- * section rather than the work, so the line after it is used when there is one.
- */
-export function workTitle(prompt: string) {
-  const lines = prompt
-    .replace(LIVE_SESSION, '')
-    .split(/\r?\n/)
-    .filter((line) => line.trim());
-  const first = lines[0] ?? '';
-  const chosen = /^\s*#{1,6}\s/.test(first) && lines[1] ? lines[1] : first;
-  return chosen.replace(LINE_START, '').replace(INLINE_MARKS, '').trim() || 'Untitled work';
-}
-
 /** One item of a computer's work as a list row; `id` is what that computer selects it by. */
 export interface WorkRow {
   id: string;
   title: string;
+  projectId: string;
   projectName: string;
+  /** Parent folders telling this project apart from another of the same name. */
+  projectHint?: string;
   agent?: string;
   /** Absent for conversations that have not run anything yet. */
   startedAt?: string;
   status: WorkStatus;
+  /** A conversation opens to its thread; a task to its result. */
+  conversation: boolean;
 }
 
 export function workRows(snapshot: Snapshot | null): WorkRow[] {
   const tasks = latestTasks(snapshot);
-  const project = (id: string) => snapshot?.projects.find((item) => item.id === id)?.name ?? '';
+  const project = (id: string) => snapshot?.projects.find((item) => item.id === id);
   return [
     ...waitingSessions(snapshot, tasks).map((session) => ({
       id: session.id,
-      title: session.title,
-      projectName: project(session.projectId),
+      title: withoutLeadingId(session.title),
+      projectId: session.projectId,
+      projectName: project(session.projectId)?.name ?? '',
+      projectHint: project(session.projectId)?.hint,
       status: sessionStatus(session),
+      conversation: true,
     })),
     ...tasks.map((task) => ({
       id: task.sessionId || task.taskId,
-      title: workTitle(task.title),
+      title: withoutLeadingId(workTitle(task.title)),
+      projectId: task.projectId,
       projectName: task.projectName,
+      projectHint: project(task.projectId)?.hint,
       agent: task.agent,
       startedAt: task.startedAt,
       status: taskStatus(task),
+      conversation: Boolean(task.sessionId),
     })),
   ];
 }
@@ -132,14 +68,45 @@ function newestFirst(a: WorkRow, b: WorkRow) {
   return b.startedAt.localeCompare(a.startedAt);
 }
 
+/** Queued and paused work is still underway, as the desktop lists it, not finished. */
+const UNDERWAY = new Set(['Queued', 'Paused']);
+
+function groupOf(status: WorkStatus) {
+  if (status.needsYou) return 'Needs you';
+  return status.working || UNDERWAY.has(status.label) ? 'Working' : 'Finished';
+}
+
 /** Rows sorted and grouped by what they need from the person; empty groups are kept. */
 export function groupWork<T extends WorkRow>(rows: T[]): [string, T[]][] {
   const sorted = [...rows].sort(newestFirst);
-  return [
-    ['Needs you', sorted.filter((row) => row.status.needsYou)],
-    ['Working', sorted.filter((row) => row.status.working)],
-    ['Recent', sorted.filter((row) => !row.status.needsYou && !row.status.working)],
-  ];
+  return (['Needs you', 'Working', 'Finished'] as const).map((group) => [
+    group,
+    sorted.filter((row) => groupOf(row.status) === group),
+  ]);
+}
+
+/**
+ * What tapping a row does, in the desktop's words, and whether its status adds anything
+ * beside that verb and its group (an answer, a review or work in progress already say it).
+ */
+export function workAction(row: Pick<WorkRow, 'status' | 'conversation'>) {
+  const { label } = row.status;
+  const thing = row.conversation ? 'conversation' : 'task';
+  if (label === 'Needs your answer') return { action: 'Answer question', showStatus: false };
+  if (label === 'Ready to review')
+    return { action: row.conversation ? 'Reply' : 'Review result', showStatus: false };
+  if (label === 'Working') return { action: 'View activity', showStatus: false };
+  if (label === 'Needs attention') return { action: `Inspect ${thing}`, showStatus: true };
+  if (label === 'Done')
+    return { action: row.conversation ? 'Open conversation' : 'Open result', showStatus: false };
+  return { action: `Open ${thing}`, showStatus: true };
+}
+
+/** Work waiting on the person this long sits under "Older" in Needs you, as on the desktop. */
+const OLDER_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function isOlder(row: Pick<WorkRow, 'startedAt'>, now = Date.now()) {
+  return Boolean(row.startedAt && now - Date.parse(row.startedAt) > OLDER_MS);
 }
 
 /** "2 need you · 1 working", or nothing when the computer is idle. */
@@ -152,4 +119,25 @@ export function workSummary(rows: WorkRow[]) {
   ]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** The native error when a computer doesn't answer at all, as opposed to answering with an error. */
+const UNREACHABLE = 'The host is unreachable';
+
+/**
+ * How an unreachable computer reads: "offline" when it doesn't answer at all, else that it
+ * answered but couldn't be used (a removed device, a bad response); the real error stays
+ * available beside this.
+ */
+export function connectionState(error: string) {
+  return error.startsWith(UNREACHABLE) || error.startsWith('Connection interrupted')
+    ? 'offline'
+    : "can't connect";
+}
+
+/** "last seen 2h ago", or that this phone hasn't reached it yet. */
+export function lastSeen(iso: string | undefined, now = Date.now()) {
+  if (!iso) return 'not reached from this phone yet';
+  const ago = since(iso, now);
+  return ago === 'now' ? 'last seen just now' : `last seen ${ago} ago`;
 }

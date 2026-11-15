@@ -11,7 +11,7 @@ use std::{
 };
 use tauri::State;
 
-mod status;
+pub(crate) mod status;
 pub use status::agent_profile_status;
 
 static SIGNING_IN: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(Mutex::default);
@@ -67,7 +67,7 @@ pub struct SignInView {
 }
 
 struct Session {
-    terminal: Option<crate::state::PtySession>,
+    terminal: Option<super::pty::PtySession>,
     tree: Option<ProcessTree>,
     lease: Option<Lease>,
     runner_lease: Option<super::managed_runtime::UseGuard>,
@@ -114,6 +114,12 @@ impl Drop for Session {
 
 #[derive(Default)]
 pub struct SignInService(Mutex<HashMap<String, Arc<Mutex<Session>>>>);
+impl crate::services::Service for SignInService {
+    fn shutdown(&self) {
+        SignInService::stop_all(self)
+    }
+}
+
 impl SignInService {
     fn session(&self, id: &str) -> Result<Arc<Mutex<Session>>, String> {
         self.0
@@ -151,6 +157,9 @@ fn login_command(
     command.args(agent_profiles::login_args(&binding.adapter));
     command.cwd(&binding.directory);
     command.env("TERM", "xterm-256color");
+    for name in super::process_control::inherited_credentials() {
+        command.env_remove(name);
+    }
     // Use the same environment overrides as task execution, including removals.
     let mut environment = std::process::Command::new(executable);
     agent_profiles::apply_binding(&mut environment, binding)?;
@@ -221,7 +230,7 @@ fn spawn_terminal(
         }
     };
     let session = Arc::new(Mutex::new(Session {
-        terminal: Some(crate::state::PtySession {
+        terminal: Some(super::pty::PtySession {
             writer,
             master: pair.master,
             child,
@@ -295,6 +304,20 @@ fn spawn_terminal(
     Ok(session)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_sign_in::agent_profile_sign_in,
+            commands::agent_sign_in::agent_profile_sign_in_poll,
+            commands::agent_sign_in::agent_profile_sign_in_input,
+            commands::agent_sign_in::agent_profile_sign_in_resize,
+            commands::agent_sign_in::agent_profile_sign_in_stop,
+            commands::agent_sign_in::status::agent_profile_status,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn agent_profile_sign_in(
     app: tauri::AppHandle,
@@ -327,7 +350,7 @@ fn start_sign_in(
     let _guard = super::integration::execution_guard()?;
     let binding = agent_profiles::bind_account(&runtime.profiles_root(), &agent, Some(&id))?;
     if runtime.integration_runs()?.iter().any(|run| {
-        ["starting", "running", "stopping"].contains(&run.status.as_str())
+        run.status.is_active()
             && run
                 .account_binding
                 .as_ref()
@@ -493,7 +516,6 @@ mod tests {
                 assert!(command.get_env(variable).is_none());
             }
         }
-        assert_eq!(agent_profiles::login_args("claude"), &["auth", "login"]);
     }
     #[test]
     #[cfg(windows)]

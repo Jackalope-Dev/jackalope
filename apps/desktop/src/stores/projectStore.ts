@@ -1,10 +1,13 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { type FeatureMapEntry, featureMapForRegistry } from '../lib/feature-map.ts';
+import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
+import { isTauriEnvironment } from '../lib/native/env.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
-import { nativeTask } from '../lib/task-runtime.ts';
-import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import type { TerminalCommand } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
@@ -35,6 +38,8 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
+  terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
   autoVerify?: boolean;
   /** Superseded by `workspaceMode`; `false` still means current-branch work. */
@@ -106,8 +111,13 @@ export interface Project {
   description?: string;
   /** Sidebar icon key from ProjectMark's set; the initial shows when unset. */
   icon?: string;
+  /** The site icon as a data URL, shown when `icon` is `website`. */
+  iconImage?: string;
+  /** The address the site icon was fetched from, offered again when changing it. */
+  website?: string;
   preferences?: ProjectPreferences;
-  agentProvider: 'codex' | 'grok' | 'claude-code' | 'openhands' | 'ollama' | 'antigravity';
+  /** Written by earlier versions and kept in saved projects; nothing reads it. */
+  agentProvider?: string;
 }
 
 interface ProjectState {
@@ -277,7 +287,7 @@ export const useProjectStore = create<ProjectState>()(
         } catch (e) {
           if (request === worktreeRequest && get().activeProjectId === active.id) {
             set({
-              worktreesError: e instanceof Error ? e.message : String(e),
+              worktreesError: describeError(e),
             });
           }
         } finally {
@@ -295,7 +305,7 @@ export const useProjectStore = create<ProjectState>()(
           await get().loadWorktreesForActiveProject();
           return { ok: true, entry };
         } catch (e) {
-          const error = e instanceof Error ? e.message : String(e);
+          const error = describeError(e);
           console.error('Failed to spawn worktree', e);
           return { ok: false, error };
         }
@@ -361,6 +371,14 @@ interface ProjectRecord {
  */
 let appAccent: string | undefined;
 
+function selectActiveProject(state: Pick<ProjectState, 'projects' | 'activeProjectId'>) {
+  return state.projects.find((project) => project.id === state.activeProjectId);
+}
+
+export function useActiveProject() {
+  return useProjectStore(selectActiveProject);
+}
+
 export function setRegistryAppAccent(accent: string) {
   if (accent === appAccent) return;
   appAccent = accent;
@@ -401,7 +419,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
 export async function mergeProjectRegistry() {
   if (!isTauriEnvironment()) return;
   try {
-    const records = await nativeTask<ProjectRecord[]>('project_registry_list', {});
+    const records = await invokeNative<ProjectRecord[]>('project_registry_list', {});
     const state = useProjectStore.getState();
     const known = new Set(state.projects.map((project) => projectPathKey(project.path)));
     const added = records
@@ -412,7 +430,6 @@ export async function mergeProjectRegistry() {
         path: ordinaryProjectPath(record.path),
         gitBranch: '',
         worktrees: [],
-        agentProvider: 'codex',
       }));
     if (added.length) {
       useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));
@@ -482,7 +499,7 @@ function mirrorProjects(projects: Project[]) {
   mirrorSync = mirrorSync
     .then(async () => {
       if (encoded === mirrored) return;
-      await nativeTask('project_registry_save', { projects: records });
+      await invokeNative('project_registry_save', { projects: records });
       mirrored = encoded;
     })
     .catch(() => {

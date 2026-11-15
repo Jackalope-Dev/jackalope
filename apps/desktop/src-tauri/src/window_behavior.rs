@@ -44,21 +44,21 @@ pub struct WindowBehavior {
 impl WindowBehavior {
     pub fn load(path: PathBuf) -> Self {
         let preferences = match std::fs::read(&path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|error| {
-                eprintln!("Could not read desktop preferences: {error}");
-                DesktopPreferences {
-                    close_to_tray: false,
-                }
-            }),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 DesktopPreferences::default()
             }
-            Err(error) => {
-                eprintln!("Could not read desktop preferences: {error}");
-                DesktopPreferences {
-                    close_to_tray: false,
-                }
-            }
+            read => read
+                .map_err(|error| error.to_string())
+                .and_then(|bytes| {
+                    serde_json::from_slice::<DesktopPreferences>(&bytes)
+                        .map_err(|error| error.to_string())
+                })
+                .unwrap_or_else(|error| {
+                    eprintln!("Could not read desktop preferences: {error}");
+                    DesktopPreferences {
+                        close_to_tray: false,
+                    }
+                }),
         };
         Self {
             preferences: Mutex::new(preferences),
@@ -97,13 +97,10 @@ impl WindowBehavior {
         }
         let mut preferences = self.preferences.lock().map_err(|e| e.to_string())?;
         let next = DesktopPreferences { close_to_tray };
-        let temporary = self.path.with_extension("json.tmp");
-        std::fs::write(
-            &temporary,
-            serde_json::to_vec(&next).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        std::fs::rename(temporary, &self.path).map_err(|e| e.to_string())?;
+        crate::commands::history::write_atomic(
+            &self.path,
+            &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
+        )?;
         *preferences = next;
         Ok(())
     }
@@ -116,6 +113,17 @@ pub struct DesktopSettings {
     tray_available: bool,
     launch_at_login: bool,
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            window_behavior::desktop_settings,
+            window_behavior::desktop_set_close_to_tray,
+            window_behavior::desktop_set_launch_at_login,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn desktop_settings(
@@ -231,14 +239,14 @@ pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
-/// Builds the tray's menu fresh from current task state: Open/New Task/
+/// Builds the tray's menu fresh from current task state: Open/New Work/
 /// Settings up top, a Recent Tasks submenu, then Quit. Called once at
 /// startup and again whenever `task-state-changed` fires, so the submenu
 /// and the returned awaiting-review count (used for the dock badge) never
 /// go stale while the tray is open.
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<(Menu<tauri::Wry>, usize)> {
     let open = MenuItem::with_id(app, "tray-open", "Open Jackalope", true, None::<&str>)?;
-    let new_task = MenuItem::with_id(app, "tray-new-task", "New Task", true, None::<&str>)?;
+    let new_task = MenuItem::with_id(app, "tray-new-task", "New Work", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "tray-settings", "Settings…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "tray-quit", "Quit Jackalope", true, None::<&str>)?;
     let separator_top = PredefinedMenuItem::separator(app)?;
@@ -307,6 +315,29 @@ pub(crate) fn set_unread_badge(app: &AppHandle, count: u32) -> Result<(), String
     refresh_badge(app, 0)
 }
 
+/// The command registry id (`src/components/layout/commands.ts`) a tray or app menu item runs.
+fn menu_action(item: &str) -> Option<&'static str> {
+    static ACTIONS: std::sync::OnceLock<std::collections::HashMap<String, String>> =
+        std::sync::OnceLock::new();
+    ACTIONS
+        .get_or_init(|| {
+            serde_json::from_str(include_str!(
+                "../../src/components/layout/menu-actions.json"
+            ))
+            .expect("src/components/layout/menu-actions.json maps menu items to commands")
+        })
+        .get(item)
+        .map(String::as_str)
+}
+
+/// Shows the main window and runs a registry command there.
+fn run_menu_action(app: &AppHandle, action: &str) {
+    show_main_window(app);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("desktop-action", action);
+    }
+}
+
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let (menu, awaiting_review) = build_tray_menu(app.handle())?;
     let mut tray = TrayIconBuilder::with_id("jackalope")
@@ -317,17 +348,11 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             let id = event.id.as_ref();
             match id {
                 "tray-open" => show_main_window(app),
-                "tray-new-task" => {
-                    show_main_window(app);
-                    let _ = app.emit("jackalope-tray-new-task", ());
-                }
-                "tray-settings" => {
-                    show_main_window(app);
-                    let _ = app.emit("jackalope-tray-settings", ());
-                }
                 "tray-quit" => app.exit(0),
                 _ => {
-                    if let Some(task_id) = id.strip_prefix(TASK_MENU_PREFIX) {
+                    if let Some(action) = menu_action(id) {
+                        run_menu_action(app, action);
+                    } else if let Some(task_id) = id.strip_prefix(TASK_MENU_PREFIX) {
                         show_main_window(app);
                         let _ = app.emit("jackalope-tray-open-task", task_id.to_string());
                     }
@@ -376,16 +401,25 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn setup_app_menu(app: &tauri::App) -> tauri::Result<()> {
-    use tauri::{
-        menu::{PredefinedMenuItem, Submenu},
-        Emitter,
-    };
     let menu = Menu::default(app.handle())?;
+    // The default app menu is About, separator, Services…; Settings… joins About's group.
     if let Some(first) = menu.items()?.first().and_then(|item| item.as_submenu()) {
         first.insert(
             &MenuItem::with_id(app, "app-settings", "Settings…", true, None::<&str>)?,
             2,
         )?;
+        first.insert(&PredefinedMenuItem::separator(app)?, 3)?;
+    }
+    // macOS adds its own search field to the (otherwise empty) default Help menu.
+    if let Some(help) = menu
+        .get(tauri::menu::HELP_SUBMENU_ID)
+        .and_then(|item| item.as_submenu().cloned())
+    {
+        help.append_items(&[
+            &MenuItem::with_id(app, "app-help", "Jackalope Help", true, None::<&str>)?,
+            &MenuItem::with_id(app, "app-feedback", "Send Feedback…", true, None::<&str>)?,
+            &MenuItem::with_id(app, "app-discord", "Join the Discord", true, None::<&str>)?,
+        ])?;
     }
     let work = Submenu::with_items(
         app,
@@ -407,19 +441,11 @@ pub fn setup_app_menu(app: &tauri::App) -> tauri::Result<()> {
     menu.insert(&work, 1)?;
     app.set_menu(menu)?;
     app.on_menu_event(|app, event| {
-        let action = match event.id.as_ref() {
-            "app-settings" => "settings",
-            "app-new-work" => "newWork",
-            "app-search" => "search",
-            "app-show" => {
-                show_main_window(app);
-                return;
-            }
-            _ => return,
-        };
-        show_main_window(app);
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.emit("desktop-action", action);
+        let id = event.id.as_ref();
+        if let Some(action) = menu_action(id) {
+            run_menu_action(app, action);
+        } else if id == "app-show" {
+            show_main_window(app);
         }
     });
     Ok(())

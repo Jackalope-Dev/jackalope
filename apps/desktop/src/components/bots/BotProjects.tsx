@@ -2,9 +2,10 @@ import { ChevronRight } from 'lucide-react';
 import { botActivity, botConversations } from '../../lib/bot-conversations';
 import { needsYou } from '../../lib/bot-hub';
 import type { LiveSession } from '../../lib/live-session';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { type Bot, botProjectIds, rosterOrder } from '../../stores/botStore';
 import type { Project } from '../../stores/projectStore';
+import { ProjectMark } from '../projects/ProjectMark';
 import { BotAvatar } from './BotAvatar';
 
 const SHOWN = 6;
@@ -48,7 +49,6 @@ export function BotProjects({
         ]
           .filter(Boolean)
           .join(' · ');
-        const accent = project.preferences?.theme?.accentHex;
         return (
           <li key={project.id}>
             <button
@@ -58,11 +58,7 @@ export function BotProjects({
               onClick={() => onOpen(project.id)}
             >
               <span className="bots-project-heading">
-                <span
-                  className="bots-project-mark"
-                  aria-hidden="true"
-                  style={accent ? { background: accent } : undefined}
-                />
+                <ProjectMark project={project} />
                 <strong title={project.name}>{project.name}</strong>
                 <ChevronRight size={16} aria-hidden="true" />
               </span>

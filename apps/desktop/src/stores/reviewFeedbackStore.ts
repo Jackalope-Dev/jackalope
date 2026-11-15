@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import type { ReviewComment } from '../lib/review-feedback';
 
@@ -36,7 +37,7 @@ function initial() {
   try {
     return { threads: read(), error: '' };
   } catch (cause) {
-    return { threads: {}, error: String(cause) };
+    return { threads: {}, error: describeError(cause) };
   }
 }
 interface ReviewFeedbackState {

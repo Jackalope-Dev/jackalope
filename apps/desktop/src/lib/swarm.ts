@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 export interface SwarmConnection {
   configured: boolean;
@@ -59,9 +59,9 @@ export interface CloudState {
   syncedAt: string | null;
 }
 
-export const swarmConnection = () => nativeTask<SwarmConnection>('swarm_connection_status');
+export const swarmConnection = () => invokeNative<SwarmConnection>('swarm_connection_status');
 export const saveSwarmConnection = (url: string, token: string) =>
-  nativeTask<SwarmConnection>('swarm_connection_save', { url, token });
+  invokeNative<SwarmConnection>('swarm_connection_save', { url, token });
 export interface SwarmRemoval {
   workerDeleted: boolean;
   /** Set when the Worker is still deployed; says how to delete it by hand. */
@@ -69,15 +69,15 @@ export interface SwarmRemoval {
 }
 /** Forgets the Worker; `deleteWorker` also deletes one that one-click setup deployed. */
 export const removeSwarmConnection = (deleteWorker = false) =>
-  nativeTask<SwarmRemoval>('swarm_connection_remove', { deleteWorker });
+  invokeNative<SwarmRemoval>('swarm_connection_remove', { deleteWorker });
 /** Deploys or updates the Worker in the connected Cloudflare account and connects it. */
-export const setupSwarm = () => nativeTask<SwarmSetupResult>('swarm_setup');
+export const setupSwarm = () => invokeNative<SwarmSetupResult>('swarm_setup');
 export async function onSwarmSetupProgress(listener: (step: SwarmSetupStep) => void) {
   const { listen } = await import('@tauri-apps/api/event');
   return listen<SwarmSetupStep>('swarm-setup-progress', (event) => listener(event.payload));
 }
 export const cloudState = (projectId: string) =>
-  nativeTask<CloudState>('swarm_cloud_state', { projectId });
+  invokeNative<CloudState>('swarm_cloud_state', { projectId });
 
 export const ago = (iso: string) => {
   const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));

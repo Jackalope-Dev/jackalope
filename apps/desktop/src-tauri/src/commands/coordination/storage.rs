@@ -1,4 +1,35 @@
 use super::*;
+use crate::commands::integration::{execution_guard, ExecutionGuard};
+
+/// The queue could not be written; the ledger keeps its previous contents.
+pub(super) struct SaveFailed(String);
+
+impl From<SaveFailed> for String {
+    fn from(failed: SaveFailed) -> Self {
+        failed.0
+    }
+}
+
+impl From<SaveFailed> for ToolError {
+    fn from(failed: SaveFailed) -> Self {
+        ToolError::failed(failed.0)
+    }
+}
+
+/// The execution guard is unavailable, for example while an update installs.
+pub(super) struct Busy(String);
+
+impl From<Busy> for String {
+    fn from(busy: Busy) -> Self {
+        busy.0
+    }
+}
+
+impl From<Busy> for ToolError {
+    fn from(busy: Busy) -> Self {
+        ToolError::status(StatusCode::CONFLICT, busy.0)
+    }
+}
 
 impl Coordinator {
     pub fn new(directory: PathBuf, runtime: TaskRuntime) -> Result<Self, String> {
@@ -8,7 +39,7 @@ impl Coordinator {
             .truncate(false)
             .read(true)
             .write(true)
-            .open(directory.join("owner.lock"))
+            .open(directory.join(crate::cli_protocol::profile::COORDINATOR_LOCK))
             .map_err(|e| e.to_string())?;
         let lock = super::super::file_lock::FileLock::try_new(lock).map_err(|_| "Another Jackalope instance owns this task queue. Close it before opening this workspace.".to_string())?;
         let path = directory.join("queue.json");
@@ -57,7 +88,7 @@ impl Coordinator {
         };
         if service.storage_error.is_none() {
             if let Err(error) = service.reconcile() {
-                service.inner.lock().unwrap().error = Some(error);
+                service.state().error = Some(error);
             }
         }
         Ok(service)
@@ -67,7 +98,46 @@ impl Coordinator {
         self.storage_error.clone().map_or(Ok(()), Err)
     }
 
-    pub(super) fn save(&self, ledger: &Ledger) -> Result<(), String> {
+    /// The coordinator's state. Coordinator code that also needs the execution
+    /// guard goes through [`Coordinator::transact`] instead, which keeps the
+    /// lock order: coordinator state, execution guard, runtime state.
+    pub(super) fn state(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.inner.lock().unwrap()
+    }
+
+    /// Locks the coordinator state, then takes the execution guard, and runs
+    /// `work` with both.
+    pub(super) fn transact<T, E: From<Busy>>(
+        &self,
+        work: impl FnOnce(&mut Inner, &ExecutionGuard) -> Result<T, E>,
+    ) -> Result<T, E> {
+        let mut inner = self.state();
+        let guard = self.execution(&inner)?;
+        work(&mut inner, &guard)
+    }
+
+    /// Takes the execution guard for a caller that already holds the
+    /// coordinator state, which the `state` argument proves.
+    pub(super) fn execution(&self, state: &Inner) -> Result<ExecutionGuard, Busy> {
+        let _ = state;
+        execution_guard().map_err(Busy)
+    }
+
+    /// Changes a copy of the ledger and keeps it once it is saved, so a change
+    /// or save that fails leaves the ledger as it was.
+    pub(super) fn commit<T, E: From<SaveFailed>>(
+        &self,
+        inner: &mut Inner,
+        change: impl FnOnce(&mut Ledger) -> Result<T, E>,
+    ) -> Result<T, E> {
+        let mut ledger = inner.ledger.clone();
+        let value = change(&mut ledger)?;
+        self.save(&ledger).map_err(SaveFailed)?;
+        inner.ledger = ledger;
+        Ok(value)
+    }
+
+    fn save(&self, ledger: &Ledger) -> Result<(), String> {
         self.ensure_storage_loaded()?;
         let bytes = serde_json::to_vec(ledger).map_err(|e| e.to_string())?;
         if bytes.len() > 32_000_000 {

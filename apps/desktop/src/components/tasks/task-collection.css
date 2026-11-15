@@ -69,22 +69,49 @@
   min-height: var(--control-height, 36px);
   font-size: var(--text-xs);
 }
+/* Archive appears with the row's hover or keyboard focus; it stays focusable while hidden,
+   and touch screens, which cannot hover, always show it. */
 .work-archive {
   flex-shrink: 0;
   min-width: var(--control-height, 36px);
   min-height: var(--control-height, 36px);
+  opacity: 0;
+  transition: opacity var(--motion-fast, 120ms) ease;
 }
 .work-cleanup {
   margin-bottom: 16px;
 }
 .work-board .work-item-row {
-  flex-wrap: wrap;
+  position: relative;
   border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  margin-bottom: 10px;
 }
+.work-board .work-item-row + .work-item-row {
+  margin-top: 8px;
+}
+/* On a card, archive sits in the corner instead of taking a row of its own. */
 .work-board .work-archive {
-  margin-left: auto;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.work-board .work-select {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+.work-item-row:is(:hover, :focus-within) .work-archive {
+  opacity: 1;
+}
+@media (hover: none), (pointer: coarse) {
+  .work-archive {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-archive {
+    transition: none;
+  }
 }
 .work-item:hover {
   background: var(--color-surface-hover);
@@ -100,6 +127,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.work-item-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: bottom;
+  color: var(--color-text-secondary);
+}
+.work-item-project .project-tree-mark {
+  width: 16px;
+  height: 16px;
+  font-size: 0.5625rem;
+}
+.work-item-project .project-tree-mark :is(svg, img) {
+  max-width: 11px;
+  max-height: 11px;
+}
+.work-item-project-hint {
+  color: var(--color-text-muted);
 }
 .work-item-title {
   font-size: var(--text-sm);
@@ -125,19 +171,31 @@
 .work-board .work-item > .work-item-action {
   max-width: 100%;
 }
+/* Lanes sit side by side and never wrap under each other; a narrow window scrolls them. */
 .work-board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+  gap: 12px;
   align-items: start;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-gutter: stable;
+}
+.work-column {
+  min-width: 0;
+  padding: 8px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-sunken);
 }
 .work-column h2 {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 4px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--color-border);
+  min-height: 32px;
+  padding: 0 8px;
+  margin-bottom: 8px;
   font-size: var(--text-sm);
   font-weight: 500;
 }
@@ -145,25 +203,21 @@
 .work-column-empty {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 .work-column-empty {
-  padding: 24px 4px;
+  padding: 12px 8px 16px;
 }
 .work-board .work-item {
   flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
-  margin-bottom: 10px;
-  background: linear-gradient(to bottom, var(--color-surface-elevated), var(--color-surface));
-  box-shadow: 0 6px 18px -12px var(--color-accent-glow);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
 }
 .work-board .work-item:hover {
   background: var(--color-surface-hover);
-}
-.work-board .work-item-row > .work-item {
-  flex-basis: 100%;
-  margin-bottom: 0;
 }
 /* Fieldsets default to min-content width, which would let long titles widen the page. */
 .work-list {
@@ -182,6 +236,32 @@
   font-size: var(--text-sm);
   font-weight: 500;
   border-bottom: 1px solid var(--color-border-subtle);
+}
+/* Needs-you work outside the filtered project: a quiet line, never a second list. */
+.work-elsewhere {
+  padding: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.work-elsewhere-action {
+  color: var(--color-accent-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.work-elsewhere-action:hover {
+  text-decoration-thickness: 2px;
+}
+.work-elsewhere-action:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.work-subgroup {
+  padding: 10px 10px 4px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 .work-group h2 span,
 .work-finished > summary span {
@@ -203,14 +283,12 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
-@media (max-width: 1050px) {
-  .work-board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 640px) {
   .work-board {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
     grid-template-columns: minmax(0, 1fr);
+    overflow-x: visible;
   }
   .work-item {
     align-items: flex-start;
@@ -238,4 +316,12 @@
     order: -1;
     flex-basis: 100%;
   }
+}
+/* A lane is narrow, so a card's title may take two lines before it is cut. */
+.work-board .work-item-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  line-height: 1.4;
 }
