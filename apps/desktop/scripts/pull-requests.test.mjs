@@ -157,3 +157,38 @@ test('a tracked pull request places finished work', () => {
   // Failing checks still surface after a local merge.
   assert.equal(place('failing', {}, ['r']).stage, 'attention');
 });
+
+test('a followed pull request leads a finished task and leaves busy work alone', async () => {
+  const { pullRequestDecision, taskDecision } = await import('../src/lib/task-workflow.ts');
+  const run = {
+    id: 'r',
+    taskId: 't',
+    projectPath: 'C:/code/shop',
+    workspace: 'C:/code/shop/.worktrees/t',
+    targetBranch: 'main',
+    status: 'review',
+    result: 'Done.',
+    prompts: [],
+  };
+  const pr = (phase) => ({ ...trackedFrom(view(), { taskId: 't', runId: 'r' }), phase });
+  const settled = taskDecision(run, false, 2);
+  assert.equal(settled.action, 'Review and merge');
+  assert.deepEqual(pullRequestDecision(settled, pr('failing')), {
+    label: 'PR checks failed',
+    action: 'Fix checks',
+    section: 'delivery',
+    tone: 'warning',
+  });
+  assert.equal(pullRequestDecision(settled, pr('ready')).action, 'Merge pull request');
+  assert.equal(pullRequestDecision(settled, pr('merged')).action, 'View delivery');
+  assert.equal(pullRequestDecision(settled, pr('closed')), settled);
+  assert.equal(pullRequestDecision(settled, undefined), settled);
+  const asking = taskDecision({
+    ...run,
+    status: 'running',
+    prompts: [{ id: 'q', question: 'Which?', status: 'pending' }],
+  });
+  assert.equal(pullRequestDecision(asking, pr('failing')), asking);
+  const failed = taskDecision({ ...run, status: 'failed' });
+  assert.equal(pullRequestDecision(failed, pr('failing')), failed);
+});

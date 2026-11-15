@@ -1,4 +1,5 @@
 import { isActive, isDone } from '@jackalope/contracts/runs';
+import { pullRequestPhaseView, type TrackedPullRequest } from './pull-requests.ts';
 import type { TaskRun } from './run-types.ts';
 
 /**
@@ -65,6 +66,27 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
   return isolated
     ? state('Ready for your review', 'Review and merge', 'integrate')
     : state('Ready for your review', 'Review result', 'changes');
+}
+
+/**
+ * Lets a followed pull request lead a finished task's headline, so the task says what the
+ * work list says: fix its checks, wait for review, or merge it. Work that is running,
+ * asking or failed keeps its own headline.
+ */
+export function pullRequestDecision(
+  decision: ReturnType<typeof taskDecision>,
+  pullRequest: TrackedPullRequest | undefined,
+) {
+  if (!pullRequest || !['integrate', 'delivery', 'result', 'changes'].includes(decision.section))
+    return decision;
+  const view = pullRequestPhaseView(pullRequest.phase);
+  if (!view.stage) return decision;
+  return {
+    label: view.label,
+    action: view.stage === 'finished' ? 'View delivery' : view.action,
+    section: 'delivery',
+    tone: view.tone,
+  };
 }
 
 /**

@@ -45,9 +45,10 @@ import {
   stopTask,
 } from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';
-import { latestAttempt, taskDecision } from '../../lib/task-workflow';
+import { latestAttempt, pullRequestDecision, taskDecision } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
@@ -230,7 +231,11 @@ export function TaskDetail({
         useWorkViewStore.getState().setViewing(null);
     };
   }, [run.id]);
-  const decision = taskDecision(run, integrated, changedFiles);
+  const pullRequest = usePullRequestStore((state) => state.tracked[run.taskId]);
+  const decision = pullRequestDecision(
+    taskDecision(run, integrated, changedFiles),
+    isLatest ? pullRequest : undefined,
+  );
   const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
     run,
     draftKey: key,

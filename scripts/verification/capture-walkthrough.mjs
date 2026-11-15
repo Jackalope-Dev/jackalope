@@ -21,9 +21,23 @@ await mkdir(output, { recursive: true });
 
 // The full-shell fixture the core flows check uses, so both show the same workspace.
 const source = await readFile('scripts/verification/verify-core-flows.mjs', 'utf8');
+// Added to it here: bots, followed pull requests and work in more states, so the walk
+// reaches the screens an empty workspace never shows.
+const extras = `
+import {useBotStore} from '/src/stores/botStore.ts';
+import {usePullRequestStore} from '/src/stores/pullRequestStore.ts';
+const ago=h=>new Date(Date.now()-h*3600000).toISOString();
+const bot=(id,name,role,style,color,agent)=>({id,name,role,instructions:role,agent,model:null,projectId:'atlas',connectionIds:null,routineIds:[],wakes:[],collaborate:true,pinned:false,createdAt:ago(90),updatedAt:ago(90),appearance:{style,color}});
+useBotStore.setState({bots:[bot('scout','Scout','Keeps dependencies healthy','cat','teal','codex'),bot('reviewer','Reviewer','Reads every change before you do','ghost','violet','codex'),bot('scribe','Scribe','Writes release notes from merged work','gem','amber','codex')],selectedId:'scout',seen:{},seenFloor:ago(1000)});
+const more=(id,prompt,extra={})=>({...base,id,taskId:id,prompt,...extra});
+useExecutionStore.setState(state=>({runs:[...state.runs,more('pr-failing','Speed up the dashboard query'),more('pr-checking','Tidy the settings page'),more('pr-ready','Fix the cart total'),more('running','Migrate the price table',{status:'running',endedAt:null}),more('question','Rename the billing module',{status:'running',endedAt:null,prompts:[{id:'q1',question:'Keep the old import path as an alias?',status:'pending'}]})]}));
+const pr=(taskId,phase,number,extra={})=>({taskId,runId:taskId,url:'https://github.com/example/atlas/pull/'+number,number,phase,failing:[],pending:0,checks:4,checkedAt:new Date(Date.now()+3600000).toISOString(),...extra});
+usePullRequestStore.setState({tracked:{'pr-failing':pr('pr-failing','failing',11,{failing:['build']}),'pr-checking':pr('pr-checking','checking',12,{pending:2}),'pr-ready':pr('pr-ready','ready',13)}});
+`;
 const fixture = source
   .slice(source.indexOf('const fixture = `') + 17, source.indexOf('`;\nasync function applyTheme'))
-  .replace("f.theme('dark');", `f.theme('${theme}');`);
+  .replace("f.theme('dark');", `f.theme('${theme}');`)
+  .replace('const mode=new URLSearchParams', `${extras}const mode=new URLSearchParams`);
 
 const browser = await chromium.launch({
   channel: process.env.UI_BROWSER_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : 'chrome'),
@@ -101,6 +115,23 @@ try {
   );
   await dismiss();
   await dismiss();
+  // An open task and its tabs.
+  // Opened from the keyboard: the list may still be settling, and a pointer click aimed at
+  // a row's old position would open its neighbour.
+  await step('task', async () => {
+    await page.locator('.work-item', { hasText: 'Speed up the dashboard query' }).focus();
+    await page.keyboard.press('Enter');
+    await page.locator('.work-item').first().waitFor({ state: 'detached' });
+  });
+  // The headline action leads to the pull request when one is followed.
+  await step('task-pull-request', () => button('Fix checks').click());
+  for (const name of ['Review', 'Activity'])
+    await step(`task-${slug(name)}`, () =>
+      main.getByRole('tab', { name, exact: false }).first().click(),
+    );
+  await step('task-question', () =>
+    page.locator('.work-sidebar-item', { hasText: 'Rename the billing' }).click(),
+  );
   await step('inbox', () => sidebar.getByRole('button', { name: 'Inbox', exact: true }).click());
   await step('command-search', () => page.keyboard.press('Control+k'));
   await dismiss();
@@ -140,6 +171,19 @@ try {
   await dismiss();
   await step('bots-new-bot', () => button('New bot').click());
   await dismiss();
+  await step('bots-project', () => page.locator('.bots-project').first().click());
+  await step('bots-project-options', () => button('Bot options').click());
+  await step('bots-share', () =>
+    page.getByRole('menuitem', { name: 'Share these bots…', exact: true }).click(),
+  );
+  await dismiss();
+  await step('bots-row-menu', () =>
+    page.locator('.bots-roster-item').nth(1).click({ button: 'right' }),
+  );
+  await dismiss();
+  await button('Bots')
+    .click()
+    .catch(() => {});
   await tabs('bots');
 
   // Agents and its sub-pages.
