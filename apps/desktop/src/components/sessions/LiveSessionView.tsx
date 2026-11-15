@@ -29,6 +29,7 @@ import {
 } from '../../lib/live-session';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import type { TaskRun } from '../../lib/run-types';
+import { sessionMarkdown } from '../../lib/session-export';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
 import { selectWork } from '../../lib/work-selection';
@@ -289,6 +290,26 @@ export function LiveSessionView({
                           onSelect: () =>
                             void act(() =>
                               sessionCommand('action', { id: session.id, action: 'finish' }),
+                            ),
+                        },
+                      ]
+                    : []),
+                  ...(session.messages.length
+                    ? [
+                        {
+                          id: 'copy-conversation',
+                          label: 'Copy conversation as Markdown',
+                          onSelect: () =>
+                            void act(() =>
+                              navigator.clipboard.writeText(
+                                sessionMarkdown(
+                                  session,
+                                  runs,
+                                  latest?.agent && latest.agent !== 'auto'
+                                    ? latest.agent
+                                    : 'Jackalope',
+                                ),
+                              ),
                             ),
                         },
                       ]
