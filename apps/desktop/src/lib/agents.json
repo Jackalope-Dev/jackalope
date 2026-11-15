@@ -293,7 +293,7 @@
     "shortName": "ACP agent",
     "vendor": "Agent Client Protocol",
     "description": "Connect any agent that speaks the Agent Client Protocol (ACP) over stdio JSON-RPC.",
-    "installUrl": "https://github.com/anthropics/agent-client-protocol",
+    "installUrl": "https://agentclientprotocol.com",
     "npmPackage": null,
     "binary": null,
     "family": null,

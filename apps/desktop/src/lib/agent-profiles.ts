@@ -98,8 +98,8 @@ export const setConfigDir = (agent: string, id: string | null, configDir: string
   invokeNative<void>('agent_profile_set_config_dir', { agent, id, configDir });
 
 export interface AgentProbeResult {
-  exists: boolean;
-  executable: boolean;
+  /** The path is a file this user may execute. */
+  valid: boolean;
   version: string | null;
   error: string | null;
 }

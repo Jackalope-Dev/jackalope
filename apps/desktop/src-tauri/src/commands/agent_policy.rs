@@ -314,6 +314,7 @@ macro_rules! tauri_commands {
         $next!($finish [$($done)*
             commands::agent_policy::agent_save_policy,
             commands::agent_policy::agent_probe_executable,
+            commands::agent_policy::agent_locate_executables,
         ] $($rest)*)
     };
 }
@@ -353,6 +354,34 @@ pub struct AgentProbeResponse {
     pub valid: bool,
     pub version: Option<String>,
     pub error: Option<String>,
+}
+
+/// Finds which of the named CLIs are installed, for offering known agents by name.
+/// Returns each found command with its absolute path; nothing is run.
+#[tauri::command]
+pub async fn agent_locate_executables(names: Vec<String>) -> Result<HashMap<String, String>, String> {
+    if names.len() > 64 {
+        return Err("Too many commands to look for.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        names
+            .into_iter()
+            .filter(|name| {
+                !name.is_empty()
+                    && name.len() <= 40
+                    && !name.starts_with('-')
+                    && name
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+            })
+            .filter_map(|name| {
+                let path = super::tasks::locate(&name)?;
+                Some((name, path.to_string_lossy().into_owned()))
+            })
+            .collect()
+    })
+    .await
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

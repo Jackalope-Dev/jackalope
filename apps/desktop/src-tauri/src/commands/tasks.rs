@@ -46,7 +46,7 @@ pub(super) use opencode::OpenCodeConfig;
 pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;
-pub(super) use runners::executable;
+pub(super) use runners::{executable, locate};
 pub use snapshots::{task_changes, TaskHighlight};
 
 use super::agents::{Bridge, Prompt, Protocol};
