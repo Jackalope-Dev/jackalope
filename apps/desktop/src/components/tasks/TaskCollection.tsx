@@ -623,6 +623,7 @@ const WorkCard = memo(
     before.item.title === after.item.title &&
     before.item.stage === after.item.stage &&
     before.item.statusLabel === after.item.statusLabel &&
+    before.item.pullRequest === after.item.pullRequest &&
     before.item.date === after.item.date &&
     before.item.run === after.item.run &&
     before.item.session === after.item.session &&

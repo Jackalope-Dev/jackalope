@@ -44,6 +44,7 @@ import {
   useActiveProject,
   useProjectStore,
 } from '../../stores/projectStore';
+import { observePullRequests } from '../../stores/pullRequestStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -151,6 +152,7 @@ export function Shell({
     [botSessions, botRuns, seen, seenFloor],
   );
   useEffect(observeManagedTasks, []);
+  useEffect(observePullRequests, []);
   const canvas = useRef<HTMLElement>(null);
   const removeReturnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {

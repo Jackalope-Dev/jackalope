@@ -347,6 +347,7 @@ macro_rules! tauri_commands {
             commands::notifications::notification_status,
             commands::notifications::notification_configure,
             commands::notifications::notification_test,
+            commands::notifications::notification_pull_request,
             commands::notifications::notification_take_open,
         ] $($rest)*)
     };
@@ -378,6 +379,43 @@ pub fn notification_configure(
 #[tauri::command]
 pub async fn notification_test(app: tauri::AppHandle) -> Result<(), String> {
     show(&app, "Task notifications are ready", None).await
+}
+
+/// Announces that a task's pull request moved to a state worth knowing about, under the
+/// same preferences as task notices. Activation opens the task.
+#[tauri::command]
+pub async fn notification_pull_request(
+    phase: String,
+    run_id: String,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let (title, attention) = match phase.as_str() {
+        "failing" => ("A pull request's checks failed", true),
+        "changes" => ("A pull request has changes requested", true),
+        "conflict" => ("A pull request has conflicts", true),
+        "ready" => ("A pull request is ready to merge", false),
+        "merged" => ("A pull request was merged", false),
+        _ => return Err("Unknown pull request state.".into()),
+    };
+    let notice = Notice {
+        key: String::new(),
+        run_id,
+        title,
+        attention,
+    };
+    let focused = app.get_webview_window("main").is_some_and(|window| {
+        window.is_focused().unwrap_or(false) && window.is_visible().unwrap_or(false)
+    });
+    let preferences = app
+        .state::<Notifications>()
+        .preferences
+        .lock()
+        .unwrap()
+        .clone();
+    if permitted(&preferences, &notice, focused) {
+        show(&app, notice.title, Some(notice.run_id)).await?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

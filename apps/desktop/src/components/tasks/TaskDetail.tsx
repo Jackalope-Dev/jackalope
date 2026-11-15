@@ -832,6 +832,7 @@ export function TaskDetail({
                         key={run.id}
                         run={run}
                         integrated={integrated}
+                        onFollowUp={canContinue ? (text) => addToReply(text, true) : undefined}
                         onHandoff={(text) => {
                           const id = useTaskStore.getState().addTask({
                             projectId: run.projectId,

@@ -4,6 +4,11 @@ import { taskAgents } from './agent-provider.ts';
 import { isAgentReview } from './agent-review.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
+import {
+  isOpenPullRequest,
+  pullRequestPhaseView,
+  type TrackedPullRequest,
+} from './pull-requests.ts';
 import type { QueueView } from './queue.ts';
 import type { TaskRun } from './run-types.ts';
 import { taskTitle, withoutLeadingId } from './task-title.ts';
@@ -13,6 +18,8 @@ const workStages = [
   { id: 'attention', label: 'Needs you' },
   { id: 'review', label: 'Ready to review' },
   { id: 'working', label: 'Working' },
+  // An open pull request waiting on checks or reviewers, not on the person.
+  { id: 'inReview', label: 'In review' },
   { id: 'ideas', label: 'Drafts' },
   { id: 'finished', label: 'Finished' },
 ] as const;
@@ -40,6 +47,22 @@ export interface WorkItem {
   archiveBlocked?: string;
   /** A question the person can answer now (see hasOpenQuestion); collection sets it. */
   question?: boolean;
+  /** The pull request this task opened, when one is tracked. */
+  pullRequest?: TrackedPullRequest;
+}
+
+/**
+ * Lets a tracked pull request place finished work: failing checks, requested changes and
+ * conflicts need the person, a pull request waiting on GitHub or reviewers does not, and a
+ * merged one is done. Work that is running or blocked on its own keeps its place.
+ */
+function withPullRequest(item: WorkItem, pullRequest: TrackedPullRequest | undefined): WorkItem {
+  if (!pullRequest) return item;
+  const view = pullRequestPhaseView(pullRequest.phase);
+  const settled = item.stage === 'review' || item.stage === 'finished';
+  if (!settled || !view.stage || (item.stage === 'finished' && !isOpenPullRequest(pullRequest)))
+    return { ...item, pullRequest };
+  return { ...item, pullRequest, stage: view.stage, statusLabel: view.label };
 }
 
 /**
@@ -84,6 +107,7 @@ export function workPresence(item: WorkItem): {
     run,
     item.managed?.request.agent ?? item.session?.request.agent ?? item.idea?.assignedAgent,
   );
+  const pullRequest = !question && item.pullRequest;
   const state = question
     ? 'waiting'
     : (run && isActive(run)) || item.stage === 'working'
@@ -106,9 +130,11 @@ export function workPresence(item: WorkItem): {
               ? 'Reply'
               : 'Open conversation'
       : run
-        ? item.stage === 'finished'
-          ? 'Open result'
-          : taskNextAction(run)
+        ? pullRequest && item.statusLabel === pullRequestPhaseView(pullRequest.phase).label
+          ? pullRequestPhaseView(pullRequest.phase).action
+          : item.stage === 'finished'
+            ? 'Open result'
+            : taskNextAction(run)
         : 'Open draft';
   return { agents, state, action };
 }
@@ -122,6 +148,8 @@ interface WorkspaceWorkOptions {
   archived?: boolean;
   /** Also list attempts that belong to a managed task. */
   nested?: boolean;
+  /** Tracked pull requests by task. */
+  pullRequests?: Record<string, TrackedPullRequest>;
 }
 
 export function collectWorkspaceWork(
@@ -134,6 +162,7 @@ export function collectWorkspaceWork(
     integratedRunIds = queue?.mergedRunIds ?? [],
     archived = false,
     nested = false,
+    pullRequests = {},
   }: WorkspaceWorkOptions = {},
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
@@ -153,6 +182,7 @@ export function collectWorkspaceWork(
     integratedRunIds,
     archived,
     nested,
+    pullRequests,
   );
   if (!archived)
     for (const { task, work } of managedWork) {
@@ -222,6 +252,7 @@ export function collectWork(
   integratedRunIds: string[] = [],
   archived = false,
   withReviews = false,
+  pullRequests: Record<string, TrackedPullRequest> = {},
 ): WorkItem[] {
   // Agent reviews belong to the task they review and open from its Review tab.
   const projectRuns = runs.filter(
@@ -264,7 +295,7 @@ export function collectWork(
     const idea = linkedIdeas.get(run.taskId);
     const active = isActive(run);
     const question = hasOpenQuestion(run);
-    items.push({
+    const item: WorkItem = {
       id: idea?.id ?? run.taskId,
       title: taskTitle(
         idea?.rawPrompt ?? original.get(run.taskId)?.prompt ?? run.prompt,
@@ -300,7 +331,8 @@ export function collectWork(
       archiveBlocked: blocked.has(run.taskId)
         ? 'Finish or resolve all attempts and save their history first. Tasks from a conversation stay with it.'
         : undefined,
-    });
+    };
+    items.push(withPullRequest(item, pullRequests[run.taskId]));
   }
   return items.sort(
     (a, b) =>

@@ -22,6 +22,7 @@ import { type Editor, editorName } from '../../lib/editor';
 import { fileManagerName } from '../../lib/native/env';
 import { type ActiveTab, workspaceView } from '../../lib/navigation';
 import { projectNameHints } from '../../lib/project-name-hints';
+import { pullRequestPhaseView } from '../../lib/pull-requests';
 import { type WorkItem, workPresence } from '../../lib/task-collection';
 import {
   openExternalSession,
@@ -66,6 +67,9 @@ const RECENT_PER_PROJECT = 3;
 function attentionReason(item: WorkItem): string | undefined {
   const run = item.run;
   if (run?.prompts?.some((prompt) => prompt.status === 'pending')) return 'Question waiting';
+  // A pull request that placed the row here is the reason.
+  if (item.pullRequest && item.statusLabel === pullRequestPhaseView(item.pullRequest.phase).label)
+    return item.statusLabel;
   if (run?.persistenceError) return 'History needs saving';
   if (run?.verificationError || run?.verification?.result.success === false) return 'Check failed';
   const error = item.session?.error || run?.error;
@@ -81,7 +85,13 @@ function closedState(item: WorkItem) {
   return [item.stage, item.date, item.run?.id, item.run?.status, questions].join('|');
 }
 
-const STAGE_ORDER: Record<string, number> = { attention: 0, review: 0, working: 1, finished: 2 };
+const STAGE_ORDER: Record<string, number> = {
+  attention: 0,
+  review: 0,
+  working: 1,
+  inReview: 1,
+  finished: 2,
+};
 
 /** Work started in the sidebar, grouped by project: what needs you, then running, then recent. */
 export function useProjectWork() {

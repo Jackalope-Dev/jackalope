@@ -859,6 +859,7 @@ export function LiveSessionView({
                         run={latest}
                         integrated={integrated}
                         onHandoff={integrated ? nextChat : append}
+                        onFollowUp={session.closed ? undefined : append}
                       />
                       <TaskLearning run={latest} allowSave />
                     </>

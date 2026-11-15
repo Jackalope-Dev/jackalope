@@ -4,6 +4,7 @@ import { useExternalSessionStore } from '../stores/externalSessionStore';
 import { useLiveSessionStore } from '../stores/liveSessionStore';
 import { useManagedTaskStore } from '../stores/managedTaskStore';
 import { useProjectStore } from '../stores/projectStore';
+import { usePullRequestStore } from '../stores/pullRequestStore';
 import { useTaskStore } from '../stores/taskStore';
 import { useWorkViewStore } from '../stores/workViewStore';
 import type { TaskRun } from './run-types';
@@ -120,9 +121,18 @@ export function useWorkspaceWork({
   const queue = useManagedTaskStore((state) => state.queue);
   const savedIdeas = useTaskStore((state) => state.tasks);
   const ideas = withoutDrafts ? noIdeas : savedIdeas;
+  const pullRequests = usePullRequestStore((state) => state.tracked);
   return useMemo(
-    () => collectWorkspaceWork(projectId, runs, { ideas, sessions, queue, archived, nested }),
-    [projectId, ideas, runs, sessions, queue, archived, nested],
+    () =>
+      collectWorkspaceWork(projectId, runs, {
+        ideas,
+        sessions,
+        queue,
+        archived,
+        nested,
+        pullRequests,
+      }),
+    [projectId, ideas, runs, sessions, queue, archived, nested, pullRequests],
   );
 }
 
