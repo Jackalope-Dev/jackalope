@@ -1,6 +1,7 @@
 import {
   Button,
   ConfirmDialog,
+  ContextMenu,
   DialogCloseButton,
   DialogContent,
   DialogHeader,
@@ -372,44 +373,66 @@ export function BotsWorkspace() {
               ]
                 .filter(Boolean)
                 .join(', ');
+              const latestReply = latest ? lastReplyAt(latest, sessionRuns) : null;
+              const actions: BotActions = {
+                bot,
+                onEdit: () => setEditing({ bot, draft: bot }),
+                onDelete: () => setDeleting(bot),
+                onRead: unread
+                  ? () => {
+                      for (const session of conversations)
+                        if (isUnread(session, sessionRuns, seen, seenFloor))
+                          useBotStore.getState().markSeen(session.id);
+                    }
+                  : undefined,
+                // Only a reply read tracking has seen arrive can become new again.
+                onUnread:
+                  latest && !unread && latestReply && latestReply > seenFloor
+                    ? () => useBotStore.getState().markUnread(latest.id)
+                    : undefined,
+              };
               return (
-                <div
-                  key={bot.id}
-                  className="bots-roster-item"
-                  data-selected={bot.id === selected?.id || undefined}
-                  data-unread={unread > 0 || undefined}
-                >
-                  <button
-                    type="button"
-                    className="bots-roster-open"
-                    aria-current={bot.id === selected?.id ? 'true' : undefined}
-                    aria-label={label === bot.name ? undefined : label}
-                    onClick={() => useBotStore.getState().openConversation(null, bot.id)}
-                  >
-                    <BotAvatar
-                      appearance={bot.appearance}
-                      agent={bot.agent}
-                      state={activity}
-                      unread={unread > 0}
-                    />
-                    <span className="bots-roster-copy">
-                      <strong>{bot.name}</strong>
-                      <small title={latest?.title ?? bot.role}>
-                        {latest?.title ?? (bot.role || 'No conversations yet')}
-                      </small>
-                    </span>
-                    {waiting > 0 && (
-                      <small className="bots-roster-count" aria-hidden="true">
-                        {waiting}
-                      </small>
-                    )}
-                  </button>
-                  <BotMenu
-                    bot={bot}
-                    onEdit={() => setEditing({ bot, draft: bot })}
-                    onDelete={() => setDeleting(bot)}
-                  />
-                </div>
+                <ContextMenu.Root key={bot.id}>
+                  <ContextMenu.Trigger asChild>
+                    <div
+                      className="bots-roster-item"
+                      data-selected={bot.id === selected?.id || undefined}
+                      data-unread={unread > 0 || undefined}
+                    >
+                      <button
+                        type="button"
+                        className="bots-roster-open"
+                        aria-current={bot.id === selected?.id ? 'true' : undefined}
+                        aria-label={label === bot.name ? undefined : label}
+                        onClick={() => useBotStore.getState().openConversation(null, bot.id)}
+                      >
+                        <BotAvatar
+                          appearance={bot.appearance}
+                          agent={bot.agent}
+                          state={activity}
+                          unread={unread > 0}
+                        />
+                        <span className="bots-roster-copy">
+                          <strong>{bot.name}</strong>
+                          <small title={latest?.title ?? bot.role}>
+                            {latest?.title ?? (bot.role || 'No conversations yet')}
+                          </small>
+                        </span>
+                        {waiting > 0 && (
+                          <small className="bots-roster-count" aria-hidden="true">
+                            {waiting}
+                          </small>
+                        )}
+                      </button>
+                      <BotMenu {...actions} />
+                    </div>
+                  </ContextMenu.Trigger>
+                  <ContextMenu.Portal>
+                    <ContextMenu.Content className="workspace-menu min-w-52">
+                      <BotMenuItems menu={ContextMenu} {...actions} />
+                    </ContextMenu.Content>
+                  </ContextMenu.Portal>
+                </ContextMenu.Root>
               );
             })}
           </nav>
@@ -642,43 +665,78 @@ function HubMenu({
   );
 }
 
-function BotMenu({
-  bot,
-  onEdit,
-  onDelete,
-}: {
+interface BotActions {
   bot: Bot;
   onEdit: () => void;
   onDelete: () => void;
-}) {
+  /** Marks the bot's new replies read; absent when there are none. */
+  onRead?: () => void;
+  /** Shows the latest reply as new again; absent when it already is or there is none. */
+  onUnread?: () => void;
+}
+
+/**
+ * A bot's actions, shared by its options button and its right-click menu so both offer
+ * the same list. `menu` is the DropdownMenu or ContextMenu namespace.
+ */
+function BotMenuItems({
+  menu: M,
+  bot,
+  onEdit,
+  onDelete,
+  onRead,
+  onUnread,
+}: BotActions & { menu: typeof Menu | typeof ContextMenu }) {
+  return (
+    <>
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => useBotStore.getState().togglePin(bot.id)}
+      >
+        {bot.pinned ? 'Unpin' : 'Pin to top'}
+      </M.Item>
+      {onRead && (
+        <M.Item className="workspace-menu-item" onSelect={onRead}>
+          Mark as read
+        </M.Item>
+      )}
+      {onUnread && (
+        <M.Item className="workspace-menu-item" onSelect={onUnread}>
+          Mark as unread
+        </M.Item>
+      )}
+      <M.Item className="workspace-menu-item" onSelect={onEdit}>
+        Edit bot
+      </M.Item>
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => useBotStore.getState().duplicate(bot.id)}
+      >
+        Duplicate
+      </M.Item>
+      <M.Separator className="menu-separator" />
+      <M.Item className="workspace-menu-item" onSelect={onDelete}>
+        Delete bot…
+      </M.Item>
+    </>
+  );
+}
+
+function BotMenu(actions: BotActions) {
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <button type="button" className="bots-roster-more" aria-label={`${bot.name} options`}>
+        <button
+          type="button"
+          className="bots-roster-more"
+          aria-label={`${actions.bot.name} options`}
+        >
           <MoreHorizontal size={16} aria-hidden="true" />
         </button>
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-          <Menu.Item
-            className="workspace-menu-item"
-            onSelect={() => useBotStore.getState().togglePin(bot.id)}
-          >
-            {bot.pinned ? 'Unpin' : 'Pin to top'}
-          </Menu.Item>
-          <Menu.Item className="workspace-menu-item" onSelect={onEdit}>
-            Edit bot
-          </Menu.Item>
-          <Menu.Item
-            className="workspace-menu-item"
-            onSelect={() => useBotStore.getState().duplicate(bot.id)}
-          >
-            Duplicate
-          </Menu.Item>
-          <Menu.Separator className="menu-separator" />
-          <Menu.Item className="workspace-menu-item" onSelect={onDelete}>
-            Delete bot…
-          </Menu.Item>
+          <BotMenuItems menu={Menu} {...actions} />
         </Menu.Content>
       </Menu.Portal>
     </Menu.Root>
