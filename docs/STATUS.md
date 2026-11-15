@@ -68,7 +68,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   project's preparation, verification and terminal commands (Project settings), each run
   only when chosen. Saved prompts from earlier versions become project workflows and saved
   commands become terminal commands when a project first opens; the saved list is kept
-  unchanged. Optional local output retention restores a stopped
+  unchanged. Local output retention, on by default, restores a stopped
   snapshot of up to 256 KiB per pane; it never restarts commands.
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
@@ -413,10 +413,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   lesson, especially one agents keep missing, into an architecture, type, lint or test
   check proven against a past instance; accepting it marks the lesson enforced and
   retires learned lessons, and a check that later disappears restores or flags the
-  lesson. Off by default per project: agent
-  reflection with the default agent after work ends (bounded, on that account's
-  quota, through the same gate), and mirroring active lessons into a marked
-  `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
+  lesson. On by default per project: agent
+  reflection with the default agent after work ends (bounded to 4 an hour and 20 a
+  day, on that account's quota, through the same gate). Off by default: mirroring
+  active lessons into a marked `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
   off by default and layered on settings sync, matches projects by repository and
   merges by revision; evidence, use counts and paths stay local. Installed
   multi-desktop sync, real-provider agent reflection and exported-file use by other

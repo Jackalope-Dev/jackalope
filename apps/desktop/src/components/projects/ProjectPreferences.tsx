@@ -550,7 +550,7 @@ export function ProjectPreferences({
               >
                 <Switch
                   label="Reflect with an agent"
-                  checked={project.preferences?.agentReflection === true}
+                  checked={project.preferences?.agentReflection !== false}
                   onCheckedChange={(agentReflection) =>
                     updateProjectPreferences(project.id, { agentReflection })
                   }

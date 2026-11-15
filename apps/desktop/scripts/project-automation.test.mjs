@@ -47,6 +47,7 @@ test('changes list only what a preset would change, with labels', () => {
       ['automaticSubtasks', false],
       ['autoVerify', false],
       ['learnAutomatically', false],
+      ['agentReflection', false],
       ['askBeforeRounds', true],
     ],
   );

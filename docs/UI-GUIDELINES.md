@@ -206,9 +206,12 @@ Inspection failure must not block setup.
 
 Defaults aim at the best first experience and stay easy to turn off: a new project checks
 finished work with its saved check command (`checksAutomatically` is the one reader of
-that setting), keeps the computer awake while agents work, and downloads a found update
-for the next restart. A default that spends an account's quota, publishes, shares data
-beyond what sign-in disclosed, or starts something at login stays off until chosen.
+that setting), reflects on finished work with the default agent within its hourly and
+daily caps, keeps the computer awake while agents work, restores a stopped terminal's
+output, and downloads a found update for the next restart. People rarely find a setting
+that starts off, so a useful one starts on. What stays off until chosen: anything that
+writes into the person's repository, publishes, shares data beyond what sign-in
+disclosed, lets an agent decide in the person's place, or starts something at login.
 
 App appearance/privacy and account access precede the project setup steps.
 Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.

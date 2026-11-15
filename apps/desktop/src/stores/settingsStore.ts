@@ -71,7 +71,7 @@ const DEFAULT_SETTINGS: Omit<
   terminalShell: 'default',
   preferredEditor: 'vscode',
   terminalLinks: true,
-  retainTerminalOutput: false,
+  retainTerminalOutput: true,
   shortcuts: {},
   dictationEndpoint: '',
   dictationModel: 'whisper-1',
