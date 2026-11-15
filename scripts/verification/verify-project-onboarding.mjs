@@ -40,6 +40,7 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
  }
  if(command==='project_git_policy')return args.policy||{attribution:'agent',name:'Fixture',email:'fixture@example.invalid',cleanupAfterMerge:true,autoCheckpoint:true};
  if(command==='routing_settings')return {mode:'agent',defaultMode:'agent',projectMode:null,jevFallback:'local',connected:false,hasKey:false,checkedAt:null,storageError:null,revision:0};
+ if(command==='system_detect_env_keys')return [];
  if(command==='queue_snapshot')return {items:[],mergedRunIds:[],enabledProjects:[]};
  return null;
 }};

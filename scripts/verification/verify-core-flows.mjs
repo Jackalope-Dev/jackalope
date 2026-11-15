@@ -46,6 +46,8 @@ if(mode) window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
  if(command==='git_commit_changes')return 'abc1234';
  if(command==='git_push_changes')return 'Pushed task/search to origin/task/search.';
  if(command==='task_pull_request_create')return 'https://github.com/example/example/pull/2';
+ if(command==='task_pull_request_status')return {url:args.url,number:2,state:'OPEN',headRefOid:'local-head',mergeable:'MERGEABLE',reviewDecision:'',statusCheckRollup:[{name:'Build',status:'IN_PROGRESS'}]};
+ if(command==='notification_pull_request')return;
  if(command==='task_delivery_status')return {head:'local-head',branch:'task/search',changed:true,upstream:'origin/task/search',ahead:1,behind:0,pullRequest:args.remote?{url:'https://github.com/example/example/pull/1',state:'OPEN',headRefOid:'different-head',statusCheckRollup:[{name:'Build',conclusion:'FAILURE'}]}:null,remoteNote:'Fixture state only',checkedAt:'2026-09-11T12:00:00Z'};
  throw new Error('Unexpected fixture command: '+command);
 }};
@@ -88,7 +90,7 @@ try {
     }),
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
+  await page.locator('.work-header-switch').waitFor();
   // Trial passes live in Settings → Invitations while signup is invitation-based.
   await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
   await page.getByRole('button', { name: 'Invitations', exact: true }).click();
@@ -101,11 +103,17 @@ try {
     .getByRole('button', { name: 'Inbox', exact: true })
     .click();
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
+  // Work that needs the person counts too, so fixture notices add to that baseline.
+  await page.evaluate(() => window.coreFixture.notices(0));
+  const badgeText = () =>
+    page.evaluate(() => document.querySelector('.companion-badge')?.textContent?.trim() ?? '0');
+  const waiting = Number(await badgeText());
   for (const count of [1, 10, 100]) {
     await page.evaluate((value) => window.coreFixture.notices(value), count);
+    const total = waiting + count;
     await page
       .locator('.companion-badge')
-      .filter({ hasText: count > 99 ? '99+' : String(count) })
+      .filter({ hasText: total > 99 ? '99+' : String(total) })
       .waitFor();
     const badge = await page.locator('.companion-badge').boundingBox();
     assert.equal(badge.width, badge.height, 'Notification badge must stay circular');
@@ -140,6 +148,11 @@ try {
   await page.setViewportSize({ width: 1280, height: 840 });
   // Work opened from the sidebar lists every project.
   await page.locator('.work-item').filter({ hasText: 'Improve billing' }).waitFor();
+  // Inbox opens on what needs the person; clearing that filter shows the rest.
+  // Pressed from the keyboard: the list is still settling after the resize above, and a
+  // pointer click aimed at the button's old position would miss it.
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).focus();
+  await page.keyboard.press('Enter');
   await page.locator('.work-item').filter({ hasText: 'Live keyboard exploration' }).waitFor();
   const rows = page.locator('.work-item');
   await rows.first().focus();
@@ -251,10 +264,14 @@ try {
   await page
     .getByText('The PR head differs from the inspected local revision.', { exact: false })
     .waitFor();
-  await page.getByText('1 CI check failed', { exact: false }).waitFor();
-  await page.getByRole('button', { name: 'Ask the agent to fix', exact: true }).click();
+  // A pull request found on the branch is followed from then on, with its failing checks.
+  const pullRequest = page.getByRole('region', { name: 'Pull request', exact: true });
+  await pullRequest.getByText('PR checks failed', { exact: true }).waitFor();
+  assert.match(await pullRequest.innerText(), /1 of 1 check failed[\s\S]*Failed: Build/);
+  await pullRequest.getByRole('button', { name: 'Ask the agent to fix', exact: true }).click();
+  await page.waitForFunction(() => window.coreFixture.handoff.includes('- Build'));
   const repair = await page.evaluate(() => window.coreFixture.handoff);
-  assert.match(repair, /- Build: FAILURE/);
+  assert.match(repair, /pull\/1[\s\S]*- Build/);
   assert.match(repair, /Do not commit, push/);
   await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Ask the agent to prepare…' }).click();
@@ -262,11 +279,17 @@ try {
   assert.match(await page.evaluate(() => window.coreFixture.handoff), /Do not commit, push/);
   assert.equal(
     await page.evaluate(() =>
-      window.coreFixture.calls.some((call) => /push|deploy|create/.test(call.command)),
+      window.coreFixture.calls.some((call) => /push|deploy|create|merge/.test(call.command)),
     ),
     false,
   );
   await page.screenshot({ path: `${output}/delivery.png` });
+  // Stop following it, so the task can open a pull request of its own.
+  await pullRequest.getByRole('button', { name: 'Pull request options', exact: true }).click();
+  await page
+    .getByRole('menuitem', { name: 'Stop following this pull request', exact: true })
+    .click();
+  await pullRequest.waitFor({ state: 'hidden' });
   await page.goto(`${url}/?mode=delivery`);
   await page.getByRole('button', { name: 'Create pull request', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Create pull request' });
@@ -281,7 +304,10 @@ try {
     'Opening the dialog must not publish anything',
   );
   await dialog.getByRole('button', { name: 'Open draft pull request', exact: true }).click();
-  await page.getByText('Pull request opened.', { exact: true }).waitFor();
+  // The new pull request is followed straight away and replaces the create action.
+  await pullRequest.getByText('Pull request #2', { exact: true }).waitFor();
+  await pullRequest.getByText('PR checks running', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Create pull request' }).count(), 0);
   const published = await page.evaluate(() =>
     window.coreFixture.calls
       .filter((call) => /commit_changes|push|pull_request_create/.test(call.command))
@@ -294,7 +320,7 @@ try {
   ]);
   assert.deepEqual(errors, []);
   console.log(
-    'Core flow browser fixtures passed: scoped unified work, visible attention items, keyboard navigation, project/task search, preview setup/readiness/feedback, guarded delivery drafts, CI repair drafts and confirmed pull request creation. No native execution.',
+    'Core flow browser fixtures passed: scoped unified work, visible attention items, keyboard navigation, project/task search, preview setup/readiness/feedback, guarded delivery drafts, followed pull requests with CI repair drafts and confirmed pull request creation. No native execution.',
   );
 } catch (error) {
   const page = browser.contexts()[0]?.pages()[0];
