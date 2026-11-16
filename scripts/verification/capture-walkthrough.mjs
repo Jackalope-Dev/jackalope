@@ -198,8 +198,6 @@ try {
   for (const [index, label] of sections.entries()) {
     if (index === 0) continue;
     await step(`settings-${slug(label)}`, async () => {
-      // Some entries open another page; come back for the next one.
-      if (!(await page.locator('.settings-sidebar').count())) await button('Settings').click();
       await page.locator('.settings-sidebar button').nth(index).click();
     });
   }

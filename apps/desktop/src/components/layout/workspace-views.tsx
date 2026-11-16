@@ -169,10 +169,12 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
   ),
   preferences: (ctx) => (
     <SettingsPage
-      key={`${ctx.settings.category}:${ctx.settings.projectId ?? 'app'}`}
-      initialCategory={ctx.settings.category}
+      key={ctx.settings.projectId ?? 'app'}
+      category={ctx.settings.category}
+      onCategory={ctx.settings.open}
       initialProjectId={ctx.settings.projectId}
       onClose={ctx.settings.close}
+      renderPage={(tab, open) => VIEW_PAGES[tab]({ ...ctx, open })}
     />
   ),
 };

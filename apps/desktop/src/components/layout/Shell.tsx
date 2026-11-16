@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
-import { navigateWorkspace, openDevices, useAppEvent } from '../../lib/app-events';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
@@ -89,6 +89,7 @@ import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import { COMMANDS, type Command, type CommandContext, findCommand } from './commands';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
+import { useWorkspaceHistory } from './useWorkspaceHistory';
 import { VIEW_PAGES, type ViewContext } from './workspace-views';
 
 // The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
@@ -365,10 +366,9 @@ export function Shell({
   }, []);
   useAppEvent('navigate', navigate);
   useAppEvent('open-settings', (destination) => {
-    // App-wide entries that moved to their own page (Devices, Routing, Tools…) open it.
-    const page = typeof destination === 'string' && categoryEntry(destination).page;
-    if (page === 'remote-hosts') return openDevices('share');
-    if (page) return navigate(page);
+    // Search-only entries stand for a page outside Settings, so they open it.
+    const entry = typeof destination === 'string' ? categoryEntry(destination) : undefined;
+    if (entry?.page && entry.hidden) return navigate(entry.page);
     setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
     setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
     setActiveTab('preferences');
@@ -381,6 +381,27 @@ export function Shell({
     selectProject(projectId);
     setActiveTab('cloud-resources');
   });
+  const history = useWorkspaceHistory(
+    {
+      tab: activeTab,
+      projectId: activeProjectId,
+      ...(activeTab === 'preferences' && { category: settingsCategory, settingsProjectId }),
+    },
+    (target) => {
+      const known = projects.some((item) => item.id === target.projectId);
+      const reached = { ...target, projectId: known ? target.projectId : activeProjectId };
+      if (reached.projectId && reached.projectId !== activeProjectId) {
+        selectWork();
+        selectProject(reached.projectId);
+      }
+      if (reached.tab === 'preferences') {
+        setSettingsCategory((reached.category as SettingsCategory | undefined) ?? 'General');
+        setSettingsProjectId(reached.settingsProjectId);
+      }
+      setActiveTab(reached.tab as ActiveTab);
+      return reached;
+    },
+  );
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
@@ -507,6 +528,7 @@ export function Shell({
       <ResizeHandles />
       <TitleBar
         themePicker
+        history={history}
         settings={{
           open: toggleSettings,
           shortcut: displayShortcut(shortcuts.settings),
@@ -695,7 +717,7 @@ export function Shell({
           {activeTab === 'kanban' && <WorkTabs />}
           <PageErrorBoundary
             feature={view.feature}
-            key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
+            key={`${activeTab}:${activeProjectId}`}
             onBack={
               activeTab === DEFAULT_WORKSPACE_TAB
                 ? undefined

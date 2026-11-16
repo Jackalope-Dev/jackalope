@@ -1,5 +1,16 @@
 [
   {
+    "id": "back-and-forward-and-settings-that-stay-in-settings",
+    "date": "2026-11-16",
+    "title": "Back and Forward, and settings that stay in Settings",
+    "description": "Easier to move around the app and find your way back.",
+    "items": [
+      "Back and Forward buttons sit beside the app name; Alt+Left and Alt+Right (Cmd+[ and Cmd+] on Mac) and a mouse's side buttons work too.",
+      "Agents, Routing, Tools, Connected apps and Devices now open inside Settings instead of taking you to another page.",
+      "A site icon fetched for a project shows in the icon dialog straight away."
+    ]
+  },
+  {
     "id": "a-clearer-board-better-defaults-and-a-button-fix",
     "date": "2026-11-15",
     "title": "A clearer board, better defaults and a button fix",

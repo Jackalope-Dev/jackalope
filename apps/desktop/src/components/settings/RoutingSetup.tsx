@@ -462,7 +462,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
           disabled={saving}
         />
         {projectId && settings && (
-          <div className="routing-detail">
+          <div className="routing-detail routing-scope">
             {settings.projectMode
               ? 'This project overrides the app default.'
               : 'This project inherits the app default.'}

@@ -1,5 +1,14 @@
 import { DiscordIcon, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
-import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  LifeBuoy,
+  Minus,
+  RotateCw,
+  Settings2,
+  Square,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
@@ -8,6 +17,7 @@ import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { HISTORY_KEYS } from './useWorkspaceHistory';
 
 const isMac = isMacPlatform();
 
@@ -31,12 +41,15 @@ export function TitleBar({
   themePicker = false,
   center,
   settings,
+  history,
 }: {
   themePicker?: boolean;
   /** Workspace controls centred in the bar, such as search. */
   center?: ReactNode;
   /** Opens Settings from the bar; screens without a settings page leave it out. */
   settings?: { open: () => void; shortcut: string; current: boolean };
+  /** Back and Forward through visited pages; a step that is not there is left undefined. */
+  history?: { back?: () => void; forward?: () => void };
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
@@ -87,6 +100,39 @@ export function TitleBar({
           <div className="app-titlebar-label" data-tauri-drag-region>
             <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
             <span>Jackalope{edition}</span>
+          </div>
+        )}
+        {history && (
+          // biome-ignore lint/a11y/useSemanticElements: a fieldset would add form semantics to window chrome.
+          <div
+            className="app-titlebar-history"
+            role="group"
+            aria-label="Page history"
+            onMouseDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            <Tooltip content={`Back (${HISTORY_KEYS.back})`}>
+              <button
+                type="button"
+                className="app-titlebar-history-step"
+                aria-label="Back"
+                disabled={!history.back}
+                onClick={history.back}
+              >
+                <ArrowLeft size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+            <Tooltip content={`Forward (${HISTORY_KEYS.forward})`}>
+              <button
+                type="button"
+                className="app-titlebar-history-step"
+                aria-label="Forward"
+                disabled={!history.forward}
+                onClick={history.forward}
+              >
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
           </div>
         )}
       </div>
