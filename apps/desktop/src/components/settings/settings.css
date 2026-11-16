@@ -357,6 +357,12 @@
   min-height: var(--control-height-compact, 32px);
   cursor: pointer;
 }
+/* A workspace page shown as a category flows in the settings column, which scrolls. */
+.settings-content .settings-section > .workspace-page-layout {
+  padding: 0;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
 .settings-nav-group {
   display: grid;
   gap: 2px;
