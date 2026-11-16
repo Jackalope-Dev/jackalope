@@ -25,7 +25,7 @@ automatic checks; reserve full setup and verification for work that changes file
 
 ## Navigation and copy
 
-The title bar holds command search, the sidebar navigates projects and their work, and
+The title bar holds Back and Forward (beside the app name) and command search, the sidebar navigates projects and their work, and
 the status bar shows the focused project's branch and activity. Peer workspace views use
 WorkspacePage for gutters and scrolling,
 WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
@@ -186,6 +186,11 @@ window chrome can follow platform sizing. Dialogs retain viewport space and scro
 small windows. Respect reduced motion, including preference changes while open.
 
 ## Setup, settings and accounts
+
+Settings keeps people in Settings: a category that is also a workspace page (Agents,
+Routing, Tools, Connected apps, Devices) renders that page in the settings column instead
+of linking away. Only search-only entries for per-project pages open elsewhere. Back and
+Forward step through pages, projects and settings categories.
 
 Keep setup provisional until workspace entry. Preserve project choice, task
 drafts and explicit preferences across Back, retry and reload. First-run project

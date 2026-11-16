@@ -210,12 +210,18 @@ function WebsiteIconField({ project, onDone }: { project: Project; onDone: () =>
 
 /** Picks the mark shown for a project in the sidebar; choosing applies it straight away. */
 export function ProjectIconDialog({
-  project,
+  project: opened,
   onOpenChange,
 }: {
   project: Project | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  // Callers hold the project they opened the dialog for; read the saved one so an
+  // icon applied here shows in this dialog rather than on the next open.
+  const saved = useProjectStore((state) =>
+    opened ? state.projects.find((candidate) => candidate.id === opened.id) : undefined,
+  );
+  const project = opened ? (saved ?? opened) : null;
   const choose = (icon: string | undefined) => {
     if (project) useProjectStore.getState().updateProject(project.id, { icon });
     onOpenChange(false);

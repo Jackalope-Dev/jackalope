@@ -145,6 +145,16 @@
 .routing-connection form > .routing-detail {
   margin-top: 10px;
 }
+/* The project scope switch sits clear of the card it scopes. */
+.routing-page > .ui-segmented {
+  margin-bottom: 12px;
+}
+.routing-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
 .routing-preferences {
   display: grid;
   gap: 20px;

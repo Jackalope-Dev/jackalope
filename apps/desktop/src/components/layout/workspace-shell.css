@@ -183,7 +183,69 @@
    right; on macOS it follows the traffic lights, which tauri.macos.conf.json places on the
    bar's centre line in line with the sidebar's first button. */
 .app-titlebar-workspace .app-titlebar-left {
+  gap: 10px;
   padding-inline-start: 8px;
+}
+/* Back and Forward: two buttons joined in one capsule beside the app name. */
+.app-titlebar-history {
+  display: flex;
+  flex-shrink: 0;
+  height: 26px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+}
+.app-titlebar-history-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.app-titlebar-history-step + .app-titlebar-history-step {
+  border-inline-start: 1px solid var(--color-border-subtle);
+}
+.app-titlebar-history-step:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.app-titlebar-history-step:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.55;
+  cursor: default;
+}
+.app-titlebar-history-step:focus-visible {
+  outline-offset: -2px;
+}
+/* Narrow windows keep the mark and drop the name, so the history buttons clear the search. */
+@media (max-width: 900px) {
+  .app-titlebar-workspace .app-titlebar-left .app-titlebar-label span {
+    display: none;
+  }
+}
+@media (max-width: 1060px) {
+  .app-titlebar-mac.app-titlebar-workspace .app-titlebar-left .app-titlebar-label span {
+    display: none;
+  }
+}
+html[data-window-glass] .app-titlebar .app-titlebar-history {
+  border-color: var(--glass-edge);
+  background: var(--glass-chrome);
+}
+@media (pointer: coarse) {
+  .app-titlebar-history {
+    height: 32px;
+  }
+  .app-titlebar-history-step {
+    width: 40px;
+  }
 }
 .app-titlebar-mac .app-titlebar-left {
   min-width: 78px;

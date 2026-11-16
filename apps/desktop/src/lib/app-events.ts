@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { type DevicesTab, useViewTabStore } from '../stores/viewTabStore.ts';
 import type { ActiveTab } from './navigation';
 import type { AppSettingsCategory, ProjectSettingsCategory } from './settings-categories';
 
@@ -52,12 +51,6 @@ export function useAppEvent<K extends AppEvent>(name: K, handler: (detail: AppEv
 }
 
 export const navigateWorkspace = (tab: ActiveTab) => emitAppEvent('navigate', tab);
-
-/** Opens Devices on one of its tabs (this is where Hosts and Remote access now live). */
-export function openDevices(tab: DevicesTab) {
-  useViewTabStore.getState().setDevices(tab);
-  navigateWorkspace('remote-hosts');
-}
 
 export const openSettings = (category: AppSettingsCategory) =>
   emitAppEvent('open-settings', category);
