@@ -1,15 +1,11 @@
-import { Checkbox, ConfirmDialog, FormField, Input, Textarea } from '@jackalope/ui';
+import { describeError } from '@jackalope/contracts/errors';
+import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-
-/** Commit failures arrive as structured objects; everything else as text. */
-function message(cause: unknown) {
-  if (cause && typeof cause === 'object' && 'message' in cause)
-    return String((cause as { message: unknown }).message);
-  return String(cause);
-}
+import { useState } from 'react';
+import { invokeNative } from '../../lib/native/transport';
+import { workingChanges } from '../../lib/project-git';
+import type { TaskRun } from '../../lib/run-types';
+import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 
 /**
  * Commits the task's remaining changes with the project's commit policy, pushes
@@ -27,40 +23,23 @@ export function CreatePullRequest({
   disabled?: boolean;
   onCreated: (url: string) => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
   const [draft, setDraft] = useState(true);
   const [uncommitted, setUncommitted] = useState<string[] | null>(null);
-  const [drafting, setDrafting] = useState(false);
-  const [draftError, setDraftError] = useState('');
-  const attempt = useRef(0);
   const checkout = { repoPath: run.projectPath, worktreePath: run.workspace };
-  const prepare = (open: boolean) => {
-    if (!open) return;
-    setTitle('');
-    setBody('');
-    setDraft(true);
-    setDraftError('');
-    setDrafting(true);
-    const current = ++attempt.current;
-    void nativeTask<{ title: string; body: string }>('git_generate_pull_request', {
+  const message = useDraftedMessage(() =>
+    invokeNative<{ title: string; body: string }>('git_generate_pull_request', {
       ...checkout,
       base: run.baseHead,
-    })
-      .then((text) => {
-        if (current !== attempt.current) return;
-        // Keep anything the person typed while the draft was being written.
-        setTitle((typed) => typed || text.title);
-        setBody((typed) => typed || text.body);
-      })
-      .catch((cause) => {
-        if (current === attempt.current) setDraftError(message(cause));
-      })
-      .finally(() => {
-        if (current === attempt.current) setDrafting(false);
-      });
+    }),
+  );
+  const title = message.title;
+  const prepare = (open: boolean) => {
+    if (!open) return;
+    message.reset();
+    setDraft(true);
+    message.write(false);
     setUncommitted(null);
-    void nativeTask<{ files: { path: string }[] }>('git_working_changes', checkout)
+    void workingChanges(checkout)
       .then((changes) => setUncommitted(changes.files.map((file) => file.path)))
       .catch(() => setUncommitted([]));
   };
@@ -68,24 +47,24 @@ export function CreatePullRequest({
     if (!title.trim()) throw new Error('Write a pull request title.');
     try {
       if (uncommitted?.length)
-        await nativeTask('git_commit_changes', {
+        await invokeNative('git_commit_changes', {
           ...checkout,
           paths: uncommitted,
           title: title.trim(),
           body: '',
           agents: run.agent ? [run.agent] : [],
         });
-      await nativeTask('git_push_changes', checkout);
+      await invokeNative('git_push_changes', checkout);
       onCreated(
-        await nativeTask<string>('task_pull_request_create', {
+        await invokeNative<string>('task_pull_request_create', {
           id: run.id,
           title: title.trim(),
-          body,
+          body: message.body,
           draft,
         }),
       );
     } catch (cause) {
-      throw new Error(message(cause));
+      throw new Error(describeError(cause));
     }
   };
   const steps = uncommitted?.length
@@ -109,31 +88,7 @@ export function CreatePullRequest({
     >
       {({ busy }) => (
         <div className="workspace-stack">
-          <FormField
-            label="Title"
-            description={
-              drafting
-                ? 'Drafting from the changes…'
-                : draftError
-                  ? `Could not draft from the changes: ${draftError}`
-                  : undefined
-            }
-          >
-            <Input
-              value={title}
-              placeholder={drafting ? 'Drafting…' : undefined}
-              disabled={busy}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </FormField>
-          <FormField label="Description">
-            <Textarea
-              rows={6}
-              value={body}
-              disabled={busy}
-              onChange={(event) => setBody(event.target.value)}
-            />
-          </FormField>
+          <DraftedMessageFields message={message} busy={busy} />
           <label className="flex items-center gap-3 min-h-11">
             <Checkbox
               checked={draft}

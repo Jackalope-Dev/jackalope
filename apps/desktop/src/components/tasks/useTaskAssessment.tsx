@@ -1,17 +1,14 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { managedTaskCommand } from '../../lib/managed-task';
-import type { RunRequest } from '../../lib/task-runtime';
+import type { RunRequest } from '../../lib/run-types';
 import {
   assessmentKey,
   assessTask,
   cancelAssessment,
   type TaskAssessment,
 } from '../../lib/task-strategy';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function useTaskAssessment() {
   const [assessment, setAssessment] = useState<{
@@ -40,7 +37,6 @@ export function useTaskAssessment() {
     operation.current = operationId;
     setBusy(true);
     try {
-      await syncAgentConfig();
       if (!mounted.current || operation.current !== operationId)
         throw new Error('Task assessment stopped.');
       const value = await assessTask(request, intent, operationId);
@@ -71,7 +67,6 @@ export function useTaskAssessment() {
     const assessment = latest.current;
     if (!assessment || assessment.key !== assessmentKey(request, intent))
       throw new Error('The task changed. Assess it again before creating a plan.');
-    await syncAgentConfig();
     let title = intent.trim().split('\n')[0];
     while (new TextEncoder().encode(title).length > 160)
       title = Array.from(title).slice(0, -1).join('');

@@ -1,0 +1,329 @@
+import type { Feature } from '@jackalope/contracts/telemetry';
+import {
+  Blocks,
+  BookOpen,
+  Bot,
+  BotMessageSquare,
+  CalendarClock,
+  ChartNoAxesColumn,
+  ClipboardList,
+  Cloud,
+  FileCheck2,
+  GitBranch,
+  GitCommitHorizontal,
+  GitFork,
+  History,
+  ListTodo,
+  type LucideIcon,
+  MonitorSmartphone,
+  Network,
+  Plug,
+  Route,
+  Settings2,
+  Share2,
+} from 'lucide-react';
+import { openExternalUrl } from './native/env.ts';
+import type { SettingsCategory } from './settings-categories';
+export type ViewGroup = 'tasks' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
+
+/**
+ * Every workspace view. Shell renders each page from workspace-views.tsx, records the
+ * view's telemetry feature and builds group subnavigation from these entries; command
+ * search lists them by label, description and keywords.
+ */
+interface ViewEntry {
+  id: string;
+  label: string;
+  /** The label in its group's subnavigation and the project menu. */
+  shortLabel?: string;
+  description: string;
+  icon: LucideIcon;
+  group: ViewGroup;
+  /** Listed in the sidebar's top navigation. */
+  primary?: boolean;
+  feature: Feature;
+  keywords?: string;
+  /** A search entry for a Settings category rather than a page of its own. */
+  settings?: SettingsCategory;
+  /** A page reached from another view, whose subnavigation item stays highlighted. */
+  within?: string;
+  /** The name the in-app helper opens this view by; Rust checks it against helper-destinations.json. */
+  helper?: string;
+  /** Left out of subnavigation and the project menu unless open (or Swarm is connected). */
+  listed?: 'when-open' | 'when-swarm';
+}
+
+export const WORKSPACE_VIEWS = [
+  {
+    id: 'kanban',
+    helper: 'tasks',
+    label: 'Work',
+    shortLabel: 'Tasks',
+    description: 'Tasks: plan, review and archive work.',
+    icon: ListTodo,
+    group: 'tasks',
+    primary: true,
+    feature: 'tasks',
+  },
+  {
+    id: 'bots',
+    label: 'Bots',
+    description: 'Saved agents with their own role, model, apps and routines.',
+    icon: BotMessageSquare,
+    group: 'bots',
+    primary: true,
+    feature: 'agents',
+  },
+  {
+    id: 'schedules',
+    helper: 'schedules',
+    label: 'Schedules',
+    description: 'Bots: recurring tasks and their run history.',
+    icon: CalendarClock,
+    group: 'bots',
+    feature: 'schedules',
+  },
+  {
+    id: 'remote-hosts',
+    label: 'Devices',
+    description: 'Use other computers from here, or let a phone or another computer use this one.',
+    icon: MonitorSmartphone,
+    group: 'hosts',
+    feature: 'connections',
+    keywords: 'hosts remote access phone companion pair pairing SSH Tailscale',
+  },
+  {
+    id: 'project-overview',
+    label: 'Project',
+    shortLabel: 'Overview',
+    description: 'Resume work, prepare your project and deliver results.',
+    icon: Network,
+    group: 'project',
+    feature: 'project',
+  },
+  {
+    id: 'changes',
+    label: 'Changes',
+    description: 'Project: review uncommitted work and commit it.',
+    icon: GitCommitHorizontal,
+    group: 'project',
+    feature: 'project',
+  },
+  {
+    id: 'worktrees',
+    helper: 'worktrees',
+    label: 'Worktrees',
+    description: 'Project: inspect and clean up branches.',
+    icon: GitBranch,
+    group: 'project',
+    feature: 'worktrees',
+  },
+  {
+    id: 'topology',
+    helper: 'project',
+    label: 'Codebase',
+    description: 'Explore codebase dependencies and project worktrees.',
+    icon: Network,
+    group: 'project',
+    feature: 'codebase',
+  },
+  {
+    id: 'project-knowledge',
+    helper: 'knowledge',
+    label: 'Context',
+    description: 'Project: repository context, saved lessons and workflows.',
+    icon: BookOpen,
+    group: 'project',
+    feature: 'knowledge',
+  },
+  {
+    id: 'repo-todos',
+    label: 'Repo TODOs',
+    shortLabel: 'TODOs',
+    description: 'Project: view, edit and create repository TODOs and roadmaps.',
+    icon: ListTodo,
+    group: 'project',
+    feature: 'project',
+  },
+  {
+    id: 'plans',
+    label: 'Plans',
+    description: 'Project: plans to review, approve and follow while they run.',
+    icon: ClipboardList,
+    group: 'project',
+    feature: 'tasks',
+  },
+  {
+    id: 'swarm',
+    label: 'Swarm',
+    description: 'Project: every agent fork on Artifacts and the conflicts between them.',
+    icon: GitFork,
+    group: 'project',
+    feature: 'project',
+    listed: 'when-swarm',
+  },
+  {
+    id: 'cloud-resources',
+    label: 'Cloud resources',
+    description: 'Project: Cloudflare storage, databases and queues for this project.',
+    icon: Cloud,
+    group: 'project',
+    feature: 'settings',
+    listed: 'when-open',
+  },
+  {
+    id: 'project-settings',
+    label: 'Project settings',
+    shortLabel: 'Settings',
+    description: 'Repository preferences, instructions and verification.',
+    icon: Settings2,
+    group: 'project',
+    feature: 'settings',
+  },
+  {
+    id: 'agents',
+    helper: 'agents',
+    label: 'Agents',
+    description: 'Agents, accounts, tools and usage.',
+    icon: Bot,
+    group: 'agents',
+    primary: true,
+    feature: 'agents',
+  },
+  {
+    id: 'mcps',
+    helper: 'mcp',
+    label: 'Tools',
+    description: 'Install and configure MCP tools.',
+    icon: Plug,
+    group: 'agents',
+    feature: 'connections',
+  },
+  {
+    id: 'mcp-marketplace',
+    label: 'Tool marketplace',
+    description: 'MCP: discover and install tools and services.',
+    icon: Plug,
+    group: 'agents',
+    feature: 'connections',
+    within: 'mcps',
+  },
+  {
+    id: 'connected-apps',
+    label: 'Connected apps',
+    shortLabel: 'Apps',
+    description: 'Agents: sign in to apps once through Composio for every agent.',
+    icon: Blocks,
+    group: 'agents',
+    feature: 'connections',
+  },
+  {
+    id: 'routing',
+    label: 'Routing',
+    description: 'Agents: how Jackalope picks an agent and model for each task.',
+    icon: Route,
+    group: 'agents',
+    feature: 'agents',
+    keywords: 'decisions automatic agent model cost tokens capacity Jev TypeSafe',
+  },
+  {
+    id: 'usage',
+    helper: 'usage',
+    label: 'Usage & quota',
+    shortLabel: 'Usage',
+    description: 'Agents: account limits and recorded token usage.',
+    icon: ChartNoAxesColumn,
+    group: 'agents',
+    feature: 'usage',
+  },
+  {
+    id: 'browser',
+    label: 'Evidence',
+    description: 'Tasks: screenshots and check results.',
+    icon: FileCheck2,
+    group: 'tasks',
+    feature: 'browser',
+  },
+  {
+    id: 'agent-settings',
+    helper: 'agent-settings',
+    label: 'Agent configuration',
+    description: 'Agents: accounts, models, paths and defaults.',
+    icon: Settings2,
+    group: 'agents',
+    feature: 'agents',
+    within: 'agents',
+  },
+  {
+    id: 'audit',
+    label: 'Diagnostics',
+    description: 'Settings: activity log, routing and discovery events.',
+    icon: History,
+    group: 'settings',
+    feature: 'settings',
+    settings: 'Diagnostics',
+  },
+  {
+    id: 'mesh',
+    label: 'System',
+    description: 'Settings: this computer and device information.',
+    icon: Share2,
+    group: 'settings',
+    feature: 'settings',
+    settings: 'System',
+  },
+  {
+    id: 'preferences',
+    helper: 'settings',
+    label: 'Settings',
+    description: 'App preferences, appearance, privacy and support.',
+    icon: Settings2,
+    group: 'settings',
+    feature: 'settings',
+  },
+] as const satisfies readonly ViewEntry[];
+export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
+/** Views with a page of their own; the others open a Settings category. */
+export type PageTab = Exclude<
+  ActiveTab,
+  Extract<(typeof WORKSPACE_VIEWS)[number], { settings: string }>['id']
+>;
+export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'kanban';
+
+export function workspaceView(id: ActiveTab): ViewEntry {
+  return WORKSPACE_VIEWS.find((item) => item.id === id) ?? WORKSPACE_VIEWS[0];
+}
+
+/** The view the in-app helper's `navigate` destination names, if any. */
+export function helperView(destination: string): ActiveTab | undefined {
+  return WORKSPACE_VIEWS.find((item: ViewEntry) => item.helper === destination)?.id;
+}
+
+/** The label a view shows in its group's subnavigation. */
+export function viewLabel(id: ActiveTab) {
+  const view = workspaceView(id);
+  return view.shortLabel ?? view.label;
+}
+
+/** The subnavigation item that stays highlighted while `id` is open. */
+export function highlightedView(id: ActiveTab) {
+  return (workspaceView(id).within as ActiveTab | undefined) ?? id;
+}
+
+export const PRIMARY_VIEWS = WORKSPACE_VIEWS.filter((item) => 'primary' in item && item.primary);
+
+/** The views a group's subnavigation and the project menu list. */
+export function groupViews(group: ViewGroup, open?: ActiveTab, swarmConnected = false) {
+  return WORKSPACE_VIEWS.filter((item: ViewEntry) => {
+    if (item.group !== group || item.within || item.settings) return false;
+    if (item.listed === 'when-open') return item.id === open;
+    if (item.listed === 'when-swarm') return swarmConnected || item.id === open;
+    return true;
+  });
+}
+
+const HELP_URL = 'https://jackalope.dev/knowledge/';
+
+export function openHelp() {
+  return openExternalUrl(HELP_URL);
+}

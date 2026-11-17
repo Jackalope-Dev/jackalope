@@ -1,7 +1,8 @@
-import type { ContextSelection } from './knowledge';
+import { isActive, isDone } from '@jackalope/contracts/runs';
+import type { ContextSelection } from './knowledge-types';
+import { invokeNative } from './native/transport.ts';
 import type { QueueView } from './queue';
-import type { RunRequest, TaskRun } from './task-runtime';
-import { isActive, nativeTask } from './task-runtime.ts';
+import type { RunRequest, TaskRun } from './run-types';
 import type { TaskAssessment } from './task-strategy';
 
 /** One assignment of a managed task's proposed plan, as its preview shows it. */
@@ -32,6 +33,8 @@ export interface ManagedTask {
     assignmentCount?: number;
     autoStarted?: boolean;
     spawnedSubtasks?: number;
+    /** Why the project's autonomy policy kept this ready result in review. */
+    held?: string | null;
   } | null;
   id: string;
   title: string;
@@ -50,7 +53,7 @@ export interface ManagedTask {
 export const managedTaskCommand = <T>(
   action: 'create' | 'start' | 'action' | 'preview',
   args: Record<string, unknown>,
-) => nativeTask<T>(`task_plan_${action}`, args);
+) => invokeNative<T>(`task_plan_${action}`, args);
 
 export const previewTaskPlan = (id: string) => managedTaskCommand<FeatureStep[]>('preview', { id });
 
@@ -117,7 +120,7 @@ export function managedTaskWork(task: ManagedTask, queue: QueueView, runs: TaskR
         (item.runId && !run) ||
         (run &&
           !isActive(run) &&
-          (!['review', 'reviewed'].includes(run.status) ||
+          (!isDone(run) ||
             run.error ||
             run.persistenceError ||
             run.verificationError ||
@@ -151,8 +154,7 @@ export function managedTaskWork(task: ManagedTask, queue: QueueView, runs: TaskR
         : 'Planning'
       : integrated
         ? 'Integrated'
-        : failed ||
-            (!task.started && (!planner || !['review', 'reviewed'].includes(planner.status)))
+        : failed || (!task.started && (!planner || !isDone(planner)))
           ? 'Needs attention'
           : interfaceIssue
             ? 'Needs attention'
@@ -189,8 +191,7 @@ export function managedTaskProgress(task: ManagedTask, work: ReturnType<typeof m
     ({ run }) => run && !isActive(run) && run.verification?.result.success,
   ).length;
   const implemented =
-    work.assignments.length > 0 &&
-    work.assignments.every(({ run }) => run && ['review', 'reviewed'].includes(run.status));
+    work.assignments.length > 0 && work.assignments.every(({ run }) => run && isDone(run));
   const stage = work.integrated
     ? 4
     : work.ready

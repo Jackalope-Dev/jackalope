@@ -1,49 +1,69 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Select, SelectItem, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { startComparison } from '../../lib/compare-launch';
-import type { ContextSelection } from '../../lib/knowledge';
+import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
-import { ATTACH_TO_COMPOSER, appendAttachments } from '../../lib/prompt-attachments';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { planCommands } from '../../lib/plan-mode';
+import { checksAutomatically } from '../../lib/project-automation';
+import { appendAttachments } from '../../lib/prompt-attachments';
 import { isQuestionOnly } from '../../lib/question-intent';
+import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
-import type { RunRequest } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { workspaceRequest } from '../../lib/workspace-mode';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { usePlanStore } from '../../stores/planStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
-import { PromptPresets } from '../tasks/PromptPresets';
 import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ChatOptions } from './ChatOptions';
 import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './ComposerAgentPicker';
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { selectWork } from '../../lib/work-selection';
+
+/** Saved work handed to the composer: a draft, an idea or an agent choice. */
+export interface ComposerSeed {
+  id: string;
+  text: string;
+  agent?: string;
+  contextSelection?: ContextSelection;
+  /** A review helper: no prepare command and no automatic checks. */
+  readOnly?: boolean;
+  /** The saved idea this replaces once the work starts. */
+  ideaId?: string;
+  draftKey?: string;
+}
 
 export function SessionStart({
   project,
   onOpenProject,
   embedded = false,
   starters = false,
+  seed,
+  onSeedApplied,
 }: {
   project?: Project;
   onOpenProject: () => void;
   embedded?: boolean;
   /** Offers editable first requests while the draft is empty. */
   starters?: boolean;
+  seed?: ComposerSeed | null;
+  onSeedApplied?: (seed: ComposerSeed) => void;
 }) {
   const draftKey = `jackalope-live-start:${project?.id ?? 'none'}`;
   const assessment = useTaskAssessment();
@@ -125,17 +145,12 @@ export function SessionStart({
   });
   const clearAssessment = useRef(assessment.clear);
   clearAssessment.current = assessment.clear;
-  useEffect(() => {
-    const receive = (event: Event) => {
-      const references = (event as CustomEvent<string[]>).detail;
-      if (!Array.isArray(references)) return;
-      clearAssessment.current();
-      setText((current) => appendAttachments(current, references));
-      input.current?.focus();
-    };
-    window.addEventListener(ATTACH_TO_COMPOSER, receive);
-    return () => window.removeEventListener(ATTACH_TO_COMPOSER, receive);
-  }, []);
+  useAppEvent('attach-to-composer', (references) => {
+    if (!Array.isArray(references)) return;
+    clearAssessment.current();
+    setText((current) => appendAttachments(current, references));
+    input.current?.focus();
+  });
   const latest = useRef(text);
   const sharpen = useSharpen({
     draft: text,
@@ -149,6 +164,33 @@ export function SessionStart({
     project: project && { id: project.id, name: project.name },
     maxChars: 12000,
   });
+  const [origin, setOrigin] = useState<{ readOnly?: boolean; ideaId?: string }>({});
+  const seedApplied = useRef(onSeedApplied);
+  seedApplied.current = onSeedApplied;
+  useEffect(() => {
+    if (!seed) return;
+    const incoming = seed.text.trim();
+    if (incoming)
+      setText((current) =>
+        current.trim() && current.trim() !== incoming
+          ? `${current}
+
+${incoming}`
+          : incoming,
+      );
+    if (seed.agent) setAgents([seed.agent]);
+    if (seed.contextSelection) setContext(seed.contextSelection);
+    setOrigin({ readOnly: seed.readOnly, ideaId: seed.ideaId });
+    clearAssessment.current();
+    seedApplied.current?.(seed);
+    input.current?.focus();
+  }, [seed]);
+  if (!text.trim() && (origin.readOnly || origin.ideaId)) setOrigin({});
+  /** Started work replaces the idea it came from. */
+  const finishOrigin = () => {
+    if (origin.ideaId) useTaskStore.getState().deleteTask(origin.ideaId);
+    if (mounted.current) setOrigin({});
+  };
   const mounted = useRef(true);
   const pending = useRef<{ id: string; messageId: string; text: string } | null>(null);
   const sending = useRef(false);
@@ -176,7 +218,7 @@ export function SessionStart({
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
   }, [draftKey, text, context, limits, codexSpeed, agentChoice, modelChoice]);
-  const send = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
+  const send = async (choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess') => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
     if ([...value].length > 12000) {
@@ -192,8 +234,7 @@ export function SessionStart({
     setBusy(true);
     setError('');
     try {
-      await syncAgentConfig();
-      if (comparing) {
+      if (comparing && choice !== 'interview') {
         const comparison = await startComparison({
           project,
           prompt: value,
@@ -205,6 +246,7 @@ export function SessionStart({
         localStorage.removeItem(`${draftKey}:context`);
         // A comparison is a one-off choice; the next message goes back to the project default.
         localStorage.removeItem(`${draftKey}:agents`);
+        finishOrigin();
         if (mounted.current) {
           setText(latest.current.trim() === value ? '' : latest.current);
           setAgents(null);
@@ -213,7 +255,7 @@ export function SessionStart({
         const first = useExecutionStore
           .getState()
           .runs.find((run) => run.taskId === comparison.taskIds[0]);
-        if (first) useExecutionStore.getState().select(first.id);
+        if (first) selectWork({ task: first.id });
         return;
       }
       const lead = chosen[0];
@@ -230,13 +272,26 @@ export function SessionStart({
         prompt: value,
         ...workspaceRequest(project),
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
-        verifyCommand: project.preferences?.verifyCommand,
+        verifyCommand: origin.readOnly ? undefined : project.preferences?.verifyCommand,
         // A question needs no installed dependencies; the agent can prepare if it must.
-        prepareCommand: isQuestionOnly(value) ? undefined : project.preferences?.prepareCommand,
+        prepareCommand:
+          origin.readOnly || isQuestionOnly(value)
+            ? undefined
+            : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
-        autoVerify: project.preferences?.autoVerify ?? true,
+        autoVerify: !origin.readOnly && checksAutomatically(project.preferences),
         contextSelection: context,
       };
+      if (choice === 'interview') {
+        const plan = await planCommands.start(request, value);
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem(`${draftKey}:context`);
+        finishOrigin();
+        if (mounted.current) setText('');
+        usePlanStore.getState().select(plan.id);
+        navigateWorkspace('plans');
+        return;
+      }
       let autoStart = false;
       if (choice === 'assess' && !limits.maxBatches && !limits.pauseAtEstimatedUsd) {
         const result = await assessment.assess(request, value);
@@ -245,6 +300,7 @@ export function SessionStart({
       }
       if (choice === 'plan' || autoStart) {
         await assessment.create(request, value, autoStart);
+        finishOrigin();
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
         return;
@@ -256,13 +312,14 @@ export function SessionStart({
         limits,
       });
       await useLiveSessionStore.getState().refresh(attempt.id);
+      finishOrigin();
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
       localStorage.removeItem(draftKey);
       localStorage.removeItem(`${draftKey}:context`);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
+      if (mounted.current) setError(describeError(cause));
     } finally {
       sending.current = false;
       if (mounted.current) setBusy(false);
@@ -334,6 +391,7 @@ export function SessionStart({
             onCancel={() => void assessment.cancel()}
             onSingle={() => void send('single')}
             onPlan={() => void send('plan')}
+            onPlanWithMe={() => void send('interview')}
           />
           <div className="live-start-actions">
             <div className="live-start-tools">
@@ -344,14 +402,6 @@ export function SessionStart({
                   disabled={busy}
                 />
               )}
-              <PromptPresets
-                projectId={project.id}
-                onInsert={(prompt) => {
-                  assessment.clear();
-                  setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-                  input.current?.focus();
-                }}
-              />
               <DictationButton
                 disabled={busy}
                 onText={(value) => {
@@ -383,6 +433,14 @@ export function SessionStart({
                 triggerVariant="button"
                 triggerLabel="Options"
                 onClose={() => input.current?.focus()}
+                actions={[
+                  {
+                    id: 'plan-with-me',
+                    label: 'Plan with me',
+                    disabled: !text.trim() || busy || !isTauriEnvironment(),
+                    onSelect: () => void send('interview'),
+                  },
+                ]}
                 items={[
                   {
                     id: 'speed',

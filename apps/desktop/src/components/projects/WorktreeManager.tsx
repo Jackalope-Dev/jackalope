@@ -1,9 +1,18 @@
+import { describeError } from '@jackalope/contracts/errors';
 import {
   Badge,
   type BadgeProps,
+  Button,
+  ConfirmDialog,
+  EmptyState,
   IconButton,
+  InlineNotice,
+  Input,
+  LoadingState,
   DropdownMenu as Menu,
   RefreshIcon,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import {
   Archive,
@@ -21,31 +30,26 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
-import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
   cleanupWorktree,
-  isTauriEnvironment,
   listWorktreeOrphans,
   pruneWorktrees,
   removeWorktreeOrphan,
   type WorktreeEntry,
   type WorktreeOrphan,
-} from '../../lib/tauri-bridge';
+} from '../../lib/git-worktrees';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
+import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorktreeRemovalPlan as RemovalPlan } from './WorktreeRemovalPlan';
+import './worktrees.css';
 
 /** Ignored paths cleanup deletes, so a confirm never hides them. */
 
@@ -90,7 +94,6 @@ function displayPath(path: string, root?: string) {
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
   const {
-    projects,
     activeProjectId,
     loadWorktreesForActiveProject,
     spawnTaskWorktree,
@@ -99,7 +102,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     worktreesError,
   } = useProjectStore(
     useShallow((s) => ({
-      projects: s.projects,
       activeProjectId: s.activeProjectId,
       loadWorktreesForActiveProject: s.loadWorktreesForActiveProject,
       spawnTaskWorktree: s.spawnTaskWorktree,
@@ -108,7 +110,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       worktreesError: s.worktreesError,
     })),
   );
-  const project = projects.find((p) => p.id === activeProjectId);
+  const project = useActiveProject();
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');
   const [branch, setBranch] = useState<string | null>(null);
@@ -161,7 +163,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     if (!projectPath || measuring) return;
     setMeasuring(path);
     try {
-      const value = await nativeTask<{
+      const value = await invokeNative<{
         bytes: number;
         files: number;
         partial: boolean;
@@ -169,7 +171,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       }>('git_worktree_usage', { repoPath: projectPath, worktreePath: path });
       setSizes((previous) => ({ ...previous, [path]: value }));
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setMeasuring('');
     }
@@ -225,8 +227,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       await cleanupWorktree(project.path, worktree);
       if (projectId.current === id) setFeedback(`Removed ${name}.`);
     } catch (cause) {
-      if (projectId.current === id)
-        setError(cause instanceof Error ? cause.message : String(cause));
+      if (projectId.current === id) setError(describeError(cause));
     } finally {
       if (projectId.current === id) {
         setProgress('Rechecking the other worktrees…');
@@ -274,13 +275,12 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           await cleanupWorktree(project.path, worktree);
           removed++;
         } catch (cause) {
-          failures.push(`${worktree.branch || worktree.path}: ${String(cause)}`);
+          failures.push(`${worktree.branch || worktree.path}: ${describeError(cause)}`);
         }
       }
       if (failures.length && projectId.current === id) setError(failures.join('\n'));
     } catch (cause) {
-      if (projectId.current === id)
-        setError(`Cleanup stopped. ${cause instanceof Error ? cause.message : String(cause)}`);
+      if (projectId.current === id) setError(`Cleanup stopped. ${describeError(cause)}`);
     } finally {
       if (projectId.current === id) {
         setFeedback(`Removed ${removed} of ${candidates.length} worktrees.`);
@@ -306,8 +306,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             : 'No missing entries to remove.',
         );
     } catch (cause) {
-      if (projectId.current === id)
-        setError(cause instanceof Error ? cause.message : String(cause));
+      if (projectId.current === id) setError(describeError(cause));
     } finally {
       if (projectId.current === id) await refresh();
       setBusy(false);
@@ -327,7 +326,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         await removeWorktreeOrphan(project.path, folder);
         removed++;
       } catch (cause) {
-        failures.push(`${folder.name}: ${cause instanceof Error ? cause.message : String(cause)}`);
+        failures.push(`${folder.name}: ${describeError(cause)}`);
       }
     }
     if (projectId.current === id) {
@@ -410,7 +409,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         </div>
         <div className="workspace-actions">
           {(wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason && (
-            <ConfirmAction
+            <ConfirmDialog
               title={`Clean up ${wt.branch || 'worktree'}?`}
               description={`Removes this worktree folder and local branch. Changes are already merged into ${wt.cleanup.target_branch}.`}
               label="Remove worktree & branch"
@@ -437,10 +436,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   busyNote={`Removing ${wt.branch || wt.path}. This may take a moment…`}
                 />
               )}
-            </ConfirmAction>
+            </ConfirmDialog>
           )}
           {wt.cleanup?.recoverable && (
-            <ConfirmAction
+            <ConfirmDialog
               title={`Archive and remove ${wt.branch || 'worktree'}?`}
               description="Saves uncommitted work to .worktrees/.archive, then removes the folder and branch."
               label="Archive & remove"
@@ -466,7 +465,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   busyNote="Archiving uncommitted work and removing folder. This may take a moment…"
                 />
               )}
-            </ConfirmAction>
+            </ConfirmDialog>
           )}
           <Button
             variant="ghost"
@@ -644,7 +643,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )}
           {loading && <LoadingState label="Loading worktrees…" compact={!!worktrees.length} />}
           {checkingWorktrees && <LoadingState label="Checking merge and cleanup status…" compact />}
-          {worktreesError && <InlineNotice tone="error">{worktreesError}</InlineNotice>}
+          <ActionError error={worktreesError} />
           {active.length > 0 && (
             <section className="worktree-group" aria-labelledby="worktrees-active">
               <header className="worktree-group-heading">
@@ -672,7 +671,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     Merged with no uncommitted changes. Removing them keeps task history.
                   </p>
                 </div>
-                <ConfirmAction
+                <ConfirmDialog
                   title={`Clean up ${ready.length} ready worktrees?`}
                   description="Removes merged worktrees and local branches. Task history is kept."
                   label="Clean up ready"
@@ -693,7 +692,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                       progress={progress}
                     />
                   )}
-                </ConfirmAction>
+                </ConfirmDialog>
               </header>
               {ready.map(renderWorktree)}
             </section>
@@ -713,7 +712,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   <p className="task-muted">Folders in .worktrees/ that Git no longer tracks.</p>
                 </div>
                 {leftover.length > 0 && (
-                  <ConfirmAction
+                  <ConfirmDialog
                     title={`Delete ${leftover.length} leftover ${leftover.length === 1 ? 'folder' : 'folders'}?`}
                     description="These folders in .worktrees/ are no longer tracked by Git. Deleting them cannot be undone."
                     label="Delete leftover folders"
@@ -735,7 +734,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         isFolder
                       />
                     )}
-                  </ConfirmAction>
+                  </ConfirmDialog>
                 )}
               </header>
               {orphans.map((folder) => (
@@ -761,7 +760,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   </div>
                   <div className="workspace-actions">
                     {!folder.blocked_reason && (
-                      <ConfirmAction
+                      <ConfirmDialog
                         title={`Delete ${folder.name}?`}
                         description="This folder in .worktrees/ is not tracked by Git. Deleting it cannot be undone."
                         label="Delete folder"
@@ -786,7 +785,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                             isFolder
                           />
                         )}
-                      </ConfirmAction>
+                      </ConfirmDialog>
                     )}
                     <IconButton
                       variant="ghost"

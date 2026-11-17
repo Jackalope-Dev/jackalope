@@ -38,7 +38,8 @@ pnpm tauri dev
 ```
 
 Run each development server in its own terminal. The desktop preview uses port
-5173 and the website uses 5180. Browser previews cannot execute native tasks;
+5173 and the website uses 5180. `pnpm tauri dev` starts the desktop preview itself,
+so run `pnpm dev` on its own only for a browser preview. Browser previews cannot execute native tasks;
 the component lab at `/design-lab.html` contains explicitly fictional UI fixtures.
 For a separate static lab build, use `pnpm --filter @jackalope/desktop build:lab`.
 Ordinary desktop builds exclude that entry point.
@@ -57,10 +58,14 @@ development is independent and requires no Cloudflare login; see its
 
 ## Checks
 
-Use `pnpm test` for the release, desktop JavaScript and server suites. Desktop
-tests are discovered from `apps/desktop/scripts/*.test.mjs`; new suites do not
-need a package script entry. Desktop tests also retain the shared release-config
-and update-manifest checks used by release builds.
+Use `pnpm test` for every suite: `pnpm test:scripts` runs the repository script
+tests (`scripts/*.test.mjs` and `scripts/release/*.test.mjs`), then each package
+runs its own `test`. `pnpm verify` and CI run the same suites: every workspace
+package with a `test` script is included, so a new package only needs that
+script. Within a package, suites are discovered from their folders (for example
+`apps/desktop/scripts/*.test.mjs` and `apps/website/test/*.test.mjs`), so a new
+test file needs no script entry. `pnpm typecheck` checks every
+package, including the server and the swarm Worker.
 
 For a single suite or test name, pass Node test-runner arguments to `test:file`:
 
@@ -105,11 +110,37 @@ An existing `core.hooksPath` requires manual integration instead of being overwr
 
 Pre-commit checks staged whitespace and runs Biome on staged JavaScript, TypeScript,
 JSON, CSS and GraphQL content. It reads the index, preserves partial staging, and
-does not format, stage or stash files. This gate is intended to take seconds.
-Pre-push runs `pnpm verify` followed by `pnpm check:secrets`; allow minutes for the
-full gate, especially after native changes or a cold Cargo build. TypeScript runs
-early so type failures stop before native compilation. Check timings are printed.
-Use `pnpm exec lefthook run pre-push` to exercise the checks without publishing.
+does not format, stage or stash files, then scans the staged changes for secrets. This
+gate is intended to take seconds.
+Pre-push runs `pnpm verify --changed`, then scans only the commits being pushed that the
+remote does not have, plus the working files, for secrets. A secret on another local
+branch is caught when that branch is pushed, so it does not block unrelated pushes.
+`pnpm check:secrets` and CI scan every commit on every ref. `--changed`
+compares the commits being pushed with their upstream (or `origin/master`): native
+formatting and Rust tests run only when files the native build reads changed
+(`apps/desktop/src-tauri/**`, its icons, the files it embeds, the vendored GLib patch,
+Cargo settings and the JavaScript lockfiles), and the JavaScript and shared checks run
+only when something outside `src-tauri` changed. `scripts/change-scope.mjs` holds these
+path rules for both the hook and CI. When the comparison is unavailable it runs
+everything; CI always runs the full gate. `--changed` also leaves the builds and the
+website deploy dry-run to CI, which runs them on every push to master and every pull
+request, and runs only the server tests that import a changed file, with at most four
+Vitest workers. Allow many minutes when Rust tests run.
+TypeScript runs early so type failures stop before native compilation. Check timings
+are printed. Use `pnpm exec lefthook run pre-push` to exercise the checks without
+publishing.
+
+Verification runs at below-normal CPU priority so the machine stays usable; set
+`JACKALOPE_VERIFY_PRIORITY=normal` to opt out. Run ad-hoc Rust tests with
+`--no-default-features`, as `pnpm verify` does, so they reuse its build instead of
+rebuilding Tauri with a different feature set. Dependencies build without debug info in
+dev and test profiles to keep linking fast and `target/` small.
+
+Each worktree has its own `target/`, so a first build compiles every dependency again.
+Install [sccache](https://github.com/mozilla/sccache) to share those builds:
+`pnpm verify` uses it whenever it is on `PATH`, and exporting
+`RUSTC_WRAPPER=sccache` in your shell profile covers plain `cargo` commands too.
+`sccache --show-stats` shows how much it saved.
 
 Actual pushes require a clean checkout and refs pointing to its current commit,
 so unstaged fixes cannot make a broken commit appear verified. No automatic stash
@@ -122,6 +153,14 @@ CI runs the full gate once on Windows. Linux and macOS use `pnpm verify --native
 for desktop JavaScript, Rust formatting and native unit tests, then run their
 browser, credential-storage, desktop-control and packaging checks. Shared server,
 website, UI gallery and repository checks are covered by the required Windows job.
+A pull request whose files nothing in the desktop app reads (documentation, root
+Markdown, the website, the swarm Worker, mobile, and the server outside `admin/`)
+skips the Rust, desktop and packaging steps: Windows runs `pnpm verify --shared-only`
+and the other platform checks report from a short Linux job without building. Any other file,
+including workflows, lockfiles and shared packages, runs everything, and pushes
+always run everything. The Rust cache is keyed by the base branch's lockfile, so
+pull requests restore master's dependency builds instead of uploading their own. A
+new push to a pull request cancels its older run; pushes to master never cancel.
 The separate security workflow also runs weekly so new advisories are detected
 without rebuilding every platform. Required check names stay consistent with the
 release source checks and branch protection.
@@ -134,7 +173,10 @@ separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates
 the [dependency inventory](docs/DEPENDENCIES.md) after dependency changes.
 
-CI also runs `pnpm check:dependencies` against current advisory databases. To run
+CI also runs `pnpm check:dependencies` against current advisory databases. Pull
+requests and merge queue entries run it only when they change a manifest, lockfile or
+audit input (`scripts/change-scope.mjs`), so a new advisory against master does not
+block unrelated pull requests; pushes and the weekly schedule always run it. To run
 it locally, install `cargo-audit` 0.22.2 with
 `cargo install cargo-audit --version 0.22.2 --locked`. The offline vendored-patch
 integrity check is included in `pnpm verify`; the full advisory check needs network
@@ -161,11 +203,15 @@ pnpm changelog:add -- --title "A clearer task review." --description "Review now
 
 Repeat `--item` for additional bullets. Use optional `--note` only for useful
 context or a specific limitation, without repeating a development-release disclaimer.
-Optional `--id`, `--date`, and `--status`
-flags override the generated ID, today's date, and `In development` status. The
-website changelog and LLM-readable discovery output both consume the resulting
-JSON directly. `pnpm verify` rejects duplicate IDs, invalid dates, unsupported
-statuses, incorrect ordering, empty fields, and em dashes.
+Optional `--id` and `--date`
+flags override the generated ID and today's date; `--kind website` marks a change
+to the website itself rather than the app. Do not write a
+status: the website build reads it from release tags, so an entry reads Coming soon
+once merged, In beta once a `beta-v*` tag contains it and Released once a
+`stable-v*` tag does. The website changelog and LLM-readable discovery output both
+consume the resulting JSON directly. `pnpm verify` rejects duplicate IDs, invalid
+dates, hand-written statuses, unknown kinds, incorrect ordering, empty fields, and
+em dashes.
 
 Use targeted checks while iterating; finish with the combined check. For UI
 changes, exercise keyboard/focus behavior, light/dark appearance, reduced motion,

@@ -42,7 +42,19 @@ pub const COMMANDS: &[&str] = &[
     "replan",
     "export",
     "deviation",
+    "rounds",
 ];
+
+/// What `/rounds <action>` sends and the note it leaves.
+pub fn rounds_action(argument: &str) -> Result<(&'static str, &'static str), &'static str> {
+    match argument.trim().to_ascii_lowercase().as_str() {
+        "approve" => Ok(("approve", "Approved the next round · it starts now")),
+        "pause" => Ok(("pause", "Paused the rounds")),
+        "resume" => Ok(("resume", "Resumed the rounds")),
+        "stop" => Ok(("stop", "Stopped the rounds")),
+        _ => Err("Choose an action: /rounds approve, pause, resume or stop"),
+    }
+}
 
 impl App {
     pub(super) fn plan_shown(&self) -> bool {
@@ -141,6 +153,11 @@ impl App {
                 .as_ref()
                 .is_some_and(|before| before.1 != plan.revision && plan.revision.is_some());
             let deviated = before.as_ref().is_some_and(|before| after.4 > before.4);
+            let proposed = before.is_some()
+                && !plan.next_round.is_empty()
+                && self
+                    .plan_view()
+                    .is_some_and(|view| view.next_round.is_empty());
             self.set_plan(*plan);
             if drafted {
                 self.note_tone(
@@ -154,6 +171,12 @@ impl App {
                     Tone::Warning,
                 );
             }
+            if proposed {
+                self.note_tone(
+                    "The next swarm round waits for you · /rounds approve or /rounds stop",
+                    Tone::Warning,
+                );
+            }
             self.offer_question();
             self.sync_picker();
             return before.as_ref() != Some(&after);
@@ -164,7 +187,10 @@ impl App {
     fn current_plan(&mut self) -> Option<PlanView> {
         let view = self.plan_view().cloned();
         if view.is_none() {
-            self.note("No plan is open. Start one with /plan <goal> or open one with /plans.");
+            self.flash(
+                "No plan is open. Start one with /plan <goal> or open one with /plans",
+                Tone::Muted,
+            );
         }
         view
     }
@@ -174,7 +200,10 @@ impl App {
         match command {
             "plan" if argument.is_empty() => match &mut self.plan {
                 Some(pane) => pane.open = !pane.open,
-                None => self.note("Plan before changing code: /plan <what you want>."),
+                None => self.flash(
+                    "Plan before changing code: /plan <what you want>",
+                    Tone::Muted,
+                ),
             },
             "plan" => {
                 if let Some(view) = self.plan_request(Request::PlanStart {
@@ -193,7 +222,7 @@ impl App {
             }
             "plans" => self.open_picker(PickerKind::Plans),
             "revise" if argument.is_empty() => {
-                self.note("Add your comments: /revise <what to change>")
+                self.flash("Add your comments: /revise <what to change>", Tone::Muted)
             }
             "revise" => self.plan_action("keep", argument, "Planning again with your comments"),
             "replan" => self.plan_action("replan", argument, "Re-planning from what is done"),
@@ -210,6 +239,7 @@ impl App {
             }
             "approve" => self.approve(argument),
             "deviation" => self.deviation(argument),
+            "rounds" => self.rounds(argument),
             _ => return false,
         }
         true
@@ -243,11 +273,14 @@ impl App {
             argument.to_ascii_lowercase()
         };
         if !["single", "subtasks", "swarm"].contains(&shape.as_str()) {
-            self.note("Approve as single, subtasks or swarm: /approve subtasks");
+            self.flash(
+                "Approve as single, subtasks or swarm: /approve subtasks",
+                Tone::Muted,
+            );
             return;
         }
         if view.planning || view.revision.is_none() {
-            self.note("There is no draft to approve yet.");
+            self.flash("There is no draft to approve yet", Tone::Muted);
             return;
         }
         let unchecked = view.verification.as_deref() == Some("review");
@@ -271,6 +304,36 @@ impl App {
         }
     }
 
+    /// `/rounds approve|pause|resume|stop` acts on a swarm's rounds.
+    fn rounds(&mut self, argument: &str) {
+        let Some(view) = self.current_plan() else {
+            return;
+        };
+        let (action, done) = match rounds_action(argument) {
+            Ok(choice) => choice,
+            Err(hint) => {
+                self.flash(hint, Tone::Muted);
+                return;
+            }
+        };
+        if action == "approve" && view.next_round.is_empty() {
+            self.flash("No round is waiting for approval", Tone::Muted);
+            return;
+        }
+        if self
+            .plan_request(Request::PlanAction {
+                plan_id: view.id,
+                action: "rounds".into(),
+                text: action.into(),
+                revision: None,
+                hash: None,
+            })
+            .is_some()
+        {
+            self.flash(done, Tone::Success);
+        }
+    }
+
     /// `/deviation` opens the three choices; `/deviation accept`, `redo` or
     /// `replan` decides directly.
     fn deviation(&mut self, argument: &str) {
@@ -278,7 +341,7 @@ impl App {
             return;
         }
         if self.pending_deviation().is_none() {
-            self.note("No deviation is waiting on you.");
+            self.flash("No deviation is waiting on you", Tone::Muted);
             return;
         }
         match argument {
@@ -290,7 +353,7 @@ impl App {
     /// Decides the oldest pending deviation: `accept`, `redo` or `replan`.
     pub(super) fn resolve_deviation(&mut self, action: &str) {
         let (Some(view), Some(deviation)) = (self.plan_view(), self.pending_deviation()) else {
-            self.note("No deviation is waiting on you.");
+            self.flash("No deviation is waiting on you", Tone::Muted);
             return;
         };
         let (plan_id, deviation_id) = (view.id.clone(), deviation.id.clone());
@@ -389,15 +452,20 @@ fn pending_count(view: &PlanView) -> usize {
 fn editor_command(path: &std::path::Path) -> std::process::Command {
     let configured = std::env::var("VISUAL")
         .ok()
-        .or_else(|| std::env::var("EDITOR").ok())
-        .filter(|editor| !editor.trim().is_empty());
-    let editor = configured.unwrap_or_else(|| {
-        if cfg!(windows) {
-            "notepad".into()
-        } else {
-            "vi".into()
-        }
-    });
+        .or_else(|| std::env::var("EDITOR").ok());
+    command_for_editor(configured, path)
+}
+
+fn command_for_editor(configured: Option<String>, path: &std::path::Path) -> std::process::Command {
+    let editor = configured
+        .filter(|editor| !editor.trim().is_empty())
+        .unwrap_or_else(|| {
+            if cfg!(windows) {
+                "notepad".into()
+            } else {
+                "vi".into()
+            }
+        });
     // Editors are often configured with arguments, such as `code --wait`.
     let mut parts = editor.split_whitespace();
     let mut command = std::process::Command::new(parts.next().unwrap_or("vi"));
@@ -422,12 +490,26 @@ mod tests {
     }
 
     #[test]
+    fn rounds_actions_parse_and_anything_else_explains_the_choices() {
+        assert_eq!(rounds_action(" Approve").unwrap().0, "approve");
+        for action in ["pause", "resume", "stop"] {
+            assert_eq!(rounds_action(action).unwrap().0, action);
+        }
+        assert!(rounds_action("").is_err());
+        assert!(rounds_action("skip").is_err());
+    }
+
+    #[test]
     fn editors_with_arguments_split_into_a_command() {
-        std::env::set_var("VISUAL", "code --wait");
-        let command = editor_command(std::path::Path::new("plan.md"));
+        let path = std::path::Path::new("plan.md");
+        let command = command_for_editor(Some("code --wait".into()), path);
         assert_eq!(command.get_program(), "code");
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args, ["--wait", "plan.md"]);
-        std::env::remove_var("VISUAL");
+        let fallback = if cfg!(windows) { "notepad" } else { "vi" };
+        assert_eq!(
+            command_for_editor(Some("  ".into()), path).get_program(),
+            fallback
+        );
     }
 }

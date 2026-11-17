@@ -8,7 +8,8 @@ for the chat sessions bots start.
 ## Profiles
 
 `stores/botStore.ts` keeps bots in renderer storage: name, role, standing instructions,
-agent (`auto` or an agent ID), optional model, project, connection scope, wake-ups,
+agent (`auto` or an agent ID), optional model, a home project and any other projects it
+also works in (`projectIds`), connection scope, wake-ups,
 whether the bot works with other bots (`collaborate`) and the schedule IDs of routines
 created before wake-ups existed. A `null` connection scope delivers every enabled
 connection; a list becomes the run request's `connectionIds`. Name and instruction edits
@@ -16,6 +17,16 @@ reach open conversations from their next batch; agent, model, project and connec
 changes apply to new conversations. Instructions are limited to 6,000 characters in the renderer and
 in native validation. Version 2 of the store adds empty wake-ups and `collaborate: true`
 to older saved bots; duplicates copy wake-ups turned off.
+
+A bot works in its home project and every project in `projectIds`. A conversation runs in
+the project it was started from; chosen connections apply by ID in each project. A
+wake-up may name one of the bot's projects (`projectId`) to watch and start in, otherwise
+it uses the home project; removing a project from the bot moves its wake-ups home.
+
+The Bots page opens on a card per project showing the bots that work there, what they
+are doing and what waits on you. Choosing a card lists that project's bots and their
+conversations in that project, and **Add an existing bot** adds a bot from another
+project to this one. An open conversation shows the project it runs in.
 
 An optional `appearance` holds a character style (the shared `AgentCharacter`
 silhouettes plus bot-only shapes whose face stays inside the fill) and a colour from
@@ -38,12 +49,33 @@ steps; editing shows the same sections on one page, followed by the bot's browse
 and its optional [computer](BOT-COMPUTERS.md), both kept natively by bot ID rather than in
 the renderer's bot record.
 
+## Sharing bots
+
+**Share these bots** in a project's Bots menu saves that project's bots as one
+`.jackalope-bots.json` file (or copies it as text), and **Import bots** adds a file's bots
+to the open project after listing them. `lib/bot-team.ts` owns the format, which is an
+allowlist: a team name and, per bot, name, description, instructions, appearance, whether
+it works with other bots, and schedule or project-change wake-ups. It has no field for an
+agent, model, project, connection, browser profile, computer, note or conversation.
+Wake-ups that watch a connection are left out and named in the dialog. Text that looks
+like a key, token or password is replaced with `[removed]` before the file is written,
+and the dialog says where.
+
+Import reads only those fields, bounded to the editor's limits, and ignores everything
+else. Imported bots use Automatic for their agent, have an empty connection list, get
+new IDs and arrive with every wake-up off; a wake-up that fails the editor's validation
+is dropped and counted. Names that clash with saved bots get a number. Nothing in a file
+changes an existing bot.
+
 ## Native hub
 
 The renderer mirrors bots whose project still exists into `commands/bot_hub.rs` through
 `bot_hub_sync`, after both the bot and project stores hydrate so an empty early
 directory cannot clear wake-up progress. Each entry carries the conversation run
-request the Bots page would start with. The hub stores its directory, wake-up state,
+request the Bots page would start with in its home project, plus one request per other
+available project (`projects`). Wake-ups and bot messages start in the project they name
+or the sender's project when the bot works there, otherwise in the home project; the
+`bots` tool reports `sameProject` when the listed bot works in the caller's project. The hub stores its directory, wake-up state,
 cards, suggestions, hand-offs, saved notes and the latest 300 activity entries in
 `bots/hub.json` in the profile directory, written atomically. An unreadable file is
 preserved and every write is refused until it is repaired. `bot-hub-changed` events
@@ -164,7 +196,8 @@ saved check.
 
 ## Verification
 
-`scripts/bots.test.mjs` covers validation, migration, roster order, run requests, the
+`scripts/bot-team.test.mjs` covers what a shared file may hold, credential removal, and
+import bounds and defaults. `scripts/bots.test.mjs` covers validation, migration, roster order, run requests, the
 hub directory, waiting counts, which conversation a message continues, unread replies,
 activity and batch limits. Native `bot_hub` tests cover sync validation, schedule and
 observer evaluation, messaging limits, reply routing, cards, suggestions, notes, persona

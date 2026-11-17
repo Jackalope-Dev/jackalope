@@ -1,4 +1,5 @@
-//! The transcript: the conversation, then Jackalope's own feed below it.
+//! The transcript: the conversation, with Jackalope's own feed placed where
+//! each item was added.
 //!
 //! Rows are measured with the same word wrapping the frame draws with, so the
 //! view can pin to the newest output exactly. The conversation part only
@@ -6,16 +7,18 @@
 //! cached; the feed (notes, `!` output, spinners) is rebuilt each frame. Only
 //! the lines in view are handed to the frame.
 
+use super::card::{self, Phase};
 use super::markdown::markdown;
 use super::{duration, welcome};
 use crate::brand;
 use crate::protocol::{self, SessionView};
 use crate::shell;
-use crate::ui::feed::Entry;
+use crate::ui::feed::{Entry, Placed};
 use crate::ui::App;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use std::ops::Range;
 
 /// Output lines shown for a command; a running one shows its tail as it
 /// streams. `/copy` and selection reach anything still on screen.
@@ -29,27 +32,81 @@ const ACTIVITY_WIDTH: usize = 160;
 pub struct Measured {
     lines: Vec<Line<'static>>,
     heights: Vec<usize>,
-    total: usize,
 }
 
 impl Measured {
     pub fn new(lines: Vec<Line<'static>>, width: u16) -> Self {
-        let heights: Vec<usize> = lines.iter().map(|line| rows(line, width)).collect();
-        let total = heights.iter().sum();
-        Self {
-            lines,
-            heights,
-            total,
+        let heights = lines.iter().map(|line| rows(line, width)).collect();
+        Self { lines, heights }
+    }
+
+    fn part(&self, range: Range<usize>) -> Part<'_> {
+        Part {
+            lines: &self.lines[range.clone()],
+            heights: &self.heights[range],
         }
+    }
+
+    fn all(&self) -> Part<'_> {
+        self.part(0..self.lines.len())
     }
 }
 
+/// A run of measured lines, read in order with others by `window`.
+struct Part<'a> {
+    lines: &'a [Line<'static>],
+    heights: &'a [usize],
+}
+
 /// Rows `line` fills at `width`, wrapped exactly as the frame wraps it.
-fn rows(line: &Line<'static>, width: u16) -> usize {
+pub(super) fn rows(line: &Line<'static>, width: u16) -> usize {
     Paragraph::new(line.clone())
         .wrap(Wrap { trim: false })
         .line_count(width.max(1))
         .max(1)
+}
+
+/// Something clickable on a block's line: the line, its columns and what
+/// clicking does.
+pub struct LineHit {
+    pub line: usize,
+    pub x: u16,
+    pub width: u16,
+    pub click: crate::ui::Click,
+}
+
+/// A click target in the transcript's view: its row, columns and action.
+pub type ViewHit = (u16, u16, u16, crate::ui::Click);
+
+impl Measured {
+    /// The rows above `line`.
+    fn rows_before(&self, line: usize) -> usize {
+        self.heights[..line.min(self.heights.len())].iter().sum()
+    }
+}
+
+/// `hits` on a block drawn from row `start`, placed in a view showing rows
+/// `top..top + height`.
+fn in_view(
+    block: &Measured,
+    hits: &[LineHit],
+    start: usize,
+    top: usize,
+    height: usize,
+) -> Vec<ViewHit> {
+    hits.iter()
+        .filter_map(|hit| {
+            let row = (start + block.rows_before(hit.line)).checked_sub(top)?;
+            (row < height).then_some((row as u16, hit.x, hit.width, hit.click))
+        })
+        .collect()
+}
+
+fn rows_of(parts: &[Part]) -> usize {
+    parts
+        .iter()
+        .map(|part| part.heights.iter().sum::<usize>())
+        .sum()
 }
 
 /// The conversation's measured lines, and what they were built from.
@@ -58,16 +115,20 @@ pub struct Cache {
     accent: Color,
     width: u16,
     measured: Measured,
+    /// The line each message ends on, after the first `n` messages at `n`.
+    ends: Vec<usize>,
+    /// The reply the run card holds, drawn by the card each frame.
+    reply: Vec<Line<'static>>,
 }
 
 /// The lines in view from `parts` read in order: those overlapping rows
 /// `top..top + height`, and how many rows of the first are above the view.
-fn window(parts: &[&Measured], top: usize, height: usize) -> (Vec<Line<'static>>, usize) {
+fn window(parts: &[Part], top: usize, height: usize) -> (Vec<Line<'static>>, usize) {
     let mut lines = Vec::new();
     let mut offset = 0;
     let mut row = 0;
     for part in parts {
-        for (line, rows) in part.lines.iter().zip(&part.heights) {
+        for (line, rows) in part.lines.iter().zip(part.heights) {
             let end = row + rows;
             if end > top && row < top + height {
                 if lines.is_empty() {
@@ -87,45 +148,152 @@ fn window(parts: &[&Measured], top: usize, height: usize) -> (Vec<Line<'static>>
 /// What the transcript shows in a body `width` columns wide and `height`
 /// rows tall: the lines to draw, the rows of the first to skip, and how far
 /// the view can scroll back.
-pub fn visible(app: &App, width: u16, height: u16) -> (Vec<Line<'static>>, usize, usize) {
-    let feed = Measured::new(feed(app), width);
+pub fn visible(
+    app: &App,
+    width: u16,
+    height: u16,
+) -> (Vec<Line<'static>>, usize, usize, Vec<ViewHit>) {
     let height = height as usize;
-    let place = |conversation: &Measured| {
-        let total = conversation.total + feed.total;
-        let bottom = total.saturating_sub(height);
+    let here: Vec<&Placed> = app
+        .feed
+        .iter()
+        .filter(|placed| placed.session == app.session)
+        .collect();
+    let place = |parts: &[Part]| {
+        let bottom = rows_of(parts).saturating_sub(height);
         let top = app.scroll_top.map_or(bottom, |top| top.min(bottom));
-        let (lines, offset) = window(&[conversation, &feed], top, height);
-        (lines, offset, bottom)
+        let (lines, offset) = window(parts, top, height);
+        (lines, offset, bottom, top)
     };
+    // A conversation that is still being read shows nothing yet, rather than
+    // the start screen it is not.
+    if app.view.is_none() && app.session.is_some() {
+        return (Vec::new(), 0, 0, Vec::new());
+    }
     let Some(view) = &app.view else {
-        return place(&Measured::new(welcome(app, width, height as u16), width));
+        let (lines, hits) = welcome(app, width, height as u16);
+        let start = Measured::new(lines, width);
+        let feed = Measured::new(feed(app, &here), width);
+        let (lines, offset, bottom, top) = place(&[start.all(), feed.all()]);
+        let hits = in_view(&start, &hits, 0, top, height);
+        return (lines, offset, bottom, hits);
     };
     let mut cache = app.transcript.borrow_mut();
     let accent = brand::accent();
     let stale = cache.as_ref().is_none_or(|cache| {
         cache.version != app.view_version || cache.accent != accent || cache.width != width
     });
+    let phase = card_phase(view);
+    let wraps_last = phase == Some(Phase::Finished)
+        && view
+            .messages
+            .last()
+            .is_some_and(|message| message.role == "agent");
     if stale {
+        let (lines, ends, reply) = conversation(view, width, phase, wraps_last);
         *cache = Some(Cache {
             version: app.view_version,
             accent,
             width,
-            measured: Measured::new(conversation(view, width), width),
+            measured: Measured::new(lines, width),
+            ends,
+            reply,
         });
     }
-    place(&cache.as_ref().expect("filled above").measured)
+    let cache = cache.as_ref().expect("filled above");
+    // Each message, then what was added after it; items placed before the
+    // conversation was read, or past its end, follow everything.
+    let last = cache.ends.len() - 1;
+    let slot = |placed: &Placed| placed.after.map_or(last + 1, |after| after.min(last));
+    let feeds: Vec<Measured> = (0..=last + 1)
+        .map(|index| {
+            let entries: Vec<&Placed> = here
+                .iter()
+                .copied()
+                .filter(|placed| slot(placed) == index)
+                .collect();
+            Measured::new(feed(app, &entries), width)
+        })
+        .collect();
+    // The run card stands in for the reply it holds, before anything added
+    // after that reply; a live card follows everything added so far.
+    let (card, card_hits) = match (phase, view.run.as_ref()) {
+        (Some(phase), Some(run)) => {
+            let (lines, hits) = card::card(app, view, run, &cache.reply, phase, width);
+            (Some(Measured::new(lines, width)), hits)
+        }
+        _ => (None, Vec::new()),
+    };
+    let mut parts = Vec::new();
+    let mut card_at = 0;
+    let mut start = 0;
+    for (index, end) in cache.ends.iter().enumerate() {
+        parts.push(cache.measured.part(start..*end));
+        let here = index == last;
+        if let Some(card) = card.as_ref().filter(|_| here && wraps_last) {
+            card_at = rows_of(&parts);
+            parts.push(card.all());
+        }
+        parts.push(feeds[index].all());
+        if let Some(card) = card.as_ref().filter(|_| here && !wraps_last) {
+            card_at = rows_of(&parts);
+            parts.push(card.all());
+        }
+        start = *end;
+    }
+    parts.push(cache.measured.part(start..cache.measured.lines.len()));
+    parts.push(feeds[last + 1].all());
+    let (lines, offset, bottom, top) = place(&parts);
+    let hits = card
+        .as_ref()
+        .map(|card| in_view(card, &card_hits, card_at, top, height))
+        .unwrap_or_default();
+    (lines, offset, bottom, hits)
 }
 
-fn conversation(view: &SessionView, width: u16) -> Vec<Line<'static>> {
+/// Whether the latest run shows as a card, and in which phase. Hosts that
+/// predate run summaries keep the plain transcript.
+fn card_phase(view: &SessionView) -> Option<Phase> {
+    view.run.as_ref()?;
+    if protocol::working(view.status.as_ref()) {
+        return Some(Phase::Live);
+    }
+    // A run that ended without a reply, such as one that failed to start,
+    // still shows what it did.
+    view.messages
+        .last()
+        .filter(|message| message.role == "agent" || message.sent)
+        .map(|_| Phase::Finished)
+}
+
+/// The conversation's lines, the line each message ends on, and the reply
+/// the run card holds: the last message when `wraps_last`, or the text being
+/// written while the card is live.
+fn conversation(
+    view: &SessionView,
+    width: u16,
+    phase: Option<Phase>,
+    wraps_last: bool,
+) -> (Vec<Line<'static>>, Vec<usize>, Vec<Line<'static>>) {
     let accent = Style::default().fg(brand::accent());
     let muted = Style::default().fg(brand::muted());
     let mut lines = Vec::new();
-    for message in &view.messages {
+    let mut ends = vec![0];
+    let mut reply = Vec::new();
+    for (index, message) in view.messages.iter().enumerate() {
+        // The previous message ends where this one starts.
+        if index > 0 {
+            ends.push(lines.len());
+        }
+        if wraps_last && index + 1 == view.messages.len() {
+            reply = markdown(&message.text);
+            continue;
+        }
         lines.push(Line::raw(""));
         if message.role == "agent" {
             // Who is speaking, so replies stand apart from your messages.
             let mut label = vec![
-                Span::styled(if brand::unicode() { "● " } else { "* " }, accent),
+                Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Dot)), accent),
                 Span::styled(view.agent.clone().unwrap_or_else(|| "agent".into()), muted),
             ];
             if let Some(attempt) = message.attempt {
@@ -155,6 +323,9 @@ fn conversation(view: &SessionView, width: u16) -> Vec<Line<'static>> {
         }
         lines.extend(callout(body, color, width));
     }
+    if !view.messages.is_empty() {
+        ends.push(lines.len());
+    }
     if view.messages.iter().all(|message| message.role != "agent")
         && view.partial.is_empty()
         && !view.result.trim().is_empty()
@@ -163,16 +334,20 @@ fn conversation(view: &SessionView, width: u16) -> Vec<Line<'static>> {
         lines.push(Line::raw(""));
         lines.extend(markdown(&view.result));
     }
-    if protocol::working(view.status.as_deref()) {
+    if phase == Some(Phase::Live) {
+        if !view.partial.trim().is_empty() {
+            reply = markdown(&view.partial);
+        }
+    } else if protocol::working(view.status.as_ref()) {
         if !view.partial.trim().is_empty() {
             // The reply as it is written, ending in a cursor.
             lines.push(Line::raw(""));
             lines.push(Line::from(vec![
-                Span::styled(if brand::unicode() { "● " } else { "* " }, accent),
+                Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Dot)), accent),
                 Span::styled(view.agent.clone().unwrap_or_else(|| "agent".into()), muted),
             ]));
             let mut reply = markdown(&view.partial);
-            let cursor = Span::styled(if brand::unicode() { "▍" } else { "_" }, accent);
+            let cursor = Span::styled(brand::mark_glyph(brand::Mark::Caret), accent);
             match reply.last_mut() {
                 Some(line) => line.spans.push(cursor),
                 None => reply.push(Line::from(cursor)),
@@ -181,32 +356,19 @@ fn conversation(view: &SessionView, width: u16) -> Vec<Line<'static>> {
         }
         lines.extend(activity(&view.activity));
     }
+    // How to answer is pinned above the input, or docked in its place.
     let warning = Style::default().fg(brand::warning());
     for question in &view.questions {
         lines.push(Line::raw(""));
         lines.push(Line::from(vec![
-            Span::styled(if brand::unicode() { "◆ " } else { "? " }, warning),
+            Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Ask)), warning),
             Span::styled(
                 question.question.clone(),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
         ]));
-        if !question.options.is_empty() {
-            lines.push(Line::styled(
-                format!("  {}", question.options.join(" · ")),
-                muted,
-            ));
-        }
-        lines.push(Line::styled(
-            if question.options.is_empty() {
-                "  Type your answer below and press Enter."
-            } else {
-                "  Choose an answer, or type your own below."
-            },
-            muted,
-        ));
     }
-    lines
+    (lines, ends, reply)
 }
 
 /// Rows of spans as a block: a bar of `color` down the left edge and its
@@ -217,7 +379,7 @@ pub(super) fn callout(
     width: u16,
 ) -> Vec<Line<'static>> {
     let bar = Span::styled(
-        if brand::unicode() { "▎ " } else { "| " },
+        format!("{} ", brand::mark_glyph(brand::Mark::Bar)),
         Style::default().fg(color),
     );
     let fill = brand::callout_style(color);
@@ -237,7 +399,7 @@ pub(super) fn callout(
 
 /// Spans broken into rows of at most `room` columns at spaces, or mid-word
 /// when a word alone is too long.
-fn wrap(spans: Vec<Span<'static>>, room: usize) -> Vec<Vec<Span<'static>>> {
+pub(super) fn wrap(spans: Vec<Span<'static>>, room: usize) -> Vec<Vec<Span<'static>>> {
     let mut rows = vec![Vec::new()];
     let mut used = 0;
     for span in spans {
@@ -304,11 +466,11 @@ fn activity(entries: &[String]) -> Vec<Line<'static>> {
     lines
 }
 
-fn feed(app: &App) -> Vec<Line<'static>> {
+fn feed(app: &App, entries: &[&Placed]) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     let mut previous_was_note = false;
-    for entry in &app.feed {
-        match entry {
+    for placed in entries {
+        match &placed.entry {
             Entry::Note(text, tone) => {
                 if !previous_was_note {
                     lines.push(Line::raw(""));
@@ -386,11 +548,11 @@ fn shell_block(run: &shell::Run, tick: usize) -> Vec<Line<'static>> {
 
 /// `~` for the home directory, so paths fit beside the command.
 fn short_path(path: &str) -> String {
-    std::env::var("HOME")
-        .ok()
-        .or_else(|| std::env::var("USERPROFILE").ok())
-        .filter(|home| !home.is_empty())
-        .and_then(|home| path.strip_prefix(&home).map(|rest| format!("~{rest}")))
+    crate::protocol::profile::home_dir()
+        .and_then(|home| {
+            path.strip_prefix(home.to_str()?)
+                .map(|rest| format!("~{rest}"))
+        })
         .unwrap_or_else(|| path.to_string())
 }
 
@@ -411,7 +573,6 @@ mod tests {
         // needs three: "aa" / "bbbbb" / "cc".
         let measured = Measured::new(vec![Line::raw("aa bbbbb cc"), Line::raw("")], 6);
         assert_eq!(measured.heights, [3, 1]);
-        assert_eq!(measured.total, 4);
     }
 
     #[test]
@@ -426,11 +587,12 @@ mod tests {
         );
         let second = Measured::new(vec![Line::raw("five"), Line::raw("six")], 5);
         // Rows: zero | one | two | three | four | five | six
-        let (lines, offset) = window(&[&first, &second], 2, 3);
+        let parts = [first.all(), second.all()];
+        let (lines, offset) = window(&parts, 2, 3);
         let shown: Vec<String> = lines.iter().map(text).collect();
         assert_eq!(shown, ["one two three", "four"]);
         assert_eq!(offset, 1, "\"one\" is above the view");
-        let (lines, offset) = window(&[&first, &second], 5, 2);
+        let (lines, offset) = window(&parts, 5, 2);
         assert_eq!(lines.iter().map(text).collect::<Vec<_>>(), ["five", "six"]);
         assert_eq!(offset, 0);
     }
@@ -473,8 +635,13 @@ mod tests {
             merged: false,
             draft: String::new(),
             draft_revision: 0,
+            run: None,
         };
-        let shown: Vec<String> = conversation(&view, 80).iter().map(text).collect();
+        let (lines, ends, _) = conversation(&view, 80, None, false);
+        assert_eq!(ends.len(), view.messages.len() + 1);
+        assert!(ends.windows(2).all(|pair| pair[0] < pair[1]));
+        assert_eq!(*ends.last().unwrap(), lines.len());
+        let shown: Vec<String> = lines.iter().map(text).collect();
         let first = shown
             .iter()
             .position(|line| line.ends_with("agent · attempt 1"))

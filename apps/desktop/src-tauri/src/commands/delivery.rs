@@ -1,4 +1,8 @@
-use super::{process_control, tasks::TaskRuntime, worktree_cleanup};
+use super::{
+    integration, process_control,
+    repo::{self, Policy},
+    tasks::TaskRuntime,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{path::Path, process::Command, time::Duration};
@@ -18,9 +22,10 @@ pub struct DeliveryStatus {
     checked_at: String,
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
+/// Reads the checkout with a time limit, since delivery status is polled.
+fn read(path: &Path, args: &[&str]) -> Result<String, String> {
     let result = process_control::run(
-        worktree_cleanup::command(path, args),
+        repo::command(path, args, Policy::Inspection),
         Duration::from_secs(10),
     )?;
     if !result.success {
@@ -29,11 +34,78 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
     Ok(result.stdout.trim().into())
 }
 
+/// What Jackalope reads about a pull request: identity, state, review and checks.
+const PULL_REQUEST_FIELDS: &str =
+    "number,title,url,state,isDraft,headRefOid,reviewDecision,mergeable,statusCheckRollup";
+
+/// A GitHub CLI call that never prompts.
+fn gh(path: &Path, args: &[&str]) -> Command {
+    let mut command = Command::new("gh");
+    command
+        .current_dir(path)
+        .args(args)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("GIT_TERMINAL_PROMPT", "0");
+    process_control::hidden(&mut command);
+    command
+}
+
+/// Reads a pull request through the person's GitHub CLI: the one named by `url`, or the
+/// checked-out branch's. `None` when there is none to read or GitHub could not be reached.
+fn view_pull_request(path: &Path, url: Option<&str>) -> Result<Option<Value>, String> {
+    let mut args = vec!["pr", "view"];
+    args.extend(url);
+    args.extend(["--json", PULL_REQUEST_FIELDS]);
+    let Ok(result) = process_control::run(gh(path, &args), Duration::from_secs(15)) else {
+        return Ok(None);
+    };
+    if !result.success {
+        return Ok(None);
+    }
+    match serde_json::from_str::<Value>(&result.stdout) {
+        Ok(value)
+            if value["url"]
+                .as_str()
+                .is_some_and(|url| url.starts_with("https://")) =>
+        {
+            Ok(Some(value))
+        }
+        _ => Err("GitHub returned an unreadable PR record. Retry the check.".into()),
+    }
+}
+
+/// Whether `url` is a pull request address, so nothing else reaches the GitHub CLI.
+fn pull_request_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let parts: Vec<_> = rest.trim_end_matches('/').split('/').collect();
+    parts.len() == 5
+        && parts[3] == "pull"
+        && parts[4].parse::<u64>().is_ok_and(|number| number > 0)
+        && parts[..3].iter().all(|part| {
+            !part.is_empty()
+                && !part.starts_with('-')
+                && part
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+        })
+}
+
+/// The task checkout the GitHub CLI runs in, or the project once the workspace is gone.
+fn checkout<'a>(workspace: &'a str, project: &'a str) -> &'a Path {
+    if !workspace.is_empty() && Path::new(workspace).is_dir() {
+        Path::new(workspace)
+    } else {
+        Path::new(project)
+    }
+}
+
 fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
-    let head = git(path, &["rev-parse", "--verify", "HEAD"])?;
-    let branch = git(path, &["branch", "--show-current"])?;
-    let changed = !git(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty();
-    let upstream = git(
+    let head = read(path, &["rev-parse", "--verify", "HEAD"])?;
+    let branch = read(path, &["branch", "--show-current"])?;
+    let changed = !read(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty();
+    let upstream = read(
         path,
         &[
             "rev-parse",
@@ -44,7 +116,7 @@ fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
     )
     .ok();
     let counts = if upstream.is_some() {
-        git(
+        read(
             path,
             &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
         )
@@ -71,37 +143,30 @@ fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
         checked_at: chrono::Utc::now().to_rfc3339(),
     };
     if remote {
-        let mut command = Command::new("gh");
-        command
-            .current_dir(path)
-            .args([
-                "pr",
-                "view",
-                "--json",
-                "url,state,headRefOid,statusCheckRollup",
-            ])
-            .env("GH_PROMPT_DISABLED", "1")
-            .env("GIT_TERMINAL_PROMPT", "0");
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
-        match process_control::run(command, Duration::from_secs(15)) {
-            Ok(result) if result.success => {
-                match serde_json::from_str::<Value>(&result.stdout) {
-                    Ok(value) if value["url"].as_str().is_some_and(|url| url.starts_with("https://")) => {
-                        status.pull_request = Some(value);
-                        status.remote_note = "PR and CI read through your GitHub CLI. Deployment has not been verified.".into();
-                    },
-                    _ => status.remote_note = "GitHub returned an unreadable PR record. Retry the check.".into(),
-                }
+        match view_pull_request(path, None) {
+            Ok(Some(value)) => {
+                status.pull_request = Some(value);
+                status.remote_note = "PR and CI read through your GitHub CLI. Deployment has not been verified.".into();
             },
-            _ => status.remote_note = "No PR could be read. Check GitHub CLI installation, sign-in, network and the current branch's PR, then retry.".into(),
+            Ok(None) => status.remote_note = "No PR could be read. Check GitHub CLI installation, sign-in, network and the current branch's PR, then retry.".into(),
+            Err(error) => status.remote_note = error,
         }
     }
     Ok(status)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::delivery::task_delivery_status,
+            commands::delivery::task_pull_request_create,
+            commands::delivery::task_pull_request_status,
+            commands::delivery::task_pull_request_merge,
+            commands::delivery::task_merge_locally,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn task_delivery_status(
@@ -172,11 +237,11 @@ pub async fn task_pull_request_create(
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if run.status.is_active() {
             return Err("Wait for the agent to finish before opening a pull request.".into());
         }
         let path = Path::new(&run.workspace);
-        let branch = git(path, &["branch", "--show-current"])?;
+        let branch = read(path, &["branch", "--show-current"])?;
         if branch.is_empty() {
             return Err("Check out the task branch before opening a pull request.".into());
         }
@@ -192,11 +257,7 @@ pub async fn task_pull_request_create(
         if draft {
             command.arg("--draft");
         }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
+        process_control::hidden(&mut command);
         let result = process_control::run_with_input(command, Duration::from_secs(60), body.into_bytes())?;
         if !result.success {
             let detail = result.stderr.trim();
@@ -208,6 +269,159 @@ pub async fn task_pull_request_create(
         }
         created_url(&result.stdout)
             .ok_or_else(|| "The pull request was created, but GitHub CLI did not print its address.".into())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Reads a task's tracked pull request, its review state and its checks. Read-only.
+#[tauri::command]
+pub async fn task_pull_request_status(
+    id: String,
+    url: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Value, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !pull_request_url(&url) {
+            return Err("This is not a pull request address.".into());
+        }
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        view_pull_request(checkout(&run.workspace, &run.project_path), Some(&url))?.ok_or_else(
+            || "The pull request could not be read. Check GitHub CLI sign-in and network.".into(),
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Merges a task's pull request on GitHub through the person's GitHub CLI, with the
+/// method they chose. GitHub enforces the repository's own rules; nothing local changes.
+#[tauri::command]
+pub async fn task_pull_request_merge(
+    id: String,
+    url: String,
+    method: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !pull_request_url(&url) {
+            return Err("This is not a pull request address.".into());
+        }
+        let method = match method.as_str() {
+            "merge" => "--merge",
+            "squash" => "--squash",
+            "rebase" => "--rebase",
+            _ => return Err("Choose merge, squash or rebase.".into()),
+        };
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        let command = gh(
+            checkout(&run.workspace, &run.project_path),
+            &["pr", "merge", &url, method],
+        );
+        let result = process_control::run(command, Duration::from_secs(60))?;
+        if !result.success {
+            let detail = result.stderr.trim();
+            return Err(if detail.is_empty() {
+                "GitHub CLI could not merge the pull request. Check that it is installed and signed in.".into()
+            } else {
+                format!(
+                    "GitHub did not merge the pull request: {}",
+                    detail.chars().take(2000).collect::<String>()
+                )
+            });
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Runs a Git command that changes the checkout, reporting Git's own message on failure.
+fn change(path: &Path, args: &[&str]) -> Result<String, String> {
+    let mut command = repo::command(path, args, Policy::Isolated);
+    command
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_MERGE_AUTOEDIT", "no");
+    let result = process_control::run(command, Duration::from_secs(120))?;
+    if result.timed_out {
+        return Err(format!("git {} took too long and was stopped.", args[0]));
+    }
+    if !result.success {
+        let detail = format!("{}\n{}", result.stderr.trim(), result.stdout.trim());
+        return Err(detail.trim().chars().take(2000).collect());
+    }
+    Ok(result.stdout.trim().into())
+}
+
+/// Merges `branch` into `target` in a checkout that has `branch` checked out, leaving
+/// `target` checked out. A conflicting or failed merge is undone and `branch` is checked
+/// out again, so the checkout ends where it started.
+fn merge_into(path: &Path, branch: &str, target: &str) -> Result<String, String> {
+    if read(path, &["branch", "--show-current"])? != branch {
+        return Err(format!(
+            "Check out {branch} in the project before merging it."
+        ));
+    }
+    if !read(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty() {
+        return Err("Commit or discard the remaining changes before merging.".into());
+    }
+    let target_ref = format!("refs/heads/{target}");
+    if read(path, &["rev-parse", "--verify", "--quiet", &target_ref]).is_err() {
+        return Err(format!("There is no local {target} branch to merge into."));
+    }
+    change(path, &["switch", target])?;
+    if let Err(error) = change(path, &["merge", "--no-ff", "--no-edit", branch]) {
+        let _ = change(path, &["merge", "--abort"]);
+        let _ = change(path, &["switch", branch]);
+        return Err(format!(
+            "{branch} could not be merged into {target}, so nothing changed. {error}"
+        ));
+    }
+    read(path, &["rev-parse", "--verify", "HEAD"])
+}
+
+/// Merges a task that worked on its own branch in the project checkout into the project's
+/// target branch locally. Nothing is pushed.
+#[tauri::command]
+pub async fn task_merge_locally(
+    id: String,
+    target: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = target.trim();
+        if target.is_empty() || target.starts_with('-') {
+            return Err("Choose a branch to merge into.".into());
+        }
+        let _guard = integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        if runs
+            .iter()
+            .any(|other| other.workspace == run.workspace && other.status.is_active())
+        {
+            return Err("Wait for work in this checkout to finish before merging.".into());
+        }
+        if run.workspace.is_empty() || run.branch.is_empty() || run.branch == target {
+            return Err(format!(
+                "This task has no separate branch to merge into {target}."
+            ));
+        }
+        merge_into(Path::new(&run.workspace), &run.branch, target)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -229,6 +443,86 @@ mod tests {
             Some("https://github.com/o/r/pull/7")
         );
         assert_eq!(created_url("warning only"), None);
+        assert!(pull_request_url("https://github.com/o/r/pull/7"));
+        assert!(pull_request_url(
+            "https://github.example.com/o/r.git/pull/7/"
+        ));
+        for url in [
+            "http://github.com/o/r/pull/7",
+            "https://github.com/o/r/pull/0",
+            "https://github.com/o/r/issues/7",
+            "https://github.com/o/r/pull/7/files",
+            "https://github.com/--flag/r/pull/7",
+            "https://github.com/o/r/pull/7 --admin",
+        ] {
+            assert!(!pull_request_url(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn local_merge_lands_on_the_target_or_leaves_the_checkout_as_it_was() {
+        let temp =
+            std::env::temp_dir().join(format!("jackalope-local-merge-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&temp).unwrap();
+        let path = temp.as_path();
+        let commit = |message: &str| {
+            change(
+                path,
+                &[
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "commit",
+                    "-qam",
+                    message,
+                ],
+            )
+            .unwrap();
+        };
+        change(path, &["init", "-q", "-b", "main"]).unwrap();
+        // merge_into makes its own merge commit, so the repository needs an identity on
+        // machines without a global one, such as CI runners.
+        change(path, &["config", "user.name", "Test"]).unwrap();
+        change(path, &["config", "user.email", "test@example.invalid"]).unwrap();
+        // Windows runners check files out with CRLF, which would change the contents read back.
+        change(path, &["config", "core.autocrlf", "false"]).unwrap();
+        std::fs::write(path.join("a.txt"), "base\n").unwrap();
+        change(path, &["add", "a.txt"]).unwrap();
+        commit("Base");
+        change(path, &["switch", "-q", "-c", "task"]).unwrap();
+        std::fs::write(path.join("a.txt"), "task\n").unwrap();
+        commit("Task");
+
+        std::fs::write(path.join("a.txt"), "dirty\n").unwrap();
+        assert!(merge_into(path, "task", "main")
+            .unwrap_err()
+            .contains("remaining changes"));
+        change(path, &["checkout", "--", "a.txt"]).unwrap();
+        assert!(merge_into(path, "task", "missing")
+            .unwrap_err()
+            .contains("no local missing"));
+
+        change(path, &["switch", "-q", "main"]).unwrap();
+        std::fs::write(path.join("a.txt"), "main\n").unwrap();
+        commit("Main");
+        change(path, &["switch", "-q", "task"]).unwrap();
+        let error = merge_into(path, "task", "main").unwrap_err();
+        assert!(error.contains("nothing changed"), "{error}");
+        assert_eq!(read(path, &["branch", "--show-current"]).unwrap(), "task");
+        assert!(read(path, &["status", "--porcelain"]).unwrap().is_empty());
+
+        change(path, &["switch", "-q", "main"]).unwrap();
+        change(path, &["reset", "-q", "--hard", "HEAD~1"]).unwrap();
+        change(path, &["switch", "-q", "task"]).unwrap();
+        let head = merge_into(path, "task", "main").unwrap();
+        assert_eq!(read(path, &["branch", "--show-current"]).unwrap(), "main");
+        assert_eq!(read(path, &["rev-parse", "main"]).unwrap(), head);
+        assert_eq!(
+            std::fs::read_to_string(path.join("a.txt")).unwrap(),
+            "task\n"
+        );
+        let _ = std::fs::remove_dir_all(temp);
     }
 
     #[test]
@@ -237,8 +531,8 @@ mod tests {
             std::env::temp_dir().join(format!("jackalope-delivery-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&temp).unwrap();
         let path = temp.as_path();
-        git(path, &["init"]).unwrap();
-        git(
+        read(path, &["init"]).unwrap();
+        read(
             path,
             &[
                 "-c",
@@ -259,13 +553,7 @@ mod tests {
         assert!(clean.pull_request.is_none());
         std::fs::write(path.join("work.txt"), "local work").unwrap();
         assert!(inspect(path, false).unwrap().changed);
-        assert_eq!(git(path, &["rev-parse", "HEAD"]).unwrap(), clean.head);
-        assert_eq!(temp.parent(), Some(std::env::temp_dir().as_path()));
-        assert!(temp
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .starts_with("jackalope-delivery-"));
+        assert_eq!(read(path, &["rev-parse", "HEAD"]).unwrap(), clean.head);
         std::fs::remove_dir_all(temp).unwrap();
     }
 }

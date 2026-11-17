@@ -7,7 +7,7 @@ import {
   pointerStates,
   supersededBy,
 } from '../../lib/decision-trail';
-import type { DecisionEntry, TaskRun } from '../../lib/task-runtime';
+import type { DecisionEntry, TaskRun } from '../../lib/run-types';
 import './decision-trail.css';
 
 const POINTER_LABEL: Record<PointerState, string> = {

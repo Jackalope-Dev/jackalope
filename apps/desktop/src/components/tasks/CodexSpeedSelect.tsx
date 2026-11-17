@@ -1,6 +1,6 @@
+import { Select, SelectItem } from '@jackalope/ui';
 import { useId } from 'react';
-import type { RunRequest } from '../../lib/task-runtime';
-import { Select, SelectItem } from '../ui/Select';
+import type { RunRequest } from '../../lib/run-types';
 
 export function CodexSpeedSelect({
   value,

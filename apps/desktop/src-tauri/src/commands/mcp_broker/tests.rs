@@ -100,6 +100,83 @@ async fn selected_results_expand_without_repeating_calls_or_crossing_attempts() 
     remove_fixture(path).await;
 }
 
+#[tokio::test]
+async fn results_too_large_for_a_computer_are_captured_with_a_preview() {
+    let path = folder();
+    let broker = Broker::default();
+    broker
+        .prepare_with(
+            "remote",
+            vec![fixture(SERVER)],
+            path.clone(),
+            None,
+            Delivery {
+                result_limit: Some(8_000),
+                approve_executes: true,
+            },
+        )
+        .unwrap();
+    broker
+        .prepare("local", vec![fixture(SERVER)], path.clone(), None)
+        .unwrap();
+    assert!(broker.approves_executes("remote"));
+    assert!(!broker.approves_executes("local"));
+    assert!(!broker.approves_executes("missing"));
+    let (found, _) = broker.search("remote", search("tool_19")).await.unwrap();
+    let handle = found["tools"][0]["handle"].as_str().unwrap();
+    assert_eq!(
+        broker.describe("remote", handle).await,
+        Some(("fixture".into(), "tool_19".into()))
+    );
+    assert_eq!(broker.describe("local", handle).await, None);
+    let mut input = execute(handle);
+    input
+        .arguments
+        .insert("value".into(), json!("source-data".repeat(2000)));
+    let (preview, usage) = broker.read("remote", input).await.unwrap();
+    assert_eq!(usage.calls, 1);
+    assert!(serde_json::to_vec(&preview).unwrap().len() < 8_000);
+    let preview = serde_json::to_value(preview).unwrap();
+    let value: Value =
+        serde_json::from_str(preview["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(value["truncated"], true);
+    let page: results::ReadInput =
+        serde_json::from_value(json!({"resultHandle":value["resultHandle"],"limit":1000})).unwrap();
+    let (page, usage) = broker.read_result("remote", page).await.unwrap();
+    assert_eq!(usage.calls, 1);
+    assert!(serde_json::to_string(&page)
+        .unwrap()
+        .contains("source-data"));
+
+    let (found, _) = broker.search("local", search("tool_19")).await.unwrap();
+    let mut input = execute(found["tools"][0]["handle"].as_str().unwrap());
+    input
+        .arguments
+        .insert("value".into(), json!("source-data".repeat(2000)));
+    let (whole, _) = broker.read("local", input).await.unwrap();
+    assert!(serde_json::to_vec(&whole).unwrap().len() > 20_000);
+
+    let mut oversized = execute(handle);
+    oversized
+        .arguments
+        .insert("value".into(), json!("x".repeat(61_000)));
+    let error = broker.read("remote", oversized).await.unwrap_err();
+    assert!(error.contains("nothing ran"), "{error}");
+
+    // A computer that receives large answers as artifacts gets the whole result.
+    assert!(broker.set_result_limit("remote", None));
+    assert!(!broker.set_result_limit("missing", None));
+    let mut input = execute(handle);
+    input
+        .arguments
+        .insert("value".into(), json!("source-data".repeat(2000)));
+    let (whole, _) = broker.read("remote", input).await.unwrap();
+    assert!(serde_json::to_vec(&whole).unwrap().len() > 20_000);
+    broker.close("remote");
+    broker.close("local");
+    remove_fixture(path).await;
+}
+
 async fn remove_fixture(path: PathBuf) {
     // Windows can retain the process's working-directory handle briefly after termination.
     for _ in 0..50 {

@@ -14,6 +14,7 @@ use super::super::{
     project_registry,
     tasks::{events::activity, TaskRun, TaskRuntime},
 };
+use crate::commands::tasks::RunStatus;
 use serde::{Deserialize, Serialize};
 use std::{
     path::PathBuf,
@@ -93,7 +94,7 @@ pub struct Settings {
 /// usable preview command is saved.
 pub fn settings(record: &project_registry::ProjectRecord) -> Option<Settings> {
     let command = record.preview_command.as_deref()?.trim();
-    if record.review_captures == Some(false)
+    if !record.settings.resolve().review_captures
         || command.is_empty()
         || command.len() > 4000
         || command.contains('\0')
@@ -427,21 +428,15 @@ fn before_source(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String>
     if workspace == checkout {
         return Err("Before screenshots are skipped when work happens in the project checkout itself; only the result was captured.".into());
     }
-    let read = |args: &[&str]| {
-        crate::commands::git_command::command(
-            &checkout,
-            args,
-            crate::commands::git_command::Policy::Inspection,
-        )
-        .output()
+    use crate::commands::repo::{git, is_dirty, Policy, Untracked};
+    if git(&checkout, &["rev-parse", "HEAD"], Policy::Inspection)
         .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-    };
-    if read(&["rev-parse", "HEAD"]).as_deref() != Some(run.base_head.as_str()) {
+        .as_deref()
+        != Some(run.base_head.as_str())
+    {
         return Err("Before screenshots are skipped because the project checkout is no longer at the task's starting commit.".into());
     }
-    if read(&["status", "--porcelain", "--untracked-files=no"]).is_none_or(|s| !s.is_empty()) {
+    if is_dirty(&checkout, Untracked::No, Policy::Inspection) != Ok(false) {
         return Err(
             "Before screenshots are skipped because the project checkout has uncommitted changes."
                 .into(),
@@ -450,7 +445,7 @@ fn before_source(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String>
     let busy = runtime.integration_runs()?.iter().any(|other| {
         other.id != run.id
             && dunce::canonicalize(&other.workspace).ok().as_ref() == Some(&checkout)
-            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
+            && other.status.is_live()
     });
     if busy {
         return Err(
@@ -465,19 +460,6 @@ fn before_source(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String>
 enum Side {
     Before,
     After,
-}
-
-fn evidence_folder(workspace: &str) -> Result<PathBuf, String> {
-    let workspace = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
-    let directory = workspace.join(".jackalope/artifacts/screenshots");
-    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    if !dunce::canonicalize(&directory)
-        .map_err(|e| e.to_string())?
-        .starts_with(&workspace)
-    {
-        return Err("The artifact folder resolves outside this workspace.".into());
-    }
-    Ok(directory)
 }
 
 /// What one capture pass shares across both sides.
@@ -585,20 +567,21 @@ fn collect(runtime: &TaskRuntime, run: &TaskRun, settings: &Settings) -> ReviewC
             })
         })
         .collect();
-    let pass = match evidence_folder(&run.workspace) {
-        Ok(folder) => Pass {
-            runtime,
-            id: &run.id,
-            folder,
-            deadline,
-        },
-        Err(error) => {
-            result
-                .notes
-                .push(format!("Review screenshots could not be saved: {error}"));
-            return result;
-        }
-    };
+    let pass =
+        match crate::commands::artifacts::evidence_folder(std::path::Path::new(&run.workspace)) {
+            Ok(folder) => Pass {
+                runtime,
+                id: &run.id,
+                folder,
+                deadline,
+            },
+            Err(error) => {
+                result
+                    .notes
+                    .push(format!("Review screenshots could not be saved: {error}"));
+                return result;
+            }
+        };
     let first = pages.first().map_or("/", |page| page.path.as_str());
     match serve(
         runtime,
@@ -702,7 +685,7 @@ pub(in crate::commands) fn wanted(runtime: &TaskRuntime, run: &TaskRun) -> bool 
 fn wanted_now(runtime: &TaskRuntime, id: &str) -> bool {
     runtime
         .run_snapshot(id)
-        .is_some_and(|run| run.review_capturing && run.status == "review")
+        .is_some_and(|run| run.review_capturing && run.status == RunStatus::Review)
 }
 
 /// Captures review screenshots in the background for an attempt whose result is

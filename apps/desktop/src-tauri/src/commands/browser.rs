@@ -11,28 +11,8 @@ use super::{
     },
     process_control::ProcessTree,
 };
-pub use engine::set_resource_directory;
 pub(super) use persistent::{cookie_sites, ProfileWindow};
 
-pub(super) fn codex_tool_policy() -> serde_json::Value {
-    let tools: serde_json::Map<String, serde_json::Value> = [
-        "browser_navigate",
-        "browser_snapshot",
-        "browser_interact",
-        "browser_screenshot",
-        "browser_configure",
-        "browser_inspect",
-        "browser_tabs",
-        "browser_open_profile",
-        "desktop_control",
-        "computer_request",
-        "computer_exec",
-    ]
-    .into_iter()
-    .map(|name| (name.into(), serde_json::json!({"approval_mode":"approve"})))
-    .collect();
-    serde_json::Value::Object(tools)
-}
 use engine::Engine;
 use serde_json::{json, Value};
 use std::{
@@ -67,29 +47,22 @@ pub(super) trait ProfileGuard: Send + Sync {
     }
 }
 
-type Router = dyn Fn(&str) -> Result<Option<Arc<dyn ProfileGuard>>, String> + Send + Sync;
-static ROUTER: OnceLock<Box<Router>> = OnceLock::new();
-
-/// Decides, once per task browser, whether it should drive another machine's
-/// browser (a bot computer) instead of a disposable local one.
-pub(super) fn set_router(router: Box<Router>) {
-    let _ = ROUTER.set(router);
-}
-
-/// Attaches the routed guard before a task browser first starts.
-/// An error (such as a computer still starting) leaves the browser unrouted
-/// so a later command decides again.
-fn route(run_id: &str, slot: &Arc<Slot>) -> Result<(), String> {
-    let Some(router) = ROUTER.get() else {
-        return Ok(());
-    };
+/// Attaches the guard `decide` names before a task browser first starts, so
+/// it drives another machine's browser (a bot computer) instead of a
+/// disposable local one. An error, such as a computer still starting, leaves
+/// the browser undecided so a later command decides again.
+pub(super) fn route(
+    run_id: &str,
+    decide: impl FnOnce() -> Result<Option<Arc<dyn ProfileGuard>>, String>,
+) -> Result<(), String> {
+    let slot = session_slot(run_id)?;
     let engine = slot.engine.lock().map_err(|e| e.to_string())?;
     if engine.is_some() || slot.routed.load(Ordering::SeqCst) {
         return Ok(());
     }
     let mut profile = slot.profile.lock().map_err(|e| e.to_string())?;
     if profile.is_none() {
-        *profile = router(run_id)?;
+        *profile = decide()?;
     }
     slot.routed.store(true, Ordering::SeqCst);
     Ok(())
@@ -100,9 +73,6 @@ pub(super) enum Verdict {
     SignIn,
 }
 
-/// Reads the current address and whether a password field is visible.
-const PAGE_STATE: &str = "(()=>({url:location.href,login:[...document.querySelectorAll('input[type=password]')].some(e=>!e.disabled&&e.getClientRects().length>0)}))()";
-
 struct Slot {
     headed: bool,
     canceled: Arc<AtomicBool>,
@@ -111,7 +81,7 @@ struct Slot {
     trees: Mutex<Vec<Arc<ProcessTree>>>,
     /// Set when the task switched to a persistent profile.
     profile: Mutex<Option<Arc<dyn ProfileGuard>>>,
-    /// Whether the router has been consulted for this browser.
+    /// Whether [`route`] has decided which browser this one drives.
     routed: AtomicBool,
 }
 
@@ -242,7 +212,7 @@ pub(super) fn peek(run_id: &str) -> Result<Peek, String> {
     let bytes = taken.and_then(|_| std::fs::read(&capture).map_err(|e| e.to_string()));
     let _ = std::fs::remove_file(&capture);
     let png = bytes?;
-    if png.len() > 8 * 1024 * 1024 {
+    if png.len() as u64 > super::artifacts::screenshot_limit() {
         return Err("The browser view exceeds the 8 MiB preview limit.".into());
     }
     Ok(Peek::Frame { url, png })
@@ -393,13 +363,9 @@ async fn with_target<T: Send + 'static>(
     work: impl FnOnce(&Engine) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     let slot = session_slot(run_id)?;
-    let run_id = run_id.to_string();
-    tauri::async_runtime::spawn_blocking(move || {
-        route(&run_id, &slot)?;
-        run_guarded(&slot, target.as_deref(), work)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || run_guarded(&slot, target.as_deref(), work))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn run_session<T>(
@@ -415,7 +381,7 @@ fn check_page(engine: &mut Option<Engine>, guard: &dyn ProfileGuard) -> Result<(
     let Some(open) = engine.as_ref() else {
         return Ok(());
     };
-    let state = open.call(json!({"action":"evaluate", "script":PAGE_STATE}))?["result"].clone();
+    let state = open.call(json!({"action":"evaluate", "script":super::computers::protocol::protocol().browser.page_state}))?["result"].clone();
     let url = state["url"].as_str().unwrap_or_default().to_owned();
     match guard.page(&url, state["login"] == true)? {
         Verdict::Proceed => Ok(()),
@@ -521,7 +487,10 @@ pub(super) fn capture_first_screen(
 
 fn bounded(text: &str) -> (String, bool) {
     let mut chars = text.chars();
-    let text = chars.by_ref().take(40_000).collect();
+    let text = chars
+        .by_ref()
+        .take(super::computers::protocol::protocol().browser.text_limit)
+        .collect();
     (text, chars.next().is_some())
 }
 
@@ -620,41 +589,30 @@ async fn screenshot(
             .as_str()
             .ok_or("Browser URL was missing")?
             .to_owned();
-        let id = uuid::Uuid::new_v4().to_string();
-        let capture = engine.directory.join(format!("{id}.png"));
+        let capture = engine
+            .directory
+            .join(format!("{}.png", uuid::Uuid::new_v4()));
         let mut request = json!({"action":"screenshot", "path":capture, "format":"png", "fullPage":selector.is_none()});
         if let Some(selector) = selector { request["selector"] = json!(selector); }
         engine.call(request)?;
         if std::fs::metadata(&capture)
             .map_err(|e| e.to_string())?
             .len()
-            > 8 * 1024 * 1024
+            > super::artifacts::screenshot_limit()
         {
             let _ = std::fs::remove_file(capture);
             return Err(
                 "Screenshot exceeds the 8 MiB preview limit. Use a smaller viewport.".into(),
             );
         }
-        let bytes = std::fs::read(&capture).map_err(|e| e.to_string())?;
-        let (width, height) = super::harness::png_dimensions(&bytes)?;
-        let directory = workspace.join(".jackalope/artifacts/screenshots");
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        let path = directory.join(format!("{id}.png"));
-        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+        let bytes = std::fs::read(&capture).map_err(|e| e.to_string());
         let _ = std::fs::remove_file(capture);
-        Ok(ScreenshotArtifact {
-            id,
-            name: name
-                .unwrap_or_else(|| "Browser capture".into())
-                .chars()
-                .take(160)
-                .collect(),
-            url,
-            file_path: path.to_string_lossy().into_owned(),
-            width,
-            height,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        })
+        let name: String = name
+            .unwrap_or_else(|| "Browser capture".into())
+            .chars()
+            .take(160)
+            .collect();
+        super::artifacts::save_screenshot(&workspace, &bytes?, &name, &url)
     })
     .await
 }

@@ -15,10 +15,34 @@
   scrollbar-gutter: stable;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
+  /* The app shell is unselectable; page content (titles, results, details) can be copied. */
+  -webkit-user-select: text;
+  user-select: text;
 }
+/* Controls keep clicks and drags from starting a selection. */
+.workspace-page-layout
+  :where(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    summary,
+    .ui-choice
+  ) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Sub-views sit above the page heading at the same gutter; the control carries its own track. */
+.workspace-subnavigation {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 12px var(--workspace-gutter, 20px) 0;
+}
+/* Actions stay on the title row; long descriptions wrap beside them instead. */
 .workspace-heading {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px 24px;
@@ -29,16 +53,18 @@
   min-width: 0;
   max-width: 65ch;
 }
-/* Actions stay on the title row; long descriptions wrap beside them instead. */
-.workspace-heading {
-  flex-wrap: nowrap;
-}
 .workspace-heading > div:first-child {
   flex: 1 1 auto;
 }
 .workspace-heading > :not(:first-child) {
   flex-shrink: 0;
   max-width: 60%;
+}
+.workspace-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .workspace-heading > .workspace-actions {
   justify-content: flex-end;

@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import {
   type AccountStatus,
@@ -108,7 +109,11 @@ export const useAgentAccountsStore = create<State>((set, get) => ({
       set((state) => ({
         agents: {
           ...state.agents,
-          [agent]: { ...(state.agents[agent] ?? empty()), loading: false, error: String(cause) },
+          [agent]: {
+            ...(state.agents[agent] ?? empty()),
+            loading: false,
+            error: describeError(cause),
+          },
         },
       }));
       return;

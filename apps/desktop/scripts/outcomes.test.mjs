@@ -112,7 +112,7 @@ test('return view selects latest attempts, prioritizes blockers and retains revi
     ['blocked', 'new', 'reviewed'],
   );
   assert.deepEqual(returnToProject([run, latest], 'p', ['new']), []);
-  assert.equal(taskDecision(blocker).action, 'Inspect interrupted work');
+  assert.equal(taskDecision(blocker).action, 'Resume');
   assert.equal(taskDecision(reviewed).action, 'Merge into your project');
 });
 

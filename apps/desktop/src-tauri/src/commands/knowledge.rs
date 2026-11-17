@@ -1,4 +1,5 @@
 use super::{history, tasks::TaskRuntime};
+use crate::commands::tasks::RunStatus;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -488,6 +489,24 @@ fn select(
     Ok(receipt)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::knowledge::knowledge_list,
+            commands::knowledge::knowledge_save,
+            commands::knowledge::knowledge_remove,
+            commands::knowledge::learning::knowledge_history,
+            commands::knowledge::learning::knowledge_learning_metrics,
+            commands::knowledge::learning::knowledge_set_archived,
+            commands::knowledge::learning::enforce::knowledge_check_draft,
+            commands::knowledge::learning::enforce::knowledge_retire_enforced,
+            commands::knowledge::knowledge_preview,
+            commands::knowledge::knowledge_search,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn knowledge_list(
     project_id: String,
@@ -516,7 +535,7 @@ pub fn knowledge_save(
                 .find(|r| &r.id == id && r.project_id == entry.project_id)
                 .ok_or("Source task is unavailable in this project")?;
             if canonical(&run.project_path)? != canonical(&entry.project_path)?
-                || run.status != "reviewed"
+                || run.status != RunStatus::Reviewed
             {
                 return Err("Review the source task before saving knowledge from it.".into());
             }

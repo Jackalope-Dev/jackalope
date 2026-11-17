@@ -316,14 +316,16 @@ it('keeps legacy waitlist payloads renderable and new private links separate fro
 });
 
 it('retains original ordering for existing members with no referrals', async () => {
-  await verified('one@example.com');
-  await verified('two@example.com');
-  const rows = await env.DB.prepare(waitlistRankSql).all<{
-    referral_count: number;
-    position: number;
-  }>();
-  expect(rows.results.map((x) => x.position)).toEqual([1, 2]);
-  expect(rows.results.every((x) => x.referral_count === 0)).toBe(true);
+  const one = await verified('one@example.com');
+  const two = await verified('two@example.com');
+  expect(await waitlistStatus(browser(one.session), bindings)).toMatchObject({
+    position: 1,
+    referrals: 0,
+  });
+  expect(await waitlistStatus(browser(two.session), bindings)).toMatchObject({
+    position: 2,
+    referrals: 0,
+  });
 });
 
 it('lets a signed-in member answer and revise the waitlist questions', async () => {

@@ -1,0 +1,5 @@
+/* Workspace pages lay out by sibling margins, not a gap, so an error notice takes the same
+   12px as the dispatch notice and the composer-to-list space. */
+.workspace-page-layout > .action-error {
+  margin-top: 12px;
+}

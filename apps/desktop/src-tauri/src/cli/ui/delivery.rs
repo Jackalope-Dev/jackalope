@@ -4,39 +4,54 @@
 use super::feed::Tone;
 use super::pickers::{Action, Item, Picker, PickerKind};
 use super::App;
+use crate::merge;
 use crate::protocol::{self, Request, Response};
 
 impl App {
-    /// `/merge [message]`: prepares the merge of this conversation's latest
+    /// `/merge [message]`: prepares the merge of the conversation's latest
     /// attempt and asks before applying it, as the app's merge review does.
     pub(super) fn merge(&mut self, message: &str) {
         let (Some(session_id), Some(view)) = (self.session.clone(), self.view.clone()) else {
-            self.note("Open a conversation to merge its work.");
+            self.flash("Open a conversation to merge its work", Tone::Muted);
             return;
         };
         if self.working() {
-            self.note("The agent is still working. Merge once it finishes.");
+            self.flash(
+                "The agent is still working. Merge once it finishes",
+                Tone::Muted,
+            );
             return;
         }
-        let plan = match self.request(Request::MergePrepare {
-            session_id,
-            message: Some(message.trim().to_string()).filter(|text| !text.is_empty()),
-        }) {
-            Some(Response::Merge { plan }) => plan,
-            _ => return,
+        let message = Some(message.trim().to_string()).filter(|text| !text.is_empty());
+        let prepared = merge::prepare(&mut self.caller(), &session_id, view.paused, message);
+        let plan = match prepared {
+            Ok(prepared) => {
+                if prepared.paused_here {
+                    self.merge_paused = Some(session_id);
+                }
+                prepared.plan
+            }
+            Err(merge::Refusal::Failed(error)) => {
+                if !error.is_empty() {
+                    self.note(error);
+                }
+                return;
+            }
+            Err(merge::Refusal::Conflicts {
+                target_branch,
+                files,
+            }) => {
+                self.note(format!(
+                    "This work conflicts with {target_branch}: {}. Resolve them in the app's merge review (/review).",
+                    files.join(", ")
+                ));
+                return;
+            }
+            Err(merge::Refusal::Empty) => {
+                self.flash("There are no changes to merge", Tone::Muted);
+                return;
+            }
         };
-        if !plan.conflicts.is_empty() {
-            self.note(format!(
-                "This work conflicts with {}: {}. Resolve them in the app's merge review (/review).",
-                plan.target_branch,
-                plan.conflicts.join(", ")
-            ));
-            return;
-        }
-        if plan.files.is_empty() {
-            self.note("There are no changes to merge.");
-            return;
-        }
         let count = plan.files.len();
         for file in plan.files.iter().take(12) {
             self.note(format!("  {file}"));
@@ -71,7 +86,7 @@ impl App {
                 Item {
                     label: "Not now".into(),
                     detail: "nothing changes".into(),
-                    action: Action::Dismiss,
+                    action: Action::CancelMerge,
                 },
             ],
             filter: String::new(),
@@ -81,40 +96,43 @@ impl App {
         });
     }
 
-    /// Pauses the conversation so no new message starts mid-merge, then
-    /// merges. A merge that fails resumes what this paused.
-    pub(super) fn apply_merge(&mut self, plan_id: String, cleanup: bool) {
-        let Some((session_id, view)) = self.session.clone().zip(self.view.clone()) else {
-            return;
-        };
-        let pause = |app: &mut Self, action: &str| {
-            app.request(Request::SessionAction {
-                session_id: session_id.clone(),
-                action: action.into(),
-                message_id: None,
-            })
-            .is_some()
-        };
-        if !view.paused && !pause(self, "pause") {
-            return;
+    /// Sends requests the way [`App::request`] does, for the shared delivery client.
+    /// Errors were already shown, so they come back empty.
+    fn caller(&mut self) -> impl FnMut(Request) -> Result<Response, String> + '_ {
+        move |request| self.request(request).ok_or_else(String::new)
+    }
+
+    /// Resumes a conversation `/merge` paused, when the merge does not go ahead.
+    pub(super) fn release_merge_pause(&mut self) {
+        if let Some(session_id) = self.merge_paused.take() {
+            merge::release(&mut self.caller(), &session_id, true);
         }
-        match self.request(Request::MergeApply { plan_id, cleanup }) {
-            Some(Response::Merge { plan }) => {
-                self.note_tone(
-                    format!(
-                        "Merged into {} · the conversation is paused; /unpause to keep working",
-                        plan.target_branch
-                    ),
-                    Tone::Success,
-                );
-                for error in plan.cleanup_errors {
-                    self.note(format!("Could not remove the worktree: {error}"));
-                }
+    }
+
+    /// Merges a prepared plan. A merge that fails resumes what `/merge` paused.
+    pub(super) fn apply_merge(&mut self, plan_id: String, cleanup: bool) {
+        let Some(session_id) = self.session.clone() else {
+            return;
+        };
+        let paused_here = self.merge_paused.take().is_some();
+        let merged = merge::apply(
+            &mut self.caller(),
+            &session_id,
+            paused_here,
+            plan_id,
+            cleanup,
+        );
+        if let Ok(plan) = merged {
+            self.note_tone(
+                format!(
+                    "Merged into {} · the conversation is paused; /unpause to keep working",
+                    plan.target_branch
+                ),
+                Tone::Success,
+            );
+            for error in plan.cleanup_errors {
+                self.note(format!("Could not remove the worktree: {error}"));
             }
-            _ if !view.paused => {
-                pause(self, "resume");
-            }
-            _ => {}
         }
         self.refresh();
     }
@@ -123,11 +141,17 @@ impl App {
     /// pushes the branch and opens a draft pull request after asking.
     pub(super) fn pull_request(&mut self, title: &str) {
         let Some(view) = self.view.clone().filter(|_| self.session.is_some()) else {
-            self.note("Open a conversation to open a pull request for its work.");
+            self.flash(
+                "Open a conversation to open a pull request for its work",
+                Tone::Muted,
+            );
             return;
         };
         if self.working() {
-            self.note("The agent is still working. Open a pull request once it finishes.");
+            self.flash(
+                "The agent is still working. Open a pull request once it finishes",
+                Tone::Muted,
+            );
             return;
         }
         let title = Some(title.trim())
@@ -176,7 +200,7 @@ impl App {
         let Some((session_id, view)) = self.session.clone().zip(self.view.clone()) else {
             return;
         };
-        let body: String = view.result.trim().chars().take(4000).collect();
+        let body = merge::pull_request_body(&view.result);
         if let Some(Response::PullRequest { url }) = self.request(Request::PullRequest {
             session_id,
             title,

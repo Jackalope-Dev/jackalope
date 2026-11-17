@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_contains;
 use crate::commands::tasks::TaskRun;
 use serde::Serialize;
 
@@ -69,12 +70,6 @@ pub(super) fn changed_paths(run: &TaskRun) -> Result<(String, Vec<String>), Stri
     result
 }
 
-fn contains(scopes: &[String], path: &str) -> bool {
-    scopes
-        .iter()
-        .any(|s| s == "." || s == path || path.starts_with(&format!("{s}/")))
-}
-
 pub(super) fn audit(ledger: &Ledger, runs: &[TaskRun], merged: &[String]) -> Vec<ScopeAudit> {
     let mut scans = Vec::new();
     for run in runs {
@@ -86,7 +81,9 @@ pub(super) fn audit(ledger: &Ledger, runs: &[TaskRun], merged: &[String]) -> Vec
         }
         let owner = agreements::owner_id(ledger, runs, run);
         let item = ledger.items.iter().find(|i| i.id == owner);
-        if item.is_none() && !active(&run.status) && !std::path::Path::new(&run.workspace).is_dir()
+        if item.is_none()
+            && !run.status.is_active()
+            && !std::path::Path::new(&run.workspace).is_dir()
         {
             continue;
         }
@@ -119,8 +116,8 @@ pub(super) fn audit(ledger: &Ledger, runs: &[TaskRun], merged: &[String]) -> Vec
                     a.outside = paths
                         .iter()
                         .filter(|p| {
-                            !contains(&agreements::effective_scopes(ledger, item), p)
-                                || contains(excluded, p)
+                            !any_contains(&agreements::effective_scopes(ledger, item), p)
+                                || any_contains(excluded, p)
                         })
                         .cloned()
                         .collect();
@@ -206,8 +203,10 @@ impl Coordinator {
             super::peers::notify_conflicts(&mut ledger, &runs, &merged);
             let excess = ledger.messages.len().saturating_sub(2000);
             ledger.messages.drain(..excess);
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(inner, |saved| {
+                *saved = ledger;
+                Ok::<_, String>(())
+            })?;
         }
         Ok(())
     }
@@ -217,12 +216,12 @@ impl Coordinator {
         ids: &[String],
         operation: impl FnOnce(&[ScopeAudit]) -> Result<T, String>,
     ) -> Result<T, String> {
-        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
-        let _guard = crate::commands::integration::execution_guard()?;
-        self.refresh_scopes_locked(&mut inner)?;
-        let runs = self.runtime.integration_runs()?;
-        self.validate_integration_locked(&inner.ledger, &runs, ids)?;
-        operation(&inner.ledger.scope_audits)
+        self.transact(|inner, _guard| {
+            self.refresh_scopes_locked(inner)?;
+            let runs = self.runtime.integration_runs()?;
+            self.validate_integration_locked(&inner.ledger, &runs, ids)?;
+            operation(&inner.ledger.scope_audits)
+        })
     }
 
     pub(super) fn validate_integration_locked(
@@ -317,17 +316,17 @@ pub async fn queue_reconcile_scope(
 ) -> Result<(), String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
-        let _guard = crate::commands::integration::execution_guard()?;
+        let mut inner = service.state();
+        let _guard = service.execution(&inner)?;
         service.refresh_scopes_locked(&mut inner)?;
         let runs = service.runtime.integration_runs()?;
-        if runs.iter().any(|r| r.id == run_id && (active(&r.status) || r.status == "interrupted")) { return Err("Stop the task and resolve interrupted process ownership before accepting its scope.".into()); }
-        let mut ledger = inner.ledger.clone();
-        let a = ledger.scope_audits.iter_mut().find(|a| a.run_id == run_id).ok_or("Scope check not found.")?;
-        if a.error.is_some() || !a.overlaps.is_empty() || a.tree.as_deref() != Some(&tree) { return Err("Files changed or overlap another task. Resolve the overlap and review the current scope check.".into()); }
-        a.accepted_tree = Some(tree);
-        service.save(&ledger)?; inner.ledger = ledger;
-        Ok(())
+        if runs.iter().any(|r| r.id == run_id && (r.status.is_live())) { return Err("Stop the task and resolve interrupted process ownership before accepting its scope.".into()); }
+        service.commit(&mut inner, |ledger| {
+            let a = ledger.scope_audits.iter_mut().find(|a| a.run_id == run_id).ok_or("Scope check not found.")?;
+            if a.error.is_some() || !a.overlaps.is_empty() || a.tree.as_deref() != Some(&tree) { return Err("Files changed or overlap another task. Resolve the overlap and review the current scope check.".into()); }
+            a.accepted_tree = Some(tree);
+            Ok(())
+        })
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -339,9 +338,9 @@ pub async fn queue_cancel_agreement(
 ) -> Result<(), String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
-        let _guard = crate::commands::integration::execution_guard()?;
-        let mut ledger = inner.ledger.clone();
+        let mut inner = service.state();
+        let _guard = service.execution(&inner)?;
+        service.commit(&mut inner, |ledger| {
         let index = ledger.agreements.iter().position(|a| a.id == id).ok_or("Agreement not found.")?;
         let mut a = ledger.agreements[index].clone();
         if a.revision != revision {
@@ -349,11 +348,11 @@ pub async fn queue_cancel_agreement(
         }
         if a.kind == "ownership" {
             let runs = service.runtime.integration_runs()?;
-            if runs.iter().any(|r| agreements::owner_id(&ledger, &runs, r) == a.task_id && (active(&r.status) || r.status == "interrupted")) {
+            if runs.iter().any(|r| agreements::owner_id(ledger, &runs, r) == a.task_id && (r.status.is_live())) {
                 return Err("Stop the owner and resolve interrupted process ownership before releasing this claim.".into());
             }
             let merged = crate::commands::integration::applied_run_ids(&service.runtime)?;
-            agreements::require_clean_paths(&ledger, &runs, &a, &merged)?;
+            agreements::require_clean_paths(ledger, &runs, &a, &merged)?;
             a.status = "released".into();
         } else {
             a.status = "canceled".into();
@@ -361,9 +360,9 @@ pub async fn queue_cancel_agreement(
         a.revision += 1;
         a.updated_at = Utc::now().to_rfc3339();
         ledger.agreements[index] = a.clone();
-        agreements::announce(&mut ledger, &a, "user");
-        service.save(&ledger)?;
-        inner.ledger = ledger;
+        agreements::announce(ledger, &a, "user");
+        Ok::<_, String>(())
+        })?;
         Ok(())
     })
     .await

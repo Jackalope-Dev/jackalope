@@ -20,7 +20,6 @@ import RichDiff from '/src/components/tasks/RichDiff.tsx';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 const items = Array.from({ length: 1000 }, (_, index) => ({
   id: 'idea-' + index, title: 'Example task ' + index, stage: 'ideas', date: '2026-01-01T12:00:00Z',
   idea: { id: 'idea-' + index, title: 'Example task ' + index, rawPrompt: 'Searchable history ' + index, status: 'backlog' },

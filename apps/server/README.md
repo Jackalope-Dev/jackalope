@@ -20,7 +20,8 @@ the `ACCESS_WEBSITE` service binding in staging and production. Set its service
 name in each environment of the private deployment configuration to the Worker
 serving `ACCESS_WEB_ORIGIN`. Deploy the website before the API. Workers on routes
 cannot receive same-zone public fetches from another Worker. Local development
-without this binding reads the public feed directly.
+without this binding reads the public feed directly. Recurring product update
+emails are drafted and sent from LopeBase from the same public changelog feed.
 
 From the repository root, use Node 26 and the repository's pnpm version:
 

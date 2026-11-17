@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
@@ -186,6 +185,6 @@ export async function runExternal(inputPath, output, binary) {
   return report;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   await runExternal(process.argv[2], process.argv[3], process.env.JACKALOPE_QUALITY_BINARY);
 }

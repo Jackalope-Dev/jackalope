@@ -331,6 +331,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 @radix-ui/react-collection 1.1.15 (LICENSE)
 @radix-ui/react-compose-refs 1.1.5 (LICENSE)
 @radix-ui/react-context 1.2.2 (LICENSE)
+@radix-ui/react-context-menu 2.3.7 (LICENSE)
 @radix-ui/react-dialog 1.1.23 (LICENSE)
 @radix-ui/react-direction 1.1.4 (LICENSE)
 @radix-ui/react-dismissable-layer 1.1.19 (LICENSE)

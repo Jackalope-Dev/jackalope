@@ -101,6 +101,23 @@ fn view(preview: &mut Preview) -> Result<PreviewView, String> {
     Ok(result)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::previews::features::project_feature_suggestions,
+            commands::previews::features::project_feature_drift,
+            commands::previews::task_preview_start,
+            commands::previews::task_preview_status,
+            commands::previews::task_preview_stop,
+            commands::previews::task_preview_inspect,
+            commands::previews::task_preview_inspect_cancel,
+            commands::previews::design::task_preview_design_open,
+            commands::previews::design::task_preview_design_capture,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_preview_status(id: String) -> Result<Option<PreviewView>, String> {
     tauri::async_runtime::spawn_blocking(move || preview_status(id))
@@ -122,11 +139,7 @@ fn preview_status(id: String) -> Result<Option<PreviewView>, String> {
 }
 
 fn http_ready(port: u16) -> bool {
-    http_ready_with_timeout(port, Duration::from_millis(300))
-}
-
-fn http_ready_with_timeout(port: u16, timeout: Duration) -> bool {
-    http_ready_at(port, "/", timeout)
+    http_ready_at(port, "/", Duration::from_millis(300))
 }
 
 fn http_ready_at(port: u16, path: &str, timeout: Duration) -> bool {
@@ -211,10 +224,10 @@ fn start_preview(
     }
     let runs = runtime.integration_runs()?;
     let run = runs.iter().find(|r| r.id == id).ok_or("Task not found")?;
-    if runs.iter().any(|r| {
-        r.workspace == run.workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|r| r.workspace == run.workspace && r.status.is_live())
+    {
         return Err("Finish active work and resolve interrupted ownership before starting a managed preview.".into());
     }
     ensure_idle(&run.workspace)?;
@@ -295,19 +308,17 @@ fn start_preview(
 fn preview_process(expanded: &str, workspace: &str, port: u16) -> Command {
     #[cfg(windows)]
     let mut cmd = {
-        use std::os::windows::process::CommandExt;
         let mut c = Command::new("cmd.exe");
-        c.args(["/D", "/S", "/C", expanded])
-            .creation_flags(0x08000000);
+        c.args(["/D", "/S", "/C", expanded]);
         c
     };
     #[cfg(not(windows))]
     let mut cmd = {
-        use std::os::unix::process::CommandExt;
         let mut c = Command::new("/bin/sh");
-        c.args(["-c", expanded]).process_group(0);
+        c.args(["-c", expanded]);
         c
     };
+    super::process_control::isolated(&mut cmd);
     cmd.current_dir(workspace)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -450,15 +461,8 @@ async fn inspect_preview(
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        let workspace = dunce::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
-        let directory = workspace.join(".jackalope/artifacts/screenshots");
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        if !dunce::canonicalize(&directory)
-            .map_err(|e| e.to_string())?
-            .starts_with(&workspace)
-        {
-            return Err("The artifact folder resolves outside this workspace.".into());
-        }
+        let directory =
+            crate::commands::artifacts::evidence_folder(std::path::Path::new(&run.workspace))?;
         let destination = directory.join(format!("{}.png", screenshot.id));
         std::fs::write(&destination, bytes).map_err(|e| e.to_string())?;
         let mut screenshot = screenshot;
@@ -602,7 +606,7 @@ mod tests {
                 assert_eq!(received, request.as_bytes());
                 client.write_all(response.as_bytes()).unwrap();
             });
-            let ready = http_ready_with_timeout(port, Duration::from_secs(5));
+            let ready = http_ready_at(port, "/", Duration::from_secs(5));
             server.join().unwrap();
             assert_eq!(ready, expected, "response {response:?}");
         }

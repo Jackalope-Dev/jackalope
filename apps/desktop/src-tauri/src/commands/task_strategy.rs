@@ -96,13 +96,14 @@ pub(super) fn source_head(request: &RunRequest) -> Result<String, String> {
         &request.project_path,
         request.target_branch.as_deref(),
     )?;
-    super::tasks::git(
-        &request.project_path,
+    super::repo::git(
+        std::path::Path::new(&request.project_path),
         &[
             "rev-parse",
             "--verify",
             &format!("refs/heads/{branch}^{{commit}}"),
         ],
+        super::repo::Policy::Inspection,
     )
 }
 
@@ -366,7 +367,7 @@ fn agent_assessment(
         return Err("Task assessment stopped.".into());
     }
     *attempted = true;
-    let response = super::tasks::helper_process::run_bounded(
+    let response = super::tasks::helper_process::run(
         runtime,
         agent,
         &binding,
@@ -436,8 +437,12 @@ pub(crate) fn assess(
         && !restrictions(&saved_context.text());
     let scopes = explicit_scopes(root, &intent);
     let (fallback, local_reason, cheap) = local_strategy(&intent, allowed, &scopes);
-    let diff = super::tasks::git(&request.project_path, &["diff", "HEAD", "--", "."])
-        .unwrap_or_else(|_| "unavailable".into());
+    let diff = super::repo::git(
+        std::path::Path::new(&request.project_path),
+        &["diff", "HEAD", "--", "."],
+        super::repo::Policy::Inspection,
+    )
+    .unwrap_or_else(|_| "unavailable".into());
     let repository = decisions::context::repository(&request);
     let routing_context_hash = routing_context_hash(runtime, &request, &repository)?;
     let fingerprint = serde_json::to_vec(&(
@@ -634,6 +639,17 @@ pub(crate) fn assess(
     }
     Ok(assessment)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::task_strategy::task_strategy_assess,
+            commands::task_strategy::task_strategy_cancel,
+            commands::task_strategy::task_strategy_history,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn task_strategy_assess(

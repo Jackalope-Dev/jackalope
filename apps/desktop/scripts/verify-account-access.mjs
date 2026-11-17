@@ -179,7 +179,7 @@ try {
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true,
       );
-      await page.locator('.access-page').evaluate((element) => {
+      await page.getByRole('main').evaluate((element) => {
         element.scrollTop = 0;
       });
       await page.screenshot({

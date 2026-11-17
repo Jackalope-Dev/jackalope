@@ -13,8 +13,11 @@ pub(super) fn prepare(root: &Path, spec: &Value) -> Result<PathBuf, String> {
         if !repo.is_dir() || repo.parent().is_none() {
             return Err("External evaluation needs a prepared repository directory".into());
         }
-        let git_root =
-            super::super::evaluation_trial::git(&repo, &["rev-parse", "--show-toplevel"])?;
+        let git_root = crate::commands::repo::git(
+            &repo,
+            &["rev-parse", "--show-toplevel"],
+            crate::commands::repo::Policy::Inherited,
+        )?;
         if std::fs::canonicalize(git_root).map_err(|error| error.to_string())? != repo {
             return Err("External workspace must be the prepared repository root".into());
         }
@@ -49,7 +52,7 @@ pub(super) fn prepare(root: &Path, spec: &Value) -> Result<PathBuf, String> {
             r#"{"attribution":"user","name":"Evaluation fixture","email":"evaluation@example.invalid","cleanupAfterMerge":false,"autoCheckpoint":false}"#,
         ],
     ] {
-        super::super::evaluation_trial::git(&repo, &args)?;
+        crate::commands::repo::git(&repo, &args, crate::commands::repo::Policy::Inherited)?;
     }
     Ok(repo)
 }

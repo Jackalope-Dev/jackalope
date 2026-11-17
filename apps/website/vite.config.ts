@@ -1,13 +1,37 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
 import { Resvg } from '@resvg/resvg-js';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
-import changelog from './src/changelog.json' with { type: 'json' };
-import { normalizePath, siteOrigin } from './src/content.ts';
+import type { ReleaseMap } from './src/changelog.ts';
+import { normalizePath, siteOrigin, updatesWith } from './src/content.ts';
 import { platformDownloads } from './src/platform-downloads.ts';
 import { discoveryFiles, pageHtml, routes } from './src/seo.ts';
+
+/**
+ * Release state for changelog entries. The website build passes the map it read
+ * from release tags (and stops when it cannot read any); the dev server reads
+ * local tags itself and falls back to Coming soon when there are none.
+ */
+function changelogReleases(): ReleaseMap {
+  if (process.env.JACKALOPE_CHANGELOG_RELEASES)
+    return JSON.parse(process.env.JACKALOPE_CHANGELOG_RELEASES) as ReleaseMap;
+  if (process.env.CHANGELOG_RELEASES === 'skip') return {};
+  try {
+    return JSON.parse(
+      execFileSync(
+        process.execPath,
+        [fileURLToPath(new URL('../../scripts/release/changelog-releases.mjs', import.meta.url))],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true },
+      ),
+    ) as ReleaseMap;
+  } catch {
+    return {};
+  }
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -32,11 +56,12 @@ export default defineConfig(({ mode }) => {
   const favicon = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="${characterMarkViewBox}"><title>Jackalope</title><rect x="25" y="-3" width="128" height="128" rx="26" fill="#ffffff"/><g fill="#171717">${mark}</g></svg>`;
   const renderIcon = (size: number) =>
     new Resvg(favicon, { fitTo: { mode: 'width', value: size } }).render().asPng();
+  const releases = changelogReleases();
   // Published so the admin broadcast composer can read the same product notes
-  // the site shows, instead of keeping a second copy that drifts.
+  // the site shows, with the same release state, instead of a copy that drifts.
   const files = {
-    ...discoveryFiles(site.origin, env),
-    'changelog.json': JSON.stringify(changelog),
+    ...discoveryFiles(site.origin, env, releases),
+    'changelog.json': JSON.stringify(updatesWith(releases)),
   };
   const icons = {
     'favicon-32.png': renderIcon(32),
@@ -100,6 +125,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
+    define: { __CHANGELOG_RELEASES__: JSON.stringify(releases) },
     server: { port: 5180, strictPort: true },
     preview: { port: 5180, strictPort: true },
     build: {

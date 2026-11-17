@@ -51,11 +51,13 @@ fn valid_key(key: &str) -> bool {
 }
 
 fn connection(path: &Path) -> Result<Option<Connection>, String> {
-    let Some(bytes) = account_storage::read(&path.join("api-key.bin"))? else {
+    let Some(value) = account_storage::read_json::<Connection>(
+        &path.join("api-key.bin"),
+        "Reconnect Jev: its saved API key could not be read.",
+    )?
+    else {
         return Ok(None);
     };
-    let value: Connection = serde_json::from_slice(&bytes)
-        .map_err(|_| "Reconnect Jev: its saved API key could not be read.".to_string())?;
     if !valid_key(&value.key) {
         return Err("Reconnect Jev: its saved API key is invalid.".into());
     }
@@ -102,7 +104,7 @@ pub(crate) fn key_for_routing(
     }
     connection(&path)?
         .map(|value| value.key)
-        .ok_or_else(|| "Connect a Jev API key in Settings → Decisions.".into())
+        .ok_or_else(|| "Connect a Jev API key in Agents → Routing.".into())
         .map(Some)
 }
 
@@ -121,6 +123,19 @@ pub(crate) fn usage(value: &Value) -> super::tasks::Usage {
         _ => Default::default(),
     }
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::jev::routing_settings,
+            commands::jev::checks::routing_connection_usage,
+            commands::jev::routing_connect,
+            commands::jev::routing_set_mode,
+            commands::jev::routing_disconnect,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub fn routing_settings(
@@ -200,10 +215,7 @@ pub async fn routing_connect(
         checked_at: chrono::Utc::now().to_rfc3339(),
     };
     std::fs::create_dir_all(&path).map_err(|_| "Could not create secure Jev storage.")?;
-    account_storage::write(
-        &path.join("api-key.bin"),
-        &serde_json::to_vec(&value).map_err(|_| "Could not prepare the Jev connection.")?,
-    )?;
+    account_storage::write_json(&path.join("api-key.bin"), &value)?;
     save(&path, &mut current)?;
     status(&path, project_id.as_deref())
 }

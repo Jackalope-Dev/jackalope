@@ -1,15 +1,15 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import type { Review } from '@jackalope/contracts/runs';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { ArrowRight, Check, FileDiff, GitMerge, Images, ListChecks, RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
-import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
+import { AgentReview } from './AgentReview';
 import { ApproveWork } from './ApproveWork';
 import { ChallengeFindings } from './ChallengeReview';
 import { ChangedFiles } from './ChangedFiles';
@@ -19,6 +19,8 @@ import { ReviewActions } from './ReviewActions';
 import { ReviewFeedback } from './ReviewFeedback';
 import { ReviewScreenshots } from './ReviewScreenshots';
 import './result-review.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { taskReview } from '../../lib/task-client';
 
 export type ReviewSection = 'changes' | 'screenshots' | 'checks' | 'delivery';
 
@@ -32,6 +34,7 @@ const EMPTY_CAPTURES: ReviewCaptures = {
 export function ResultReview({
   run,
   onCorrect,
+  onContinue,
   outcomes,
   evidence,
   visible = true,
@@ -46,6 +49,8 @@ export function ResultReview({
 }: {
   run: TaskRun;
   onCorrect?: (prompt: string) => void | Promise<void>;
+  /** Continues the task with a prompt in one step, such as fixes from an agent review. */
+  onContinue?: (prompt: string) => Promise<void>;
   outcomes?: ReactNode;
   evidence?: ReactNode;
   visible?: boolean;
@@ -91,9 +96,9 @@ export function ResultReview({
     setError('');
     try {
       if (suppliedReview) await onRefresh?.();
-      else setReview(await nativeTask<Review>('task_review', { id: run.id }));
+      else setReview(await taskReview(run.id));
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setLoading(false);
     }
@@ -143,6 +148,14 @@ export function ResultReview({
               {portalActions(
                 <div className="task-review-actions">
                   <div ref={setFeedbackSlot} className="review-feedback-slot" />
+                  {!!review?.diff && (
+                    <AgentReview
+                      run={run}
+                      verifyCommand={run.verifyCommand ?? project?.preferences?.verifyCommand}
+                      onApply={onContinue}
+                      onCorrect={onCorrect}
+                    />
+                  )}
                   {review ? (
                     <ReviewActions
                       run={run}

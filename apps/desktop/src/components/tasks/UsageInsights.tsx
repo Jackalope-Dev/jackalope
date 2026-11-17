@@ -1,8 +1,15 @@
-import { Badge, Disclosure, DisclosureBody, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  Panel,
+  Stat,
+} from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { UsageInsights as Insights } from '../../lib/usage-insights';
-import { Button } from '../ui/button';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './usage-insights.css';
 import { ProviderMark } from '../agents/ProviderMark';
@@ -64,7 +71,7 @@ export function UsageInsights({
           <Stat
             label="New context tokens"
             value={tokenLabel(data.total.freshInput)}
-            description={`${tokenLabel(data.total.cacheRead)} cached re-reads · ${tokenLabel(data.total.tokens)} cumulative · ${data.total.reported} of ${data.total.calls} calls reported${data.total.costUsd === null ? '' : ` · $${data.total.costUsd.toFixed(2)} reported cost`}`}
+            description={`${tokenLabel(data.total.cacheRead)} cached re-reads · ${tokenLabel(data.total.tokens)} cumulative · ${data.total.reported} of ${data.total.calls} calls reported`}
           />
           <Stat
             label="Tasks with activity"

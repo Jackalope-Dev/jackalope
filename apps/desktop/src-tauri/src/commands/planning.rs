@@ -3,12 +3,14 @@
 //! agent, planned subtasks or a swarm through the managed-task queue.
 
 pub mod artifact;
-pub mod cli;
 #[cfg(test)]
 mod fixture_tests;
 pub mod handoff;
 pub mod interview;
 mod learning;
+#[cfg(test)]
+mod round_tests;
+pub mod rounds;
 pub mod session;
 pub mod store;
 #[cfg(test)]
@@ -18,11 +20,6 @@ use super::{
     coordination::Coordinator,
     harness::AskUserInput,
     tasks::{RunRequest, TaskRun},
-};
-use axum::{
-    extract::State as WebState,
-    http::{HeaderMap, StatusCode},
-    Json,
 };
 use rmcp::schemars;
 use serde::Deserialize;
@@ -117,28 +114,25 @@ pub struct DeviationInput {
     pub amendment: String,
 }
 
-/// POST /v1/plan-deviation: an agent working on an approved plan reports a
-/// material departure. Agents never edit the plan; the person decides.
-pub(in crate::commands) async fn bridge_plan_deviation(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<DeviationInput>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let run = service
-        .authorized_run(&headers)
-        .map_err(|status| (status, "Unauthorized".into()))?;
-    let worker = service.clone();
+/// `plan_deviation`: an agent working on an approved plan reports a material
+/// departure. Agents never edit the plan; the person decides.
+pub(in crate::commands) async fn plan_deviation(
+    call: super::bridge::Call,
+    input: DeviationInput,
+) -> Result<serde_json::Value, super::bridge::ToolError> {
+    let worker = call.service;
+    let run = call.caller.run;
     let deviation = tauri::async_runtime::spawn_blocking(move || {
         session::declare_deviation(&worker, &run, &input.summary, &input.amendment)
     })
     .await
-    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-    .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
-    Ok(Json(serde_json::json!({
+    .map_err(|error| super::bridge::ToolError::failed(error.to_string()))?
+    .map_err(super::bridge::ToolError::refused)?;
+    Ok(serde_json::json!({
         "deviationId": deviation,
         "status": "pending",
         "message": "Recorded. Work that depends on this plan is paused until the person accepts the amendment, asks for a redo or re-plans. Finish only work the deviation does not affect, then end with a report; do not edit the plan."
-    })))
+    }))
 }
 
 async fn blocking<T: Send + 'static>(
@@ -168,6 +162,30 @@ pub fn list(coordinator: &Coordinator, project_id: Option<&str>) -> Result<PlanL
         problems,
     })
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::planning::plan_list,
+            commands::planning::plan_get,
+            commands::planning::plan_start,
+            commands::planning::plan_keep_planning,
+            commands::planning::plan_save,
+            commands::planning::plan_approve,
+            commands::planning::plan_replan,
+            commands::planning::plan_rounds,
+            commands::planning::plan_resolve_deviation,
+            commands::planning::plan_export,
+            commands::planning::plan_diff,
+            commands::planning::plan_revision,
+            commands::planning::plan_archive,
+            commands::planning::plan_settings_get,
+            commands::planning::plan_settings_set,
+            commands::planning::plan_create,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn plan_list(
@@ -244,10 +262,26 @@ pub async fn plan_approve(
     hash: String,
     shape: String,
     checks: Option<session::PlanChecks>,
+    reviewer: Option<String>,
     state: State<'_, Coordinator>,
 ) -> Result<(), String> {
     let service = state.inner().clone();
-    blocking(move || session::approve(&service, &id, revision, &hash, &shape, "app", checks)).await
+    let choices = session::ApprovalChoices { checks, reviewer };
+    blocking(move || session::approve(&service, &id, revision, &hash, &shape, "app", choices)).await
+}
+
+/// `pause`, `resume` or `stop` a swarm's rounds and its current round's work,
+/// `approve` the proposed next round (with edited `assignments`), or `ask` /
+/// `auto` to choose whether later rounds wait for approval.
+#[tauri::command]
+pub async fn plan_rounds(
+    id: String,
+    action: String,
+    assignments: Option<Vec<rounds::RoundAssignment>>,
+    state: State<'_, Coordinator>,
+) -> Result<(), String> {
+    let service = state.inner().clone();
+    blocking(move || rounds::action(&service, &id, &action, assignments)).await
 }
 
 #[tauri::command]

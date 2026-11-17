@@ -125,6 +125,19 @@ pub struct CommunityStatus {
     configured: bool,
     build_channel: ReleaseChannel,
 }
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::community::app_community_settings,
+            commands::community::app_community_configure,
+            commands::community::app_release_channel,
+            commands::community::app_telemetry,
+            commands::community::app_submit_feedback,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub fn app_community_settings(
     app: AppHandle,
@@ -152,12 +165,17 @@ pub fn app_community_configure(
     let _ = app.emit("community-settings-changed", &status);
     Ok(status)
 }
+/// Async so waiting for the shared execution lock never blocks the main thread.
 #[tauri::command]
-pub fn app_release_channel(
-    app: AppHandle,
-    state: State<'_, Community>,
-    channel: ReleaseChannel,
-) -> Result<(), String> {
+pub async fn app_release_channel(app: AppHandle, channel: ReleaseChannel) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || set_release_channel(&app, channel))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn set_release_channel(app: &AppHandle, channel: ReleaseChannel) -> Result<(), String> {
+    use tauri::Manager;
+    let state = app.state::<Community>();
     let _guard = super::integration::execution_guard()?;
     if super::release::installing() {
         return Err("Wait for the update to finish before changing channels.".into());

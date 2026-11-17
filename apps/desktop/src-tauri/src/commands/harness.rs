@@ -7,6 +7,15 @@ use std::sync::Mutex;
 use std::time::Duration;
 use uuid::Uuid;
 
+/// Questions one attempt may ask; later ones are refused.
+const QUESTION_LIMIT: usize = 100;
+pub(crate) const QUESTION_LIMIT_REACHED: &str = "This attempt has reached its question limit.";
+
+/// Whether `run` may still ask the person a question.
+pub(crate) fn can_ask(run: &super::tasks::TaskRun) -> bool {
+    run.prompts.len() < QUESTION_LIMIT
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingUserPrompt {
@@ -22,7 +31,9 @@ pub struct PendingUserPrompt {
     #[serde(default)]
     #[serde(alias = "default_value")]
     pub default_value: Option<String>,
-    pub status: String, // "pending" | "answered"
+    /// `pending` (waiting on the person), `deciding` (an agent decides first; the
+    /// person may still answer) or `answered`.
+    pub status: String,
     pub answer: Option<String>,
     #[serde(alias = "created_at")]
     pub created_at: String,
@@ -30,10 +41,210 @@ pub struct PendingUserPrompt {
     pub answered_at: Option<String>,
     #[serde(flatten)]
     pub presentation: QuestionPresentation,
+    #[serde(flatten)]
+    pub autonomy: PromptAutonomy,
+}
+
+/// How a question was routed when agents may decide for the person. Empty on
+/// prompts saved before agents could decide, and whenever the person decides.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptAutonomy {
+    /// Set when an agent answered on the person's behalf.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answered_by: Option<AnsweredBy>,
+    /// Why the question reached the person although agents may decide.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escalation: Option<Escalation>,
+    /// Something only the person can do; never routed to an agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_action: Option<HumanAction>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnsweredBy {
+    /// Always `agent`; a person's answer carries no record.
+    pub kind: String,
+    pub agent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// The answer without the in-band attribution the asking agent receives.
+    #[serde(default)]
+    pub answer: String,
+    #[serde(default)]
+    pub rationale: String,
+    #[serde(default)]
+    pub confidence: f64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<String>,
+    /// The deciding attempt, for its full transcript.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Escalation {
+    /// A question category such as `secret` or `direction`, or `decider` and
+    /// `limit` when the deciding agent or the decision limit sent it on.
+    pub category: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HumanActionKind {
+    Secret,
+    SignIn,
+    Payment,
+    Account,
+    Other,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HumanAction {
+    pub kind: HumanActionKind,
+    pub instructions: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_name: Option<String>,
+}
+
+/// Input for `request_human_action`: something only the person can do, such
+/// as signing in, paying, creating an account or providing a secret.
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HumanActionInput {
+    #[schemars(description = "secret, sign_in, payment, account or other")]
+    pub kind: HumanActionKind,
+    #[schemars(description = "Short title of what the person must do, up to 120 characters")]
+    pub title: String,
+    #[schemars(
+        description = "Clear numbered steps for the person, up to 2,000 characters. Never ask them to paste a secret into the conversation."
+    )]
+    pub instructions: String,
+    #[schemars(
+        description = "Optional link where the person does it: https, or a macOS System Settings pane such as x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    )]
+    #[serde(default)]
+    pub url: Option<String>,
+    #[schemars(
+        description = "For kind secret: the environment variable name you need, such as STRIPE_SECRET_KEY"
+    )]
+    #[serde(default, alias = "secret_name")]
+    pub secret_name: Option<String>,
+}
+
+/// Whether `url` opens a macOS System Settings pane, such as
+/// `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
+/// Only pane identifiers and their anchors are accepted.
+pub(crate) fn system_settings_link(url: &str) -> bool {
+    url.strip_prefix("x-apple.systempreferences:")
+        .is_some_and(|pane| {
+            !pane.is_empty()
+                && pane.len() <= 200
+                && pane
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "._-?=&".contains(c))
+        })
+}
+
+pub const HUMAN_DONE: &str = "Done";
+pub const HUMAN_DECLINED: &str = "Declined";
+
+impl HumanActionInput {
+    /// The question record the person sees: bounded text, an https or System
+    /// Settings link only, and an environment-variable-shaped secret name.
+    pub(super) fn into_question(self) -> Result<(AskUserInput, HumanAction), String> {
+        let clean = |text: &str, limit: usize| -> String {
+            text.replace(char::from(0), "")
+                .trim()
+                .chars()
+                .take(limit)
+                .collect()
+        };
+        let title = clean(&self.title, 120);
+        let instructions = clean(&self.instructions, 2000);
+        if title.is_empty() || instructions.is_empty() {
+            return Err("Give a title and the steps the person must take.".into());
+        }
+        let url = self
+            .url
+            .map(|url| url.trim().to_string())
+            .filter(|url| !url.is_empty());
+        if url.as_deref().is_some_and(|url| {
+            !(url.starts_with("https://") || system_settings_link(url))
+                || url.len() > 2000
+                || url.contains(char::is_whitespace)
+        }) {
+            return Err(
+                "Use an https link or a macOS System Settings link (x-apple.systempreferences:) without spaces, or leave url out."
+                    .into(),
+            );
+        }
+        let secret_name = self
+            .secret_name
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty());
+        if secret_name.as_deref().is_some_and(|name| {
+            name.len() > 120
+                || !name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+        }) {
+            return Err(
+                "Name the secret like an environment variable, such as STRIPE_SECRET_KEY.".into(),
+            );
+        }
+        Ok((
+            AskUserInput {
+                question: title,
+                input_type: "humanAction".into(),
+                options: vec![HUMAN_DONE.into(), HUMAN_DECLINED.into()],
+                default_value: None,
+                category: None,
+                presentation: Default::default(),
+            },
+            HumanAction {
+                kind: self.kind,
+                instructions,
+                url,
+                secret_name,
+            },
+        ))
+    }
 }
 
 fn default_input_type() -> String {
     "text".into()
+}
+
+impl PendingUserPrompt {
+    /// A new question for the person to answer by choosing one of `options`,
+    /// without a free-text answer.
+    pub fn choice(run_id: &str, header: &str, question: String, options: Vec<String>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            run_id: run_id.into(),
+            question,
+            input_type: "choice".into(),
+            options,
+            default_value: None,
+            status: "pending".into(),
+            answer: None,
+            created_at: Utc::now().to_rfc3339(),
+            answered_at: None,
+            presentation: QuestionPresentation {
+                header: Some(header.into()),
+                allow_other: Some(false),
+                ..Default::default()
+            },
+            autonomy: Default::default(),
+        }
+    }
 }
 
 /// Optional structure for a question card. Every field is optional so prompts
@@ -277,6 +488,11 @@ pub struct AskUserInput {
     #[schemars(description = "Optional default suggested value")]
     #[serde(default)]
     pub default_value: Option<String>,
+    #[schemars(
+        description = "Optional: what the question is about. Use secret, payment, sign_in, account, publish, protected_path, direction or destructive when it touches those, routine otherwise. Anything but routine always goes to the person."
+    )]
+    #[serde(default)]
+    pub category: Option<super::question_risk::QuestionCategory>,
     #[serde(flatten)]
     pub presentation: QuestionPresentation,
 }
@@ -370,8 +586,8 @@ pub fn find_browser_executable() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         let mut roots = vec![PathBuf::from("/Applications")];
-        if let Some(home) = std::env::var_os("HOME") {
-            roots.push(PathBuf::from(home).join("Applications"));
+        if let Some(home) = super::platform::home_dir() {
+            roots.push(home.join("Applications"));
         }
         for root in roots {
             for (app, binary) in [
@@ -421,6 +637,27 @@ pub async fn ask_user_async(
     wait_duration: Duration,
     registered: impl FnOnce(&PendingUserPrompt),
 ) -> PendingUserPrompt {
+    ask_routed(
+        run_id,
+        input,
+        Default::default(),
+        false,
+        wait_duration,
+        registered,
+    )
+    .await
+}
+
+/// Registers a prompt with its autonomy record. `deciding` saves it as
+/// `deciding`, so an agent decides first without notifying the person.
+pub async fn ask_routed(
+    run_id: &str,
+    input: AskUserInput,
+    autonomy: PromptAutonomy,
+    deciding: bool,
+    wait_duration: Duration,
+    registered: impl FnOnce(&PendingUserPrompt),
+) -> PendingUserPrompt {
     let prompt_id = Uuid::new_v4().to_string();
     let presentation = input.presentation.sanitized(&input.options);
     let prompt = PendingUserPrompt {
@@ -435,11 +672,12 @@ pub async fn ask_user_async(
         },
         options: input.options,
         default_value: input.default_value,
-        status: "pending".into(),
+        status: if deciding { "deciding" } else { "pending" }.into(),
         answer: None,
         created_at: Utc::now().to_rfc3339(),
         answered_at: None,
         presentation,
+        autonomy,
     };
 
     let (tx, rx) = tokio::sync::oneshot::channel::<String>();
@@ -552,6 +790,42 @@ mod tests {
     }
 
     #[test]
+    fn human_action_links_are_https_or_system_settings_panes() {
+        let link = |url: &str| {
+            HumanActionInput {
+                kind: HumanActionKind::Other,
+                title: "Allow Accessibility".into(),
+                instructions: "1. Turn on Jackalope.".into(),
+                url: Some(url.into()),
+                secret_name: None,
+            }
+            .into_question()
+            .map(|(_, action)| action.url)
+        };
+        for good in [
+            "https://dashboard.stripe.com/apikeys",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            " x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture ",
+        ] {
+            assert_eq!(link(good).unwrap().as_deref(), Some(good.trim()));
+        }
+        for bad in [
+            "http://insecure.example",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "x-apple.systempreferences:",
+            "x-apple.systempreferences:com.apple preference",
+            "x-apple.systempreferences:com.apple.preference.security?a/../b",
+            "X-APPLE.SYSTEMPREFERENCES:com.apple.preference.security",
+            "https://example.com/a b",
+        ] {
+            let error = link(bad).unwrap_err();
+            assert!(error.contains("System Settings"), "{bad}: {error}");
+        }
+        assert_eq!(link("  ").unwrap(), None);
+    }
+
+    #[test]
     fn browser_urls_reject_executable_schemes() {
         assert!(super::super::browser::validate_url("javascript:alert(1)").is_err());
         assert!(super::super::browser::validate_url("http://localhost:5173").is_ok());
@@ -570,6 +844,7 @@ mod tests {
             input_type: default_input_type(),
             options: vec![],
             default_value: None,
+            category: None,
             presentation: Default::default(),
         };
 

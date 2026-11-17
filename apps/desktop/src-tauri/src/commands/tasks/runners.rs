@@ -1,15 +1,5 @@
 use super::*;
 
-pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &[
-    "codex",
-    "claude",
-    "grok",
-    "opencode",
-    "kimi",
-    "antigravity",
-    "gemini",
-];
-
 pub(super) fn discover_runner(
     policy: &crate::commands::agent_policy::AgentPolicy,
     id: &str,
@@ -18,21 +8,13 @@ pub(super) fn discover_runner(
     let mut runner = Runner {
         desktop_installed: id == "antigravity" && antigravity_desktop_installed(),
         id: id.to_string(),
-        name: match id {
-            "codex" => "Codex",
-            "claude" => "Claude Code",
-            "grok" => "Grok",
-            "opencode" => "OpenCode",
-            "kimi" => "Kimi Code",
-            "antigravity" => "Antigravity",
-            "gemini" => "Gemini CLI",
-            _ => id,
-        }
-        .into(),
+        name: crate::commands::agents::name(id).into(),
         available: false,
         signed_in: false,
         account: "Current CLI account".into(),
         detail: String::new(),
+        sign_in_needed: false,
+        ready: false,
     };
     if let Some(custom) = policy.custom_agents.iter().find(|agent| agent.id == id) {
         runner.name = custom.name.clone();
@@ -62,31 +44,18 @@ pub(super) fn discover_runner(
                 }
             };
             runner.account = binding.label.clone();
-            if adapter == "acp" {
-                runner.detail = "Ready. Sign in with this CLI in a terminal first. Jackalope starts it over ACP.".into();
-                return runner;
-            }
-            if adapter == "antigravity" {
-                runner.detail =
-                    "Ready. Uses your agy sign-in or a Gemini API key added in Agents.".into();
-                return runner;
-            }
-            if adapter == "kimi" {
-                runner.detail =
-                    "Ready. Run kimi login once to sign in; access is checked when a task starts."
-                        .into();
-                return runner;
-            }
-            if adapter == "grok" {
-                runner.detail = "Ready. Access is checked when a task starts.".into();
-                return runner;
-            }
-            if adapter == "opencode" {
-                runner.detail = "Ready. Works with local and free models; provider access is checked when a task starts.".into();
-                return runner;
-            }
-            if adapter == "gemini" {
-                runner.detail = "Ready. Add and sign in to accounts in Agents; access is checked when a task starts.".into();
+            let unchecked = match adapter.as_str() {
+                "acp" => Some("Ready. Sign in with this CLI in a terminal first. Jackalope starts it over ACP."),
+                "antigravity" => Some("Ready. Uses your agy sign-in or a Gemini API key added in Agents."),
+                "kimi" => Some("Ready. Run kimi login once to sign in; access is checked when a task starts."),
+                "grok" => Some("Ready. Access is checked when a task starts."),
+                "opencode" => Some("Ready. Works with local and free models; provider access is checked when a task starts."),
+                "gemini" => Some("Ready. Add and sign in to accounts in Agents; access is checked when a task starts."),
+                _ => None,
+            };
+            if let Some(detail) = unchecked {
+                runner.ready = true;
+                runner.detail = detail.into();
                 return runner;
             }
             let args = if adapter == "codex" {
@@ -97,7 +66,7 @@ pub(super) fn discover_runner(
             match probe_auth(path, args, Some(&binding)) {
                 Ok(out) => {
                     if adapter == "claude" {
-                        if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
+                        if let Ok(auth) = serde_json::from_str::<Value>(&out.stdout) {
                             runner.signed_in = auth["loggedIn"] == true;
                             runner.account = auth["email"]
                                 .as_str()
@@ -105,8 +74,10 @@ pub(super) fn discover_runner(
                                 .into();
                         }
                     } else {
-                        runner.signed_in = out.status.success();
+                        runner.signed_in = out.success;
                     }
+                    runner.sign_in_needed = !runner.signed_in;
+                    runner.ready = runner.signed_in;
                     runner.detail = if runner.signed_in {
                         "Signed in and ready.".into()
                     } else if binding.profile_id.is_some() {
@@ -117,7 +88,7 @@ pub(super) fn discover_runner(
                         "Sign in using the agent's CLI, then refresh.".into()
                     };
                 }
-                Err(error) => runner.detail = error.to_string(),
+                Err(error) => runner.detail = error,
             }
         }
     }
@@ -128,29 +99,32 @@ pub(super) fn discover_runner(
 }
 
 pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
-    if !BUILTIN_AGENTS.contains(&agent) {
+    let Some(binary) = crate::commands::agents::find(agent).and_then(|spec| spec.binary.as_deref())
+    else {
         return Err("Unsupported agent".into());
-    }
+    };
     if agent == "opencode" {
         if let Some(path) = crate::commands::managed_runtime::executable()? {
             return Ok(path);
         }
     }
-    let binary = if agent == "antigravity" { "agy" } else { agent };
-    let candidates: Vec<String> = if cfg!(windows) {
-        vec![
-            format!("{binary}.exe"),
-            format!("{binary}.cmd"),
-            format!("{binary}.bat"),
-            binary.to_string(),
-        ]
-    } else {
-        vec![binary.to_string()]
-    };
-    let mut dirs: Vec<PathBuf> =
-        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect();
-    if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
-        let home_path = PathBuf::from(&home);
+    if let Some(found) = crate::commands::platform::find_executable(binary, &install_dirs(agent)) {
+        return Ok(found);
+    }
+    Err(format!(
+        "Install {agent} and make its executable available on PATH, then refresh."
+    ))
+}
+
+/// Finds a CLI by its command name on PATH and in the places installers put agent CLIs.
+pub(in crate::commands) fn locate(binary: &str) -> Option<PathBuf> {
+    crate::commands::platform::find_executable(binary, &install_dirs(""))
+}
+
+/// Directories agent CLIs are commonly installed to, searched besides PATH.
+fn install_dirs(agent: &str) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(home_path) = crate::commands::platform::home_dir() {
         dirs.push(home_path.join(".local/bin"));
         dirs.push(home_path.join(".grok/bin"));
         dirs.push(home_path.join(".opencode/bin"));
@@ -195,17 +169,7 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
         dirs.push(PathBuf::from("/usr/local/bin"));
         dirs.push(PathBuf::from("/opt/homebrew/bin"));
     }
-    for dir in &dirs {
-        for candidate in &candidates {
-            let target = dir.join(candidate);
-            if dir.is_absolute() && crate::commands::platform::is_executable(&target) {
-                return Ok(target);
-            }
-        }
-    }
-    Err(format!(
-        "Install {agent} and make its executable available on PATH, then refresh."
-    ))
+    dirs
 }
 
 fn antigravity_desktop_installed() -> bool {

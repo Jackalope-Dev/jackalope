@@ -1,3 +1,4 @@
+import { metricDimension } from '@jackalope/contracts/telemetry';
 import type { Feedback, Telemetry } from './contracts';
 
 function canonical(value: unknown): unknown {
@@ -25,20 +26,7 @@ export async function saveTelemetry(env: Env, data: Telemetry, now = Date.now())
     await Promise.all(
       data.events.map(async (event) => {
         const payload = JSON.stringify(canonical(event));
-        const dimension =
-          event.name === 'operation_result'
-            ? [event.operation, event.outcome].join('|')
-            : 'state' in event
-              ? event.agent || event.workflow
-                ? [event.state, event.agent ?? 'unknown', event.workflow ?? 'unknown'].join('|')
-                : event.state
-              : event.name === 'feature_used'
-                ? event.feature
-                : 'code' in event
-                  ? event.operation || event.feature
-                    ? [event.code, event.operation ?? '', event.feature ?? ''].join('|')
-                    : event.code
-                  : '';
+        const dimension = metricDimension(event);
         // D1 executes the batch atomically; changes() counts only the preceding receipt insert.
         return [
           env.DB.prepare(

@@ -1,5 +1,5 @@
 import type { DecisionMode, JevFallback } from './decisions';
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 export type RoutingMode = DecisionMode;
 export interface RoutingSettings {
   mode: RoutingMode;
@@ -14,15 +14,16 @@ export interface RoutingSettings {
 }
 
 export const routingSettings = {
-  read: (projectId?: string) => nativeTask<RoutingSettings>('routing_settings', { projectId }),
+  read: (projectId?: string) => invokeNative<RoutingSettings>('routing_settings', { projectId }),
   connect: (key: string, revision: number, projectId?: string) =>
-    nativeTask<RoutingSettings>('routing_connect', { key, revision, projectId }),
+    invokeNative<RoutingSettings>('routing_connect', { key, revision, projectId }),
   setMode: (
     mode: RoutingMode | null,
     revision: number,
     projectId?: string,
     jevFallback?: JevFallback,
-  ) => nativeTask<RoutingSettings>('routing_set_mode', { mode, revision, projectId, jevFallback }),
+  ) =>
+    invokeNative<RoutingSettings>('routing_set_mode', { mode, revision, projectId, jevFallback }),
   disconnect: (revision: number, projectId?: string) =>
-    nativeTask<RoutingSettings>('routing_disconnect', { revision, projectId }),
+    invokeNative<RoutingSettings>('routing_disconnect', { revision, projectId }),
 };

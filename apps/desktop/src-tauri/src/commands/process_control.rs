@@ -6,6 +6,9 @@ use std::{
 
 pub const OUTPUT_LIMIT: usize = 128_000;
 
+mod console;
+pub use console::{credential_variable, hidden, inherited_credentials, isolated, CREATE_NO_WINDOW};
+
 pub fn read_bounded(mut reader: impl Read, limit: usize) -> std::io::Result<(String, bool)> {
     read_observed(&mut reader, limit, |_| {})
 }
@@ -325,16 +328,7 @@ fn run_supervised_input(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
-    }
+    isolated(&mut command);
     let start = Instant::now();
     let mut child = command
         .spawn()

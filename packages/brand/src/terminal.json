@@ -1,0 +1,26 @@
+{
+  "defaultAccent": "#8b5cf6",
+  "noise": "01<>/\\{}[]#$%&*+=?",
+  "dark": {
+    "shell": [7.8, 7],
+    "ground": [5.4, 11],
+    "elevated": [5.4, 14],
+    "hairline": [5.4, 19],
+    "text": [4, 94],
+    "muted": [3, 66],
+    "success": [160, 64, 65],
+    "warning": [40, 95, 65],
+    "danger": [0, 90, 75]
+  },
+  "light": {
+    "shell": [7.8, 90.5],
+    "ground": [5.4, 97],
+    "elevated": [5.4, 100],
+    "hairline": [5.4, 90],
+    "text": [4, 14],
+    "muted": [3, 40],
+    "success": [160, 75, 23],
+    "warning": [35, 90, 27],
+    "danger": [0, 72, 38]
+  }
+}

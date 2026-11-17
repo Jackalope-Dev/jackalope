@@ -89,6 +89,15 @@ fn read(project: &Path, limit: usize) -> Result<Vec<GraphLine>, String> {
     Ok(parse(&String::from_utf8_lossy(&output.stdout)))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::commit_graph::project_commit_graph,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Recent commits across local branches, newest first, with graph drawing.
 #[tauri::command]
 pub async fn project_commit_graph(
@@ -132,8 +141,13 @@ mod tests {
     fn reads_a_real_repository_and_reports_missing_ones() {
         let root = std::env::temp_dir().join(format!("jackalope-graph-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
+        // Agent shells export a Git identity, which would override the commit's own author.
         let run = |args: &[&str]| {
             assert!(command(&root, args, Policy::Isolated)
+                .env_remove("GIT_AUTHOR_NAME")
+                .env_remove("GIT_AUTHOR_EMAIL")
+                .env_remove("GIT_COMMITTER_NAME")
+                .env_remove("GIT_COMMITTER_EMAIL")
                 .output()
                 .unwrap()
                 .status

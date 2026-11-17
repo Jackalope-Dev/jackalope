@@ -157,7 +157,8 @@ pub(crate) fn in_use(id: &str) -> bool {
 }
 
 /// Recomputes which computers active runs hold, mirroring [`super::for_run`]:
-/// a bot conversation holds its bot's computer, any other run its task's.
+/// a bot conversation holds its bot's computer, any other run its task's, and
+/// a run whose agent is on a project computer holds that computer too.
 /// Held computers count as used, so idle time starts when the run ends.
 pub(crate) fn refresh_run_leases(runtime: &TaskRuntime) {
     let root = runtime.computers_root();
@@ -165,6 +166,10 @@ pub(crate) fn refresh_run_leases(runtime: &TaskRuntime) {
     let hub = crate::commands::bot_hub::installed();
     let mut held = HashSet::new();
     for run in runtime.active_runs() {
+        // The project computer an agent is running on.
+        if let Some(remote) = &run.remote {
+            held.insert(remote.computer_id.clone());
+        }
         let owner = match hub.and_then(|hub| hub.caller(&run).ok()) {
             Some((bot, _)) => (BOT, bot.id),
             None => (TASK, run.task_id.clone()),

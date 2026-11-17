@@ -8,6 +8,7 @@ import {
 } from './ComparisonVisual';
 import { FeatureMedia } from './FeatureMedia';
 import { featureMedia } from './feature-media';
+import { InlineLinks } from './InlineLinks';
 import type { MarketingPage as MarketingPageContent } from './marketing-content';
 import { WaitlistButton } from './Signup';
 import './comparisons.css';
@@ -211,7 +212,9 @@ function SectionContent({ section }: { section: MarketingPageContent['sections']
   return (
     <>
       {section.paragraphs.map((paragraph) => (
-        <p key={paragraph}>{paragraph}</p>
+        <p key={paragraph}>
+          <InlineLinks text={paragraph} />
+        </p>
       ))}
       {section.table && (
         <section

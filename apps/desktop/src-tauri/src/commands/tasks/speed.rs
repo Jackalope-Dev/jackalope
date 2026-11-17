@@ -48,8 +48,6 @@ mod tests {
         let summary = run.summary();
         assert_eq!(summary.codex_speed, run.codex_speed);
         assert_eq!(summary.requested_service_tier, run.requested_service_tier);
-        let metrics: super::super::efficiency::Efficiency = serde_json::from_str("{}").unwrap();
-        assert_eq!(metrics.verification_reuses, None);
     }
 
     #[test]

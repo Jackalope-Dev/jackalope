@@ -19,7 +19,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for task ownership and
 
 ## Current routing contract
 
-Settings → Decisions selects an app default and optional project overrides. Project
+Agents → Routing selects an app default and optional project overrides. Project
 onboarding includes the same choice. Existing installations retain agent-powered
 routing. Local rules use project preference, capacity and active workload without
 a model call. Agent-powered routing uses the configured default agent. Jev-assisted
@@ -88,7 +88,7 @@ optional assistance has a separate ledger so those calls are not counted twice.
 
 ## Optional Jev assistance
 
-Routing goals and optional assistance in Settings → Decisions can inherit app
+Routing goals and optional assistance in Agents → Routing can inherit app
 settings or use project overrides. All additional helpers default off. While enabled
 and Jev is connected for that scope, relevant repository guidance, candidate lessons,
 diffs, results and check output may be sent to TypeSafe. Each call records usage even
@@ -151,10 +151,14 @@ real-task cost/latency comparisons and native macOS/Linux credential checks rema
 
 `tasks/routing.rs` owns automatic selection and up to three quota handoffs.
 `tasks/routing/process.rs` runs a bounded, cancellable routing-only subprocess
-outside coordinator/execution locks. The default agent sees the task, frozen project
-context, outcome contract, coordination instructions and eligible agent/model/account
-options with provider windows. It returns a validated option ID, reason, optional
-quota estimate and ordered alternatives. Provider identifiers, task text and progress
+outside coordinator/execution locks. The default agent sees the complete request, its
+acceptance criteria, recorded outcomes and eligible agent/model/account options with
+provider windows; context saved for the worker is left out. It answers without tools at
+its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at low
+reasoning) and returns a validated option ID, a short reason, an optional quota
+estimate and up to three ordered alternatives. A routing agent that does not answer
+within eight seconds, or fails without a quota error, leaves the choice to local rules
+and the receipt says why, so routing never holds up or blocks the work. Provider identifiers, task text and progress
 are untrusted input, not executable routing instructions.
 
 Enabled/configured models, project allowlists and account selections, available
@@ -203,6 +207,13 @@ the latest saved attempt. Individual calls retain provider, model, input/output
 and available cost estimates; task rows combine the selected calls across attempts.
 Dates use the viewer's local time: workers use attempt start dates; routing and
 quota handoffs use recorded dates. These are not per-token billing timestamps.
+
+Attempt usage stores input as every prompt token the provider read, cache included:
+Claude, OpenCode and Antigravity report cache reads and writes beside uncached input,
+which Jackalope adds; Codex and Gemini CLI input already contains its cached part.
+New context is input minus cache reads and writes, and the cache hit rate shown with
+an attempt is cache reads divided by input. A Claude attempt with at least 50,000
+input tokens and no cache reads is flagged, since prompt caching may be off.
 
 Agent selection is measured routing overhead, including failed selections.
 Quota-interrupted worker legs remain separate from the final worker. Prompt,

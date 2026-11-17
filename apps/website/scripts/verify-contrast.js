@@ -69,6 +69,7 @@ async function _verifyContrast(page) {
     });
   const results = [];
   for (const [palette, id] of [
+    ['Jackalope Violet', 'jackalope-violet'],
     ['Mojave Sunset', 'mojave-sunset'],
     ['Alpine Aurora', 'alpine-aurora'],
     ['Electric Indigo', 'electric-indigo'],

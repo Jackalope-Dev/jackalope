@@ -1,6 +1,7 @@
 //! Files a user attaches to a prompt. Existing files are referenced by path;
 //! pasted images have no path, so they are written under the project's
 //! `.jackalope/attachments` folder, which Git ignores through info/exclude.
+//! `agent_context` copies the ones a prompt names into its task workspace.
 
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
@@ -31,6 +32,16 @@ fn save_image(project: &Path, extension: &str, bytes: &[u8]) -> Result<PathBuf, 
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::attachments::prompt_attachment_save,
+            commands::attachments::prompt_attachment_pick,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 /// Saves a pasted image for the given project and returns its absolute path.
 #[tauri::command]

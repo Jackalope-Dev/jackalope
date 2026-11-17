@@ -1,6 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 
 export interface FeedbackView {
   enabled: boolean;
@@ -51,12 +52,12 @@ export const useFeedbackStore = create<State>((set) => ({
     }
     const result = queue.then(async () => {
       try {
-        const view = await nativeTask<FeedbackView>('app_account_feedback', { action });
+        const view = await invokeNative<FeedbackView>('app_account_feedback', { action });
         set({ view, error: '' });
         return view;
       } catch (error) {
         set((state) => ({
-          error: String(error),
+          error: describeError(error),
           view: state.view ? { ...state.view, eligible: false } : null,
         }));
         return null;

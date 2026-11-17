@@ -10,24 +10,15 @@ fn native_output_plugin_preserves_existing_configuration_and_never_stores_bridge
     let mut command = Command::new("fixture");
     command.env("OPENCODE_CONFIG_CONTENT", original.to_string());
     command.env("JACKALOPE_BRIDGE_TOKEN", "private-fixture-token");
-    configure_tool_plugin(&mut command, &directory, "fixture").unwrap();
-    let config: Value = serde_json::from_str(
-        command
-            .get_envs()
-            .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
-            .unwrap()
-            .1
-            .unwrap()
-            .to_str()
-            .unwrap(),
-    )
-    .unwrap();
+    let mut config = OpenCodeConfig::read(&command).unwrap();
+    configure_tool_plugin(&mut command, &mut config, &directory, "fixture").unwrap();
+    let written = config.value().clone();
     for key in ["model", "permission", "provider", "mcp"] {
-        assert_eq!(config[key], original[key]);
+        assert_eq!(written[key], original[key]);
     }
-    assert_eq!(config["plugin"][0], original["plugin"][0]);
-    assert_eq!(config["plugin"].as_array().unwrap().len(), 2);
-    let plugin = reqwest::Url::parse(config["plugin"][1].as_str().unwrap())
+    assert_eq!(written["plugin"][0], original["plugin"][0]);
+    assert_eq!(written["plugin"].as_array().unwrap().len(), 2);
+    let plugin = reqwest::Url::parse(written["plugin"][1].as_str().unwrap())
         .unwrap()
         .to_file_path()
         .unwrap();
@@ -35,19 +26,20 @@ fn native_output_plugin_preserves_existing_configuration_and_never_stores_bridge
     assert!(!std::fs::read_to_string(&plugin)
         .unwrap()
         .contains("private-fixture-token"));
-    let unchanged = config.to_string();
-    assert!(configure_tool_plugin(&mut command, &directory.join("missing"), "next").is_err());
-    assert_eq!(
-        command
-            .get_envs()
-            .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
-            .unwrap()
-            .1
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        unchanged
-    );
+    assert!(configure_tool_plugin(
+        &mut command,
+        &mut config,
+        &directory.join("missing"),
+        "next"
+    )
+    .is_err());
+    assert_eq!(config.value(), &written);
+    config.apply(&mut command);
+    let applied: Value = serde_json::from_str(
+        &crate::commands::mcp::command_env(&command, "OPENCODE_CONFIG_CONTENT").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(applied, written);
     std::fs::remove_dir_all(directory).unwrap();
 }
 
@@ -61,25 +53,16 @@ fn continuation_configuration_preserves_provider_and_permission_settings() {
         "provider":{"custom":{"options":{"baseURL":"https://example.invalid"}}}
     });
     command.env("OPENCODE_CONFIG_CONTENT", original.to_string());
-    let _connection = Connection::configure(&mut command).unwrap();
-    let config: Value = serde_json::from_str(
-        command
-            .get_envs()
-            .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
-            .unwrap()
-            .1
-            .unwrap()
-            .to_str()
-            .unwrap(),
-    )
-    .unwrap();
+    let mut config = None;
+    let _connection = Connection::configure(&mut command, &mut config).unwrap();
+    let config = config.unwrap().value().clone();
     for key in ["model", "permission", "provider"] {
         assert_eq!(config[key], original[key]);
     }
     assert_eq!(config["experimental"]["batch_tool"], true);
     assert_eq!(config["experimental"]["continue_loop_on_deny"], true);
     command.env("OPENCODE_CONFIG_CONTENT", r#"{"experimental":false}"#);
-    assert!(Connection::configure(&mut command).is_err());
+    assert!(Connection::configure(&mut command, &mut None).is_err());
 }
 
 #[test]
@@ -217,6 +200,21 @@ fn effort_uses_only_advertised_enabled_variants_and_preserves_unknown_models() {
 }
 
 #[test]
+fn a_session_missing_from_the_server_reads_as_a_lost_conversation() {
+    assert!(
+        lost_session("OpenCode /session/ses_gone returned HTTP 404.")
+            .unwrap()
+            .starts_with("OpenCode no longer has this task's earlier conversation")
+    );
+    for other in [
+        "OpenCode /session/ses_gone returned HTTP 500.",
+        "Could not reach the task's OpenCode server for /session/ses_gone.",
+    ] {
+        assert_eq!(lost_session(other), None);
+    }
+}
+
+#[test]
 fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history() {
     use crate::commands::agent_policy::{AgentPolicy, CustomAgent};
     let folder = std::env::temp_dir().join(format!("jackalope-opencode-{}", uuid::Uuid::new_v4()));
@@ -275,30 +273,24 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
             id: "fixture".into(),
             name: "Fixture".into(),
             path: root.into(),
-            accent: None,
-            auto_approve: None,
-            workspace_mode: None,
-            learn_automatically: None,
-            learning_cadence: None,
-            sync_lessons: None,
-            agent_reflection: None,
-            export_lessons: None,
-            personal_claude_setup: None,
-            edit_check: None,
             ..Default::default()
         }],
     )
     .unwrap();
     let mut request:RunRequest=serde_json::from_value(json!({"id":"opencode-fixture-first","projectId":"fixture","projectName":"Fixture","projectPath":root,"agent":"opencode-fixture","isolated":false,"prompt":"Fixture task","autoVerify":false,"model":"fixture/worker","effort":"quick"})).unwrap();
-    for attempt in 0..8 {
+    for attempt in 0..9 {
         request.prompt = match attempt {
             2 => "Continue fixture",
             5 => "Question fixture",
             6 => "Repeat fixture",
             7 => "Limit fixture",
+            8 => "Lost fixture",
             _ => "Fixture task",
         }
         .into();
+        if attempt == 8 {
+            std::fs::write(folder.join("forget-session"), "").unwrap();
+        }
         runtime.start(request.clone()).unwrap();
         let deadline =
             std::time::Instant::now() + Duration::from_secs(if attempt == 0 { 10 } else { 20 });
@@ -309,7 +301,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                 .into_iter()
                 .find(|r| r.id == request.id)
                 .unwrap();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 break run;
             }
             for prompt in run.prompts.iter().filter(|p| p.status == "pending") {
@@ -342,9 +334,9 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
         assert_eq!(
             completed.status,
             match attempt {
-                0 | 1 | 2 | 5 => "review",
-                4 => "stopped",
-                _ => "failed",
+                0 | 1 | 2 | 5 | 8 => RunStatus::Review,
+                4 => RunStatus::Stopped,
+                _ => RunStatus::Failed,
             },
             "{:?}",
             completed.error
@@ -359,9 +351,10 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
             crate::commands::project_registry::set_settings(
                 &runtime,
                 "fixture",
-                Some(false),
-                None,
-                Default::default(),
+                &crate::commands::project_registry::ProjectSettingsPatch {
+                    auto_approve: Some(false),
+                    ..Default::default()
+                },
             )
             .unwrap();
         }
@@ -372,7 +365,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                 "xx"
             );
         }
-        if matches!(attempt, 0 | 1 | 2 | 5) {
+        if matches!(attempt, 0 | 1 | 2 | 5 | 8) {
             assert_eq!(completed.result, "Fixture complete");
             assert_eq!(completed.usage.input, 15);
             assert_eq!(completed.reasoning_effort.as_deref(), Some("low"));
@@ -393,13 +386,32 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                 .unwrap()
                 .contains("limit of denied actions"));
         }
+        if attempt == 8 {
+            // The server no longer had the session: the turn started over as a new one.
+            let refused = completed
+                .activity
+                .iter()
+                .position(|line| {
+                    line == "OpenCode could not resume the earlier conversation: OpenCode /session/ses_fixture returned HTTP 404."
+                })
+                .expect("refusal in activity");
+            assert!(completed.activity[refused + 1]
+                .starts_with("OpenCode no longer had this task's earlier conversation"));
+            assert!(completed.error.is_none());
+            let prompt = std::fs::read_to_string(folder.join("prompt.txt")).unwrap();
+            assert!(prompt.contains("Task:\nLost fixture\n"), "{prompt}");
+            assert!(
+                prompt.contains("Earlier request:\nLimit fixture"),
+                "{prompt}"
+            );
+        }
         assert!(runtime.inner.lock().unwrap().processes.is_empty());
         request.previous_run_id = Some(request.id.clone());
         request.id = format!("opencode-fixture-next-{attempt}");
     }
     assert_eq!(
         std::fs::read_to_string(folder.join("authorized.txt")).unwrap(),
-        "xxx"
+        "xxxx"
     );
     assert_eq!(
         std::fs::read_to_string(folder.join("independent.txt")).unwrap(),
@@ -412,7 +424,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     }
     drop(runtime);
     let runtime = TaskRuntime::new(folder.join("history")).unwrap();
-    assert_eq!(runtime.integration_runs().unwrap().len(), 8);
+    assert_eq!(runtime.integration_runs().unwrap().len(), 9);
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
 }

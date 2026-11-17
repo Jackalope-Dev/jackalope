@@ -111,7 +111,7 @@ const comparisons: Comparison[] = [
       {
         title: 'When does a multi-agent workspace help?',
         paragraphs: [
-          'Consider Jackalope when you use Codex alongside Claude Code or another supported CLI and want project accounts, task history, checks, and related changes together. A reviewed plan can coordinate separate assignments while keeping one parent result to inspect.',
+          'Consider Jackalope when you use Codex alongside Claude Code or another supported CLI and want project accounts, task history, checks, and related changes together. [A reviewed plan can coordinate separate assignments](/parallel-coding-agents/) while keeping one parent result to inspect.',
           'If your work already fits Codex’s local or cloud workflow, try its existing worktree and review controls first. A second workspace is useful when it removes a concrete coordination problem, not merely because it can open more sessions.',
         ],
         links: [{ label: 'Codex CLI integration in Jackalope', href: '/agents/codex/' }],
@@ -188,7 +188,7 @@ const comparisons: Comparison[] = [
         title: 'Cursor is more than an autocomplete comparison.',
         paragraphs: [
           'Cursor’s current documentation covers an agent that edits code and runs tools, worktrees for parallel changes, and Cloud Agents. Its UI worktree controls live in the Agents Window; the IDE also has worktree skills. Evaluate the surface you intend to use.',
-          'Jackalope’s focus is the work around installed agent CLIs: which project and account own a task, what context carries forward, and how several changes reach a reviewable result. It does not replace every editing feature in an IDE.',
+          'Jackalope’s focus is the work around installed agent CLIs: which project and account own a task, what context carries forward, and how [several changes reach a reviewable result](/parallel-coding-agents/). It does not replace every editing feature in an IDE.',
         ],
       },
       {
@@ -283,13 +283,13 @@ const comparisons: Comparison[] = [
         title: 'Where Jackalope puts the emphasis',
         paragraphs: [
           'Jackalope starts with the outcome you want and keeps the brief, project context, selected account, attempts, questions, and result attached to it. That organization is useful when a task needs several follow-ups or when you return to a project after working elsewhere. You can inspect what happened without treating a terminal tab as the only record of the work.',
-          'For coordinated changes, a parallel plan can name independent tasks, file scopes, dependencies, and a concurrency limit. Work that depends on another task waits for its changes to be integrated. This matters when an API change must land before an agent can build the interface that consumes it.',
+          'For coordinated changes, [a parallel plan](/parallel-coding-agents/) can name independent tasks, file scopes, dependencies, and a concurrency limit. Work that depends on another task waits for its changes to be integrated. This matters when an API change must land before an agent can build the interface that consumes it.',
         ],
       },
       {
         title: 'Compare integration, not just parallel execution',
         paragraphs: [
-          'A good evaluation should include two agents changing related behavior. Separate worktrees prevent edits from colliding in one directory, but they cannot prevent incompatible assumptions about an API or data shape. You still need a review of the combined result.',
+          'A good evaluation should include two agents changing related behavior. [Separate worktrees](/git-worktrees-for-ai-agents/) prevent edits from colliding in one directory, but they cannot prevent incompatible assumptions about an API or data shape. You still need a review of the combined result.',
           'Jackalope prepares a combined patch from selected results and rechecks the source and target before an explicit integration action. Assess whether that step helps you catch problems earlier than reviewing independent branches alone. Keep your project checks in the trial: neither a completed agent response nor a clean merge establishes correct behavior.',
         ],
       },
@@ -399,7 +399,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Review across more than one branch',
         paragraphs: [
-          'Jackalope can prepare a combined patch from parallel task results before integration. For a feature with dependencies, its plan records which work must be integrated before the next task begins. These controls help separate “the agent finished” from “the change is ready for dependent work.”',
+          'Jackalope can prepare a combined patch from [parallel task results](/parallel-coding-agents/) before integration. For a feature with dependencies, its plan records which work must be integrated before the next task begins. These controls help separate “the agent finished” from “the change is ready for dependent work.”',
           'An effective trial includes a deliberately overlapping edit. Ask what happens when one task changes a shared type and another uses the old contract. Evaluate the review information, recovery path, and amount of manual explanation needed. Worktree isolation alone cannot resolve that kind of disagreement.',
         ],
       },
@@ -501,7 +501,7 @@ const comparisons: Comparison[] = [
         title: 'Local coordination is Jackalope’s starting point',
         paragraphs: [
           'Jackalope operates around installed agents and local Git projects. The task carries its instructions, account, context, attempts, and review evidence. This is useful when your development workflow depends on tools and services already configured on your computer and you want to supervise the work there.',
-          'For multiple tasks, Jackalope can create isolated worktrees and record dependencies. If a migration or API change needs to land first, dependent work waits for integration. Human collaboration in a shared live session is a different requirement; Jackalope’s agent coordination should not be mistaken for a multiplayer product.',
+          'For multiple tasks, Jackalope can [create isolated worktrees](/git-worktrees-for-ai-agents/) and record dependencies. If a migration or API change needs to land first, dependent work waits for integration. Human collaboration in a shared live session is a different requirement; Jackalope’s agent coordination should not be mistaken for a multiplayer product.',
         ],
       },
       {
@@ -606,7 +606,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Project context should survive changing agents',
         paragraphs: [
-          'Jackalope keeps project instructions and selected tools at the project level, with relevant context attached to the task. The goal is continuity when you change workers or revisit unfinished work. A follow-up should begin with an understandable brief and previous result, rather than requiring a fresh explanation of the entire project.',
+          'Jackalope keeps [project instructions and selected tools at the project level](/features/project-context-for-coding-agents/), with relevant context attached to the task. The goal is continuity when you change workers or revisit unfinished work. A follow-up should begin with an understandable brief and previous result, rather than requiring a fresh explanation of the entire project.',
           'When comparing resource libraries, bring one real project rule, one reusable workflow, and one external tool. Check whether each reaches the agent that needs it and whether you can inspect the effective configuration. A large library has little value if its instructions are not applied to the intended task.',
         ],
       },
@@ -711,7 +711,7 @@ const comparisons: Comparison[] = [
       {
         title: 'A worktree is the start of a task environment',
         paragraphs: [
-          'A separate checkout gives an agent its own files and branch. It does not automatically provide dependencies, a database, environment configuration, or an unused development-server port. Include those requirements when comparing any workspace that creates worktrees for you.',
+          'A separate checkout gives an agent [its own files and branch](/git-worktrees-for-ai-agents/). It does not automatically provide dependencies, a database, environment configuration, or an unused development-server port. Include those requirements when comparing any workspace that creates worktrees for you.',
           'Jackalope attaches project context and instructions to tasks so the agent can understand the setup and expected outcome. For an evaluation, choose a repository whose baseline checks already pass. Record the commands needed to reproduce that baseline in a new checkout, then see how well the task retains that knowledge.',
         ],
       },
@@ -725,7 +725,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Review the relationship between branches',
         paragraphs: [
-          'Jackalope’s parallel plans can express dependencies and delay downstream work until an upstream change is integrated. Its review preparation combines selected task outputs and rechecks the source and target state before integration. This is especially useful to evaluate on changes that share a public interface.',
+          'Jackalope’s [parallel plans](/parallel-coding-agents/) can express dependencies and delay downstream work until an upstream change is integrated. Its review preparation combines selected task outputs and rechecks the source and target state before integration. This is especially useful to evaluate on changes that share a public interface.',
           'For example, split a settings feature into persistence, validation, and presentation. Decide which pieces can run independently and which require an accepted contract first. A workspace helps when it makes that sequence visible; opening all three agents at once is not necessarily the fastest route to a correct result.',
         ],
       },
@@ -834,7 +834,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Review with enough context to make a decision',
         paragraphs: [
-          'Jackalope keeps the task’s requested outcome, attempts, evidence, and resulting patch connected. For parallel work, combined review helps you inspect how changes fit together before integration. A dependency can wait for the prerequisite’s actual integration rather than trusting a completion message.',
+          'Jackalope keeps the task’s requested outcome, attempts, evidence, and resulting patch connected. For parallel work, [combined review](/parallel-coding-agents/) helps you inspect how changes fit together before integration. A dependency can wait for the prerequisite’s actual integration rather than trusting a completion message.',
           'Try a bug investigation followed by an implementation and a verification pass. Ask whether another reviewer can identify what was requested, what changed, which checks ran, and what remains uncertain. A useful record makes those questions answerable without a separate verbal handoff.',
         ],
       },
@@ -935,7 +935,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Review the result when you return',
         paragraphs: [
-          'A task running while you are occupied elsewhere should leave a result you can understand. In Jackalope, the requested outcome, attempts, reported checks, and evidence remain together. Selected parallel results can be prepared as a combined patch before an explicit integration decision.',
+          'A task running while you are occupied elsewhere should leave a result you can understand. In Jackalope, the requested outcome, attempts, reported checks, and evidence remain together. [Selected parallel results](/parallel-coding-agents/) can be prepared as a combined patch before an explicit integration decision.',
           'For a useful trial, ask for a focused bug fix, leave it running, and come back without rereading the whole transcript. Can you identify the changed behavior, find the relevant files, and see what the agent did not verify? Then request a correction and confirm that the original intent remains easy to find.',
         ],
       },
@@ -1053,7 +1053,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Automation still needs an acceptance step',
         paragraphs: [
-          'An agent can finish a sequence of tool calls without satisfying the original requirement. Jackalope makes review part of the task lifecycle: inspect the patch, reported checks, and evidence before accepting the result. For parallel work, prepare the combined changes and review their interaction before integration.',
+          'An agent can finish a sequence of tool calls without satisfying the original requirement. Jackalope makes review part of the task lifecycle: inspect the patch, reported checks, and evidence before accepting the result. For [parallel work](/parallel-coding-agents/), prepare the combined changes and review their interaction before integration.',
           'Use two different trial tasks to separate these needs. One might be a recurring research summary, where freshness and useful sources matter. The other might be a code change across two dependent components, where branch state, tests, and integration matter. The best choice may differ between those tasks.',
         ],
       },
@@ -1105,5 +1105,7 @@ export const comparisonPages: MarketingPage[] = comparisons.map((comparison) => 
     { href: '/compare/', label: 'All comparisons' },
     ...comparisonLinks.filter((link) => link.href !== `/compare/${comparison.slug}/`),
     { href: '/compare/terminal-tabs/', label: 'Jackalope and terminal tabs' },
+    { href: '/parallel-coding-agents/', label: 'Parallel coding agents in Jackalope' },
+    { href: '/git-worktrees-for-ai-agents/', label: 'Git worktrees for AI agents' },
   ],
 }));

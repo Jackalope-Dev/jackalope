@@ -1,18 +1,16 @@
-import { CopyButton, Popover } from '@jackalope/ui';
+import { Button, CopyButton, Popover } from '@jackalope/ui';
 import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
-import { selectWork } from '../../lib/work-selection';
+import { openWork, selectWork, useWorkspaceWork } from '../../lib/work-selection';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { navigateWorkspace } from './navigation';
-import { selectWorkItem, useWorkspaceWork } from './WorkSidebar';
+import { useActiveProject } from '../../stores/projectStore';
 
 /**
  * The project, remote host and the work in focus: the selected task, plan or
@@ -32,9 +30,7 @@ export function useFocusedWork() {
   const { queue, selectedId: selectedManaged } = useManagedTaskStore(
     useShallow((s) => ({ queue: s.queue, selectedId: s.selectedId })),
   );
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const session = sessions.find(
     (item) => item.id === selectedSession && item.request.projectId === project?.id,
   );
@@ -64,9 +60,7 @@ const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replac
  */
 function useSwitchTargets(checkout: string) {
   const work = useWorkspaceWork();
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   if (!project) return [];
   const existing = project.worktrees ?? [];
   const seen = new Set([checkout]);
@@ -97,14 +91,14 @@ function useSwitchTargets(checkout: string) {
       key: path,
       branch: run.branch || 'Branch unknown',
       label: item.title,
-      open: () => selectWorkItem(item),
+      open: () => openWork(item),
     });
     if (targets.length >= MAX_SWITCH_TARGETS) break;
   }
   return targets;
 }
 
-/** The branch in focus, in the status bar beside the project name, with where it lives and what to do with it. */
+/** The branch in focus, in the status bar; the page header names the scope, so the trigger names the project only in its label. */
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
   const targets = useSwitchTargets(checkout);
@@ -117,10 +111,17 @@ export function BranchIndicator() {
       : project.plainFolder
         ? 'No Git'
         : project.gitBranch || 'Branch unknown';
+  const copyableBranch = run ? run.branch : !managed ? project.gitBranch : '';
+  const location = run ? run.workspace : project.path;
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
+        <button
+          type="button"
+          className="chrome-branch"
+          title={`${project.name} · Branch: ${branch}`}
+          aria-label={`${project.name}, branch ${branch}`}
+        >
           <GitBranch size={14} aria-hidden="true" />
           <span className="chrome-branch-name">{branchLabel(branch)}</span>
           <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />
@@ -134,19 +135,39 @@ export function BranchIndicator() {
           sideOffset={6}
           collisionPadding={12}
         >
-          <strong>
+          <h2 className="branch-details-title">
             {run ? 'Task workspace' : managed ? 'Plan workspaces' : 'Project checkout'}
-          </strong>
-          <p className="work-context-path">
-            {run
-              ? run.workspace || 'Workspace is being prepared.'
-              : managed
-                ? 'Assignments use separate workspaces. Select an assignment to inspect its branch.'
-                : project.path}
-          </p>
+          </h2>
+          {managed && !run ? (
+            <p className="branch-details-note">
+              Assignments use separate workspaces. Select an assignment to inspect its branch.
+            </p>
+          ) : (
+            <dl className="branch-facts">
+              <div>
+                <dt>Branch</dt>
+                <dd>{branch}</dd>
+                {copyableBranch && (
+                  <CopyButton
+                    size="sm"
+                    text={copyableBranch}
+                    label="Copy"
+                    aria-label="Copy branch"
+                  />
+                )}
+              </div>
+              <div>
+                <dt>Path</dt>
+                <dd>{location || 'Workspace is being prepared.'}</dd>
+                {location && (
+                  <CopyButton size="sm" text={location} label="Copy" aria-label="Copy path" />
+                )}
+              </div>
+            </dl>
+          )}
           {targets.length > 0 && (
             <section className="branch-switch" aria-labelledby="branch-switch-heading">
-              <h2 id="branch-switch-heading">Switch to</h2>
+              <h3 id="branch-switch-heading">Switch to</h3>
               <ul>
                 {targets.map((target) => (
                   <li key={target.key}>
@@ -160,9 +181,9 @@ export function BranchIndicator() {
                           navigateWorkspace('kanban');
                         }}
                       >
-                        <GitBranch size={14} aria-hidden="true" />
-                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
+                        <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
                         <span className="branch-switch-label">{target.label}</span>
+                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
                       </button>
                     </Popover.Close>
                   </li>
@@ -173,7 +194,9 @@ export function BranchIndicator() {
           <div className="branch-actions">
             {!managed && (
               <Popover.Close asChild>
-                <Button onClick={() => openChanges(checkout)}>Review changes</Button>
+                <Button variant="secondary" onClick={() => openChanges(checkout)}>
+                  Review changes
+                </Button>
               </Popover.Close>
             )}
             <Popover.Close asChild>
@@ -181,20 +204,6 @@ export function BranchIndicator() {
                 Manage worktrees
               </Button>
             </Popover.Close>
-            {run?.branch || (!run && !managed && project.gitBranch) ? (
-              <CopyButton
-                variant="outline"
-                text={run ? run.branch : project.gitBranch}
-                label="Copy branch"
-              />
-            ) : null}
-            {(run ? run.workspace : !managed && project.path) ? (
-              <CopyButton
-                variant="outline"
-                text={run ? run.workspace : project.path}
-                label="Copy path"
-              />
-            ) : null}
           </div>
         </Popover.Content>
       </Popover.Portal>

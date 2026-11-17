@@ -4,8 +4,9 @@
 use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
 use crate::host::{self, ColdStart};
+use crate::merge;
 use crate::protocol::{
-    self, profile_root, AgentStatus, Project, Request, Response, SessionSummary,
+    self, profile, AgentState, AgentStatus, Project, Request, Response, SessionSummary,
 };
 use serde_json::json;
 
@@ -14,6 +15,53 @@ use serde_json::json;
 pub fn here(connection: &mut Connection) -> Result<Project, String> {
     let directory = std::env::current_dir().map_err(|error| error.to_string())?;
     connection.project(&directory.to_string_lossy())
+}
+
+/// A running swarm in this project: its plan, round line and whether a
+/// proposed round or deviation waits on the person.
+pub struct Swarm {
+    pub id: String,
+    pub line: String,
+    pub needs_you: bool,
+}
+
+/// This project's running swarms (beta), at most a few so status stays quick.
+fn swarms(connection: &mut Connection, path: &str) -> Vec<Swarm> {
+    let Ok(Response::Plans { plans }) = connection.call(&Request::Plans {
+        project_path: path.into(),
+    }) else {
+        return vec![];
+    };
+    plans
+        .into_iter()
+        .filter(|plan| plan.status == "running")
+        .take(5)
+        .filter_map(|plan| {
+            let Ok(Response::Plan { plan: view }) = connection.call(&Request::PlanDetail {
+                plan_id: plan.id.clone(),
+            }) else {
+                return None;
+            };
+            let progress = view.progress.as_deref().filter(|_| view.swarm)?;
+            Some(Swarm {
+                id: plan.id.clone(),
+                line: format!("{} · {progress}", view.title),
+                needs_you: plan.needs_you,
+            })
+        })
+        .collect()
+}
+
+/// The status row for a swarm.
+pub fn swarm_row(swarm: &Swarm) -> String {
+    let mut row = format!("{}  {}", short(&swarm.id), swarm.line);
+    if swarm.needs_you {
+        row.push_str(&format!(
+            " · needs you: jackalope plan rounds {}",
+            short(&swarm.id)
+        ));
+    }
+    row
 }
 
 /// The most recent conversation in this project, for `--continue`. The host
@@ -117,7 +165,7 @@ pub fn stop(preference: Option<ColdStart>, prefix: &str) -> Result<(), String> {
     let view = connection.session(&id)?;
     match view
         .run_id
-        .filter(|_| protocol::working(view.status.as_deref()))
+        .filter(|_| protocol::working(view.status.as_ref()))
     {
         Some(run_id) => {
             connection.call(&Request::Stop { run_id })?;
@@ -201,8 +249,7 @@ pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(
 }
 
 /// Merges a conversation's latest reviewed attempt into the project's target
-/// branch through the app's merge review, pausing the conversation first so no
-/// new message starts mid-merge. Shows the plan and asks before applying.
+/// branch through the app's merge review. Shows the plan and asks before applying.
 pub fn merge(
     preference: Option<ColdStart>,
     prefix: &str,
@@ -212,51 +259,28 @@ pub fn merge(
     let mut connection = host::ensure(preference)?;
     let id = resolve(&connection.sessions()?, prefix)?;
     let view = connection.session(&id)?;
-    if protocol::working(view.status.as_deref()) {
+    if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Merge once it finishes.".into());
     }
-    if !view.paused {
-        connection.call(&Request::SessionAction {
-            session_id: id.clone(),
-            action: "pause".into(),
-            message_id: None,
+    let mut call = |request: Request| connection.call(&request);
+    let merge::Prepared { plan, paused_here } =
+        merge::prepare(&mut call, &id, view.paused, message).map_err(|refusal| match refusal {
+            merge::Refusal::Failed(error) => error,
+            merge::Refusal::Conflicts {
+                target_branch,
+                files,
+            } => format!(
+                "{} conflicts with {target_branch}: {}. Resolve them in the app's merge review.",
+                view.title,
+                files.join(", ")
+            ),
+            merge::Refusal::Empty => "There are no changes to merge.".into(),
         })?;
+    if paused_here {
         eprintln!(
             "Paused {} so no new message starts during the merge.",
             view.title
         );
-    }
-    let prepared = connection.call(&Request::MergePrepare {
-        session_id: id.clone(),
-        message,
-    });
-    let plan = match prepared {
-        Ok(Response::Merge { plan }) => plan,
-        other => {
-            // Nothing was prepared, so the pause this command added is undone.
-            if !view.paused {
-                let _ = connection.call(&Request::SessionAction {
-                    session_id: id.clone(),
-                    action: "resume".into(),
-                    message_id: None,
-                });
-            }
-            return Err(match other {
-                Err(error) => error,
-                _ => unexpected(),
-            });
-        }
-    };
-    if !plan.conflicts.is_empty() {
-        return Err(format!(
-            "{} conflicts with {}: {}. Resolve them in the app's merge review.",
-            view.title,
-            plan.target_branch,
-            plan.conflicts.join(", ")
-        ));
-    }
-    if plan.files.is_empty() {
-        return Err("There are no changes to merge.".into());
     }
     let count = plan.files.len();
     eprintln!(
@@ -279,26 +303,16 @@ pub fn merge(
         eprintln!("The worktree is removed afterwards, as your commit settings ask.");
     }
     if !approved(yes, "Merge now?")? {
-        eprintln!(
-            "Not merged. {} stays paused; resume it with /unpause in jackalope attach {}.",
-            view.title,
-            short(&id)
-        );
+        merge::release(&mut call, &id, paused_here);
+        eprintln!("Not merged.");
         return Ok(());
     }
-    match connection.call(&Request::MergeApply {
-        plan_id: plan.id,
-        cleanup: plan.cleanup,
-    })? {
-        Response::Merge { plan } => {
-            println!("Merged {} into {}.", view.title, plan.target_branch);
-            for error in plan.cleanup_errors {
-                eprintln!("Could not remove the worktree: {error}");
-            }
-            Ok(())
-        }
-        _ => Err(unexpected()),
+    let merged = merge::apply(&mut call, &id, paused_here, plan.id, plan.cleanup)?;
+    println!("Merged {} into {}.", view.title, merged.target_branch);
+    for error in merged.cleanup_errors {
+        eprintln!("Could not remove the worktree: {error}");
     }
+    Ok(())
 }
 
 /// Commits a conversation's remaining changes with the project's commit
@@ -314,7 +328,7 @@ pub fn pull_request(
     let mut connection = host::ensure(preference)?;
     let id = resolve(&connection.sessions()?, prefix)?;
     let view = connection.session(&id)?;
-    if protocol::working(view.status.as_deref()) {
+    if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Open a pull request once it finishes.".into());
     }
     let title = title
@@ -324,7 +338,7 @@ pub fn pull_request(
     if title.is_empty() || title.contains('\n') {
         return Err("Give the pull request a one-line title with --title.".into());
     }
-    let body: String = view.result.trim().chars().take(4000).collect();
+    let body = merge::pull_request_body(&view.result);
     let branch = view.branch.clone().unwrap_or_default();
     eprintln!(
         "Commit any remaining changes with your commit settings, push {} and open a {} pull request:",
@@ -392,12 +406,8 @@ fn agents(connection: &mut Connection) -> Result<(Vec<AgentStatus>, String), Str
     }
 }
 
-fn usable(agent: &AgentStatus) -> bool {
-    matches!(agent.state.as_str(), "ready" | "installed" | "sign-in")
-}
-
 pub fn status(as_json: bool) -> Result<(), String> {
-    let profile = profile_root()
+    let profile = profile::root()
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "unknown".into());
     let Some(mut connection) = host::attach_or_wait() else {
@@ -423,6 +433,10 @@ pub fn status(as_json: bool) -> Result<(), String> {
         })
     });
     let overview = agents(&mut connection);
+    let swarms = project
+        .as_ref()
+        .map(|project| swarms(&mut connection, &project.path))
+        .unwrap_or_default();
 
     if as_json {
         let (agents, default_agent) = overview.clone().unwrap_or_default();
@@ -439,6 +453,11 @@ pub fn status(as_json: bool) -> Result<(), String> {
                 "branch": branch,
             })),
             "openHere": open_here,
+            "swarms": swarms.iter().map(|swarm| json!({
+                "id": swarm.id,
+                "rounds": swarm.line,
+                "needsYou": swarm.needs_you,
+            })).collect::<Vec<_>>(),
             "agents": agents.iter().map(|agent| json!({
                 "id": agent.id,
                 "name": agent.name,
@@ -474,13 +493,16 @@ pub fn status(as_json: bool) -> Result<(), String> {
     if let Some(count) = open_here {
         row("Open", &format!("{count} conversation(s) here"));
     }
+    for (index, swarm) in swarms.iter().enumerate() {
+        row(if index == 0 { "Swarms" } else { "" }, &swarm_row(swarm));
+    }
     match overview {
         Ok((agents, default_agent)) => {
             let mut first = true;
-            for agent in agents.iter().filter(|agent| usable(agent)) {
-                let state = match agent.state.as_str() {
-                    "ready" => agent.account.as_str(),
-                    "sign-in" => "sign-in needed",
+            for agent in agents.iter().filter(|agent| agent.state.is_usable()) {
+                let state = match agent.state {
+                    AgentState::Ready => agent.account.as_str(),
+                    AgentState::SignIn => "sign-in needed",
                     _ => "installed",
                 };
                 let default = if agent.id == default_agent {
@@ -509,6 +531,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_swarm_waiting_on_you_names_the_command_that_decides() {
+        let mut swarm = Swarm {
+            id: "ab12cd34-0000".into(),
+            line: "Export · swarm (beta) round 2/5 · reviewing".into(),
+            needs_you: false,
+        };
+        assert!(!swarm_row(&swarm).contains("needs you"));
+        swarm.needs_you = true;
+        assert!(swarm_row(&swarm).ends_with(&format!(
+            "needs you: jackalope plan rounds {}",
+            short(&swarm.id)
+        )));
+    }
+
+    #[test]
     fn ages_read_briefly() {
         let ago = |seconds: i64| {
             age(&(chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339())
@@ -532,6 +569,8 @@ mod tests {
             updated_at: String::new(),
             status: None,
             asking: false,
+            agent: None,
+            step: None,
         };
         assert_eq!(state(&session), "open");
         session.pending = 2;

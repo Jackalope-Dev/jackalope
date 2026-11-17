@@ -1,18 +1,19 @@
 use ignore::WalkBuilder;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Read;
 use std::ops::ControlFlow;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tree_sitter::{Node, ParseOptions, Parser, Tree};
 
-const MAX_FILES: usize = 6_000;
-const MAX_FILE_BYTES: u64 = 512 * 1024;
-const MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
+
+/// The scan bounds a computer's runner applies to its own repository search too.
+fn search() -> &'static super::computers::protocol::Search {
+    &super::computers::protocol::protocol().search
+}
 
 mod analysis_cache;
 pub(crate) mod context_read;
@@ -59,6 +60,15 @@ pub struct CodebaseSnapshot {
     diagnostics: Vec<CodebaseDiagnostic>,
     truncated: bool,
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::codebase::codebase_scan,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn codebase_scan(repo_path: String) -> Result<CodebaseSnapshot, String> {
@@ -113,15 +123,14 @@ fn normalized(path: &Path) -> Option<String> {
 }
 
 fn read_bounded(path: &Path) -> Result<String, String> {
-    let mut bytes = Vec::new();
-    std::fs::File::open(path)
-        .map_err(|e| e.to_string())?
-        .take(MAX_FILE_BYTES + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > MAX_FILE_BYTES {
-        return Err("File exceeds the 512 KiB analysis limit.".into());
-    }
+    let bytes = match super::platform::read_capped(path, search().file_bytes) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Err("File no longer exists.".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+            return Err("File exceeds the 512 KiB analysis limit.".into())
+        }
+        Err(error) => return Err(error.to_string()),
+    };
     String::from_utf8(bytes).map_err(|_| "File is not UTF-8 text.".into())
 }
 
@@ -179,7 +188,7 @@ fn analyze(
     let mut cursor = tree.walk();
     loop {
         let node = cursor.node();
-        if symbols.len() < 64 {
+        if symbols.len() < search().file_symbols {
             if let Some(symbol) = symbols::declaration(node, text) {
                 symbols.push(symbol);
             }
@@ -496,25 +505,16 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
         .sort_by_file_path(|a, b| a.cmp(b))
         .filter_entry(|e| {
             e.depth() == 0
-                || !matches!(
-                    e.file_name().to_str().unwrap_or(""),
-                    ".git"
-                        | ".worktrees"
-                        | "node_modules"
-                        | "target"
-                        | "vendor"
-                        | "dist"
-                        | "build"
-                        | "coverage"
-                        | "output"
-                        | ".next"
-                        | ".venv"
-                        | "__pycache__"
-                )
+                || !search()
+                    .skip
+                    .iter()
+                    .any(|skip| e.file_name().to_str() == Some(skip.as_str()))
         })
         .build();
     for entry in walker {
-        if started.elapsed() > Duration::from_secs(20) || result.files.len() >= MAX_FILES {
+        if started.elapsed() > Duration::from_secs(search().seconds)
+            || result.files.len() >= search().files
+        {
             result.truncated = true;
             break;
         }
@@ -603,8 +603,8 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
             "Rust" => "rs",
             _ => continue,
         };
-        if started.elapsed() > Duration::from_secs(20)
-            || total_bytes + file.bytes > MAX_TOTAL_BYTES
+        if started.elapsed() > Duration::from_secs(search().seconds)
+            || total_bytes + file.bytes > search().bytes
             || result.references.len() >= MAX_REFERENCES
         {
             result.truncated = true;
@@ -829,7 +829,7 @@ mod tests {
         f.write(".worktrees/task/a.ts", "export {}");
         f.write("target/a.rs", "");
         f.write("visible.ts", "import x from './missing'; const = ;");
-        f.write("large.ts", &" ".repeat(MAX_FILE_BYTES as usize + 1));
+        f.write("large.ts", &" ".repeat(search().file_bytes as usize + 1));
         f.write("notes.md", "# Context");
         let snapshot = scan(&f.0).unwrap();
         assert_eq!(snapshot.files.len(), 4);
@@ -960,7 +960,7 @@ mod tests {
 
     #[test]
     fn long_dependency_chains_and_self_imports_are_checked_without_recursion() {
-        let mut refs = (0..MAX_FILES)
+        let mut refs = (0..search().files)
             .map(|i| CodebaseReference {
                 source: format!("{i}.ts"),
                 target: Some(format!("{}.ts", i + 1)),
@@ -972,25 +972,9 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(dependency_cycles(&refs).is_empty());
         refs.last_mut().unwrap().target = Some("0.ts".into());
-        assert_eq!(dependency_cycles(&refs)[0].len(), MAX_FILES);
+        assert_eq!(dependency_cycles(&refs)[0].len(), search().files);
         refs.truncate(1);
         refs[0].target = Some("0.ts".into());
         assert_eq!(dependency_cycles(&refs), vec![vec!["0.ts".to_string()]]);
-    }
-
-    #[test]
-    #[ignore = "Manual real-repository scan; set JACKALOPE_SCAN_ROOT and JACKALOPE_SCAN_OUTPUT"]
-    fn export_repository_scan() {
-        let root = std::env::var("JACKALOPE_SCAN_ROOT").unwrap();
-        let output = std::env::var("JACKALOPE_SCAN_OUTPUT").unwrap();
-        let snapshot = scan(Path::new(&root)).unwrap();
-        println!(
-            "{} files, {} references, {} diagnostics in {}ms",
-            snapshot.files.len(),
-            snapshot.references.len(),
-            snapshot.diagnostics.len(),
-            snapshot.duration_ms
-        );
-        std::fs::write(output, serde_json::to_vec_pretty(&snapshot).unwrap()).unwrap();
     }
 }

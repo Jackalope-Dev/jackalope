@@ -42,7 +42,6 @@ export async function conflictsBetween(
   for (const mine of left.files) {
     const other = theirs.get(mine.path);
     if (!other) continue;
-    // Identical results merge cleanly.
     if (mine.head === other.head) continue;
     const forks: [string, string] = [left.fork, right.fork];
     if (mine.base === null && other.base === null) {

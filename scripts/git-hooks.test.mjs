@@ -5,13 +5,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { root as repositoryRoot } from './lib/paths.mjs';
 
 const script = fileURLToPath(new URL('./git-hooks.mjs', import.meta.url));
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'jackalope-hook-test-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const env = { ...process.env, CI: '', LEFTHOOK: '', NODE_ENV: 'test' };
+  // Secret scans need gitleaks and are covered by check-secrets.mjs itself.
+  const env = {
+    ...process.env,
+    CI: '',
+    LEFTHOOK: '',
+    LEFTHOOK_EXCLUDE: 'secrets',
+    NODE_ENV: 'test',
+  };
   for (const key of Object.keys(env)) {
     if (key.startsWith('GIT_')) delete env[key];
   }
@@ -38,11 +46,7 @@ function fixture(t) {
   const lefthook = (args, options) =>
     run(
       process.execPath,
-      [
-        fileURLToPath(new URL('../node_modules/lefthook/bin/index.js', import.meta.url)),
-        'run',
-        ...args,
-      ],
+      [fileURLToPath(import.meta.resolve('lefthook/bin/index.js')), 'run', ...args],
       options,
     );
   return { root, run, git, write, hook, lefthook };
@@ -160,9 +164,12 @@ test('Lefthook executes staged checks and propagates their failures', (t) => {
 
 test('Lefthook forwards push refs and stops before verification on a dirty checkout', (t) => {
   const { root, git, lefthook } = fixture(t);
-  const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
   const sourceGit = (...args) => {
-    const result = spawnSync('git', args, { cwd: sourceRoot, encoding: 'utf8', windowsHide: true });
+    const result = spawnSync('git', args, {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };

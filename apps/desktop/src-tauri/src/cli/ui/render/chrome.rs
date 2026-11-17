@@ -60,17 +60,21 @@ fn separator() -> Piece {
     (text("   ".into(), brand::muted()), None)
 }
 
-/// The header: the wordmark and conversation on the left; the agent, project,
-/// branch and other conversations on the right.
+/// The header: the project and conversation on the left; the agent, branch
+/// and other conversations on the right.
 pub fn header(frame: &mut Frame, app: &App, area: Rect) {
     let mut left: Vec<Piece> = vec![(
         Span::styled(
-            format!("{} jackalope", if brand::unicode() { "◆" } else { "*" }),
+            format!(
+                "{} {}",
+                brand::mark_glyph(brand::Mark::Project),
+                brand::ellipsize(&app.project.name, 32)
+            ),
             Style::default()
                 .fg(brand::accent())
                 .add_modifier(Modifier::BOLD),
         ),
-        Some(Click::Command("new")),
+        Some(Click::Command("projects")),
     )];
     let title = match &app.view {
         Some(view) => Some(view.title.clone()),
@@ -105,8 +109,9 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
     let agent = app
         .view
         .as_ref()
-        .and_then(|view| view.agent.clone())
-        .or_else(|| app.next_agent.as_ref().map(|agent| app.agent_name(agent)));
+        .and_then(|view| view.agent.as_deref())
+        .or(app.next_agent.as_deref())
+        .map(|agent| app.agent_name(agent));
     if let Some(agent) = agent {
         right.push((text(agent, brand::text()), Some(Click::Command("agent"))));
         if let Some(model) = app.view.as_ref().and_then(|view| view.model.clone()) {
@@ -117,10 +122,6 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
         }
         right.push(separator());
     }
-    right.push((
-        text(app.project.name.clone(), brand::muted()),
-        Some(Click::Command("projects")),
-    ));
     let branch = app
         .view
         .as_ref()
@@ -131,14 +132,17 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
         right.push((
             text(
                 format!(
-                    "  {} {}",
-                    if brand::unicode() { "⎇" } else { "@" },
+                    "{} {}",
+                    brand::mark_glyph(brand::Mark::Branch),
                     brand::short_branch(&branch)
                 ),
                 brand::accent(),
             ),
             None,
         ));
+    } else if right.last().is_some_and(|(_, click)| click.is_none()) {
+        // Nothing follows the last separator.
+        right.pop();
     }
 
     let right_start = area.right().saturating_sub(width(&right) + 2);
@@ -203,23 +207,23 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
     let working = if current {
         app.working()
     } else {
-        protocol::working(session.status.as_deref())
+        protocol::working(session.status.as_ref())
     };
-    let dot = if brand::unicode() { "●" } else { "*" };
+    let dot = brand::mark_glyph(brand::Mark::Dot);
     if needs_you {
         (dot, brand::warning())
     } else if working {
         (brand::spinner(app.tick), brand::accent())
     } else if session.paused {
-        (if brand::unicode() { "◌" } else { "-" }, brand::muted())
+        (brand::mark_glyph(brand::Mark::Waiting), brand::muted())
     } else {
-        (if brand::unicode() { "○" } else { "o" }, brand::muted())
+        (brand::mark_glyph(brand::Mark::Idle), brand::muted())
     }
 }
 
 /// The open conversations as tabs between `x` and `limit`: a number for
-/// Alt+number, a dot for how each is doing, and its title. Titles shorten to
-/// fit; what still does not fit is counted at the end.
+/// Alt+number, a dot for how each is doing, its title and a close button.
+/// Titles shorten to fit; what still does not fit is counted at the end.
 fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
     let order = app.tab_order();
     let room = limit.saturating_sub(x) as usize;
@@ -272,7 +276,17 @@ fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
         let click = Some(Click::Tab(index));
         pieces.push((Span::styled(number.to_string(), base), click));
         pieces.push((Span::styled(dot.to_string(), base.fg(color)), click));
+        // The space after the title belongs to the close button, so the `×`
+        // sits centred in its hover highlight.
+        let title = title.strip_suffix(' ').unwrap_or(title);
         pieces.push((Span::styled(title.to_string(), base), click));
+        pieces.push((
+            Span::styled(
+                format!(" {} ", brand::mark_glyph(brand::Mark::Close)),
+                base.fg(brand::muted()).remove_modifier(Modifier::BOLD),
+            ),
+            Some(Click::CloseTab(index)),
+        ));
         pieces.push((Span::raw(" "), None));
     }
     if shown < order.len() {
@@ -300,12 +314,12 @@ fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
 /// each title's length: titles narrow to eight columns before tabs drop from
 /// the end, leaving room for a `+N` count and, while composing, `+ new`.
 fn fit_tabs(titles: &[usize], room: usize, composing: bool) -> (usize, usize) {
-    // A tab is " N  title " plus a gap: seven columns around the title.
+    // A tab is " N  title × " plus a gap: nine columns around the title.
     let total = |shown: usize, width: usize| -> usize {
         titles[..shown]
             .iter()
             .enumerate()
-            .map(|(index, title)| title.min(&width) + if index < 9 { 7 } else { 5 })
+            .map(|(index, title)| title.min(&width) + if index < 9 { 9 } else { 7 })
             .sum::<usize>()
             + if shown < titles.len() { 6 } else { 0 }
             + if composing { 8 } else { 0 }
@@ -327,10 +341,8 @@ pub fn status(frame: &mut Frame, app: &App, area: Rect) {
     let (label, color, details) = super::status_parts(app);
     let glyph = if app.working() {
         brand::spinner(app.tick)
-    } else if brand::unicode() {
-        "●"
     } else {
-        "*"
+        brand::mark_glyph(brand::Mark::Dot)
     };
     let state = Style::default().fg(color);
     let mut left: Vec<Piece> = vec![(Span::styled(format!("{glyph} "), state), None)];

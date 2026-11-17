@@ -1,10 +1,19 @@
+import { isActive } from '@jackalope/contracts/runs';
 import {
   Badge,
+  Button,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
+  EmptyState,
   IconButton,
+  InlineNotice,
+  Input,
+  LoadingState,
   RefreshIcon,
+  Select,
+  SelectItem,
+  Textarea,
 } from '@jackalope/ui';
 import {
   ArrowUpFromLine,
@@ -16,34 +25,32 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { isActive, nativeTask, type RunRequest } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { authorEvidence } from '../../lib/agent-review';
+import { emitAppEvent, navigateWorkspace, openHelperDraft } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import {
+  type ChangedFile,
+  type CommitPolicy,
+  projectGitPolicy,
+  type WorkingChanges,
+  workingChanges,
+} from '../../lib/project-git';
+import type { RunRequest } from '../../lib/run-types';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { navigateWorkspace } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
-import { type ChangedFile, CommitFilesList, STATUS } from './CommitFilesList';
+import { describeError } from '@jackalope/contracts/errors';
+import { stopTask } from '../../lib/task-client';
+import { openRun } from '../../lib/work-selection';
+import { CommitFilesList, STATUS } from './CommitFilesList';
 import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
-
-interface WorkingChanges {
-  branch: string | null;
-  head: string | null;
-  files: ChangedFile[];
-}
 
 const TITLE_LIMIT = 72;
 
@@ -60,9 +67,7 @@ function authorLine(policy: CommitPolicy | null, agents: string[]) {
 }
 
 export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const loadWorktrees = useProjectStore((state) => state.loadWorktreesForActiveProject);
   const runs = useExecutionStore((state) => state.runs);
   const {
@@ -167,10 +172,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setLoading(true);
     setError('');
     try {
-      const next = await nativeTask<WorkingChanges>('git_working_changes', {
-        repoPath: projectPath,
-        worktreePath: target,
-      });
+      const next = await workingChanges({ repoPath: projectPath, worktreePath: target });
       if (current.current !== target) return;
       setChanges(next);
       setHistoryVersion((value) => value + 1);
@@ -178,7 +180,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       if (target === projectPath && next.branch && active && next.branch !== active.gitBranch) {
         useProjectStore.getState().updateProject(active.id, { gitBranch: next.branch });
       }
-      window.dispatchEvent(new Event('jackalope:changes-updated'));
+      emitAppEvent('changes-updated');
       const paths = new Set(next.files.map((file) => file.path));
       // Forget exclusions for files that no longer have changes.
       const { excluded, setExcluded } = useCommitReviewStore.getState();
@@ -186,7 +188,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       if (kept.length !== (excluded[target] ?? []).length) setExcluded(target, kept);
       setFocused((previous) => (paths.has(previous) ? previous : (next.files[0]?.path ?? '')));
     } catch (cause) {
-      if (current.current === target) setError(String(cause));
+      if (current.current === target) setError(describeError(cause));
     } finally {
       if (current.current === target) setLoading(false);
     }
@@ -206,7 +208,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     if (!projectPath || !desktop) return;
     projectGitPolicy(projectPath)
       .then(setPolicy)
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, [projectPath, desktop]);
   useEffect(() => {
     const onFocus = () => void refresh();
@@ -219,7 +221,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     if (!changes || !focused || !projectPath) return setPatch(null);
     let live = true;
     setPatchError('');
-    nativeTask<string>('git_working_file_diff', {
+    invokeNative<string>('git_working_file_diff', {
       repoPath: projectPath,
       worktreePath: checkout,
       path: focused,
@@ -230,7 +232,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       .catch((cause) => {
         if (!live) return;
         setPatch(null);
-        setPatchError(String(cause));
+        setPatchError(describeError(cause));
       });
     return () => {
       live = false;
@@ -258,14 +260,14 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setFeedback('');
     setPushable(false);
     try {
-      await nativeTask('git_discard_changes', {
+      await invokeNative('git_discard_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
         paths: [file.path],
       });
       setFeedback(`Discarded changes to ${file.path}.`);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       await refresh();
     }
@@ -276,7 +278,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setGenerating(true);
     setGenerateError('');
     try {
-      const message = await nativeTask<{ title: string; body: string }>(
+      const message = await invokeNative<{ title: string; body: string }>(
         'git_generate_commit_message',
         {
           repoPath: projectPath,
@@ -287,7 +289,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       setTitle(message.title);
       setBody(message.body);
     } catch (cause) {
-      setGenerateError(String(cause));
+      setGenerateError(describeError(cause));
     } finally {
       setGenerating(false);
     }
@@ -298,7 +300,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setPushing(true);
     setError('');
     try {
-      const result = await nativeTask<string>('git_push_changes', {
+      const result = await invokeNative<string>('git_push_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
       });
@@ -319,7 +321,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setFeedback('');
     setPushable(false);
     try {
-      const sha = await nativeTask<string>('git_commit_changes', {
+      const sha = await invokeNative<string>('git_commit_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
         paths: chosenFiles.map((file) => file.path),
@@ -392,7 +394,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const stopFix = async () => {
     if (!fixRun) return;
     try {
-      await nativeTask('task_stop', { id: fixRun.id });
+      await stopTask(fixRun.id);
     } catch (cause) {
       setFixError(failureOf(cause).message);
     }
@@ -400,7 +402,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
 
   const openFixTask = () => {
     if (!fixRun) return;
-    useExecutionStore.getState().select(fixRun.id);
+    openRun(fixRun.id);
     navigateWorkspace('kanban');
   };
 
@@ -410,21 +412,29 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     const list = (chosenFiles.length ? chosenFiles : files)
       .map((file) => `- ${file.path} (${STATUS[file.status].label.toLowerCase()})`)
       .join('\n');
+    const same = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+    const author = runs
+      .filter((run) => run.workspace && same(run.workspace) === same(checkout))
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+    const evidence = author ? authorEvidence(author) : '';
     useExecutionStore.getState().draft(key, {
       title: `Review uncommitted work${branch ? ` on ${branch}` : ''}`,
       prompt: [
         `Review the uncommitted changes in ${checkout}${branch ? ` (branch ${branch})` : ''}.`,
         'Read them with `git status` and `git diff HEAD` in that folder. Do not edit, stage or commit anything.',
         'Report correctness bugs, risky changes, missing tests and anything unfinished, most severe first, with file and line references.',
+        `If you are later asked to apply fixes, edit only files in ${checkout} and run checks from inside it; your own folder holds other work.`,
         '',
         'Files:',
         list,
+        ...(evidence ? ['', evidence] : []),
       ].join('\n'),
       projectId: project.id,
       isolated: false,
+      readOnly: true,
       agent: '',
     });
-    window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
+    openHelperDraft(key);
   };
 
   if (!project)

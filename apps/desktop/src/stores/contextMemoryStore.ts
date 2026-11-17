@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { discoverCodebaseContext } from '../lib/context/discovery';
@@ -19,6 +20,9 @@ interface ContextMemoryState {
   removeMemory: (projectId: string) => void;
 }
 
+/** Scans someone asked for and is waiting on; silent background refreshes don't count. */
+let visibleScans = 0;
+
 export const useContextMemoryStore = create<ContextMemoryState>()(
   persist(
     (set, get) => ({
@@ -29,11 +33,10 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
 
       refreshMemory: async (project, options = {}) => {
         const { id, name, path } = project;
-        const previousMood = useMascotStore.getState().mood;
-        const showActivity = !options.silent && previousMood !== 'working';
         set((state) => ({ scanning: { ...state.scanning, [id]: true } }));
-        if (showActivity) {
-          useMascotStore.getState().setMood('thinking');
+        if (!options.silent) {
+          visibleScans += 1;
+          useMascotStore.getState().setActivity('scan', true);
         }
 
         try {
@@ -82,16 +85,14 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
             category: 'discovery',
             severity: 'warning',
             title: 'Codebase Discovery Incomplete',
-            message: `Could not read repository context: ${String(error)}`,
+            message: `Could not read repository context: ${describeError(error)}`,
           });
           throw error;
         } finally {
-          if (
-            showActivity &&
-            !Object.values(get().scanning).some(Boolean) &&
-            useMascotStore.getState().mood === 'thinking'
-          )
-            useMascotStore.getState().setMood(previousMood === 'thinking' ? 'idle' : previousMood);
+          if (!options.silent) {
+            visibleScans -= 1;
+            useMascotStore.getState().setActivity('scan', visibleScans > 0);
+          }
         }
       },
 

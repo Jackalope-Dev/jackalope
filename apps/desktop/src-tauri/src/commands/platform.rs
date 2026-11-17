@@ -1,5 +1,36 @@
 use std::path::{Path, PathBuf};
 
+pub use crate::cli_protocol::profile::home_dir;
+
+/// Reads `path` when it holds at most `limit` bytes, without reading further.
+/// `None` when it does not exist; an `InvalidData` error when it is larger.
+pub(crate) fn read_capped(path: &Path, limit: u64) -> std::io::Result<Option<Vec<u8>>> {
+    use std::io::Read;
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("The file exceeds its {limit}-byte limit."),
+        ));
+    }
+    Ok(Some(bytes))
+}
+
+/// The contents of `path`, which must exist and hold at most `limit` bytes.
+pub(crate) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
+    match read_capped(path, limit) {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) => Err(std::io::Error::from(std::io::ErrorKind::NotFound).to_string()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
 pub fn is_executable(path: &Path) -> bool {
     let Ok(metadata) = path.metadata() else {
         return false;
@@ -19,9 +50,39 @@ pub fn is_executable(path: &Path) -> bool {
 }
 
 pub fn find_on_path(name: &str) -> Option<PathBuf> {
-    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+    find_executable(name, &[])
+}
+
+/// The first executable named `name` in a PATH directory, then in `extra`.
+/// On Windows a name without an extension matches `name.exe`, `name.cmd` or
+/// `name.bat`; a file without one cannot be started there.
+pub fn find_executable(name: &str, extra: &[PathBuf]) -> Option<PathBuf> {
+    find_in(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .chain(extra.iter().cloned()),
+        name,
+    )
+}
+
+/// The first executable named `name` (see [`find_executable`]) in `directories`.
+pub fn find_in(directories: impl IntoIterator<Item = PathBuf>, name: &str) -> Option<PathBuf> {
+    let names: Vec<String> = if cfg!(windows) && Path::new(name).extension().is_none() {
+        [".exe", ".cmd", ".bat"]
+            .iter()
+            .map(|suffix| format!("{name}{suffix}"))
+            .collect()
+    } else {
+        vec![name.to_string()]
+    };
+    directories
+        .into_iter()
         .filter(|directory| directory.is_absolute())
-        .map(|directory| directory.join(name))
+        .flat_map(|directory| {
+            names
+                .iter()
+                .map(move |name| directory.join(name))
+                .collect::<Vec<_>>()
+        })
         .find(|path| is_executable(path))
 }
 
@@ -51,7 +112,7 @@ fn path_from_shell(output: &str) -> Option<&str> {
 pub fn initialize_environment() {
     use std::{process::Command, time::Duration};
     let inherited = std::env::var_os("PATH").unwrap_or_default();
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = home_dir();
     let shell = std::env::var_os("SHELL")
         .map(PathBuf::from)
         .or_else(|| {
@@ -119,9 +180,78 @@ pub fn initialize_environment() {
 #[cfg(not(unix))]
 pub fn initialize_environment() {}
 
+/// Calls `attempt` every `interval` until it returns `Some`, it fails, or
+/// `deadline` passes. The last attempt runs at or after the deadline, so a slow
+/// condition still gets a final check; `Ok(None)` means it never held.
+pub fn poll_until<T, E>(
+    deadline: std::time::Instant,
+    interval: std::time::Duration,
+    mut attempt: impl FnMut() -> Result<Option<T>, E>,
+) -> Result<Option<T>, E> {
+    loop {
+        if let Some(value) = attempt()? {
+            return Ok(Some(value));
+        }
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            return Ok(None);
+        }
+        std::thread::sleep(interval.min(deadline - now));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn executables_are_found_only_in_absolute_directories() {
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-npm-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        assert_eq!(find_in([directory.clone()], "npm"), None);
+        let npm = directory.join(if cfg!(windows) { "npm.cmd" } else { "npm" });
+        std::fs::write(&npm, "#!/bin/sh\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&npm, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        assert_eq!(find_in([directory.clone()], "npm"), Some(npm));
+        assert_eq!(find_in([PathBuf::from("relative")], "npm"), None);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn polling_stops_when_the_condition_holds_or_the_deadline_passes() {
+        use std::time::{Duration, Instant};
+        let mut calls = 0;
+        let found = poll_until(
+            Instant::now() + Duration::from_secs(5),
+            Duration::from_millis(1),
+            || -> Result<_, ()> {
+                calls += 1;
+                Ok((calls == 3).then_some(calls))
+            },
+        );
+        assert_eq!(found, Ok(Some(3)));
+        let mut calls = 0;
+        let never = poll_until(
+            Instant::now(),
+            Duration::from_secs(60),
+            || -> Result<Option<()>, ()> {
+                calls += 1;
+                Ok(None)
+            },
+        );
+        assert_eq!((never, calls), (Ok(None), 1));
+        assert_eq!(
+            poll_until(Instant::now(), Duration::ZERO, || Err::<Option<()>, _>(
+                "stop"
+            )),
+            Err("stop")
+        );
+    }
 
     #[test]
     fn directories_are_not_executables() {

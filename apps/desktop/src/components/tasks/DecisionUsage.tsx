@@ -1,5 +1,5 @@
-import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { Disclosure, DisclosureBody, DisclosureSummary, InlineNotice, Table } from '@jackalope/ui';
+import { useNativeResource } from '../../hooks/useNativeResource';
 import {
   countedTaskDecisions,
   decisionUsageEntries,
@@ -8,39 +8,13 @@ import {
 } from '../../lib/decision-usage';
 import { decisionLabels } from '../../lib/decisions';
 import { summarizeUsage } from '../../lib/usage-insights';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
-export function useTaskDecisionUsage(enabled = true) {
-  const [records, setRecords] = useState<TaskDecisionUsage[]>([]);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (!enabled) return;
-    let alive = true;
-    const read = () =>
-      void readTaskDecisionUsage()
-        .then((values) => {
-          if (alive) {
-            setRecords(values);
-            setLoading(false);
-            setError('');
-          }
-        })
-        .catch((cause) => {
-          if (alive) {
-            setError(String(cause));
-            setLoading(false);
-          }
-        });
-    read();
-    const timer = setInterval(read, 15000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [enabled]);
-  return { records, error, loading };
+const NO_RECORDS: TaskDecisionUsage[] = [];
+
+export function useTaskDecisionUsage() {
+  const { data, error, loading } = useNativeResource(readTaskDecisionUsage, [], { pollMs: 15000 });
+  return { records: data ?? NO_RECORDS, error, loading };
 }
 
 export function DecisionUsage({
@@ -79,10 +53,6 @@ export function DecisionUsage({
               ? 'Tokens unavailable'
               : `${summary.tokens.toLocaleString()} reported tokens`}
             {summary.missing ? ` · ${summary.missing} usage reports unavailable` : ''}
-            {summary.costUsd === null
-              ? ' · Cost unavailable'
-              : ` · $${summary.costUsd.toFixed(6)} estimated`}
-            {summary.costMissing || summary.missing ? ' · Cost coverage is incomplete' : ''}
           </p>
           <Disclosure>
             <DisclosureSummary>Assessment details</DisclosureSummary>
@@ -94,7 +64,6 @@ export function DecisionUsage({
                     <th scope="col">Provider</th>
                     <th scope="col">Decision</th>
                     <th scope="col">Tokens</th>
-                    <th scope="col">Estimated cost</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -116,15 +85,6 @@ export function DecisionUsage({
                               entry.attempt.usage.input + entry.attempt.usage.output
                             ).toLocaleString()
                           : 'Unavailable'}
-                      </td>
-                      <td>
-                        {entry.attempt.usage.estimatedCostUsd == null
-                          ? 'Unavailable'
-                          : new Intl.NumberFormat(undefined, {
-                              style: 'currency',
-                              currency: 'USD',
-                              maximumFractionDigits: 6,
-                            }).format(entry.attempt.usage.estimatedCostUsd)}
                       </td>
                     </tr>
                   ))}

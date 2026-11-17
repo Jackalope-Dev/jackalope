@@ -1,16 +1,25 @@
+import { isActive, isTerminal } from '@jackalope/contracts/runs';
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { taskAgents } from './agent-provider.ts';
+import { isAgentReview } from './agent-review.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
+import {
+  isOpenPullRequest,
+  pullRequestPhaseView,
+  type TrackedPullRequest,
+} from './pull-requests.ts';
 import type { QueueView } from './queue.ts';
-import { isActive, type TaskRun } from './task-runtime.ts';
-import { taskTitle } from './task-title.ts';
-import { taskDecision, taskNextAction } from './task-workflow.ts';
+import type { TaskRun } from './run-types.ts';
+import { taskTitle, withoutLeadingId } from './task-title.ts';
+import { hasOpenQuestion, taskDecision, taskNextAction } from './task-workflow.ts';
 
 const workStages = [
   { id: 'attention', label: 'Needs you' },
   { id: 'review', label: 'Ready to review' },
   { id: 'working', label: 'Working' },
+  // An open pull request waiting on checks or reviewers, not on the person.
+  { id: 'inReview', label: 'In review' },
   { id: 'ideas', label: 'Drafts' },
   { id: 'finished', label: 'Finished' },
 ] as const;
@@ -25,14 +34,6 @@ export function matchesWorkFilter(item: WorkItem, filter: string) {
   return filter === 'all' || workGroup(item.stage) === workGroup(filter);
 }
 
-export const ideaStageLabels: Record<TaskTicket['status'], string> = {
-  backlog: 'Idea',
-  refinement: 'Ready to shape',
-  in_progress: 'Planned: in motion',
-  verification: 'Planned: for review',
-  done: 'Marked done',
-};
-
 export interface WorkItem {
   id: string;
   title: string;
@@ -44,6 +45,24 @@ export interface WorkItem {
   managed?: ManagedTask;
   statusLabel?: string;
   archiveBlocked?: string;
+  /** A question the person can answer now (see hasOpenQuestion); collection sets it. */
+  question?: boolean;
+  /** The pull request this task opened, when one is tracked. */
+  pullRequest?: TrackedPullRequest;
+}
+
+/**
+ * Lets a tracked pull request place finished work: failing checks, requested changes and
+ * conflicts need the person, a pull request waiting on GitHub or reviewers does not, and a
+ * merged one is done. Work that is running or blocked on its own keeps its place.
+ */
+function withPullRequest(item: WorkItem, pullRequest: TrackedPullRequest | undefined): WorkItem {
+  if (!pullRequest) return item;
+  const view = pullRequestPhaseView(pullRequest.phase);
+  const settled = item.stage === 'review' || item.stage === 'finished';
+  if (!settled || !view.stage || (item.stage === 'finished' && !isOpenPullRequest(pullRequest)))
+    return { ...item, pullRequest };
+  return { ...item, pullRequest, stage: view.stage, statusLabel: view.label };
 }
 
 /**
@@ -83,12 +102,13 @@ export function workPresence(item: WorkItem): {
   action: string;
 } {
   const run = item.run;
-  const pending = !!run?.prompts?.some((prompt) => prompt.status === 'pending');
+  const question = item.question ?? (!!run && hasOpenQuestion(run));
   const agents = taskAgents(
     run,
     item.managed?.request.agent ?? item.session?.request.agent ?? item.idea?.assignedAgent,
   );
-  const state = pending
+  const pullRequest = !question && item.pullRequest;
+  const state = question
     ? 'waiting'
     : (run && isActive(run)) || item.stage === 'working'
       ? 'working'
@@ -100,29 +120,50 @@ export function workPresence(item: WorkItem): {
         ? 'Review task'
         : 'Open task'
     : item.session
-      ? pending
+      ? question
         ? 'Answer question'
         : item.stage === 'attention'
-          ? 'Inspect session'
+          ? 'Inspect conversation'
           : item.stage === 'working'
             ? 'View activity'
-            : 'Open conversation'
+            : item.stage === 'review'
+              ? 'Reply'
+              : 'Open conversation'
       : run
-        ? item.stage === 'finished'
-          ? 'Open result'
-          : taskNextAction(run)
+        ? pullRequest && item.statusLabel === pullRequestPhaseView(pullRequest.phase).label
+          ? pullRequestPhaseView(pullRequest.phase).action
+          : item.stage === 'finished'
+            ? 'Open result'
+            : taskNextAction(run)
         : 'Open draft';
   return { agents, state, action };
 }
 
+interface WorkspaceWorkOptions {
+  ideas?: TaskTicket[];
+  sessions?: LiveSession[];
+  queue?: QueueView;
+  /** Attempts merged into their target; the queue's merged attempts when left out. */
+  integratedRunIds?: string[];
+  archived?: boolean;
+  /** Also list attempts that belong to a managed task. */
+  nested?: boolean;
+  /** Tracked pull requests by task. */
+  pullRequests?: Record<string, TrackedPullRequest>;
+}
+
 export function collectWorkspaceWork(
   projectId: string | null,
-  ideas: TaskTicket[],
   runs: TaskRun[],
-  sessions: LiveSession[],
-  integratedRunIds: string[] = [],
-  archived = false,
-  queue?: QueueView,
+  {
+    ideas = [],
+    sessions = [],
+    queue,
+    integratedRunIds = queue?.mergedRunIds ?? [],
+    archived = false,
+    nested = false,
+    pullRequests = {},
+  }: WorkspaceWorkOptions = {},
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
   const managedWork = (queue?.managedTasks ?? [])
@@ -134,10 +175,14 @@ export function collectWorkspaceWork(
     projectId,
     ideas.filter((idea) => !idea.runId || parentProjects.get(idea.runId) !== idea.projectId),
     runs.filter(
-      (run) => !childIds.has(run.id) && (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+      (run) =>
+        (nested || !childIds.has(run.id)) &&
+        (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
     ),
     integratedRunIds,
     archived,
+    nested,
+    pullRequests,
   );
   if (!archived)
     for (const { task, work } of managedWork) {
@@ -150,6 +195,7 @@ export function collectWorkspaceWork(
         idea: ideas.find(
           (idea) => idea.runId === task.id && idea.projectId === task.request.projectId,
         ),
+        question: work.questions.length > 0,
         stage: work.integrated
           ? 'finished'
           : work.questions.length || work.failed || work.status === 'Needs attention'
@@ -167,14 +213,17 @@ export function collectWorkspaceWork(
     for (const session of sessions) {
       if (projectId !== null && session.request.projectId !== projectId) continue;
       // Bot conversations live in the Bots view.
-      if (session.persona) continue;
+      if (session.persona && !nested) continue;
       const work = sessionWork(session, runs);
+      // A closed conversation can't take an answer, so a question left in it doesn't need you.
+      const question = !session.closed && work.work.some(hasOpenQuestion);
       items.push({
         id: `session:${session.id}`,
-        title: session.title,
+        title: withoutLeadingId(session.title),
         date: session.updatedAt,
+        question,
         stage:
-          work.questions.length || work.status === 'Needs attention'
+          question || work.status === 'Needs attention'
             ? 'attention'
             : work.active || work.pending
               ? 'working'
@@ -202,19 +251,20 @@ export function collectWork(
   runs: TaskRun[],
   integratedRunIds: string[] = [],
   archived = false,
+  withReviews = false,
+  pullRequests: Record<string, TrackedPullRequest> = {},
 ): WorkItem[] {
-  const projectRuns = runs.filter((run) => projectId === null || run.projectId === projectId);
+  // Agent reviews belong to the task they review and open from its Review tab.
+  const projectRuns = runs.filter(
+    (run) =>
+      (projectId === null || run.projectId === projectId) && (withReviews || !isAgentReview(run)),
+  );
   const byId = new Map(projectRuns.map((run) => [run.id, run]));
   const latest = new Map<string, TaskRun>();
   const original = new Map<string, TaskRun>();
   const blocked = new Set<string>();
   for (const run of projectRuns) {
-    if (
-      !['review', 'reviewed', 'failed', 'stopped'].includes(run.status) ||
-      run.finishing ||
-      run.liveSessionId ||
-      run.persistenceError
-    )
+    if (!isTerminal(run) || run.finishing || run.liveSessionId || run.persistenceError)
       blocked.add(run.taskId);
     const newest = latest.get(run.taskId);
     const oldest = original.get(run.taskId);
@@ -243,16 +293,18 @@ export function collectWork(
   for (const run of latest.values()) {
     if (!!run.archivedAt !== archived) continue;
     const idea = linkedIdeas.get(run.taskId);
-    const active = ['starting', 'running', 'stopping'].includes(run.status);
-    const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
-    items.push({
+    const active = isActive(run);
+    const question = hasOpenQuestion(run);
+    const item: WorkItem = {
       id: idea?.id ?? run.taskId,
       title: taskTitle(
         idea?.rawPrompt ?? original.get(run.taskId)?.prompt ?? run.prompt,
         idea?.title,
+        [run.projectPath, run.workspace],
       ),
+      question,
       stage:
-        pending ||
+        question ||
         run.persistenceError ||
         (!active &&
           !integratedRunIds.includes(run.id) &&
@@ -279,7 +331,8 @@ export function collectWork(
       archiveBlocked: blocked.has(run.taskId)
         ? 'Finish or resolve all attempts and save their history first. Tasks from a conversation stay with it.'
         : undefined,
-    });
+    };
+    items.push(withPullRequest(item, pullRequests[run.taskId]));
   }
   return items.sort(
     (a, b) =>
@@ -288,3 +341,51 @@ export function collectWork(
       Date.parse(b.date) - Date.parse(a.date),
   );
 }
+
+/** Why a row needs the person, when its status alone would only say it needs attention. */
+export function attentionReason(item: WorkItem): string | undefined {
+  const run = item.run;
+  if (run?.prompts?.some((prompt) => prompt.status === 'pending')) return 'Question waiting';
+  // A pull request that placed the row here is the reason.
+  if (item.pullRequest && item.statusLabel === pullRequestPhaseView(item.pullRequest.phase).label)
+    return item.statusLabel;
+  if (run?.persistenceError) return 'History needs saving';
+  if (run?.verificationError || run?.verification?.result.success === false) return 'Check failed';
+  const error = item.session?.error || run?.error;
+  if (error) return `Failed · ${error.split('\n')[0]}`;
+  if (run?.status === 'stopped') return 'Stopped before finishing';
+  if (run?.status === 'interrupted') return 'Interrupted';
+  return undefined;
+}
+
+/**
+ * Statuses that a row's action already says, keyed by status; the meta line leaves them out
+ * when the action matches, and keeps anything that adds information.
+ */
+const REPEATED_STATUS: Record<string, RegExp> = {
+  'ready for your review': /^(review|reply)\b/i,
+  'ready to review': /^(review|reply)\b/i,
+  'plan ready for review': /^review\b/i,
+  'waiting for your answer': /^answer\b/i,
+  'question waiting': /^answer\b/i,
+  'needs input': /^answer\b/i,
+  'ready to merge': /^(merge|review and merge)\b/i,
+};
+
+/** The status worth showing beside the shape, unless the row's group or action already says it. */
+export function workRowStatus(item: WorkItem, action: string) {
+  // What blocks the row says more than its general status.
+  const label = (needsYou(item) && attentionReason(item)) || item.statusLabel?.trim();
+  if (!label || item.stage === 'finished') return undefined;
+  const key = label.toLowerCase();
+  const group = workGroups.find((stage) => stage.id === workGroup(item.stage))?.label;
+  if (key === group?.toLowerCase() || REPEATED_STATUS[key]?.test(action.trim())) return undefined;
+  return label;
+}
+
+/** Whether a stage is waiting on the person, as the sidebar's Work count reads it. */
+export const needsYou = (item: Pick<WorkItem, 'stage'>) =>
+  item.stage === 'attention' || item.stage === 'review';
+
+/** Most collapsible sections stay open; past this many items they start collapsed. */
+export const OPEN_SECTION_LIMIT = 5;

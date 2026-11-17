@@ -32,10 +32,13 @@ and is not a list of everything shipped in every installer.
   embedded axe-core MPL-2.0 source and license notices in
   `apps/desktop/src-tauri/resources/agent-browser`. Preserve those accompanying files.
 - The bot computer image definition in `apps/desktop/src-tauri/resources/computer` is
-  Jackalope's own. Building it installs Debian packages (Chromium, Xvfb, Openbox,
-  x11vnc, noVNC, websockify and others) under their own licenses on the building
-  machine; no image is distributed. Publishing one requires their notices. See
-  [bot computers](BOT-COMPUTERS.md).
+  Jackalope's own. The image built from it, and published for linux/amd64 to GitHub
+  Container Registry, contains Debian packages (Chromium, Xvfb, Openbox, x11vnc, noVNC,
+  websockify and others) and the Codex CLI under their own licenses. It keeps every
+  Debian package's `/usr/share/doc/<package>/copyright`, the npm packages' own license
+  files and a `/usr/share/doc/jackalope-computer/NOTICE`; preserve them when changing or
+  redistributing it. Claude Code is not redistributed: the image installs it from npm
+  on first use. See [bot computers](BOT-COMPUTERS.md#the-image).
 - Agent CLIs, models and connected services have their own licenses, subscriptions
   and terms. Jackalope does not include provider access or sublicense their services.
 - Optional private OpenCode downloads retain the upstream MIT notice in

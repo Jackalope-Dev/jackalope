@@ -1,18 +1,15 @@
-import { execFileSync } from 'node:child_process';
 import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { run } from './lib/proc.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
 const pnpm = process.env.npm_execpath;
 if (!pnpm || !/\.[cm]?js$/i.test(pnpm)) throw new Error('Run with pnpm licenses:generate.');
 const execute = (command, args) =>
   JSON.parse(
-    execFileSync(command, args, {
-      cwd: root,
+    run(command, args, {
+      stdio: ['ignore', 'pipe', 'inherit'],
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
-      windowsHide: true,
     }),
   );
 const npm = execute(process.execPath, [pnpm, 'licenses', 'list', '--json']);
@@ -54,6 +51,8 @@ Website screenshots and walkthroughs use explicit fictional sample data.
 See [licensing and redistribution](LICENSING.md) for project materials and trademarks.
 The desktop bundles agent-browser's native executable, Apache-2.0 license and
 embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
+The published bot computer image is not listed here: its Debian and npm packages
+keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.md#the-image).
 
 ## JavaScript packages
 

@@ -1,6 +1,6 @@
 use super::{AccountBinding, TaskRuntime};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::path::Path;
 use tauri::State;
 
 #[derive(Serialize, Deserialize)]
@@ -15,6 +15,16 @@ fn allowed(agent: &str, name: &str) -> bool {
         "opencode" => provider(name).is_some() || name == "JACKALOPE_ENDPOINT_KEY",
         _ => false,
     }
+}
+
+/// A key imported from this device's environment for the agent it belongs to.
+fn imported(agent: &str, name: &str) -> bool {
+    crate::commands::local_detection::key_provider_info(name)
+        .is_some_and(|(_, target)| target == agent)
+}
+
+fn valid_value(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 8192 && !value.chars().any(char::is_control)
 }
 
 pub(super) fn provider(name: &str) -> Option<&'static str> {
@@ -33,36 +43,20 @@ pub(super) fn provider(name: &str) -> Option<&'static str> {
 
 pub(super) fn read(binding: &AccountBinding) -> Result<Option<ApiKey>, String> {
     let path = binding.directory.join("api-key.bin");
-    #[cfg(unix)]
-    let legacy = if path.exists() {
-        let bytes = crate::commands::history::read_bounded(&path, 16384)?;
-        serde_json::from_slice::<ApiKey>(&bytes).ok().map(|_| bytes)
-    } else {
-        None
-    };
-    #[cfg(unix)]
-    let bytes = match &legacy {
-        Some(bytes) => Some(bytes.clone()),
-        None => crate::commands::account_storage::read(&path)?,
-    };
-    #[cfg(windows)]
-    let bytes = crate::commands::account_storage::read(&path)?;
+    // Older versions saved the key as plaintext JSON.
+    let bytes = crate::commands::account_storage::read_or_migrate(&path, |bytes| {
+        bytes.len() <= 16384 && serde_json::from_slice::<ApiKey>(bytes).is_ok()
+    })?;
     let Some(bytes) = bytes else { return Ok(None) };
     let key: ApiKey = serde_json::from_slice(&bytes).map_err(|_| {
         "This account's saved API key is unreadable. Reconnect it before running tasks."
     })?;
-    if !allowed(&binding.adapter, &key.name)
-        || key.value.is_empty()
-        || key.value.len() > 8192
-        || key.value.chars().any(char::is_control)
+    if !(allowed(&binding.adapter, &key.name) || imported(&binding.adapter, &key.name))
+        || !valid_value(&key.value)
     {
         return Err(
             "This account's saved API key is invalid. Reconnect it before running tasks.".into(),
         );
-    }
-    #[cfg(unix)]
-    if legacy.is_some() {
-        crate::commands::account_storage::write(&path, &bytes)?;
     }
     Ok(Some(key))
 }
@@ -70,25 +64,61 @@ pub(super) fn read(binding: &AccountBinding) -> Result<Option<ApiKey>, String> {
 pub(super) fn write_endpoint_key(directory: &Path, value: Option<&str>) -> Result<(), String> {
     let path = directory.join("api-key.bin");
     match value.map(str::trim).filter(|value| !value.is_empty()) {
-        None => {
-            if path.exists() {
-                fs::remove_file(&path).map_err(|error| error.to_string())?;
-            }
-            Ok(())
-        }
-        Some(value) => {
-            let bytes = serde_json::to_vec(&ApiKey {
+        None => crate::commands::account_storage::remove(&path),
+        Some(value) => crate::commands::account_storage::write_json(
+            &path,
+            &ApiKey {
                 name: "JACKALOPE_ENDPOINT_KEY".into(),
                 value: value.to_string(),
-            })
-            .map_err(|_| "Could not prepare the API key.".to_string())?;
-            crate::commands::account_storage::write(&path, &bytes)
-        }
+            },
+        ),
     }
 }
 
 #[tauri::command]
-pub fn agent_profile_save_key(
+pub async fn agent_profile_save_key(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+    name: String,
+    value: String,
+) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || save_key(app.state(), agent, id, name, value))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Waits for the shared execution lock, so commands run it off the main thread.
+pub(in crate::commands) fn save_key(
+    runtime: State<'_, TaskRuntime>,
+    agent: String,
+    id: String,
+    name: String,
+    value: String,
+) -> Result<(), String> {
+    if !allowed(&agent, &name) {
+        return Err("Choose a supported provider and enter a valid API key.".into());
+    }
+    store_key(runtime, agent, id, name, value)
+}
+
+/// Saves a key found in this device's environment to the account created for
+/// the agent it belongs to.
+pub(in crate::commands) fn save_imported_key(
+    runtime: State<'_, TaskRuntime>,
+    agent: String,
+    id: String,
+    name: String,
+    value: String,
+) -> Result<(), String> {
+    if !allowed(&agent, &name) && !imported(&agent, &name) {
+        return Err("Choose a supported provider and enter a valid API key.".into());
+    }
+    store_key(runtime, agent, id, name, value)
+}
+
+fn store_key(
     runtime: State<'_, TaskRuntime>,
     agent: String,
     id: String,
@@ -96,11 +126,7 @@ pub fn agent_profile_save_key(
     value: String,
 ) -> Result<(), String> {
     runtime.access.ensure()?;
-    if !allowed(&agent, &name)
-        || value.trim().is_empty()
-        || value.len() > 8192
-        || value.chars().any(char::is_control)
-    {
+    if !valid_value(value.trim()) {
         return Err("Choose a supported provider and enter a valid API key.".into());
     }
     let _guard = crate::commands::integration::execution_guard()?;
@@ -110,7 +136,7 @@ pub fn agent_profile_save_key(
     let binding = super::bind_account(&runtime.profiles_root(), &agent, Some(&id))?;
     crate::commands::agent_sign_in::ensure_idle(&binding)?;
     if runtime.integration_runs()?.iter().any(|run| {
-        ["starting", "running", "stopping"].contains(&run.status.as_str())
+        run.status.is_active()
             && run
                 .account_binding
                 .as_ref()
@@ -118,13 +144,13 @@ pub fn agent_profile_save_key(
     }) {
         return Err("Stop tasks using this account before changing its API key.".into());
     }
-    let bytes = serde_json::to_vec(&ApiKey {
-        name,
-        value: value.trim().to_owned(),
-    })
-    .map_err(|_| "Could not prepare the API key.")?;
-    let path = binding.directory.join("api-key.bin");
-    crate::commands::account_storage::write(&path, &bytes)?;
+    crate::commands::account_storage::write_json(
+        &binding.directory.join("api-key.bin"),
+        &ApiKey {
+            name,
+            value: value.trim().to_owned(),
+        },
+    )?;
     runtime.invalidate_account_helpers(&binding.directory);
     Ok(())
 }

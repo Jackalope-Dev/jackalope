@@ -77,6 +77,13 @@ pub enum Command {
         shape: Option<String>,
         yes: bool,
     },
+    /// `plan rounds <id> [pause|resume|stop|approve]`: a swarm's rounds, or
+    /// an action on them.
+    PlanRounds {
+        id: String,
+        action: Option<String>,
+        yes: bool,
+    },
     /// `plans`: this project's plans.
     Plans {
         json: bool,
@@ -334,6 +341,23 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                         yes,
                     }
                 }
+                Some("rounds") => {
+                    extra(4)?;
+                    let action = words.get(3).map(|word| word.to_ascii_lowercase());
+                    if action.as_deref().is_some_and(|action| {
+                        !["pause", "resume", "stop", "approve"].contains(&action)
+                    }) {
+                        return Err(format!("Choose pause, resume, stop or approve. {USAGE}"));
+                    }
+                    Command::PlanRounds {
+                        id: words
+                            .get(2)
+                            .cloned()
+                            .ok_or("Which plan? Run 'jackalope plans' to see them.")?,
+                        action,
+                        yes,
+                    }
+                }
                 _ => Command::Plan {
                     goal: words[1.min(words.len())..].join(" "),
                     agent: agent.take(),
@@ -381,11 +405,14 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     }
     let delivers = matches!(
         command,
-        Command::Merge { .. } | Command::PullRequest { .. } | Command::PlanApprove { .. }
+        Command::Merge { .. }
+            | Command::PullRequest { .. }
+            | Command::PlanApprove { .. }
+            | Command::PlanRounds { .. }
     );
     if yes && !delivers {
         return Err(format!(
-            "--yes applies to merge, pr and plan approve. {USAGE}"
+            "--yes applies to merge, pr, plan approve and plan rounds. {USAGE}"
         ));
     }
     if message.is_some() {
@@ -485,6 +512,40 @@ mod tests {
         assert!(parse_line(&["plan", "approve", "ab12", "everything"]).is_err());
         assert!(parse_line(&["plan", "approve"]).is_err());
         assert!(parse_line(&["plan", "show", "ab12", "--yes"]).is_err());
+    }
+
+    #[test]
+    fn plan_rounds_parses_its_actions() {
+        assert_eq!(
+            command(&["plan", "rounds", "ab12"]),
+            Command::PlanRounds {
+                id: "ab12".into(),
+                action: None,
+                yes: false,
+            }
+        );
+        for action in ["pause", "resume", "stop", "approve"] {
+            assert_eq!(
+                command(&["plan", "rounds", "ab12", action]),
+                Command::PlanRounds {
+                    id: "ab12".into(),
+                    action: Some(action.into()),
+                    yes: false,
+                }
+            );
+        }
+        assert_eq!(
+            command(&["plan", "rounds", "ab12", "Approve", "--yes"]),
+            Command::PlanRounds {
+                id: "ab12".into(),
+                action: Some("approve".into()),
+                yes: true,
+            }
+        );
+        assert!(parse_line(&["plan", "rounds"]).is_err());
+        assert!(parse_line(&["plan", "rounds", "ab12", "skip"]).is_err());
+        assert!(parse_line(&["plan", "rounds", "ab12", "stop", "now"]).is_err());
+        assert!(parse_line(&["plan", "rounds", "ab12", "--json"]).is_err());
     }
 
     #[test]

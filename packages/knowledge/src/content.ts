@@ -598,7 +598,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Why use Git worktrees for parallel tasks?',
         paragraphs: [
           'Separate worktrees give independent tasks their own files, index, and branch while sharing the repository’s Git object database. Each checkout still uses disk space for working files, dependencies, and build output.',
-          'Choose an isolated worktree for independent work or use the current checkout deliberately. Worktrees do not sandbox processes: agents retain their local permissions, and shared services, ports, and external resources can still conflict.',
+          'Choose an [isolated worktree for independent work](/git-worktrees-for-ai-agents/) or use the current checkout deliberately. Worktrees do not sandbox processes: agents retain their local permissions, and shared services, ports, and external resources can still conflict.',
         ],
       },
       {
@@ -630,7 +630,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Substantial requests are split into subtasks automatically: your selected development agent plans independent pieces with separate file ownership, and they start without a review step. Small requests go straight to one agent. Choose Review before starting while it plans to check the assignments first, or turn off Split work into subtasks in Project settings to always review plans. One parent keeps planning, worker attempts, usage, and the combined result together.',
           'While subtasks run, agents can read each other’s in-progress files, copy a finished interface into their own workspace, and hear right away when their changes stop merging. An agent that finds separable work can split it off to a new parallel worker, and Split this task asks a running agent to do the same. Each piece keeps separate file ownership and joins the combined review.',
-          'Parallel plans record task scopes, dependencies, and a concurrency limit. The coordinator reserves work before launching an agent; dependencies wait for the changes they need to be integrated.',
+          '[Parallel plans](/parallel-coding-agents/) record task scopes, dependencies, and a concurrency limit. The coordinator reserves work before launching an agent; dependencies wait for the changes they need to be integrated.',
           'New managed plans combine groups of completed assignments while other work continues. Shared contracts have one owner or an explicit dependency. Jackalope resolves overlaps in a separate workspace and checks the combined result before handing it to dependent work or final review.',
           'Plan, Work, Check and Review keep the complete result, preview and checks together. Work details expands individual assignments. A failed check can receive up to two automatic repair attempts; a correction authorizes a fresh allowance. If more help is needed, the task keeps the result and offers a correction or another repair. Provider failures and interrupted processes require explicit recovery.',
           'Pause dispatch holds pending work; Stop task also stops active attempts. Restart leaves dispatch paused. Review the final outcomes and combined changes before Apply changes to the target branch. Cleanup follows your selected apply option; the app does not push the changes.',
@@ -697,8 +697,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Cloudflare and fill in Cloudflare Artifacts.',
         ],
         steps: [
-          'Copy your account ID from the Cloudflare dashboard.',
-          'Create an API token with the Account → Artifacts → Edit permission.',
+          'Choose Connect Cloudflare and approve Jackalope in your browser, or choose Use an API token.',
+          'For a token, create one with the Account → Artifacts → Edit permission and paste it. Jackalope finds the account it covers, or asks which one when it covers several.',
           'Choose a namespace for Jackalope repositories, such as jackalope.',
           'Optionally restrict data to the EU or US. This applies only when Jackalope creates the namespace and cannot be changed later.',
           'Choose Connect. Jackalope checks the token with Cloudflare before saving it in your system’s protected storage.',
@@ -709,7 +709,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I create a new project on Artifacts or move an existing one?',
         paragraphs: [
           'In project setup, choose Create on Artifacts. Jackalope creates the repository, a local project folder with Git, and pushes the first commit.',
-          'For an existing repository, open Project settings → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local.',
+          'For an existing repository, open Project settings → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local. A repository without commits offers Create first commit, which commits your files as your Git identity after showing how many there are.',
         ],
         callout: {
           kind: 'note',

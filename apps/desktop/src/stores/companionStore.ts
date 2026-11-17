@@ -23,6 +23,9 @@ function readSaved(): string[] {
 export const useCompanionStore = create<{
   sources: Record<string, CompanionNotice[]>;
   readIds: string[];
+  /** The Work list is on screen, where needs-you work is already listed. */
+  onWorkList: boolean;
+  setOnWorkList: (onWorkList: boolean) => void;
   publish: (source: string, notices: CompanionNotice[]) => void;
   remove: (source: string) => void;
   markRead: (ids: string[]) => void;
@@ -30,6 +33,8 @@ export const useCompanionStore = create<{
 }>()((set) => ({
   sources: {},
   readIds: readSaved(),
+  onWorkList: false,
+  setOnWorkList: (onWorkList) => set({ onWorkList }),
   markUnread: (id) =>
     set((state) => {
       const readIds = state.readIds.filter((saved) => saved !== id);

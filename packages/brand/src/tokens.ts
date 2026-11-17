@@ -15,6 +15,15 @@ export interface ThemePalette {
 
 export const PRESET_THEMES: ThemePalette[] = [
   {
+    id: 'jackalope-violet',
+    name: 'Jackalope Violet',
+    accentHue: 258,
+    accentSat: 90,
+    accentLight: 66,
+    accentHex: '#8b5cf6',
+    isDark: true,
+  },
+  {
     id: 'mojave-sunset',
     name: 'Mojave Sunset',
     accentHue: 24,
@@ -70,7 +79,18 @@ export const PRESET_THEMES: ThemePalette[] = [
   },
 ];
 
-export const DEFAULT_THEME = PRESET_THEMES[2];
+export const DEFAULT_THEME = PRESET_THEMES[0];
+
+/** A preset's colors with `current`'s appearance, atmosphere and harmony kept. */
+export function withPreset(preset: ThemePalette, current: ThemePalette): ThemePalette {
+  return {
+    ...preset,
+    isDark: current.isDark,
+    appearance: current.appearance,
+    atmosphere: current.atmosphere,
+    harmony: current.harmony,
+  };
+}
 
 export function paletteColors(theme: ThemePalette) {
   const offsets =
@@ -124,6 +144,11 @@ export function themeTokens(theme: ThemePalette) {
     `hsl(${accentHue} ${saturation}% ${light}%)`;
   set('color-scheme', dark ? 'dark' : 'light');
   set('--brand-brightness', dark ? '1' : '0.2');
+  // The moulded lip and corner sheen of plastic controls. Set here per scheme rather than
+  // with light-dark() in CSS: build tools rewrite that function into a pair of toggles this
+  // inline color-scheme never switches, which leaves both colours in the value.
+  set('--plastic-lip', `rgb(255 255 255 / ${dark ? 0.1 : 0.5})`);
+  set('--plastic-sheen', `rgb(255 255 255 / ${dark ? 0.06 : 0.26})`);
 
   set('--accent-h', `${accentHue}`);
   set('--accent-s', `${accentSat}%`);

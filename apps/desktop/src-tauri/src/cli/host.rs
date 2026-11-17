@@ -2,7 +2,7 @@
 
 use crate::connection::Connection;
 use crate::prefs;
-use crate::protocol::{attach, profile_root};
+use crate::protocol::{attach, ProfilePaths};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -22,7 +22,7 @@ const PREFERENCES: &str = "cli.json";
 /// releases immediately, and the app retries its lock briefly, so probing never
 /// stops an app from starting.
 fn starting() -> bool {
-    let Some(path) = profile_root().map(|root| root.join("task-runs-v1/runtime.lock")) else {
+    let Some(path) = ProfilePaths::active().map(|paths| paths.runtime_lock()) else {
         return false;
     };
     let Ok(file) = std::fs::File::open(path) else {

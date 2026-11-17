@@ -1,4 +1,4 @@
-import { Checkbox, RefreshIcon } from '@jackalope/ui';
+import { Button, Checkbox, RefreshIcon, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, CheckCircle2, Cpu, KeyRound, Server, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,9 +9,8 @@ import {
   importDetectedKey,
   type LocalLlmEndpoint,
 } from '../../lib/local-detection';
-import { Button } from '../ui/button';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import './detected-keys.css';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function DetectedKeysModal({
   open,
@@ -39,10 +38,10 @@ export function DetectedKeysModal({
       const [foundKeys, foundEndpoints] = await Promise.all([detectEnvKeys(), detectLocalLlms()]);
       setKeys(foundKeys);
       setEndpoints(foundEndpoints);
-      // Strictly maintain: keys start unselected
+      // Keys start unselected so nothing is imported without a choice.
       setSelectedKeys(new Set());
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }
@@ -76,12 +75,16 @@ export function DetectedKeysModal({
         await importDetectedKey(keyName);
         importedCount += 1;
       }
-      setSuccessMessage(`Successfully imported ${importedCount} key(s) into Jackalope profiles!`);
+      setSuccessMessage(
+        importedCount === 1
+          ? 'Imported 1 key as a new account.'
+          : `Imported ${importedCount} keys as new accounts.`,
+      );
       setSelectedKeys(new Set());
       await scan();
       onImported?.();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setImporting(false);
     }
@@ -100,7 +103,7 @@ export function DetectedKeysModal({
             <div className="flex items-center gap-2">
               <KeyRound size={20} className="text-[var(--color-accent-ink)]" />
               <Dialog.Title className="text-lg font-semibold text-[var(--color-text-primary)]">
-                Local Models & Ambient Key Discovery
+                Detected keys and local models
               </Dialog.Title>
             </div>
             <Dialog.Close asChild>
@@ -115,8 +118,7 @@ export function DetectedKeysModal({
           </div>
 
           <p id="detected-keys-description" className="sr-only">
-            Discovery hub for local LLM inference engines and environment API keys with privacy
-            guarantees.
+            API keys in your environment and model servers running on this computer.
           </p>
 
           <div className="my-4 space-y-4">
@@ -124,15 +126,9 @@ export function DetectedKeysModal({
             <div className="privacy-guarantee-banner p-3 rounded-lg border flex gap-3 items-start bg-[var(--color-success)]/10 border-[var(--color-success)]/30 text-[var(--color-text-primary)]">
               <ShieldCheck size={22} className="text-[var(--color-success)] shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
-                <strong className="block font-medium text-[var(--color-success)]">
-                  Local-Only Privacy Guarantee
-                </strong>
                 <p className="text-[var(--color-text-secondary)] leading-relaxed">
-                  Jackalope inspects environment variables and local ports purely in-memory on your
-                  machine.
-                  <strong> Keys are NEVER transmitted to any external server or telemetry.</strong>{' '}
-                  No keys are added to Jackalope unless you explicitly check them and click import
-                  below.
+                  This scan runs on your computer and sends keys nowhere. Nothing is added until you
+                  select a key and import it.
                 </p>
               </div>
             </div>
@@ -155,7 +151,7 @@ export function DetectedKeysModal({
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-medium flex items-center gap-2 text-[var(--color-text-primary)]">
                   <Server size={15} />
-                  Local Inference Servers
+                  Local model servers
                 </h4>
                 <Button
                   variant="ghost"
@@ -197,8 +193,8 @@ export function DetectedKeysModal({
                       {ep.online ? (
                         <span className="text-[var(--color-success)] font-medium">
                           {ep.models.length > 0
-                            ? `${ep.models.length} model(s) loaded`
-                            : 'Ready for connection'}
+                            ? `${ep.models.length} ${ep.models.length === 1 ? 'model' : 'models'} loaded`
+                            : 'Running'}
                         </span>
                       ) : (
                         <span className="text-[var(--color-text-muted)]">Not running</span>
@@ -232,7 +228,7 @@ export function DetectedKeysModal({
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-medium flex items-center gap-2 text-[var(--color-text-primary)]">
                   <Cpu size={15} />
-                  Detected System Keys ({keys.length})
+                  API keys in your environment ({keys.length})
                 </h4>
                 <span className="text-xs text-[var(--color-text-muted)]">
                   {selectedKeys.size} selected
@@ -242,8 +238,8 @@ export function DetectedKeysModal({
               {keys.length === 0 ? (
                 <div className="p-4 text-center rounded-lg border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
                   {loading
-                    ? 'Scanning environment variables...'
-                    : 'No AI API keys found in system environment variables (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY).'}
+                    ? 'Scanning environment variables…'
+                    : 'No API keys found, such as OPENAI_API_KEY or ANTHROPIC_API_KEY.'}
                 </div>
               ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -286,10 +282,6 @@ export function DetectedKeysModal({
                             </p>
                           </div>
                         </div>
-
-                        <span className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">
-                          {k.source}
-                        </span>
                       </label>
                     );
                   })}
@@ -314,7 +306,7 @@ export function DetectedKeysModal({
               loadingLabel="Importing…"
             >
               <Sparkles size={14} />
-              Import Selected ({selectedKeys.size})
+              Import selected ({selectedKeys.size})
             </Button>
           </div>
         </Dialog.Content>

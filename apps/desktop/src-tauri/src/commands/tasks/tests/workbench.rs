@@ -37,7 +37,7 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     run.task_id = uuid::Uuid::new_v4().to_string();
     run.workspace = workspace.to_string_lossy().into_owned();
     run.project_path = run.workspace.clone();
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     runtime.save(&run).unwrap();
     drop(runtime);
@@ -189,7 +189,7 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     assert_eq!(status()["running"], true);
     drop(cleanup);
     runtime
-        .update_checked(&run.id, |run| run.status = "interrupted".into())
+        .update_checked(&run.id, |run| run.status = RunStatus::Interrupted)
         .unwrap();
     assert!(work_terminal::start(&runtime, &run.id).is_err());
 }

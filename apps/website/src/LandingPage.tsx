@@ -1,4 +1,5 @@
 import { AgentCharacter, type AgentGaze } from '@jackalope/brand/agent-character';
+import { AsciiMark } from '@jackalope/brand/ascii-mark';
 import { PROVIDER_MARKS } from '@jackalope/brand/provider-marks';
 import { Disclosure, DisclosureSummary, GitHubIcon } from '@jackalope/ui';
 import { ArrowDownToLine, ArrowRight, Check, Laptop, MousePointer2 } from 'lucide-react';
@@ -17,7 +18,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AsciiMark } from './AsciiMark';
 import { GITHUB_URL } from './community';
 import { TerminalDemo } from './TerminalDemo';
 import './landing.css';

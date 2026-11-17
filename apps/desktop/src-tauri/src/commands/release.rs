@@ -10,6 +10,14 @@ use tauri_plugin_updater::UpdaterExt;
 #[cfg(all(windows, feature = "store"))]
 mod store;
 
+/// Lets Windows reopen the Store build after it applies an update.
+pub fn register_update_restart() {
+    #[cfg(all(windows, feature = "store"))]
+    if store::configured() {
+        store::restart_after_updates();
+    }
+}
+
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 pub fn installing() -> bool {
     INSTALLING.load(Ordering::SeqCst)
@@ -101,6 +109,18 @@ fn updater(
         .build()
         .map_err(|_| "Update settings unavailable.".into())
 }
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::release::app_diagnostics,
+            commands::release::app_release_status,
+            commands::release::app_install_update,
+            commands::release::app_download_update,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn app_release_status(
     app: AppHandle,
@@ -186,9 +206,11 @@ pub async fn app_install_update(
         if installing() {
             return Err("An update is already being installed.".into());
         }
-        if runtime.integration_runs()?.iter().any(|r| {
-            ["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-        }) {
+        if runtime
+            .integration_runs()?
+            .iter()
+            .any(|r| r.status.is_live())
+        {
             return Err(
                 "Finish active tasks and resolve interrupted work before installing an update."
                     .into(),
@@ -322,18 +344,16 @@ pub fn app_diagnostics(runtime: State<'_, TaskRuntime>) -> Result<serde_json::Va
 }
 
 fn diagnostics(runs: &[super::tasks::TaskRun]) -> serde_json::Value {
-    let count = |states: &[&str]| {
-        runs.iter()
-            .filter(|r| states.contains(&r.status.as_str()))
-            .count()
-    };
+    use super::tasks::RunStatus;
+    let count =
+        |matches: fn(&RunStatus) -> bool| runs.iter().filter(|r| matches(&r.status)).count();
     let checks = runs.iter().filter(|r| r.verification.is_some()).count();
     serde_json::json!({
         "schemaVersion": 1, "appVersion": env!("CARGO_PKG_VERSION"),
         "os": std::env::consts::OS, "architecture": std::env::consts::ARCH,
-        "attempts": runs.len(), "active": count(&["starting", "running", "stopping"]),
-        "readyToReview": count(&["review"]), "reviewed": count(&["reviewed"]),
-        "failed": count(&["failed"]), "stopped": count(&["stopped"]), "interrupted": count(&["interrupted"]),
+        "attempts": runs.len(), "active": count(RunStatus::is_active),
+        "readyToReview": count(|s| *s == RunStatus::Review), "reviewed": count(|s| *s == RunStatus::Reviewed),
+        "failed": count(|s| *s == RunStatus::Failed), "stopped": count(|s| *s == RunStatus::Stopped), "interrupted": count(|s| *s == RunStatus::Interrupted),
         "historySaveFailures": runs.iter().filter(|r| r.persistence_error.is_some()).count(),
         "checksRecorded": checks, "checksPassed": runs.iter().filter(|r| r.verification.as_ref().is_some_and(|v| v.result.success && v.tree.is_some())).count(),
         "coverage": "Local retained attempts only. Counts are not user satisfaction or accepted-change measurements."
@@ -344,16 +364,17 @@ fn diagnostics(runs: &[super::tasks::TaskRun]) -> serde_json::Value {
 mod tests {
     use super::*;
     #[test]
-    fn diagnostics_contain_only_allowlisted_summary_fields() {
-        let report = diagnostics(&[]);
-        let keys: std::collections::HashSet<_> = report
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect();
-        assert_eq!(keys.len(), 15);
-        assert!(!report.to_string().contains("projectPath"));
-        assert_eq!(report["attempts"], 0);
+    fn diagnostics_count_runs_without_exposing_their_content() {
+        let run = super::super::tasks::TaskRun {
+            project_path: "/private/repository".into(),
+            prompt: "secret prompt".into(),
+            status: super::super::tasks::RunStatus::Failed,
+            ..Default::default()
+        };
+        let report = diagnostics(&[run]);
+        assert_eq!(report["attempts"], 1);
+        assert_eq!(report["failed"], 1);
+        let text = report.to_string();
+        assert!(!text.contains("/private/repository") && !text.contains("secret prompt"));
     }
 }

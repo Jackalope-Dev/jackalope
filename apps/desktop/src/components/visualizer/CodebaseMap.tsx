@@ -1,20 +1,14 @@
+import { Button, EmptyState, LoadingState } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { lazy, Suspense } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { LoadingState } from '../ui/LoadingState';
+import { useActiveProject } from '../../stores/projectStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 
 const CodebaseExplorer = lazy(() => import('./CodebaseExplorer'));
 
 export function CodebaseMap({ onOpenProject }: { onOpenProject: () => void }) {
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const project = projects.find((project) => project.id === activeProjectId);
+  const project = useActiveProject();
   return (
     <WorkspacePage>
       {project ? (

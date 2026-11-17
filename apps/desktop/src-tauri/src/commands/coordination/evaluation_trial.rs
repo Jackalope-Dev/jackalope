@@ -1,20 +1,8 @@
 use super::*;
+use crate::commands::repo::{self, Policy};
+use crate::commands::tasks::RunStatus;
 use serde_json::{json, Value};
 use std::{path::Path, time::Instant};
-
-pub(super) fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
-    let output = crate::commands::git_command::command(
-        repo,
-        args,
-        crate::commands::git_command::Policy::Inherited,
-    )
-    .output()
-    .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().into())
-}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Executes installed agents on disposable evaluation cases; requires JACKALOPE_EVAL_CASE and JACKALOPE_EVAL_MODE"]
@@ -53,15 +41,28 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     for (name, content) in case["files"].as_object().unwrap() {
         std::fs::write(repo.join(name), content.as_str().unwrap())?;
     }
-    git(&repo, &["init", "-b", "main"])?;
-    git(&repo, &["config", "user.name", "Evaluation fixture"])?;
-    git(
+    repo::git(&repo, &["init", "-b", "main"], Policy::Inherited)?;
+    repo::git(
+        &repo,
+        &["config", "user.name", "Evaluation fixture"],
+        Policy::Inherited,
+    )?;
+    repo::git(
         &repo,
         &["config", "user.email", "evaluation@example.invalid"],
+        Policy::Inherited,
     )?;
-    git(&repo, &["config", "commit.gpgsign", "false"])?;
-    git(&repo, &["add", "."])?;
-    git(&repo, &["commit", "-m", "Evaluation fixture"])?;
+    repo::git(
+        &repo,
+        &["config", "commit.gpgsign", "false"],
+        Policy::Inherited,
+    )?;
+    repo::git(&repo, &["add", "."], Policy::Inherited)?;
+    repo::git(
+        &repo,
+        &["commit", "-m", "Evaluation fixture"],
+        Policy::Inherited,
+    )?;
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
     let cleanup = EvaluationOwner {
@@ -120,7 +121,7 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
             for item in &view.items {
                 if let Some(run) = runs
                     .iter()
-                    .find(|r| Some(&r.id) == item.run_id.as_ref() && r.status == "review")
+                    .find(|r| Some(&r.id) == item.run_id.as_ref() && r.status == RunStatus::Review)
                 {
                     if !integrated.contains(&run.id) {
                         crate::commands::integration::evaluation_integrate(
@@ -132,7 +133,8 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        if view.items.iter().any(|i| i.error.is_some()) || runs.iter().any(|r| r.status == "failed")
+        if view.items.iter().any(|i| i.error.is_some())
+            || runs.iter().any(|r| r.status == RunStatus::Failed)
         {
             break;
         }
@@ -141,7 +143,7 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
                 .iter()
                 .find(|i| &i.id == id)
                 .and_then(|i| i.run_id.as_ref())
-                .is_some_and(|id| runs.iter().any(|r| &r.id == id && !active(&r.status)))
+                .is_some_and(|id| runs.iter().any(|r| &r.id == id && !r.status.is_active()))
         }) {
             break;
         }
@@ -152,14 +154,14 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     if runtime
         .integration_runs()?
         .iter()
-        .any(|run| active(&run.status))
+        .any(|run| run.status.is_active())
     {
         runtime.stop_all();
         let stopping = Instant::now();
         while runtime
             .integration_runs()?
             .iter()
-            .any(|run| active(&run.status))
+            .any(|run| run.status.is_active())
             && stopping.elapsed().as_secs() < 15
         {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -172,11 +174,7 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .find(|item| &item.id == id)
             .and_then(|item| item.run_id.as_ref())
-            .is_some_and(|id| {
-                runs.iter().any(|run| {
-                    &run.id == id && ["review", "reviewed"].contains(&run.status.as_str())
-                })
-            })
+            .is_some_and(|id| runs.iter().any(|run| &run.id == id && run.status.is_done()))
     });
     let final_run = ids
         .last()
@@ -275,7 +273,7 @@ Do not access the network, install dependencies, edit other worktrees, or commit
                 .items
                 .iter()
                 .any(|i| i.feature_id.as_deref() == Some(&task_id) && i.error.is_some())
-            || runs.iter().any(|r| r.status == "failed")
+            || runs.iter().any(|r| r.status == RunStatus::Failed)
         {
             break None;
         }
@@ -286,7 +284,7 @@ Do not access the network, install dependencies, edit other worktrees, or commit
             .and_then(|id| view.items.iter().find(|item| &item.id == id))
             .and_then(|item| item.run_id.as_ref())
             .and_then(|id| runs.iter().find(|run| &run.id == id));
-        if let Some(run) = final_run.filter(|run| !active(&run.status) && !run.finishing) {
+        if let Some(run) = final_run.filter(|run| !run.status.is_active() && !run.finishing) {
             break Some(run.id.clone());
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -298,8 +296,7 @@ Do not access the network, install dependencies, edit other worktrees, or commit
     let view = service.view()?;
     let task = view.managed_tasks.iter().find(|task| task.id == task_id);
     let final_run = final_run_id.and_then(|id| runs.iter().find(|run| run.id == id));
-    let completed =
-        final_run.is_some_and(|run| ["review", "reviewed"].contains(&run.status.as_str()));
+    let completed = final_run.is_some_and(|run| run.status.is_done());
     std::fs::write(root.join("oracle.cjs"), case["oracle"].as_str().unwrap())?;
     let oracle = if let Some(run) = final_run.filter(|_| completed && !budget_stopped) {
         let mut command = std::process::Command::new("node");

@@ -1,6 +1,6 @@
 import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
+import { invokeNative } from '../native/transport.ts';
 import { parseRepoTodos, TODO_FILES } from '../repo-todos.ts';
-import { nativeTask } from '../task-runtime.ts';
 import type { ProjectDefaults } from './project-defaults.ts';
 import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types.ts';
 
@@ -126,7 +126,7 @@ export async function discoverCodebaseContext(
   const read =
     fileReader ??
     ((relativePath: string) =>
-      nativeTask<string | null>('task_read_context', { projectPath, relativePath }));
+      invokeNative<string | null>('task_read_context', { projectPath, relativePath }));
 
   // 1. Inspect package.json
   const pkgContent = await read('package.json');
@@ -194,7 +194,7 @@ export async function discoverCodebaseContext(
   const metaAgent = useAgentConfigStore.getState().defaultMetaAgent;
   const projectDefaults = fileReader
     ? undefined
-    : await nativeTask<ProjectDefaults>('project_defaults', { path: projectPath }).catch(
+    : await invokeNative<ProjectDefaults>('project_defaults', { path: projectPath }).catch(
         () => undefined,
       );
   const duration = Date.now() - startTime;

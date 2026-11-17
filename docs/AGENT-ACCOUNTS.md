@@ -123,6 +123,47 @@ keys; short keys are fully masked. CLI-owned sign-in/configuration remains under
 provider's storage contract. Jackalope-owned MCP configuration is protected separately;
 see [MCP discovery](MCP-DISCOVERY.md).
 
+## Project secrets
+
+Project settings → **Secrets** gives a project's task agents environment variables such
+as `HIGGSFIELD_API_KEY`. Names use capital letters, digits and underscores (at most
+128 characters, starting with a letter or underscore); names Jackalope, agent sign-ins
+or the system own are refused, including `JACKALOPE_*`, `GIT_*`, `LD_*`, `DYLD_*`,
+`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `CODEX_API_KEY`, the
+agents' profile variables, `PATH` and `HOME`. A project holds at most 64 secrets of up
+to 16,000 characters each. Each has **Available to**: all agents (the default), agents
+on this device, or agents on the project's computer.
+
+`commands/project_secrets.rs` keeps each project's secrets in one protected record
+(`project-secrets/<project>.bin` in the task profile, through the same Windows DPAPI,
+macOS Keychain or Linux Secret Service storage as other Jackalope-owned keys), never in
+project JSON, saved task requests or task history. The renderer receives names,
+availability and save times only; a saved value can be replaced or removed but is never
+shown again. Removing the last secret removes the record.
+
+Secrets go only into the environment of task agent processes: local attempts, including
+persistent Claude Code sessions, and [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+For an agent on a computer, a selected stdio connection that runs there can also use a
+secret available to computers as `${NAME}` in its arguments or environment
+([details](BOT-COMPUTERS.md#agents-on-a-computer)).
+Workspace preparation, checks, previews and deploy commands do not receive them. A
+secret replaces an inherited variable of the same name. The attempt's activity names the
+secrets the agent received. An unreadable record fails the attempt with the storage error
+instead of starting the agent without them. Anything an agent can read it can use or
+leak, so prefer keys with spending limits.
+
+`commands/redaction.rs` keeps the values an attempt gives its agent out of that
+attempt's record: project secrets and every credential variable Jackalope sets
+(names ending in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD`, such as a managed
+account's provider key or the bridge token). Values of at least eight characters
+are replaced with `[redacted]` as written, JSON-escaped, base64 and URL-encoded in
+the result, activity, diagnostics, errors, questions, decisions, checks and
+streaming text before they are saved, shown or exported. Identifiers, statuses,
+timestamps and the person's own prompt are kept. The values live only in memory for
+the attempt. Redaction protects the record, not the value: the agent can still use
+or send what it can read, a value it transforms some other way is not recognized,
+and the agent CLI's own session files are outside Jackalope's record.
+
 ## Verification
 
 Automated regression coverage and isolated native trials are described in

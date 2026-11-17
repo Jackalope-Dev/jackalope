@@ -25,8 +25,9 @@ match future task instructions. Task-derived entries retain a link to the source
 attempt. Manual entries stay under your control. Jackalope also derives bounded local lessons
 from saved user feedback and repository evidence, and keeps
 [learned lessons](#learned-lessons) from conversations and finished work. It does not
-rewrite repository instructions or make background model calls unless you turn on
-[lesson export or agent reflection](#optional-extensions) for a project.
+rewrite repository instructions unless you turn on
+[lesson export](#optional-extensions) for a project. Its only background model calls
+are [agent reflection](#optional-extensions), which is on by default and bounded.
 
 The composer previews matching lessons under **Saved project context**. Skip an
 individual lesson or disable matching for that task. The native launcher applies
@@ -286,8 +287,8 @@ changing a default.
 ### Optional extensions
 
 These are per-project settings in Project settings and the terminal's `/settings`.
-All are off by default except sync inclusion, which only applies once lesson sync is
-on for the desktop.
+Agent reflection is on by default, as is sync inclusion, which only applies once lesson
+sync is on for the desktop; export is off.
 
 **Reflect with an agent** also shows finished work to the project's default agent
 (the routing agent and account configured in Agents) once the task or conversation

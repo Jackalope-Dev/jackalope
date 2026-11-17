@@ -188,9 +188,13 @@ pub struct QueueView {
     pub messages: Vec<CoordinationMessage>,
     pub enabled_projects: Vec<String>,
     pub concurrency: usize,
+    /// Agents that may run at once on project computers.
+    pub remote_concurrency: usize,
     pub bridge_url: Option<String>,
     pub bridge_error: Option<String>,
     pub merged_run_ids: Vec<String>,
+    /// Applied integrations whose merge left the target branch; their dependents wait.
+    pub paused_integrations: Vec<crate::commands::integration::PausedIntegration>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, rmcp::schemars::JsonSchema)]

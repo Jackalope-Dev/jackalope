@@ -10,33 +10,29 @@ Desktop delivery is implemented but contributor builds have no reporting endpoin
 Hosting the service does not activate installed clients. See [BETA-MONITORING.md](BETA-MONITORING.md). Follow [RELEASE.md](RELEASE.md) for installer signing and
 installed-app acceptance, and [BACKEND.md](BACKEND.md) for the later remote backend.
 
-## GitHub deployment environments
+## Cloudflare Workers Builds deployment
 
-The optional Actions deployment jobs use environments separate from desktop releases.
-Run `pnpm release:setup --apply` to configure `service-staging` for beta and
-`service-production` for master. Production deployments require maintainer approval;
-administrators cannot bypass it. These environments must
-not contain Store, Apple or desktop updater signing credentials.
+Cloudflare Workers Builds, not GitHub Actions, deploys this service. Every push to
+`master` deploys `jackalope-service-production` (this app, production) and
+`jackalope-website` (the marketing site). Every push to `beta` deploys
+`jackalope-service-staging` (this app, staging). There is no GitHub Actions deploy
+workflow; Actions only runs verification checks on pushes and pull requests.
 
-When enabling Actions deployments, add `CLOUDFLARE_API_TOKEN` to each service
-environment, scoped to the intended account and resources. Keep
-`CLOUDFLARE_DEPLOY_ENABLED=false` when Cloudflare Git builds own deployment; their
-build tokens stay configured in Cloudflare and need no duplicate GitHub secret.
-Changing GitHub environments does not change those native Cloudflare integrations
-or their credentials.
+Each Worker's own build settings in the Cloudflare dashboard hold its build
+variables (`COMMUNITY_CONFIG`, `INGESTION_ENABLED`, `ACCESS_AUDIENCE_LIST`,
+`OPEN_SIGNUP`, and the rest) and its deploy credentials; set or rotate those there,
+not in a GitHub secret or environment. The production build applies the server's
+D1 migrations (`wrangler d1 migrations apply DB --remote --env production`) before
+`wrangler deploy`, then verifies `/readyz`; staging follows the same shape with
+`--env staging`.
 
 The launch infrastructure check reads public API readiness and website responses.
 It needs no environment approval, Cloudflare token or deploy hook, and does not
 write to R2 or trigger deployments. These checks do not establish deployment
 permissions, Store certification or installed-app update acceptance.
 
-When moving deployment ownership to Actions from shared `cloud-beta`/`cloud-stable`
-environments, enter the service credentials again from private operator storage;
-GitHub does not return existing secret values. Confirm the intended service jobs
-work, then remove obsolete Cloudflare credentials from desktop release environments.
-Keep publication/deployment gates off until the corresponding setup and acceptance
-checks pass. The disabled legacy R2 publisher separately requires its publication
-token and `CLOUDFLARE_WEBSITE_DEPLOY_HOOK`; do not enable it for Store/Cloud releases.
+The disabled legacy R2 publisher separately requires its publication token and
+`CLOUDFLARE_WEBSITE_DEPLOY_HOOK`; do not enable it for Store/Cloud releases.
 
 ## 1. Configure an independent deployment
 

@@ -1,6 +1,23 @@
-import { RefreshIcon } from '@jackalope/ui';
+import { describeError } from '@jackalope/contracts/errors';
+import {
+  Button,
+  ChoiceCards,
+  ConfirmDialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  LoadingState,
+  RefreshIcon,
+  Select,
+  SelectItem,
+  Switch,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Circle, KeyRound, LogIn, Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -15,25 +32,16 @@ import {
   setAgentProfileTag,
   setConfigDir,
 } from '../../lib/agent-profiles';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   accountProfiles,
   CLI_ACCOUNT_ID,
   profileId,
   useAgentAccountsStore,
 } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { ActionError } from '../ui/ActionError';
 import { AgentKeySignIn } from './AgentKeySignIn';
 import { DetectedKeysModal } from './DetectedKeysModal';
 
@@ -94,7 +102,7 @@ function EditAccount({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent {...dialogFocus} className="confirm-action-dialog agent-account-edit">
+      <DialogContent {...dialogFocus} layer="confirm" className="agent-account-edit">
         <DialogHeader
           title="Edit account"
           description={<>Choose a name, label and group to keep your accounts organized.</>}
@@ -113,7 +121,7 @@ function EditAccount({
               }
               onClose();
             } catch (e) {
-              setError(String(e));
+              setError(describeError(e));
             } finally {
               setBusy(false);
             }
@@ -159,7 +167,7 @@ function EditAccount({
               the agent's default path when empty.
             </p>
           </details>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
               Cancel
@@ -202,7 +210,7 @@ export function AgentAccounts({
     const before = project.preferences;
     change();
     try {
-      await syncAgentConfig();
+      await agentPolicySaved();
     } catch (cause) {
       useProjectStore.getState().updateProject(project.id, { preferences: before });
       throw cause;
@@ -228,7 +236,7 @@ export function AgentAccounts({
   const [group, setGroup] = useState<AgentProfile['group']>('work');
   const [busy, setBusy] = useState('');
   const [keyModalOpen, setKeyModalOpen] = useState(false);
-  const [connectionMethod, setConnectionMethod] = useState('signIn');
+  const [connectionMethod, setConnectionMethod] = useState<'signIn' | 'apiKey'>('signIn');
   const statuses = accountData?.statuses ?? {};
   const [signIn, setSignIn] = useState<AgentProfile>();
   const [signInWithKey, setSignInWithKey] = useState(false);
@@ -251,7 +259,7 @@ export function AgentAccounts({
     try {
       await run();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setBusy('');
     }
@@ -328,15 +336,26 @@ export function AgentAccounts({
           </p>
         </div>
         {agentId === 'opencode' && (
-          <Select
-            aria-label="OpenCode connection method"
+          <ChoiceCards
+            label="OpenCode connection method"
             value={connectionMethod}
             onValueChange={setConnectionMethod}
             disabled={locked}
-          >
-            <SelectItem value="signIn">Provider sign-in</SelectItem>
-            <SelectItem value="apiKey">Provider API key (including DeepSeek)</SelectItem>
-          </Select>
+            options={[
+              {
+                value: 'signIn',
+                title: 'Sign in',
+                description: "Use the provider's own sign-in in a browser.",
+                icon: <LogIn size={18} />,
+              },
+              {
+                value: 'apiKey',
+                title: 'API key',
+                description: 'Paste a provider key, including DeepSeek. Billed by the provider.',
+                icon: <KeyRound size={18} />,
+              },
+            ]}
+          />
         )}
         <AccountGroup
           value={group}
@@ -448,7 +467,7 @@ export function AgentAccounts({
                           },
                         });
                         try {
-                          await syncAgentConfig();
+                          await agentPolicySaved();
                         } catch (cause) {
                           useAgentConfigStore.setState({ disabledAccounts: before });
                           throw cause;
@@ -573,7 +592,7 @@ export function AgentAccounts({
                   <Pencil size={16} />
                 </Button>
                 {!existing && (
-                  <ConfirmAction
+                  <ConfirmDialog
                     title="Remove account?"
                     description={`Remove ${profile.name} and its sign-in data? Projects and existing tasks using it will need attention. The normal CLI sign-in is kept.`}
                     label="Remove account"

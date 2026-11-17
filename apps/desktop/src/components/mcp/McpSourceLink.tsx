@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { safeMarketplaceUrl } from './marketplace-info';
 
 export function SourceLink({ url, children }: { url?: string | null; children: ReactNode }) {

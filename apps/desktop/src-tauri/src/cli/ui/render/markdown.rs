@@ -126,6 +126,20 @@ fn emphasis_end(after: &str, marker: char) -> Option<usize> {
         })
 }
 
+/// The `:line` or `:line:column` a file link ends with, such as `:9`.
+fn line_suffix(url: &str) -> Option<&str> {
+    let digits = |part: &str| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit());
+    let (rest, last) = url.rsplit_once(':')?;
+    if !digits(last) {
+        return None;
+    }
+    let start = match rest.rsplit_once(':') {
+        Some((_, line)) if digits(line) => rest.len() - line.len() - 1,
+        _ => rest.len(),
+    };
+    Some(&url[start..])
+}
+
 /// `[text](url)` at the start of `rest`, as (text, url, bytes consumed).
 fn link(rest: &str) -> Option<(&str, &str, usize)> {
     let close = rest.find("](")?;
@@ -205,7 +219,13 @@ pub fn inline(text: &str) -> Vec<Span<'static>> {
                     label.to_string(),
                     accent.add_modifier(Modifier::UNDERLINED),
                 ));
-                if url != label {
+                if !url.contains("://") {
+                    // A file in the workspace: its label already names it, and
+                    // its absolute path only says which worktree it is in.
+                    if let Some(line) = line_suffix(url).filter(|line| !label.ends_with(line)) {
+                        spans.push(Span::styled(line.to_string(), muted));
+                    }
+                } else if url != label {
                     spans.push(Span::styled(format!(" ({url})"), muted));
                 }
                 rest = &rest[consumed..];
@@ -273,6 +293,13 @@ mod tests {
             "read the guide (https://x.dev/guide) first"
         );
         assert_eq!(shown("[x](x)"), "x");
+        assert_eq!(
+            shown("Fixed [src/discounts.js](/work/.worktrees/fix/src/discounts.js:9) today"),
+            "Fixed src/discounts.js:9 today"
+        );
+        assert_eq!(shown("see [a.rs](/w/a.rs:3:7)"), "see a.rs:3:7");
+        assert_eq!(shown("see [a.rs:3](/w/a.rs:3)"), "see a.rs:3");
+        assert_eq!(shown("see [a.rs](src/a.rs)"), "see a.rs");
         assert_eq!(shown("[not a link]"), "[not a link]");
     }
 

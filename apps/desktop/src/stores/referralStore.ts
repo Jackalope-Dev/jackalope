@@ -1,6 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 
 interface ReferralInvite {
   id: string;
@@ -52,7 +53,7 @@ export const useReferralStore = create<{
     }
     const version = generation;
     set({ loading: true, error: '' });
-    pending = nativeTask<ReferralView>('app_account_referrals')
+    pending = invokeNative<ReferralView>('app_account_referrals')
       .then((referrals) => {
         if (!referrals || !Number.isInteger(referrals.remaining) || referrals.remaining < 0)
           throw new Error('Invitation allowance unavailable.');
@@ -60,7 +61,7 @@ export const useReferralStore = create<{
       })
       .catch((cause) => {
         if (version === generation)
-          set({ referrals: null, error: String(cause), checkedAt: Date.now() });
+          set({ referrals: null, error: describeError(cause), checkedAt: Date.now() });
       })
       .finally(() => {
         if (version === generation) {

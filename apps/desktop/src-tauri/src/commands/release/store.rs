@@ -11,6 +11,21 @@ pub fn configured() -> bool {
     Package::Current().is_ok()
 }
 
+/// Windows closes a packaged app to apply its Store update and reopens only apps that
+/// registered for restart. The flags limit this to updates: no relaunch after a crash,
+/// hang or reboot.
+pub fn restart_after_updates() {
+    use windows_sys::Win32::System::Recovery::{
+        RegisterApplicationRestart, RESTART_NO_CRASH, RESTART_NO_HANG, RESTART_NO_REBOOT,
+    };
+    unsafe {
+        RegisterApplicationRestart(
+            std::ptr::null(),
+            RESTART_NO_CRASH | RESTART_NO_HANG | RESTART_NO_REBOOT,
+        );
+    }
+}
+
 async fn on_main<T: Send + 'static>(
     app: &AppHandle,
     action: impl FnOnce(StoreContext) -> windows::core::Result<T> + Send + 'static,

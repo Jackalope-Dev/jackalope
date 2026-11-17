@@ -10,6 +10,8 @@ pub struct PlanLaunch {
     pub request: RunRequest,
     pub title: String,
     pub link: managed::PlanLink,
+    /// Assignments the plan may run; ordinary plans keep the document's limit.
+    pub max_assignments: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -87,13 +89,15 @@ impl Coordinator {
             started: false,
             error: None,
             auto_start: false,
-            max_assignments: crate::commands::planning::artifact::MAX_TASKS,
+            max_assignments: launch
+                .max_assignments
+                .unwrap_or(crate::commands::planning::artifact::MAX_TASKS),
             plan: Some(launch.link),
         };
         // Validate before saving so a rejected plan leaves no task behind.
         managed::plan_entries(task.plan.as_ref().unwrap(), &task)?;
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.state();
             if inner.url.is_none() {
                 return Err(
                     "The coordination bridge is unavailable. Retry when it is ready.".into(),
@@ -102,19 +106,19 @@ impl Coordinator {
             if inner.ledger.managed_tasks.len() >= 500 {
                 return Err("The managed task history limit has been reached.".into());
             }
-            let mut ledger = inner.ledger.clone();
-            ledger.managed_tasks.push(task.clone());
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(&mut inner, |ledger| {
+                ledger.managed_tasks.push(task.clone());
+                Ok::<_, String>(())
+            })?;
         }
         if let Err(error) = self.start_managed(&task.id, &task.planner_run_id) {
-            let mut inner = self.inner.lock().unwrap();
-            let mut ledger = inner.ledger.clone();
-            ledger
-                .managed_tasks
-                .retain(|saved| saved.id != task.id || saved.started);
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            let mut inner = self.state();
+            self.commit(&mut inner, |ledger| {
+                ledger
+                    .managed_tasks
+                    .retain(|saved| saved.id != task.id || saved.started);
+                Ok::<_, String>(())
+            })?;
             return Err(error);
         }
         Ok(task.id)
@@ -122,7 +126,7 @@ impl Coordinator {
 
     pub(crate) fn plan_delivery(&self, id: &str) -> Result<PlanDelivery, String> {
         self.ensure_storage_loaded()?;
-        let inner = self.inner.lock().unwrap();
+        let inner = self.state();
         let task = inner
             .ledger
             .managed_tasks
@@ -192,5 +196,67 @@ impl Coordinator {
 
     pub(crate) fn swarm_connected(&self) -> bool {
         cloud::configured(&self.runtime)
+    }
+
+    /// Assignments one swarm round of the project may run: as many as the
+    /// hosts in its capacity pool can run at once, within the round limits.
+    pub(crate) fn swarm_limit(&self, project_id: &str) -> usize {
+        let inner = self.state();
+        let slots = inner.pool.slots(
+            project_id,
+            inner.remote_projects.contains(project_id),
+            crate::commands::computers::pool::Limits {
+                device: inner.concurrency,
+                remote: inner.remote_concurrency,
+            },
+        );
+        managed::swarm_assignment_limit(slots)
+    }
+
+    /// The request and plan link a plan's managed task started with, so the
+    /// next swarm round runs with the same checks, agent and reviewer.
+    pub(crate) fn plan_template(&self, id: &str) -> Option<(RunRequest, managed::PlanLink)> {
+        let inner = self.inner.lock().ok()?;
+        let task = inner
+            .ledger
+            .managed_tasks
+            .iter()
+            .find(|task| task.id == id)?;
+        Some((task.request.clone(), task.plan.clone()?))
+    }
+
+    /// Sends one direct message from Jackalope to the task `run` belongs to. It
+    /// arrives at the agent's next tool response, or with a continuation.
+    pub(crate) fn tell_task(
+        &self,
+        run: &crate::commands::tasks::TaskRun,
+        text: String,
+    ) -> Result<(), String> {
+        self.ensure_storage_loaded()?;
+        let mut inner = self.state();
+        let owner = inner
+            .ledger
+            .items
+            .iter()
+            .find(|item| item.run_id.as_ref() == Some(&run.id))
+            .map_or(run.task_id.clone(), |item| item.id.clone());
+        self.commit(&mut inner, |ledger| {
+            ledger.messages.push(CoordinationMessage {
+                id: Uuid::new_v4().to_string(),
+                project_id: run.project_id.clone(),
+                task_id: "jackalope".into(),
+                kind: "handoff".into(),
+                text,
+                created_at: Utc::now().to_rfc3339(),
+                recipient_task_id: Some(owner),
+                acknowledged_by: vec![],
+                report: None,
+                run_id: Some(run.id.clone()),
+                source_tree: None,
+                resolved_by: None,
+            });
+            Ok::<_, String>(())
+        })?;
+        Ok(())
     }
 }

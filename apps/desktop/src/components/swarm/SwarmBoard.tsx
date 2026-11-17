@@ -1,29 +1,29 @@
-import { Badge } from '@jackalope/ui';
-import { AlertTriangle, GitFork } from 'lucide-react';
+import { Badge, Button, InlineNotice, LoadingState } from '@jackalope/ui';
+import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { navigateWorkspace, openCloudResources, openSettings } from '../../lib/app-events';
+import { runHostName } from '../../lib/computers';
+import { type DeployStatus, deliveryPhase, deployStatus } from '../../lib/deploy';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { ago, type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
+import { swarmMap } from '../../lib/swarm-map';
+import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useManagedTaskStore } from '../../stores/managedTaskStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { openSettings } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
+import { HostCapacity } from '../computers/HostCapacity';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { SwarmDelivery } from './SwarmDelivery';
+import { SwarmMap } from './SwarmMap';
 import './swarm.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 5000;
 const FILES_SHOWN = 8;
-
-const ago = (iso: string) => {
-  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-  return new Date(iso).toLocaleTimeString();
-};
 
 /**
  * Every agent attempt on an Artifacts project works in its own fork; the swarm
@@ -31,28 +31,38 @@ const ago = (iso: string) => {
  */
 export function SwarmBoard() {
   const projectId = useProjectStore((state) => state.activeProjectId);
+  const projectPath = useActiveProject()?.path;
   const runs = useExecutionStore((state) => state.runs);
+  const queue = useManagedTaskStore((state) => state.queue);
   const [state, setState] = useState<CloudState | null>(null);
+  const [delivery, setDelivery] = useState<DeployStatus | null>(null);
   const [error, setError] = useState('');
+  const [tick, setTick] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tick re-reads after an action.
   useEffect(() => {
     if (!projectId || !isTauriEnvironment()) return;
     let alive = true;
-    const read = () =>
+    const read = () => {
       cloudState(projectId)
         .then((next) => {
           if (!alive) return;
           setState(next);
           setError('');
         })
-        .catch((cause) => alive && setError(String(cause)));
-    void read();
+        .catch((cause) => alive && setError(describeError(cause)));
+      if (projectPath)
+        deployStatus(projectPath)
+          .then((next) => alive && setDelivery(next))
+          .catch(() => alive && setDelivery(null));
+    };
+    read();
     const timer = window.setInterval(read, POLL_MS);
     return () => {
       alive = false;
       window.clearInterval(timer);
     };
-  }, [projectId]);
+  }, [projectId, projectPath, tick]);
 
   const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
   const swarm = state?.swarm;
@@ -66,6 +76,19 @@ export function SwarmBoard() {
         paths.set(fork, (paths.get(fork) ?? new Set()).add(conflict.path));
     return paths;
   }, [conflicts]);
+  const model = useMemo(
+    () =>
+      projectId
+        ? swarmMap({ projectId, runs, queue, forks: swarm?.forks, conflicts: swarm?.conflicts })
+        : null,
+    [projectId, runs, queue, swarm],
+  );
+  const target = useMemo(() => {
+    const latest = runs
+      .filter((run) => run.projectId === projectId && run.targetBranch)
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+    return latest?.targetBranch ?? null;
+  }, [runs, projectId]);
   const label = (forkName: string) => {
     const fork = forkByName.get(forkName);
     return fork ? fork.title || fork.agent : forkName;
@@ -76,11 +99,27 @@ export function SwarmBoard() {
       <WorkspaceHeading
         title="Swarm"
         description="Each agent works in its own Artifacts fork. Your swarm Worker compares every fork after each snapshot, so overlapping edits surface while agents are still working."
+        action={
+          <Button
+            onClick={() => {
+              selectWork();
+              navigateWorkspace('kanban');
+            }}
+          >
+            <Plus size={16} aria-hidden="true" />
+            New goal
+          </Button>
+        }
       />
+      {model && isTauriEnvironment() && (
+        <SwarmMap model={model} target={target} delivery={deliveryPhase(delivery)} />
+      )}
+      <HostCapacity projectId={projectId} label="Where agents run" />
+      {delivery && <SwarmDelivery status={delivery} onChange={() => setTick((n) => n + 1)} />}
       {!isTauriEnvironment() && (
         <InlineNotice>The swarm is available in the desktop app.</InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {!state && isTauriEnvironment() && !error && (
         <LoadingState compact label="Reading the swarm…" />
       )}
@@ -103,6 +142,18 @@ export function SwarmBoard() {
         </InlineNotice>
       )}
       {state?.error && <InlineNotice tone="warning">{state.error}</InlineNotice>}
+      {projectId && state?.configured && (
+        <InlineNotice
+          action={
+            <Button variant="outline" onClick={() => openCloudResources(projectId)}>
+              Cloud resources
+            </Button>
+          }
+        >
+          Create R2, D1, KV, Queues and other Cloudflare resources for this project and copy their
+          wrangler bindings.
+        </InlineNotice>
+      )}
       {state?.repo && (
         <p className="swarm-meta">
           <GitFork size={14} aria-hidden="true" />
@@ -159,7 +210,9 @@ export function SwarmBoard() {
                       <div>
                         <strong>{fork.title}</strong>
                         <small>
-                          {run?.agent ?? fork.agent} · <code>{fork.fork}</code>
+                          {run?.agent ?? fork.agent}
+                          {run && runHostName(run) && ` · on ${runHostName(run)}`} ·{' '}
+                          <code>{fork.fork}</code>
                         </small>
                       </div>
                       {hot?.size ? (

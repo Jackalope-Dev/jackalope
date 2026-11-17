@@ -6,8 +6,9 @@ verification, integration and schedule services.
 
 ## Capture and context
 
-New work and the configurable Ctrl/Cmd+Shift+N shortcut open the conversation composer. Saved-draft and issue-intake actions retain the task capture dialog. Guided
-setup also offers capture before project setup. Ideas can have an empty project
+New work and the configurable Ctrl/Cmd+Shift+N shortcut open the conversation composer on
+Work. Saved drafts, ideas, repo TODOs, helper drafts and the setup's first task open there
+too, with their text and agent filled in; starting the work replaces the idea it came from. Ideas can have an empty project
 identifier; they do not create fictitious projects or authorize execution.
 A draft's suggested project is frozen when captured, editable, and preserved
 across navigation/reload. Existing project drafts and saved planning records remain
@@ -16,8 +17,11 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
-Project instructions are included; optional guidelines and tool selection remain
-inspectable. Project connection loading must finish before dispatch. An explicitly
+Project instructions (Project settings → Basics) reach every task agent natively at launch,
+whatever started the work; a resumed agent session is not given them again, and a prompt
+that already contains them (scheduled and remote tasks add them) does not repeat them.
+Optional guidelines and tool selection remain inspectable. Project connection loading must
+finish before dispatch. An explicitly
 empty connection list stays empty through save/restore. Task setup opens existing
 agent, project and connection controls without discarding the draft.
 
@@ -25,6 +29,31 @@ Connected work browses GitHub issues and pull requests, Linear issues and Jira C
 issues. Selecting one prepares an editable draft with its source link; it does not
 start work or update the issue. GitHub uses the existing CLI sign-in. Linear and Jira
 connections are tested before their tokens are saved in protected native storage.
+
+### Jackalope context
+
+Files Jackalope keeps for a project under its `.jackalope` folder reach agents without the
+person committing, copying or pasting them (`commands/agent_context.rs`). After the
+workspace is prepared, every attempt, including a continuation, copies into it the project's
+`.jackalope/cloudflare.json` ([cloud resources](ORCHESTRATION-CAPABILITIES.md#cloud-resources))
+and the pasted images under `.jackalope/attachments` that its prompt names (at most 16, 64 MB
+in all), replacing an older or edited copy and removing a manifest the project no longer has.
+The prompt's absolute paths to those images become workspace-relative. The attempt's
+activity lists what it received. `/.jackalope/` is in the repository's `info/exclude`, so the
+copies never appear in `git status`, task commits, swarm snapshots or integration; a path the
+workspace's Git tracks (the person committed it) or does not ignore is left untouched. Work in
+the project checkout itself needs no copy.
+
+The launch input adds a Jackalope context section of at most 1,200 bytes naming each cloud
+resource and binding, ending with "and N more" when they do not fit, and pointing to the file.
+Project instructions, at most 4,000 characters, come before it. Writing to a context file is
+a risky action, so automatic approval does not approve it, and the next attempt restores the
+file anyway. On a project's computer the context is uploaded with the workspace, and changes
+the agent made to it are left out of what comes back (see
+[bot computers](BOT-COMPUTERS.md#agents-on-a-computer)). Screenshots and other output
+the agent saves under `.jackalope/artifacts` come back and stay out of commits.
+`cargo test --lib agent_context` covers placement, refresh, the committed-file case, Git
+exclusion, the computer archive, patches from a computer and the launch summary's budget.
 
 ## Work and results
 
@@ -88,20 +117,29 @@ native bounded evidence reader and cannot claim current visual acceptance.
 
 ## Agent and Challenge review
 
-Review's actions menu offers two optional reviews by another agent. Neither starts
-until you submit it, and both suggest an available reviewer from a model family
-different from the author's (then an agent of unknown family, then the same family);
-you can choose any connected agent. Families come from the model when it names one,
-otherwise from the agent (`src/lib/reviewer-choice.ts`).
+Review offers two optional reviews by another agent. Both suggest an available
+reviewer from a model family different from the author's (then an agent of unknown
+family, then the same family); you can choose any connected agent. Families come from
+the model when it names one, otherwise from the agent (`src/lib/reviewer-choice.ts`).
+Both commit the author's current files, uncommitted work included, onto the task base
+and start each reviewer in its own worktree at that commit (recorded as `challengeOf`
+on the reviewer's attempt, with `kind` `review` or `challenge`), so reviewers never
+touch the author's workspace. The author must be idle.
 
-- **Ask another agent to review** opens an editable read-only review request in the
-  task composer.
-- **Challenge this change** starts one or two reviewers, each told to break the
-  change. The intent it must hold to is the original request plus the author's
-  result. `task_start_challenge` commits the author's current files, uncommitted
-  work included, onto the task base and starts each reviewer in its own worktree at
-  that commit (recorded as `challengeOf` on the reviewer's attempt), so reviewers
-  never touch the author's workspace. The author must be idle.
+- **Agent review** in Review's toolbar starts one reviewer with
+  `task_start_agent_review` on click. It skips the project's preparation command and
+  is told to read the change without building, installing or running it. A dialog
+  follows its steps and live activity; agent reviews stay out of the work list and
+  notify on the reviewed attempt. The reviewer ends with a `jackalope-review` JSON
+  block: a summary and findings with severity, file, line, problem and fix plan
+  (`src/lib/agent-review.ts`). **Make these changes** continues the task with the
+  selected findings, an optional note and, when the project has a verification
+  command, a request to run it once at the end. Where the attempt can't continue
+  directly, the same text is added to the reply instead. A reply without a readable
+  block is shown in full and can be sent as is.
+- **Challenge this change** in the actions menu starts one or two reviewers, each
+  told to break the change. The intent it must hold to is the original request plus
+  the author's result.
 
 A Challenge reviewer reports each finding with `record_validation_step`: status
 `failed`, the title as `step`, and a `finding` with the exact command, the output it
@@ -143,7 +181,9 @@ skipped and reported as skipped rather than run again. A preparation command tha
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
 
-Automatic verification is explicitly enabled in Project defaults. Its saved command
+Automatic verification is on for a project unless Check results automatically is turned
+off in Project settings, and does nothing until the project has a check command. Every
+launcher and the settings switch read it through `checksAutomatically`. Its saved command
 and authorization travel with the task, queue item or schedule and survive account
 or preference changes. After a successful agent result the task remains active
 while native verification reserves its workspace and uses separate check capacity. Navigating away does not
@@ -169,6 +209,36 @@ later attempt. It continues in the previous attempt's worktree only when that wo
 still exists, no other attempt owns it, and the agent left no uncommitted changes;
 otherwise a fresh worktree is cut and the earlier one is kept for inspection.
 
+An interrupted attempt keeps its workspace until the person resumes it. Resume lists
+processes still running in the workspace (on macOS and Linux) so anything the attempt
+started outside its own process group, such as a dev server, can be stopped first.
+Confirming records the attempt as stopped, then continues its agent session with a
+note that Jackalope restarted, or retries it when no session was recorded.
+
+## Conversations from outside Jackalope
+
+Claude Code and Codex keep each conversation in their own session files: Claude Code under
+`projects/` of its configuration directory, Codex as rollouts under `sessions/` and
+`archived_sessions/` of its home (compressed once idle). Jackalope reads the stores of the
+accounts it uses for each CLI (the CLI's own sign-in and any added accounts) and lists a
+conversation under a project when it ran in the project folder or a worktree of the same
+repository, in a read-only Outside Jackalope group. Its own attempts are left out by the
+session IDs they recorded, by its data folder and by the `.worktrees/<name>` folders on
+`jackalope/<name>` branches it creates. A background index keyed by file path, modification
+time and size reads only new and changed files and skips lines and files it does not
+recognize; a file watch and periodic refresh keep it current. Opening one shows its
+transcript with tool names; subagent work is not shown. Reading is local and nothing is
+uploaded; Settings → Privacy turns it off and deletes the index.
+
+Continue in Jackalope starts a conversation whose first attempt resumes the CLI's own
+session (`codex exec resume`, `claude --resume`) under the account directory it was saved
+in, directly in the checkout or worktree it ran in, reserving that folder like in-place
+work. It is unavailable, with the reason shown, when that directory is not one of
+Jackalope's accounts for the CLI, the account or agent is turned off for the project, the
+folder is gone, the conversation started in a subfolder, or the project runs agents on a
+computer. Its changes stay in that folder: merge review and retry refuse it, and follow-ups
+continue in the conversation.
+
 ## Iteration and delivery
 
 Follow-ups use the same native session, workspace and saved account. During active
@@ -188,6 +258,17 @@ snapshots, check requirements, conflict handling and receipt recovery. Mark revi
 still only records a review. Merging does not push. Source cleanup follows the merge
 choice and defaults on. Integrated work continues through a new task based on the
 updated target, with the earlier result attached.
+
+A pull request opened from Delivery, or found on the task branch by its GitHub check, is
+followed per task in renderer storage (`stores/pullRequestStore.ts`) and re-read through
+`task_pull_request_status` on a schedule until it merges or closes. `lib/pull-requests.ts`
+reduces GitHub's record to one state, most blocking first: failed checks, requested
+changes, conflict, checks running, draft, waiting for review, ready to merge, merged or
+closed. That state places finished work in the work list (Needs you, In review, Ready to
+merge or Finished) and never moves work that is running, blocked on a question or failed
+on its own. A failed read keeps the last state and says so. Fix requests are editable
+follow-ups in the task's own composer; pushing an update and merging on GitHub each need
+their own confirmation, and no state change sends, pushes or merges by itself.
 
 Paused Chat sessions use the same integration controls for their latest batch after
 queued messages are run or canceled. Applied receipts block reopening or sending into

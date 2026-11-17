@@ -1,85 +1,39 @@
+use super::super::helper_process::{reported, Interrupted, Turn};
 use super::*;
-use crate::commands::process_control::{read_bounded, ProcessTree};
 
-pub(in crate::commands::tasks) struct Configuration(Option<PathBuf>);
+/// How long the routing agent has to answer before local rules choose instead,
+/// matching Jev's timeout. Sonnet answered a real routing request in about six
+/// seconds, including the CLI's start-up.
+pub(in crate::commands::tasks) const ROUTING_BUDGET: Duration = Duration::from_secs(8);
 
-impl Drop for Configuration {
-    fn drop(&mut self) {
-        if let Some(path) = &self.0 {
-            let _ = std::fs::remove_file(path);
+/// The model a routing agent answers with. Choosing a worker is a short
+/// structured judgement, so Claude routes on Sonnet rather than its default
+/// or Opus; other agents keep the router's configured model.
+pub(in crate::commands::tasks) fn routing_model(
+    adapter: &str,
+    model: Option<&str>,
+) -> Option<String> {
+    match (adapter, model) {
+        ("claude", None) => Some("sonnet".into()),
+        ("claude", Some(model)) if model.to_ascii_lowercase().contains("opus") => {
+            Some("sonnet".into())
         }
+        (_, model) => model.map(str::to_string),
     }
 }
 
-pub(in crate::commands::tasks) fn configure(
+/// A routing answer asks for the lowest effort the router's model accepts.
+pub(in crate::commands::tasks) fn routing_effort(
     cmd: &mut Command,
     adapter: &str,
-    prompt_path: &Path,
-    prompt: &str,
-) -> Result<Configuration, String> {
-    let mut configuration = Configuration(None);
-    match adapter {
-        "codex" => { cmd.args(["exec", "--disable", "shell_tool", "--disable", "apps", "--disable", "plugins", "--disable", "multi_agent", "--json", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}", "-c", "web_search=\"disabled\"", "-"]); }
-        "claude" => { cmd.args(["--print", "--verbose", "--output-format", "stream-json", "--no-session-persistence", "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}", "--max-turns", "1"]); }
-        "grok" => { cmd.args(["--output-format", "streaming-messages-json", "--permission-mode", "dontAsk", "--tools", "", "--deny", "*", "--disable-web-search", "--max-turns", "1", "--prompt-file"]).arg(prompt_path); }
-        "opencode" => {
-            cmd.args(["run", "--format", "json"]);
-            cmd.env("OPENCODE_CONFIG_CONTENT", "{\"permission\":\"deny\",\"agent\":{\"build\":{\"permission\":\"deny\"}}}");
-        }
-        "kimi" => {
-            let path = prompt_path.with_extension("agent.md");
-            let mut options = std::fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)] { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
-            let mut file = options.open(&path).map_err(|_| "Could not create the Kimi helper configuration.")?;
-            configuration.0 = Some(path.clone());
-            file.write_all(format!("---\nname: jackalope-helper\ndescription: Answer the supplied Jackalope request without tools.\ntools: []\nsubagents: []\n---\n{prompt}\n").as_bytes()).map_err(|_| "Could not write the Kimi helper configuration.")?;
-            cmd.args(["--agent-file"]).arg(path).args(["--output-format", "stream-json", "--prompt", "Answer the supplied Jackalope request. Follow its output format."]);
-        }
-        _ => return Err("This default agent has no supported routing-only interface. Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator. Antigravity remains available as a worker.".into()),
-    }
-    Ok(configuration)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn kimi_helper_uses_a_private_tool_free_definition_and_cleans_it_up() {
-        let path =
-            std::env::temp_dir().join(format!("jackalope-helper-{}.txt", uuid::Uuid::new_v4()));
-        let mut command = Command::new("fixture");
-        let context = "Private task context with `commands` and \"quotes\"";
-        let configuration = configure(&mut command, "kimi", &path, context).unwrap();
-        let args: Vec<_> = command
-            .get_args()
-            .map(|arg| arg.to_string_lossy().into_owned())
-            .collect();
-        assert!(!args.join(" ").contains(context));
-        let definition = std::fs::read_to_string(path.with_extension("agent.md")).unwrap();
-        assert!(definition.contains("tools: []\nsubagents: []\n---\n"));
-        assert!(definition.contains(context));
-        let mut run = TaskRun::default();
-        consume_adapter_event(
-            &mut run,
-            r#"{"role":"meta","content":"not an answer"}"#,
-            "kimi",
-        );
-        consume_adapter_event(
-            &mut run,
-            r#"{"role":"assistant","content":"answer"}"#,
-            "kimi",
-        );
-        assert_eq!(run.result, "answer");
-        consume_adapter_event(
-            &mut run,
-            r#"{"role":"assistant","tool_calls":[{"id":"unexpected"}]}"#,
-            "kimi",
-        );
-        assert!(run.error.is_some());
-        drop(configuration);
-        assert!(!path.with_extension("agent.md").exists());
-    }
+    model: Option<&str>,
+) {
+    super::super::effort::configure(
+        cmd,
+        adapter,
+        model,
+        Some(super::super::effort::TaskEffort::Quick),
+    );
 }
 
 impl TaskRuntime {
@@ -97,107 +51,59 @@ impl TaskRuntime {
                 .join(format!("{}-{}", req.id, uuid::Uuid::new_v4()))
         };
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        let prompt_path = directory.join("request.txt");
         let (_, executable) = self.policy()?.resolve(&router.agent)?;
-        let mut cmd = command(executable);
-        let _configuration = configure(&mut cmd, &router.adapter, &prompt_path, prompt)?;
         agent_profiles::validate_binding(&self.profiles_root(), &router.binding)?;
-        agent_profiles::apply_binding(&mut cmd, &router.binding)?;
-        if let Some(model) = &router.model {
-            cmd.args(["--model", model]);
+        let model = routing_model(&router.adapter, router.model.as_deref());
+        let mut output = self.run_snapshot(&req.id).ok_or("Attempt not found")?;
+        let answer = Turn {
+            agent: &router.agent,
+            adapter: &router.adapter,
+            executable,
+            binding: &router.binding,
+            model: model.as_deref(),
+            prompt,
+            prompt_path: directory.join("request.txt"),
+            directory,
+            attempt: Some(&req.id),
+            limit: ROUTING_BUDGET,
         }
-        if router.adapter == "grok" {
-            std::fs::write(&prompt_path, prompt).map_err(|e| e.to_string())?;
-        }
-        cmd.current_dir(&directory)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let warm_started = std::time::Instant::now();
-        let mut warm = if router.adapter == "opencode" {
-            self.warm_helpers
-                .attach(&mut cmd, &router.binding, || !self.is_running(&req.id))?
-        } else {
-            None
-        };
-        let warm_elapsed = warm_started.elapsed();
-        let mut inner = self.inner.lock().unwrap();
-        if inner.canceled.contains(&req.id) {
+        .run(
+            self,
+            |cmd| routing_effort(cmd, &router.adapter, model.as_deref()),
+            &|| !self.is_running(&req.id),
+            |answer| {
+                self.update_checked(&req.id, |run| {
+                    run.efficiency.timing("helperStartup", answer.warm_elapsed);
+                    run.efficiency.warm_provider_hits += u64::from(answer.warm.as_ref().is_some_and(|lease| lease.reused));
+                    run.process_contained = cfg!(windows);
+                    activity(run, &format!("{} is choosing an agent, model and account using task context and available quota.", router.agent));
+                })
+            },
+        )?;
+        if !answer.ran {
             return Err("Routing was stopped.".into());
         }
-        let mut output = inner
-            .runs
-            .get(&req.id)
-            .cloned()
-            .ok_or("Attempt not found")?;
-        let (mut child, _) = super::super::runtime::spawn_agent(&mut cmd, &router.agent)?;
-        let tree = match ProcessTree::attach(&child) {
-            Ok(tree) => tree,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(error);
-            }
-        };
-        let stdin = child.stdin.take().ok_or("Routing input unavailable")?;
-        let stdout = child.stdout.take().ok_or("Routing output unavailable")?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or("Routing diagnostics unavailable")?;
-        let process = Arc::new(Mutex::new(child));
-        inner.processes.insert(req.id.clone(), process.clone());
-        drop(inner);
-        self.update_checked(&req.id, |run| {
-            run.efficiency.timing("helperStartup", warm_elapsed);
-            run.efficiency.warm_provider_hits += u64::from(warm.as_ref().is_some_and(|lease| lease.reused));
-            run.process_contained = cfg!(windows);
-            activity(run, &format!("{} is choosing an agent, model and account using task context and available quota.", router.agent));
-        })?;
-        let input = prompt.as_bytes().to_vec();
-        let file_input = matches!(router.adapter.as_str(), "grok" | "kimi");
-        let writer = std::thread::spawn(move || {
-            let mut stdin = stdin;
-            if file_input {
-                Ok(())
-            } else {
-                stdin.write_all(&input)
-            }
-        });
-        let reader = std::thread::spawn(move || read_bounded(stdout, 512_000));
-        let diagnostics = std::thread::spawn(move || read_bounded(stderr, 16_000));
-        let started = std::time::Instant::now();
         let mut failure = None;
-        let exit = loop {
-            match process.lock().unwrap().try_wait() {
-                Ok(Some(exit)) => break Some(exit),
-                Ok(None) => {}
-                Err(error) => {
-                    failure = Some(error.to_string());
-                    break None;
-                }
+        let exit = match answer.exit {
+            Ok(status) => Some(status),
+            Err(Interrupted::Stopped) => {
+                failure = Some("Routing was stopped.".to_string());
+                None
             }
-            if !self.is_running(&req.id) {
-                failure = Some("Routing was stopped.".into());
-                break None;
+            Err(Interrupted::TimedOut) => {
+                failure = Some(format!(
+                    "The routing agent did not answer within {} seconds.",
+                    ROUTING_BUDGET.as_secs()
+                ));
+                None
             }
-            if started.elapsed() > Duration::from_secs(120) {
-                failure =
-                    Some("The default agent's routing request timed out. Retry the task.".into());
-                break None;
+            Err(Interrupted::Failed(error)) => {
+                failure = Some(error);
+                None
             }
-            std::thread::sleep(Duration::from_millis(50));
         };
-        tree.terminate();
-        let _ = process.lock().unwrap().kill();
-        let _ = process.lock().unwrap().wait();
-        self.inner.lock().unwrap().processes.remove(&req.id);
-        let written = writer.join().map_err(|_| "Routing input writer stopped")?;
-        let mut read = reader
-            .join()
-            .map_err(|_| "Routing output reader stopped")?
-            .map_err(|e| e.to_string())?;
-        let _ = diagnostics.join();
+        let mut read = answer.output;
+        let mut warm = answer.warm;
         if let Some(lease) = &warm {
             match lease.output(|| !self.is_running(&req.id)) {
                 Ok(text) => read.0 = text,
@@ -206,10 +112,7 @@ impl TaskRuntime {
                 }
             }
         }
-        if router.adapter == "grok" {
-            let _ = std::fs::remove_file(prompt_path);
-        }
-        output.model = router.model.clone();
+        output.model = model;
         output.result.clear();
         output.error = None;
         output.session_id = None;
@@ -223,14 +126,17 @@ impl TaskRuntime {
         if let Some(error) = &failure {
             output.error = Some(error.clone());
         }
-        if written.is_err() {
+        if answer.written.is_err() {
             output.error = Some("The default agent did not accept the routing context.".into());
         }
         if read.1 {
             output.error = Some("The routing response exceeded its size limit.".into());
         }
         if !exit.is_some_and(|status| status.success()) && output.error.is_none() {
-            output.error = Some("The default agent could not complete routing.".into());
+            output.error = Some(reported(
+                "The default agent could not complete routing.",
+                &answer.diagnostics,
+            ));
         }
         self.update_checked(&req.id, |run| {
             run.routing
@@ -248,7 +154,10 @@ impl TaskRuntime {
         if output.quota_failure.is_none()
             && (!exit.is_some_and(|status| status.success()) || output.error.is_some())
         {
-            return Err("The default agent could not complete routing. Check its account, model and quota, then retry. No worker was launched.".into());
+            return Err(output
+                .error
+                .clone()
+                .unwrap_or_else(|| "The routing agent could not complete routing.".into()));
         }
         if output.error.is_none() && output.quota_failure.is_none() {
             if let Some(lease) = &mut warm {

@@ -25,6 +25,26 @@ dated milestones in `src/changelog.json`. Update the shared source when content
 changes; route metadata, structured data, sitemap, RSS and LLM-readable discovery
 files are generated from it.
 
+Changelog entries carry no status. `pnpm build` fetches the `beta-v*` and
+`stable-v*` tags (only their tips in a shallow clone) and labels each app entry
+Released, In beta or Coming soon from the first release whose `src/changelog.json`
+contains its id (`scripts/release/changelog-releases.mjs`). Missing tags can only
+make an entry read Coming soon, and a build that can read no release tags stops;
+set `CHANGELOG_RELEASES=skip` to build without them. Labels refresh on the next
+website deploy after a release. The dev server reads local tags.
+
+LopeBase publishes field notes as Markdown files in `content/blog/<slug>.md`
+through pull requests that `.github/workflows/lopebase-posts.yml` approves and
+merges once the required checks pass. `src/blog-markdown.ts` loads them alongside
+the hand-written posts; a file whose front matter or slug does not parse, or a slug
+that another post already uses, fails the build so it never merges. Their bodies
+render as Markdown with raw HTML dropped. An `author` slug from `src/authors.ts`
+signs the post with that byline and lists it on the author page. An `image` (an
+https URL; anything else fails the build) becomes the post's og:image, twitter:image
+and structured-data image, with `image_alt` (the title by default) as its alt text.
+`image_kind: artwork`, or no kind, also shows it above the post; a `title_card`
+repeats the heading, so it only serves link previews. Both kinds are 1200x630.
+
 The landing page's terminal demo (`src/TerminalDemo.tsx`) imitates the `jackalope`
 terminal UI with scripted replies. It copies the terminal's layout, glyphs, copy and
 command names, so update it when the terminal's visible behavior changes.

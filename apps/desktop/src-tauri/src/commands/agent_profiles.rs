@@ -8,8 +8,9 @@ use tauri::State;
 
 use super::tasks::TaskRuntime;
 
-mod credentials;
+pub(crate) mod credentials;
 pub use credentials::agent_profile_save_key;
+pub(in crate::commands) use credentials::save_imported_key;
 
 pub(super) fn has_api_key(binding: &AccountBinding) -> Result<bool, String> {
     credentials::read(binding).map(|key| key.is_some())
@@ -82,39 +83,19 @@ pub struct AgentProfilesView {
     pub env_var: Option<String>,
 }
 
+/// The catalog's account variable for `adapter`; agent facts belong in
+/// `agents.json`, not in tables here.
 pub fn env_var_for(adapter: &str) -> Option<&'static str> {
-    match adapter {
-        "codex" => Some("CODEX_HOME"),
-        "claude" => Some("CLAUDE_CONFIG_DIR"),
-        "grok" => Some("GROK_HOME"),
-        "kimi" => Some("KIMI_CODE_HOME"),
-        "opencode" => Some("XDG_DATA_HOME"),
-        "gemini" => Some("GEMINI_CLI_HOME"),
-        "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
-        _ => None,
-    }
+    super::agents::find(adapter)?.account_env()
 }
 
-pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
-    match adapter {
-        "codex" => &["login"],
-        "grok" | "kimi" => &["login"],
-        "opencode" => &["auth", "login"],
-        "claude" => &["auth", "login"],
-        _ => &[],
-    }
+/// The catalog's sign-in arguments for `adapter`.
+pub(super) fn login_args(adapter: &str) -> &'static [String] {
+    super::agents::find(adapter).map_or(&[], |agent| &agent.login_args)
 }
 
 fn manifest_path(root: &Path) -> PathBuf {
     root.join("manifest.json")
-}
-
-#[cfg(test)]
-fn load(root: &Path) -> Manifest {
-    fs::read_to_string(manifest_path(root))
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
 }
 
 fn load_checked(root: &Path) -> Result<Manifest, String> {
@@ -143,18 +124,6 @@ pub(super) fn dir_for(root: &Path, agent: &str, id: &str) -> PathBuf {
     root.join(agent).join(id)
 }
 
-#[cfg(test)]
-fn active_profile_dir(root: &Path, agent: &str) -> Option<PathBuf> {
-    let manifest = load(root);
-    let entry = manifest.agents.get(agent)?;
-    let active = entry.active.as_ref()?;
-    entry
-        .profiles
-        .iter()
-        .any(|p| &p.id == active)
-        .then(|| dir_for(root, agent, active))
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountBinding {
@@ -164,15 +133,16 @@ pub struct AccountBinding {
     pub label: String,
 }
 
-pub(super) fn preferred_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+/// The model saved for `binding`'s account in the manifest under `root`.
+/// The binding's directory cannot locate that manifest: an account may keep
+/// its sign-in in a folder of its own choosing.
+pub(super) fn preferred_model(
+    root: &Path,
+    binding: &AccountBinding,
+) -> Result<Option<String>, String> {
     let Some(id) = binding.profile_id.as_deref() else {
         return Ok(None);
     };
-    let root = binding
-        .directory
-        .parent()
-        .and_then(Path::parent)
-        .ok_or("Invalid account directory.")?;
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let manifest = load_checked(root)?;
     Ok(manifest
@@ -211,6 +181,24 @@ fn complete_provider(root: &Path, id: &str, model: &str, activate: bool) -> Resu
     }
     save(root, &manifest)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_profiles::agent_profile_list,
+            commands::agent_profiles::agent_profile_create,
+            commands::agent_profiles::agent_profile_set_config_dir,
+            commands::agent_profiles::credentials::agent_profile_save_key,
+            commands::agent_profiles::agent_profile_complete_provider,
+            commands::agent_profiles::agent_profile_rename,
+            commands::agent_profiles::agent_profile_delete,
+            commands::agent_profiles::agent_profile_set_active,
+            commands::agent_profiles::agent_profile_set_group,
+            commands::agent_profiles::agent_profile_set_tag,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub fn agent_profile_complete_provider(
@@ -293,8 +281,7 @@ fn bind_account_selection(
             .and_then(|entry| entry.active.as_deref())
     });
     if adapter == "acp" && selected.is_none() {
-        let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .map(PathBuf::from)
+        let directory = super::platform::home_dir()
             .filter(|path| path.is_absolute())
             .ok_or("Cannot locate the home directory for this CLI's own sign-in.")?;
         return Ok(AccountBinding {
@@ -304,9 +291,11 @@ fn bind_account_selection(
             label: "This CLI's own sign-in".into(),
         });
     }
+    let spec = super::agents::find(adapter);
     if adapter == "antigravity" && selected.is_none() {
-        let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .map(|home| PathBuf::from(home).join(".gemini"))
+        let directory = super::platform::home_dir()
+            .zip(spec)
+            .map(|(home, spec)| spec.default_directory(&home))
             .filter(|path| path.is_absolute())
             .ok_or("Cannot locate Antigravity's CLI data directory.")?;
         return Ok(AccountBinding {
@@ -320,7 +309,9 @@ fn bind_account_selection(
                 .unwrap_or_else(|| "Current Antigravity CLI account (identity not pinned)".into()),
         });
     }
-    let env_name = env_var_for(adapter).ok_or("This agent does not support account isolation.")?;
+    let (spec, env_name) = spec
+        .and_then(|spec| Some((spec, spec.account_env()?)))
+        .ok_or("This agent does not support account isolation.")?;
     let entry = saved.agents.get(adapter);
     let id = selected;
     let (profile_id, directory, label) = if let Some(id) = id {
@@ -342,20 +333,7 @@ fn bind_account_selection(
     } else {
         let directory = std::env::var_os(env_name)
             .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|home| {
-                    if adapter == "gemini" {
-                        return PathBuf::from(home);
-                    }
-                    PathBuf::from(home).join(if adapter == "opencode" {
-                        ".local/share".to_string()
-                    } else if adapter == "kimi" {
-                        ".kimi-code".to_string()
-                    } else {
-                        format!(".{adapter}")
-                    })
-                })
-            })
+            .or_else(|| super::platform::home_dir().map(|home| spec.default_directory(&home)))
             .ok_or("Cannot locate the agent's default account directory.")?;
         (
             None,
@@ -382,7 +360,7 @@ pub fn apply_binding(
 ) -> Result<(), String> {
     if binding.profile_id.is_some() {
         if binding.adapter == "antigravity" {
-            let config: serde_json::Value = serde_json::from_slice(&super::history::read_bounded(
+            let config: serde_json::Value = serde_json::from_slice(&super::platform::read_bounded(
                 &binding
                     .directory
                     .join(".gemini/antigravity-cli/settings.json"),
@@ -528,7 +506,7 @@ fn local_verification(
         return Ok(None);
     }
     let verification: super::local_ai::Verification =
-        serde_json::from_slice(&super::history::read_bounded(&path, 4096)?)
+        serde_json::from_slice(&super::platform::read_bounded(&path, 4096)?)
             .map_err(|_| "Local model settings are unreadable. Run local setup again.")?;
     Ok(Some(verification))
 }
@@ -637,8 +615,9 @@ pub(in crate::commands) fn create_local(
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
     super::agent_sign_in::ensure_idle(binding)?;
     if binding.adapter == "antigravity" && binding.profile_id.is_none() {
-        let current = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .map(|home| PathBuf::from(home).join(".gemini"));
+        let current = super::platform::home_dir()
+            .zip(super::agents::find("antigravity"))
+            .map(|(home, spec)| spec.default_directory(&home));
         if current.as_ref() != Some(&binding.directory) {
             return Err("Antigravity's CLI data location changed. Start a new task.".into());
         }
@@ -884,7 +863,21 @@ pub fn agent_profile_rename(
 }
 
 #[tauri::command]
-pub fn agent_profile_delete(
+pub async fn agent_profile_delete(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        delete_profile(app.state(), app.state(), agent, id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Waits for the shared execution lock, so commands run it off the main thread.
+pub(in crate::commands) fn delete_profile(
     runtime: State<'_, TaskRuntime>,
     helper: State<'_, super::helper::Helper>,
     agent: String,
@@ -898,7 +891,7 @@ pub fn agent_profile_delete(
         return Err("Invalid account ID".into());
     }
     if runtime.integration_runs()?.iter().any(|run| {
-        ["starting", "running", "stopping"].contains(&run.status.as_str())
+        run.status.is_active()
             && run.account_binding.as_ref().is_some_and(|binding| {
                 binding.adapter == agent && binding.profile_id.as_deref() == Some(&id)
             })
@@ -959,64 +952,9 @@ pub fn agent_profile_set_active(
     save(&root, &manifest)
 }
 
-pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
-    match adapter {
-        "codex" => &["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"],
-        "claude" => &[
-            "ANTHROPIC_API_KEY",
-            "ANTHROPIC_AUTH_TOKEN",
-            "CLAUDE_CODE_OAUTH_TOKEN",
-        ],
-        "grok" => &["XAI_API_KEY", "GROK_API_KEY", "GROK_DEPLOYMENT_KEY"],
-        "kimi" => &[
-            "KIMI_API_KEY",
-            "KIMI_BASE_URL",
-            "KIMI_MODEL_NAME",
-            "KIMI_MODEL_API_KEY",
-            "KIMI_MODEL_BASE_URL",
-            "KIMI_MODEL_PROVIDER_TYPE",
-            "KIMI_CODE_CUSTOM_HEADERS",
-        ],
-        "gemini" | "antigravity" => &[
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
-            "GOOGLE_GENERATIVE_AI_API_KEY",
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            "GOOGLE_GENAI_USE_VERTEXAI",
-            "GOOGLE_GENAI_USE_GCA",
-            "AGY_ADC_AUTH",
-        ],
-        "opencode" => &[
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "ANTHROPIC_AUTH_TOKEN",
-            "CLAUDE_CODE_OAUTH_TOKEN",
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
-            "GOOGLE_GENERATIVE_AI_API_KEY",
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            "XAI_API_KEY",
-            "GROK_API_KEY",
-            "OPENROUTER_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "GROQ_API_KEY",
-            "MISTRAL_API_KEY",
-            "AZURE_API_KEY",
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-            "AWS_SESSION_TOKEN",
-            "AWS_PROFILE",
-        ],
-        _ => &[],
-    }
-}
-
-#[cfg(test)]
-fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> Option<PathBuf> {
-    bind_account(root, agent, explicit_id)
-        .ok()
-        .filter(|b| b.profile_id.is_some())
-        .map(|b| b.directory)
+/// The catalog's credential variables for `adapter`.
+pub fn credential_env_vars(adapter: &str) -> &'static [String] {
+    super::agents::find(adapter).map_or(&[], |agent| &agent.credential_env)
 }
 
 #[cfg(test)]
@@ -1039,14 +977,14 @@ mod tests {
             .default_model = "other/default".into();
         assert_eq!(
             policy
-                .model_for_account("opencode", None, &binding)
+                .model_for_account(&root, "opencode", None, &binding)
                 .unwrap()
                 .as_deref(),
             Some("deepseek/flash")
         );
         assert_eq!(
             policy
-                .model_for_account("opencode", Some("deepseek/pro"), &binding)
+                .model_for_account(&root, "opencode", Some("deepseek/pro"), &binding)
                 .unwrap()
                 .as_deref(),
             Some("deepseek/pro")
@@ -1057,7 +995,7 @@ mod tests {
             .unwrap()
             .restrict_models = true;
         assert!(policy
-            .model_for_account("opencode", None, &binding)
+            .model_for_account(&root, "opencode", None, &binding)
             .is_err());
         let _ = fs::remove_dir_all(root);
     }
@@ -1087,9 +1025,40 @@ mod tests {
         assert_eq!(saved.agents["opencode"].active.as_deref(), Some("old"));
         assert!(saved.agents["opencode"].pending.is_empty());
         assert_eq!(
-            preferred_model(&binding).unwrap().as_deref(),
+            preferred_model(&root, &binding).unwrap().as_deref(),
             Some("deepseek/flash")
         );
+        // An account signed in from a folder of its own still finds its model.
+        let mut manifest = load_checked(&root).unwrap();
+        let custom =
+            std::env::temp_dir().join(format!("jackalope-custom-{}", uuid::Uuid::new_v4()));
+        manifest
+            .agents
+            .get_mut("opencode")
+            .unwrap()
+            .profiles
+            .iter_mut()
+            .find(|p| p.id == "paid")
+            .unwrap()
+            .config_dir = Some(custom.to_string_lossy().into_owned());
+        save(&root, &manifest).unwrap();
+        let moved = bind_account(&root, "opencode", Some("paid")).unwrap();
+        assert_eq!(moved.directory, custom);
+        assert_eq!(
+            preferred_model(&root, &moved).unwrap().as_deref(),
+            Some("deepseek/flash")
+        );
+        let mut manifest = load_checked(&root).unwrap();
+        manifest
+            .agents
+            .get_mut("opencode")
+            .unwrap()
+            .profiles
+            .iter_mut()
+            .find(|p| p.id == "paid")
+            .unwrap()
+            .config_dir = None;
+        save(&root, &manifest).unwrap();
         complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
         complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
         assert_eq!(
@@ -1147,20 +1116,20 @@ mod tests {
             .default_model = "paid/model".into();
         assert_eq!(
             policy
-                .model_for_account("opencode", None, &paid)
+                .model_for_account(&root, "opencode", None, &paid)
                 .unwrap()
                 .as_deref(),
             Some("paid/model")
         );
         assert_eq!(
             policy
-                .model_for_account("opencode", None, &binding)
+                .model_for_account(&root, "opencode", None, &binding)
                 .unwrap()
                 .as_deref(),
             Some("jackalope-local/qwen3.5:4b")
         );
         assert!(policy
-            .model_for_account("opencode", Some("paid/model"), &binding)
+            .model_for_account(&root, "opencode", Some("paid/model"), &binding)
             .is_err());
         policy
             .runner_options
@@ -1168,7 +1137,7 @@ mod tests {
             .unwrap()
             .restrict_models = true;
         assert!(policy
-            .model_for_account("opencode", None, &binding)
+            .model_for_account(&root, "opencode", None, &binding)
             .is_err());
         let mut command = std::process::Command::new("opencode");
         command.env(
@@ -1260,19 +1229,9 @@ mod tests {
             group: Some("work".into()),
             ..profile
         };
-        assert_eq!(grouped.id, "old-id");
         assert_eq!(serde_json::to_value(&grouped).unwrap()["group"], "work");
         assert!(validate_group(Some("personal")).is_ok());
         assert!(validate_group(Some("invalid")).is_err());
-    }
-
-    #[test]
-    fn env_var_mapping_matches_verified_cli_overrides() {
-        assert_eq!(env_var_for("codex"), Some("CODEX_HOME"));
-        assert_eq!(env_var_for("claude"), Some("CLAUDE_CONFIG_DIR"));
-        assert_eq!(env_var_for("grok"), Some("GROK_HOME"));
-        assert_eq!(env_var_for("opencode"), Some("XDG_DATA_HOME"));
-        assert_eq!(env_var_for("some-custom-agent"), None);
     }
 
     #[test]
@@ -1307,7 +1266,6 @@ mod tests {
         assert_eq!(env["KIMI_MODEL_API_KEY"], None);
         assert_eq!(env["KIMI_SHARE_DIR"], env["KIMI_CODE_HOME"]);
         assert_eq!(env["KIMI_MODEL_NAME"], None);
-        assert_eq!(login_args("kimi"), &["login"]);
         std::fs::remove_dir_all(directory).unwrap();
     }
 
@@ -1437,13 +1395,6 @@ mod tests {
     }
 
     #[test]
-    fn unconfigured_agent_has_no_active_profile() {
-        let root = temp_root();
-        assert!(active_profile_dir(&root, "codex").is_none());
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
     fn explicit_profile_wins_and_a_stale_id_is_rejected() {
         let root = temp_root();
         let mut manifest = Manifest::default();
@@ -1467,20 +1418,17 @@ mod tests {
         entry.active = Some("personal".into());
         save(&root, &manifest).unwrap();
 
-        // A project asking for "work" gets it, even though "personal" is active.
         assert_eq!(
-            resolve_profile_dir(&root, "codex", Some("work")),
-            Some(dir_for(&root, "codex", "work"))
-        );
-        // No explicit choice falls back to whichever profile is active.
-        assert_eq!(
-            resolve_profile_dir(&root, "codex", None),
-            Some(dir_for(&root, "codex", "personal"))
+            bind_account(&root, "codex", Some("work"))
+                .unwrap()
+                .directory,
+            dir_for(&root, "codex", "work")
         );
         assert_eq!(
-            resolve_profile_dir(&root, "codex", Some("deleted-long-ago")),
-            None
+            bind_account(&root, "codex", None).unwrap().directory,
+            dir_for(&root, "codex", "personal")
         );
+        assert!(bind_account(&root, "codex", Some("deleted-long-ago")).is_err());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1550,57 +1498,6 @@ mod tests {
         fs::write(manifest_path(&root), "broken").unwrap();
         assert!(bind_account(&root, "codex", None).is_err());
         let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn deleting_the_active_profile_falls_back() {
-        let root = temp_root();
-        let mut manifest = Manifest::default();
-        let entry = manifest.agents.entry("codex".into()).or_default();
-        entry.profiles.push(AgentProfile {
-            preferred_model: None,
-            id: "a".into(),
-            name: "Work".into(),
-            group: None,
-            tag: None,
-            config_dir: None,
-        });
-        entry.profiles.push(AgentProfile {
-            preferred_model: None,
-            id: "b".into(),
-            name: "Personal".into(),
-            group: None,
-            tag: None,
-            config_dir: None,
-        });
-        entry.active = Some("a".into());
-        save(&root, &manifest).unwrap();
-        assert_eq!(
-            active_profile_dir(&root, "codex"),
-            Some(dir_for(&root, "codex", "a"))
-        );
-
-        let mut manifest = load(&root);
-        let entry = manifest.agents.get_mut("codex").unwrap();
-        entry.profiles.retain(|p| p.id != "a");
-        entry.active = entry.profiles.first().map(|p| p.id.clone());
-        save(&root, &manifest).unwrap();
-        assert_eq!(
-            active_profile_dir(&root, "codex"),
-            Some(dir_for(&root, "codex", "b"))
-        );
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn an_active_id_no_longer_present_in_profiles_is_ignored() {
-        let root = temp_root();
-        let mut manifest = Manifest::default();
-        let entry = manifest.agents.entry("claude".into()).or_default();
-        entry.active = Some("ghost".into());
-        save(&root, &manifest).unwrap();
-        assert!(active_profile_dir(&root, "claude").is_none());
-        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

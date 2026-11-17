@@ -52,6 +52,7 @@
   color: var(--color-text-primary);
 }
 .onboarding-step-number {
+  flex-shrink: 0;
   width: 30px;
   height: 30px;
   display: grid;
@@ -72,6 +73,15 @@
 .onboarding-steps strong {
   font-size: var(--text-sm);
   font-weight: 500;
+}
+.onboarding-step-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.onboarding-step-copy small {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 .onboarding-content {
   --onboarding-padding: 32px;
@@ -95,16 +105,26 @@
 }
 /* A slim thumb that stays inside the card: it starts below the rounded top corner and stops
    above the footer. The scrollbar column carries the footer's surface and divider so the
-   footer still spans the card while content scrolls. */
+   footer still spans the card while content scrolls. Scrollbars are not clipped by
+   border-radius, so the bottom row paints the card's rounded corner itself. */
 .onboarding-content::-webkit-scrollbar {
+  --corner: var(--radius-3xl);
   width: 14px;
-  background: linear-gradient(
-    to top,
-    var(--onboarding-footer-background) calc(var(--onboarding-footer-height) - 1px),
-    var(--color-border-subtle) calc(var(--onboarding-footer-height) - 1px)
-      var(--onboarding-footer-height),
-    transparent var(--onboarding-footer-height)
-  );
+  background:
+    radial-gradient(
+      circle at calc(100% - var(--corner)) 0,
+      var(--onboarding-footer-background) calc(var(--corner) - 0.5px),
+      transparent var(--corner)
+    )
+    bottom / 100% var(--corner) no-repeat,
+    linear-gradient(
+      to top,
+      transparent var(--corner),
+      var(--onboarding-footer-background) var(--corner) calc(var(--onboarding-footer-height) - 1px),
+      var(--color-border-subtle) calc(var(--onboarding-footer-height) - 1px)
+        var(--onboarding-footer-height),
+      transparent var(--onboarding-footer-height)
+    );
 }
 .onboarding-content::-webkit-scrollbar-track {
   margin-top: 20px;
@@ -147,6 +167,11 @@
 }
 .onboarding-heading-row > h2 {
   min-width: 0;
+}
+/* The heading wraps before its action does. */
+.onboarding-heading-row > button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .onboarding-content h2 {
   font-size: var(--text-2xl);
@@ -236,6 +261,13 @@
   font-size: var(--text-xs);
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+.onboarding-account-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 .onboarding-local-agent {
   margin: 16px 0 0 0;
@@ -329,6 +361,24 @@
 }
 .onboarding-command-box > button {
   flex-shrink: 0;
+}
+.onboarding-install-run {
+  display: grid;
+  gap: 8px;
+}
+.onboarding-install-log {
+  max-height: 160px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .onboarding-install-catalog {
   margin-top: 16px;
@@ -566,11 +616,9 @@
 }
 /* Peer choices fill the card as one segmented track, like "Keep it on" below. */
 :is(.onboarding-project-options, .onboarding-project-storage) .ui-segmented {
+  --ui-segment-flex: 1;
   display: flex;
   width: 100%;
-}
-:is(.onboarding-project-options, .onboarding-project-storage) .ui-segmented > button {
-  flex: 1;
 }
 /* A local overview of the chosen folder. It keeps one footprint while empty, loading and
    loaded so choosing a folder never reflows the card. */
@@ -873,7 +921,11 @@ html[data-window-glass] :is(.onboarding-intro, .onboarding-content) {
   outline-offset: -1px;
   border-radius: var(--radius-3xl);
   background: var(--onboarding-pane);
-  box-shadow: var(--glass-shadow);
+  /* Tighter than --glass-shadow: these cards float apart over the wallpaper, where a
+     wide blur reads as a haze around them rather than as elevation. */
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
 }
 /* The card can be taller than its step, so its actions sit on its bottom edge. The card's
    tint stops where the footer starts and the footer paints the same tint, so the footer
@@ -902,4 +954,12 @@ html[data-window-glass] .onboarding-intro {
 }
 html[data-window-glass] .onboarding-actions {
   min-height: var(--onboarding-footer-height);
+}
+.onboarding-install-catalog .onboarding-note {
+  margin-top: 12px;
+}
+.onboarding-detected-keys {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
 }

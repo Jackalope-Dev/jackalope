@@ -1,4 +1,4 @@
-use super::{git_command, process_control};
+use super::{git_command, process_control, repo};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, time::Duration};
 
@@ -28,11 +28,14 @@ pub struct MonitorChange {
 }
 
 impl ChangeMonitor {
+    /// Saved monitors are looked up in Git exactly as written and re-checked on
+    /// every tick, so this accepts every path earlier versions saved (a trailing
+    /// `/`, empty segments, surrounding spaces) and rejects only escapes.
     pub fn validate(&self) -> Result<(), String> {
         if self.path.len() > 500
             || self.path.contains(['\\', ':', '\0', '\n', '\r'])
             || self.path.starts_with('/')
-            || self.path.split('/').any(|p| p == ".." || p == ".")
+            || self.path.split('/').any(|part| part == ".." || part == ".")
         {
             return Err(
                 "Choose a tracked path relative to the project, using forward slashes.".into(),
@@ -66,11 +69,7 @@ impl ChangeMonitor {
             Duration::from_secs(5),
         )?;
         let hash = result.stdout.trim();
-        if !result.success
-            || result.truncated
-            || !(hash.len() == 40 || hash.len() == 64)
-            || !hash.bytes().all(|b| b.is_ascii_hexdigit())
-        {
+        if !result.success || result.truncated || !repo::is_object_id(hash) {
             return Err("Cannot read the monitored path on the saved local branch. Check that the branch and tracked path still exist.".into());
         }
         if self.path.is_empty() {
@@ -92,7 +91,7 @@ impl ChangeMonitor {
             return Ok("absent".into());
         }
         let hash = result.stdout.trim();
-        if !(hash.len() == 40 || hash.len() == 64) || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if !repo::is_object_id(hash) {
             return Err("Git returned an invalid content revision.".into());
         }
         Ok(hash.into())
@@ -100,8 +99,6 @@ impl ChangeMonitor {
 }
 
 pub fn inspect(project: &str, change: &MonitorChange) -> Result<String, String> {
-    let valid =
-        |s: &str| (s.len() == 40 || s.len() == 64) && s.bytes().all(|b| b.is_ascii_hexdigit());
     if change.before == "absent" || change.after == "absent" {
         return Ok(format!(
             "{} was {} on {}. Inspect the tracked path in your repository.",
@@ -114,7 +111,7 @@ pub fn inspect(project: &str, change: &MonitorChange) -> Result<String, String> 
             change.branch
         ));
     }
-    if !valid(&change.before) || !valid(&change.after) {
+    if !repo::is_object_id(&change.before) || !repo::is_object_id(&change.after) {
         return Err("Invalid saved monitor revisions".into());
     }
     let result = process_control::run(

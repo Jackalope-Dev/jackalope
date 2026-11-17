@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -200,7 +201,7 @@ fn task_candidates(
             values.push(candidate(project_id, path, &format!("preference:{}", words(line)), "User preference", format!("Previously requested by the user: {line}\nApply only when relevant to the current task; newer instructions take precedence."), keywords, "preference", format!("Task {}: {}", run.id, line), Some(run)));
         }
         if run.task_id != run.id
-            && run.status == "reviewed"
+            && run.status == RunStatus::Reviewed
             && values.len() == before_preferences
             && runs.iter().any(|original| {
                 original.id == run.task_id
@@ -262,7 +263,7 @@ fn review_resolution(
         })
         .max_by(|a, b| a.started_at.cmp(&b.started_at).then(a.id.cmp(&b.id)))?;
     if latest.id == source.id
-        || latest.status != "reviewed"
+        || latest.status != RunStatus::Reviewed
         || latest.details_omitted
         || latest.persistence_error.is_some()
         || latest.error.is_some()
@@ -309,7 +310,7 @@ fn verified_checks(
         BTreeMap::new();
     for run in runs {
         if run.project_id != project_id
-            || run.status != "reviewed"
+            || run.status != RunStatus::Reviewed
             || run.persistence_error.is_some()
             || canonical(&run.project_path).ok().as_deref() != Some(path)
         {

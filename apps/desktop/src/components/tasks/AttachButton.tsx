@@ -1,6 +1,5 @@
+import { Button, Tooltip } from '@jackalope/ui';
 import { Paperclip } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Tooltip } from '../ui/Tooltip';
 
 /** Opens the file picker for a composer that uses `usePromptAttachments`. */
 export function AttachButton({

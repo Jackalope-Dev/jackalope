@@ -1,0 +1,9 @@
+/* Write with AI sits on the Title label's row, above the field. */
+.drafted-message-title {
+  position: relative;
+}
+.drafted-message-title > .drafted-message-write {
+  position: absolute;
+  top: -6px;
+  right: 0;
+}

@@ -1,48 +1,51 @@
+import type {
+  PreferenceAgent,
+  PreferencePriority,
+  WaitlistPreferences as Preferences,
+} from '@jackalope/contracts/access';
+import type { Platform } from '@jackalope/contracts/platform';
 import { Button, Checkbox, Panel } from '@jackalope/ui';
 import { ArrowRight, Check, Copy } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
 
+const platformLabels: Record<Platform, string> = {
+  macos: 'macOS',
+  windows: 'Windows',
+  linux: 'Linux',
+};
+const agentLabels: Record<PreferenceAgent, string> = {
+  codex: 'Codex',
+  claude: 'Claude Code',
+  opencode: 'OpenCode',
+  grok: 'Grok',
+  antigravity: 'Antigravity',
+  cursor: 'Cursor',
+  gemini: 'Gemini CLI',
+  other: 'Other',
+  exploring: 'Still exploring',
+};
+const priorityLabels: Record<PreferencePriority, string> = {
+  parallel: 'Parallel tasks',
+  review: 'Reviewing changes',
+  context: 'Project memory',
+  accounts: 'Accounts & usage',
+  recurring: 'Recurring work',
+  remote: 'Remote access',
+};
 const groups = [
-  {
-    name: 'platforms',
-    title: 'Where do you build?',
-    options: [
-      ['macos', 'macOS'],
-      ['windows', 'Windows'],
-      ['linux', 'Linux'],
-    ],
-  },
+  { name: 'platforms', title: 'Where do you build?', options: Object.entries(platformLabels) },
   {
     name: 'agents',
     title: 'Which agents do you use or want to try?',
-    options: [
-      ['codex', 'Codex'],
-      ['claude', 'Claude Code'],
-      ['opencode', 'OpenCode'],
-      ['grok', 'Grok'],
-      ['antigravity', 'Antigravity'],
-      ['cursor', 'Cursor'],
-      ['gemini', 'Gemini CLI'],
-      ['other', 'Other'],
-      ['exploring', 'Still exploring'],
-    ],
+    options: Object.entries(agentLabels),
   },
   {
     name: 'priorities',
     title: 'What would help you most?',
-    options: [
-      ['parallel', 'Parallel tasks'],
-      ['review', 'Reviewing changes'],
-      ['context', 'Project memory'],
-      ['accounts', 'Accounts & usage'],
-      ['recurring', 'Recurring work'],
-      ['remote', 'Remote access'],
-    ],
+    options: Object.entries(priorityLabels),
   },
-];
-
-export type Preferences = { platforms: string[]; agents: string[]; priorities: string[] };
+] satisfies { name: keyof Preferences; title: string; options: [string, string][] }[];
 
 /**
  * The same three questions, for a member who is already signed in.

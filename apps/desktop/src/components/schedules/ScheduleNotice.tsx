@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useState } from 'react';
+import { useNativeResource } from '../../hooks/useNativeResource';
+import { navigateWorkspace } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { listSchedules, needsAction } from '../../lib/schedules';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { useCompanionNotices } from '../mascot/useCompanionNotices';
 
-interface ScheduleStatus {
-  lastNotice?: { dueAt: string; runId: string | null; outcome: string } | null;
-  definition: { id: string; name: string; request: { projectId: string } };
-  history: { dueAt: string; runId: string | null; outcome: string }[];
-}
 export function ScheduleNotice() {
-  const [schedules, setSchedules] = useState<ScheduleStatus[]>([]);
-  const [error, setError] = useState('');
+  const desktop = isTauriEnvironment();
+  const { data, error } = useNativeResource(listSchedules, [], { pollMs: 15000, enabled: desktop });
+  const schedules = data?.schedules ?? [];
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('jackalope-schedule-notices') ?? '[]');
@@ -25,41 +22,14 @@ export function ScheduleNotice() {
     }
   });
   const runs = useExecutionStore((s) => s.runs);
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let active = true;
-    const refresh = () =>
-      nativeTask<{ schedules: ScheduleStatus[] }>('schedule_list')
-        .then((data) => {
-          if (active) {
-            setSchedules(data.schedules);
-            setError('');
-          }
-        })
-        .catch((cause) => {
-          if (active) setError(String(cause));
-        });
-    void refresh();
-    const timer = setInterval(refresh, 15000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, []);
   const notices = schedules.flatMap((schedule) => {
     const event = schedule.lastNotice ?? schedule.history.at(-1);
     if (!event) return [];
     const run = runs.find((r) => r.id === event.runId);
     if (run) return [];
     const status = event.outcome;
-    const actionable =
-      ['review', 'failed', 'interrupted'].includes(status) ||
-      status.startsWith('Failed') ||
-      status.startsWith('Change detected') ||
-      status.startsWith('Monitor needs attention') ||
-      status.startsWith('Interrupted dispatch');
     const key = `${schedule.definition.id}:${event.dueAt}:${status}`;
-    return actionable && !dismissed.includes(key)
+    return needsAction(event) && !dismissed.includes(key)
       ? [
           {
             key,
@@ -75,8 +45,8 @@ export function ScheduleNotice() {
     notices.map((notice) => ({
       id: `schedule:${notice.key}`,
       title: notice.name,
-      detail: notice.status === 'review' ? 'Ready to review' : notice.status,
-      kind: notice.status === 'review' ? 'success' : 'attention',
+      detail: notice.status,
+      kind: 'attention',
       actionLabel: 'Open schedule',
       onOpen: () => {
         useProjectStore.getState().selectProject(notice.projectId);

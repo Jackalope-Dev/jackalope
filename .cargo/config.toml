@@ -1,2 +1,4 @@
 [env]
-RUST_TEST_THREADS = "2"
+# Local default; CI sets its own limit. Several tests start Git and agent
+# fixtures, so going much higher mostly adds contention.
+RUST_TEST_THREADS = "6"

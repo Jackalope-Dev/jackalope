@@ -1,15 +1,23 @@
 import { PassTickets } from '@jackalope/brand/passes';
-import { CopyButton, ExternalLinkIcon, Input, MailIcon, RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  CopyButton,
+  ExternalLinkIcon,
+  Input,
+  LoadingState,
+  MailIcon,
+  RefreshIcon,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+} from '@jackalope/ui';
 import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { nativeTask } from '../../lib/task-runtime';
-import { openInBrowser } from '../../lib/tauri-bridge';
+import { openInBrowser } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useReferralStore } from '../../stores/referralStore';
-import { Button } from '../ui/button';
-import { LoadingState } from '../ui/LoadingState';
-import { SettingActions, SettingBody, SettingGroup } from './Setting';
 
 const invitationMessage =
   'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an Instant Access Pass for you to skip the waitlist after email verification, while a pass is available.';
@@ -67,7 +75,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
   };
   const openManagement = async () => {
     try {
-      await nativeTask('app_account_open_referrals');
+      await invokeNative('app_account_open_referrals');
     } catch (cause) {
       setError(typeof cause === 'string' ? cause : 'Could not open invitation management.');
     }

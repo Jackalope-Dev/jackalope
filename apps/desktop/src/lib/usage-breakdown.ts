@@ -1,4 +1,4 @@
-import type { RunUsage, TaskRun } from './task-runtime.ts';
+import type { RunUsage, TaskRun } from './run-types.ts';
 
 function total(usages: RunUsage[]) {
   const reported = usages.filter((usage) => usage.reported);

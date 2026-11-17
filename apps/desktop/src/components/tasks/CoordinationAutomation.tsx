@@ -1,8 +1,7 @@
-import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Checkbox, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function CoordinationAutomation({
   project,
@@ -14,7 +13,7 @@ export function CoordinationAutomation({
   project: Project;
   queue: QueueView;
   busy: boolean;
-  act: (command: QueueCommand, args: Record<string, unknown>) => Promise<void>;
+  act: (command: QueueCommand, args: Record<string, unknown>) => Promise<unknown>;
   onSelect: (id: string) => void;
 }) {
   const policy = queue.assistPolicies?.find((p) => p.projectId === project.id);
@@ -69,6 +68,11 @@ export function CoordinationAutomation({
           results stay in Review & merge. Pausing the queue stops new automatic actions; running
           agents continue.
         </p>
+        <p className="task-muted">
+          Commit <code>.jackalope/autonomy.json</code> to the target branch to choose which paths
+          can merge automatically and how large a change can be. Everything else stays in Review &
+          merge.
+        </p>
       </Disclosure>
       {jobs
         .slice(-10)
@@ -77,7 +81,8 @@ export function CoordinationAutomation({
           <article key={job.id} className="queue-message">
             <h3>Reconciliation · {job.status === 'review' ? 'Ready for review' : job.status}</h3>
             <p>{job.sourceIds.length} source tasks</p>
-            {job.error && <InlineNotice tone="error">{job.error}</InlineNotice>}
+            {job.held && <InlineNotice>{job.held}</InlineNotice>}
+            <ActionError error={job.error} />
             {job.runId && (
               <Button variant="outline" onClick={() => onSelect(job.runId as string)}>
                 Open reconciliation task

@@ -19,6 +19,8 @@ mod drafts;
 mod editor;
 mod events;
 mod feed;
+#[cfg(all(test, unix))]
+mod harness;
 mod keys;
 mod pickers;
 mod plan;
@@ -28,16 +30,16 @@ mod selection;
 mod sharpen;
 
 use crate::connection::Connection;
-use crate::protocol::{AgentStatus, Handshake, Project, SessionSummary, SessionView};
+use crate::protocol::{AgentStatus, Attribution, Handshake, Project, SessionSummary, SessionView};
 use crate::{brand, git, history, shell};
 use crossterm::event::{
-    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyEvent,
-    KeyboardEnhancementFlags, MouseEvent, PopKeyboardEnhancementFlags,
-    PushKeyboardEnhancementFlags,
+    DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+    EnableFocusChange, EnableMouseCapture, KeyEvent, KeyboardEnhancementFlags, MouseEvent,
+    PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use crossterm::terminal::SetTitle;
 use editor::Editor;
-use feed::{Entry, Tone};
+use feed::{Placed, Tone};
 use pickers::{Picker, PickerKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -56,6 +58,8 @@ enum Event {
     /// The pointer moved to this column and row, for hover highlights.
     Hover(u16, u16),
     Paste(String),
+    /// The terminal window gained (`true`) or lost focus, where it reports it.
+    Focus(bool),
     Shell(shell::Update),
     Resize,
     Changed,
@@ -82,6 +86,14 @@ enum Click {
     Type(&'static str),
     /// Shows the open conversation at this position in the tabs.
     Tab(usize),
+    /// Closes the tab at this position.
+    CloseTab(usize),
+    /// Chooses the open picker's row at this position, as Enter would.
+    Row(usize),
+    /// Chooses the command or mention menu's row at this position.
+    Menu(usize),
+    /// Shows this changed file in the changes panel.
+    File(usize),
 }
 
 /// Something an `@` can name: an agent to hand the message to, or a file.
@@ -141,7 +153,7 @@ struct App {
     /// The last host error a refresh reported, so it is noted once.
     problem: Option<String>,
     /// This project's commit authorship, fetched when settings open.
-    attribution: Option<String>,
+    attribution: Option<Attribution>,
     picker: Option<Picker>,
     /// The highlighted row of the slash-command or mention menu.
     slash: usize,
@@ -155,6 +167,15 @@ struct App {
     offered: HashSet<String>,
     /// Conversations opened in this terminal, kept as tabs once visited.
     opened: HashSet<String>,
+    /// Each conversation as last read, shown at once when switching back to it.
+    seen_views: std::collections::HashMap<String, SessionView>,
+    /// Each conversation's changed files as last read, for the same reason.
+    seen_changes: std::collections::HashMap<String, Vec<crate::git::FileChange>>,
+    /// The top bar with the project and tabs is hidden (`/tabs`, Ctrl+T).
+    top_bar_hidden: bool,
+    /// Conversations whose tab was closed, kept out of the tabs until opened
+    /// again or until they start needing you.
+    closed: HashSet<String>,
     history: Vec<String>,
     history_index: Option<usize>,
     files: Option<FileIndex>,
@@ -175,8 +196,8 @@ struct App {
     /// What the window title and bell last reflected.
     signalled: Option<Signal>,
     /// Jackalope's own lines — help, errors, confirmations and `!` output —
-    /// shown under the conversation and never sent to an agent.
-    feed: Vec<Entry>,
+    /// shown in the conversation they were added in and never sent to an agent.
+    feed: Vec<Placed>,
     shells: Vec<shell::Run>,
     /// A short confirmation in the status line, such as "Copied".
     flash: Option<(String, Tone, Instant)>,
@@ -209,12 +230,27 @@ struct App {
     draft_sync: Option<drafts::DraftSync>,
     /// How long the work that just stopped ran, for the done message.
     last_run_took: Option<std::time::Duration>,
+    /// The conversation `/merge` paused while its merge is prepared and asked
+    /// about, resumed if the merge does not go ahead.
+    merge_paused: Option<String>,
+    /// The run whose result just arrived and when, so its card decodes into
+    /// place once.
+    reveal: Option<(String, Instant)>,
+    /// The newest step the run card shows and when it appeared, so it
+    /// resolves as it arrives.
+    newest_step: RefCell<Option<(String, Instant)>>,
     /// When the start screen was first drawn, for the wordmark's light sweep.
     intro: Cell<Option<Instant>>,
     /// Animation frame for the working indicator.
     tick: usize,
+    /// The terminal window has focus, as far as it reports; idle motion such
+    /// as the wordmark's glitch waits while it is in the background.
+    focused: bool,
     /// Currently displayed rotating tip.
     tip_index: usize,
+    /// The last frame drew the framed layout, whose tip changes only when
+    /// something is sent rather than on a timer.
+    framed: Cell<bool>,
     last_tip_change: Instant,
     /// The plan open in this terminal, from `/plan` or `/plans`.
     plan: Option<plan::PlanPane>,
@@ -244,69 +280,7 @@ pub fn run(
     events::spawn_ticker(events.clone());
     let refresher = refresh::spawn(handshake.clone(), events.clone());
 
-    let mut app = App {
-        connection,
-        events,
-        refresher,
-        branch: git::branch(&project.path),
-        handshake,
-        project,
-        session,
-        context: 0,
-        view: None,
-        view_version: 0,
-        sessions: Vec::new(),
-        projects: Vec::new(),
-        overview: None,
-        overview_asked: (Instant::now(), true),
-        offline: None,
-        problem: None,
-        attribution: None,
-        picker: None,
-        slash: 0,
-        editor: Editor::default(),
-        next_agent: next.agent,
-        next_model: next.model,
-        offered: HashSet::new(),
-        opened: HashSet::new(),
-        history: history::load(),
-        history_index: None,
-        files: None,
-        indexing: None,
-        sharpening: false,
-        sharpen_undo: None,
-        mention_cache: RefCell::new(None),
-        mention_closed: false,
-        stop_armed: None,
-        suspend: false,
-        signalled: None,
-        feed: Vec::new(),
-        shells: Vec::new(),
-        flash: None,
-        work_started: None,
-        last_progress: None,
-        changes: Vec::new(),
-        changes_version: 0,
-        panel: changes::Panel::default(),
-        selection: None,
-        screen: None,
-        body_area: Cell::new(Rect::default()),
-        input_width: Cell::new(1),
-        scroll_top: None,
-        max_scroll: Cell::new(0),
-        transcript: RefCell::new(None),
-        hits: RefCell::new(Vec::new()),
-        hover: None,
-        draft_sync: None,
-        intro: Cell::new(None),
-        last_run_took: None,
-        tick: 0,
-        tip_index: 0,
-        last_tip_change: Instant::now(),
-        plan: None,
-        plan_edit: false,
-        quit: false,
-    };
+    let mut app = App::new(connection, project, session, next, events, refresher);
     // The first read happens here rather than on the refresher, so the
     // conversation is on screen from the first frame.
     app.refresh_now();
@@ -331,6 +305,93 @@ pub fn run(
     result
 }
 
+impl App {
+    /// The view's state before its first read, sending what it starts to
+    /// `events` and refreshes to `refresher`.
+    fn new(
+        connection: Connection,
+        project: Project,
+        session: Option<String>,
+        next: NextStart,
+        events: Sender<Event>,
+        refresher: Sender<refresh::Request>,
+    ) -> Self {
+        let handshake = connection.handshake().clone();
+        App {
+            connection,
+            events,
+            refresher,
+            branch: git::branch(&project.path),
+            handshake,
+            project,
+            session,
+            context: 0,
+            view: None,
+            view_version: 0,
+            sessions: Vec::new(),
+            projects: Vec::new(),
+            overview: None,
+            overview_asked: (Instant::now(), true),
+            offline: None,
+            problem: None,
+            attribution: None,
+            picker: None,
+            slash: 0,
+            editor: Editor::default(),
+            next_agent: next.agent,
+            next_model: next.model,
+            offered: HashSet::new(),
+            opened: HashSet::new(),
+            seen_views: std::collections::HashMap::new(),
+            seen_changes: std::collections::HashMap::new(),
+            closed: HashSet::new(),
+            top_bar_hidden: feed::top_bar_hidden(),
+            history: history::load(),
+            history_index: None,
+            files: None,
+            indexing: None,
+            sharpening: false,
+            sharpen_undo: None,
+            mention_cache: RefCell::new(None),
+            mention_closed: false,
+            stop_armed: None,
+            suspend: false,
+            signalled: None,
+            feed: Vec::new(),
+            shells: Vec::new(),
+            flash: None,
+            work_started: None,
+            last_progress: None,
+            merge_paused: None,
+            reveal: None,
+            newest_step: RefCell::new(None),
+            changes: Vec::new(),
+            changes_version: 0,
+            panel: changes::Panel::default(),
+            selection: None,
+            screen: None,
+            body_area: Cell::new(Rect::default()),
+            input_width: Cell::new(1),
+            scroll_top: None,
+            max_scroll: Cell::new(0),
+            transcript: RefCell::new(None),
+            hits: RefCell::new(Vec::new()),
+            hover: None,
+            draft_sync: None,
+            intro: Cell::new(None),
+            last_run_took: None,
+            tick: 0,
+            focused: true,
+            tip_index: 0,
+            framed: Cell::new(false),
+            last_tip_change: Instant::now(),
+            plan: None,
+            plan_edit: false,
+            quit: false,
+        }
+    }
+}
+
 /// Turns on what the interface relies on beyond raw mode, returning whether
 /// the terminal reports modified keys (so Shift+Enter is distinguishable).
 ///
@@ -341,7 +402,12 @@ pub fn run(
 /// still reaches the terminal's own selection.
 fn enter_modes() -> bool {
     let mut stdout = std::io::stdout();
-    let _ = crossterm::execute!(stdout, EnableMouseCapture, EnableBracketedPaste);
+    let _ = crossterm::execute!(
+        stdout,
+        EnableMouseCapture,
+        EnableBracketedPaste,
+        EnableFocusChange
+    );
     // Windows consoles report modifiers natively and reject the escape.
     let enhanced =
         cfg!(not(windows)) && crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false);
@@ -359,7 +425,12 @@ fn leave_modes(enhanced: bool) {
     if enhanced {
         let _ = crossterm::execute!(stdout, PopKeyboardEnhancementFlags);
     }
-    let _ = crossterm::execute!(stdout, DisableBracketedPaste, DisableMouseCapture);
+    let _ = crossterm::execute!(
+        stdout,
+        DisableFocusChange,
+        DisableBracketedPaste,
+        DisableMouseCapture
+    );
 }
 
 /// Ctrl+Z: restores the terminal, stops this process as a shell's job, and
@@ -387,9 +458,17 @@ impl App {
         }
         // Coming back to the start screen plays the wordmark's sweep again.
         self.intro.set(None);
-        self.opened.extend(session.clone());
+        if let Some(id) = &session {
+            self.opened.insert(id.clone());
+            self.closed.remove(id);
+        }
+        // The conversation as last seen shows at once; the read that follows
+        // brings it up to date, so switching never flashes the start screen.
+        let seen = session
+            .as_ref()
+            .and_then(|id| self.seen_views.get(id).cloned());
         self.session = session;
-        self.set_view(None);
+        self.set_view(seen);
         self.context += 1;
         self.scroll_top = None;
         self.selection = None;
@@ -397,6 +476,13 @@ impl App {
         self.last_run_took = None;
         self.last_progress = None;
         self.reset_panel();
+        if let Some(changes) = self
+            .session
+            .as_ref()
+            .and_then(|id| self.seen_changes.get(id).cloned())
+        {
+            self.set_changes(changes);
+        }
         self.refresh();
     }
 
@@ -415,10 +501,14 @@ impl App {
             (None, None) => true,
             _ => false,
         };
+        if let Some(view) = &view {
+            self.seen_views.insert(view.id.clone(), view.clone());
+        }
         self.view = view;
         if !unchanged {
             self.view_version += 1;
         }
+        self.settle_feed();
     }
 
     /// Switches to another project with no conversation open.

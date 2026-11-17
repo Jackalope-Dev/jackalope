@@ -19,6 +19,14 @@
 .work-signal-removed {
   color: var(--color-danger);
 }
+.work-signal-files {
+  color: var(--color-text-muted);
+}
+.work-signal-unlanded {
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-text-secondary);
+}
 .work-signal-unread {
   display: inline-grid;
   place-items: center;

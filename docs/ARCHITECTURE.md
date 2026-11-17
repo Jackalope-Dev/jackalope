@@ -1,6 +1,6 @@
 # Architecture
 
-Jackalope has three applications and shared UI, branding and knowledge packages. Desktop execution
+Jackalope has three applications and shared UI, branding, knowledge and contract packages. Desktop execution
 is local; verified account access is required to start new work in every build.
 Saved history and running tasks remain accessible when access expires.
 
@@ -16,12 +16,16 @@ Saved history and running tasks remain accessible when access expires.
 | `packages/ui` | Browser-safe React controls shared by desktop, website and admin |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
+| `packages/contracts` | Cross-application shapes: telemetry, account and download responses, platforms, release distribution (targets, CDN URLs, installer names, R2 layout, Store links), run statuses and agent questions, and the remote companion protocol (snapshot, actions, status labels, draft keys) |
 | `scripts/release` | Cross-application build, signing, release receipts and publication orchestration |
 | `scripts/verification` | Browser regression fixtures and local acceptance helpers |
 | `docs` | Public architecture, feature contracts, verification and release guidance |
 
-Application runtime imports share code through `packages/ui`, `packages/brand` and `packages/knowledge`; applications do
-not import each other's runtime modules. Release tooling intentionally spans
+Application runtime imports share code through `packages/ui`, `packages/brand`, `packages/knowledge` and
+`packages/contracts`; applications do not import each other's runtime modules, except that the mobile
+companion renders the desktop's remote workspace hook and a few task components (questions, changed
+files, provider marks) from `apps/desktop/src`. Release scripts import
+`packages/contracts` for release names and URLs. Release tooling intentionally spans
 applications. The website generates its monochrome SVG and PNG icons directly
 from shared character geometry during development and builds. The server bundles
 its React admin frontend from `apps/server/admin` using `pnpm admin:build`; Wrangler
@@ -39,7 +43,15 @@ Project readiness uses isolated gix metadata reads with Git fallback. Review ren
 uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integration
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
 Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
-and MCP connections and marketplace. Zustand stores keep
+and MCP connections and marketplace. Workspace views are registered once in
+lib/navigation.ts (label, group, icon, telemetry feature, search keywords) with
+their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
+read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
+command search and the shortcut sheet live in layout/commands.ts; the tray and macOS
+menu items name their command in layout/menu-actions.json, which the native menus read. Work is read through
+lib/work-selection.ts (`useWorkspaceWork`, `useAllRuns`) and opened with `openWork`,
+`openRun` or `openConversation`, which clear the other selections and focus the
+project. Zustand stores keep
 selection, drafts and preferences; they do not establish that native work ran.
 
 ~~~text
@@ -53,12 +65,25 @@ Composer / saved idea / queue / native schedule
   → prepared integration receipt → explicit application
 ~~~
 
-executionStore.start synchronizes agent policy and invokes task_start. Clients in
-lib/queue.ts synchronize policy before queue creation/dispatch. Native commands
-are registered in src-tauri/src/lib.rs, the authoritative command inventory.
-lib/task-runtime.ts, lib/queue.ts, lib/agent-profiles.ts, lib/codebase.ts and
-lib/tauri-bridge.ts hold feature contracts/clients. DTOs follow Rust serde field
-names; changes must preserve both sides and old saved records.
+The webview owns the agent policy (stores/agentConfigStore.ts). The main window
+saves it to the native side on every change, and the transport saves it again
+before each command that reads it (task starts, discovery, queue creation and
+dispatch, schedules, Chat and others listed there), so no caller syncs by hand.
+Each native module
+lists its own commands in a `tauri_commands!` macro; src-tauri/src/lib.rs chains
+those lists into the one handler, and a test checks that every
+`#[tauri::command]` is registered exactly once. Managed services that own
+background work implement `Service`, and src-tauri/src/services.rs lists the
+order they stop in when the app exits.
+Every webview call goes through invokeNative in lib/native/transport.ts, which
+rejects in the browser preview and reports operation telemetry and timing;
+lib/native/env.ts detects the desktop app and opens links. lib/run-types.ts holds
+the attempt DTOs and `@jackalope/contracts/runs` the named status predicates and
+labels.
+Per-domain clients (lib/task-client.ts, lib/queue.ts, lib/agent-profiles.ts,
+lib/git-worktrees.ts, lib/mcp-client.ts, lib/system-info.ts, lib/codebase.ts and
+others) own their command names and DTOs. DTOs follow Rust serde field names;
+changes must preserve both sides and old saved records.
 
 ## Native modules
 
@@ -68,27 +93,43 @@ names; changes must preserve both sides and old saved records.
 | tasks/routing.rs, tasks/routing/ | Validated default-agent selection, quota admission, routing subprocess ownership and bounded handoff |
 | coordination.rs, coordination/ | Queue contracts, eligibility, storage, guarded dispatch and loopback bridge |
 | integration.rs | Captured source snapshots, review receipts and guarded fast-forward application |
-| cli_host.rs, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint, PATH links, app terminal hand-off and the shared project mirror |
-| git.rs, git_command.rs, worktree_cleanup.rs | Worktree operations and explicit Git environment policies |
+| cli_host.rs, cli_host/, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint and its mapping of conversations, plans and projects onto the terminal protocol, PATH links, opening the command in the system terminal and the shared project mirror (settings and their defaults live in cli/project_settings.rs, shared with the CLI) |
+| scope_path.rs | Repository-relative paths tasks own or name, with one case-folding rule for containment and overlap |
+| git.rs, git_command.rs, repo.rs, worktree_cleanup.rs | Worktree operations, explicit Git environment policies and Git plumbing shared with the CLI (private indexes, synthetic commits, `-z` parsers) |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
 | process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
 | notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
+| agents.rs | The agent catalog read from src/lib/agents.json: names, executables, sign-in directories and variables, protocols and capabilities |
 | agent_policy.rs, agent_profiles.rs, capacity/ | Allowlists, profile binding/sign-in and capacity |
-| mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
+| mcp.rs, mcp_broker.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped questions |
+| bridge.rs, bridge/ | The attempt bridge: one table defines every tool (input, description, hints, placement, HTTP route, optional group, who is offered it, handler); the MCP server, HTTP routes and help, runner placement, Codex approvals and deferred loading are derived from it, and each handler serves both transports after one authorization |
+| agent_decider.rs, question_risk.rs | Autonomy policy, question classification and read-only decider attempts that answer plan questions, rounds and deviations for the person |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
-| computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot and task computers: provider trait, local Docker sandboxes, paired cloud machines, the in-sandbox agent image and run routing for desktop and browser tools |
+| computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
+| computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
+| computers/pool.rs, coordination/hosts.rs | The capacity pool of execution hosts (this device and the person's computers): per-project host choices, limits, health, the deterministic placer for planned and swarm forks, and the one retry of a fork whose host was lost |
+| computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
+| tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), one record of what workspace tools did, and the recovery of changes a lost attempt left on a computer, saved as a patch and never applied |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
-| cloudflare_artifacts.rs | Protected Cloudflare Artifacts connection, repository creation, host-scoped token pushes and review snapshots |
+| cloudflare.rs, cloudflare/ | The protected Cloudflare connection and Connect Cloudflare sign-in, the product scopes it may request, and the v4 account API client shared by Artifacts, cloud resources and Swarm setup |
+| cloudflare_artifacts.rs, cloudflare_resources.rs | Artifacts repository creation, host-scoped token pushes and review snapshots; per-project cloud resources and their manifest |
+| http.rs | Outbound HTTP clients that refuse redirects, shared per timeout, and bounded response reads |
+| site_gate.rs, artifacts.rs | The once-per-site question shared by every agent-driven browser; screenshot evidence and saved output in the workspace |
+| resources.rs | Files bundled under `resources/`, with the source tree's copy in development builds |
 | remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 
-Lock order is **coordinator state → execution guard → runtime state**.
-TaskRuntime::start_locked requires a caller-held execution guard. Successful
+Lock order is **coordinator state → execution guard → runtime state**, and the
+types carry it: coordinator code takes the guard through `Coordinator::transact` or
+`Coordinator::execution`, which need the locked coordinator state, and
+`TaskRuntime::start_locked` takes the `&ExecutionGuard` it runs under. Coordinated
+attempts start through `Coordinator::launch_assignment`, and ledger changes go through
+`Coordinator::commit`, which keeps a change only once it is saved. Successful
 agent exit is not an integrated dependency. Integration rechecks source/target
 identity, saved checks and local files before changing a checkout. See
 [PARALLEL-WORKFLOWS.md](PARALLEL-WORKFLOWS.md) for the full contract.
@@ -101,13 +142,54 @@ MCP and HTTP handlers use the same seven tools and existing screenshot artifacts
 The daemon is a pinned local implementation detail, not a hosted service or an
 agent-supplied executable. See [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
+An agent on a computer splits one attempt across two planes. This device is the
+control plane: it keeps identity and credentials, approvals and policy (including
+autonomy deciders), orchestration, history and review, and the final Git integration,
+and it never runs a tool against the computer's workspace. The computer's agent
+(`resources/computer/agent.py`) is the runner, the execution plane: it owns the
+uploaded workspace and everything that touches it. They speak one versioned run
+protocol (`runs` in `run_status`); from protocol 4 the runner lists `capabilities`,
+and each behaviour past protocol 3 is enabled only by a listed capability, so older
+images keep their earlier behaviour. Each bridge tool's entry in the bridge's table places it
+as Workspace (served by the runner's local bridge when it has the capability) or
+Control (forwarded to this device through the relay queue). The runner asks this
+device before anything a person or rule governs through `POST /v1/policy` (kinds
+`tool`, `site`, `secret`); anything but an explicit allow, including no answer, is a
+refusal. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+
+Placement is a parameter of every attempt, not a separate code path. The task runtime
+assembles the agent's command and prompt, then runs it through an `AttemptRunner`
+(`tasks/runner.rs`): `LocalRunner` uses this device's worktree as it is and owns the agent
+process, and `RemoteRunner` is the computer's runner seen from here. Both go through
+`TaskRuntime::run_attempt` (prepare, attach the placement, start, follow, collect) before
+the shared completion path, so checks, checkpoints, review, integration and the lock order
+are the same. The local runner reports the `device` capability and every workspace
+capability, so its tool list comes from the same bridge tool table, and the
+bridge applies each attempt's attached placement to `tools/list`. Tool events from the
+bridge's own handlers and from a runner's `/v1/runner/event` are recorded by one function.
+See [the runner](BOT-COMPUTERS.md#the-runner).
+
+Which runner an attempt gets is decided on this device. When the coordinator's dispatch
+reserves planned or swarm work, the capacity pool's placer (`computers/pool.rs`) picks one
+host from this device and the computers the project may use, by the fork's needs, the
+project's choice of hosts and free capacity, under the coordinator lock and before the
+execution guard; the choice reaches the attempt when it is created and is saved on it.
+Attempts the queue does not dispatch, continuations included, keep the project's computer
+rule or their earlier host. A fork whose host was lost is retried once on another host
+through the same dispatch path, so reservations, quota handoff and the lock order are
+unchanged. Recovering the changes a lost attempt left on its computer
+(`tasks/runner/recovery.rs`) takes neither the coordinator lock nor the execution guard:
+it writes only beside the attempt's history and on the computer, never to a workspace,
+and its own lock keeps it apart from a run preparing on that computer. See
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
+
 `desktop_control.rs` separately owns explicit window, app and desktop grants, the
 session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot
 checks. See [DESKTOP-CONTROL.md](DESKTOP-CONTROL.md) for platform support and limits.
 
 Native profiles store task journals, queues, schedules, integration receipts and
 preferences. Locks prevent concurrent writers. Interrupted attempts are retained,
-not automatically replayed. Unreadable files are preserved; unsaved history blocks
+not automatically replayed, until the person resumes them. Unreadable files are preserved; unsaved history blocks
 operations that would lose continuity. Legacy plan-only schedules and saved ideas
 remain compatible.
 
@@ -135,18 +217,24 @@ not change native task, update or recovery state. Keep action-local errors inlin
 
 components/tasks separates collection/composer, detail/result review, queue/add-work
 and integration review. Browser-safe controls live in packages/ui, consumed as
-@jackalope/ui by desktop, website and admin. Desktop components/ui retains
-compatibility exports and app-specific compositions such as workspace navigation
-and task state mapping. System information belongs to Settings; saved task editing
+@jackalope/ui by desktop, website and admin; desktop imports them from there directly.
+Desktop components/ui holds only app-specific compositions such as workspace navigation
+and error boundaries. System information belongs to Settings; saved task editing
 belongs to Tasks. TaskDetail composes TaskRunDetails, TaskFollowUpPanel and the
 useTaskFollowUps queue hook; OnboardingFlow composes one component per step.
 
-Subscribe to native events with hooks/useTauriEvent and to app `jackalope:*` window
-events with hooks/useWindowEvent; both handle late-resolving cleanup and stale
-handlers. Open links through openInBrowser in lib/tauri-bridge, which reports
+Subscribe to native events with hooks/useTauriEvent. Requests between parts of a
+window (navigate, open settings or the Agents page, open a helper draft, attach to the
+composer, changes or feedback saved) are typed events in lib/app-events: send them with
+its helpers or emitAppEvent and listen with useAppEvent. Settings categories, their
+groups, icons and search words are one registry in lib/settings-categories.ts;
+the in-app helper's page names are lib/helper-destinations.json, which the native
+helper validates against and workspace views name with `helper`. The mascot's mood is
+derived in stores/mascotStore from activity sources (running work, a requested
+repository scan) rather than set by callers. Open links through openInBrowser in lib/native/env, which reports
 failures to the caller. Select store fields with useShallow rather than
 subscribing to a whole store. PROMPT_MAX_CHARS bounds task, follow-up and
-schedule instructions.
+schedule instructions in the composer; the native side accepts longer ones.
 
 The UI package owns portable styling, accessible controls, overlays, feedback
 states and basic layout/data primitives. It has no native bridge, stores, routing

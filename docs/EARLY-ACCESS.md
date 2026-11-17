@@ -139,6 +139,9 @@ For unsynced newsletter consent, an operator may reset `newsletter_attempts` and
 `newsletter_next_at` for the affected consenting member after correcting the cause.
 Never reset `newsletter_synced_at` to resubscribe someone who opted out.
 
+Recurring product update emails are drafted and sent from LopeBase, which reads
+the website's public changelog feed. The admin composer remains for one-off notes.
+
 ## Private installers and rollout
 
 Approved members can also connect the desktop through browser approval using the

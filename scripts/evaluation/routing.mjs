@@ -3,9 +3,10 @@ import { routingEvidence } from './routing-evidence.mjs';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const files = args.filter((a) => !a.startsWith('--'));
-const outcome = args.find((a) => a.startsWith('--outcome='))?.slice(10) ?? 'accepted';
-const output = args.find((a) => a.startsWith('--output='))?.slice(9);
-const reviewFile = args.find((a) => a.startsWith('--reviews='))?.slice(10);
+const value = (name) => args.find((a) => a.startsWith(`${name}=`))?.slice(name.length + 1);
+const outcome = value('--outcome') ?? 'accepted';
+const output = value('--output');
+const reviewFile = value('--reviews');
 if (!files.length)
   throw new Error(
     'Supply comparison.json files and optionally --reviews=<JSON receipt-to-review map>, --outcome=oraclePassed, --output=<report.json>.',

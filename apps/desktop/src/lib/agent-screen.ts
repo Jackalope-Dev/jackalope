@@ -1,5 +1,5 @@
 import type { ComputerStatus } from './computers.ts';
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 interface AgentBrowserView {
   status: 'live' | 'busy' | 'stopped' | 'unavailable';
@@ -52,23 +52,23 @@ export interface AgentScreen {
 
 /** Reads the attempt's browser and desktop access without starting or changing either. */
 export const readAgentScreen = (runId: string, capture: boolean) =>
-  nativeTask<AgentScreen>('task_agent_screen', { runId, capture });
+  invokeNative<AgentScreen>('task_agent_screen', { runId, capture });
 
 export const revokeAgentAccess = (runId: string, target: 'browser' | 'desktop') =>
-  nativeTask<void>('task_agent_screen_revoke', { runId, target });
+  invokeNative<void>('task_agent_screen_revoke', { runId, target });
 
 /** Saves the attempt's current window or app grant as "Always allow" for its project. */
 export const rememberDesktopGrant = (runId: string) =>
-  nativeTask<RememberedDesktopGrant>('desktop_control_remember', { runId });
+  invokeNative<RememberedDesktopGrant>('desktop_control_remember', { runId });
 
 export const desktopPermissions = (projectId: string) =>
-  nativeTask<{ grants: RememberedDesktopGrant[]; sites: DesktopSiteDecision[] }>(
+  invokeNative<{ grants: RememberedDesktopGrant[]; sites: DesktopSiteDecision[] }>(
     'desktop_control_permissions',
     { projectId },
   );
 
 export const forgetDesktopPermission = (projectId: string, id: string) =>
-  nativeTask<void>('desktop_control_forget', { projectId, id });
+  invokeNative<void>('desktop_control_forget', { projectId, id });
 
 export function desktopScopeLabel(scope: DesktopScope | null | undefined) {
   switch (scope) {

@@ -25,6 +25,10 @@ pub struct Delivery {
     pub auto_started: bool,
     /// Subtasks agents spawned with propose_subtask.
     pub spawned_subtasks: usize,
+    /// Why the autonomy policy kept a ready result in review.
+    pub held: Option<String>,
+    /// Target commit and attempts `held` was decided for; a change to either re-checks.
+    pub held_key: Option<String>,
 }
 
 impl Default for Delivery {
@@ -47,6 +51,8 @@ impl Default for Delivery {
             assignment_count: 0,
             auto_started: false,
             spawned_subtasks: 0,
+            held: None,
+            held_key: None,
         }
     }
 }
@@ -252,7 +258,7 @@ pub(super) fn validate_review(ledger: &Ledger, ids: &[String]) -> Result<(), Str
 
 fn passed(run: &TaskRun) -> bool {
     !run.finishing
-        && matches!(run.status.as_str(), "review" | "reviewed")
+        && run.status.is_done()
         && run.error.is_none()
         && run.persistence_error.is_none()
         && !run.dependency_invalidated
@@ -431,7 +437,7 @@ fn repair_candidate<'a>(
                 .iter()
                 .find(|run| Some(&run.id) == item.run_id.as_ref())?;
             if !run.finishing
-                && matches!(run.status.as_str(), "review" | "reviewed")
+                && run.status.is_done()
                 && run.error.is_none()
                 && run.persistence_error.is_none()
                 && !run.dependency_invalidated
@@ -474,6 +480,7 @@ impl Coordinator {
     pub(super) fn deliver_managed_locked(
         &self,
         inner: &mut Inner,
+        guard: &ExecutionGuard,
         runs: &[TaskRun],
         merged: &[String],
         url: &str,
@@ -500,7 +507,7 @@ impl Coordinator {
                 && workers.iter().all(|item| {
                     item.run_id.as_ref().is_some_and(|id| {
                         runs.iter()
-                            .any(|run| &run.id == id && !active(&run.status) && !run.finishing)
+                            .any(|run| &run.id == id && !run.status.is_active() && !run.finishing)
                     })
                 })
                 && delivery.workers_finished_at.is_none()
@@ -609,12 +616,14 @@ impl Coordinator {
             changed |= enqueue_checkpoint(&mut ledger, &task.id, runs);
         }
         if changed {
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(inner, |saved| {
+                *saved = ledger;
+                Ok::<_, String>(())
+            })?;
         }
         if runs
             .iter()
-            .filter(|run| active(&run.status) && !run.finishing)
+            .filter(|run| run.status.is_active() && !run.finishing)
             .count()
             >= inner.concurrency
         {
@@ -638,7 +647,7 @@ impl Coordinator {
                 self.delivery_error(inner, &task.id, "The combined checks still need attention after the allowed repair attempts. Review the result, give a correction, or allow another attempt.")?;
                 return Ok(true);
             }
-            if let Err(error) = self.repair_managed_locked(inner, task, &item, run, url) {
+            if let Err(error) = self.repair_managed_locked(inner, guard, task, &item, run, url) {
                 self.delivery_error(inner, &task.id, &error)?;
             }
             return Ok(true);
@@ -646,16 +655,156 @@ impl Coordinator {
         Ok(false)
     }
 
+    /// Merges a ready planned result into its local target branch when the
+    /// project opted into automatic merging and its committed autonomy policy
+    /// allows every change. Without a policy file, results wait for a person.
+    pub(super) fn apply_managed_locked(
+        &self,
+        inner: &mut Inner,
+        runs: &[TaskRun],
+        merged: &[String],
+    ) -> Result<bool, String> {
+        for task in inner.ledger.managed_tasks.clone() {
+            let Some(delivery) = &task.delivery else {
+                continue;
+            };
+            let project = &task.request.project_id;
+            if delivery.ready_at.is_none()
+                || delivery.applied_at.is_some()
+                || task.error.is_some()
+                || !inner.enabled.contains(project)
+            {
+                continue;
+            }
+            let Some(policy) = inner
+                .ledger
+                .assist_policies
+                .iter()
+                .find(|p| &p.project_id == project && p.merge)
+                .cloned()
+            else {
+                continue;
+            };
+            let items: Vec<_> = inner
+                .ledger
+                .items
+                .iter()
+                .filter(|item| item.feature_id.as_ref() == Some(&task.id))
+                .collect();
+            let ids: Vec<String> = items.iter().filter_map(|i| i.run_id.clone()).collect();
+            if ids.is_empty()
+                || ids.len() != items.len()
+                || ids.iter().any(|id| merged.contains(id))
+            {
+                continue;
+            }
+            let Some(final_run) = items
+                .iter()
+                .find(|item| Some(&item.id) == delivery.final_item.as_ref())
+                .and_then(|item| {
+                    runs.iter()
+                        .find(|run| Some(&run.id) == item.run_id.as_ref())
+                })
+            else {
+                continue;
+            };
+            let Some(target) = final_run.target_branch.clone() else {
+                continue;
+            };
+            let project_path = std::path::PathBuf::from(&final_run.project_path);
+            let Ok(head) = super::autonomy::branch_head(&project_path, &target) else {
+                continue;
+            };
+            let key = format!("{head}:{}", ids.join(","));
+            if delivery.held_key.as_deref() == Some(key.as_str())
+                || matches!(super::autonomy::load(&project_path, &head), Ok(None))
+            {
+                continue;
+            }
+            let directory = self.runtime.integration_directory();
+            let outcome = (|| -> Result<Option<String>, String> {
+                if runs.iter().any(|run| {
+                    ids.contains(&run.id)
+                        && run.verify_command.as_deref() != Some(policy.verify_command.as_str())
+                }) {
+                    return Ok(Some(
+                        "This result was not checked with the project's saved check. Held for review."
+                            .into(),
+                    ));
+                }
+                if let Some(reason) = super::autonomy::accept_before_merge(
+                    &self.runtime,
+                    &directory,
+                    &project_path,
+                    &head,
+                    runs,
+                    &ids,
+                ) {
+                    return Ok(Some(reason));
+                }
+                // Reload: the policy may have just recorded outcome acceptance.
+                let runs = &self.runtime.integration_runs()?;
+                self.refresh_scopes_locked(inner)?;
+                self.validate_integration_locked(&inner.ledger, runs, &ids)?;
+                let plan = crate::commands::integration::prepare_with_message(
+                    &directory,
+                    runs,
+                    &ids,
+                    Some(&task.title),
+                )?;
+                if plan.status != "ready" {
+                    return Ok(Some(
+                        "The combined result does not merge cleanly. Held for review.".into(),
+                    ));
+                }
+                let Some(combined) = plan.integration_head.as_deref() else {
+                    return Ok(Some("The combined result has no commit to check against the autonomy policy. Held for review.".into()));
+                };
+                if let Some(reason) =
+                    super::autonomy::hold_reason(&project_path, &plan.master_head, combined)
+                {
+                    return Ok(Some(reason));
+                }
+                if plan.sources.iter().any(|source| {
+                    inner.ledger.scope_audits.iter().any(|audit| {
+                        audit.run_id == source.run_id && audit.tree.as_ref() != Some(&source.tree)
+                    })
+                }) {
+                    return Err("Files changed during the scope check.".into());
+                }
+                crate::commands::integration::apply(&directory, runs, &plan.id)?;
+                Ok(None)
+            })();
+            let held = match outcome {
+                Ok(held) => held,
+                Err(error) => Some(format!("{error} Held for review.")),
+            };
+            self.commit(inner, |ledger| {
+                let saved = ledger
+                    .managed_tasks
+                    .iter_mut()
+                    .find(|saved| saved.id == task.id)
+                    .and_then(|saved| saved.delivery.as_mut())
+                    .unwrap();
+                saved.held_key = held.as_ref().map(|_| key);
+                saved.held = held;
+                Ok::<_, String>(())
+            })?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
     fn delivery_error(&self, inner: &mut Inner, id: &str, error: &str) -> Result<(), String> {
-        let mut ledger = inner.ledger.clone();
-        ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|task| task.id == id)
-            .unwrap()
-            .error = Some(error.into());
-        self.save(&ledger)?;
-        inner.ledger = ledger;
+        self.commit(inner, |ledger| {
+            ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| task.id == id)
+                .unwrap()
+                .error = Some(error.into());
+            Ok::<_, String>(())
+        })?;
         inner.enabled.remove(&managed::dispatch_key(id));
         Ok(())
     }
@@ -663,6 +812,7 @@ impl Coordinator {
     fn repair_managed_locked(
         &self,
         inner: &mut Inner,
+        guard: &ExecutionGuard,
         task: &managed::ManagedTask,
         item: &QueueItem,
         run: &TaskRun,
@@ -698,68 +848,51 @@ The plan review left these gaps open. Fix them, then record a new Plan review:
 {gaps}"
             ));
         }
-        let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-        request.coordination = Some(CoordinationContext {
-            managed: true,
-            endpoint: url.into(),
-            token: token.clone(),
-            instructions: instructions(item),
-        });
-        let mut ledger = inner.ledger.clone();
-        capture_interfaces(&mut ledger, item, &request.id);
-        let saved = ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|saved| saved.id == task.id)
-            .unwrap();
-        saved.run_ids.push(request.id.clone());
-        saved.delivery.as_mut().unwrap().repairs.push(Repair {
-            item_id: item.id.clone(),
-            source_run_id: run.id.clone(),
-            run_id: request.id.clone(),
-            created_at: Utc::now().to_rfc3339(),
-        });
-        ledger
-            .items
-            .iter_mut()
-            .find(|saved| saved.id == item.id)
-            .unwrap()
-            .run_id = Some(request.id.clone());
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        inner
-            .grants
-            .insert(token.clone(), (item.id.clone(), request.id.clone()));
-        let result = (|| {
-            let briefing = self.startup(inner, &request, Some(item))?;
-            request
-                .coordination
-                .as_mut()
-                .unwrap()
-                .instructions
-                .push_str(&briefing);
-            self.register_launch(inner, &request.id)?;
-            self.runtime.start_locked(request)
-        })();
-        if let Err(error) = &result {
-            inner.grants.remove(&token);
-            let mut ledger = inner.ledger.clone();
+        self.commit(inner, |ledger| {
+            capture_interfaces(ledger, item, &request.id);
+            let saved = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|saved| saved.id == task.id)
+                .unwrap();
+            saved.run_ids.push(request.id.clone());
+            saved.delivery.as_mut().unwrap().repairs.push(Repair {
+                item_id: item.id.clone(),
+                source_run_id: run.id.clone(),
+                run_id: request.id.clone(),
+                created_at: Utc::now().to_rfc3339(),
+            });
             ledger
                 .items
                 .iter_mut()
                 .find(|saved| saved.id == item.id)
                 .unwrap()
-                .error = Some(error.clone());
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+                .run_id = Some(request.id.clone());
+            Ok::<_, String>(())
+        })?;
+        let launched = self.launch_assignment(
+            inner,
+            guard,
+            LaunchSpec {
+                request,
+                endpoint: url,
+                managed: true,
+                instructions: instructions(item),
+                assigned: Some(item),
+                host: None,
+            },
+        );
+        if let Err(error) = &launched {
+            self.record_item_error(inner, &item.id, error.clone())?;
         }
-        result.map(|_| ())
+        launched.map(|_| ())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
 
     fn fixture() -> (Ledger, Vec<TaskRun>) {
         let task: managed::ManagedTask = serde_json::from_value(serde_json::json!({
@@ -847,6 +980,9 @@ mod tests {
             ledger,
             enabled: ["managed:parent".into()].into(),
             concurrency: 3,
+            remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
+            remote_projects: HashSet::new(),
+            pool: Default::default(),
             grants: HashMap::new(),
             url: Some("fixture".into()),
             error: None,
@@ -874,10 +1010,10 @@ mod tests {
     #[test]
     fn single_finished_assignment_waits_without_launching_an_extra_agent() {
         let (mut ledger, mut runs) = fixture();
-        runs[1].status = "running".into();
+        runs[1].status = RunStatus::Running;
         assert!(!enqueue_checkpoint(&mut ledger, "parent", &runs));
-        runs[1].status = "review".into();
-        runs[2].status = "review".into();
+        runs[1].status = RunStatus::Review;
+        runs[2].status = RunStatus::Review;
         assert!(!enqueue_checkpoint(&mut ledger, "parent", &runs));
     }
 
@@ -896,7 +1032,7 @@ mod tests {
             runs[0].status = status.into();
             assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
         }
-        runs[0].status = "review".into();
+        runs[0].status = RunStatus::Review;
         ledger.items[2].dependencies.push("a".into());
         assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
         let saved: Ledger = serde_json::from_value(serde_json::to_value(&ledger).unwrap()).unwrap();
@@ -950,7 +1086,7 @@ mod tests {
         runs[1].error = Some("crashed".into());
         assert!(!passed(&runs[1]));
         // A run that has a check still needs it to pass.
-        runs[2].status = "review".into();
+        runs[2].status = RunStatus::Review;
         runs[2].verify_command = Some("check".into());
         assert!(!passed(&runs[2]));
         ledger.managed_tasks[0].plan = Some(managed::PlanLink {
@@ -972,6 +1108,81 @@ mod tests {
     }
 
     #[test]
+    fn ready_results_merge_automatically_only_with_opt_in_and_a_committed_policy() {
+        let repo = super::super::agreement_tests::Repo::new();
+        let history = repo.root.join("history");
+        std::fs::create_dir(&history).unwrap();
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
+        let (mut ledger, mut runs) = fixture();
+        let mut final_run = runs[0].clone();
+        final_run.id = "final".into();
+        runs.push(final_run);
+        for run in &mut runs {
+            run.status = RunStatus::Review;
+            run.project_path = repo.root.to_string_lossy().into();
+            run.target_branch = Some("main".into());
+        }
+        ledger.items[3].run_id = Some("final".into());
+        ledger.managed_tasks[0].delivery.as_mut().unwrap().ready_at = Some("now".into());
+        let mut inner = service.state();
+        inner.ledger = ledger;
+        let attempt = |inner: &mut Inner| service.apply_managed_locked(inner, &runs, &[]).unwrap();
+        let held = |inner: &Inner| {
+            inner.ledger.managed_tasks[0]
+                .delivery
+                .as_ref()
+                .unwrap()
+                .held
+                .clone()
+        };
+        // Without opting in, an enabled queue or a committed policy, a person merges.
+        assert!(!attempt(&mut inner));
+        inner.enabled.insert("p".into());
+        inner
+            .ledger
+            .assist_policies
+            .push(super::super::reconciliation::AssistPolicy {
+                project_id: "p".into(),
+                project_name: "Project".into(),
+                project_path: repo.root.to_string_lossy().into(),
+                agent: "auto".into(),
+                verify_command: "check".into(),
+                resolve: false,
+                merge: true,
+            });
+        assert!(!attempt(&mut inner));
+        assert!(held(&inner).is_none());
+        std::fs::create_dir(repo.root.join(".jackalope")).unwrap();
+        std::fs::write(
+            repo.root.join(".jackalope/autonomy.json"),
+            r#"{"version":1,"default":"merge"}"#,
+        )
+        .unwrap();
+        repo.git(&["add", ".jackalope"]);
+        repo.git(&[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-m",
+            "Autonomy policy",
+        ]);
+        // These fixture attempts have no worktrees, so preparing fails and the
+        // result is held once rather than retried on every pass.
+        assert!(attempt(&mut inner));
+        assert!(held(&inner).unwrap().ends_with("Held for review."));
+        assert!(!attempt(&mut inner));
+        assert!(inner.ledger.managed_tasks[0]
+            .delivery
+            .as_ref()
+            .unwrap()
+            .applied_at
+            .is_none());
+    }
+
+    #[test]
     fn exhausted_repairs_pause_durably_without_replaying_work_after_restart() {
         let repo = super::super::agreement_tests::Repo::new();
         let history = repo.root.join("history");
@@ -986,23 +1197,25 @@ mod tests {
             .unwrap()
             .repair_limit = 0;
         runs[0].verification.as_mut().unwrap().result.success = false;
-        let mut inner = service.inner.lock().unwrap();
+        let mut inner = service.state();
         inner.ledger = ledger;
         inner.enabled.insert("managed:parent".into());
+        let guard = service.execution(&inner).map_err(String::from).unwrap();
         assert!(service
-            .deliver_managed_locked(&mut inner, &runs, &[], "http://fixture")
+            .deliver_managed_locked(&mut inner, &guard, &runs, &[], "http://fixture")
             .unwrap());
         assert!(!inner.enabled.contains("managed:parent"));
         assert!(inner.ledger.managed_tasks[0].error.is_some());
         assert_eq!(inner.ledger.items[0].run_id.as_deref(), Some("a"));
         assert!(!service
-            .deliver_managed_locked(&mut inner, &runs, &[], "http://fixture")
+            .deliver_managed_locked(&mut inner, &guard, &runs, &[], "http://fixture")
             .unwrap());
+        drop(guard);
         drop(inner);
         drop(service);
         let restarted =
             Coordinator::new(directory, TaskRuntime::with_test_access(history).unwrap()).unwrap();
-        let inner = restarted.inner.lock().unwrap();
+        let inner = restarted.state();
         assert!(inner.enabled.is_empty());
         assert!(inner.ledger.managed_tasks[0].error.is_some());
         assert!(inner.ledger.managed_tasks[0]

@@ -68,6 +68,17 @@ const KNOWN_KEY_NAMES: &[&str] = &[
     "MISTRAL_API_KEY",
 ];
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::local_detection::system_detect_local_llms,
+            commands::local_detection::system_detect_env_keys,
+            commands::local_detection::agent_import_detected_key,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn system_detect_local_llms() -> Result<Vec<LocalLlmEndpoint>, String> {
     let targets = [
@@ -211,7 +222,22 @@ fn is_key_configured(profiles_root: &Path, agent: &str, key_name: &str) -> bool 
 }
 
 #[tauri::command]
-pub fn agent_import_detected_key(
+pub async fn agent_import_detected_key(
+    app: tauri::AppHandle,
+    key_name: String,
+    profile_name: Option<String>,
+) -> Result<AgentProfile, String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        import_detected_key(app.state(), app.state(), key_name, profile_name)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Saving a key waits for the shared execution lock, so the command runs this
+/// off the main thread.
+fn import_detected_key(
     runtime: State<'_, TaskRuntime>,
     helper: State<'_, super::helper::Helper>,
     key_name: String,
@@ -233,7 +259,6 @@ pub fn agent_import_detected_key(
     let default_name = format!("{} (Imported Key)", key_name);
     let name = profile_name.unwrap_or(default_name).trim().to_string();
 
-    let root = runtime.profiles_root();
     let profile = agent_profiles::agent_profile_create(
         runtime.clone(),
         target_agent.to_string(),
@@ -250,30 +275,21 @@ pub fn agent_import_detected_key(
         Some("Imported Key".to_string()),
     );
 
-    if target_agent == "opencode" {
-        if let Err(error) = agent_profiles::agent_profile_save_key(
-            runtime.clone(),
+    if let Err(error) = agent_profiles::save_imported_key(
+        runtime.clone(),
+        target_agent.into(),
+        profile.id.clone(),
+        key_name,
+        val.into(),
+    ) {
+        let _ = agent_profiles::delete_profile(
+            runtime,
+            helper,
             target_agent.into(),
             profile.id.clone(),
-            key_name,
-            val.into(),
-        ) {
-            let _ = agent_profiles::agent_profile_delete(
-                runtime,
-                helper,
-                target_agent.into(),
-                profile.id.clone(),
-            );
-            return Err(error);
-        }
-        return Ok(profile);
+        );
+        return Err(error);
     }
-
-    let profile_dir = root.join(target_agent).join(&profile.id);
-    let env_path = profile_dir.join(".env");
-    let env_content = format!("{key_name}={val}\n");
-    std::fs::write(env_path, env_content).map_err(|e| e.to_string())?;
-
     Ok(profile)
 }
 
@@ -294,31 +310,6 @@ mod tests {
 
         let tiny = "abc";
         assert_eq!(mask_key(tiny), "***");
-    }
-
-    #[test]
-    fn key_provider_info_matches_agents() {
-        assert_eq!(
-            key_provider_info("OPENAI_API_KEY"),
-            Some(("OpenAI", "codex"))
-        );
-        assert_eq!(
-            key_provider_info("ANTHROPIC_API_KEY"),
-            Some(("Anthropic", "claude"))
-        );
-        assert_eq!(
-            key_provider_info("XAI_API_KEY"),
-            Some(("xAI (Grok)", "grok"))
-        );
-        assert_eq!(
-            key_provider_info("GEMINI_API_KEY"),
-            Some(("Google Gemini", "gemini"))
-        );
-        assert_eq!(key_provider_info("UNKNOWN_KEY"), None);
-        assert_eq!(
-            key_provider_info("DEEPSEEK_API_KEY"),
-            Some(("DeepSeek", "opencode"))
-        );
     }
 
     #[test]

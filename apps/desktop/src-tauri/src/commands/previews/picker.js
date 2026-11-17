@@ -17,7 +17,7 @@
   }
   const style = document.createElement('style');
   style.textContent =
-    'div{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--color-surface,#14171d);color:var(--color-text-primary,#f3f4f6);border:1px solid var(--color-border,#262c37);border-radius:8px;font:14px system-ui}button{font:inherit;min-height:44px;border:1px solid var(--color-border,#262c37);border-radius:6px;background:transparent;color:inherit;padding:6px 12px;cursor:pointer}button:focus-visible{outline:2px solid var(--color-accent,#6366f1);outline-offset:2px}';
+    'div{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--color-surface,#14171d);color:var(--color-text-primary,#f3f4f6);border:1px solid var(--color-border,#262c37);border-radius:8px;font:14px system-ui}button{font:inherit;min-height:44px;border:1px solid var(--color-border,#262c37);border-radius:6px;background:transparent;color:inherit;padding:6px 12px;cursor:pointer}button:focus-visible{outline:2px solid var(--color-accent,#8b5cf6);outline-offset:2px}';
   const toolbar = document.createElement('div');
   const label = document.createElement('span');
   label.textContent = 'Jackalope';
@@ -27,7 +27,7 @@
   const outline = document.createElement('div');
   outline.style.cssText =
     'position:fixed;pointer-events:none;z-index:2147483646;border:2px solid;display:none;box-sizing:border-box';
-  outline.style.borderColor = theme['--color-accent'] || '#6366f1';
+  outline.style.borderColor = theme['--color-accent'] || '#8b5cf6';
   const stop = () => {
     state.picking = false;
     outline.style.display = 'none';

@@ -1,19 +1,20 @@
-import { guideMarkdown } from '@jackalope/knowledge';
+import {
+  type GuideCategory,
+  guideCategories,
+  guideMarkdown,
+  guidePath,
+  type KnowledgeGuideSection,
+  knowledgeGuides,
+  troubleshootingScenarios,
+} from '@jackalope/knowledge';
 import { Button, Disclosure, DisclosureSummary, SearchField } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, Check, Copy, Info, Play } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { siteOrigin } from './content';
+import { InlineLinks, stripInlineLinks } from './InlineLinks';
 import { KnowledgeMedia } from './KnowledgeMedia';
-import {
-  type GuideCategory,
-  guideCategories,
-  type KnowledgeGuideSection,
-  knowledgeGuides,
-  troubleshootingScenarios,
-} from './knowledge-content';
 import { knowledgeClips } from './knowledge-media';
 
-const guideHref = (slug: string) => `/knowledge/${slug}/`;
 const categoryLabel = (category: GuideCategory) =>
   guideCategories.find((item) => item.id === category)?.label;
 const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -24,7 +25,7 @@ const matchesTerms = (text: string, terms: string[]) => {
 const sectionText = (section: KnowledgeGuideSection) =>
   [
     section.question,
-    ...section.paragraphs,
+    ...section.paragraphs.map(stripInlineLinks),
     ...(section.bullets ?? []),
     ...(section.steps ?? []),
     section.codeBox?.code,
@@ -174,7 +175,7 @@ export function KnowledgebasePage({
               {copiedId === 'guide' ? <Check size={16} /> : <Copy size={16} />}
               {copiedId === 'guide' ? 'Copied' : 'Copy for your agent'}
             </Button>
-            <a className="knowledge-agent-markdown" href={`${guideHref(activeGuide.slug)}index.md`}>
+            <a className="knowledge-agent-markdown" href={`${guidePath(activeGuide.slug)}index.md`}>
               Read Markdown
             </a>
           </div>
@@ -209,7 +210,9 @@ export function KnowledgebasePage({
                 <h2>{section.question}</h2>
                 <KnowledgeMedia slug={activeGuide.slug} section={section.id} dark={dark} />
                 {section.paragraphs.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
+                  <p key={paragraph}>
+                    <InlineLinks text={paragraph} />
+                  </p>
                 ))}
                 {section.steps && (
                   <ol className="knowledge-steps">
@@ -345,13 +348,13 @@ export function KnowledgebasePage({
                 <a
                   key={guide.slug}
                   className="knowledge-search-item"
-                  href={`${guideHref(guide.slug)}${section ? `#${section.id}` : ''}`}
+                  href={`${guidePath(guide.slug)}${section ? `#${section.id}` : ''}`}
                 >
                   <span className="knowledge-eyebrow">
                     {categoryLabel(guide.category)} · {guide.readingTime}
                   </span>
                   <h3>{guide.shortTitle}</h3>
-                  <p>{section?.paragraphs[0] ?? guide.description}</p>
+                  <p>{stripInlineLinks(section?.paragraphs[0] ?? guide.description)}</p>
                   <span className="knowledge-card-link">
                     {section?.question ?? 'Read guide'} <ArrowRight size={15} />
                   </span>
@@ -382,7 +385,7 @@ export function KnowledgebasePage({
             </div>
             <div className="knowledge-start-grid">
               {startingPoints.map((point, index) => (
-                <a key={point.slug} href={guideHref(point.slug)}>
+                <a key={point.slug} href={guidePath(point.slug)}>
                   <span className="knowledge-start-number">0{index + 1}</span>
                   <div>
                     <h3>{point.title}</h3>
@@ -400,7 +403,7 @@ export function KnowledgebasePage({
             </div>
             <div className="knowledge-watch-grid">
               {knowledgeClips.map((clip) => (
-                <a key={clip.id} href={`${guideHref(clip.slug)}#${clip.section}`}>
+                <a key={clip.id} href={`${guidePath(clip.slug)}#${clip.section}`}>
                   <div className="knowledge-watch-image">
                     <img
                       src={`/media/knowledge/${clip.id}.jpg`}
@@ -453,7 +456,7 @@ export function KnowledgebasePage({
             </p>
             <div className="knowledge-hub-grid">
               {filteredGuides.map((guide) => (
-                <a key={guide.slug} className="knowledge-hub-card" href={guideHref(guide.slug)}>
+                <a key={guide.slug} className="knowledge-hub-card" href={guidePath(guide.slug)}>
                   <div className="knowledge-eyebrow">
                     {categoryLabel(guide.category)} <span>· {guide.readingTime}</span>
                   </div>
@@ -476,7 +479,7 @@ export function KnowledgebasePage({
               {troubleshootingScenarios.map((scenario) => (
                 <a
                   key={scenario.id}
-                  href={`${guideHref(scenario.targetSlug)}${scenario.targetAnchor ? `#${scenario.targetAnchor}` : ''}`}
+                  href={`${guidePath(scenario.targetSlug)}${scenario.targetAnchor ? `#${scenario.targetAnchor}` : ''}`}
                 >
                   <div>
                     <h3>{scenario.title}</h3>

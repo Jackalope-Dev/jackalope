@@ -1,4 +1,5 @@
-import { isTauriEnvironment } from './tauri-bridge.ts';
+import { isTauriEnvironment } from './native/env.ts';
+import { invokeNative } from './native/transport.ts';
 
 export interface LocalLlmEndpoint {
   service: string;
@@ -18,10 +19,7 @@ export interface DetectedKey {
 }
 
 export async function detectLocalLlms(): Promise<LocalLlmEndpoint[]> {
-  if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<LocalLlmEndpoint[]>('system_detect_local_llms');
-  }
+  if (isTauriEnvironment()) return invokeNative<LocalLlmEndpoint[]>('system_detect_local_llms');
   return [
     {
       service: 'Ollama',
@@ -48,23 +46,8 @@ export async function detectLocalLlms(): Promise<LocalLlmEndpoint[]> {
 }
 
 export async function detectEnvKeys(): Promise<DetectedKey[]> {
-  if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<DetectedKey[]>('system_detect_env_keys');
-  }
-  return [];
+  return isTauriEnvironment() ? invokeNative<DetectedKey[]>('system_detect_env_keys') : [];
 }
 
-export async function importDetectedKey(
-  keyName: string,
-  profileName?: string,
-): Promise<{ id: string; name: string }> {
-  if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<{ id: string; name: string }>('agent_import_detected_key', {
-      keyName,
-      profileName,
-    });
-  }
-  throw new Error('Open the desktop app to import API keys.');
-}
+export const importDetectedKey = (keyName: string, profileName?: string) =>
+  invokeNative<{ id: string; name: string }>('agent_import_detected_key', { keyName, profileName });

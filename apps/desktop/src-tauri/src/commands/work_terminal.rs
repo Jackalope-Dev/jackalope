@@ -1,5 +1,5 @@
+use super::pty::PtySession;
 use super::{integration, process_control::ProcessTree, tasks::TaskRuntime};
-use crate::state::PtySession;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -161,6 +161,20 @@ pub fn active_count() -> usize {
         .unwrap_or(0)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::work_terminal::task_terminal_start,
+            commands::work_terminal::task_terminal_restore,
+            commands::work_terminal::task_terminal_status,
+            commands::work_terminal::task_terminal_write,
+            commands::work_terminal::task_terminal_resize,
+            commands::work_terminal::task_terminal_stop,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_terminal_start(
     id: String,
@@ -212,8 +226,7 @@ pub(super) fn start_with_shell(
     let workspace = dunce::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
     if runs.iter().any(|other| {
         dunce::canonicalize(&other.workspace).ok().as_ref() == Some(&workspace)
-            && (["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
-                || other.finishing)
+            && (other.status.is_live() || other.finishing)
     }) {
         return Err(
             "Finish active work and resolve interrupted ownership before opening a task terminal."
@@ -284,7 +297,9 @@ fn spawn_terminal(
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
     command.cwd(&workspace);
     command.env("TERM", "xterm-256color");
-    command.env_remove("JACKALOPE_BRIDGE_TOKEN");
+    for name in super::process_control::inherited_credentials() {
+        command.env_remove(name);
+    }
     command.env_remove("JACKALOPE_BRIDGE_URL");
     let mut child = pair
         .slave
@@ -543,29 +558,5 @@ mod tests {
         assert_eq!(output.offset + output.text.len(), OUTPUT_LIMIT * 4);
         output.append("next");
         assert!(output.text.ends_with("next"));
-    }
-}
-
-/// Runs `command` in the terminal `id` unless one is already running there.
-/// Used for terminals that host a client rather than owning a task workspace,
-/// so the task terminal's workspace checks do not apply.
-pub(super) fn start_command(
-    id: &str,
-    workspace: std::path::PathBuf,
-    command: CommandBuilder,
-) -> Result<(), String> {
-    let mut sessions = terminals().lock().map_err(|e| e.to_string())?;
-    if let Some(terminal) = sessions.get_mut(id) {
-        if running(terminal)? {
-            return Ok(());
-        }
-    }
-    spawn_terminal(sessions, id.into(), workspace, command, None)
-}
-
-/// Ends the terminal `id`; dropping it stops its process tree.
-pub(super) fn close(id: &str) {
-    if let Ok(mut sessions) = terminals().lock() {
-        sessions.remove(id);
     }
 }

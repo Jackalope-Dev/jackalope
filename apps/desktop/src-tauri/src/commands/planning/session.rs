@@ -4,8 +4,8 @@
 
 use super::{
     artifact::{self, PlanDocument},
-    handoff, interview,
-    store::{Approval, Deviation, Execution, PlanRecord, PlanSettings, Session, Store},
+    handoff, interview, rounds,
+    store::{Approval, Deviation, Execution, PlanRecord, PlanSettings, Round, Session, Store},
 };
 use crate::commands::{
     coordination::{managed::PlanLink, planned::PlanLaunch, Coordinator},
@@ -23,10 +23,6 @@ pub fn store(coordinator: &Coordinator) -> Store {
 /// The plan store for a task runtime, for callers without a coordinator.
 pub fn store_for(runtime: &crate::commands::tasks::TaskRuntime) -> Store {
     Store::new(runtime.integration_directory().with_file_name("plans"))
-}
-
-fn active(status: &str) -> bool {
-    ["starting", "running", "stopping", "routing", "queued"].contains(&status)
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -77,10 +73,17 @@ pub struct PlanView {
     pub changes: Vec<artifact::SectionChange>,
     pub questions: Vec<PendingUserPrompt>,
     pub planner_run_id: Option<String>,
+    /// The agent and model that implement the plan once approved.
+    pub agent: String,
+    pub model: Option<String>,
     pub approval: Option<Approval>,
     pub shape: String,
     pub swarm_connected: bool,
     pub progress: Option<Progress>,
+    /// Swarm rounds, for plans approved as a swarm.
+    pub rounds: Option<rounds::RoundsView>,
+    /// What agents decided for the person, when the project lets them.
+    pub autonomy: Option<crate::commands::agent_decider::AutonomyView>,
     pub criteria: Vec<handoff::CriterionState>,
     pub deviations: Vec<Deviation>,
     /// How approving now would verify the work.
@@ -187,7 +190,7 @@ pub struct PlanSummary {
     pub status: String,
     pub revision: Option<u32>,
     pub updated_at: String,
-    /// A deviation is waiting on the person's decision.
+    /// A deviation or a proposed swarm round is waiting on the person.
     pub needs_you: bool,
 }
 
@@ -199,8 +202,17 @@ pub fn summary(record: &PlanRecord) -> PlanSummary {
         status: record.status(),
         revision: record.latest().map(|revision| revision.number),
         updated_at: record.updated_at.clone(),
-        needs_you: pending_deviation(record).is_some(),
+        needs_you: needs_person(record),
     }
+}
+
+/// A deviation or a proposed round waits on the person rather than an agent.
+pub fn needs_person(record: &PlanRecord) -> bool {
+    record
+        .deviations
+        .iter()
+        .any(|deviation| deviation.status == "pending" && !deviation.agent_deciding)
+        || rounds::awaiting(record)
 }
 
 /// The oldest deviation still waiting on the person.
@@ -212,7 +224,11 @@ pub fn pending_deviation(record: &PlanRecord) -> Option<&Deviation> {
 }
 
 /// A planning request: read-only, isolated, unchecked and without outcomes.
-fn planning_request(template: &RunRequest, settings: &PlanSettings, prompt: String) -> RunRequest {
+pub(in crate::commands) fn planning_request(
+    template: &RunRequest,
+    settings: &PlanSettings,
+    prompt: String,
+) -> RunRequest {
     let mut request = template.clone();
     request.id = Uuid::new_v4().to_string();
     request.prompt = prompt;
@@ -267,6 +283,9 @@ pub fn start(
     if goal.is_empty() || goal.len() > 20_000 {
         return Err("Describe what to plan in up to 20,000 characters.".into());
     }
+    // A project without commits gets its first one so planning can run in a
+    // worktree; a failure here surfaces again at approval.
+    let _ = crate::commands::first_commit::ensure_first_commit(&template.project_path, true);
     let store = store(coordinator);
     let settings = store.settings(&template.project_id);
     let prompt = interview::interview_prompt(
@@ -305,6 +324,7 @@ pub fn start(
         error: None,
         reflected: false,
         archived: false,
+        autonomy: vec![],
     };
     store.create(&record)?;
     super::register_run(&request.id, &record.id, settings.question_cap, 0);
@@ -469,10 +489,26 @@ pub fn create_manual(
         error: None,
         reflected: false,
         archived: false,
+        autonomy: vec![],
     };
     record.push_revision(doc, "you", "Written by you", None)?;
     store.create(&record)?;
     Ok(record)
+}
+
+/// The agent for the plan's combined review: the app's ranked choice (another model
+/// family where one is available), otherwise the planner. The implementer reviews its
+/// own work only when neither differs from it.
+pub(super) fn combined_reviewer(
+    chosen: Option<&str>,
+    planner: Option<&str>,
+    implementer: &str,
+) -> Option<String> {
+    [chosen, planner]
+        .into_iter()
+        .flatten()
+        .find(|agent| !agent.is_empty() && *agent != implementer)
+        .map(str::to_string)
 }
 
 fn planning_run<'a>(record: &PlanRecord, runs: &'a [TaskRun]) -> Option<&'a TaskRun> {
@@ -497,7 +533,7 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
         })
         .collect();
     for run in &pending {
-        if active(&run.status) || run.finishing {
+        if run.status.is_active() || run.finishing {
             super::register_run(
                 &run.id,
                 &record.id,
@@ -508,7 +544,7 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
     }
     let finished: Vec<&TaskRun> = pending
         .into_iter()
-        .filter(|run| !active(&run.status) && !run.finishing)
+        .filter(|run| !run.status.is_active() && !run.finishing)
         .collect();
     if finished.is_empty() {
         return Ok(record.clone());
@@ -516,10 +552,10 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
     let (record, _) = store.update(&record.id, |saved| {
         for run in finished {
             saved.session.ingested.push(run.id.clone());
-            if !matches!(run.status.as_str(), "review" | "reviewed") || run.error.is_some() {
+            if !run.status.is_done() || run.error.is_some() {
                 saved.error = Some(format!(
                     "Planning ended without a plan ({}). Keep planning to try again.",
-                    run.error.as_deref().unwrap_or(&run.status)
+                    run.error.as_deref().unwrap_or(run.status.as_str())
                 ));
                 continue;
             }
@@ -551,7 +587,7 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
 
 /// Updates the latest revision's front matter in place; the content hash,
 /// which excludes front matter, is unchanged.
-fn set_front(
+pub(super) fn set_front(
     record: &mut PlanRecord,
     change: impl FnOnce(&mut artifact::FrontMatter),
 ) -> Result<(), String> {
@@ -570,9 +606,9 @@ fn task_state(run: Option<&TaskRun>, merged: bool, error: bool) -> &'static str 
         _ if merged => "merged",
         _ if error => "needs-attention",
         None => "waiting",
-        Some(run) if active(&run.status) || run.finishing => "running",
+        Some(run) if run.status.is_active() || run.finishing => "running",
         Some(run)
-            if matches!(run.status.as_str(), "review" | "reviewed")
+            if run.status.is_done()
                 && run.error.is_none()
                 && run
                     .verification
@@ -585,7 +621,7 @@ fn task_state(run: Option<&TaskRun>, merged: bool, error: bool) -> &'static str 
     }
 }
 
-fn progress(
+pub(super) fn progress(
     coordinator: &Coordinator,
     record: &PlanRecord,
     doc: &PlanDocument,
@@ -695,10 +731,11 @@ fn detected(progress: &Progress) -> Vec<(String, String)> {
 pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
     let store = store(coordinator);
     let runs = coordinator.runtime.integration_runs()?;
-    let mut record = ingest(&store, &store.load(id)?, &runs)?;
+    let mut record =
+        crate::commands::agent_decider::reconcile(&store, ingest(&store, &store.load(id)?, &runs)?);
     let doc = record.document();
     let planner = planning_run(&record, &runs);
-    let planning = planner.is_some_and(|run| active(&run.status) || run.finishing);
+    let planning = planner.is_some_and(|run| run.status.is_active() || run.finishing);
     let mut progress_view = None;
     let mut criteria = vec![];
     if let Some(doc) = &doc {
@@ -713,7 +750,9 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
                         .any(|deviation| &deviation.summary == summary)
                 })
                 .collect();
-            let finished = progress.merged && doc.front.status != "done";
+            // A swarm is done when its orchestrator says so, not when a round merges.
+            let finished =
+                progress.merged && doc.front.status != "done" && !rounds::in_rounds(&record);
             if !found.is_empty() || finished {
                 record = store
                     .update(id, |saved| {
@@ -731,6 +770,8 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
                                 status: "pending".into(),
                                 created_at: Utc::now().to_rfc3339(),
                                 resolved_at: None,
+                                agent_deciding: false,
+                                resolved_by: None,
                             });
                         }
                         if finished {
@@ -749,6 +790,35 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
         }
     }
     let doc = record.document();
+    let rounds_view = rounds::view(coordinator, &record, &runs);
+    let plan_runs: Vec<&str> = progress_view
+        .as_ref()
+        .map(|progress| {
+            progress
+                .tasks
+                .iter()
+                .chain(progress.review.iter())
+                .filter_map(|task| task.run_id.as_deref())
+                .collect()
+        })
+        .unwrap_or_default();
+    let waiting = runs
+        .iter()
+        .filter(|run| plan_runs.contains(&run.id.as_str()))
+        .map(|run| {
+            run.prompts
+                .iter()
+                .filter(|prompt| prompt.status == "pending")
+                .count()
+        })
+        .sum::<usize>()
+        + record
+            .deviations
+            .iter()
+            .filter(|deviation| deviation.status == "pending" && !deviation.agent_deciding)
+            .count()
+        + usize::from(rounds::awaiting(&record));
+    let autonomy_view = crate::commands::agent_decider::view(&store, &record, waiting);
     let latest = record.latest();
     let previous = record
         .revisions
@@ -797,13 +867,17 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
             })
             .unwrap_or_default(),
         planner_run_id: planner.map(|run| run.id.clone()),
+        agent: record.request.agent.clone(),
+        model: record.request.model.clone(),
         approval: record.approval.clone(),
         shape: doc
             .as_ref()
-            .map(|doc| handoff::default_shape(doc, coordinator.swarm_connected()).to_string())
+            .map(|doc| handoff::default_shape(doc).to_string())
             .unwrap_or_else(|| "single".into()),
         swarm_connected: coordinator.swarm_connected(),
         progress: progress_view,
+        rounds: rounds_view,
+        autonomy: autonomy_view,
         criteria,
         deviations: record.deviations.clone(),
         criteria_check: doc
@@ -824,7 +898,7 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
 }
 
 fn guard_idle(record: &PlanRecord, runs: &[TaskRun]) -> Result<(), String> {
-    if planning_run(record, runs).is_some_and(|run| active(&run.status) || run.finishing) {
+    if planning_run(record, runs).is_some_and(|run| run.status.is_active() || run.finishing) {
         return Err(
             "The planner is still working. Answer its question or wait for the draft.".into(),
         );
@@ -919,11 +993,15 @@ pub fn save_edit(
 }
 
 fn approver(record: &PlanRecord, surface: &str) -> String {
-    let name = crate::commands::tasks::git(&record.project_path, &["config", "user.name"])
-        .ok()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "local user".into());
+    let name = crate::commands::repo::git(
+        std::path::Path::new(&record.project_path),
+        &["config", "user.name"],
+        crate::commands::repo::Policy::Inspection,
+    )
+    .ok()
+    .map(|name| name.trim().to_string())
+    .filter(|name| !name.is_empty())
+    .unwrap_or_else(|| "local user".into());
     format!("{name} ({surface})")
 }
 
@@ -941,6 +1019,14 @@ pub struct PlanChecks {
     pub setup_files: Vec<String>,
 }
 
+/// What the app sends with an approval; the terminal sends neither.
+#[derive(Clone, Debug, Default)]
+pub struct ApprovalChoices {
+    pub checks: Option<PlanChecks>,
+    /// The app's ranked reviewer for the combined review.
+    pub reviewer: Option<String>,
+}
+
 /// Approval is always an explicit call naming the exact revision and hash
 /// shown to the person; nothing else, including elapsed time, approves.
 pub fn approve(
@@ -950,8 +1036,9 @@ pub fn approve(
     hash: &str,
     shape: &str,
     surface: &str,
-    checks: Option<PlanChecks>,
+    choices: ApprovalChoices,
 ) -> Result<(), String> {
+    let ApprovalChoices { checks, reviewer } = choices;
     if !["single", "subtasks", "swarm"].contains(&shape) {
         return Err("Choose single, subtasks or swarm.".into());
     }
@@ -976,8 +1063,23 @@ pub fn approve(
     // dependencies continue from clean finishes and integration waits for a
     // passing plan review.
     let verified = verification(&checks, &doc);
-    if shape == "swarm" && !coordinator.swarm_connected() {
-        return Err("Connect a swarm Worker in Settings before running as a swarm.".into());
+    let open = doc
+        .tasks
+        .iter()
+        .filter(|task| !task.status.eq_ignore_ascii_case("done"))
+        .count();
+    if shape == "subtasks" && open > artifact::MAX_TASKS {
+        return Err(format!(
+            "Planned subtasks run at most {} tasks. Run this plan as a swarm.",
+            artifact::MAX_TASKS
+        ));
+    }
+    // A swarm round may run more assignments where the project's agents have slots.
+    let swarm_limit = (shape == "swarm").then(|| coordinator.swarm_limit(&record.project_id));
+    if let Some(limit) = swarm_limit.filter(|limit| open > *limit) {
+        return Err(format!(
+            "This swarm can run {limit} assignments per round with the current concurrency. Raise concurrency or run agents on a computer."
+        ));
     }
     if let Some(previous) = record
         .execution
@@ -989,12 +1091,13 @@ pub fn approve(
             item.run_id
                 .as_ref()
                 .and_then(|id| runs.iter().find(|run| &run.id == id))
-                .is_some_and(|run| active(&run.status) || run.finishing)
+                .is_some_and(|run| run.status.is_active() || run.finishing)
         }) {
             return Err("Earlier tasks of this plan are still running. Let them finish or stop them before approving the new revision.".into());
         }
     }
     let assignments = handoff::assignments(&doc, shape)?;
+    crate::commands::first_commit::ensure_first_commit(&record.project_path, true)?;
     let source_head = crate::commands::task_strategy::source_head(&record.request)?;
     let approved_by = approver(&record, surface);
     let approved_at = Utc::now().to_rfc3339();
@@ -1015,7 +1118,11 @@ pub fn approve(
         plan_id: record.id.clone(),
         revision,
         assignments,
-        reviewer_agent: planner_agent.filter(|agent| agent != &request.agent),
+        reviewer_agent: combined_reviewer(
+            reviewer.as_deref(),
+            planner_agent.as_deref(),
+            &request.agent,
+        ),
         review_brief: interview::review_brief(&doc),
     };
     store.update(id, |saved| {
@@ -1047,16 +1154,37 @@ pub fn approve(
         request,
         title: doc.title.clone(),
         link,
+        max_assignments: swarm_limit,
     });
+    let settings = store.settings(&record.project_id);
+    let max_rounds = if shape == "swarm" {
+        settings.max_rounds
+    } else {
+        0
+    };
     store.update(id, |saved| {
         match &launched {
             Ok(managed) => {
+                let started_at = Utc::now().to_rfc3339();
                 saved.execution = Some(Execution {
                     shape: shape.into(),
                     revision,
                     managed_task_id: Some(managed.clone()),
                     items: vec![],
-                    started_at: Utc::now().to_rfc3339(),
+                    started_at: started_at.clone(),
+                    max_rounds,
+                    ask_before_rounds: settings.ask_before_rounds,
+                    orchestrators: settings.orchestrators,
+                    rounds: if max_rounds > 0 {
+                        vec![Round {
+                            number: 1,
+                            managed_task_id: managed.clone(),
+                            started_at,
+                            ..Default::default()
+                        }]
+                    } else {
+                        vec![]
+                    },
                 });
                 saved.error = None;
                 set_front(saved, |front| front.status = "running".into())?;
@@ -1065,6 +1193,9 @@ pub fn approve(
         }
         Ok(())
     })?;
+    if launched.is_ok() && max_rounds > 0 {
+        rounds::activate(id, false);
+    }
     launched.map(|_| ())
 }
 
@@ -1122,17 +1253,31 @@ pub fn declare_deviation(
         .plan_of_run(&run.id)
         .ok_or("This attempt is not working on an approved plan.")?;
     let store = store(coordinator);
-    let (_, deviation) = store.update(&plan_id, |saved| {
-        if saved
+    let too_many = |saved: &PlanRecord| {
+        saved
             .deviations
             .iter()
             .filter(|deviation| deviation.run_id.as_ref() == Some(&run.id))
             .count()
             >= 5
-        {
+    };
+    let record = store.load(&plan_id)?;
+    if too_many(&record) {
+        return Err("This attempt already reported five deviations.".into());
+    }
+    let deviation = Uuid::new_v4().to_string();
+    let job = crate::commands::agent_decider::route_deviation(
+        coordinator,
+        &record,
+        &deviation,
+        summary,
+        amendment.trim(),
+    );
+    let deciding = job.is_ok();
+    let saved = store.update(&plan_id, |saved| {
+        if too_many(saved) {
             return Err("This attempt already reported five deviations.".into());
         }
-        let deviation = Uuid::new_v4().to_string();
         saved.deviations.push(Deviation {
             id: deviation.clone(),
             run_id: Some(run.id.clone()),
@@ -1142,12 +1287,63 @@ pub fn declare_deviation(
             status: "pending".into(),
             created_at: Utc::now().to_rfc3339(),
             resolved_at: None,
+            agent_deciding: deciding,
+            resolved_by: None,
         });
-        Ok(deviation)
-    })?;
-    crate::commands::notifications::plan_decision_needed(&plan_id, &deviation);
+        Ok(())
+    });
+    if let Err(error) = saved {
+        if let Ok(job) = job {
+            job.abandon();
+        }
+        return Err(error);
+    }
     coordinator.plan_dispatch(&managed, "pause")?;
+    match job {
+        Ok(job) => crate::commands::agent_decider::spawn_deviation(coordinator.clone(), job),
+        Err(_) => crate::commands::notifications::plan_decision_needed(&plan_id, &deviation),
+    }
     Ok(deviation)
+}
+
+/// Accepts a deviation as the agent deciding it for the person, unless the
+/// person already resolved it.
+pub(in crate::commands) fn accept_by_agent(
+    coordinator: &Coordinator,
+    id: &str,
+    deviation_id: &str,
+    agent: &str,
+) -> Result<(), String> {
+    let deciding = store(coordinator)
+        .load(id)?
+        .deviations
+        .iter()
+        .any(|deviation| {
+            deviation.id == deviation_id
+                && deviation.status == "pending"
+                && deviation.agent_deciding
+        });
+    if !deciding {
+        return Err(format!("The deviation changed before {agent} decided."));
+    }
+    resolve_deviation(
+        coordinator,
+        id,
+        deviation_id,
+        "accept",
+        &format!("decided by {agent}"),
+    )?;
+    store(coordinator).update(id, |saved| {
+        if let Some(deviation) = saved
+            .deviations
+            .iter_mut()
+            .find(|deviation| deviation.id == deviation_id)
+        {
+            deviation.resolved_by = Some(agent.into());
+        }
+        Ok(())
+    })?;
+    Ok(())
 }
 
 pub fn resolve_deviation(
@@ -1209,7 +1405,7 @@ pub fn resolve_deviation(
                 if let Some(run) = runs
                     .iter()
                     .find(|run| &run.id == run_id)
-                    .filter(|run| !active(&run.status) && !run.finishing)
+                    .filter(|run| !run.status.is_active() && !run.finishing)
                 {
                     let mut request = record.request.clone();
                     request.id = Uuid::new_v4().to_string();
@@ -1243,6 +1439,7 @@ fn mark(record: &mut PlanRecord, deviation_id: &str, status: &str) {
         .find(|deviation| deviation.id == deviation_id)
     {
         deviation.status = status.into();
+        deviation.agent_deciding = false;
         deviation.resolved_at = Some(Utc::now().to_rfc3339());
     }
 }

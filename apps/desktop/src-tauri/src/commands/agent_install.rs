@@ -1,0 +1,172 @@
+//! Installs a supported agent CLI after the person clicks Install.
+//!
+//! Only agents with an npm package in the catalog can be installed here, and
+//! the command is fixed by agent ID, never taken from the renderer. It runs in
+//! an owned terminal served by the sign-in poll, input and stop commands, so the
+//! person sees npm's output and can cancel it. OpenCode can instead use the
+//! private runner (`managed_runtime_prepare`), which needs no Node.js.
+
+use super::agent_sign_in::{self, SignInService};
+use portable_pty::CommandBuilder;
+use serde::Serialize;
+use std::path::{Path, PathBuf};
+use tauri::State;
+
+const NODE_MISSING: &str = "Installing this agent needs Node.js with npm. Install the Node.js LTS release from nodejs.org, restart Jackalope, then try again.";
+
+fn package(agent: &str) -> Option<&'static str> {
+    super::agents::find(agent)?.npm_package.as_deref()
+}
+
+fn install_args(package: &str) -> [&str; 3] {
+    ["install", "-g", package]
+}
+
+/// The command shown to the person, exactly as it runs apart from npm's path.
+fn display_command(agent: &str) -> Option<String> {
+    package(agent).map(|package| format!("npm {}", install_args(package).join(" ")))
+}
+
+/// Where npm usually lives when the app was started without it on PATH.
+fn npm_directories() -> Vec<PathBuf> {
+    let mut directories: Vec<PathBuf> =
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect();
+    if cfg!(windows) {
+        for variable in ["ProgramFiles", "ProgramFiles(x86)"] {
+            if let Some(root) = std::env::var_os(variable) {
+                directories.push(PathBuf::from(root).join("nodejs"));
+            }
+        }
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            directories.push(PathBuf::from(local).join("Programs/nodejs"));
+        }
+    } else {
+        directories.push(PathBuf::from("/usr/local/bin"));
+        directories.push(PathBuf::from("/opt/homebrew/bin"));
+        directories.push(PathBuf::from("/usr/bin"));
+    }
+    directories
+}
+
+fn find_npm() -> Option<PathBuf> {
+    super::platform::find_in(npm_directories(), "npm")
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallPlan {
+    /// The npm command, or `None` when this agent installs another way.
+    command: Option<String>,
+    /// Whether npm was found.
+    npm: bool,
+    /// OpenCode's private runner can be prepared instead, without Node.js.
+    managed: bool,
+}
+
+fn plan(agent: &str, npm: bool, managed_supported: bool) -> InstallPlan {
+    InstallPlan {
+        command: display_command(agent),
+        npm,
+        managed: agent == "opencode" && managed_supported,
+    }
+}
+
+fn install_command(agent: &str, npm: &Path) -> Result<CommandBuilder, String> {
+    let package = package(agent)
+        .ok_or("Jackalope cannot install this agent. Follow its install guide instead.")?;
+    let mut command = CommandBuilder::new(npm);
+    command.args(install_args(package));
+    if let Some(home) = super::platform::home_dir() {
+        command.cwd(home);
+    }
+    command.env("TERM", "xterm-256color");
+    command.env("NPM_CONFIG_FUND", "false");
+    command.env("NPM_CONFIG_UPDATE_NOTIFIER", "false");
+    for name in super::process_control::inherited_credentials() {
+        command.env_remove(name);
+    }
+    Ok(command)
+}
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_install::agent_install_plan,
+            commands::agent_install::agent_install,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
+/// How an agent can be installed from the app.
+#[tauri::command]
+pub fn agent_install_plan(agent: String) -> InstallPlan {
+    plan(
+        &agent,
+        find_npm().is_some(),
+        super::managed_runtime::supported(),
+    )
+}
+
+/// Starts the agent's npm install in an owned terminal and returns its session,
+/// which the `agent_profile_sign_in_*` commands poll and stop.
+#[tauri::command]
+pub async fn agent_install(
+    app: tauri::AppHandle,
+    agent: String,
+    cols: Option<u16>,
+    rows: Option<u16>,
+) -> Result<String, String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        let runtime: State<'_, super::tasks::TaskRuntime> = app.state();
+        runtime.access.ensure()?;
+        let service: State<'_, SignInService> = app.state();
+        let npm = find_npm().ok_or(NODE_MISSING)?;
+        let command = install_command(&agent, &npm)?;
+        agent_sign_in::start_terminal(
+            &service,
+            command,
+            cols.unwrap_or(80),
+            rows.unwrap_or(16),
+            "Could not start npm. Check your Node.js installation and try again.",
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_catalog_packages_can_be_installed() {
+        assert_eq!(display_command("antigravity"), None);
+        assert_eq!(display_command("acp"), None);
+        assert_eq!(display_command("codex; rm -rf /"), None);
+        assert!(install_command("acp", Path::new("npm")).is_err());
+        let command = install_command("gemini", Path::new("npm")).unwrap();
+        let argv: Vec<String> = command
+            .get_argv()
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(argv, ["npm", "install", "-g", "@google/gemini-cli"]);
+    }
+
+    #[test]
+    fn opencode_prefers_the_private_runner_where_supported() {
+        assert!(plan("opencode", false, true).managed);
+        assert!(!plan("opencode", true, false).managed);
+        assert!(!plan("codex", true, true).managed);
+        assert_eq!(
+            plan("codex", false, true),
+            InstallPlan {
+                command: Some("npm install -g @openai/codex".into()),
+                npm: false,
+                managed: false,
+            }
+        );
+    }
+}

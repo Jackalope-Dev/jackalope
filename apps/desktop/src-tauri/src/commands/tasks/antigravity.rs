@@ -1,7 +1,5 @@
 use super::*;
 
-pub(super) const TIMEOUT: Duration = Duration::from_secs(30 * 60);
-
 pub(in crate::commands) fn configure(cmd: &mut Command, workspace: &str, session: Option<&str>) {
     cmd.args([
         "--input-format",
@@ -92,7 +90,7 @@ impl Stream {
                 }
                 self.initialized = self.session(run, &event["conversation_id"]);
                 if let Some(model) = event["init"]["model"].as_str() {
-                    run.model = Some(model.chars().take(160).collect());
+                    super::served_model::observe(run, model);
                 }
                 let mode = event["init"]["permission_mode"]
                     .as_str()

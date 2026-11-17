@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub use crate::cli_protocol::{RunStatus, WorkspaceMode};
+
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Usage {
@@ -19,8 +21,32 @@ pub struct UsageObservation {
     pub session_id: Option<String>,
     pub parent_tool_use_id: Option<String>,
     pub model: Option<String>,
+    /// Includes the cache reads and writes below.
     pub input: u64,
     pub output: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cache_write: u64,
+}
+
+/// Where an attempt's agent ran when a project computer ran it.
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteExecution {
+    pub computer_id: String,
+    pub computer_name: String,
+}
+
+/// A Claude Code or Codex session someone started outside Jackalope that an attempt
+/// continues, in the folder it ran in and under the account directory it was saved in.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContinuedSession {
+    pub adapter: String,
+    pub session_id: String,
+    pub workspace: String,
+    pub home: std::path::PathBuf,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -53,6 +79,9 @@ pub struct TaskRun {
     /// The attempt this run retried, linking a retry back to what it replaced.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// The session from outside Jackalope this task continued, carried by every attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues: Option<ContinuedSession>,
     #[serde(default)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(default)]
@@ -63,6 +92,16 @@ pub struct TaskRun {
     pub routing: Option<super::routing::RoutingHistory>,
     #[serde(default)]
     pub quota_failure: Option<super::routing::QuotaFailure>,
+    /// What kind of failure `error` describes, when its message says. Never replaces it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_kind: Option<super::failure::FailureKind>,
+    /// A provider error the agent printed as assistant text, used if the turn ends unanswered.
+    #[serde(skip)]
+    pub provider_error: Option<String>,
+    /// The CLI's own refusal to resume a session it no longer has. The attempt then starts
+    /// once more as a new conversation, unless it continues a session from outside Jackalope.
+    #[serde(skip)]
+    pub session_refused: Option<String>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     /// The agent's own restatement of the task, reported once at the start.
@@ -90,6 +129,13 @@ pub struct TaskRun {
     pub target_branch: Option<String>,
     #[serde(default)]
     pub process_contained: bool,
+    /// The computer the agent ran on, when it did not run on this device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote: Option<RemoteExecution>,
+    /// The execution host chosen for the attempt and why, from the capacity
+    /// pool. Attempts saved before it existed have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<crate::commands::computers::pool::RunHost>,
     #[serde(default)]
     pub verify_command: Option<String>,
     #[serde(default)]
@@ -104,9 +150,21 @@ pub struct TaskRun {
     pub finishing: bool,
     #[serde(default)]
     pub verification_error: Option<String>,
+    /// The model last reported serving the attempt, or the requested one until it reports.
     pub model: Option<String>,
+    /// The model Jackalope asked the agent for; absent when the CLI chose its default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_model: Option<String>,
+    /// The overload fallback model Claude Code was given for this attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_mismatch: Option<super::served_model::ModelMismatch>,
+    /// The agent named the model serving this attempt; until it does, `model` is the request.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub model_reported: bool,
     pub prompt: String,
-    pub status: String,
+    pub status: RunStatus,
     pub started_at: String,
     pub ended_at: Option<String>,
     pub session_id: Option<String>,
@@ -115,6 +173,10 @@ pub struct TaskRun {
     /// cleared when the message completes into activity or `result`.
     #[serde(skip)]
     pub streaming: String,
+    /// Labels of tool calls still waiting for their result, by call id, so a failed
+    /// result can name the step. Kept in memory only.
+    #[serde(skip)]
+    pub pending_tools: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub details_omitted: bool,
     pub activity: Vec<String>,
@@ -130,6 +192,10 @@ pub struct TaskRun {
     pub usage_observations: Vec<UsageObservation>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
+    /// Questions whose ask returned to the agent unanswered and whose answer has
+    /// not reached it yet, through `user_response` or a Claude Code hook.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub awaiting_answers: Vec<String>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
     /// Append-only decision trail the agent reported for this attempt.
@@ -137,6 +203,10 @@ pub struct TaskRun {
     pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// macOS permissions this attempt's last desktop-control call lacked, such as
+    /// `accessibility`, for the task view's setup notice. Cleared when a call succeeds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub desktop_permissions: Vec<String>,
     /// Desktop-control actions for the Screen view, newest last and bounded.
     #[serde(default)]
     pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
@@ -152,6 +222,68 @@ pub struct TaskRun {
     /// The result this attempt challenges, when it is a Challenge reviewer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
+    /// Secret values the agent was given, which the record never shows. Kept
+    /// in memory only, for as long as the attempt can still produce output.
+    #[serde(skip)]
+    pub(crate) secrets: Option<std::sync::Arc<crate::commands::redaction::KnownSecrets>>,
+}
+
+impl TaskRun {
+    pub fn mark_stopped(&mut self) {
+        super::events::settle_usage(self);
+        self.status = RunStatus::Stopped;
+        self.ended_at = Some(chrono::Utc::now().to_rfc3339());
+    }
+
+    pub fn mark_failed(&mut self, error: String) {
+        super::events::settle_usage(self);
+        self.status = RunStatus::Failed;
+        self.error = Some(error);
+        self.ended_at = Some(chrono::Utc::now().to_rfc3339());
+        self.progress = None;
+    }
+
+    /// Adds `values` to the secrets this attempt's record never shows, and
+    /// redacts what it already holds.
+    pub(in crate::commands) fn protect(&mut self, values: Vec<String>) {
+        if let Some(secrets) =
+            crate::commands::redaction::KnownSecrets::with(self.secrets.as_deref(), values)
+        {
+            self.secrets = Some(std::sync::Arc::new(secrets));
+            self.redact_secrets();
+        }
+    }
+
+    /// Replaces the attempt's secret values wherever the record keeps what the
+    /// agent wrote, asked, decided, checked or showed. The person's prompt and
+    /// the record's identifiers, paths and statuses are left as they are.
+    pub(in crate::commands) fn redact_secrets(&mut self) {
+        let Some(secrets) = self.secrets.clone() else {
+            return;
+        };
+        secrets.text(&mut self.result);
+        secrets.streaming(&mut self.streaming);
+        for text in self
+            .activity
+            .iter_mut()
+            .chain(&mut self.diagnostics)
+            .chain(&mut self.visited_pages)
+            .chain(&mut self.error)
+            .chain(&mut self.verification_error)
+            .chain(&mut self.checkpoint_error)
+        {
+            secrets.text(text);
+        }
+        secrets.record(&mut self.prompts);
+        secrets.record(&mut self.validation_steps);
+        secrets.record(&mut self.decisions);
+        secrets.record(&mut self.understanding);
+        secrets.record(&mut self.screenshots);
+        secrets.record(&mut self.desktop_actions);
+        secrets.record(&mut self.quota_failure);
+        secrets.record(&mut self.verification);
+        secrets.record(&mut self.progress);
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -207,44 +339,54 @@ pub struct RunRequest {
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// A first attempt that resumes a session from outside Jackalope where it ran.
+    #[serde(skip)]
+    pub continues: Option<ContinuedSession>,
     #[serde(default)]
     pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
     pub coordination: Option<CoordinationContext>,
 }
 
-/// Where new work in a Git project runs.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum WorkspaceMode {
-    /// A separate worktree on a new `jackalope/<name>` branch named after the request.
-    #[default]
-    Worktree,
-    /// A new `jackalope/<name>` branch checked out in the project checkout.
-    Branch,
-    /// The project checkout on its current branch.
-    Current,
-    /// Ask the person when the task starts.
-    Ask,
-}
-
-impl WorkspaceMode {
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "worktree" => Some(Self::Worktree),
-            "branch" => Some(Self::Branch),
-            "current" => Some(Self::Current),
-            "ask" => Some(Self::Ask),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Worktree => "worktree",
-            Self::Branch => "branch",
-            Self::Current => "current",
-            Self::Ask => "ask",
+impl RunRequest {
+    /// A new attempt with a fresh id, in its own worktree, with every option at
+    /// its default. Callers set the fields they need with struct update syntax.
+    pub(in crate::commands) fn new(
+        project_id: &str,
+        project_name: &str,
+        project_path: &str,
+        agent: &str,
+        prompt: String,
+    ) -> Self {
+        Self {
+            live_session_id: None,
+            effort: None,
+            codex_speed: None,
+            dependency_snapshot: Default::default(),
+            monitor_change: None,
+            context_selection: Default::default(),
+            context_receipt: Default::default(),
+            model: None,
+            id: uuid::Uuid::new_v4().to_string(),
+            project_id: project_id.into(),
+            project_name: project_name.into(),
+            project_path: project_path.into(),
+            agent: agent.into(),
+            agent_profile_id: None,
+            verify_command: None,
+            prepare_command: None,
+            setup_files: Vec::new(),
+            auto_verify: false,
+            target_branch: None,
+            account_binding: None,
+            prompt,
+            isolated: true,
+            workspace_mode: None,
+            previous_run_id: None,
+            retry_of: None,
+            continues: None,
+            connection_ids: None,
+            coordination: None,
         }
     }
 }
@@ -268,7 +410,7 @@ pub struct ArchivedRun {
     pub project_name: String,
     pub agent: String,
     pub prompt: String,
-    pub status: String,
+    pub status: RunStatus,
     pub started_at: String,
     pub ended_at: Option<String>,
 }
@@ -283,6 +425,10 @@ pub struct Runner {
     pub signed_in: bool,
     pub account: String,
     pub detail: String,
+    /// The sign-in check ran and found no signed-in account.
+    pub sign_in_needed: bool,
+    /// Tasks can start: the account is signed in, or this agent checks access when a task starts.
+    pub ready: bool,
 }
 
 impl TaskRun {
@@ -315,11 +461,15 @@ impl TaskRun {
             progress: self.progress.clone(),
             preparation: self.preparation.clone(),
             retry_of: self.retry_of.clone(),
+            continues: self.continues.clone(),
             dependency_snapshot: self.dependency_snapshot.clone(),
             checkpoint: self.checkpoint.clone(),
             checkpoint_error: self.checkpoint_error.clone(),
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
+            failure_kind: self.failure_kind,
+            provider_error: None,
+            session_refused: None,
             contract: self.contract.clone(),
             understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
@@ -338,6 +488,8 @@ impl TaskRun {
             account_binding: self.account_binding.clone(),
             target_branch: self.target_branch.clone(),
             process_contained: self.process_contained.clone(),
+            remote: self.remote.clone(),
+            host: self.host.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
             setup_files: self.setup_files.clone(),
@@ -346,6 +498,10 @@ impl TaskRun {
             finishing: self.finishing.clone(),
             verification_error: self.verification_error.clone(),
             model: self.model.clone(),
+            requested_model: self.requested_model.clone(),
+            fallback_model: self.fallback_model.clone(),
+            model_mismatch: self.model_mismatch.clone(),
+            model_reported: self.model_reported,
             prompt: self.prompt.chars().take(500).collect(),
             status: self.status.clone(),
             started_at: self.started_at.clone(),
@@ -353,8 +509,9 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             streaming: String::new(),
+            pending_tools: Default::default(),
             details_omitted: true,
-            activity: if ["starting", "running", "stopping"].contains(&self.status.as_str()) {
+            activity: if self.status.is_active() {
                 self.activity
                     .iter()
                     .rev()
@@ -373,15 +530,18 @@ impl TaskRun {
             mcp_usage: self.mcp_usage.clone(),
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
+            awaiting_answers: self.awaiting_answers.clone(),
             validation_steps: self.validation_steps.clone(),
             decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_permissions: self.desktop_permissions.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
             visited_pages: self.visited_pages.clone(),
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
             challenge_of: self.challenge_of.clone(),
+            secrets: None,
         }
     }
 }

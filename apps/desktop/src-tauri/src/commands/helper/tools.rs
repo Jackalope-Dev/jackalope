@@ -67,6 +67,15 @@ fn decode<T: serde::de::DeserializeOwned>(value: Value) -> Result<T, String> {
     serde_json::from_value(value).map_err(|e| format!("Invalid tool arguments: {e}"))
 }
 
+/// App pages the helper may open. The app maps each to a view in its view registry.
+pub(super) fn destinations() -> &'static [String] {
+    static DESTINATIONS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    DESTINATIONS.get_or_init(|| {
+        serde_json::from_str(include_str!("../../../../src/lib/helper-destinations.json"))
+            .expect("src/lib/helper-destinations.json is a list of names")
+    })
+}
+
 fn enum_value(value: &Option<String>, values: &[&str]) -> bool {
     value.as_ref().is_none_or(|v| values.contains(&v.as_str()))
 }
@@ -150,7 +159,10 @@ impl Helper {
                     .and_then(|tasks| tasks.iter().find(|t| t["id"] == input.run_id))
                     .ok_or("Choose a task ID from the shared task list.")?;
                 if name == "stop_task"
-                    && !["starting", "running"].contains(&task["status"].as_str().unwrap_or(""))
+                    && !crate::commands::tasks::RunStatus::from(
+                        task["status"].as_str().unwrap_or(""),
+                    )
+                    .is_running()
                 {
                     return Err("This task is not running.".into());
                 }
@@ -230,20 +242,7 @@ impl Helper {
             }
             "navigate" => {
                 let input: Navigate = decode(arguments)?;
-                if ![
-                    "tasks",
-                    "agents",
-                    "agent-settings",
-                    "mcp",
-                    "usage",
-                    "settings",
-                    "schedules",
-                    "project",
-                    "worktrees",
-                    "knowledge",
-                ]
-                .contains(&input.destination.as_str())
-                {
+                if !destinations().contains(&input.destination) {
                     return Err("Unknown app destination.".into());
                 }
                 (json!(input), json!({}))

@@ -1,4 +1,4 @@
-use super::{agent_profiles, capacity::client::Client, tasks::TaskRuntime};
+use super::{agent_profiles, cli_rpc::Client, tasks::TaskRuntime};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -111,13 +111,43 @@ fn parse_antigravity_model(value: &Value) -> Vec<AgentModel> {
     parse_models(&json!([{"id":model["id"],"name":model["label"],"isDefault":true}]))
 }
 
+/// How an agent with a model catalog reports it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Reader {
+    /// The `/model` command in print mode.
+    Antigravity,
+    /// The session an ACP `session/new` opens.
+    Acp,
+    /// `opencode models --verbose`.
+    Opencode,
+    /// The app server's paged `model/list`.
+    Codex,
+    /// The control protocol's `initialize` response.
+    Claude,
+}
+
+impl Reader {
+    fn of(adapter: &str) -> Option<Self> {
+        Some(match adapter {
+            "antigravity" => Self::Antigravity,
+            "kimi" | "grok" => Self::Acp,
+            "opencode" => Self::Opencode,
+            "codex" => Self::Codex,
+            "claude" => Self::Claude,
+            _ => return None,
+        })
+    }
+}
+
 async fn read_catalog(
     adapter: &str,
     executable: &Path,
     binding: &agent_profiles::AccountBinding,
 ) -> Result<Vec<AgentModel>, String> {
+    let reader =
+        Reader::of(adapter).ok_or("This agent does not expose a supported model catalog.")?;
     let _runner_lease = super::managed_runtime::acquire(executable)?;
-    if adapter == "antigravity" {
+    if reader == Reader::Antigravity {
         super::capacity::antigravity::require_commands(binding, executable).await?;
         let output = super::capacity::antigravity::output(
             binding,
@@ -136,7 +166,7 @@ async fn read_catalog(
             .map_err(|_| "Antigravity returned invalid model metadata.")?;
         return Ok(parse_antigravity_model(&value));
     }
-    if matches!(adapter, "kimi" | "grok") {
+    if reader == Reader::Acp {
         let args: &[&str] = if adapter == "kimi" {
             &["acp"]
         } else {
@@ -161,7 +191,7 @@ async fn read_catalog(
         client.close().await;
         return result;
     }
-    if adapter == "opencode" {
+    if reader == Reader::Opencode {
         let mut command = Command::new(executable);
         command.args(["models", "--verbose"]);
         if let Some(provider) = agent_profiles::api_provider(binding)? {
@@ -174,8 +204,7 @@ async fn read_catalog(
             .stderr(Stdio::null())
             .kill_on_drop(true);
         agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-        #[cfg(windows)]
-        command.creation_flags(0x08000000);
+        super::process_control::hidden(command.as_std_mut());
         let mut child = command
             .spawn()
             .map_err(|_| "Could not start the model reader")?;
@@ -214,7 +243,7 @@ async fn read_catalog(
         let _ = timeout(Duration::from_secs(2), child.wait()).await;
         return result;
     }
-    let args: &[&str] = if adapter == "codex" {
+    let args: &[&str] = if reader == Reader::Codex {
         &["app-server", "--listen", "stdio://"]
     } else {
         &[
@@ -231,7 +260,7 @@ async fn read_catalog(
     };
     let mut client = Client::spawn_executable(binding, executable, args)?;
     let result = timeout(Duration::from_secs(20), async {
-        if adapter == "claude" {
+        if reader == Reader::Claude {
             let response = client.request(json!({"type":"control_request","request_id":"models-init","request":{"subtype":"initialize","hooks":{}}})).await?;
             return Ok(parse_models(&response["models"]));
         }
@@ -254,6 +283,15 @@ async fn read_catalog(
     result
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::agent_models::agent_models,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn agent_models(
     runtime: State<'_, TaskRuntime>,
@@ -268,7 +306,7 @@ pub async fn agent_models(
     if adapter == "gemini" {
         return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "Gemini CLI does not expose a model catalog command. Tasks use the CLI's configured model unless a saved model override is passed with --model; the model in use is reported when a task starts.".into()});
     }
-    if !["codex", "claude", "grok", "opencode", "kimi", "antigravity"].contains(&adapter.as_str()) {
+    if !super::agents::find(&adapter).is_some_and(|agent| agent.model_catalog) {
         return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "This agent does not expose a supported model catalog. Model selection is unavailable; the agent manages its model unless a saved override exists.".into()});
     }
     let binding = agent_profiles::bind_account(
@@ -322,6 +360,19 @@ pub async fn agent_models(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_agent_with_a_model_catalog_has_a_reader() {
+        for agent in super::super::agents::all() {
+            assert_eq!(
+                Reader::of(&agent.id).is_some(),
+                agent.model_catalog,
+                "{}",
+                agent.id
+            );
+        }
+    }
+
     #[test]
     fn antigravity_current_model_requires_a_zero_turn_command_receipt() {
         let value = json!({"status":"SUCCESS","num_turns":0,"command":{"name":"model","data":{"id":"reported-model","label":"Current model"}}});

@@ -1,13 +1,13 @@
+import { isActive } from '@jackalope/contracts/runs';
+import { FileDiff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { WorkItem } from '../../lib/task-collection';
-import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOpenWorkStore } from '../../stores/openWorkStore';
 import {
-  type ChangeStats,
   compactElapsed,
   isUnread,
   openSignalKey,
@@ -16,6 +16,7 @@ import {
   useWorkSignalsStore,
 } from '../../stores/workSignalsStore';
 import './work-signals.css';
+import type { ChangeStats } from '../../lib/run-types';
 
 /** Key of the work open in the main view. */
 export function useOpenSignalKey() {
@@ -48,24 +49,44 @@ export function useWorkSignals() {
   );
 }
 
+export const changeSummary = (stats: ChangeStats) =>
+  `+${stats.added.toLocaleString()} −${stats.removed.toLocaleString()} in ${stats.files.toLocaleString()} ${stats.files === 1 ? 'file' : 'files'}`;
+
+/** The size of a change, for headers with room for it. */
+export function ChangeSize({ stats }: { stats: ChangeStats }) {
+  return (
+    <span className="work-signal-diff" title={changeSummary(stats)}>
+      <span className="work-signal-added">+{stats.added.toLocaleString()}</span>
+      <span className="work-signal-removed">−{stats.removed.toLocaleString()}</span>
+      <span className="work-signal-files">
+        {stats.files.toLocaleString()} {stats.files === 1 ? 'file' : 'files'}
+      </span>
+    </span>
+  );
+}
+
 /**
- * Compact status for a work row: an unread dot, elapsed time while running and
- * the size of the change once there is one.
+ * Status for a work row: an unread dot, elapsed time while running and the size of the
+ * change once there is one. `compact` rows keep their width for the title: they show
+ * only a mark for finished work whose changes have not landed, with the size in its label.
  */
 export function WorkSignals({
   item,
   stats,
   unread,
+  compact = false,
 }: {
   item: WorkItem;
   stats?: ChangeStats;
   unread: boolean;
+  compact?: boolean;
 }) {
   const running = item.run ? isActive(item.run) : false;
-  const now = useNow(running);
-  const elapsed = running && item.run ? compactElapsed(item.run.startedAt, now) : '';
-  const changed = stats && stats.files > 0;
-  if (!unread && !elapsed && !changed) return null;
+  const now = useNow(running && !compact);
+  const elapsed = running && !compact && item.run ? compactElapsed(item.run.startedAt, now) : '';
+  const changed = !!stats && stats.files > 0;
+  const unlanded = compact && changed && !running && item.stage !== 'finished';
+  if (!unread && !elapsed && !(compact ? unlanded : changed)) return null;
   return (
     <span className="work-signals">
       {elapsed && (
@@ -73,13 +94,19 @@ export function WorkSignals({
           {elapsed}
         </span>
       )}
-      {changed && (
+      {stats && unlanded && (
         <span
-          className="work-signal-diff"
-          title={`${stats.files} ${stats.files === 1 ? 'file' : 'files'} changed`}
+          className="work-signal-unlanded"
+          role="img"
+          aria-label={`Changes not merged yet, ${changeSummary(stats)}`}
         >
-          <span className="work-signal-added">+{stats.added}</span>
-          <span className="work-signal-removed">−{stats.removed}</span>
+          <FileDiff size={13} aria-hidden="true" />
+        </span>
+      )}
+      {stats && changed && !compact && (
+        <span className="work-signal-diff" title={changeSummary(stats)}>
+          <span className="work-signal-added">+{stats.added.toLocaleString()}</span>
+          <span className="work-signal-removed">−{stats.removed.toLocaleString()}</span>
         </span>
       )}
       {unread && (

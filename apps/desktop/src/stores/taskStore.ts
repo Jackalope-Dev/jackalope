@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ContextSelection } from '../lib/knowledge';
+import type { ContextSelection } from '../lib/knowledge-types';
 import type { TaskEffort } from '../lib/task-effort';
 
 export type TaskStatus = 'backlog' | 'refinement' | 'in_progress' | 'verification' | 'done';

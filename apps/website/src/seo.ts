@@ -1,8 +1,18 @@
-import { guideMarkdown, knowledgeFiles } from '@jackalope/knowledge';
+import { guideMarkdown, guidePath, knowledgeFiles, knowledgeGuides } from '@jackalope/knowledge';
+import { type Author, authorPath, authors, findAuthor } from './authors.ts';
 import benchmarks from './benchmark-summary.json' with { type: 'json' };
-import { serializeBlogPost } from './blog-types.ts';
-import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
-import { knowledgeGuides } from './knowledge-content.ts';
+import { blogImageSize, serializeBlogPost } from './blog-types.ts';
+import {
+  changelogReleases,
+  company,
+  normalizePath,
+  pages,
+  posts,
+  siteOrigin,
+  tour,
+  updates,
+  updatesWith,
+} from './content.ts';
 import { type MarketingPage, marketingPages } from './marketing-content.ts';
 import { platformDownloads } from './platform-downloads.ts';
 
@@ -19,6 +29,20 @@ const SOCIAL_IMAGE_ALT =
   'Jackalope: Run your agents side by side. Codex, Claude Code, Gemini CLI and more, each in its own Git worktree.';
 
 export const routes = pages.map((page) => page.path);
+
+function personSchema(author: Author, origin: string) {
+  return {
+    '@type': 'Person',
+    '@id': `${origin}${authorPath(author)}#person`,
+    name: author.name,
+    url: `${origin}${authorPath(author)}`,
+    image: `${origin}${author.image}`,
+    jobTitle: author.jobTitle,
+    description: author.bio,
+    sameAs: author.profiles.map((profile) => profile.url),
+    worksFor: { '@type': 'Organization', name: company.name, url: company.url },
+  };
+}
 const indexablePages = pages.filter((page) => !page.noindex);
 
 function lastModified(path: string) {
@@ -36,6 +60,13 @@ function lastModified(path: string) {
       .map((post) => post.updated ?? post.date)
       .sort()
       .at(-1);
+  const author = authors.find((item) => path === authorPath(item));
+  if (author)
+    return posts
+      .filter((post) => post.author === author.slug)
+      .map((post) => post.updated ?? post.date)
+      .sort()
+      .at(-1);
   const post = posts.find((post) => path === `/blog/${post.slug}/`);
   return post?.updated ?? post?.date;
 }
@@ -46,11 +77,21 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
   const marketingPage = marketingPages.find((item) => item.path === normalized);
   const comparison = marketingPage?.comparison;
-  const guide = knowledgeGuides.find((item) => normalized === `/knowledge/${item.slug}/`);
+  const guide = knowledgeGuides.find((item) => normalized === guidePath(item.slug));
+  const postAuthor = findAuthor(post?.author);
+  const profile = authors.find((item) => normalized === authorPath(item));
   const title = page?.title || 'Page not found | Jackalope';
   const description = page?.description || 'Find your way back to Jackalope.';
   const url = `${origin}${normalized}`;
   const isArticle = Boolean(post || guide || comparison || normalized.startsWith('/guides/'));
+  // A post's own cover replaces the site image in link previews and its structured data.
+  const socialImage = post?.image?.url ?? `${origin}${SOCIAL_IMAGE}`;
+  const socialImageAlt = post?.image?.alt ?? SOCIAL_IMAGE_ALT;
+  const socialImageSize = post?.image ? blogImageSize(post.image) : { width: 1200, height: 630 };
+  const postSchemaImage =
+    post?.image && socialImageSize
+      ? { '@type': 'ImageObject', url: socialImage, ...socialImageSize }
+      : socialImage;
   const graph: Record<string, unknown>[] = [
     {
       '@type': 'Organization',
@@ -72,17 +113,19 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     {
       '@type': post
         ? 'BlogPosting'
-        : comparison
-          ? 'Article'
-          : isArticle
-            ? 'TechArticle'
-            : normalized === '/blog/' ||
-                normalized === '/changelog/' ||
-                normalized === '/agents/' ||
-                normalized === '/knowledge/' ||
-                normalized === '/compare/'
-              ? 'CollectionPage'
-              : 'WebPage',
+        : profile
+          ? 'ProfilePage'
+          : comparison
+            ? 'Article'
+            : isArticle
+              ? 'TechArticle'
+              : normalized === '/blog/' ||
+                  normalized === '/changelog/' ||
+                  normalized === '/agents/' ||
+                  normalized === '/knowledge/' ||
+                  normalized === '/compare/'
+                ? 'CollectionPage'
+                : 'WebPage',
       '@id': url,
       url,
       name: title,
@@ -112,19 +155,33 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
           ? {
               datePublished: post.date,
               dateModified: post.updated ?? post.date,
-              author: { '@type': 'Organization', name: company.name, url: company.url },
+              author: postAuthor
+                ? personSchema(postAuthor, origin)
+                : { '@type': 'Organization', name: company.name, url: company.url },
               publisher: { '@id': `${origin}/#organization` },
-              image: `${origin}${SOCIAL_IMAGE}`,
+              image: postSchemaImage,
               mainEntityOfPage: url,
             }
-          : isArticle
+          : profile
             ? {
-                author: { '@type': 'Organization', name: company.name, url: company.url },
-                publisher: { '@id': `${origin}/#organization` },
-                image: `${origin}${SOCIAL_IMAGE}`,
-                mainEntityOfPage: url,
+                mainEntity: personSchema(profile, origin),
+                hasPart: posts
+                  .filter((entry) => entry.author === profile.slug)
+                  .map((entry) => ({
+                    '@type': 'BlogPosting',
+                    headline: entry.title,
+                    url: `${origin}/blog/${entry.slug}/`,
+                    datePublished: entry.date,
+                  })),
               }
-            : {}),
+            : isArticle
+              ? {
+                  author: { '@type': 'Organization', name: company.name, url: company.url },
+                  publisher: { '@id': `${origin}/#organization` },
+                  image: `${origin}${SOCIAL_IMAGE}`,
+                  mainEntityOfPage: url,
+                }
+              : {}),
     },
   ];
   if (normalized === '/') {
@@ -155,7 +212,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   if (page && normalized !== '/') {
     const ancestors = [
       { name: 'Jackalope', item: `${origin}/` },
-      ...(post ? [{ name: 'Field notes', item: `${origin}/blog/` }] : []),
+      ...(post || profile ? [{ name: 'Field notes', item: `${origin}/blog/` }] : []),
       ...(guide ? [{ name: 'Knowledgebase', item: `${origin}/knowledge/` }] : []),
       ...(normalized.startsWith('/agents/') && normalized !== '/agents/'
         ? [{ name: 'Agents', item: `${origin}/agents/` }]
@@ -164,7 +221,11 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         ? [{ name: 'Compare workflows', item: `${origin}/compare/` }]
         : []),
       {
-        name: post?.title || guide?.shortTitle || title.replace(/ [|:] Jackalope$/, ''),
+        name:
+          post?.title ||
+          profile?.name ||
+          guide?.shortTitle ||
+          title.replace(/ [|:] Jackalope$/, ''),
         item: url,
       },
     ];
@@ -176,6 +237,17 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         '@type': 'ListItem',
         position: index + 1,
         ...entry,
+      })),
+    });
+  }
+  if (post?.faq && post.faq.length >= 2) {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${url}#faq`,
+      mainEntity: post.faq.map((entry) => ({
+        '@type': 'Question',
+        name: entry.question,
+        acceptedAnswer: { '@type': 'Answer', text: entry.answer },
       })),
     });
   }
@@ -213,7 +285,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         '@type': 'ListItem',
         position: index + 1,
         name: entry.title,
-        url: `${origin}/knowledge/${entry.slug}/`,
+        url: `${origin}${guidePath(entry.slug)}`,
       })),
     };
   }
@@ -228,20 +300,30 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:url" content="${escapeHtml(url)}" />`,
-    `<meta property="og:image" content="${origin}${SOCIAL_IMAGE}" />`,
-    `<meta property="og:image:width" content="1200" />`,
-    `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
+    `<meta property="og:image" content="${escapeHtml(socialImage)}" />`,
+    ...(socialImageSize
+      ? [
+          `<meta property="og:image:width" content="${socialImageSize.width}" />`,
+          `<meta property="og:image:height" content="${socialImageSize.height}" />`,
+        ]
+      : []),
+    `<meta property="og:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:site" content="@JackalopeDotDev" />`,
-    `<meta name="twitter:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(socialImageAlt)}" />`,
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
-    `<meta name="twitter:image" content="${origin}${SOCIAL_IMAGE}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(socialImage)}" />`,
     ...(post
       ? [
           `<meta property="article:published_time" content="${post.date}T12:00:00Z" />`,
           `<meta property="article:modified_time" content="${post.updated ?? post.date}T12:00:00Z" />`,
+          ...(postAuthor
+            ? [
+                `<meta property="article:author" content="${origin}${authorPath(postAuthor)}" />`,
+                `<meta name="author" content="${escapeHtml(postAuthor.name)}" />`,
+              ]
+            : []),
         ]
       : []),
     `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')}</script>`,
@@ -253,7 +335,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   return html
     .replace(/<title>[\s\S]*?<\/title>/g, '')
     .replace(
-      /<meta\s+(?:name="(?:description|robots|twitter:[^"]+)"|property="(?:og:[^"]+|article:[^"]+)")[^>]*>/g,
+      /<meta\s+(?:name="(?:description|author|robots|twitter:[^"]+)"|property="(?:og:[^"]+|article:[^"]+)")[^>]*>/g,
       '',
     )
     .replace(/<link rel="(?:canonical|alternate|sitemap)"[^>]*>/g, '')
@@ -291,7 +373,11 @@ function marketingPageText(page: MarketingPage, origin: string) {
   return `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${body}\n\n${details}`;
 }
 
-export function discoveryFiles(origin = siteOrigin, env: Record<string, string | undefined> = {}) {
+export function discoveryFiles(
+  origin = siteOrigin,
+  env: Record<string, string | undefined> = {},
+  releases = changelogReleases,
+) {
   // macOS and Linux always have public release builds; Windows is listed once configured.
   const platforms = platformDownloads(env)
     .filter((platform) => platform.url || platform.id !== 'windows')
@@ -314,7 +400,14 @@ export function discoveryFiles(origin = siteOrigin, env: Record<string, string |
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
     'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${lastModified(page.path) ? `<lastmod>${lastModified(page.path)}</lastmod>` : ''}</url>`).join('')}</urlset>`,
     'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Gemini CLI, and Antigravity. Direct project MCP connections support Codex, Claude Code, OpenCode, and Kimi Code; all seven adapters support on-demand discovery. Kimi supports named accounts, model selection, structured questions, task tokens, membership quota, routing, and Ask Jackalope. Antigravity is worker-only; its current model and subscription quota use read-only CLI commands. Named profiles use Gemini API keys with separate billing, while subscription login is shared. Gemini CLI runs worker tasks with session continuation and file-edit approval; shell and HTTP tools follow its own permission policy. Its quota is unknown, and it does not coordinate routing or Ask Jackalope. Installed-provider acceptance remains open. Provider access and reported usage vary by adapter. See ${origin}/agents/ for coverage and limits and ${origin}/agents/kimi-code/ for Kimi setup.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
-    'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# ${tour.title}\n${origin}/tour/\n\n${tour.description}\n\nTranscript: ${tour.transcript}\n\n# Agent performance benchmarks\n${origin}/benchmarks/\n\nMeasured ${benchmarks.date} across ${benchmarks.agentTrials} agent trials. ${benchmarks.environment.scope}.\n\n${[...benchmarks.comparisons, ...benchmarks.experiments].map((entry) => `## ${entry.title}\n\n${entry.detail}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.${post.updated ? ` Updated ${post.updated}.` : ''}\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n${origin}/changelog/\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`).join('\n\n')}\n`,
+    'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# ${tour.title}\n${origin}/tour/\n\n${tour.description}\n\nTranscript: ${tour.transcript}\n\n# Agent performance benchmarks\n${origin}/benchmarks/\n\nMeasured ${benchmarks.date} across ${benchmarks.agentTrials} agent trials. ${benchmarks.environment.scope}.\n\n${[...benchmarks.comparisons, ...benchmarks.experiments].map((entry) => `## ${entry.title}\n\n${entry.detail}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${findAuthor(post.author)?.name ?? company.name}.${post.updated ? ` Updated ${post.updated}.` : ''}\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n${origin}/changelog/\n\n${updatesWith(
+      releases,
+    )
+      .map(
+        (update) =>
+          `## ${update.date}: ${update.title} (${update.status}${update.version ? ` ${update.version}` : ''})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`,
+      )
+      .join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({
       name: 'Jackalope',

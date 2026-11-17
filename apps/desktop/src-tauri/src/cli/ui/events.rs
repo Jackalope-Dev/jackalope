@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 /// How long a status-line confirmation stays.
-const FLASH: Duration = Duration::from_millis(2500);
+const FLASH: Duration = Duration::from_millis(4000);
 
 pub fn event_loop(
     terminal: &mut ratatui::DefaultTerminal,
@@ -17,21 +17,8 @@ pub fn event_loop(
     inbox: &Receiver<Event>,
     enhanced: bool,
 ) -> Result<(), String> {
-    // Set when the desktop app started this terminal; it asks which
-    // conversation is showing here when the user moves it elsewhere.
-    let key = std::env::var("JACKALOPE_TERMINAL").ok();
-    let mut reported: Option<Option<String>> = None;
     let mut redraw = true;
     while !app.quit {
-        if let Some(key) = &key {
-            if reported.as_ref() != Some(&app.session) {
-                let _ = app.connection.send(&Request::Attached {
-                    terminal: key.clone(),
-                    session_id: app.session.clone(),
-                });
-                reported = Some(app.session.clone());
-            }
-        }
         #[cfg(unix)]
         if std::mem::take(&mut app.suspend) {
             super::suspend(terminal, enhanced)?;
@@ -120,6 +107,7 @@ fn handle(app: &mut App, event: Event) -> bool {
         Event::Files { directory, files } => app.files_listed(directory, files),
         Event::Sharpened { original, result } => app.sharpened(original, result),
         Event::Resize => {}
+        Event::Focus(focused) => app.focused = focused,
         Event::Scroll(lines) => app.scroll(lines),
         Event::Paste(text) => {
             if app.picker.is_none() {
@@ -160,6 +148,8 @@ pub fn spawn_input(events: Sender<Event>) {
             }
             Ok(TermEvent::Resize(_, _)) => events.send(Event::Resize),
             Ok(TermEvent::Paste(text)) => events.send(Event::Paste(text)),
+            Ok(TermEvent::FocusGained) => events.send(Event::Focus(true)),
+            Ok(TermEvent::FocusLost) => events.send(Event::Focus(false)),
             Ok(TermEvent::Mouse(mouse)) => match mouse.kind {
                 MouseEventKind::ScrollUp => events.send(Event::Scroll(3)),
                 MouseEventKind::ScrollDown => events.send(Event::Scroll(-3)),
@@ -248,8 +238,8 @@ impl App {
     }
 
     /// Rotates to the next tip every 8 seconds, returning true when changed.
-    fn rotate_tip_if_elapsed(&mut self) -> bool {
-        if self.last_tip_change.elapsed() >= Duration::from_secs(8) {
+    pub(super) fn rotate_tip_if_elapsed(&mut self) -> bool {
+        if !self.framed.get() && self.last_tip_change.elapsed() >= Duration::from_secs(8) {
             self.tip_index = (self.tip_index + 1) % render::TIPS.len();
             self.last_tip_change = std::time::Instant::now();
             true

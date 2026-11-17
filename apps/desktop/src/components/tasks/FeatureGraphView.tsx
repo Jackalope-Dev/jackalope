@@ -1,5 +1,6 @@
 import { graphlib, layout } from '@dagrejs/dagre';
-import { Badge, EmptyState } from '@jackalope/ui';
+import { isActive, isDone, isRetryable } from '@jackalope/contracts/runs';
+import { Badge, Button, EmptyState, Select, SelectItem } from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -20,11 +21,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { QueueItem } from '../../lib/queue';
-import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
 import '@xyflow/react/dist/style.css';
 import './feature-graph.css';
 
@@ -59,14 +57,9 @@ export function FeatureGraphView({
       const original = runs.find((r) => r.id === item.runId);
       const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
       if (item.runId && mergedRunIds.includes(item.runId)) return 'merged';
-      if (
-        item.error ||
-        run?.dependencyInvalidated ||
-        (run && ['failed', 'stopped', 'interrupted'].includes(run.status))
-      )
-        return 'attention';
+      if (item.error || run?.dependencyInvalidated || (run && isRetryable(run))) return 'attention';
       if (run && isActive(run)) return 'active';
-      if (run && ['review', 'reviewed'].includes(run.status)) return 'review';
+      if (run && isDone(run)) return 'review';
       if (item.runId) return 'attention';
       return 'queued';
     },

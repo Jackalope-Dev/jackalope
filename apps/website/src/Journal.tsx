@@ -1,9 +1,13 @@
 import { MailIcon } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import type { BlogSection } from './blog-types';
+import Markdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { type Author, authorPath, authors, findAuthor } from './authors';
+import { type BlogPost, type BlogSection, blogImageSize, postPageImage } from './blog-types';
 import { posts, updates } from './content';
 import { EditorialArt } from './EditorialArt';
+import { InlineLinks } from './InlineLinks';
 import { PublishedReleases } from './PublishedReleases';
 import './blog.css';
 
@@ -21,7 +25,44 @@ const dateLabel = (date: string) =>
 
 const sectionId = (section: BlogSection, index: number) => section.id || `section-${index + 1}`;
 
-function JournalIndex() {
+// Raw HTML in Markdown is dropped (skipHtml) and react-markdown strips unsafe URLs, so
+// posts merged without review cannot inject markup or scripts.
+const markdownComponents: Components = {
+  h1: 'h3',
+  h2: 'h3',
+  ul: ({ node: _node, ...props }) => <ul className="blog-checklist" {...props} />,
+  ol: ({ node: _node, ...props }) => <ol className="blog-checklist" {...props} />,
+  pre: ({ node: _node, ...props }) => (
+    <figure className="blog-code">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Overflowing code must be keyboard-scrollable. */}
+      <pre tabIndex={0} {...props} />
+    </figure>
+  ),
+  table: ({ node: _node, ...props }) => (
+    <section
+      className="blog-table-scroll"
+      aria-label="Table"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: The table region must support keyboard scrolling on narrow screens.
+      tabIndex={0}
+    >
+      <table {...props} />
+    </section>
+  ),
+};
+
+const BlogMarkdown = ({ children }: { children: string }) => (
+  <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents} skipHtml>
+    {children}
+  </Markdown>
+);
+
+function JournalIndex({
+  items = posts,
+  heading = 'Guides and field notes',
+}: {
+  items?: BlogPost[];
+  heading?: string;
+}) {
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,11 +125,11 @@ function JournalIndex() {
     <section className="journal-teaser page-width journal-index" aria-labelledby="notes-title">
       <div className="journal-section-heading">
         <div>
-          <h2 id="notes-title">Guides and field notes</h2>
+          <h2 id="notes-title">{heading}</h2>
         </div>
       </div>
       <div className="notes-grid" ref={gridRef}>
-        {posts.map((post) => (
+        {items.map((post) => (
           <a
             className="note-preview"
             href={`/blog/${post.slug}/`}
@@ -119,6 +160,7 @@ function JournalIndex() {
 
 export function JournalPage({ path }: { path: string }) {
   const post = posts.find((item) => path === `/blog/${item.slug}/`);
+  const pageImage = post && postPageImage(post);
   if (post)
     return (
       <main id="main" className="article page-width">
@@ -132,7 +174,7 @@ export function JournalPage({ path }: { path: string }) {
           <h1>{post.title}</h1>
           <p className="article-deck">{post.description}</p>
           <div className="article-byline">
-            Jackalope Digital LLC <span>·</span>{' '}
+            <Byline author={findAuthor(post.author)} /> <span>·</span>{' '}
             <time dateTime={post.date}>{dateLabel(post.date)}</time>
             {post.updated && (
               <>
@@ -144,8 +186,20 @@ export function JournalPage({ path }: { path: string }) {
             {post.readingTime}
           </div>
         </header>
+        {pageImage && (
+          <figure className="article-cover">
+            <img
+              src={pageImage.url}
+              alt={pageImage.alt}
+              {...blogImageSize(pageImage)}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+            />
+          </figure>
+        )}
         <div className="article-body blog-body">
-          {post.related && (
+          {post.sections.length >= 3 && (
             <nav className="blog-contents" aria-label="On this page">
               <h2>On this page</h2>
               <ol>
@@ -157,13 +211,17 @@ export function JournalPage({ path }: { path: string }) {
               </ol>
             </nav>
           )}
+          {post.intro && <BlogMarkdown>{post.intro}</BlogMarkdown>}
           {post.sections.map((section, index) => (
             <section key={section.title} aria-labelledby={sectionId(section, index)}>
               <h2 id={sectionId(section, index)} tabIndex={-1}>
                 {section.title}
               </h2>
+              {section.markdown && <BlogMarkdown>{section.markdown}</BlogMarkdown>}
               {section.paragraphs.map((text) => (
-                <p key={text}>{text}</p>
+                <p key={text}>
+                  <InlineLinks text={text} />
+                </p>
               ))}
               {section.bullets && (
                 <ul className="blog-checklist">
@@ -249,7 +307,7 @@ export function JournalPage({ path }: { path: string }) {
             <a href="/tour/">Watch the app tour</a> or <a href="/#how-it-works">see how it works</a>
             .
           </p>
-          {post.related && (
+          {(post.related || post.category === 'Practical guides') && (
             <p>
               <a href="/#newsletter">Sign up free</a> to try Jackalope on your own projects.
             </p>
@@ -257,6 +315,8 @@ export function JournalPage({ path }: { path: string }) {
         </div>
       </main>
     );
+  const author = authors.find((item) => path === authorPath(item));
+  if (author) return <AuthorPage author={author} />;
   if (path === '/changelog/')
     return (
       <main id="main" className="journal-page page-width">
@@ -277,7 +337,10 @@ export function JournalPage({ path }: { path: string }) {
             <article id={update.id} key={update.id} className="change-entry">
               <div className="change-date">
                 <time dateTime={update.date}>{dateLabel(update.date)}</time>
-                <span>{update.status}</span>
+                <span className="change-status" data-state={update.state}>
+                  {update.status}
+                  {update.version && <small>v{update.version}</small>}
+                </span>
               </div>
               <div>
                 <h2>
@@ -318,6 +381,49 @@ export function JournalPage({ path }: { path: string }) {
           Back home <ArrowRight size={16} />
         </a>
       </header>
+    </main>
+  );
+}
+
+function Byline({ author }: { author?: Author }) {
+  if (!author) return <>Jackalope Digital LLC</>;
+  return (
+    <a className="article-author" href={authorPath(author)} rel="author">
+      <img src={author.image} alt="" width={20} height={20} />
+      {author.name}
+    </a>
+  );
+}
+
+function AuthorPage({ author }: { author: Author }) {
+  const written = posts.filter((post) => post.author === author.slug);
+  return (
+    <main id="main" className="journal-page page-width">
+      <nav className="article-breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Jackalope</a>
+        <span aria-hidden="true">/</span>
+        <a href="/blog/">Field notes</a>
+      </nav>
+      <header className="author-profile">
+        <img src={author.image} alt={author.name} width={128} height={128} />
+        <div>
+          <h1 className="author-name">{author.name}</h1>
+          <p className="author-role">{author.jobTitle}</p>
+          <p>{author.bio}</p>
+          <ul className="author-links" aria-label={`${author.name} elsewhere`}>
+            {author.profiles.map((profile) => (
+              <li key={profile.url}>
+                <a href={profile.url} rel="me noopener" target="_blank">
+                  {profile.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </header>
+      {written.length > 0 && (
+        <JournalIndex items={written} heading={`Articles by ${author.name}`} />
+      )}
     </main>
   );
 }

@@ -1,26 +1,5 @@
 use super::*;
-
-#[test]
-fn lean_help_keeps_tool_recovery_and_full_contracts_discoverable() {
-    let full = help_response(false, true);
-    let lean = help_response(true, true);
-    assert!(lean.to_string().len() < full.to_string().len() / 2);
-    for contract in [
-        "/v1/help?full=true",
-        "never switch transports",
-        "agreement gates",
-        "/v1/user-prompt/poll",
-        "elapsed time is not an answer",
-    ] {
-        assert!(lean["instructions"].as_str().unwrap().contains(contract));
-    }
-    assert_eq!(lean["verification"], full["verification"]);
-    assert_eq!(lean["discovery"], full["discovery"]);
-    assert!(lean["discovery"]
-        .as_str()
-        .unwrap()
-        .contains("structuredContent.selected.rows"));
-}
+use crate::commands::scope_path::any_overlap;
 
 #[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
@@ -32,16 +11,18 @@ fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     std::fs::write(&path, b"{incomplete queue").unwrap();
     let service = Coordinator::new(queue.clone(), runtime.clone()).unwrap();
     assert!(service.view().err().unwrap().contains("original remains"));
-    assert!(service.save(&Ledger::default()).is_err());
+    assert!(service
+        .commit(&mut service.state(), |_| Ok::<_, String>(()))
+        .is_err());
     assert!(service.tick().is_err());
     assert!(service.ensure_storage_loaded().is_err());
-    assert!(service.inner.lock().unwrap().enabled.is_empty());
+    assert!(service.state().enabled.is_empty());
     assert_eq!(std::fs::read(&path).unwrap(), b"{incomplete queue");
     drop(service);
     std::fs::write(&path, serde_json::to_vec(&Ledger::default()).unwrap()).unwrap();
     let restored = Coordinator::new(queue, runtime.clone()).unwrap();
     assert!(restored.view().unwrap().items.is_empty());
-    assert!(restored.inner.lock().unwrap().enabled.is_empty());
+    assert!(restored.state().enabled.is_empty());
     drop(restored);
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
@@ -92,18 +73,6 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
     assert!(text.contains("record_decision"));
     assert!(text.len() < 1900);
     assert!(!text.contains("/v1/browser/navigate"));
-    assert!(http_bootstrap().contains("/v1/help"));
-    let help = http_instructions();
-    for endpoint in [
-        "/v1/project",
-        "/v1/browser/navigate",
-        "/v1/user-prompt",
-        "/v1/validation-step",
-        "/v1/goal-restatement",
-        "/v1/decisions",
-    ] {
-        assert!(help.contains(endpoint));
-    }
 }
 
 #[test]
@@ -116,15 +85,15 @@ fn import_orders_dependencies_and_rejects_cycles_and_missing_keys() {
 }
 #[test]
 fn scopes_detect_shared_ownership_without_sibling_false_positives() {
-    assert!(overlaps(
+    assert!(any_overlap(
         &scopes(vec!["apps\\desktop/".into()]).unwrap(),
         &vec!["apps/desktop/src/main.ts".into()]
     ));
-    assert!(!overlaps(
+    assert!(!any_overlap(
         &vec!["docs/a.md".into()],
         &vec!["docs/b.md".into()]
     ));
-    assert!(overlaps(&vec![".".into()], &vec!["anything".into()]));
+    assert!(any_overlap(&vec![".".into()], &vec!["anything".into()]));
     assert!(scopes(vec!["../outside".into()]).is_err());
     assert!(scopes(vec!["C:/outside".into()]).is_err());
 }
@@ -180,17 +149,12 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
             dependencies: vec![],
         })
         .unwrap();
-    service
-        .inner
-        .lock()
-        .unwrap()
-        .enabled
-        .insert("project".into());
+    service.state().enabled.insert("project".into());
     drop(service);
     let restored = Coordinator::new(dir.join("queue"), runtime).unwrap();
-    assert!(restored.inner.lock().unwrap().enabled.is_empty());
-    assert_eq!(restored.inner.lock().unwrap().ledger.items[0].id, id);
-    assert!(restored.authorized(&HeaderMap::new()).is_err());
+    assert!(restored.state().enabled.is_empty());
+    assert_eq!(restored.state().ledger.items[0].id, id);
+    assert!(restored.caller(&HeaderMap::new()).is_err());
     drop(restored);
     assert!(dir.starts_with(std::env::temp_dir()));
     std::fs::remove_dir_all(dir).unwrap();
@@ -247,7 +211,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
     assert!(service
         .import(request(vec![entry("first", &[]), invalid]))
         .is_err());
-    assert!(service.inner.lock().unwrap().ledger.items.is_empty());
+    assert!(service.state().ledger.items.is_empty());
     let mut shared = entry("shared", &[]);
     shared.scopes = vec!["docs/first.md".into()];
     service
@@ -269,7 +233,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         ]))
         .unwrap();
     assert_eq!(retry_ids.len(), 4);
-    assert_eq!(service.inner.lock().unwrap().ledger.items.len(), 4);
+    assert_eq!(service.state().ledger.items.len(), 4);
     shared.scopes = vec!["different".into()];
     assert!(service
         .import(request(vec![
@@ -279,7 +243,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
             entry("after", &["first"])
         ]))
         .is_err());
-    let mut inner = service.inner.lock().unwrap();
+    let mut inner = service.state();
     inner.enabled.insert("project".into());
     let first = ready_items(&inner, &[], &[]);
     assert_eq!(first.len(), 2);
@@ -298,95 +262,4 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
     drop(service);
     assert!(dir.starts_with(std::env::temp_dir()));
     std::fs::remove_dir_all(dir).unwrap();
-}
-
-#[cfg(windows)]
-fn process_is_alive(pid: u32) -> bool {
-    let output = std::process::Command::new("tasklist")
-        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
-        .output()
-        .expect("failed to run tasklist");
-    String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
-}
-#[cfg(not(windows))]
-fn process_is_alive(pid: u32) -> bool {
-    std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-#[tokio::test]
-async fn computer_verify_command_execution_is_bounded_and_non_blocking() {
-    // Exercises the exact mechanism bridge_computer_verify uses (tokio::
-    // process::Command wrapped in tokio::time::timeout, kill_on_drop),
-    // the fix for a real bug: it used to run std::process::Command's
-    // blocking output() directly inside an async handler with no
-    // timeout at all, so a command that hangs (waits on stdin, starts a
-    // long-lived server) would permanently occupy a tokio worker thread
-    // - and even with a timeout, without kill_on_drop the process would
-    // keep running as an undetected orphan instead of actually stopping.
-    // Testing through the full authorized HTTP path would need a
-    // running agent process to produce an "active" TaskRun; this
-    // isolates the part that actually changed.
-    #[cfg(windows)]
-    let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) = (
-        "cmd.exe",
-        vec!["/C", "exit", "0"],
-        "ping",
-        vec!["-n", "30", "127.0.0.1"],
-    );
-    #[cfg(not(windows))]
-    let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) =
-        ("sh", vec!["-c", "exit 0"], "sleep", vec!["30"]);
-
-    let mut quick = tokio::process::Command::new(quick_program);
-    quick.args(&quick_args);
-    let result = tokio::time::timeout(Duration::from_millis(2000), quick.output()).await;
-    assert!(
-        result.is_ok(),
-        "a quick command must not be affected by the bound"
-    );
-
-    // Spawned directly (not through a shell) so kill_on_drop's
-    // direct-child termination actually stops the real long-running
-    // process being measured, not an intermediate shell wrapper.
-    let mut hang = tokio::process::Command::new(hang_program);
-    hang.args(&hang_args)
-        .kill_on_drop(true)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    let mut child = hang.spawn().expect("failed to spawn hang command");
-    let pid = child.id().expect("spawned child has no pid");
-    assert!(
-        process_is_alive(pid),
-        "process should be running before the timeout"
-    );
-
-    let started = std::time::Instant::now();
-    // Moved into the awaited future (mirroring cmd.output()'s own
-    // internal Child ownership) so dropping it on timeout drops the
-    // Child too, which is what actually triggers kill_on_drop.
-    let result = tokio::time::timeout(
-        Duration::from_millis(200),
-        async move { child.wait().await },
-    )
-    .await;
-    assert!(
-        result.is_err(),
-        "a command that never exits must time out rather than hang forever"
-    );
-    assert!(
-        started.elapsed() < Duration::from_secs(5),
-        "the timeout must actually bound wall-clock time, not just the return type"
-    );
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    while process_is_alive(pid) && std::time::Instant::now() < deadline {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    assert!(
-        !process_is_alive(pid),
-        "kill_on_drop should terminate the process once we give up waiting on it, not leave it orphaned"
-    );
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use serde_json::{json, Value};
 use std::time::Instant;
 mod jev_fixture;
@@ -29,7 +30,11 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let root = std::env::temp_dir().join(format!("jackalope-quality-{}", Uuid::new_v4()));
     let external = spec["externalWorkspace"].is_string();
     let repo = workspace::prepare(&root, &spec)?;
-    let target_branch = super::evaluation_trial::git(&repo, &["symbolic-ref", "--short", "HEAD"])?;
+    let target_branch = crate::commands::repo::git(
+        &repo,
+        &["symbolic-ref", "--short", "HEAD"],
+        crate::commands::repo::Policy::Inherited,
+    )?;
     let project_id = Uuid::new_v4().to_string();
     learning::seed(&root, &repo, &project_id, &spec)?;
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
@@ -159,9 +164,9 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                     permission_decisions.push(json!({"promptId":prompt.id,"decision":"reject","source":"matched unattended benchmark policy"}));
                 }
             }
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 stopped |= budget_exceeded;
-                if run.status == "review" && !stopped && next_followup < followups.len() {
+                if run.status == RunStatus::Review && !stopped && next_followup < followups.len() {
                     let previous = id.clone();
                     id = Uuid::new_v4().to_string();
                     attempt_ids.push(id.clone());
@@ -203,11 +208,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
             spec["oracle"].as_str().ok_or("Missing oracle")?,
         )?;
     }
-    let oracle = if let Some(run) = run.filter(|r| {
-        !external && {
-            !["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-        }
-    }) {
+    let oracle = if let Some(run) = run.filter(|r| !external && !r.status.is_live()) {
         let mut command = std::process::Command::new("node");
         command.arg(root.join("oracle.cjs")).arg(&run.workspace);
         Some(crate::commands::process_control::run_cancellable(

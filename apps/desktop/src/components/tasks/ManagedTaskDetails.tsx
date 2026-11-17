@@ -37,19 +37,12 @@ export function ManagedTaskDetails({
             <dt>Reported tokens</dt>
             <dd>{usage.tokens === null ? 'Unavailable' : usage.tokens.toLocaleString()}</dd>
           </div>
-          <div>
-            <dt>Estimated cost</dt>
-            <dd>{usage.costUsd === null ? 'Unavailable' : `$${usage.costUsd.toFixed(4)}`}</dd>
-          </div>
         </dl>
         {!!usage.missing && (
           <p className="task-muted">{usage.missing} usage reports unavailable.</p>
         )}
         {work.missingAttempts.length > 0 && (
           <p className="task-muted">History coverage is incomplete.</p>
-        )}
-        {!!(usage.costMissing || usage.missing || work.missingAttempts.length) && (
-          <p className="task-muted">Cost coverage is incomplete.</p>
         )}
         <p className="task-muted">Includes assessment, planning and execution.</p>
       </Panel>

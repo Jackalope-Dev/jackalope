@@ -20,22 +20,28 @@ representative benefit and installed-platform acceptance remain open.
 
 - One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
   activity and quota freshness. Desktop preferences include power, running services, zoom,
-  shortcuts, editor/shell choices, saved actions and optional local dictation.
-  Split terminals can retain stopped output without replaying commands. Explicit
+  shortcuts, editor/shell choices and optional local dictation. Task terminals offer each
+  project's preparation, verification and saved commands as buttons, and split terminals
+  can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
 - One workspace layout keeps recent work in a collapsible sidebar beside the open item,
   with list and board views of the work list.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
-  unread results; recently opened work stays in tabs.
+  unread results; recently opened work stays in tabs. Claude Code and Codex conversations
+  from outside Jackalope appear read-only under their project and can be continued where
+  they ran.
   Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.
 
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Plan mode interviews read-only, then runs an approved plan as one agent, planned
-  subtasks or a swarm with an independent review against it.
+  subtasks or a swarm with an independent review against it. A swarm (beta) runs in
+  rounds until an orchestrator finds every acceptance criterion met. Agents can decide
+  routine questions, checked rounds and in-scope deviations for the person, who is asked
+  only for sign-ins, payment, secrets and changes of direction.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and
   GitHub/Linear/Jira issue intake keep corrections and source work together.
@@ -70,7 +76,8 @@ Python 3. Dictation requires a local transcription service. Installed permission
 recovery and cross-platform behavior still require validation.
 
 Trusted-host pairing and a responsive web companion support scoped task check-ins,
-questions, follow-ups, dispatch and change review. SSH forwarding and HTTPS retain
+questions, follow-ups, dispatch and change review. Android and iOS companion apps
+reuse those screens and add notifications when work needs you. SSH forwarding and HTTPS retain
 the host's execution ownership. Native multi-device, transport and provider acceptance
 remain in progress; implementation does not establish release availability.
 
@@ -159,8 +166,12 @@ on-demand connection. A Screen view shows the task browser's viewport and deskto
 grant state with revoke controls. Persistent agent browser profiles, one per project and
 optionally per bot, keep sign-ins between tasks with per-site permission and a
 person-only sign-in window. Bots can also have their own computer, a Linux sandbox in
-Docker or a paired cloud machine the person runs, where desktop and browser tools act
-instead of on the person's desktop; tasks get one only with the person's approval.
+Docker, a paired cloud machine the person runs or a machine on their own Agent37
+account, where desktop and browser tools act instead of on the person's desktop; tasks
+get one only with the person's approval. A project can run its Claude Code and Codex
+task agents on such a computer while checks, review and merging stay local, and a
+swarm can spread its tasks across this device and the person's computers, each placed by
+what it needs and which host has room, with a lost host's task retried once elsewhere.
 Local sandboxes start when needed and stop when idle or when Jackalope quits.
 Jackalope-hosted computers are planned, not available. Installed and live-account
 acceptance remain open.
@@ -184,7 +195,8 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 
 ## Further out: work across machines
 
-Managed hosting (including hosted Artifacts repositories), agent-native repository
-workflows, native mobile applications, shared workspaces and team collaboration
-depend on validated individual remote workflows. These remain exploratory directions.
+Jackalope Cloud, an always-on host that keeps coordinating work while the laptop is away so
+phones and other computers stay useful, comes first in this direction. Managed hosting
+(including hosted Artifacts repositories), agent-native repository workflows, shared
+workspaces and team collaboration depend on validated individual remote workflows. These remain exploratory directions.
 See [BACKEND.md](BACKEND.md).

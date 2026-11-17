@@ -250,6 +250,27 @@ test('missing acceptance, foreign drafts, changed remote bytes and tag conflicts
   assert.ok(!state.writes.includes('publish'));
 });
 
+test('an unreadable uploaded asset stops publication and names the file', async (t) => {
+  const { plan } = await fixture(t);
+  const { options, state } = remoteFixture(plan);
+  await publishCloud(plan, { ...options, publish: false });
+  const asset = state.release.assets[1];
+  await assert.rejects(
+    publishCloud(plan, {
+      ...options,
+      readAssetHash: async (assetId) => {
+        if (assetId === asset.id) throw new Error('Cannot verify uploaded asset bytes (HTTP 404)');
+        return state.hashes.get(assetId);
+      },
+    }),
+    (error) =>
+      error.message.includes('HTTP 404') &&
+      error.message.includes(asset.filename) &&
+      error.message.includes(asset.id),
+  );
+  assert.ok(!state.writes.includes('publish'));
+});
+
 test('newer remote versions and extra assets cannot be overwritten by a retry', async (t) => {
   const { plan } = await fixture(t);
   const { options, state } = remoteFixture(plan);

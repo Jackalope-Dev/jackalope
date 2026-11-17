@@ -39,9 +39,27 @@ const runWithRetry = async (cmd, args) => {
       return run(cmd, args);
     } catch (error) {
       if (attempt === 4) throw error;
-      await new Promise((done) => setTimeout(done, attempt * 20_000));
+      await pause(attempt * 20_000);
     }
   }
+};
+const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+/**
+ * Whether the notarization ticket was already stapled during bundling. Apple can publish a
+ * ticket minutes after reporting Accepted, and Tauri bundles on without it; then this keeps
+ * stapling until the ticket appears, and the caller rebuilds the DMG and updater archive so
+ * they carry the stapled app.
+ */
+const stapledDuringBundle = async (app) => {
+  if (spawnSync('xcrun', ['stapler', 'validate', app], { stdio: 'ignore' }).status === 0)
+    return true;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    console.log(`Waiting for Apple's notarization ticket (attempt ${attempt} of 6)`);
+    if (spawnSync('xcrun', ['stapler', 'staple', app], { stdio: 'inherit' }).status === 0)
+      return false;
+    await pause(attempt * 30_000);
+  }
+  throw new Error("Apple has not published the app's notarization ticket; rerun this job later");
 };
 const capture = (cmd, args) => run(cmd, args, { stdio: 'pipe', encoding: 'utf8' }).trim();
 const source = capture('git', ['rev-parse', 'HEAD']);
@@ -182,12 +200,17 @@ try {
   }
   // Tauri skips the Finder layout pass (background, window size, icon
   // positions) when CI is set, which leaves the DMG unstyled.
-  run('pnpm', ['tauri', 'bundle', ...common, '--bundles', mac ? 'app,dmg' : 'appimage'], {
-    env: { ...process.env, CI: undefined },
-  });
+  const bundle = () =>
+    run('pnpm', ['tauri', 'bundle', ...common, '--bundles', mac ? 'app,dmg' : 'appimage'], {
+      env: { ...process.env, CI: undefined },
+    });
+  bundle();
   const name = candidate ? 'Jackalope' : 'Jackalope Rehearsal';
   if (mac) {
     const app = resolve(native, 'bundle/macos', `${name}.app`);
+    // Bundling again resubmits the same signed code, whose ticket now exists, so Tauri
+    // staples it before packing the DMG and updater archive.
+    if (candidate && !(await stapledDuringBundle(app))) bundle();
     run('codesign', ['--verify', '--deep', '--strict', app]);
     if (candidate) {
       const info = spawnSync('codesign', ['-dv', '--verbose=4', app], { encoding: 'utf8' });

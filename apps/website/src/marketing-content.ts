@@ -62,7 +62,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Separate the files. Coordinate the decisions.',
         paragraphs: [
-          'Each parallel task can receive its own Git worktree and branch, preventing two agents from editing the same checkout. Project instructions and relevant updates keep each agent informed about related work.',
+          'Each parallel task can receive [its own Git worktree and branch](/git-worktrees-for-ai-agents/), preventing two agents from editing the same checkout. [Project instructions](/blog/agents-md-claude-md-project-instructions/) and relevant updates keep each agent informed about related work.',
         ],
         bullets: [
           'Choose Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, or Antigravity per task.',
@@ -81,7 +81,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Split by independent outcomes.',
         paragraphs: [
           'For a search feature, one task can investigate a ranking regression while another updates help text that does not depend on the fix. If a third task changes the API consumed by the interface, decide the contract first and make the interface task depend on that integration.',
-          'Give each task a file scope, an expected behavior, and a check it can run. Start with two workers and increase concurrency only when their scopes remain understandable. Shared files, database migrations, generated outputs, and fixed development-server ports can create dependencies even when the prompts sound independent.',
+          'Give each task a file scope, an expected behavior, and a check it can run. [Start with two workers](/blog/run-ai-coding-agents-in-parallel/) and increase concurrency only when their scopes remain understandable. Shared files, database migrations, generated outputs, and fixed development-server ports can create dependencies even when the prompts sound independent.',
         ],
         links: [
           {
@@ -132,7 +132,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Why worktrees matter for coding agents.',
         paragraphs: [
-          'Two agents in one checkout can overwrite files, change the active branch, or make a clean review difficult. A Git worktree gives each task a separate working directory and branch while sharing the repository’s object database.',
+          '[Two agents in one checkout](/parallel-coding-agents/) can overwrite files, change the active branch, or make a clean review difficult. A Git worktree gives each task a separate working directory and branch while sharing the repository’s object database.',
           'Isolation does not eliminate semantic conflicts. Two locally correct patches can still disagree about an API or shared assumption. That is why Jackalope treats the combined review as a separate decision.',
         ],
       },
@@ -157,7 +157,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Prepare more than the branch.',
         paragraphs: [
-          'A worktree contains checked-in files, but it may not contain installed packages, ignored environment files, or a running database. Record the setup commands in project guidance and establish the same build in the new checkout before asking an agent to diagnose application behavior.',
+          'A worktree contains checked-in files, but it may not contain installed packages, ignored environment files, or a running database. Record the setup commands in [project guidance](/blog/agents-md-claude-md-project-instructions/) and [establish the same build in the new checkout](/blog/git-worktrees-for-ai-coding-agents/) before asking an agent to diagnose application behavior.',
           'Give local servers distinct ports and check whether tools write to shared caches or external services. Worktrees share Git repository data; they do not create separate operating-system accounts or automatically isolate services.',
         ],
         links: [
@@ -409,7 +409,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Connect the Codex CLI you already use.',
         paragraphs: [
           'Jackalope launches your installed Codex CLI. An OpenAI account in a browser is not enough: the executable and the account selected for the task must be usable on the machine running Jackalope. Start with the official CLI installation and sign-in instructions, then check Codex in Agents → Configuration.',
-          'Choose a local Git project whose normal build already works. Add the build command and project conventions to its instructions. Your first task should have one observable result, such as fixing a failing parser test, so you can separate setup problems from implementation problems.',
+          'Choose a local Git project whose normal build already works. Add the build command and [project conventions to its instructions](/blog/agents-md-claude-md-project-instructions/). Your first task should have one observable result, such as fixing a failing parser test, so you can separate setup problems from implementation problems.',
         ],
         links: [
           {
@@ -499,7 +499,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Start with a working Claude Code sign-in.',
         paragraphs: [
           'Install Claude Code from Anthropic’s documentation and complete its own sign-in flow. In Jackalope, open Agents → Configuration and check the detected CLI. Choose an existing login or create a named account profile, then select that account for the project.',
-          'Use a project that builds before the agent edits it. Put its setup and test commands in project guidance. If Claude Code is not found after installation, check the executable path and restart Jackalope so it receives the updated environment.',
+          'Use a project that builds before the agent edits it. Put its setup and test commands in [project guidance](/blog/agents-md-claude-md-project-instructions/). If Claude Code is not found after installation, check the executable path and restart Jackalope so it receives the updated environment.',
         ],
         links: [
           {
@@ -552,7 +552,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Use a second agent where the work is independent.',
         paragraphs: [
-          'While Claude Code fixes the invitation screen, another agent can update unrelated documentation in its own worktree. If the documentation depends on a new resend contract, make it wait until that change is accepted. Review both outputs together and exercise the invitation flow before integration.',
+          'While Claude Code fixes the invitation screen, [another agent can update unrelated documentation](/guides/run-codex-and-claude-code-in-parallel/) in its own worktree. If the documentation depends on a new resend contract, make it wait until that change is accepted. Review both outputs together and exercise the invitation flow before integration.',
           'Jackalope is in early access. Its Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.',
         ],
         links: [
@@ -819,14 +819,14 @@ export const marketingPages: MarketingPage[] = [
       {
         title: '1. Split the outcome, not the context.',
         paragraphs: [
-          'Start with one project goal, then separate work only where the tasks can be reviewed independently. Give Codex and Claude Code concrete outcomes, relevant file scopes, and a shared description of the project constraints.',
+          'Start with one project goal, then separate work only where the tasks can be reviewed independently. Give Codex and Claude Code concrete outcomes, relevant file scopes, and [a shared description of the project constraints](/blog/agents-md-claude-md-project-instructions/).',
           'Use a dependency when one task truly requires another task’s integrated code. Parallel work should not be an excuse to hide ordering assumptions.',
         ],
       },
       {
         title: '2. Launch each task in its own worktree.',
         paragraphs: [
-          'Jackalope resolves the target branch and creates isolated workspaces for the assigned agents. Each attempt receives the project briefing, selected context, and supported tools. You can follow progress, answer questions, and stop an individual task without losing the rest of the plan.',
+          'Jackalope resolves the target branch and creates [isolated workspaces](/git-worktrees-for-ai-agents/) for the assigned agents. Each attempt receives the project briefing, selected context, and supported tools. You can follow progress, answer questions, and stop an individual task without losing the rest of the plan.',
         ],
         bullets: [
           'Use Codex for one reviewable slice and Claude Code for another.',
@@ -838,14 +838,14 @@ export const marketingPages: MarketingPage[] = [
       {
         title: '3. Review the combination, not only the parts.',
         paragraphs: [
-          'Passing checks in two worktrees does not prove the patches work together. Inspect each result, prepare the combined patch, and run the checks that matter against the integrated state before accepting it.',
+          'Passing checks in two worktrees does not prove the patches work together. Inspect each result, [prepare the combined patch](/parallel-coding-agents/), and run the checks that matter against the integrated state before accepting it.',
           'Jackalope keeps integration explicit and stops when the target or source state has changed. It does not automatically stash, reset, or overwrite unrelated work.',
         ],
       },
       {
         title: 'Example: add a saved search filter.',
         paragraphs: [
-          'Agree that a saved filter contains a name and a query before dispatch. Use that decision to distinguish the work that can start now from the work that needs an accepted prerequisite. Agent assignments are examples, not a ranking of model strengths.',
+          'Agree that a saved filter contains a name and a query before dispatch. Use that decision to distinguish the work that can start now from the work that needs an accepted prerequisite. Agent assignments are examples, not a ranking of model strengths; [using Claude Code and Codex together](/blog/claude-code-and-codex-together/) covers how to split the work.',
         ],
         table: {
           columns: ['Task', 'Scope and worker', 'Ready when'],

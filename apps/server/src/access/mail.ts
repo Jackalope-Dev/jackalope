@@ -1,9 +1,9 @@
 import { randomToken, seal, tokenHash, unseal } from './crypto';
+import { stableDownloads } from './downloads';
 import { feedbackMailAllowed, queueFeedbackMail } from './feedback';
 import { queueGrowthMail } from './growth-mail';
 import { type AccessMail, accessEmail, type Mail } from './mail-templates';
 import { providerJson } from './provider';
-import { stableDownloads } from './routes';
 import { openSignup } from './waitlist';
 
 export { type AccessMail, accessEmail, type WaitlistMail } from './mail-templates';

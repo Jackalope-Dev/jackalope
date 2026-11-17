@@ -1,8 +1,22 @@
-import { Checkbox, Input } from '@jackalope/ui';
+import { describeError } from '@jackalope/contracts/errors';
+import {
+  Button,
+  Checkbox,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FlowDiagram,
+  FormField,
+  Input,
+  SecretField,
+  Select,
+  SelectItem,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { KeyRound } from 'lucide-react';
+import { Laptop, Server } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { ModelCatalog } from '../../lib/agent-models';
+import { agentModels, type ModelCatalog } from '../../lib/agent-models';
 import {
   type AgentProfile,
   completeProviderProfile,
@@ -12,19 +26,16 @@ import {
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { ActionError } from '../ui/ActionError';
+import { CredentialStep, providerMarkFor } from './CredentialStep';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
+import './provider-connections.css';
 
 function ConnectProvider({
   provider,
@@ -52,6 +63,8 @@ function ConnectProvider({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [keySaved, setKeySaved] = useState(false);
+  // Set while saving the key or reading models, so the provider link shows a real request.
+  const [checking, setChecking] = useState(false);
   const models = catalog?.models.filter((model) => model.id.startsWith(`${provider.id}/`)) ?? [];
   const close = async () => {
     if (busy) return;
@@ -63,15 +76,14 @@ function ConnectProvider({
       await useAgentAccountsStore.getState().load('opencode', true);
       onClose();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
   };
   const readModels = async () => {
     if (!profile.current) return;
-    const result = await nativeTask<ModelCatalog>('agent_models', {
-      agent: 'opencode',
+    const result = await agentModels('opencode', {
       agentProfileId: profile.current.id,
       refresh: true,
     });
@@ -86,7 +98,7 @@ function ConnectProvider({
         if (!open) void close();
       }}
     >
-      <DialogContent {...focus} className="confirm-action-dialog">
+      <DialogContent {...focus} layer="confirm">
         <DialogHeader
           title={`Connect ${provider.name}`}
           description={
@@ -106,6 +118,7 @@ function ConnectProvider({
             try {
               if (!keySaved) {
                 await runner.prepare();
+                setChecking(true);
                 profile.current ??= await createAgentProfile('opencode', name.trim(), null);
                 await saveAgentProfileKey('opencode', profile.current.id, provider.key, key);
                 setKey('');
@@ -114,6 +127,7 @@ function ConnectProvider({
                 return;
               }
               if (!catalog || !models.length) {
+                setChecking(true);
                 await readModels();
                 return;
               }
@@ -135,7 +149,7 @@ function ConnectProvider({
                     },
                   });
                 }
-                await syncAgentConfig();
+                await agentPolicySaved();
               }
               await useAgentAccountsStore.getState().load('opencode', true);
               await useExecutionStore.getState().discover();
@@ -143,10 +157,11 @@ function ConnectProvider({
             } catch (cause) {
               setError(
                 saved.current
-                  ? `Your account and model are saved. Finishing setup failed; retry to finish or close to keep the connection. ${String(cause)}`
-                  : String(cause),
+                  ? `Your account and model are saved. Finishing setup failed; retry to finish or close to keep the connection. ${describeError(cause)}`
+                  : describeError(cause),
               );
             } finally {
+              setChecking(false);
               setBusy(false);
             }
           }}
@@ -162,24 +177,31 @@ function ConnectProvider({
                   disabled={busy || !!profile.current}
                 />
               </FormField>
-              <FormField
-                label="API key"
+              <CredentialStep
+                providerName={provider.name}
+                providerIcon={providerMarkFor(provider.id, 16)}
+                envKey={provider.key}
+                value={key}
+                onValueChange={setKey}
+                state={checking ? 'checking' : error ? 'failed' : 'idle'}
+                error={error || undefined}
+                disabled={busy}
                 description="Kept in protected local storage for this account."
-              >
-                <Input
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={key}
-                  onChange={(event) => setKey(event.target.value)}
-                  required
-                  maxLength={8192}
-                  disabled={busy}
-                />
-              </FormField>
+              />
             </>
           ) : (
             <>
+              <FlowDiagram
+                from={{ label: 'This computer', icon: <Laptop size={16} /> }}
+                to={{ label: provider.name, icon: providerMarkFor(provider.id, 16) }}
+                via="API key"
+                state={checking ? 'checking' : models.length ? 'connected' : 'failed'}
+                error={
+                  !checking && !models.length
+                    ? `No ${provider.name} models were returned.`
+                    : undefined
+                }
+              />
               <p className="task-muted">
                 The key is saved. Model access and available credit are checked when a task runs.
               </p>
@@ -225,10 +247,10 @@ function ConnectProvider({
           {runner.preparing && (
             <ManagedRuntimeProgress
               progress={runner.progress}
-              onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+              onCancel={() => void runner.cancel().catch((cause) => setError(describeError(cause)))}
             />
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={keySaved ? error : ''} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
               {saved.current ? 'Close' : 'Cancel'}
@@ -272,7 +294,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
             setError('');
             try {
               if (!model) {
-                const found = await nativeTask<string[]>('openai_endpoint_models', {
+                const found = await invokeNative<string[]>('openai_endpoint_models', {
                   baseUrl,
                   apiKey: apiKey.trim() || null,
                 });
@@ -280,7 +302,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
                 setModel(found[0] ?? '');
                 return;
               }
-              await nativeTask('openai_endpoint_connect', {
+              await invokeNative('openai_endpoint_connect', {
                 name,
                 baseUrl,
                 model,
@@ -290,7 +312,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               await useExecutionStore.getState().discover();
               onClose();
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -299,6 +321,13 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
           <DialogHeader
             title="Local model server"
             description="LM Studio, vLLM, or another OpenAI-compatible server on this computer. Jackalope reads its model list and saves the connection as an OpenCode account."
+          />
+          <FlowDiagram
+            from={{ label: 'Jackalope', icon: <Laptop size={16} /> }}
+            to={{ label: name.trim() || 'Local server', icon: <Server size={16} /> }}
+            via="OpenAI API"
+            state={busy ? 'checking' : error ? 'failed' : models.length ? 'connected' : 'idle'}
+            error={error || undefined}
           />
           <FormField label="Name">
             <Input
@@ -313,6 +342,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
             description="http://127.0.0.1, localhost, or ::1, with a port."
           >
             <Input
+              className="provider-address"
               value={baseUrl}
               onChange={(event) => {
                 setBaseUrl(event.target.value);
@@ -323,18 +353,12 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               spellCheck={false}
             />
           </FormField>
-          <FormField
+          <SecretField
             label="API key"
             description="Optional. Stored with this account and not shown again."
-          >
-            <Input
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              maxLength={8192}
-            />
-          </FormField>
+            value={apiKey}
+            onValueChange={setApiKey}
+          />
           {models.length > 0 && (
             <FormField label="Model">
               <Select aria-label="Endpoint model" value={model} onValueChange={setModel}>
@@ -346,7 +370,6 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               </Select>
             </FormField>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
@@ -376,27 +399,32 @@ export function ProviderConnections({ setup = false }: { setup?: boolean } = {})
           {setup ? 'No agent installed? Use an API key' : 'Connect an API provider'}
         </h2>
         <p className="task-muted">
-          Bring your own key for DeepSeek and other providers, or a local OpenAI-compatible server.
-          No separate OpenCode installation or account is needed.
+          Use your own provider key or a local OpenAI-compatible server. Nothing else to install.
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="provider-tiles">
         {apiProviders.map((provider) => (
           <Button
             key={provider.id}
             variant="outline"
+            className="provider-tile"
             disabled={!isTauriEnvironment()}
+            aria-label={`Connect ${provider.name}`}
             onClick={() => setProvider(provider)}
           >
-            <KeyRound size={16} /> {provider.name}
+            {providerMarkFor(provider.id, 20)}
+            <span>{provider.name}</span>
           </Button>
         ))}
         <Button
           variant="outline"
+          className="provider-tile"
           disabled={!isTauriEnvironment()}
+          aria-label="Connect a local model server"
           onClick={() => setEndpoint(true)}
         >
-          Local server
+          <Server size={20} aria-hidden="true" />
+          <span>Local server</span>
         </Button>
       </div>
       {provider && (

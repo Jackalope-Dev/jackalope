@@ -1,13 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 import { releaseTargets } from './cloud-publish.mjs';
 
 const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
 const automatic = process.env.GITHUB_EVENT_NAME === 'push';
 const branch = process.env.GITHUB_REF_NAME;
-if (!['stable', 'beta'].includes(branch)) throw new Error('Cloud releases require stable or beta');
+if (!isReleaseChannel(branch)) throw new Error('Cloud releases require stable or beta');
 const channel = branch === 'stable' ? 'stable' : 'beta';
 const mode = automatic ? 'publish' : event.inputs?.mode;
 if (!['rehearsal', 'candidate', 'draft', 'publish'].includes(mode))

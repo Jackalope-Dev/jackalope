@@ -5,7 +5,7 @@ use super::pickers::PickerKind;
 use super::App;
 use crate::connection::short;
 use crate::history;
-use crate::protocol::{AgentStatus, Request, Response};
+use crate::protocol::{AgentStatus, Request, Response, SessionCommand};
 
 pub const COMMANDS: &[(&str, &str)] = &[
     (
@@ -19,6 +19,9 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ),
     ("init", "write or refresh AGENTS.md for this repository"),
     ("sessions", "switch to any open conversation"),
+    ("board", "see every open conversation's state at a glance"),
+    ("close", "close this tab, a tab by number, others or all"),
+    ("tabs", "hide or show the top bar with the tabs (Ctrl+T)"),
     ("resume", "pick up an earlier conversation"),
     ("projects", "switch to another project"),
     ("agents", "see which agents are ready"),
@@ -76,6 +79,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "deviation",
         "decide on a plan deviation: accept, redo or replan",
     ),
+    ("rounds", "a swarm's rounds: approve, pause, resume or stop"),
     (
         "browser",
         "show the project browser; /browser open [url] to sign in",
@@ -207,6 +211,7 @@ impl App {
         if text.is_empty() {
             return;
         }
+        self.tip_index = (self.tip_index + 1) % super::render::TIPS.len();
         if history::keep(&raw) {
             history::remember(&mut self.history, &text);
             history::append(&text);
@@ -343,7 +348,7 @@ impl App {
         if self
             .request(Request::SessionAction {
                 session_id,
-                action: "cancel-message".into(),
+                action: SessionCommand::CancelMessage,
                 message_id: Some(message_id),
             })
             .is_some()
@@ -408,15 +413,15 @@ impl App {
         ));
     }
 
-    fn session_action(&mut self, action: &str, done: &str, tone: Tone) {
+    fn session_action(&mut self, action: SessionCommand, done: &str, tone: Tone) {
         let Some(session_id) = self.session.clone() else {
-            self.note("Start a conversation first.");
+            self.flash("Start a conversation first", Tone::Muted);
             return;
         };
         if self
             .request(Request::SessionAction {
                 session_id,
-                action: action.into(),
+                action,
                 message_id: None,
             })
             .is_some()
@@ -438,7 +443,8 @@ impl App {
             "Enter send · Shift+Enter, \\ Enter, Alt+Enter or Ctrl+J new line",
             "Esc clear draft (Ctrl+Y restores) · Esc Esc stop the agent",
             "Up/Down rows, then history · Ctrl+R search history",
-            "Ctrl+N/P switch conversations · PgUp/PgDn scroll · drag to copy",
+            "Ctrl+N/P switch conversations · Ctrl+T hide the top bar · PgUp/PgDn scroll",
+            "Drag to copy",
             "Ctrl+A/E line start/end · Ctrl+W, Alt+Backspace delete word",
             "Ctrl+U/K delete to line start/end · Ctrl+Y paste deleted text",
             "Ctrl+L clear notes · Ctrl+Z suspend · Ctrl+C clear, stop commands, leave",
@@ -462,14 +468,15 @@ impl App {
             }
             "new" | "clear" => {
                 self.show(None);
-                self.note("New conversation. Type a message to begin.");
             }
             "init" => {
                 if let Some(id) = self.start_conversation(INIT_PROMPT.into()) {
                     self.show(Some(id));
                 }
             }
-            "bg" if argument.is_empty() => self.note("Add the message: /bg <what to do>"),
+            "bg" if argument.is_empty() => {
+                self.flash("Add the message: /bg <what to do>", Tone::Warning)
+            }
             "bg" => {
                 if let Some(id) = self.start_conversation(argument.into()) {
                     self.note_tone(
@@ -506,6 +513,9 @@ impl App {
             "help" | "?" => self.help(),
             "quit" | "exit" | "q" => self.quit = true,
             "sessions" | "resume" => self.open_picker(PickerKind::Sessions),
+            "board" => self.open_picker(PickerKind::Board),
+            "close" => self.close_tabs(argument),
+            "tabs" | "header" => self.toggle_top_bar(),
             "history" => self.open_picker(PickerKind::History),
             "projects" => self.open_picker(PickerKind::Projects),
             "agents" => self.open_picker(PickerKind::Agents),
@@ -525,10 +535,8 @@ impl App {
             "files" => self.toggle_panel(),
             "answer" => match self.question().map(|question| question.options.is_empty()) {
                 Some(false) => self.open_picker(PickerKind::Question),
-                Some(true) => {
-                    self.note("This question has no options; type your answer and press Enter.")
-                }
-                None => self.note("Nothing is waiting on an answer."),
+                Some(true) => self.flash("Type your answer and press Enter", Tone::Muted),
+                None => self.flash("Nothing is waiting on an answer", Tone::Muted),
             },
             "sharpen" => self.sharpen(argument),
             "learn" => self.learn(),
@@ -561,10 +569,10 @@ impl App {
             "unqueue" => self.unqueue(),
             "merge" => self.merge(argument),
             "pr" => self.pull_request(argument),
-            "retry" => self.session_action("retry", "Relaunching", Tone::Muted),
-            "finish" => self.session_action("finish", "Marked done", Tone::Success),
-            "pause" => self.session_action("pause", "Paused", Tone::Muted),
-            "unpause" => self.session_action("resume", "Resumed", Tone::Muted),
+            "retry" => self.session_action(SessionCommand::Retry, "Relaunching", Tone::Muted),
+            "finish" => self.session_action(SessionCommand::Finish, "Marked done", Tone::Success),
+            "pause" => self.session_action(SessionCommand::Pause, "Paused", Tone::Muted),
+            "unpause" => self.session_action(SessionCommand::Resume, "Resumed", Tone::Muted),
             "stop" => {
                 let run = self
                     .view
@@ -587,8 +595,14 @@ impl App {
                 self.plan_command(name, argument);
             }
             other => match closest_command(other) {
-                Some(name) => self.note(format!("Unknown command /{other}. Did you mean /{name}?")),
-                None => self.note(format!("Unknown command /{other}. Type / to see the list.")),
+                Some(name) => self.flash(
+                    format!("Unknown command /{other} · did you mean /{name}?"),
+                    Tone::Warning,
+                ),
+                None => self.flash(
+                    format!("Unknown command /{other} · type / to see the list"),
+                    Tone::Warning,
+                ),
             },
         }
         self.refresh();
@@ -708,7 +722,7 @@ impl App {
 
     fn learn(&mut self) {
         let Some(session_id) = self.session.clone() else {
-            self.note("Start a conversation first.");
+            self.flash("Start a conversation first", Tone::Muted);
             return;
         };
         if let Some(Response::Learned {
@@ -814,7 +828,7 @@ fn split_agent_mentions(text: &str, agents: &[AgentStatus]) -> (Vec<String>, Str
         let agent = word.strip_prefix('@').and_then(|name| {
             agents
                 .iter()
-                .find(|agent| super::pickers::usable(agent) && agent.id.eq_ignore_ascii_case(name))
+                .find(|agent| agent.state.is_usable() && agent.id.eq_ignore_ascii_case(name))
         });
         match agent {
             Some(agent) => {

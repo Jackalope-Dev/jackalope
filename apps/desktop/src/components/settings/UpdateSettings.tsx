@@ -1,26 +1,28 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { isLive } from '@jackalope/contracts/runs';
+import {
+  Badge,
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useId } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { useExecutionStore } from '../../stores/executionStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { BetaProgram } from './BetaProgram';
 import { ReleaseNotes } from './ReleaseNotes';
-import { SettingBody, SettingGroup } from './Setting';
 
 export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }) {
   const update = useUpdateStore();
   const channelId = useId();
   const runs = useExecutionStore((state) => state.runs);
   const desktop = isTauriEnvironment();
-  const blocked = runs.some(
-    (run) =>
-      run.persistenceError ||
-      ['starting', 'running', 'stopping', 'interrupted'].includes(run.status),
-  );
+  const blocked = runs.some((run) => run.persistenceError || isLive(run));
   useEffect(() => {
     void update.load();
   }, [update.load]);
@@ -209,7 +211,7 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
     </>
   );
   return showHeading ? (
-    <SettingGroup aria-label="App updates" title={'App updates'}>
+    <SettingGroup aria-label="App updates" title="App updates" data-settings-tile>
       <SettingBody>{content}</SettingBody>
     </SettingGroup>
   ) : (

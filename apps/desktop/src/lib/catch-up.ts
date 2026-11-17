@@ -1,10 +1,12 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
+import { isRetryable } from '@jackalope/contracts/runs';
 import { sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
 import { capturedPages } from './review-captures.ts';
+import type { ScreenshotArtifact, TaskRun } from './run-types.ts';
 import type { WorkItem } from './task-collection.ts';
 import { requirementAssessment } from './task-outcomes.ts';
-import type { PendingUserPrompt, ScreenshotArtifact, TaskRun } from './task-runtime.ts';
 import { looksLikePlan, taskDecision } from './task-workflow.ts';
 import { signalKey } from './work-signals.ts';
 
@@ -266,7 +268,7 @@ function decisionFor(
         : undefined,
     };
   }
-  if (checksFailed(run) && run && !['failed', 'stopped', 'interrupted'].includes(run.status))
+  if (checksFailed(run) && run && !isRetryable(run))
     return {
       kind: 'failed-check',
       decision: 'The project checks fail. Ask for a fix, or inspect the changes yourself.',
@@ -286,7 +288,7 @@ function decisionFor(
       risk: { level: 'low', reason: 'Nothing runs while it is paused.' },
     };
   const stopped =
-    (run && ['failed', 'stopped', 'interrupted'].includes(run.status)) ||
+    (run && isRetryable(run)) ||
     !!item.session?.error ||
     !!managed?.error ||
     item.statusLabel === 'Needs attention';
@@ -385,7 +387,7 @@ function eventFor(
   if (pendingQuestions(item, runs, queue).length) return undefined;
   if (run?.persistenceError)
     return { ...base, outcome: 'Finished, but its history did not save', tone: 'warning' };
-  if (checksFailed(run) && run && !['failed', 'stopped', 'interrupted'].includes(run.status))
+  if (checksFailed(run) && run && !isRetryable(run))
     return {
       ...base,
       outcome: run.verificationError

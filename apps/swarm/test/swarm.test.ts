@@ -3,7 +3,7 @@ import { authorized } from '../src/auth';
 import { changedFiles } from '../src/changes';
 import { allConflicts, conflictsBetween } from '../src/conflicts';
 import { changedHunks, overlappingHunks, splitLines } from '../src/diff';
-import { forkName } from '../src/names';
+import { forkName, SwarmError, settle } from '../src/names';
 import { CachedReader } from '../src/objects';
 import { FakeRepo } from './fake-repo';
 
@@ -152,5 +152,23 @@ describe('access', () => {
   it('names forks from the repository and attempt', () => {
     expect(forkName('app', '3f2a9c1e-77b0-4d0a-9e1b-123456789abc')).toBe('app--3f2a9c1e77b0');
     expect(() => forkName('app', 'x')).toThrow(/six/);
+  });
+
+  it('reports request errors with their status and upstream failures as 502', async () => {
+    expect(await settle(async () => 1)).toEqual({ ok: true, value: 1 });
+    expect(await settle(() => Promise.reject(new SwarmError('Unknown fork.', 404)))).toEqual({
+      ok: false,
+      status: 404,
+      error: 'Unknown fork.',
+    });
+    expect(await settle(() => Promise.reject(new SwarmError('Use a longer ID.')))).toMatchObject({
+      status: 400,
+    });
+    expect(await settle(() => Promise.reject(new Error('Repository not found')))).toMatchObject({
+      status: 404,
+    });
+    expect(await settle(() => Promise.reject(new Error('Unknown upstream reply')))).toMatchObject({
+      status: 502,
+    });
   });
 });
