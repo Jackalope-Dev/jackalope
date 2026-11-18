@@ -61,7 +61,7 @@ import { DecisionTrail } from './DecisionTrail';
 import { DesktopPermissionNotice } from './DesktopPermissionNotice';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
-import { ResumeInterrupted, resumePrompt } from './ResumeInterrupted';
+import { ResumeInterrupted, resumePrompt, StopInterrupted } from './ResumeInterrupted';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { SplitTaskButton } from './SplitTaskButton';
 import { TaskActivity } from './TaskActivity';
@@ -488,12 +488,15 @@ export function TaskDetail({
         )}
         <div className="task-detail-utilities">
           {!active && isLatest && run.status === 'interrupted' && !integrated ? (
-            <ResumeInterrupted
-              id="task-resume"
-              run={run}
-              disabled={acting || submitting}
-              onResume={resumeInterrupted}
-            />
+            <>
+              <ResumeInterrupted
+                id="task-resume"
+                run={run}
+                disabled={acting || submitting}
+                onResume={resumeInterrupted}
+              />
+              <StopInterrupted run={run} disabled={acting || submitting} onStopped={refresh} />
+            </>
           ) : !active && isLatest ? (
             <Button
               disabled={acting || submitting}

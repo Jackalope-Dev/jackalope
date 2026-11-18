@@ -16,6 +16,7 @@ import { openHelp } from '../../lib/navigation';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
+import { useUpdateBlockers } from '../settings/UpdateBlockers';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { HISTORY_KEYS } from './useWorkspaceHistory';
 
@@ -60,6 +61,7 @@ export function TitleBar({
       state.downloadedVersion === availableUpdateId(state.release),
   );
   const updating = useUpdateStore((state) => state.installing);
+  const blocked = useUpdateBlockers().length > 0;
   // Development builds and the beta channel are labeled; stable keeps the plain title.
   const edition = import.meta.env.DEV ? ' - dev' : beta ? ' - Beta' : '';
 
@@ -146,7 +148,13 @@ export function TitleBar({
       )}
       <div className="app-titlebar-controls">
         {updateReady && (
-          <Tooltip content="The update is downloaded. Jackalope reopens in a few seconds.">
+          <Tooltip
+            content={
+              blocked
+                ? 'Downloaded. Finish or stop active tasks to restart.'
+                : 'The update is downloaded. Jackalope reopens in a few seconds.'
+            }
+          >
             <button
               type="button"
               className="app-titlebar-update"
@@ -154,9 +162,14 @@ export function TitleBar({
               aria-busy={updating}
               onMouseDown={(event) => event.stopPropagation()}
               onDoubleClick={(event) => event.stopPropagation()}
-              onClick={() => void useUpdateStore.getState().install()}
+              onClick={() => {
+                const update = useUpdateStore.getState();
+                // Installing refuses while tasks hold their workspaces; show which ones instead.
+                if (blocked) update.showDetails(true);
+                else void update.install();
+              }}
             >
-              <RotateCw size={13} aria-hidden="true" />
+              <RotateCw size={12} aria-hidden="true" />
               {updating ? 'Restarting…' : 'Restart to update'}
             </button>
           </Tooltip>

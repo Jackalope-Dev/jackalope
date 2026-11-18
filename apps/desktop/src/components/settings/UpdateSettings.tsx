@@ -1,4 +1,3 @@
-import { isLive } from '@jackalope/contracts/runs';
 import {
   Badge,
   Button,
@@ -12,17 +11,17 @@ import {
 } from '@jackalope/ui';
 import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
-import { useExecutionStore } from '../../stores/executionStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { BetaProgram } from './BetaProgram';
 import { ReleaseNotes } from './ReleaseNotes';
+import { UpdateBlockers, useUpdateBlockers } from './UpdateBlockers';
 
 export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }) {
   const update = useUpdateStore();
   const channelId = useId();
-  const runs = useExecutionStore((state) => state.runs);
   const desktop = isTauriEnvironment();
-  const blocked = runs.some((run) => run.persistenceError || isLive(run));
+  const blockers = useUpdateBlockers();
+  const blocked = blockers.length > 0;
   useEffect(() => {
     void update.load();
   }, [update.load]);
@@ -159,11 +158,7 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
               Downloaded and ready. Restarting takes a few seconds.
             </p>
           )}
-          {blocked && (
-            <p className="text-sm" role="status">
-              Finish active tasks, resolve interrupted work and save task history to install.
-            </p>
-          )}
+          {blocked && <UpdateBlockers runs={blockers} />}
           <Button
             disabled={busy || blocked}
             onClick={() => void update.install()}
