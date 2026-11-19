@@ -46,6 +46,13 @@ pub struct OrphanFolder {
 const ARCHIVE_MAX_BYTES: u64 = 512 * 1024 * 1024;
 const ARCHIVE_MAX_FILES: usize = 20_000;
 
+/// Cap on the untracked content the cleanup check hashes. Every object it writes
+/// lands in the shared object store until gc expires it, so an unignored build
+/// folder would add gigabytes on each refresh. Past the cap the worktree stays
+/// recoverable and archiving still applies its own limits.
+const CONTENT_CHECK_MAX_BYTES: u64 = 64 * 1024 * 1024;
+const CONTENT_CHECK_MAX_FILES: usize = 5_000;
+
 fn canonical(path: &str) -> Result<PathBuf, String> {
     std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
 }
@@ -398,9 +405,31 @@ const CLEANUP_IDENTITY: Identity = Identity {
     email: "cleanup@jackalope.invalid",
 };
 
+fn untracked_within_check_limits(path: &Path) -> Result<bool, String> {
+    let names = repo::untracked_paths(path, Inspection)?;
+    if names.len() > CONTENT_CHECK_MAX_FILES {
+        return Ok(false);
+    }
+    let mut bytes = 0u64;
+    for name in names {
+        match std::fs::symlink_metadata(path.join(&name)) {
+            Ok(metadata) => bytes = bytes.saturating_add(metadata.len()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        }
+        if bytes > CONTENT_CHECK_MAX_BYTES {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 // Require a no-op three-way merge for both the index and working copy. Comparing
 // whole trees would reject older worktrees; checking only HEAD would lose edits.
 fn content_in_target(path: &Path, head: &str, target: &str) -> Result<bool, String> {
+    if !untracked_within_check_limits(path)? {
+        return Ok(false);
+    }
     let index = repo::git_exact(
         path,
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
@@ -1468,6 +1497,28 @@ mod tests {
         assert_eq!(status.discarded_paths.len(), 3);
         f.remove(&entry, &[]).unwrap();
         assert!(!f.worktree.exists());
+    }
+
+    #[test]
+    fn oversized_untracked_content_is_not_hashed_by_the_content_check() {
+        let f = Fixture::new("main");
+        fs::write(f.worktree.join("file.txt"), "integrated\n").unwrap();
+        f.commit(&f.repo, "integrated\n");
+        assert!(f.entry().cleanup.as_ref().unwrap().content_merged);
+        fs::create_dir(f.worktree.join("target-agent")).unwrap();
+        fs::File::create(f.worktree.join("target-agent/dep-graph.bin"))
+            .unwrap()
+            .set_len(CONTENT_CHECK_MAX_BYTES + 1)
+            .unwrap();
+        let objects = || repo::git_exact(&f.repo, &["count-objects"], Inspection).unwrap();
+        let before = objects();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(!status.content_merged);
+        assert!(status.recoverable);
+        assert_eq!(objects(), before);
+        assert!(f.remove(&entry, &[]).is_err());
+        assert!(f.worktree.join("target-agent/dep-graph.bin").exists());
     }
 
     #[test]

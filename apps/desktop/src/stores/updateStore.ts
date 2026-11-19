@@ -52,6 +52,9 @@ interface UpdateState {
   lastAttempt: number | null;
   lastChecked: number | null;
   dismissedVersion: string | null;
+  /** The update details dialog is open, from the title bar or the companion notice. */
+  detailsOpen: boolean;
+  showDetails: (open: boolean) => void;
   setAutoCheck: (value: boolean) => void;
   setAutoDownload: (value: boolean) => void;
   download: () => Promise<void>;
@@ -130,6 +133,8 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     lastAttempt: null,
     lastChecked: null,
     dismissedVersion: null,
+    detailsOpen: false,
+    showDetails: (detailsOpen) => set({ detailsOpen }),
     setAutoCheck: (autoCheck) => {
       set({ autoCheck });
       try {
