@@ -25,6 +25,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Appearance. Favorites sit above the tree as tiles sized by how many there are; pinned
   work stays at the top of its project and folders group a project's work, all saved
   locally. A project with no work shows a launchpad of starting points and project pages.
+  The sidebar and the Work project switcher offer General, a place without a project for
+  work such as operating a web page or checking a connection; once added it lists like
+  any project.
   Inbox gathers work that needs the person, new results, app alerts (including low
   allowances), running work and pull requests waiting on others across projects. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
@@ -42,6 +45,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   left out. Continue in Jackalope starts a conversation that resumes the CLI's session
   directly in the checkout or worktree it ran in. Settings → Privacy turns reading off.
   See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
+- Non-code work (a short request to read or operate a web page or a connection, work on an
+  attached window that names no code, and everything in General) runs in the project folder as it is: no
+  worktree, preparation, automatic checks or planning check, and the agent is told not to
+  edit files unless asked. It does not reserve the checkout. Options → Treat as code work
+  overrides the guess. General is a plain folder in Jackalope's data directory, never a
+  Git repository. See [capture and context](CORE-WORKFLOW.md#capture-and-context).
 - The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
   text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
   Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
@@ -442,6 +451,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   apps and the user's logged-in browser with a one-window, one-app or full-desktop
   grant; window and app grants can be remembered per project, browser sites are asked
   once each, and actions target accessibility element refs through a resident helper.
+  On Windows and macOS window and app grants keep working while the person uses other
+  apps: reads, captures and element actions continue in the background, input that
+  needs the window in front waits for it, and only the person's clicks, scrolls or keys
+  in the granted window pause control. Paused calls wait for Resume instead of failing.
 - Connected apps link the user's own Composio project. The project key and Composio
   identifiers stay in protected storage; apps connect through Composio's hosted sign-in
   in the user's browser, and one managed on-demand connection delivers them to every
@@ -803,10 +816,13 @@ RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants 
 AT-SPI element actions, portal input and Screenshot-portal captures; physical input
 does not pause control there, and wlroots desktops without RemoteDesktop remain
 unavailable. The portal client compiles only in Linux CI and has no real-portal
-fixture. XWayland alone is insufficient. A person can attach a window to a conversation by
-dragging its agent onto it (Windows and macOS) or picking it from a list, choosing see-only
-or see-and-control; the agent's next window request uses it without asking. The cross-app
-drag has unit and browser-fixture coverage only. Worktrees separate Git changes; agent processes and
+fixture. XWayland alone is insufficient. A person can attach a window to a conversation, or
+to new work before Send, by dragging its agent onto it (Windows and macOS) or picking it
+from a list, choosing see-only or see-and-control; the agent's next window request uses it
+without asking. On Windows and macOS the window wears a badge and edge while it waits, and a
+turn that ends while its grant is paused leaves a Resume button there that continues the
+conversation. The cross-app drag, badge and background control have unit and
+browser-fixture coverage only. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
