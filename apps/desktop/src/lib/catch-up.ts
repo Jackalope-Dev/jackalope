@@ -433,7 +433,7 @@ const kindNames: Record<CatchUpDecision['kind'], [string, string]> = {
   stopped: ['a stopped task', 'stopped tasks'],
   paused: ['a paused plan', 'paused plans'],
   review: ['a review', 'reviews'],
-  other: ['another item', 'other items'],
+  other: ['one more', 'more'],
 };
 
 /** One sentence naming what waits on the person, or saying nothing does. */
@@ -451,9 +451,10 @@ export function catchUpHeadline(waiting: CatchUpDecision[]): string {
   }
   const counts = new Map<CatchUpDecision['kind'], number>();
   for (const item of waiting) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
-  const parts = [...counts].map(([kind, count]) =>
-    count === 1 ? kindNames[kind][0] : `${count} ${kindNames[kind][1]}`,
-  );
+  // Unnamed kinds read as "and one more", so they always come last.
+  const parts = [...counts]
+    .sort(([a], [b]) => Number(a === 'other') - Number(b === 'other'))
+    .map(([kind, count]) => (count === 1 ? kindNames[kind][0] : `${count} ${kindNames[kind][1]}`));
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
   return `${waiting.length} things need you: ${list}.`;
 }
