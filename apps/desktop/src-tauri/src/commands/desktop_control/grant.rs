@@ -80,6 +80,8 @@ pub struct Grant {
     pub window: Option<Window>,
     /// Remembered grant used instead of asking, if any.
     pub remembered: Option<String>,
+    /// A window the person attached for reading only: observe actions work, input does not.
+    pub read_only: bool,
 }
 
 impl Grant {
@@ -91,6 +93,7 @@ impl Grant {
                 label: app_label(&window),
                 window: Some(window),
                 remembered: None,
+                read_only: false,
             },
             Choice::App {
                 key,
@@ -103,6 +106,7 @@ impl Grant {
                 label,
                 window: Some(primary),
                 remembered: None,
+                read_only: false,
             },
             Choice::Desktop => Self {
                 scope: Scope::Desktop,
@@ -110,6 +114,7 @@ impl Grant {
                 label: "your computer".into(),
                 window: None,
                 remembered: None,
+                read_only: false,
             },
         }
     }

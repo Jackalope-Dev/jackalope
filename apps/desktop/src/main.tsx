@@ -12,6 +12,9 @@ suppressNativeContextMenu();
 
 const LiveSessionWindow = React.lazy(() => import('./components/sessions/LiveSessionWindow'));
 const WorkPaneWindow = React.lazy(() => import('./components/tasks/WorkPaneWindow'));
+const GlobOverlay = React.lazy(() =>
+  import('./components/sessions/GlobOverlay').then((m) => ({ default: m.GlobOverlay })),
+);
 const root = windowKind();
 // Paired phones show each shared project's icon; only the main window owns the project list.
 if (root.kind === 'main') startProjectIconSync();
@@ -19,8 +22,12 @@ if (root.kind === 'main') startProjectIconSync();
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <DesktopExperience />
-      {root.kind === 'workPane' ? (
+      {root.kind !== 'glob' && <DesktopExperience />}
+      {root.kind === 'glob' ? (
+        <React.Suspense fallback={null}>
+          <GlobOverlay provider={root.provider} />
+        </React.Suspense>
+      ) : root.kind === 'workPane' ? (
         <React.Suspense fallback={<p>Loading task…</p>}>
           <WorkPaneWindow id={root.id} pane={root.pane} />
         </React.Suspense>

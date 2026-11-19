@@ -73,6 +73,7 @@ macro_rules! with_commands {
             commands::decisions,
             commands::delivery,
             commands::desktop_control,
+            commands::desktop_control::attach,
             commands::desktop_integration,
             commands::dictation,
             commands::execution_access,

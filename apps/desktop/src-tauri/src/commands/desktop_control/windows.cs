@@ -184,6 +184,18 @@ public static class JackalopeDesktop {
         return windows;
     }
 
+    // The top-level window under the pointer, for attaching a window by dragging onto it.
+    // The desktop, taskbars and denied processes are never targets.
+    static object WindowAtCursor(HashSet<uint> deny) {
+        Point cursor;
+        if (!GetCursorPos(out cursor)) return null;
+        var hit = GetAncestor(WindowFromPoint(cursor), 2);
+        if (hit == IntPtr.Zero || !IsWindowVisible(hit) || IsIconic(hit) || Title(hit).Length == 0 || deny.Contains(Pid(hit))) return null;
+        string kind = Class(hit);
+        if (kind == "Progman" || kind == "WorkerW" || kind == "Shell_TrayWnd" || kind == "Shell_SecondaryTrayWnd") return null;
+        try { return Info(hit); } catch { return null; }
+    }
+
     static List<object> Monitors() {
         var result = new List<object>();
         var screens = System.Windows.Forms.Screen.AllScreens;
@@ -223,6 +235,7 @@ public static class JackalopeDesktop {
         string action = Text(request, "action") ?? "";
         if (action == "hello") return new Dictionary<string, object> { {"protocol", 1} };
         if (action == "list") return new Dictionary<string, object> { {"windows", ListWindows(Deny(request))}, {"monitors", Monitors()} };
+        if (action == "at") return new Dictionary<string, object> { {"window", WindowAtCursor(Deny(request))} };
         var guard = Map(request, "guard");
         if (guard == null) throw new Exception("Desktop indicator grant is required.");
         GuardFile = Text(guard, "file");
