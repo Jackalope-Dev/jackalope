@@ -41,6 +41,12 @@ export const GLOB_TARGET_EVENT = 'desktop-glob-target';
 export const GLOB_BEGIN_EVENT = 'desktop-glob-begin';
 /** Emitted when a drag ends: `drop` splats, `return` springs home toward `dx`, `dy`. */
 export const GLOB_FINISH_EVENT = 'desktop-glob-finish';
+/** Emitted when a drag ends, natively or from the app, with the window dropped on. */
+export const GLOB_DROPPED_EVENT = 'desktop-glob-dropped';
+export interface GlobDropped {
+  target: AttachTarget | null;
+  canceled: boolean;
+}
 /** Emitted with a conversation key when its window was detached outside the app. */
 export const ATTACH_CHANGED_EVENT = 'desktop-attach-changed';
 /** A badge asks the draft's composer to send a question; it answers with the result. */
@@ -114,9 +120,15 @@ export const prepareGlob = () => invokeNative<void>('desktop_glob_prepare');
 export const startGlob = (conversation: string, provider: string) =>
   invokeNative<void>('desktop_glob_start', { conversation, provider });
 
-/** Ends a drag; a drop returns the window under the pointer, for the person to confirm. */
+/** Ends a drag from the app; the outcome arrives as `GLOB_DROPPED_EVENT`. */
 export const endGlob = (drop: boolean) =>
   invokeNative<AttachTarget | null>('desktop_glob_end', { drop });
+
+/** One line in the dev app's drag trace (`glob:` in its terminal output). */
+export function globLog(message: string) {
+  if (!isTauriEnvironment()) return;
+  void invokeNative<void>('desktop_glob_log', { message }).catch(() => undefined);
+}
 
 /** The overlay or badge page painted its first transparent frame. */
 export const overlayReady = () => invokeNative<void>('desktop_overlay_ready');

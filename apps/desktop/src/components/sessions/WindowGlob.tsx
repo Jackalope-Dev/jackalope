@@ -10,6 +10,7 @@ import {
   InlineNotice,
   LinkButton,
   LoadingState,
+  Tooltip,
 } from '@jackalope/ui';
 import { listen } from '@tauri-apps/api/event';
 import { AppWindow, Eye, MousePointerClick, X } from 'lucide-react';
@@ -38,7 +39,10 @@ import {
   clearAttached,
   confirmAttach,
   endGlob,
+  GLOB_DROPPED_EVENT,
   GLOB_TARGET_EVENT,
+  type GlobDropped,
+  globLog,
   prepareGlob,
   startGlob,
 } from '../../lib/window-attach';
@@ -57,6 +61,8 @@ const CARRY = 52;
 const NECK = 170;
 /** How long the overlay's spring home plays before the agent pops back into its socket. */
 const HOME_DELAY = 380;
+/** Losing the pointer this close to the window edge means it left the window. */
+const EDGE = 40;
 const HINT_KEY = 'jackalope.glob-hint';
 const HINT_TIMES = 3;
 
@@ -194,6 +200,32 @@ export function WindowGlob({
   }, [conversation, support.badge]);
 
   const out = phase === 'out';
+  // Native code ends the drag on the mouse release wherever it happens; the webview
+  // rarely sees that release once the pointer is over another app.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the handlers read live state through refs
+  useEffect(() => {
+    if (!out) return;
+    const stop = listen<GlobDropped>(GLOB_DROPPED_EVENT, (event) => {
+      if (phaseRef.current !== 'out') return;
+      const { target, canceled } = event.payload;
+      globLog(
+        `app heard the drop: ${target ? `${target.app}` : canceled ? 'canceled' : 'nothing'}`,
+      );
+      setHovered(null);
+      if (target) {
+        land();
+        setAnnounce(`Dropped on ${target.app}: ${target.title}`);
+        setDialog({ dropped: target });
+      } else {
+        setPhase('home');
+        setAnnounce(
+          canceled ? 'Canceled.' : 'No window there. Drop the agent onto another app’s window.',
+        );
+        setTimeout(land, HOME_DELAY);
+      }
+    });
+    return () => void stop.then((unlisten) => unlisten());
+  }, [out]);
   useEffect(() => {
     if (!out) return;
     const stop = listen<AttachTarget | null>(GLOB_TARGET_EVENT, (event) => {
@@ -276,24 +308,14 @@ export function WindowGlob({
     }
   }
 
+  /** Asks native code to end the drag; the outcome arrives as the dropped event. */
   async function finish(drop: boolean) {
     if (ending.current || phaseRef.current !== 'out') return;
     ending.current = true;
-    setHovered(null);
     try {
-      const target = await endGlob(drop);
-      if (target) {
-        land();
-        setAnnounce(`Dropped on ${target.app}: ${target.title}`);
-        setDialog({ dropped: target });
-      } else {
-        setPhase('home');
-        setAnnounce(
-          drop ? 'No window there. Drop the agent onto another app’s window.' : 'Canceled.',
-        );
-        setTimeout(land, HOME_DELAY);
-      }
+      await endGlob(drop);
     } catch (error) {
+      globLog(`ending the drag failed: ${describeError(error)}`);
       land();
       setAnnounce(describeError(error));
     } finally {
@@ -301,15 +323,20 @@ export function WindowGlob({
     }
   }
 
-  function leave() {
+  function leave(why: string) {
+    if (phaseRef.current === 'out') return;
+    globLog(`left the window (${why}), handing over to the overlay`);
     setPhase('out');
     setAnnounce(`Dragging ${agent}. Drop it on any window, or press Escape to cancel.`);
     void startGlob(conversation, provider).catch((error) => {
+      globLog(`starting the drag failed: ${describeError(error)}`);
       goHome();
       setAnnounce(describeError(error));
       setDialog({ dropped: null });
     });
   }
+  /** The last pointer position the webview saw, to tell a lost pointer at the edge. */
+  const lastPointer = useRef({ x: 0, y: 0 });
 
   const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     if (disabled || event.button !== 0 || !support.drag || phaseRef.current !== 'idle') return;
@@ -322,6 +349,8 @@ export function WindowGlob({
       radius: Math.max(12, rect.width * 0.42),
     };
     if (stretch.current) stretch.current.style.transition = 'none';
+    lastPointer.current = { x: event.clientX, y: event.clientY };
+    globLog('picked up');
     setPhase('pressed');
   };
   const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
@@ -329,6 +358,7 @@ export function WindowGlob({
     if (current !== 'pressed' && current !== 'free') return;
     const { start, socket } = drag.current;
     const pointer = { x: event.clientX, y: event.clientY };
+    lastPointer.current = pointer;
     const away =
       pointer.x < 0 ||
       pointer.y < 0 ||
@@ -342,7 +372,7 @@ export function WindowGlob({
         if (length >= CLICK_SLOP) {
           setHint(false);
           writeHints(HINT_TIMES);
-          leave();
+          leave('reduced motion');
         }
         return;
       }
@@ -356,6 +386,7 @@ export function WindowGlob({
         return;
       }
       // Snap: it pops free and the socket stays behind.
+      globLog('snapped free of its socket');
       setHint(false);
       writeHints(HINT_TIMES);
       motion.reset();
@@ -372,10 +403,11 @@ export function WindowGlob({
     }
     drawNeck(socket, at, Math.hypot(at.x - socket.x, at.y - socket.y));
     // At the window edge the overlay takes over, at exactly this spot.
-    if (away) leave();
+    if (away) leave('pointer crossed the edge');
   };
   const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
     const current = phaseRef.current;
+    if (current !== 'idle') globLog(`webview saw the release while ${current}`);
     if (current === 'out') void finish(true);
     else if (current === 'free') goHome();
     else if (current === 'pressed') {
@@ -397,6 +429,11 @@ export function WindowGlob({
     ? `Attach a window to ${agent}. Drag onto any window, or press Enter to choose from a list.`
     : `Attach a window to ${agent}`;
   const socketed = phase === 'free' || phase === 'out' || phase === 'home';
+  const tooltipText = attached
+    ? `${attached.title} · ${attached.control ? 'can control' : 'see only'}. Click × to detach.`
+    : support.drag
+      ? `Drag ${agent} onto any window to let it see or control it. Click to pick from a list.`
+      : `Let ${agent} see or control another app's window. Click to pick one.`;
   const layer =
     (phase === 'pressed' || phase === 'free' || phase === 'home') && !reduced
       ? createPortal(
@@ -431,47 +468,67 @@ export function WindowGlob({
       : null;
   return (
     <span className="window-glob" data-compact={compact || undefined}>
-      <button
-        ref={handle}
-        type="button"
-        className={
-          compact ? 'window-glob-handle window-glob-compact' : 'live-mascot window-glob-handle'
-        }
-        data-phase={phase === 'idle' ? undefined : phase}
-        data-socket={socketed || undefined}
-        data-target={hovered ? true : undefined}
-        aria-label={label}
-        disabled={disabled || !usable}
-        onPointerEnter={prepare}
-        onFocus={prepare}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onLostPointerCapture={() => {
-          if (phaseRef.current === 'out') void finish(true);
-          else if (phaseRef.current === 'free') goHome();
-        }}
-        onClick={(event) => {
-          // Pointer presses open the dialog on release; this keeps keyboard and assistive clicks.
-          if (!support.drag || event.detail === 0) setDialog({ dropped: null });
-        }}
-        onKeyDown={onKeyDown}
-      >
-        <span ref={stretch} className="window-glob-stretch">
-          <span
-            key={landed}
-            ref={mascotRef}
-            aria-hidden="true"
-            className="window-glob-character"
-            data-landed={landed > 0 || undefined}
-          >
-            {children}
+      <Tooltip
+        side={compact ? 'top' : 'bottom'}
+        label={tooltipText}
+        className={phase === 'idle' ? undefined : 'window-glob-tip-hidden'}
+        content={
+          <span className="window-glob-tip">
+            <strong>{attached ? 'Window attached' : 'Attach a window'}</strong>
+            <span>{tooltipText}</span>
           </span>
-        </span>
-      </button>
+        }
+      >
+        <button
+          ref={handle}
+          type="button"
+          className={
+            compact ? 'window-glob-handle window-glob-compact' : 'live-mascot window-glob-handle'
+          }
+          data-phase={phase === 'idle' ? undefined : phase}
+          data-socket={socketed || undefined}
+          data-target={hovered ? true : undefined}
+          aria-label={label}
+          disabled={disabled || !usable}
+          onPointerEnter={prepare}
+          onFocus={prepare}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onLostPointerCapture={() => {
+            const current = phaseRef.current;
+            if (current === 'idle' || current === 'home') return;
+            globLog(`webview lost the pointer while ${current}`);
+            // Out on the desktop, native code follows the pointer and the release.
+            if (current === 'out') return;
+            const { x, y } = lastPointer.current;
+            const nearEdge =
+              x < EDGE || y < EDGE || x > window.innerWidth - EDGE || y > window.innerHeight - EDGE;
+            if (current === 'free' && nearEdge) leave('lost the pointer at the edge');
+            else goHome();
+          }}
+          onClick={(event) => {
+            // Pointer presses open the dialog on release; this keeps keyboard and assistive clicks.
+            if (!support.drag || event.detail === 0) setDialog({ dropped: null });
+          }}
+          onKeyDown={onKeyDown}
+        >
+          <span ref={stretch} className="window-glob-stretch">
+            <span
+              key={landed}
+              ref={mascotRef}
+              aria-hidden="true"
+              className="window-glob-character"
+              data-landed={landed > 0 || undefined}
+            >
+              {children}
+            </span>
+          </span>
+        </button>
+      </Tooltip>
       {hint && !active && (
         <span className="window-glob-hint" role="note">
-          Drag me onto any window to show it to {agent}
+          Try dragging me onto a window
         </span>
       )}
       {attached && (

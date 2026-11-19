@@ -5,9 +5,14 @@
 //! offscreen, so a drag never shows an unpainted (black) window. It is never shown with
 //! `show()`, which on macOS makes a window key and would take focus from the app the
 //! person is dragging onto; it only moves on and off the screen.
+//!
+//! Once the pointer leaves Jackalope the webview no longer sees it reliably, so the drag
+//! is driven natively: the cursor is polled for position and the left button for the
+//! release, which ends the drag as a drop wherever it happens.
 
 use super::{conversation_id, denied, drag_supported, dropped, summary, target_from, AttachTarget};
 use crate::commands::desktop_control::{helper, platform, Window};
+use serde::Serialize;
 use serde_json::json;
 use std::{
     sync::{
@@ -15,7 +20,7 @@ use std::{
         Arc, Mutex, OnceLock,
     },
     thread::JoinHandle,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -24,8 +29,10 @@ pub const OVERLAY: &str = "desktop-glob";
 pub const BEGIN_EVENT: &str = "desktop-glob-begin";
 /// Sent with the window under the pointer, or null, whenever it changes.
 pub const TARGET_EVENT: &str = "desktop-glob-target";
-/// Sent when the drag ends: a drop splats onto the window, anything else springs home.
+/// Sent to the overlay when the drag ends: a drop splats, anything else springs home.
 pub const FINISH_EVENT: &str = "desktop-glob-finish";
+/// Sent to the app when the drag ends, with the window dropped on (if any).
+pub const DROPPED_EVENT: &str = "desktop-glob-dropped";
 /// Logical size of the overlay: the blob plus its label, nothing more.
 const SIZE: (f64, f64) = (232.0, 96.0);
 /// Where the blob's centre sits inside the overlay, in logical pixels.
@@ -41,9 +48,21 @@ const HIT_EVERY: u32 = 6;
 /// How long the drop splat and the spring home play before the overlay leaves.
 const SPLAT: Duration = Duration::from_millis(560);
 const SPRING_HOME: Duration = Duration::from_millis(420);
+/// A page that never reports its first paint is shown anyway after this long, so a
+/// broken page shows up as a visible problem instead of an invisible drag.
+const READY_FALLBACK: Duration = Duration::from_millis(800);
+/// The button must read as released for this many frames in a row to end the drag.
+const RELEASE_FRAMES: u32 = 2;
 
 static READY: AtomicBool = AtomicBool::new(false);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// A drag trace in the dev app's terminal; silent in release builds.
+pub(crate) fn trace(message: std::fmt::Arguments) {
+    if cfg!(debug_assertions) {
+        eprintln!("glob: {message}");
+    }
+}
 
 struct Drag {
     conversation: String,
@@ -58,14 +77,73 @@ fn drag_slot() -> &'static Mutex<Option<Drag>> {
     DRAG.get_or_init(Mutex::default)
 }
 
-/// The overlay's physical top-left corner for a pointer position.
-pub fn origin(pointer: (f64, f64), scale: f64) -> (f64, f64) {
-    (pointer.0 + LEAD * scale, pointer.1 + LEAD * scale)
+/// Whether the left mouse button is down right now, from the window server.
+#[cfg(target_os = "macos")]
+fn left_button_down() -> Option<bool> {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGEventSourceButtonState(state: i32, button: u32) -> bool;
+    }
+    // kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft.
+    Some(unsafe { CGEventSourceButtonState(0, 0) })
+}
+
+#[cfg(windows)]
+fn left_button_down() -> Option<bool> {
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetAsyncKeyState(key: i32) -> i16;
+    }
+    // VK_LBUTTON; the high bit means held now.
+    Some(unsafe { GetAsyncKeyState(1) } as u16 & 0x8000 != 0)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn left_button_down() -> Option<bool> {
+    None
+}
+
+/// Positions are in the units each platform places windows in without rounding through
+/// another display's scale: logical points from the main display's top-left on macOS,
+/// physical pixels elsewhere.
+const LOGICAL: bool = cfg!(target_os = "macos");
+
+/// The pointer in placement units. Tauri reports a physical position that on macOS is
+/// the logical point scaled by the main display, while it places a window by dividing by
+/// that window's own scale; an overlay parked off every screen can disagree, which put it
+/// far from the pointer. Undoing the main display's scale keeps it in points.
+fn pointer(app: &AppHandle) -> Option<(f64, f64)> {
+    let position = app.cursor_position().ok()?;
+    if LOGICAL {
+        let scale = app
+            .primary_monitor()
+            .ok()
+            .flatten()
+            .map(|monitor| monitor.scale_factor())
+            .unwrap_or(1.0);
+        Some((position.x / scale, position.y / scale))
+    } else {
+        Some((position.x, position.y))
+    }
+}
+
+/// How many placement units one logical pixel is for this window.
+fn unit(window: &WebviewWindow) -> f64 {
+    if LOGICAL {
+        1.0
+    } else {
+        window.scale_factor().unwrap_or(1.0)
+    }
+}
+
+/// The overlay's top-left corner for a pointer position.
+pub fn origin(pointer: (f64, f64), unit: f64) -> (f64, f64) {
+    (pointer.0 + LEAD * unit, pointer.1 + LEAD * unit)
 }
 
 /// Where the overlay moves on a drop, so the splat lands exactly on the pointer.
-pub fn splat_origin(pointer: (f64, f64), scale: f64) -> (f64, f64) {
-    (pointer.0 - BLOB.0 * scale, pointer.1 - BLOB.1 * scale)
+pub fn splat_origin(pointer: (f64, f64), unit: f64) -> (f64, f64) {
+    (pointer.0 - BLOB.0 * unit, pointer.1 - BLOB.1 * unit)
 }
 
 /// The unit direction from the pointer back toward the app window it left.
@@ -82,8 +160,18 @@ pub fn home_direction(pointer: (f64, f64), home: Option<(f64, f64)>) -> (f64, f6
     }
 }
 
+/// Whether the drag ends on this frame: the button has read as released for enough
+/// frames in a row, after having been seen held.
+pub fn released(held_seen: bool, released_frames: u32) -> bool {
+    held_seen && released_frames >= RELEASE_FRAMES
+}
+
 fn place(window: &WebviewWindow, at: (f64, f64)) {
-    let _ = window.set_position(tauri::PhysicalPosition::new(at.0, at.1));
+    let _ = if LOGICAL {
+        window.set_position(tauri::LogicalPosition::new(at.0, at.1))
+    } else {
+        window.set_position(tauri::PhysicalPosition::new(at.0, at.1))
+    };
 }
 
 fn park(window: &WebviewWindow) {
@@ -115,19 +203,98 @@ fn ensure(app: &AppHandle) -> Result<WebviewWindow, String> {
     if let Some(profile) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
         builder = builder.data_directory(std::path::PathBuf::from(profile).join("webview"));
     }
-    let window = builder.build().map_err(|e| e.to_string())?;
+    let window = builder.build().map_err(|e| {
+        trace(format_args!("overlay build failed: {e}"));
+        e.to_string()
+    })?;
     let _ = window.set_ignore_cursor_events(true);
+    trace(format_args!("overlay built, waiting for its first paint"));
     Ok(window)
 }
 
+/// The centre of the window the drag started from, in placement units.
 fn home_center(app: &AppHandle, label: &str) -> Option<(f64, f64)> {
     let window = app.get_webview_window(label)?;
     let position = window.outer_position().ok()?;
     let size = window.outer_size().ok()?;
+    let scale = if LOGICAL {
+        window.scale_factor().unwrap_or(1.0)
+    } else {
+        1.0
+    };
     Some((
-        position.x as f64 + size.width as f64 / 2.0,
-        position.y as f64 + size.height as f64 / 2.0,
+        (position.x as f64 + size.width as f64 / 2.0) / scale,
+        (position.y as f64 + size.height as f64 / 2.0) / scale,
     ))
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Dropped {
+    target: Option<AttachTarget>,
+    canceled: bool,
+}
+
+/// Ends the drag once, whoever notices first: the native release, the webview's
+/// pointer-up, or Escape. The overlay plays its splat or spring home, then waits
+/// offscreen; the app hears what was dropped on.
+fn finish(app: &AppHandle, drop: bool, why: &str) -> Option<AttachTarget> {
+    let mut drag = drag_slot().lock().ok()?.take()?;
+    drag.stop.store(true, Ordering::SeqCst);
+    let target = drop
+        .then(|| drag.target.lock().ok().and_then(|mut slot| slot.take()))
+        .flatten();
+    let shown = target.as_ref().map(summary);
+    if let Some(window) = target {
+        if let Ok(mut map) = dropped().lock() {
+            map.insert(drag.conversation.clone(), window);
+        }
+    }
+    trace(format_args!(
+        "drag ended by {why}: {}",
+        match (&shown, drop) {
+            (Some(target), _) => format!("dropped on {} \u{2014} {}", target.app, target.title),
+            (None, true) => "dropped on nothing attachable".into(),
+            (None, false) => "canceled".into(),
+        }
+    ));
+    let _ = app.emit(
+        DROPPED_EVENT,
+        Dropped {
+            target: shown.clone(),
+            canceled: !drop,
+        },
+    );
+    let splat = shown.is_some();
+    let generation = GENERATION.load(Ordering::SeqCst);
+    let poll = drag.poll.take();
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Some(poll) = poll {
+            if poll.thread().id() != std::thread::current().id() {
+                let _ = poll.join();
+            }
+        }
+        let Some(overlay) = app.get_webview_window(OVERLAY) else {
+            return;
+        };
+        let at = pointer(&app).unwrap_or_default();
+        if splat {
+            place(&overlay, splat_origin(at, unit(&overlay)));
+            let _ = app.emit(FINISH_EVENT, json!({ "kind": "drop" }));
+        } else {
+            let (dx, dy) = home_direction(at, home_center(&app, &drag.home));
+            let _ = app.emit(
+                FINISH_EVENT,
+                json!({ "kind": "return", "dx": dx, "dy": dy }),
+            );
+        }
+        std::thread::sleep(if splat { SPLAT } else { SPRING_HOME });
+        if GENERATION.load(Ordering::SeqCst) == generation {
+            park(&overlay);
+        }
+    });
+    shown
 }
 
 /// Builds the overlay ahead of a drag, when the person points at the agent, so its first
@@ -143,6 +310,7 @@ pub async fn desktop_glob_prepare(app: AppHandle) -> Result<(), String> {
 /// The overlay's or a badge's page painted its first transparent frame.
 #[tauri::command]
 pub fn desktop_overlay_ready(window: WebviewWindow) {
+    trace(format_args!("{} painted its first frame", window.label()));
     if window.label() == OVERLAY {
         READY.store(true, Ordering::SeqCst);
     } else {
@@ -150,8 +318,19 @@ pub fn desktop_overlay_ready(window: WebviewWindow) {
     }
 }
 
+/// A line for the drag trace from the app or overlay pages; dev builds only.
+#[tauri::command]
+pub fn desktop_glob_log(window: WebviewWindow, message: String) {
+    let message: String = message
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(300)
+        .collect();
+    trace(format_args!("[{}] {message}", window.label()));
+}
+
 /// Starts dragging the agent: the overlay follows the pointer and names the window
-/// under it. Polling runs only while dragging and stops on drop or cancel.
+/// under it. Polling runs only while dragging and stops on release, drop or cancel.
 #[tauri::command]
 pub async fn desktop_glob_start(
     app: AppHandle,
@@ -167,13 +346,24 @@ pub async fn desktop_glob_start(
     if let Some(previous) = drag_slot().lock().map_err(|e| e.to_string())?.take() {
         previous.stop.store(true, Ordering::SeqCst);
     }
-    ensure(&app)?;
+    let overlay = ensure(&app)?;
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let provider: String = provider
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
         .take(40)
         .collect();
+    trace(format_args!(
+        "drag started from {} at {:?} (main display scale {:?}, overlay scale {:?}, painted {})",
+        window.label(),
+        pointer(&app),
+        app.primary_monitor()
+            .ok()
+            .flatten()
+            .map(|m| m.scale_factor()),
+        overlay.scale_factor().ok(),
+        READY.load(Ordering::SeqCst),
+    ));
     let _ = app.emit(BEGIN_EVENT, json!({ "provider": provider }));
     let stop = Arc::new(AtomicBool::new(false));
     let target = Arc::new(Mutex::new(None));
@@ -181,31 +371,67 @@ pub async fn desktop_glob_start(
     let poll = std::thread::spawn(move || {
         let mut helper = helper::Helper::new(launcher);
         let denied = denied();
+        let started = Instant::now();
         let mut last: Option<String> = None;
         let mut frame = 0u32;
+        let mut shown = false;
+        let (mut held_seen, mut released_frames) = (false, 0u32);
+        let mut ended_by_release = false;
         while !poll_stop.load(Ordering::SeqCst) && GENERATION.load(Ordering::SeqCst) == generation {
-            if let (Ok(pointer), Some(overlay)) = (
-                poll_app.cursor_position(),
-                poll_app.get_webview_window(OVERLAY),
-            ) {
+            match left_button_down() {
+                Some(true) => {
+                    held_seen = true;
+                    released_frames = 0;
+                }
+                Some(false) => released_frames += 1,
+                None => {}
+            }
+            if released(held_seen, released_frames) {
+                ended_by_release = true;
+                break;
+            }
+            let painted = READY.load(Ordering::SeqCst);
+            if !painted && !shown && started.elapsed() >= READY_FALLBACK {
+                trace(format_args!(
+                    "overlay never reported its first paint; showing it anyway"
+                ));
+                READY.store(true, Ordering::SeqCst);
+            }
+            if let (Some(at), Some(overlay)) =
+                (pointer(&poll_app), poll_app.get_webview_window(OVERLAY))
+            {
                 if READY.load(Ordering::SeqCst) {
-                    let scale = overlay.scale_factor().unwrap_or(1.0);
-                    place(&overlay, origin((pointer.x, pointer.y), scale));
+                    let corner = origin(at, unit(&overlay));
+                    place(&overlay, corner);
+                    if !shown {
+                        shown = true;
+                        trace(format_args!("overlay on screen at {corner:?}"));
+                    }
                 }
             }
             if frame.is_multiple_of(HIT_EVERY) {
-                let hit = helper
-                    .call(
-                        &json!({"action":"at","deny":denied}),
-                        Duration::from_secs(2),
-                        &poll_stop,
-                    )
-                    .ok()
-                    .and_then(|value| target_from(&value, &denied));
+                let reply = helper.call(
+                    &json!({"action":"at","deny":denied}),
+                    Duration::from_secs(2),
+                    &poll_stop,
+                );
+                if let Err(error) = &reply {
+                    if frame == 0 {
+                        trace(format_args!("hit test failed: {}", error.message));
+                    }
+                }
+                let hit = reply.ok().and_then(|value| target_from(&value, &denied));
                 let key = hit.as_ref().map(|window| window.handle.clone());
                 if key != last {
                     last = key;
                     let shown = hit.as_ref().map(summary);
+                    trace(format_args!(
+                        "over {}",
+                        shown
+                            .as_ref()
+                            .map(|t| format!("{} \u{2014} {}", t.app, t.title))
+                            .unwrap_or_else(|| "no attachable window".into())
+                    ));
                     if let Ok(mut slot) = poll_target.lock() {
                         *slot = hit;
                     }
@@ -216,6 +442,9 @@ pub async fn desktop_glob_start(
             std::thread::sleep(FRAME);
         }
         helper.shutdown();
+        if ended_by_release {
+            finish(&poll_app, true, "mouse release");
+        }
     });
     *drag_slot().lock().map_err(|e| e.to_string())? = Some(Drag {
         conversation,
@@ -227,53 +456,11 @@ pub async fn desktop_glob_start(
     Ok(())
 }
 
-/// Ends the drag. A drop returns the window under the pointer for the confirm dialog;
-/// nothing is attached until the person confirms. The overlay plays its splat or its
-/// spring home, then waits offscreen for the next drag.
+/// Ends the drag from the app: Escape cancels; a pointer-up the webview still saw drops.
+/// The app learns the outcome from the dropped event either way.
 #[tauri::command]
 pub fn desktop_glob_end(app: AppHandle, drop: bool) -> Option<AttachTarget> {
-    let mut drag = drag_slot().lock().ok()?.take()?;
-    drag.stop.store(true, Ordering::SeqCst);
-    let target = drop
-        .then(|| drag.target.lock().ok().and_then(|mut slot| slot.take()))
-        .flatten();
-    let shown = target.as_ref().map(summary);
-    if let Some(window) = target {
-        if let Ok(mut map) = dropped().lock() {
-            map.insert(drag.conversation.clone(), window);
-        }
-    }
-    let splat = shown.is_some();
-    let generation = GENERATION.load(Ordering::SeqCst);
-    let poll = drag.poll.take();
-    std::thread::spawn(move || {
-        if let Some(poll) = poll {
-            let _ = poll.join();
-        }
-        let Some(overlay) = app.get_webview_window(OVERLAY) else {
-            return;
-        };
-        let pointer = app
-            .cursor_position()
-            .map(|p| (p.x, p.y))
-            .unwrap_or_default();
-        let scale = overlay.scale_factor().unwrap_or(1.0);
-        if splat {
-            place(&overlay, splat_origin(pointer, scale));
-            let _ = app.emit(FINISH_EVENT, json!({ "kind": "drop" }));
-        } else {
-            let (dx, dy) = home_direction(pointer, home_center(&app, &drag.home));
-            let _ = app.emit(
-                FINISH_EVENT,
-                json!({ "kind": "return", "dx": dx, "dy": dy }),
-            );
-        }
-        std::thread::sleep(if splat { SPLAT } else { SPRING_HOME });
-        if GENERATION.load(Ordering::SeqCst) == generation {
-            park(&overlay);
-        }
-    });
-    shown
+    finish(&app, drop, if drop { "the app" } else { "Escape" })
 }
 
 #[cfg(test)]
@@ -294,5 +481,20 @@ mod tests {
         assert!((dx - 0.6).abs() < 1e-9 && (dy - 0.8).abs() < 1e-9);
         assert_eq!(home_direction((5.0, 5.0), Some((5.0, 5.0))), (0.0, -1.0));
         assert_eq!(home_direction((5.0, 5.0), None), (0.0, -1.0));
+    }
+
+    #[test]
+    fn the_drag_ends_only_on_a_release_after_the_button_was_seen_held() {
+        assert!(
+            !released(false, 10),
+            "a button never seen held does not end it"
+        );
+        assert!(!released(true, 1), "one released frame may be a glitch");
+        assert!(released(true, RELEASE_FRAMES));
+    }
+
+    #[test]
+    fn finishing_without_a_drag_does_nothing() {
+        assert!(drag_slot().lock().unwrap().is_none());
     }
 }

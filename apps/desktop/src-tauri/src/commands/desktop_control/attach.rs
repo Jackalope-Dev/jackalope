@@ -365,6 +365,7 @@ macro_rules! tauri_commands {
             commands::desktop_control::attach::overlay::desktop_glob_start,
             commands::desktop_control::attach::overlay::desktop_glob_end,
             commands::desktop_control::attach::overlay::desktop_overlay_ready,
+            commands::desktop_control::attach::overlay::desktop_glob_log,
             commands::desktop_control::attach::badge::desktop_badge_state,
             commands::desktop_control::attach::badge::desktop_badge_resize,
             commands::desktop_control::attach::badge::desktop_badge_detach,

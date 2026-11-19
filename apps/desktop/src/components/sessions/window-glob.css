@@ -259,3 +259,12 @@
     animation: none;
   }
 }
+
+.window-glob-tip {
+  display: grid;
+  gap: 2px;
+  max-width: 16rem;
+}
+.ui-tooltip.window-glob-tip-hidden {
+  display: none;
+}

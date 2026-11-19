@@ -6,6 +6,7 @@ import {
   GLOB_BEGIN_EVENT,
   GLOB_FINISH_EVENT,
   GLOB_TARGET_EVENT,
+  globLog,
   overlayReady,
 } from '../../lib/window-attach';
 import { useWindowTheme } from '../../window-bootstrap';
@@ -37,16 +38,28 @@ export function GlobOverlay() {
   targetRef.current = target;
 
   useEffect(() => {
+    globLog('overlay page mounted');
+    const failed = (event: ErrorEvent | PromiseRejectionEvent) =>
+      globLog(
+        `overlay error: ${'message' in event ? event.message : String(event.reason).slice(0, 200)}`,
+      );
+    window.addEventListener('error', failed);
+    window.addEventListener('unhandledrejection', failed);
     // Two frames: the transparent page has been composited, not just laid out.
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => void overlayReady().catch(() => undefined));
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('error', failed);
+      window.removeEventListener('unhandledrejection', failed);
+    };
   }, []);
 
   useEffect(() => {
     const stops: Array<Promise<() => void>> = [
       listen<{ provider: string }>(GLOB_BEGIN_EVENT, (event) => {
+        globLog(`overlay began a drag (${event.payload.provider || 'auto'})`);
         motion.reset();
         setProvider(event.payload.provider || 'auto');
         setTarget(null);
@@ -56,7 +69,10 @@ export function GlobOverlay() {
         if (!event.payload && targetRef.current) setMissed((value) => value + 1);
         setTarget(event.payload);
       }),
-      listen<Finish>(GLOB_FINISH_EVENT, (event) => setFinish(event.payload)),
+      listen<Finish>(GLOB_FINISH_EVENT, (event) => {
+        globLog(`overlay finishing: ${event.payload.kind}`);
+        setFinish(event.payload);
+      }),
     ];
     const window = getCurrentWindow();
     const scale = () => globalThis.devicePixelRatio || 1;
