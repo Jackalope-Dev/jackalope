@@ -1,6 +1,6 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { InlineNotice, LoadingState, SearchIcon, Tooltip } from '@jackalope/ui';
-import { Inbox, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
+import { Images, Inbox, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import {
   type CSSProperties,
   lazy,
@@ -102,6 +102,7 @@ const CommandPalette = lazy(() =>
 const RemoveProjectAction = lazy(() =>
   import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
+const InboxPage = lazy(() => import('../inbox/InboxPage').then((m) => ({ default: m.InboxPage })));
 
 /** Swarm is a beta Cloudflare integration; its project tab appears once it is connected. */
 function useSwarmConfigured() {
@@ -220,6 +221,7 @@ export function Shell({
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     selectWork();
+    useWorkViewStore.getState().closeInbox();
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
   }, []);
@@ -407,7 +409,12 @@ export function Shell({
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
   const navWidth = useWorkViewStore((state) => state.sizes.sidebar);
-  const workScope = useWorkViewStore((state) => state.scope);
+  const inboxOpen =
+    useWorkViewStore((state) => state.inbox) &&
+    activeTab === 'kanban' &&
+    !selectedTaskId &&
+    !selectedSessionId &&
+    !selectedManagedId;
   const shortcut = displayShortcut(shortcuts.search);
   const remoteHost = useHostContextStore((state) => state.host);
   const toggleSettings = () =>
@@ -593,31 +600,34 @@ export function Shell({
             </Tooltip>
           </div>
           <nav aria-label="Workspace" className="workspace-nav-list">
-            {/* Inbox is the cross-project scope: everything waiting on the person. A project row
-                scopes Work to that project; the page header names the scope either way. */}
+            {/* Inbox gathers what waits on the person across every project, with app alerts.
+                A project row scopes Work to that project; "All projects" lists everything. */}
             <button
               type="button"
               onClick={() => {
                 selectWork();
-                useWorkViewStore.getState().openList('attention');
+                useWorkViewStore.getState().openInbox();
                 setActiveTab('kanban');
               }}
-              aria-current={
-                activeTab === 'kanban' &&
-                !selectedTaskId &&
-                !selectedSessionId &&
-                !selectedManagedId &&
-                workScope === 'all'
-                  ? 'page'
-                  : undefined
-              }
+              aria-current={inboxOpen ? 'page' : undefined}
               aria-label="Inbox"
-              title="Inbox: work across every project that needs you"
+              title="Inbox: what needs you across every project"
               className="workspace-nav-item"
             >
               <Inbox aria-hidden="true" />
               <span>Inbox</span>
               <NeedsYouCount />
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('library')}
+              aria-current={view.group === 'library' ? 'page' : undefined}
+              aria-label="Library"
+              title="Library: screenshots, images and files your work created"
+              className="workspace-nav-item"
+            >
+              <Images aria-hidden="true" />
+              <span>Library</span>
             </button>
           </nav>
           {navCollapsed ? (
@@ -732,7 +742,7 @@ export function Shell({
                 </WorkspacePage>
               }
             >
-              {page(viewContext)}
+              {inboxOpen ? <InboxPage onNewWork={focusComposer} /> : page(viewContext)}
             </Suspense>
           </PageErrorBoundary>
         </main>
