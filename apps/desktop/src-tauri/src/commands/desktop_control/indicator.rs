@@ -75,6 +75,11 @@ fn forward_trace(file: &std::path::Path) {
     }
 }
 
+/// The app, once the main window has reported its theme.
+pub(crate) fn app() -> Option<tauri::AppHandle> {
+    APP.get().cloned()
+}
+
 /// Brings the attempt's conversation, or its task, forward in Jackalope.
 fn open_in_app(runtime: &TaskRuntime, id: &str) {
     use tauri::{Emitter, Manager};
@@ -234,7 +239,8 @@ impl Indicator {
             json!({"action":"indicator", "window":indicator_window(grant),
             "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
             "file":directory.join("state"),"theme":directory.join("theme"),
-            "look":directory.join("look"),"logo":directory.join("logo.png"),"agent":grant.agent}),
+            "look":directory.join("look"),"logo":directory.join("logo.png"),"agent":grant.agent,
+            "resume":grant.resume}),
         )?;
         command
             .stdin(Stdio::null())

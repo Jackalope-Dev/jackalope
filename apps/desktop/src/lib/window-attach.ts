@@ -33,6 +33,10 @@ export interface BadgeState extends AttachedWindow {
   agent: string;
   /** The agent's character. */
   provider: string;
+  /** Control was paused when the agent's turn ended; Resume picks it back up. */
+  resumable: boolean;
+  /** The conversation's agent is working right now. */
+  running: boolean;
 }
 
 /** Emitted while dragging with the window under the pointer, or null. */
@@ -147,6 +151,9 @@ export const resizeBadge = (expanded: boolean) =>
   invokeNative<void>('desktop_badge_resize', { expanded });
 export const detachFromBadge = () => invokeNative<void>('desktop_badge_detach');
 export const openFromBadge = () => invokeNative<void>('desktop_badge_open');
+/** The badge's Resume; wakes an idle conversation once. */
+export const resumeFromBadge = () =>
+  invokeNative<{ sent: boolean; running: boolean }>('desktop_badge_resume');
 
 /** The line added to the composer, so the next message tells the agent about the window. */
 export function attachMessage(window: Pick<AttachedWindow, 'title' | 'app' | 'control'>) {

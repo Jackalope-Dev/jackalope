@@ -31,7 +31,7 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct DesktopRequest {
     #[schemars(
-        description = "request_access (scope window, app or desktop), snapshot, screenshot, wait_for, focus, list_windows, switch_window, open_app, click, double_click, right_click, drag, type, set_value, press, scroll, invoke, select, clipboard_read, clipboard_write, or release. Ask for the narrowest scope that fits. Escape/Stop/release revokes access; physical input pauses control until the human clicks Resume."
+        description = "request_access (scope window, app or desktop), snapshot, screenshot, wait_for, focus, list_windows, switch_window, open_app, click, double_click, right_click, drag, type, set_value, press, scroll, invoke, select, clipboard_read, clipboard_write, or release. Ask for the narrowest scope that fits. Escape/Stop/release revokes access. While control is paused (a new grant, or the person clicked or typed in the window), calls wait for the person to click Resume on the bar and return status paused if it takes longer: call again instead of asking in the conversation. The person may keep working in other apps while you work: a granted window in the background still answers snapshot, screenshot, wait_for and element actions by ref (invoke, select, set_value, focus, click and type with an element), but coordinate clicks, drags, scrolling, key presses and typing without an element need the window in front; they wait for it and return status background. Prefer element refs."
     )]
     pub action: String,
     #[schemars(
@@ -126,6 +126,17 @@ pub struct DesktopActionRecord {
 const ACTION_LOG_LIMIT: usize = 200;
 /// The person's own browser: their local services are asked about like any site.
 const SITE_LOOPBACK: Loopback = Loopback::Asked;
+/// How long one call waits for Resume or for a backgrounded window to come forward,
+/// within the bridge's tool timeout; the agent calls again to keep waiting.
+pub(crate) const MCP_WAIT: Duration = Duration::from_secs(50);
+/// After this many calls in a row that found control paused, stop telling the agent to
+/// keep waiting and have it ask the person instead.
+const WAIT_CALLS: u32 = 6;
+const WAIT_POLL: Duration = Duration::from_millis(250);
+/// The indicator's reason while active but not in front (the person works elsewhere).
+pub(crate) const BACKGROUND: &str = "background";
+/// How the helpers refuse focus-needing input to a background window.
+const BACKGROUND_REFUSAL: &str = "is in the background";
 /// Refusal for anything but observing a window attached for reading.
 const READ_ONLY: &str = "The person attached this window for reading only. Snapshot, screenshot, wait_for and list_windows work; ask in the conversation if you need to click or type.";
 /// How long a snapshot's refs may be used for input.
@@ -217,6 +228,10 @@ struct Session {
     canceled: AtomicBool,
     access: Mutex<Access>,
     helper: Mutex<Backend>,
+    /// Calls in a row that found control paused.
+    waits: std::sync::atomic::AtomicU32,
+    /// The conversation and agent the grant serves, for offering Resume after it ends.
+    origin: Mutex<Option<(String, String)>>,
     _lease: super::file_lock::FileLock,
 }
 
@@ -225,6 +240,8 @@ impl Session {
         Self {
             canceled: AtomicBool::new(false),
             access: Mutex::new(Access::default()),
+            waits: std::sync::atomic::AtomicU32::new(0),
+            origin: Mutex::new(None),
             helper: Mutex::new(match platform::launcher() {
                 Some(launcher) => Backend::Resident(helper::Helper::new(launcher)),
                 #[cfg(target_os = "linux")]
@@ -305,6 +322,43 @@ fn start_janitor() {
             }
         });
     });
+}
+
+/// Ends an attempt's desktop access. A window grant still waiting for Resume in a
+/// conversation is left on the window as an attachment whose badge offers Resume, so the
+/// person can pick up from there instead of typing that they will.
+pub fn attempt_ended(id: &str) {
+    let session = sessions()
+        .lock()
+        .ok()
+        .and_then(|entries| entries.get(id).cloned());
+    if let Some(session) = session {
+        let paused = session.access.try_lock().ok().and_then(|mut access| {
+            let grant = access.grant.clone()?;
+            let window = access.target.clone()?;
+            let waiting = grant.scope == Scope::Window
+                && access.indicator.as_mut().is_some_and(|indicator| {
+                    !indicator.is_portal()
+                        && indicator
+                            .state()
+                            .is_ok_and(|state| state.status == "paused")
+                });
+            waiting.then_some((window, !grant.read_only))
+        });
+        let origin = session.origin.lock().ok().and_then(|origin| origin.clone());
+        if let (Some((window, control)), Some((conversation, provider))) = (paused, origin) {
+            let staged = attach::offer_resume(&conversation, window, control, &provider);
+            attach::overlay::trace(format_args!("left a paused grant for Resume on the window"));
+            if let Some(app) = indicator::app() {
+                std::thread::spawn(move || {
+                    if attach::badge::supported() {
+                        attach::badge::open(&app, &staged);
+                    }
+                });
+            }
+        }
+    }
+    close(id);
 }
 
 pub fn close(id: &str) {
@@ -587,7 +641,7 @@ impl Call<'_> {
             if let Some((saved, choice)) =
                 grant::remembered_choice(&remembered, scope, request.app.as_deref(), &windows)
             {
-                self.activate(choice, Some(saved))?;
+                self.activate(choice, Some(saved), false)?;
                 return Ok(None);
             }
             let choices = grant::options(
@@ -641,7 +695,7 @@ impl Call<'_> {
                 label,
             )?);
         }
-        self.activate(choice, None)?;
+        self.activate(choice, None, false)?;
         if let Some(saved) = saved {
             self.activity(format!(
                 "You chose to always allow {} in this project. Remove it in project settings.",
@@ -660,7 +714,7 @@ impl Call<'_> {
             &staged,
         ))?;
         let title: String = staged.window.title.chars().take(80).collect();
-        self.activate(Choice::Window(staged.window), None)?;
+        self.activate(Choice::Window(staged.window), None, staged.resumed)?;
         if let Some(grant) = self.access.grant.as_mut() {
             grant.read_only = !staged.control;
         }
@@ -685,10 +739,17 @@ impl Call<'_> {
         &mut self,
         choice: Choice,
         saved: Option<grant::RememberedGrant>,
+        resume: bool,
     ) -> Result<(), String> {
         let mut grant = Grant::from_choice(choice);
         grant.remembered = saved.as_ref().map(|saved| saved.id.clone());
         grant.agent = crate::commands::agents::name(&self.run.agent).to_owned();
+        grant.resume = resume;
+        if let (Ok(mut origin), Some(conversation)) =
+            (self.session.origin.lock(), self.run.live_session_id.clone())
+        {
+            *origin = Some((conversation, self.run.agent.clone()));
+        }
         let indicator = self.session.start_indicator(
             &grant,
             &self.runtime.preferences_directory(),
@@ -1257,10 +1318,91 @@ fn summarize(request: &DesktopRequest, target: Option<&str>) -> String {
     }
 }
 
+/// What a call waiting on the person finds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Gate {
+    /// Control is active (in front, or the action works in the background).
+    Ready,
+    /// Waiting for the person to click Resume.
+    Paused,
+    /// Active, but the window is behind the person's work and the action needs it in front.
+    Background,
+    /// The grant or the attempt ended.
+    Ended,
+}
+
+/// Actions that need the window in front: raw pointer input and keyboard input with no
+/// element to act on through Accessibility or UI Automation.
+pub(crate) fn needs_focus(request: &DesktopRequest) -> bool {
+    match request.action.as_str() {
+        "click" => request.element.is_none(),
+        "double_click" | "right_click" | "press" | "drag" | "scroll" => true,
+        "type" => request.element.is_none(),
+        _ => false,
+    }
+}
+
+/// Reads where the grant stands without waiting on an in-flight operation.
+fn gate(session: &Session, focus: bool) -> Gate {
+    if session.canceled.load(Ordering::SeqCst) {
+        return Gate::Ended;
+    }
+    let Ok(mut access) = session.access.try_lock() else {
+        return Gate::Ready;
+    };
+    if access.grant.is_none() {
+        return Gate::Ready;
+    }
+    let Some(indicator) = access.indicator.as_mut() else {
+        return Gate::Ready;
+    };
+    if indicator.is_portal() {
+        return Gate::Ready;
+    }
+    match indicator.state() {
+        Ok(state) if state.status == "canceled" => Gate::Ended,
+        Ok(state) if state.status == "paused" => Gate::Paused,
+        Ok(state) if focus && state.reason == BACKGROUND => Gate::Background,
+        _ => Gate::Ready,
+    }
+}
+
+/// Polls `check` until control is ready or ended, or the deadline passes, and returns
+/// what it last found. Holds no lock between checks.
+pub(crate) async fn wait_for_gate(
+    deadline: Instant,
+    poll: Duration,
+    mut check: impl FnMut() -> Gate,
+) -> Gate {
+    loop {
+        let gate = check();
+        if matches!(gate, Gate::Ready | Gate::Ended) || Instant::now() >= deadline {
+            return gate;
+        }
+        tokio::time::sleep(poll).await;
+    }
+}
+
+/// The result for a call that found control paused: keep calling, or after several
+/// tries, ask the person.
+fn paused_reply(waits: u32, reason: &str) -> Result<Value, String> {
+    if waits > WAIT_CALLS {
+        return Err("Desktop control has been paused for several minutes. Ask the person to click Resume on the bar at the top of the screen, then try again.".into());
+    }
+    Ok(
+        json!({"status":"paused","reason":reason,"instruction":"The person paused control or hasn't clicked Resume yet. Call desktop_control again to keep waiting; calls wait for Resume. Don't ask in the conversation, the bar tells them. After Resume, take a fresh snapshot."}),
+    )
+}
+
+fn background_reply() -> Value {
+    json!({"status":BACKGROUND,"instruction":"The window is in the background while the person works elsewhere. Snapshots, screenshots, wait_for and element actions by ref still work: use invoke, select, set_value, or click and type with an element. Coordinate input, drags, scrolling and key presses wait until the person brings the window back; call again to keep waiting. Never switch windows to get around this."})
+}
+
 pub async fn execute(
     runtime: TaskRuntime,
     run: TaskRun,
     request: DesktopRequest,
+    wait: Duration,
 ) -> Result<Value, String> {
     actions::validate(&request)?;
     if let Some(target) = super::computers::for_run(&runtime, &run) {
@@ -1276,6 +1418,19 @@ pub async fn execute(
     platform::capabilities().action(&request.action)?;
     let owned = session(&runtime, &run.id, request.action == "request_access")?;
     let id = run.id.clone();
+    // Wait for Resume, or for a backgrounded window to come forward, before taking the
+    // operation lock, so the Screen view and Stop stay responsive while waiting.
+    let focus = needs_focus(&request);
+    if !wait.is_zero() {
+        let (waiting, check_runtime, check_id) = (owned.clone(), runtime.clone(), run.id.clone());
+        wait_for_gate(Instant::now() + wait, WAIT_POLL, move || {
+            if current(&check_runtime, &check_id).is_err() {
+                return Gate::Ended;
+            }
+            gate(&waiting, focus)
+        })
+        .await;
+    }
     let (recorder, recorded) = (runtime.clone(), !run.desktop_permissions.is_empty());
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<Value, Failure> {
         let mut access = owned
@@ -1303,7 +1458,12 @@ pub async fn execute(
             if call.access.indicator.as_ref().is_some_and(|indicator| indicator.is_portal()) {
                 return Err(format!("Desktop control is not active yet: {} Wait for the user, then take a fresh snapshot.", state.reason).into());
             }
-            return Err("Desktop control paused. Wait for the user to click Resume on the bar; then take a fresh snapshot. Do not reclaim focus or bypass the pause.".into());
+            let waits = owned.waits.fetch_add(1, Ordering::SeqCst) + 1;
+            return paused_reply(waits, &state.reason).map_err(Failure::Other);
+        }
+        owned.waits.store(0, Ordering::SeqCst);
+        if focus && state.reason == BACKGROUND {
+            return Ok(background_reply());
         }
         if let Some(pending) = call.site_answer(&fresh)? {
             return Ok(pending);
@@ -1327,6 +1487,10 @@ pub async fn execute(
         close(&id);
     }
     match result {
+        // A helper refused input a background window can't take without focus.
+        Err(Failure::Other(message)) if message.contains(BACKGROUND_REFUSAL) => {
+            Ok(background_reply())
+        }
         // The helper refuses with a System Settings step when macOS lacks a permission.
         Err(failure) => {
             let message = String::from(failure);

@@ -1,7 +1,7 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { describeError } from '@jackalope/contracts/errors';
 import { emit, listen } from '@tauri-apps/api/event';
-import { ArrowUp, ChevronDown, Eye, MousePointerClick, X } from 'lucide-react';
+import { ArrowUp, ChevronDown, Eye, MousePointerClick, Play, X } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
 import {
@@ -16,6 +16,7 @@ import {
   openFromBadge,
   overlayReady,
   resizeBadge,
+  resumeFromBadge,
 } from '../../lib/window-attach';
 import { windowKind } from '../../lib/window-kind';
 import { useWindowTheme } from '../../window-bootstrap';
@@ -40,6 +41,8 @@ export function AttachBadge() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<Sent>(null);
   const [error, setError] = useState('');
+  /** What the badge's Resume did, shown in place of the button. */
+  const [resumed, setResumed] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
   /** Bumped when Jackalope asks where the window is, to replay the bounce. */
   const [bounce, setBounce] = useState(0);
@@ -152,6 +155,24 @@ export function AttachBadge() {
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
 
+  const resume = async () => {
+    setError('');
+    try {
+      const result = await resumeFromBadge();
+      setResumed(
+        result.running
+          ? 'Jackalope picks it up next'
+          : result.sent
+            ? 'Resumed, Jackalope is continuing'
+            : 'Resumed',
+      );
+      setState(await badgeState());
+    } catch (cause) {
+      setError(describeError(cause));
+      if (!open) toggle(true);
+    }
+  };
+
   if (!state) return null;
   const mode = state.control ? 'can control' : 'see only';
   return (
@@ -170,7 +191,7 @@ export function AttachBadge() {
             type="button"
             className="attach-badge-main"
             aria-expanded={open}
-            aria-label={`${state.agent} is attached to this window, ${mode}. ${open ? 'Close' : 'Ask about this window'}`}
+            aria-label={`Jackalope is attached to this window, ${mode}. ${open ? 'Close' : 'Ask about this window'}`}
             onClick={() => toggle(!open)}
           >
             {state.control ? (
@@ -179,10 +200,21 @@ export function AttachBadge() {
               <Eye size={14} aria-hidden="true" className="attach-badge-mode" />
             )}
             <span className="attach-badge-text">
-              <strong>Attached</strong> · {mode}
+              <strong>{state.resumable ? 'Paused' : 'Attached'}</strong> · {mode}
             </span>
             <ChevronDown size={14} aria-hidden="true" className="attach-badge-chevron" />
           </button>
+          {state.resumable && !resumed && (
+            <button type="button" className="attach-badge-resume" onClick={() => void resume()}>
+              <Play size={12} aria-hidden="true" />
+              Resume
+            </button>
+          )}
+          {resumed && (
+            <span className="attach-badge-resumed" role="status">
+              {resumed}
+            </span>
+          )}
           <button
             type="button"
             className="attach-badge-icon"
@@ -201,8 +233,8 @@ export function AttachBadge() {
             rows={2}
             maxLength={4000}
             value={text}
-            placeholder={`Ask ${state.agent} about this window…`}
-            aria-label={`Ask ${state.agent} about this window`}
+            placeholder={`Ask Jackalope about this window…`}
+            aria-label={`Ask Jackalope about this window`}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
             readOnly={busy}

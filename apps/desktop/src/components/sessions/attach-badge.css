@@ -114,6 +114,32 @@
   font: inherit;
   cursor: pointer;
 }
+.attach-badge-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+  height: 26px;
+  margin: 0 2px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.attach-badge-resume:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+.attach-badge-resumed {
+  margin: 0 6px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
 .attach-badge-icon {
   display: inline-grid;
   place-items: center;

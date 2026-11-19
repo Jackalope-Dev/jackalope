@@ -483,7 +483,10 @@ struct Target {
             return false
         }
         if window.isForeground(rect) { return false }
-        try require(scope != "window", "The selected window lost focus. Wait for the human to Resume.")
+        // Window and app grants never pull a window in front of the person's work; only a
+        // desktop grant may switch windows.
+        try require(scope == "desktop" || (scope == "app" && NSWorkspace.shared.frontmostApplication?.processIdentifier == window.pid),
+                    "The window is in the background. Use element actions by ref, or wait until the person brings it back.")
         try window.focus()
         let deadline = Date().addingTimeInterval(1)
         while !window.isForeground(rect) && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
@@ -661,7 +664,16 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
               !text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw ControlError("Invalid literal text.") }
         var changed = false
         if request["element"] is String {
-            _ = AXUIElementSetAttributeValue(try referenced(request, "element"), kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            let element = try referenced(request, "element")
+            // In the background, keys would reach the person's app; add the text through
+            // the control's value instead when it has one.
+            if let window = target.window, !window.isForeground(target.rect), settable(element, kAXValueAttribute) {
+                let current = attribute(element, kAXValueAttribute) as? String ?? ""
+                try require(AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, (current + text) as CFString) == .success,
+                            "The app refused the new value.")
+                return sent("accessibility", false, "Added the text through Accessibility; the window stayed in the background.")
+            }
+            _ = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
             changed = true
         }
         changed = try target.ensureForeground() || changed
@@ -814,7 +826,8 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         display = monitor.0
         rect = monitor.1
     }
-    if scope == "window", let window = window { _ = try window.foreground(rect) }
+    // Reads and element actions work while the window sits behind the person's work; only
+    // raw pointer and keyboard input need it in front (Target.ensureForeground).
     if let expected = request["bounds"] as? [String: Double] {
         try require(sameBounds(rect, try rectFromJSON(expected)), "Window bounds changed. Take a new snapshot.")
     }
@@ -850,7 +863,6 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         try guardState.check()
         if let window = window {
             try require(sameBounds(rect, try window.bounds()), "Window moved or resized during capture. Take a new snapshot.")
-            if scope == "window" { _ = try window.foreground(rect) }
         }
         try writePNG(scaled(image, request["thumb"] as? Int ?? 0), path)
         var result: [String: Any] = ["bounds": boundsJSON(rect)]
@@ -914,6 +926,11 @@ func hexColor(_ text: String) -> NSColor? {
                    blue: Double(rgb & 255) / 255, alpha: 1)
 }
 
+/// Whether a window is minimized: listed by Accessibility but off screen.
+func minimized(_ window: SelectedWindow) -> Bool {
+    !visibleWindows().contains { ($0[kCGWindowNumber as String] as? UInt32) == window.id }
+}
+
 final class Indicator: NSObject {
     let selected: SelectedWindow?
     let scope: String
@@ -955,6 +972,10 @@ final class Indicator: NSObject {
     var dark = true
     var surface = hexColor("#1d1b22")!
     var textColor = hexColor("#f4f3f7")!
+    /// Active, but the granted window or app is behind the person's work.
+    var background = false
+    /// The person already clicked Resume on the attached window's badge.
+    let resumeAtStart: Bool
     var lookKey = ""
     var lastFrameStatus = ""
     var status = "paused"
@@ -977,6 +998,7 @@ final class Indicator: NSObject {
         stateFile = URL(fileURLWithPath: file); themeFile = URL(fileURLWithPath: theme)
         lookFile = (request["look"] as? String).map { URL(fileURLWithPath: $0) }
         logoFile = (request["logo"] as? String).map { URL(fileURLWithPath: $0) }
+        resumeAtStart = request["resume"] as? Bool == true
         super.init()
         readTheme()
     }
@@ -1023,7 +1045,8 @@ final class Indicator: NSObject {
     /// Lays the pill out folded (a small chip) or sized to its content, keeping it centred
     /// where it was. Text never runs under the buttons; only a long pause reason shortens.
     func layoutPill() {
-        let showFull = !folded || (hovering && !holdFold)
+        // In the background the bar keeps to a small chip, out of the person's way.
+        let showFull = (!folded && !(background && status == "active")) || (hovering && !holdFold)
         let height = Indicator.height
         let pad: CGFloat = 12, gap: CGFloat = 8, button: CGFloat = 28, buttonGap: CGFloat = 2
         let buttons = [toggle, stop, open, fold]
@@ -1046,7 +1069,7 @@ final class Indicator: NSObject {
         dot.layer?.cornerRadius = dotSize / 2
         for view in [label, detail] + buttons as [NSView] { view.isHidden = !showFull }
         guard showFull else {
-            pill.setAccessibilityLabel("\(agent) is working here. Hover to show controls.")
+            pill.setAccessibilityLabel("Jackalope is working. Hover to show controls.")
             return
         }
         pill.setAccessibilityLabel(nil)
@@ -1112,11 +1135,13 @@ final class Indicator: NSObject {
     }
 
     func save() {
-        let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(reason.replacingOccurrences(of: "|", with: "/"))"
+        // Active in the background is still active; the reason tells the app.
+        let shown = status == "active" && background ? "background" : reason
+        let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(shown.replacingOccurrences(of: "|", with: "/"))"
         do { try text.write(to: stateFile, atomically: true, encoding: .utf8) }
         catch { NSApp.terminate(nil) }
-        let title = status == "active" ? "\(agent) is \(working)" : "Paused"
-        let secondary = status == "active" ? "Esc to stop" : reason
+        let title = status != "active" ? "Paused" : background ? "Jackalope is working in the background" : "Jackalope is \(working)"
+        let secondary = status != "active" ? reason : background ? "Stop on the bar ends it" : "Esc to stop"
         if label.stringValue != title || detail.stringValue != secondary || toggle.toolTip != (status == "active" ? "Pause" : "Resume") {
             label.stringValue = title
             detail.stringValue = secondary
@@ -1134,7 +1159,7 @@ final class Indicator: NSObject {
         let room = Indicator.frameRoom
         if status == "active" || status == "paused" {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
-            if scope == "window", let rect = try? selected?.bounds() {
+            if scope == "window", let rect = try? selected?.bounds(), !(selected.map { minimized($0) } ?? false) {
                 areas = [NSRect(x: rect.minX - room, y: top - rect.maxY - room,
                                 width: rect.width + room * 2, height: rect.height + room * 2)]
             } else if scope == "desktop" {
@@ -1178,7 +1203,14 @@ final class Indicator: NSObject {
                 frame.setFrame(area, display: true)
                 styleFrame(frame)
             }
-            frame.orderFrontRegardless()
+            // A window frame sits just above its window, so other apps in front cover it
+            // too; it never draws over the person's foreground work.
+            if scope == "window", let selected = selected {
+                frame.level = .normal
+                frame.order(.above, relativeTo: Int(selected.id))
+            } else {
+                frame.orderFrontRegardless()
+            }
         }
     }
 
@@ -1310,12 +1342,38 @@ final class Indicator: NSObject {
         return panel.isVisible && panel.frame.contains(NSPoint(x: point.x, y: top - point.y))
     }
 
+    /// Whether the person's input lands on what Jackalope controls: anywhere for a desktop
+    /// grant; keys while the granted window or app is in front; a click or scroll on the
+    /// granted window (or app) where it is visible. Input in other apps leaves the agent's
+    /// background work alone.
+    func targetsGrant(_ type: CGEventType, _ point: CGPoint) -> Bool {
+        if scope == "desktop" { return true }
+        if type == .keyDown { return !background }
+        let hit = visibleWindows().first { value in
+            guard (value[kCGWindowLayer as String] as? Int) == 0,
+                  (value[kCGWindowOwnerPID as String] as? Int32) != getpid(),
+                  (value[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let bounds = value[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return rect.contains(point)
+        }
+        guard let hit = hit else { return false }
+        if scope == "window" { return (hit[kCGWindowNumber as String] as? UInt32) == selected?.id }
+        guard let pid = hit[kCGWindowOwnerPID as String] as? Int32 else { return false }
+        return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier?.lowercased() == app
+    }
+
     func event(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { resumeTicket += 1; pause("Input monitor interrupted"); return }
         // The agent's own input carries this indicator's tag; everything else is the person.
         if event.getIntegerValueField(.eventSourceUserData) == tag { return }
-        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 { resumeTicket += 1; cancel(); return }
-        guard Indicator.retakes(type), !onPill(event.location) else { return }
+        // Escape stops control while the granted window is in front (or for a desktop
+        // grant). An Escape in another app is the person's own; Stop on the bar always works.
+        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
+            if scope == "desktop" || !background { resumeTicket += 1; cancel() }
+            return
+        }
+        guard Indicator.retakes(type), !onPill(event.location), targetsGrant(type, event.location) else { return }
         resumeTicket += 1
         pause(type == .keyDown ? "You pressed a key" : type == .scrollWheel ? "You scrolled" : "You clicked")
     }
@@ -1390,21 +1448,29 @@ final class Indicator: NSObject {
                                      y: frame.maxY - Indicator.height - 8))
         panel.orderFrontRegardless()
         save()
+        // The person already clicked Resume on the attached window's badge: start the same
+        // way the bar's Resume would, with the same checks.
+        if resumeAtStart { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.change() } }
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if getppid() != self.parent || !self.panel.isVisible { self.cancel(); return }
             do {
-                if self.scope == "window", let selected = self.selected {
+                if self.scope == "window", let selected = self.selected,
+                   minimized(selected), NSRunningApplication(processIdentifier: selected.pid) != nil {
+                    // Minimized: nothing to read or press until it's restored, but it isn't
+                    // a reason to stop; actions report it.
+                    self.background = true
+                } else if self.scope == "window", let selected = self.selected {
                     let rect = try selected.bounds()
-                    if self.status == "active" {
-                        _ = try selected.foreground(rect)
-                        if let previous = self.previousBounds, !sameBounds(rect, previous) { self.pause("Window moved or resized") }
-                    }
-                } else if self.scope == "app" && self.status == "active" && !self.frontmostAllowed() {
-                    self.pause("\(self.name) is no longer active")
+                    // Another app in front, a move or a resize no longer pauses: the agent
+                    // keeps working in the background and its snapshots go stale on a move.
+                    self.background = !selected.isForeground(rect)
+                    self.previousBounds = rect
+                } else if self.scope == "app" {
+                    self.background = !self.frontmostAllowed()
                 }
                 if self.status == "active" && !CGEvent.tapIsEnabled(tap: tap) { self.pause("Input monitor interrupted") }
-            } catch { self.pause("Window focus or identity changed") }
+            } catch { self.pause("The window closed, was minimized or changed") }
             if self.readTheme() { self.restyle() }
             self.save()
         }

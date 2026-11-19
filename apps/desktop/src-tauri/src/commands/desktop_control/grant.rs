@@ -84,6 +84,9 @@ pub struct Grant {
     pub read_only: bool,
     /// The agent's display name, for the control bar.
     pub agent: String,
+    /// The person already clicked Resume (on an attached window's badge), so control
+    /// starts without asking again.
+    pub resume: bool,
 }
 
 impl Grant {
@@ -97,6 +100,7 @@ impl Grant {
                 remembered: None,
                 read_only: false,
                 agent: String::new(),
+                resume: false,
             },
             Choice::App {
                 key,
@@ -111,6 +115,7 @@ impl Grant {
                 remembered: None,
                 read_only: false,
                 agent: String::new(),
+                resume: false,
             },
             Choice::Desktop => Self {
                 scope: Scope::Desktop,
@@ -120,6 +125,7 @@ impl Grant {
                 remembered: None,
                 read_only: false,
                 agent: String::new(),
+                resume: false,
             },
         }
     }

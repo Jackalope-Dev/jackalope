@@ -616,7 +616,9 @@ public static class JackalopeDesktop {
         bool changed = false;
         IntPtr foreground = GetForegroundWindow();
         if (context.Target != IntPtr.Zero && foreground != context.Target) {
-            if (!allowSwitch || context.Scope == "window") throw new Exception("Selected window is not foreground. Focus it and take a new snapshot.");
+            // Window and app grants never pull a window in front of the person's work.
+            bool sameApp = context.Scope == "app" && Pid(foreground) == Pid(context.Target);
+            if (!allowSwitch || context.Scope == "window" || (context.Scope == "app" && !sameApp)) throw new Exception("The window is in the background. Use element actions by ref, or wait until the person brings it back.");
             ShowWindow(context.Target, 9);
             SetForegroundWindow(context.Target);
             System.Threading.Thread.Sleep(60);

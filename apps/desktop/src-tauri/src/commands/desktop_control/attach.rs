@@ -56,6 +56,11 @@ pub struct Staged {
     /// The agent's display name and character, for the badge.
     pub agent: String,
     pub provider: String,
+    /// Left behind by an attempt that ended while its grant waited for Resume; the badge
+    /// offers Resume, which wakes the conversation.
+    pub resume_offered: bool,
+    /// The person clicked Resume on the badge, so the next grant starts already resumed.
+    pub resumed: bool,
     at: Instant,
 }
 
@@ -171,6 +176,8 @@ fn insert(conversation: &str, window: Window, control: bool, agent: &str, at: In
                 control,
                 agent: agent.chars().take(40).collect(),
                 provider: "auto".into(),
+                resume_offered: false,
+                resumed: false,
                 at,
             },
         );
@@ -179,6 +186,34 @@ fn insert(conversation: &str, window: Window, control: bool, agent: &str, at: In
         }
     }
     id
+}
+
+/// Stages the window of a grant that was still waiting for Resume when its attempt
+/// ended, so its badge can offer Resume. Returns the staged id.
+pub fn offer_resume(conversation: &str, window: Window, control: bool, provider: &str) -> String {
+    let id = stage(conversation, window, control, "Jackalope");
+    set_provider(conversation, provider);
+    if let Ok(mut map) = staged_map().lock() {
+        if let Some(staged) = map.get_mut(conversation) {
+            staged.resume_offered = true;
+        }
+    }
+    id
+}
+
+/// Records the badge's Resume click. Returns the key it waits under, the window title,
+/// and whether this was the first click, so the wake note is sent once per resume.
+pub fn mark_resumed(id: &str) -> Option<(String, String, bool)> {
+    let mut map = staged_map().lock().ok()?;
+    expire(&mut map);
+    let (key, staged) = map.iter_mut().find(|(_, staged)| staged.id == id)?;
+    let first = !staged.resumed;
+    staged.resumed = true;
+    Some((
+        key.clone(),
+        staged.window.title.chars().take(80).collect(),
+        first,
+    ))
 }
 
 /// The key a run's attached window is staged under: its conversation, or its task for
@@ -371,6 +406,7 @@ macro_rules! tauri_commands {
             commands::desktop_control::attach::badge::desktop_badge_resize,
             commands::desktop_control::attach::badge::desktop_badge_detach,
             commands::desktop_control::attach::badge::desktop_badge_open,
+            commands::desktop_control::attach::badge::desktop_badge_resume,
         ] $($rest)*)
     };
 }
@@ -649,6 +685,28 @@ mod tests {
     }
 
     #[test]
+    fn a_left_behind_grant_offers_resume_and_counts_only_the_first_click() {
+        let _serial = serial();
+        let window = window("70", 42, "GitHub", "browser");
+        let id = offer_resume("conversation-r", window.clone(), true, "codex");
+        let offered = staged("conversation-r").unwrap();
+        assert!(offered.resume_offered && !offered.resumed && offered.control);
+        assert_eq!(offered.provider, "codex");
+        let (key, title, first) = mark_resumed(&id).unwrap();
+        assert_eq!(
+            (key.as_str(), title.as_str(), first),
+            ("conversation-r", "GitHub", true)
+        );
+        assert!(
+            !mark_resumed(&id).unwrap().2,
+            "a second click sends nothing"
+        );
+        let taken = take_for("conversation-r", &[window], &[]).unwrap();
+        assert!(taken.resumed, "the next grant starts resumed");
+        assert!(mark_resumed(&id).is_none());
+    }
+
+    #[test]
     fn detaching_by_id_or_key_drops_the_attached_window() {
         let _serial = serial();
         stage(
@@ -681,6 +739,8 @@ mod tests {
             control: false,
             agent: "Codex".into(),
             provider: "codex".into(),
+            resume_offered: false,
+            resumed: false,
             at: Instant::now(),
         };
         let prompt = answered_prompt("run-1", "Trail", &staged);

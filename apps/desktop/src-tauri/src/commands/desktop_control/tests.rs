@@ -926,3 +926,104 @@ fn only_system_settings_links_open_natively() {
         assert!(platform::desktop_control_open_settings_link(url.into()).is_err());
     }
 }
+
+fn desktop(action: &str, element: Option<&str>) -> DesktopRequest {
+    DesktopRequest {
+        action: action.into(),
+        element: element.map(Into::into),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn only_raw_pointer_and_keyboard_input_needs_the_window_in_front() {
+    assert!(needs_focus(&desktop("click", None)));
+    assert!(
+        !needs_focus(&desktop("click", Some("e3"))),
+        "a ref click can press through Accessibility"
+    );
+    assert!(needs_focus(&desktop("double_click", Some("e3"))));
+    assert!(needs_focus(&desktop("type", None)));
+    assert!(!needs_focus(&desktop("type", Some("e3"))));
+    for action in ["press", "drag", "scroll"] {
+        assert!(needs_focus(&desktop(action, None)), "{action}");
+    }
+    for action in [
+        "snapshot",
+        "screenshot",
+        "wait_for",
+        "invoke",
+        "select",
+        "set_value",
+        "list_windows",
+    ] {
+        assert!(!needs_focus(&desktop(action, Some("e1"))), "{action}");
+    }
+}
+
+#[tokio::test]
+async fn a_paused_call_waits_for_resume_and_then_proceeds() {
+    let mut checks = 0;
+    let gate = wait_for_gate(
+        Instant::now() + Duration::from_secs(5),
+        Duration::from_millis(1),
+        || {
+            checks += 1;
+            if checks < 4 {
+                Gate::Paused
+            } else {
+                Gate::Ready
+            }
+        },
+    )
+    .await;
+    assert_eq!(gate, Gate::Ready);
+    assert_eq!(checks, 4);
+}
+
+#[tokio::test]
+async fn waiting_gives_up_at_the_deadline_and_stops_when_access_ends() {
+    let started = Instant::now();
+    let gate = wait_for_gate(
+        started + Duration::from_millis(30),
+        Duration::from_millis(5),
+        || Gate::Background,
+    )
+    .await;
+    assert_eq!(gate, Gate::Background);
+    assert!(started.elapsed() >= Duration::from_millis(30));
+    let mut checks = 0;
+    let gate = wait_for_gate(
+        Instant::now() + Duration::from_secs(5),
+        Duration::from_millis(1),
+        || {
+            checks += 1;
+            if checks < 2 {
+                Gate::Paused
+            } else {
+                Gate::Ended
+            }
+        },
+    )
+    .await;
+    assert_eq!(
+        gate,
+        Gate::Ended,
+        "Stop, Escape or the attempt ending cancels the wait"
+    );
+}
+
+#[test]
+fn a_paused_reply_asks_to_call_again_until_it_has_waited_long_enough() {
+    let reply = paused_reply(1, "You clicked").unwrap();
+    assert_eq!(reply["status"], "paused");
+    assert!(reply["instruction"]
+        .as_str()
+        .unwrap()
+        .contains("Call desktop_control again"));
+    assert!(paused_reply(WAIT_CALLS, "").is_ok());
+    assert!(paused_reply(WAIT_CALLS + 1, "")
+        .unwrap_err()
+        .contains("Ask the person"));
+    assert_eq!(background_reply()["status"], BACKGROUND);
+}
