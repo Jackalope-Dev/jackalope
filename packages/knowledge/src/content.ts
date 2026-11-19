@@ -210,7 +210,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Find your way around Work, Inbox and Library',
     shortTitle: 'Work, Inbox & Library',
     description:
-      'The sidebar keeps your projects and their work in view, Inbox shows what needs you, Library keeps screenshots and files, and favorites, pins and folders keep work close.',
+      'The sidebar keeps your projects and work in view. Inbox shows what needs you, Library keeps screenshots and files, and pins and folders keep work close.',
     readingTime: '3 min read',
     sections: [
       {
