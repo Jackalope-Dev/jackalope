@@ -17,6 +17,7 @@ import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
 import { editorName, openProjectInEditor } from '../../lib/editor';
+import { openGeneralProject } from '../../lib/general-project';
 import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
 import { fileManagerName, isTauriEnvironment, revealInFileManager } from '../../lib/native/env';
@@ -647,6 +648,17 @@ export function Shell({
               activeTab={activeTab}
               onOpen={() => setActiveTab('kanban')}
               onAddProject={openProjectSetup}
+              onOpenGeneral={() => {
+                setCommandError('');
+                void openGeneralProject()
+                  .then(() => {
+                    useWorkViewStore.getState().setScope('project');
+                    focusComposer();
+                  })
+                  .catch((cause) =>
+                    setCommandError(`Could not open General: ${describeError(cause)}`),
+                  );
+              }}
             />
           )}
           <nav aria-label="Setup" className="workspace-nav-list workspace-setup">

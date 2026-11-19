@@ -104,6 +104,10 @@ pub async fn task_change_stats(
     tauri::async_runtime::spawn_blocking(move || {
         runs.into_iter()
             .filter_map(|run| {
+                // Non-code work reads a checkout it shares with the person; its edits are theirs.
+                if run.non_code {
+                    return None;
+                }
                 let workspace = Path::new(&run.workspace);
                 // Omitted rather than counting later work in the shared checkout as the attempt's.
                 let ended =

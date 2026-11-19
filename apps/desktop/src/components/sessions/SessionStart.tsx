@@ -14,7 +14,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
 import { checksAutomatically } from '../../lib/project-automation';
 import { appendAttachments } from '../../lib/prompt-attachments';
-import { isQuestionOnly } from '../../lib/question-intent';
+import { isQuestionOnly, nonCodeReason } from '../../lib/question-intent';
 import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import {
@@ -32,7 +32,12 @@ import { workspaceRequest } from '../../lib/workspace-mode';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { usePlanStore } from '../../stores/planStore';
-import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
+import {
+  agentAccountFor,
+  isGeneralProject,
+  type Project,
+  useProjectStore,
+} from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
@@ -185,6 +190,8 @@ export function SessionStart({
     maxChars: 12000,
   });
   const [origin, setOrigin] = useState<{ readOnly?: boolean; ideaId?: string }>({});
+  /** The person's choice, from Options, to give inferred non-code work the full code setup. */
+  const [treatAsCode, setTreatAsCode] = useState(false);
   const seedApplied = useRef(onSeedApplied);
   seedApplied.current = onSeedApplied;
   useEffect(() => {
@@ -206,6 +213,7 @@ ${incoming}`
     input.current?.focus();
   }, [seed]);
   if (!text.trim() && (origin.readOnly || origin.ideaId)) setOrigin({});
+  if (!text.trim() && treatAsCode) setTreatAsCode(false);
   /** Started work replaces the idea it came from. */
   const finishOrigin = () => {
     if (origin.ideaId) useTaskStore.getState().deleteTask(origin.ideaId);
@@ -295,6 +303,9 @@ ${incoming}`
   }, [attachKey]);
   const comparingRef = useRef(comparing);
   comparingRef.current = comparing;
+  const general = isGeneralProject(project);
+  /** Non-code work Jackalope inferred, which Options can switch back to code work. */
+  const inferredNonCode = !general && !!nonCodeReason(text, { window: !!attached });
   const send = async (
     choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess',
     override?: string,
@@ -344,6 +355,13 @@ ${incoming}`
       }
       const lead = chosen[0];
       const agent = lead?.id ?? 'auto';
+      // Non-code work (General, an attached window, or a request that only reads or operates
+      // something outside the code) gets no worktree, preparation or automatic checks.
+      const nonCode = !!nonCodeReason(value, {
+        general,
+        window: !!attachedRef.current,
+        treatAsCode,
+      });
       const request: RunRequest = {
         id: attempt.id,
         projectId: project.id,
@@ -356,14 +374,15 @@ ${incoming}`
         prompt: value,
         ...workspaceRequest(project),
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
-        verifyCommand: origin.readOnly ? undefined : project.preferences?.verifyCommand,
+        verifyCommand: origin.readOnly || nonCode ? undefined : project.preferences?.verifyCommand,
         // A question needs no installed dependencies; the agent can prepare if it must.
         prepareCommand:
-          origin.readOnly || isQuestionOnly(value)
+          origin.readOnly || nonCode || isQuestionOnly(value)
             ? undefined
             : project.preferences?.prepareCommand,
-        setupFiles: project.preferences?.setupFiles,
-        autoVerify: !origin.readOnly && checksAutomatically(project.preferences),
+        setupFiles: nonCode ? undefined : project.preferences?.setupFiles,
+        autoVerify: !origin.readOnly && !nonCode && checksAutomatically(project.preferences),
+        ...(nonCode ? { nonCode } : {}),
         contextSelection: context,
       };
       if (choice === 'interview') {
@@ -379,9 +398,11 @@ ${incoming}`
       }
       let autoStart = false;
       // An attached window belongs to one conversation, so skip the planning check and start
-      // that conversation; planning stays available from Options.
+      // that conversation; planning stays available from Options. Non-code work goes
+      // straight to the agent too.
       if (
         choice === 'assess' &&
+        !nonCode &&
         !attachedRef.current &&
         !limits.maxBatches &&
         !limits.pauseAtEstimatedUsd
@@ -570,12 +591,31 @@ ${incoming}`
                 triggerLabel="Options"
                 onClose={() => input.current?.focus()}
                 actions={[
-                  {
-                    id: 'plan-with-me',
-                    label: 'Plan with me',
-                    disabled: !text.trim() || busy || !isTauriEnvironment(),
-                    onSelect: () => void send('interview'),
-                  },
+                  // Planning needs a repository, which General never has.
+                  ...(general
+                    ? []
+                    : [
+                        {
+                          id: 'plan-with-me',
+                          label: 'Plan with me',
+                          disabled: !text.trim() || busy || !isTauriEnvironment(),
+                          onSelect: () => void send('interview'),
+                        },
+                      ]),
+                  ...(inferredNonCode
+                    ? [
+                        {
+                          id: 'code-work',
+                          label: treatAsCode ? 'Treat as non-code work' : 'Treat as code work',
+                          disabled: busy,
+                          onSelect: () => {
+                            assessment.clear();
+                            pending.current = null;
+                            setTreatAsCode((current) => !current);
+                          },
+                        },
+                      ]
+                    : []),
                 ]}
                 items={[
                   {

@@ -49,7 +49,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { type Project, useProjectStore } from '../../stores/projectStore';
+import { GENERAL_PROJECT_ID, type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { type SidebarFolder, useSidebarStore } from '../../stores/sidebarStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
@@ -747,11 +747,14 @@ export function WorkSidebar({
   activeTab,
   onOpen,
   onAddProject,
+  onOpenGeneral,
   ...actions
 }: ProjectActions & {
   activeTab: ActiveTab;
   onOpen: () => void;
   onAddProject: () => void;
+  /** Adds General, for work without a project, and opens its composer. */
+  onOpenGeneral: () => void;
 }) {
   const [iconFor, setIconFor] = useState<Project | null>(null);
   const projects = useProjectStore((state) => state.projects);
@@ -1009,6 +1012,23 @@ export function WorkSidebar({
           </section>
         );
       })}
+      {/* General lists like any project once added; until then this row adds it. */}
+      {!projects.some((project) => project.id === GENERAL_PROJECT_ID) && (
+        <section className="project-tree-group">
+          <div className="project-tree-head">
+            <span className="project-tree-toggle" aria-hidden="true" />
+            <button
+              type="button"
+              className="project-tree-name"
+              title="Work that needs no project, such as a web page or a connection"
+              onClick={onOpenGeneral}
+            >
+              <ProjectMark project={{ id: GENERAL_PROJECT_ID, name: 'General' }} />
+              <span className="project-tree-label">General</span>
+            </button>
+          </div>
+        </section>
+      )}
       <ProjectIconDialog project={iconFor} onOpenChange={(next) => !next && setIconFor(null)} />
     </nav>
   );

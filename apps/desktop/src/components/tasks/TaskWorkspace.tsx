@@ -4,7 +4,13 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { describeError } from '@jackalope/contracts/errors';
-import { Button, EmptyState, LoadingState, DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  EmptyState,
+  InlineNotice,
+  LoadingState,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import { FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -17,11 +23,12 @@ import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { isGeneralProject, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { ActionError } from '../ui/ActionError';
+import { DismissButton } from '../ui/DismissButton';
 import { DispatchPausedNotices } from './DispatchPausedNotice';
 import { ProjectLaunchpad } from './ProjectLaunchpad';
 import { WorkCatchUp } from './WorkCatchUp';
@@ -84,6 +91,8 @@ export function TaskWorkspace({
   const loading = useExecutionStore((state) => state.loading);
   // Paused dispatches have their own notices; other queue errors show as they are.
   const pausedMessages = pausedDispatchMessages(managed.queue?.pausedIntegrations, managed.error);
+  /** Why General could not be opened from the switcher. */
+  const [generalError, setGeneralError] = useState('');
   const error =
     useExecutionStore((state) => state.error) ||
     (parseDispatchPaused(managed.error) ? null : managed.error);
@@ -286,7 +295,9 @@ export function TaskWorkspace({
       Plan feature work
     </Menu.Item>
   );
-  const launchpad = project && projectFilter !== 'all' && (
+  // Its starting points are code work, which General never holds.
+  const general = isGeneralProject(project);
+  const launchpad = project && projectFilter !== 'all' && !general && (
     <ProjectLaunchpad
       project={project}
       onStart={(text) => setStarterSeed({ id: crypto.randomUUID(), text })}
@@ -294,7 +305,20 @@ export function TaskWorkspace({
   );
   return (
     <WorkspacePage className="task-home">
-      <WorkHeader scope={scope} project={project} onScopeChange={setScope} />
+      <WorkHeader
+        scope={scope}
+        project={project}
+        onScopeChange={(next) => {
+          setGeneralError('');
+          setScope(next);
+        }}
+        onError={setGeneralError}
+      />
+      {generalError && (
+        <InlineNotice tone="error" action={<DismissButton onDismiss={() => setGeneralError('')} />}>
+          {generalError}
+        </InlineNotice>
+      )}
       <SessionStart
         embedded
         seed={starterSeed ?? composerSeed}
@@ -304,7 +328,7 @@ export function TaskWorkspace({
         }}
         key={project?.id ?? 'none'}
         project={project}
-        starters={!hasWork && !launchpad}
+        starters={!hasWork && !launchpad && !general}
         onOpenProject={() => useOnboardingStore.getState().begin()}
       />
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (

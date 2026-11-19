@@ -167,11 +167,12 @@ fn file_extension(path: &Path) -> String {
 
 /// The newest attempt in each workspace that still exists, newest first. An attempt that
 /// edited the project checkout in place is skipped once the checkout moved past it, since
-/// its diff from the base would then include later work.
+/// its diff from the base would then include later work. Non-code work creates no files
+/// there, so the person's own changes in a checkout it read are never listed as its output.
 fn changed_sources(runs: &[TaskRun]) -> Vec<&TaskRun> {
     let mut newest: BTreeMap<&str, &TaskRun> = BTreeMap::new();
     for run in runs {
-        if run.workspace.is_empty() || run.base_head.is_empty() {
+        if run.workspace.is_empty() || run.base_head.is_empty() || run.non_code {
             continue;
         }
         if newest

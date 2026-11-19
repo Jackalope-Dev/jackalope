@@ -364,6 +364,11 @@ export interface RunRequest {
   isolated: boolean;
   /** Overrides `isolated` for a new Git task; absent keeps the `isolated` choice. */
   workspaceMode?: 'worktree' | 'branch' | 'current' | 'ask';
+  /**
+   * Work that changes no code: it runs in the project folder as it is, with no worktree,
+   * preparation or automatic checks, whatever the other workspace fields say.
+   */
+  nonCode?: boolean;
   previousRunId?: string;
   retryOf?: string;
   taskId?: string;
