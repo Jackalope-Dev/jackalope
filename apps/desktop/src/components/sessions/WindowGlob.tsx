@@ -44,6 +44,7 @@ import {
   type GlobDropped,
   globLog,
   prepareGlob,
+  revealAttached,
   startGlob,
 } from '../../lib/window-attach';
 import { GlobFigure } from './GlobFigure';
@@ -135,10 +136,16 @@ export function WindowGlob({
   const [landed, setLanded] = useState(0);
   const changed = useRef(onAttachedChange);
   changed.current = onAttachedChange;
+  const wasAttached = useRef(false);
   const setAttached = (window: AttachedWindow | null) => {
     setAttachedState(window);
     changed.current?.(window);
   };
+  // Detached: the agent comes home to its socket with a pop.
+  useEffect(() => {
+    if (wasAttached.current && !attached) setLanded((value) => value + 1);
+    wasAttached.current = !!attached;
+  }, [attached]);
   const handle = useRef<HTMLButtonElement>(null);
   const stretch = useRef<HTMLSpanElement>(null);
   const carrier = useRef<HTMLSpanElement>(null);
@@ -428,7 +435,9 @@ export function WindowGlob({
   const label = support.drag
     ? `Attach a window to ${agent}. Drag onto any window, or press Enter to choose from a list.`
     : `Attach a window to ${agent}`;
-  const socketed = phase === 'free' || phase === 'out' || phase === 'home';
+  // While its window is attached, the agent is away on that window and its spot stays empty.
+  const socketed =
+    phase === 'free' || phase === 'out' || phase === 'home' || (phase === 'idle' && !!attached);
   const tooltipText = attached
     ? `${attached.title} · ${attached.control ? 'can control' : 'see only'}. Click × to detach.`
     : support.drag
@@ -533,14 +542,19 @@ export function WindowGlob({
       )}
       {attached && (
         <span className="window-glob-attached">
-          <AppWindow size={13} aria-hidden="true" />
-          <span
+          <button
+            type="button"
             className="window-glob-attached-name"
-            title={`${attached.title} · ${attached.app} · waits ${attached.minutesLeft} more min`}
+            title={`${attached.title} · waits ${attached.minutesLeft} more min. Click to show it.`}
+            onClick={() => {
+              globLog(`revealing the attached ${attached.app} window`);
+              void revealAttached(conversation).catch(() => undefined);
+            }}
           >
-            {attached.app}
+            <AppWindow size={13} aria-hidden="true" />
+            On {attached.app}
             {attached.control ? '' : ' · see only'}
-          </span>
+          </button>
           <button
             type="button"
             className="window-glob-detach"

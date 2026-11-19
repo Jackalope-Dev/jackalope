@@ -47,6 +47,11 @@ export interface GlobDropped {
   target: AttachTarget | null;
   canceled: boolean;
 }
+/** Tells the window frame how to draw: around the target, around a just-attached window, or not. */
+export const GLOB_FRAME_EVENT = 'desktop-glob-frame';
+export type GlobFrameMode = 'target' | 'attached' | 'off';
+/** Asks the badge with this window label to bounce. */
+export const BADGE_PULSE_EVENT = 'desktop-badge-pulse';
 /** Emitted with a conversation key when its window was detached outside the app. */
 export const ATTACH_CHANGED_EVENT = 'desktop-attach-changed';
 /** A badge asks the draft's composer to send a question; it answers with the result. */
@@ -99,6 +104,10 @@ export const attachedWindow = (conversation: string) =>
 
 export const clearAttached = (conversation: string) =>
   invokeNative<void>('desktop_attach_clear', { conversation });
+
+/** Shows where an attached window is: its outline glows again and its badge bounces. */
+export const revealAttached = (conversation: string) =>
+  invokeNative<void>('desktop_attach_reveal', { conversation });
 
 /** Where the new-work composer stages a window before Send creates a conversation. */
 export const draftAttachKey = (projectId: string) => `draft:${projectId}`;

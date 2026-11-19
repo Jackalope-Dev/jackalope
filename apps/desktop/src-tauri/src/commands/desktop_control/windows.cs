@@ -186,7 +186,7 @@ public static class JackalopeDesktop {
 
     // The top-level window under the pointer, for attaching a window by dragging onto it.
     // The desktop, taskbars and denied processes are never targets.
-    static object WindowAtCursor(HashSet<uint> deny) {
+    static Dictionary<string, object> WindowAtCursor(HashSet<uint> deny) {
         Point cursor;
         if (!GetCursorPos(out cursor)) return null;
         var hit = GetAncestor(WindowFromPoint(cursor), 2);
@@ -235,7 +235,12 @@ public static class JackalopeDesktop {
         string action = Text(request, "action") ?? "";
         if (action == "hello") return new Dictionary<string, object> { {"protocol", 1} };
         if (action == "list") return new Dictionary<string, object> { {"windows", ListWindows(Deny(request))}, {"monitors", Monitors()} };
-        if (action == "at") return new Dictionary<string, object> { {"window", WindowAtCursor(Deny(request))} };
+        if (action == "at") {
+            var hit = WindowAtCursor(Deny(request));
+            object frame = null;
+            if (hit != null) { try { frame = Bounds(new IntPtr(long.Parse((string)hit["handle"]))); } catch { } }
+            return new Dictionary<string, object> { {"window", hit}, {"bounds", frame} };
+        }
         // Bounds of one window, for the badge on an attached window; geometry only.
         if (action == "bounds") {
             try {

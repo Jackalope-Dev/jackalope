@@ -748,19 +748,24 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     // The topmost window under the pointer, for attaching a window by dragging onto it.
     // Anything above normal windows (menus, the Dock, panels) or a denied process is no target.
     if action == "at" {
+        // Panels, menus and system layers (the Dock keeps a full-screen window above
+        // everything) are looked through; the first normal window under the pointer is the
+        // target, unless it is Jackalope's own. Untitled windows go by their app's name.
         let point = CGEvent(source: nil)?.location ?? .zero
         for value in visibleWindows() {
             guard let bounds = value[kCGWindowBounds as String] as? NSDictionary,
                   let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.contains(point),
-                  (value[kCGWindowAlpha as String] as? Double ?? 1) > 0 else { continue }
-            guard (value[kCGWindowLayer as String] as? Int) == 0,
-                  let id = value[kCGWindowNumber as String] as? UInt32,
+                  (value[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  (value[kCGWindowLayer as String] as? Int) == 0 else { continue }
+            guard let id = value[kCGWindowNumber as String] as? UInt32,
                   let pid = value[kCGWindowOwnerPID as String] as? Int32, !deny.contains(pid),
-                  let title = value[kCGWindowName as String] as? String, !title.isEmpty,
                   let start = started(pid), let app = NSRunningApplication(processIdentifier: pid),
                   let bundle = app.bundleIdentifier else { return ["window": NSNull()] }
+            let name = app.localizedName ?? bundle
+            let title = (value[kCGWindowName as String] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? name
             return ["window": ["handle": String(id), "pid": pid, "started": start, "title": title, "class": bundle,
-                               "app": bundle, "appName": app.localizedName ?? bundle]]
+                               "app": bundle, "appName": name],
+                    "bounds": boundsJSON(rect)]
         }
         return ["window": NSNull()]
     }

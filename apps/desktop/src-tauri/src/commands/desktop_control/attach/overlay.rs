@@ -25,6 +25,14 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 pub const OVERLAY: &str = "desktop-glob";
+/// Frames the window under the pointer while dragging, and the attached window just after.
+pub const FRAME: &str = "desktop-glob-frame";
+/// Tells the frame page how to draw: `target`, `attached` or `off`.
+pub const FRAME_EVENT: &str = "desktop-glob-frame";
+/// Room around the framed window for the outline's outer glow, in logical pixels.
+const FRAME_MARGIN: f64 = 14.0;
+/// How long the frame stays around a window that was just attached.
+const ATTACHED_GLOW: Duration = Duration::from_millis(4200);
 /// Sent when a drag starts, with the agent to draw.
 pub const BEGIN_EVENT: &str = "desktop-glob-begin";
 /// Sent with the window under the pointer, or null, whenever it changes.
@@ -42,7 +50,7 @@ pub const BLOB: (f64, f64) = (44.0, 44.0);
 pub const LEAD: f64 = 8.0;
 /// Far outside every screen; the overlay waits here between drags.
 const OFFSCREEN: (f64, f64) = (-32000.0, -32000.0);
-const FRAME: Duration = Duration::from_millis(16);
+const TICK: Duration = Duration::from_millis(16);
 /// Hit-testing asks the helper; every few frames is enough to follow the pointer.
 const HIT_EVERY: u32 = 6;
 /// How long the drop splat and the spring home play before the overlay leaves.
@@ -56,6 +64,9 @@ const RELEASE_FRAMES: u32 = 2;
 
 static READY: AtomicBool = AtomicBool::new(false);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
+static FRAME_READY: AtomicBool = AtomicBool::new(false);
+/// Bumped whenever the frame moves, so a delayed hide never hides a newer frame.
+static FRAME_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// A drag trace in the dev app's terminal; silent in release builds.
 pub(crate) fn trace(message: std::fmt::Arguments) {
@@ -181,35 +192,125 @@ fn park(window: &WebviewWindow) {
 /// Builds the overlay once: transparent, shadowless, click-through, unfocusable, out of
 /// screen captures, waiting offscreen.
 fn ensure(app: &AppHandle) -> Result<WebviewWindow, String> {
-    if let Some(window) = app.get_webview_window(OVERLAY) {
+    build(app, OVERLAY, "index.html?glob=1", SIZE, &READY)
+}
+
+fn ensure_frame(app: &AppHandle) -> Result<WebviewWindow, String> {
+    build(
+        app,
+        FRAME,
+        "index.html?globFrame=1",
+        (200.0, 200.0),
+        &FRAME_READY,
+    )
+}
+
+fn build(
+    app: &AppHandle,
+    label: &str,
+    url: &str,
+    size: (f64, f64),
+    ready: &AtomicBool,
+) -> Result<WebviewWindow, String> {
+    if let Some(window) = app.get_webview_window(label) {
         return Ok(window);
     }
-    READY.store(false, Ordering::SeqCst);
-    let mut builder =
-        WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App("index.html?glob=1".into()))
-            .title("Jackalope")
-            .inner_size(SIZE.0, SIZE.1)
-            .position(OFFSCREEN.0, OFFSCREEN.1)
-            .decorations(false)
-            .transparent(true)
-            .shadow(false)
-            .resizable(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .focused(false)
-            .focusable(false)
-            .content_protected(true)
-            .visible_on_all_workspaces(true);
+    ready.store(false, Ordering::SeqCst);
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
+        .title("Jackalope")
+        .inner_size(size.0, size.1)
+        .position(OFFSCREEN.0, OFFSCREEN.1)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .focusable(false)
+        .content_protected(true)
+        .visible_on_all_workspaces(true);
     if let Some(profile) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
         builder = builder.data_directory(std::path::PathBuf::from(profile).join("webview"));
     }
     let window = builder.build().map_err(|e| {
-        trace(format_args!("overlay build failed: {e}"));
+        trace(format_args!("{label} build failed: {e}"));
         e.to_string()
     })?;
     let _ = window.set_ignore_cursor_events(true);
-    trace(format_args!("overlay built, waiting for its first paint"));
+    trace(format_args!("{label} built, waiting for its first paint"));
     Ok(window)
+}
+
+/// The frame window's corner and size around a window's bounds, in placement units.
+pub fn frame_rect(bounds: super::badge::Rect, unit: f64) -> (f64, f64, f64, f64) {
+    let margin = FRAME_MARGIN * unit;
+    (
+        bounds.x - margin,
+        bounds.y - margin,
+        bounds.width + margin * 2.0,
+        bounds.height + margin * 2.0,
+    )
+}
+
+/// Frames a window: `target` while dragging over it, `attached` just after attaching.
+fn show_frame(app: &AppHandle, bounds: super::badge::Rect, mode: &str) -> u64 {
+    let generation = FRAME_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    let Some(frame) = app.get_webview_window(FRAME) else {
+        return generation;
+    };
+    if !FRAME_READY.load(Ordering::SeqCst) {
+        trace(format_args!(
+            "frame not painted yet; skipping the {mode} highlight"
+        ));
+        return generation;
+    }
+    let (x, y, width, height) = frame_rect(bounds, unit(&frame));
+    let _ = app.emit(FRAME_EVENT, json!({ "mode": mode }));
+    if LOGICAL {
+        let _ = frame.set_size(tauri::LogicalSize::new(width, height));
+    } else {
+        let _ = frame.set_size(tauri::PhysicalSize::new(width, height));
+    }
+    place(&frame, (x, y));
+    trace(format_args!(
+        "{mode} highlight at x {x:.0} y {y:.0} w {width:.0} h {height:.0}"
+    ));
+    generation
+}
+
+fn hide_frame(app: &AppHandle) {
+    FRAME_GENERATION.fetch_add(1, Ordering::SeqCst);
+    if let Some(frame) = app.get_webview_window(FRAME) {
+        let _ = app.emit(FRAME_EVENT, json!({ "mode": "off" }));
+        park(&frame);
+    }
+}
+
+/// Glows around a window that was just attached, then fades away, so it's clear where
+/// the agent went. Used after attaching and when the person asks where it is.
+pub fn flash_attached(app: &AppHandle, window: Window) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if ensure_frame(&app).is_err() {
+            return;
+        }
+        let bounds = crate::commands::desktop_control::native(
+            json!({"action":"bounds","deny":denied(),"window":window}),
+            &AtomicBool::new(false),
+        )
+        .ok()
+        .and_then(|value| super::badge::parse_bounds(&value));
+        let Some(bounds) = bounds else {
+            trace(format_args!("attached window has no bounds; no highlight"));
+            return;
+        };
+        let generation = show_frame(&app, bounds, "attached");
+        std::thread::sleep(ATTACHED_GLOW);
+        if FRAME_GENERATION.load(Ordering::SeqCst) == generation {
+            hide_frame(&app);
+        }
+    });
 }
 
 /// The centre of the window the drag started from, in placement units.
@@ -265,6 +366,7 @@ fn finish(app: &AppHandle, drop: bool, why: &str) -> Option<AttachTarget> {
             canceled: !drop,
         },
     );
+    hide_frame(app);
     let splat = shown.is_some();
     let generation = GENERATION.load(Ordering::SeqCst);
     let poll = drag.poll.take();
@@ -303,6 +405,7 @@ fn finish(app: &AppHandle, drop: bool, why: &str) -> Option<AttachTarget> {
 pub async fn desktop_glob_prepare(app: AppHandle) -> Result<(), String> {
     if drag_supported() {
         ensure(&app)?;
+        ensure_frame(&app)?;
     }
     Ok(())
 }
@@ -313,6 +416,8 @@ pub fn desktop_overlay_ready(window: WebviewWindow) {
     trace(format_args!("{} painted its first frame", window.label()));
     if window.label() == OVERLAY {
         READY.store(true, Ordering::SeqCst);
+    } else if window.label() == FRAME {
+        FRAME_READY.store(true, Ordering::SeqCst);
     } else {
         super::badge::ready(window.label());
     }
@@ -347,6 +452,7 @@ pub async fn desktop_glob_start(
         previous.stop.store(true, Ordering::SeqCst);
     }
     let overlay = ensure(&app)?;
+    let _ = ensure_frame(&app);
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let provider: String = provider
         .chars()
@@ -420,10 +526,17 @@ pub async fn desktop_glob_start(
                         trace(format_args!("hit test failed: {}", error.message));
                     }
                 }
-                let hit = reply.ok().and_then(|value| target_from(&value, &denied));
+                let value = reply.ok();
+                let hit = value.as_ref().and_then(|value| target_from(value, &denied));
                 let key = hit.as_ref().map(|window| window.handle.clone());
                 if key != last {
                     last = key;
+                    match (&hit, value.as_ref().and_then(super::badge::parse_bounds)) {
+                        (Some(_), Some(bounds)) => {
+                            show_frame(&poll_app, bounds, "target");
+                        }
+                        _ => hide_frame(&poll_app),
+                    }
                     let shown = hit.as_ref().map(summary);
                     trace(format_args!(
                         "over {}",
@@ -439,7 +552,7 @@ pub async fn desktop_glob_start(
                 }
             }
             frame = frame.wrapping_add(1);
-            std::thread::sleep(FRAME);
+            std::thread::sleep(TICK);
         }
         helper.shutdown();
         if ended_by_release {
@@ -481,6 +594,18 @@ mod tests {
         assert!((dx - 0.6).abs() < 1e-9 && (dy - 0.8).abs() < 1e-9);
         assert_eq!(home_direction((5.0, 5.0), Some((5.0, 5.0))), (0.0, -1.0));
         assert_eq!(home_direction((5.0, 5.0), None), (0.0, -1.0));
+    }
+
+    #[test]
+    fn the_frame_surrounds_the_window_with_room_for_its_glow() {
+        let bounds = super::super::badge::Rect {
+            x: 100.0,
+            y: 50.0,
+            width: 800.0,
+            height: 600.0,
+        };
+        assert_eq!(frame_rect(bounds, 1.0), (86.0, 36.0, 828.0, 628.0));
+        assert_eq!(frame_rect(bounds, 2.0), (72.0, 22.0, 856.0, 656.0));
     }
 
     #[test]

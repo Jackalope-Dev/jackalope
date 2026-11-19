@@ -9,6 +9,7 @@ import {
   ATTACH_ASK_RESULT_EVENT,
   type AttachAsk,
   type AttachAskResult,
+  BADGE_PULSE_EVENT,
   type BadgeState,
   badgeState,
   detachFromBadge,
@@ -16,6 +17,7 @@ import {
   overlayReady,
   resizeBadge,
 } from '../../lib/window-attach';
+import { windowKind } from '../../lib/window-kind';
 import { useWindowTheme } from '../../window-bootstrap';
 import './attach-badge.css';
 
@@ -39,6 +41,16 @@ export function AttachBadge() {
   const [sent, setSent] = useState<Sent>(null);
   const [error, setError] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
+  /** Bumped when Jackalope asks where the window is, to replay the bounce. */
+  const [bounce, setBounce] = useState(0);
+  useEffect(() => {
+    const kind = windowKind();
+    const label = kind.kind === 'badge' ? kind.label : '';
+    const stop = listen<string>(BADGE_PULSE_EVENT, (event) => {
+      if (event.payload === label) setBounce((value) => value + 1);
+    });
+    return () => void stop.then((unlisten) => unlisten());
+  }, []);
 
   useEffect(() => {
     let frame = requestAnimationFrame(() => {
@@ -144,31 +156,38 @@ export function AttachBadge() {
   const mode = state.control ? 'can control' : 'see only';
   return (
     <div className="attach-badge" data-open={open || undefined}>
-      <div className="attach-badge-bar">
-        <button
-          type="button"
-          className="attach-badge-main"
-          aria-expanded={open}
-          aria-label={`${state.agent} is attached to this window, ${mode}. ${open ? 'Close' : 'Ask about this window'}`}
-          onClick={() => toggle(!open)}
+      <div className="attach-badge-dock">
+        <span
+          key={bounce}
+          className="attach-badge-agent"
+          data-bounce={bounce > 0 || undefined}
+          aria-hidden="true"
         >
-          <span className="attach-badge-agent" aria-hidden="true">
-            <AgentCharacter provider={state.provider || 'auto'} state="idle" />
-          </span>
-          <span className="attach-badge-text">
-            <strong>Attached</strong> · {mode}
-          </span>
-          <ChevronDown size={14} aria-hidden="true" className="attach-badge-chevron" />
-        </button>
-        <button
-          type="button"
-          className="attach-badge-icon"
-          aria-label="Detach this window"
-          title="Detach"
-          onClick={() => void detachFromBadge()}
-        >
-          <X size={14} aria-hidden="true" />
-        </button>
+          <AgentCharacter provider={state.provider || 'auto'} state="idle" />
+        </span>
+        <div className="attach-badge-bar">
+          <button
+            type="button"
+            className="attach-badge-main"
+            aria-expanded={open}
+            aria-label={`${state.agent} is attached to this window, ${mode}. ${open ? 'Close' : 'Ask about this window'}`}
+            onClick={() => toggle(!open)}
+          >
+            <span className="attach-badge-text">
+              <strong>Attached</strong> · {mode}
+            </span>
+            <ChevronDown size={14} aria-hidden="true" className="attach-badge-chevron" />
+          </button>
+          <button
+            type="button"
+            className="attach-badge-icon"
+            aria-label="Detach this window"
+            title="Detach"
+            onClick={() => void detachFromBadge()}
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
       {open && (
         <div className="attach-badge-ask">

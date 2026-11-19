@@ -22,9 +22,11 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const PREFIX: &str = "desktop-attach-";
+/// Asks the badge with this label to bounce.
+pub const PULSE_EVENT: &str = "desktop-badge-pulse";
 /// Logical sizes: the collapsed badge, and the badge with its question box open.
-pub const COLLAPSED: (f64, f64) = (248.0, 40.0);
-pub const EXPANDED: (f64, f64) = (340.0, 164.0);
+pub const COLLAPSED: (f64, f64) = (264.0, 56.0);
+pub const EXPANDED: (f64, f64) = (340.0, 184.0);
 /// The badge hangs this far inside the window's top edge.
 const INSET: f64 = 6.0;
 const POLL: Duration = Duration::from_millis(350);
@@ -243,6 +245,17 @@ pub fn close(id: &str) {
     }
 }
 
+/// Asks a staged window's badge to bounce, so the person can find it.
+pub fn pulse(app: &AppHandle, id: &str) {
+    let label = badges()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(id).map(|badge| badge.label.clone()));
+    if let Some(label) = label {
+        let _ = app.emit(PULSE_EVENT, label);
+    }
+}
+
 pub fn ready(label: &str) {
     if let Ok(map) = badges().lock() {
         if let Some(badge) = map.values().find(|badge| badge.label == label) {
@@ -387,8 +400,8 @@ mod tests {
             width: 800.0,
             height: 600.0,
         };
-        assert_eq!(position(bounds, COLLAPSED, 2.0, true), (376.0, 56.0));
-        assert_eq!(position(bounds, COLLAPSED, 2.0, false), (252.0, 62.0));
+        assert_eq!(position(bounds, COLLAPSED, 2.0, true), (368.0, 56.0));
+        assert_eq!(position(bounds, COLLAPSED, 2.0, false), (236.0, 62.0));
     }
 
     #[test]

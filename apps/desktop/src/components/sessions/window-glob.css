@@ -166,7 +166,7 @@
   gap: 4px;
   max-width: 14rem;
   height: 24px;
-  padding: 0 4px 0 8px;
+  padding: 0 4px 0 6px;
   border-radius: var(--radius-full);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
@@ -174,9 +174,28 @@
   flex: none;
 }
 .window-glob-attached-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+}
+.window-glob-attached-name:hover {
+  text-decoration: underline;
+}
+.window-glob-attached-name:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 .window-glob-detach {
   display: inline-grid;

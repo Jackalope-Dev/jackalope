@@ -361,6 +361,7 @@ macro_rules! tauri_commands {
             commands::desktop_control::attach::desktop_attach_clear,
             commands::desktop_control::attach::desktop_attach_hand_off,
             commands::desktop_control::attach::desktop_attach_clear_drafts,
+            commands::desktop_control::attach::desktop_attach_reveal,
             commands::desktop_control::attach::overlay::desktop_glob_prepare,
             commands::desktop_control::attach::overlay::desktop_glob_start,
             commands::desktop_control::attach::overlay::desktop_glob_end,
@@ -426,13 +427,36 @@ pub async fn desktop_attach_confirm(
     .map_err(|e| e.to_string())??;
     if badge::supported() {
         badge::open(&app, &staged.id);
+        overlay::flash_attached(&app, staged.window.clone());
     }
+    overlay::trace(format_args!(
+        "attached {} \u{2014} {} ({})",
+        grant::app_label(&staged.window),
+        staged.window.title.chars().take(60).collect::<String>(),
+        if staged.control {
+            "can control"
+        } else {
+            "see only"
+        }
+    ));
     Ok(AttachedWindow::of(&staged))
 }
 
 #[tauri::command]
 pub fn desktop_attach_get(conversation: String) -> Option<AttachedWindow> {
     staged(conversation_id(&conversation).ok()?).map(|staged| AttachedWindow::of(&staged))
+}
+
+/// Shows where an attached window is: its outline glows again and its badge bounces.
+#[tauri::command]
+pub fn desktop_attach_reveal(app: AppHandle, conversation: String) {
+    let Some(staged) = conversation_id(&conversation).ok().and_then(staged) else {
+        return;
+    };
+    if badge::supported() {
+        badge::pulse(&app, &staged.id);
+        overlay::flash_attached(&app, staged.window);
+    }
 }
 
 /// Hands a draft's window to the conversation Send created, or back if that failed.

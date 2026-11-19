@@ -15,11 +15,14 @@ const WorkPaneWindow = React.lazy(() => import('./components/tasks/WorkPaneWindo
 const GlobOverlay = React.lazy(() =>
   import('./components/sessions/GlobOverlay').then((m) => ({ default: m.GlobOverlay })),
 );
+const GlobFrame = React.lazy(() =>
+  import('./components/sessions/GlobFrame').then((m) => ({ default: m.GlobFrame })),
+);
 const AttachBadge = React.lazy(() =>
   import('./components/sessions/AttachBadge').then((m) => ({ default: m.AttachBadge })),
 );
 const root = windowKind();
-const overlay = root.kind === 'glob' || root.kind === 'badge';
+const overlay = root.kind === 'glob' || root.kind === 'frame' || root.kind === 'badge';
 // Overlay windows are transparent from their very first paint: the page background, the
 // theme class and the body's background utility would otherwise flash as a solid box.
 if (overlay) {
@@ -39,6 +42,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       {root.kind === 'glob' ? (
         <React.Suspense fallback={null}>
           <GlobOverlay />
+        </React.Suspense>
+      ) : root.kind === 'frame' ? (
+        <React.Suspense fallback={null}>
+          <GlobFrame />
         </React.Suspense>
       ) : root.kind === 'badge' ? (
         <React.Suspense fallback={null}>
