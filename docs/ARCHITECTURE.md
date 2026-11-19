@@ -271,7 +271,7 @@ access/feedback.ts owns authenticated campaign state, shared cooldowns, opt-in e
 eligibility and scoped website replies through the existing inbox/outbox. Anonymous
 telemetry remains separate. See [feedback invitations](FEEDBACK-INVITATIONS.md).
 Shared brand/tokens exports pure theme calculation for browser and Worker rendering.
-Native commands/account.rs owns required early-access account connection; its
+Native commands/account.rs owns the required account connection; its
 credential is protected by account_storage.rs with Windows DPAPI or a macOS Keychain /
 Linux Secret Service reference. platform.rs initializes the Unix GUI login PATH before
 runtime threads start; children inherit the discovery environment. Worker access/devices.ts

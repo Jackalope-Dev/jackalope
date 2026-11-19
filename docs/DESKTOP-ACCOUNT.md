@@ -1,8 +1,11 @@
 # Desktop account connection
 
-The welcome screen and Settings → Jackalope account connect verified waitlist
-members and approved early-access members to this desktop. All builds, including local development builds, require an approved
+The welcome screen and Settings → Jackalope account connect a Jackalope account to
+this desktop; in waitlist mode, verified waitlist members can also connect to follow
+their progress. All builds, including local development builds, require an approved
 account for new native tasks and terminals, with a bounded 72-hour offline lease.
+With open signup, the production setting, confirming the signup email approves the
+account.
 Saved work and running tasks remain accessible. There is no development bypass.
 See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
 Account connection does not sync projects, enable remote execution or change
@@ -16,8 +19,8 @@ installed connection, expiry and revocation flows still require acceptance.
 
 Approval and direct-invitation emails open the website download page. The recipient
 explicitly confirms the email link before an account session is created. The page
-shows platform availability, waitlist signup and friend-pass guidance; confirming
-access does not imply that a build is available. Account sign-in and waitlist
+shows platform availability, signup and sign-in; confirming access does not imply
+that a build is available for every platform. Account sign-in and waitlist
 verification emails retain their existing routes.
 
 1. Connect account opens the website in the system browser. The app displays a code.

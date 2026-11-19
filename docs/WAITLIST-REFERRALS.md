@@ -1,5 +1,9 @@
 # Waitlist referrals and Instant Access Passes
 
+This guide covers waitlist mode, which the service runs when `OPEN_SIGNUP` is off
+(the tracked staging and local setting). Production runs open signup, where
+confirming the email approves the account; see [account access](EARLY-ACCESS.md).
+
 Waitlist sharing is unlimited. After verifying an email, a person can open
 `/waitlist/` to see their current position, verified and pending referral totals,
 and a public `/?ref=…` link. Accepted members separately receive five Instant
@@ -87,7 +91,7 @@ Build the website first to generate the email logo used by those previews. Run
 fixture entry, uses a fake native response, and checks theme persistence and
 keyboard copy without connecting an account or executing a task.
 
-Before release, use controlled inboxes to verify signup → referral verification →
-admin ordering → approval → pass claim → download → desktop connection. Check
-sender authentication, inbox placement, links, expiry and scheduled retries with
-the real provider. No deployment or live email send is part of local verification.
+Before turning waitlist mode on for a deployment, use controlled inboxes to verify
+signup → referral verification → admin ordering → approval → pass claim → download
+→ desktop connection. Check sender authentication, inbox placement, links, expiry
+and scheduled retries with the real provider. No deployment or live email send is part of local verification.

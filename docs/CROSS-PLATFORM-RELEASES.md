@@ -1,8 +1,8 @@
 # Cross-platform release requirements
 
-The intended launch targets macOS, Windows and Linux. Enable each platform's
-download only after its signing, secure storage, installation, updates and real
-agent acceptance pass. Windows rehearsals do not establish acceptance on another OS.
+Jackalope publishes downloads for macOS, Windows and Linux. Enable a download for a
+new platform or package type only after its signing, secure storage, installation,
+updates and real agent acceptance pass. Windows rehearsals do not establish acceptance on another OS.
 
 ## Distribution tooling
 
@@ -83,14 +83,16 @@ the existing host protocol; terminal and embedded-preview controls stay in the
 Linux app. Automatic host installation/startup and Windows path translation are
 not provided.
 
-Optional dictation requires an OpenAI-compatible transcription endpoint on a
-numeric loopback HTTP address. The user starts microphone recording explicitly;
-recordings are limited to one minute, converted to mono WAV and sent only to the
-configured local service. Text is inserted into the draft for editing. Jackalope
-stores no audio files and bundles no speech model. Windows Store packaging declares
+Optional dictation transcribes on the computer with a Whisper model (base, small
+or large-v3-turbo) downloaded on first use from a pinned, checksum-verified source.
+An OpenAI-compatible transcription endpoint on a numeric loopback HTTP address is
+used only when no voice model is selected. The user starts microphone recording
+explicitly; recordings are limited to one minute and converted to 16 kHz mono WAV.
+Text is inserted into the draft for editing. Jackalope stores no audio files and
+the installer bundles no speech model. Windows Store packaging declares
 the microphone capability; macOS declares its usage description and audio-input
-entitlement. Test permission denial, missing service, cancellation and window closure
-on each target WebView.
+entitlement. Test permission denial, model download and deletion, missing service,
+cancellation and window closure on each target WebView.
 
 ### Native checks on your devices
 

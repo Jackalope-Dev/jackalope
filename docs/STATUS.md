@@ -1,7 +1,8 @@
 # Current capabilities and limits
 
-Jackalope is prerelease software. This page describes source behavior, not a record
-of completed trials or deployed environments. See [contributor priorities](TODO.md)
+Jackalope is publicly available for Windows, macOS and Linux, with open signup.
+This page describes source behavior, not a record of completed trials or deployed
+environments. See [contributor priorities](TODO.md)
 and [release requirements](RELEASE.md) for outstanding acceptance work.
 
 Provider connections retain per-account models. Private runner settings support
@@ -664,17 +665,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 ## Services and distribution
 
-The website download page lists Windows, macOS and Linux availability, prioritizes
+The website download page lists Windows, macOS and Linux downloads, prioritizes
 the visitor's likely desktop platform and explains free signup with email
-confirmation. With the service's open-signup switch on, confirming the email
-approves the account and signs the person in; with it off, owner approval and
-friend passes still apply. Acceptance emails lead through explicit email confirmation on that page.
-Unconfigured platforms remain Coming soon; page visits never start a download.
+confirmation. The service's `OPEN_SIGNUP` switch is on in the tracked production
+configuration: confirming the email approves the account and signs the person in.
+With it off (waitlist mode), owner approval and friend passes apply instead.
+Acceptance emails lead through explicit email confirmation on that page. A platform
+without a configured download shows Coming soon; page visits never start a download.
 
-Verified waitlist members can connect the desktop to see their queue position,
-referral progress and share link, with website and tour links before approval.
-Connections persist across restarts and detect approval; offline progress remains
-labeled and cannot authorize execution. Installed and deployed acceptance remain open.
+In waitlist mode, verified waitlist members can connect the desktop to see their
+queue position, referral progress and share link, with website and tour links before
+approval. Connections persist across restarts and detect approval; offline progress
+remains labeled and cannot authorize execution. Installed and deployed acceptance of
+waitlist mode remain open.
 
 New execution requires approved account access in every desktop build. Previously
 verified accounts retain bounded offline access; saved work remains reviewable after

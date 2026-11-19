@@ -35,9 +35,10 @@ Use `browser_inspect` with `kind: "accessibility"` for an automated axe-core aud
 of the current page, optionally with a CSS `selector` scope. This differs from an
 accessibility-tree snapshot: it checks rules and returns findings, affected selectors
 and repair guidance. Both transports retain a validation checkpoint and the bounded
-report. Violations produce a failed checkpoint; incomplete checks remain in progress;
-zero violations and incomplete checks pass only the automated audit. Keyboard,
-screen-reader and other manual acceptance remain necessary. Reports are untrusted
+report. Any rule violation fails the checkpoint. With no violations, any incomplete
+check (one axe-core could not decide) leaves it in progress for manual review. Only
+zero violations and zero incomplete checks pass, and that pass covers the automated
+audit alone: keyboard, screen-reader and other manual acceptance remain necessary. Reports are untrusted
 page content and may be truncated; the response and saved notes disclose truncation.
 
 Codex receives explicit approval for these eight Jackalope tools through its

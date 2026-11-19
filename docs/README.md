@@ -35,7 +35,7 @@ maintained behavior, a repeatable workflow or a reusable template. Follow the
 - [Server setup](../apps/server/README.md), [server operations](SERVER-LAUNCH.md)
 - [Jackalope Swarm Worker](../apps/swarm/README.md)
 - [Desktop account connection](DESKTOP-ACCOUNT.md), [settings sync](SETTINGS-SYNC.md)
-- [Early access](EARLY-ACCESS.md), [waitlist referrals and passes](WAITLIST-REFERRALS.md)
+- [Account access and invitations](EARLY-ACCESS.md), [waitlist referrals and passes](WAITLIST-REFERRALS.md)
 - [Monitoring and privacy controls](BETA-MONITORING.md), [feedback invitations](FEEDBACK-INVITATIONS.md)
 - [Website setup and signup forms](../apps/website/README.md)
 - [Knowledge content and media](KNOWLEDGE-MEDIA.md), [search and discovery](WEBSITE-SEO.md)

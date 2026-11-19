@@ -60,9 +60,9 @@ representative benefit and installed-platform acceptance remain open.
   connections with curated discovery and guided setup, browser tools and Ask Jackalope.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
-- Account connection with optional open signup and Turnstile-protected signup,
-  waitlist/referral progress, platform download guidance and optional settings sync,
-  feedback and reporting.
+- Free signup with email confirmation and Turnstile protection, desktop account
+  connection, platform downloads, optional settings sync, feedback and reporting.
+  A configurable waitlist mode with referral progress remains available to operators.
 
 These capabilities describe source behavior. Provider, platform, delivery and
 installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
@@ -143,8 +143,8 @@ and background rich rendering are implemented. Local [performance fixtures](PERF
 exercise these contracts; installed startup, memory and responsiveness acceptance remains open.
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
-large-project performance in installed builds. Complete signing, installation,
-updates and secure storage for each intended platform. Required account access
+large-project performance in installed builds. Validate installation, updates and
+secure storage on each platform. Required account access
 in every build, optional settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
@@ -152,9 +152,9 @@ account/settings sync, Unix process guardians and tray/Dock recovery. macOS and 
 window-control helpers, a GNOME 46 Wayland extension and an XDG desktop portal
 backend for other Wayland desktops are implemented for validation.
 Installed acceptance remains in progress. Cross-platform signing and branch-based
-release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
-update checks and installation are implemented for validation; live signing, publication and
-installed upgrades remain acceptance work,
+release automation use Windows Store and Mac/Linux Cloud candidates, and public
+downloads are available for all three platforms. In-app Store update checks and
+installation are implemented; installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. KDE Plasma and other GNOME versions use the portal backend, which still
 needs installed acceptance; desktops without the RemoteDesktop portal remain unsupported.

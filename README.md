@@ -17,11 +17,11 @@ sign-ins, run tasks in parallel Git worktrees, and review changes before merging
 [User guides](https://jackalope.dev/knowledge/) · [Documentation](docs/README.md) ·
 [Contributing](CONTRIBUTING.md) · [Apache-2.0](LICENSE)
 
-**Prerelease · coming soon for macOS, Windows and Linux.** You can build from source
-today. Signed installers and platform acceptance remain in progress; see
-[current status](docs/STATUS.md) and [release requirements](docs/CROSS-PLATFORM-RELEASES.md).
-Joining the [waitlist](https://jackalope.dev/#newsletter) is optional for contributors.
-Running native tasks requires an approved Jackalope account, including in source builds.
+**Available for macOS, Windows and Linux.** [Download Jackalope](https://jackalope.dev/download/)
+and sign up for a free account, or build from source. Running native tasks requires
+a Jackalope account, including in source builds. See [current status](docs/STATUS.md)
+and [release requirements](docs/CROSS-PLATFORM-RELEASES.md) for what is still being
+validated on each platform.
 
 <img src=".github/assets/work.png" alt="Jackalope Work view listing a project's tasks grouped by what needs you, what agents are working on and drafts" width="1440" />
 
@@ -62,7 +62,7 @@ and 5180. The desktop browser preview cannot execute native tasks.
 
 Building the source and running automated tests do not require a Jackalope cloud
 account, deployment secrets or a reporting endpoint. Running native tasks requires
-an approved Jackalope account in every build. See [privacy and reporting](docs/BETA-MONITORING.md).
+a Jackalope account in every build; signup is free. See [privacy and reporting](docs/BETA-MONITORING.md).
 
 Run `pnpm verify` before submitting changes. [CONTRIBUTING.md](CONTRIBUTING.md)
 covers the toolchain, focused tests, secret checks and pull-request workflow.

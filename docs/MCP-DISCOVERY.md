@@ -190,8 +190,10 @@ catalog caching and cross-project connection identity remain follow-up work.
 Codex configuration overrides put server IDs inside a TOML table value. Its CLI
 interprets the override key as a dotted path, so quoting a name inside that path
 would become part of the server name. The table value preserves dotted IDs and
-merges with existing configuration. Verified with the installed CLI and its
+merges with existing configuration; see Codex's
 [configuration documentation](https://learn.chatgpt.com/docs/config-file/config-advanced).
+`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib project_delivery_preserves_selection`
+checks that a dotted ID survives inside the generated table value.
 
 ## Verification
 

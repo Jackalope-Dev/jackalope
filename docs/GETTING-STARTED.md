@@ -8,6 +8,10 @@ supported). Jackalope uses the account already on this computer unless you choos
 isolated account in Agents. Each provider's own subscription and permissions
 still apply.
 
+Running tasks also needs a free Jackalope account. The welcome screen opens the
+website in your browser to sign up or sign in, then you confirm the code shown in
+the app to connect this desktop. See [desktop account connection](DESKTOP-ACCOUNT.md).
+
 1. Open a Git repository with at least one commit (Project settings → Integrations →
    Cloudflare Artifacts can make the first one). Choose the agent you want.
    Project setup asks for the project, its agents and an optional first-task
@@ -16,8 +20,8 @@ still apply.
 2. Setup detects preparation, check and preview commands automatically without
    running them or replacing saved choices. Review or edit them in Project settings
    and choose a committed local target branch.
-3. In **Tasks → Chat**, describe one concrete result. Chat uses a separate workspace.
-   Commit any existing changes the agent needs before starting. Optional workflow
+3. Choose **New work** in the sidebar and describe one concrete result. The work runs
+   in a separate workspace, so commit any existing changes the agent needs first. Optional workflow
    starters import GitHub evidence into a draft; review it before sending.
 4. Watch progress, respond to questions, or stop the attempt. Switching pages
    does not move the task to a different project or account.
@@ -40,8 +44,8 @@ branch change after review, prepare a fresh review. Conflicts must be resolved
 in the worktree before preparing another integration. Source worktrees are kept.
 
 Use **Changes since my last review** to inspect the next iteration against a saved
-review position. Marking files seen does not accept them. Chat's start page shows work
-waiting across your projects. Optional usefulness ratings and review time are saved
+review position. Marking files seen does not accept them. **Inbox**, at the top of
+the sidebar, shows work waiting on you across your projects. Optional usefulness ratings and review time are saved
 locally with each task. **Usage & quota** shows account limits and recorded token activity.
 
 **Session limits** can pause after a number of batches or at an estimated dollar
@@ -80,11 +84,14 @@ have no update service configured.
 
 ## Keeping Jackalope up to date
 
-Published builds check for updates after startup and every hour while open.
-Open **Settings → Help & community** to change automatic checking or check now.
-When an update is available, use **Review update** to read the release notes.
-**Later** dismisses the notice for the current session; the update remains in
-Settings. Finish active work and save task history, then choose **Install update
-and reopen**. Keep the app open while it downloads. No download or restart begins
-without that action. A failed check or download can be retried from the same view.
-Local builds without a configured release service cannot receive updates.
+Published builds check for updates after startup and every hour while open, and
+download a found update in the background. Open **Settings → Help & community** to
+turn off automatic checking or background downloads, or to check now. The update
+notice offers **Download and install**, or **Restart to update** once the download
+is ready; open the details to read the release notes first. Dismissing the notice
+hides it for that version; the update stays available in Settings. Installing waits until
+running tasks finish or are stopped, and the details list the tasks in the way.
+Nothing installs or restarts without your action. A failed check or download can be
+retried from the same view. Microsoft Store builds install through the Store, and
+background delivery follows your Store settings. Local builds without a configured
+release service cannot receive updates.

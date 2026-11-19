@@ -303,10 +303,11 @@ the public feed with rehearsal versions.
    both download URLs return exact bytes matching recorded checksums.
 3. Open the old app: the automatic check should occur shortly after the workspace
    opens; confirm notes and version. Opt out, restart, and verify no automatic check.
-   Manual checking must still work. Later dismisses the notice for that session and
-   version; Settings → Help & community keeps the update accessible.
+   Manual checking must still work. Dismissing the notice hides it for that session
+   and version; Settings → Help & community keeps the update accessible.
 4. While a task is active/interrupted or history is unsaved, try installation.
-   It must be blocked. Resolve the condition, choose Install, inspect progress,
+   It must be blocked. Resolve the condition, choose **Restart to update** (or
+   **Install and restart** while the download is unfinished), inspect progress,
    and verify new work/integration cannot race installation.
 5. After installer completion/reopen, inspect the installed version and repeat a
    normal task/check/review journey. Confirm preferences, history, bindings and
@@ -321,7 +322,9 @@ the public feed with rehearsal versions.
 
 Current automatic checks are throttled to one hour, run while the workspace is
 visible, and catch up on return. A failed check does not retry continuously; use
-manual Check for updates during a trial. Download begins only after Install.
+manual Check for updates during a trial. A found update downloads in the background
+unless **Download updates automatically** is off; installation waits for the user's
+**Restart to update**.
 Local builds without key/feed cannot participate. First-version users must receive
 a build with the production key/feed already embedded; an unconfigured older
 installer cannot discover its update source retroactively.

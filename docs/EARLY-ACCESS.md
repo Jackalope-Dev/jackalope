@@ -1,16 +1,21 @@
-# Early access and invitations
+# Account access and invitations
+
+The website collects signups in D1. The `OPEN_SIGNUP` setting chooses how a signup
+becomes an approved member:
+
+- Open signup (`true`, the tracked production setting): confirming the signup email
+  approves the member and starts a member sign-in session, so the person can pair a
+  desktop without a second email.
+- Waitlist mode (`false`, the tracked staging and local setting): confirming the
+  email verifies a waitlist session and any newsletter request bound to that link,
+  but cannot grant membership or download access. An owner approves members from
+  `https://api.jackalope.dev/admin/access`, behind Cloudflare Access.
 
 See [waitlist referrals and passes](WAITLIST-REFERRALS.md) for ranked waitlists,
-separate status sessions and Instant Access Pass presentation. Signup confirmation
-verifies a waitlist session and any newsletter request bound to that link. With
-`OPEN_SIGNUP` off it cannot grant membership or download access; with it on, the
-confirmation approves that member and also starts a member sign-in session, so the
-person can pair a desktop without a second email.
-
-The website collects admission requests in D1. An owner approves them from
-`https://api.jackalope.dev/admin/access`, behind Cloudflare Access. The worker also
-verifies the Access JWT issuer, audience, expiry, signature and exact owner email.
-Public request bodies cannot approve members or choose invitation limits.
+separate status sessions and Instant Access Pass presentation in waitlist mode.
+The worker verifies the Access JWT issuer, audience, expiry, signature and exact
+owner email for every admin request. Public request bodies cannot approve members
+or choose invitation limits.
 
 The admin dashboard includes setup checks, access filters/search, person details,
 website/desktop sign-in progress, recent email history and confirmed access actions.
@@ -36,9 +41,9 @@ inbox acceptance.
   Accepted invitations remain counted, including after access revocation.
   Owners see their invitees' emails and acceptance status; recipients see that
   disclosure before accepting through a shared link.
-- The gate covers the member hub and private prerelease downloads. Every desktop
-  build requires approved account access for new native work. Standalone agent
-  CLI use remains independent of Jackalope sign-in; see
+- The gate covers the member hub and member download links, which record the
+  first download. Every desktop build requires approved account access for new
+  native work. Standalone agent CLI use remains independent of Jackalope sign-in; see
   [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) and [STORE-RELEASE.md](STORE-RELEASE.md).
 
 ## Configuration
@@ -84,9 +89,10 @@ The worker denies admin requests even on a workers.dev URL without a valid JWT.
 
 ## Email and newsletter behavior
 
-New waitlist registrations queue a separate transactional signup confirmation in
-the same D1 batch as the member insert. It does not create an access token, grant
-approval, or require newsletter consent. Duplicate registrations without a new
+New signups queue a separate transactional signup confirmation in the same D1
+batch as the member insert. Queuing it does not create an access token, grant
+approval, or require newsletter consent; with open signup, consuming its link
+approves the member. Duplicate registrations without a new
 newsletter request do not resend confirmations. A new optional newsletter request
 can send an existing member a confirmation link, subject to the per-address
 cooldown. Confirmation mail does not
@@ -159,11 +165,12 @@ Upload only a reviewed, signed candidate to the selected private R2 bucket under
 `early-access/vX.Y.Z/Jackalope-setup.exe`, then set `ACCESS_INSTALLER_KEY` in the
 environment's deployment configuration. The authenticated download endpoint streams
 that object with `no-store`; the public update route rejects this prefix. Do not
-enable the R2 public development URL. No installer is seeded by this feature.
+enable the R2 public development URL. Deployment does not seed an installer, so the
+key stays empty until one is uploaded.
 
-Public stable/beta update feeds are a separate release decision. This feature does
-not retroactively make a published update object private. Keep public publication
-disabled while prerelease distribution is invite-only.
+The public stable and beta update feeds are separate from this private installer
+path. Setting `ACCESS_INSTALLER_KEY` does not make an already published update
+object private.
 
 For rollback, disable `EARLY_ACCESS_ENABLED`, clear `VITE_ACCESS_API` and rebuild
 the website. Preserve the additive D1 tables and Worker secrets for recovery.
