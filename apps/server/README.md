@@ -37,7 +37,7 @@ pnpm --filter @jackalope/server exec wrangler dev --local --var INGESTION_ENABLE
 ```
 
 Only copy the example if `.dev.vars` does not already exist. The example secret is
-for disposable local work. `build` **only bundles with `--dry-run`**. Tests run
+for disposable local work. `build` only bundles with `--dry-run`. Tests run
 inside workerd with local D1/R2 and apply the real migration. Most rate-limit tests
 substitute deterministic limiter responses; production edge behavior needs a
 staging trial. Wrangler may warn about a missing shell secret during tests; test
@@ -69,7 +69,7 @@ optional and not declared in `secrets.required`, so local `wrangler dev` needs
 `--var LOPEBASE_SIGNING_SECRET:<value>` to serve it.
 
 Public ingestion/update routes reject query strings; private admin filters are validated. Ingestion accepts JSON (optional UTF-8 charset),
-at most 32,768 **bytes**, with a 10-second body-read deadline. Encoded bodies and
+at most 32,768 bytes, with a 10-second body-read deadline. Encoded bodies and
 browser Origin headers are rejected. This is a native-client API without CORS,
 accounts or client secrets. Origin checks do not authenticate callers. Never
 embed the server's Cloudflare credentials or `RATE_SECRET` in an installer.
@@ -149,7 +149,7 @@ Success returns HTTP 202 after D1 confirms persistence: `{ "accepted": N }` for
 telemetry, `{ "accepted": true, "id": "..." }` for feedback. `N` includes identical
 retries; it is not the count of newly inserted rows. Reuse the same ID and payload
 when retrying. Different payload under the same event ID or feedback ID
-returns 409 `id_conflict`; a conflicting batch persists **none** of its new events.
+returns 409 `id_conflict`; a conflicting batch persists none of its new events.
 JSON object field order does not affect identity. Deduplication lasts until the
 stored record expires or is deleted; clients must not replay old queues forever.
 

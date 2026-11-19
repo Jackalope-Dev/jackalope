@@ -5,12 +5,12 @@ author: "caden-sumner"
 date: 2026-11-12
 slug: "coding-agent-subscription-vs-api"
 tags: ["coding agents", "API", "subscriptions", "credential management"]
-faq: [{"q":"Does a coding agent subscription include API access?","a":"Don't assume so. Check the specific agent's authentication documentation and your account's entitlements. Subscription login and API billing can be separate routes even when they come from the same provider."},{"q":"Is API access always cheaper?","a":"No universal answer applies. Compare your actual supported workflows and usage records. Include interrupted work, supervision, and review effort rather than treating token usage as the entire cost."},{"q":"Can you use work and personal accounts on the same machine?","a":"Only where your tools and organizational policy allow it. Use documented account separation, verify identity before launching, and don't treat separate repository folders as credential isolation."},{"q":"Should every task use the same model?","a":"Not necessarily. Keep the account boundary fixed, then choose a model available through that route based on the task's demands and observed results. Change models in response to identifiable failures, not habit."}]
+faq: [{"q":"Does a coding agent subscription include API access?","a":"Don't assume so. Check the specific agent's authentication documentation and your account's entitlements. Subscription login and API billing can be separate routes even when they come from the same provider."},{"q":"Is API access always cheaper?","a":"There's no universal answer. Compare your actual supported workflows and usage records. Include interrupted work, supervision, and review effort rather than treating token usage as the entire cost."},{"q":"Can you use work and personal accounts on the same machine?","a":"Only where your tools and organizational policy allow it. Use documented account separation, verify identity before launching, and don't treat separate repository folders as credential isolation."},{"q":"Should every task use the same model?","a":"Not necessarily. Keep the account boundary fixed, then choose a model available through that route based on the task's demands and observed results. Change models in response to identifiable failures, not habit."}]
 ---
 
 Choose subscription access for interactive coding when its supported workflow fits your work. Choose API access when you need an explicitly billed integration or automation path. Use both when those needs differ, but make the account boundary visible before you start a task.
 
-The coding agent subscription vs API decision isn't just about cost. You also need to know which account receives the usage, which models the agent can actually use, and whether a personal credential can accidentally follow you into a work repository.
+Cost is only part of the coding agent subscription vs API decision. You also need to know which account receives the usage, which models the agent can actually use, and whether a personal credential can accidentally follow you into a work repository.
 
 ## Choose an access route at a glance
 
@@ -28,7 +28,7 @@ A subscription login and an API credential are different access routes, not inte
 
 Subscription access ties the agent to a supported account login. It fits hands-on work where you can steer the agent, review its changes, and respond if usage restrictions interrupt the session.
 
-**Best for:** Interactive development in an agent your organization already permits.
+Use it for interactive development in an agent your organization already permits.
 
 For example, you ask an agent to trace a regression, inspect its explanation, and approve a narrow fix. Before it reads the repository, confirm that you're signed into the work account, not the personal account already open in your browser.
 
@@ -38,7 +38,7 @@ Don't assume that access to a model in a chat interface means the same model or 
 
 API access uses credentials for a provider's programmatic service. It fits workflows that need a supported integration and a deliberate billing identity separate from a person's interactive login.
 
-**Best for:** Automation with an explicitly assigned owner and provider project.
+Use it for automation with an explicitly assigned owner and provider project.
 
 For example, a maintenance job receives a credential from your approved secret store, opens a bounded task, and produces a patch for review. Assign the credential to the intended project and inspect the provider's available spending and access controls before running it unattended.
 
@@ -48,11 +48,11 @@ An API key doesn't make a workflow safe by itself. It doesn't constrain shell co
 
 Hybrid access assigns different routes to different workflows. It fits teams that want interactive subscription sessions alongside separately owned automation.
 
-**Best for:** Keeping human-driven work and unattended jobs under distinct account boundaries.
+Use it to keep human-driven work and unattended jobs under separate account boundaries.
 
 For example, you investigate an issue through an approved work subscription, then run a repeatable maintenance job using a dedicated API project. Record the route in each task's launch instructions rather than asking developers to remember which credential was last active.
 
-Hybrid setups introduce more configuration to inspect. If nobody owns that configuration, a single approved route is easier to reason about than several loosely managed ones.
+Hybrid setups add more configuration to inspect. If nobody owns that configuration, I'd stick with a single approved route. It's easier to reason about than several loosely managed ones.
 
 ## Choose models by task, not by account habit
 
@@ -109,13 +109,13 @@ fi
 
 These checks detect presence, including an empty value. They don't establish validity, ownership, or which credential the agent will use. They also don't inspect credentials stored elsewhere. Avoid dumping the entire environment into logs, where unrelated secrets may appear.
 
-Use your approved credential mechanism, keep secrets out of prompts and tracked files, and follow the provider's revocation procedure if a key is exposed. A repository instruction saying “use the work account” cannot override an already authenticated process.
+Use your approved credential mechanism, keep secrets out of prompts and tracked files, and follow the provider's revocation procedure if a key is exposed. A repository instruction saying "use the work account" can't override an already authenticated process.
 
 ## Make parallel sessions visibly accountable
 
 Parallel work makes account confusion harder to spot. Two windows can look identical while using different billing identities. Label each task with its repository, branch or worktree, agent, and intended account. If you change authentication, verify the next session rather than assuming an existing process adopted it.
 
-This is where Jackalope can help: it's a desktop workspace for running coding agents side by side, with a separate Git worktree for each task and a choice of agent and work or personal account for each project. That makes project-level account selection part of the workspace instead of an informal terminal convention. The [workspace tour](https://jackalope.dev/tour/) shows the product in context.
+This is where Jackalope can help. It's a desktop workspace for running coding agents side by side, with a separate Git worktree for each task and a choice of agent and work or personal account for each project. That makes project-level account selection part of the workspace instead of an informal terminal convention. The [workspace tour](https://jackalope.dev/tour/) shows the product in context.
 
 Account selection still isn't authorization to expose code. Your organization's rules determine which services may receive repository content. Keep that decision separate from permission checks on local commands and from approval of the finished patch.
 
@@ -141,7 +141,7 @@ Don't assume so. Check the specific agent's authentication documentation and you
 
 ### Is API access always cheaper?
 
-No universal answer applies. Compare your actual supported workflows and usage records. Include interrupted work, supervision, and review effort rather than treating token usage as the entire cost.
+There's no universal answer. Compare your actual supported workflows and usage records. Include interrupted work, supervision, and review effort rather than treating token usage as the entire cost.
 
 ### Can you use work and personal accounts on the same machine?
 
