@@ -21,8 +21,8 @@ export type EmailDownload = { label: string; url: string };
 
 /**
  * `downloads` adds direct installer links to approval emails; other kinds ignore it.
- * `open` words signup and referral emails for open signup, where confirming an email
- * creates a ready account and nobody waits in line.
+ * `open` words emails for open signup, where confirming an email creates a ready
+ * account and nobody waits in line; pass and early-access wording is waitlist-only.
  */
 export function accessEmail(
   mail: Mail,
@@ -39,7 +39,7 @@ export function accessEmail(
       intro: 'What’s useful in Jackalope, and what could be better?',
       action: 'Share feedback',
       detail: 'A sentence or two is plenty.',
-      stamp: 'Feedback / Early access',
+      stamp: open ? 'Feedback / Your account' : 'Feedback / Early access',
     },
     waitlist: open
       ? {
@@ -72,13 +72,14 @@ export function accessEmail(
     welcome: {
       subject: 'You’re in. Welcome to Jackalope',
       title: 'You’re in.',
-      intro:
-        'Your early access is approved. Confirm your email, then download Jackalope for your computer.',
+      intro: open
+        ? 'Your Jackalope account is ready. Confirm your email, then download Jackalope for your computer.'
+        : 'Your early access is approved. Confirm your email, then download Jackalope for your computer.',
       action: 'Get Jackalope',
       detail: open
         ? ''
         : 'You also have five Instant Access Passes to share. Each lets one person skip the waitlist after verifying their email.',
-      stamp: 'Early access / Welcome',
+      stamp: open ? 'Your account / Welcome' : 'Early access / Welcome',
     },
     invite: {
       subject: 'An Instant Access Pass to Jackalope',
@@ -87,7 +88,7 @@ export function accessEmail(
         'You’ve been invited to Jackalope. Verify your email to claim a pass while one is available.',
       action: 'Claim my pass',
       detail:
-        'Your pass skips the waitlist. Once you’re in, you’ll get five passes to share. Choose your platform on the download page when a release is available.',
+        'Your pass skips the waitlist. Once you’re in, you’ll get five passes to share. Choose your platform on the download page.',
       stamp: 'Instant access pass / Admit one',
     },
     login: {
@@ -108,14 +109,23 @@ export function accessEmail(
         : 'Each verified referral earns one day of waitlist priority. Sharing is unlimited and doesn’t use your Instant Access Passes.',
       stamp: open ? 'Your account / Referrals' : 'Waitlist / Referrals',
     },
-    passes_ready: {
-      subject: 'Your Jackalope passes are ready',
-      title: 'Your passes are ready.',
-      intro: `You now have early access and ${total} Instant Access ${total === 1 ? 'Pass' : 'Passes'} to share.`,
-      action: 'See my passes',
-      detail: 'Each pass lets one person skip the waitlist after verifying their email.',
-      stamp: 'Instant access / Pass it on',
-    },
+    passes_ready: open
+      ? {
+          subject: 'You’re in. Welcome to Jackalope',
+          title: 'You’re in.',
+          intro: 'Your Jackalope account is ready. Download the app and sign in with this address.',
+          action: 'Open my account',
+          detail: '',
+          stamp: 'Your account / Welcome',
+        }
+      : {
+          subject: 'Your Jackalope passes are ready',
+          title: 'Your passes are ready.',
+          intro: `You now have early access and ${total} Instant Access ${total === 1 ? 'Pass' : 'Passes'} to share.`,
+          action: 'See my passes',
+          detail: 'Each pass lets one person skip the waitlist after verifying their email.',
+          stamp: 'Instant access / Pass it on',
+        },
     pass_claimed: {
       subject: 'Someone claimed your Jackalope pass',
       title: 'Your pass was claimed.',

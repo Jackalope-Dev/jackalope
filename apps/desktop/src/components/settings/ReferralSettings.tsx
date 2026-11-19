@@ -80,12 +80,12 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       setError(typeof cause === 'string' ? cause : 'Could not open invitation management.');
     }
   };
-  if (loading && !referrals) return <LoadingState label={'Loading passes…'} />;
+  if (loading && !referrals) return <LoadingState label="Loading invitations…" />;
   if (!referrals)
     return (
       <SettingGroup
-        title="Instant Access Passes"
-        description={error || fetchError || 'Passes are unavailable.'}
+        title="Invitations"
+        description={error || fetchError || 'Invitations are unavailable.'}
       >
         <SettingActions>
           <Button onClick={onAccount}>Open account settings</Button>
