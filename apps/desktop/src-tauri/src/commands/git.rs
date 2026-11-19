@@ -218,7 +218,9 @@ fn list_branches(repo: &Path) -> Result<BranchList, String> {
         }
     }
     remote.retain(|name| {
-        let short = name.split_once('/').map_or(name.as_str(), |(_, short)| short);
+        let short = name
+            .split_once('/')
+            .map_or(name.as_str(), |(_, short)| short);
         !local.iter().any(|branch| branch.name == short)
     });
     local.truncate(MAX_BRANCHES);
@@ -426,7 +428,8 @@ mod tests {
     }
 
     fn branch_repo() -> std::path::PathBuf {
-        let repo = std::env::temp_dir().join(format!("jackalope-branches-{}", uuid::Uuid::new_v4()));
+        let repo =
+            std::env::temp_dir().join(format!("jackalope-branches-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&repo).unwrap();
         run(&repo, &["init", "-q", "-b", "main"]);
         run(&repo, &["config", "user.email", "test@example.com"]);
@@ -451,8 +454,14 @@ mod tests {
         assert!(refused.contains("uncommitted changes"), "{refused}");
         assert_eq!(current(&repo), "main");
 
-        assert_eq!(switch_branch(&repo, "feature/new", true, &[]).unwrap(), "feature/new");
-        assert_eq!(fs::read_to_string(repo.join("README.md")).unwrap(), "edited");
+        assert_eq!(
+            switch_branch(&repo, "feature/new", true, &[]).unwrap(),
+            "feature/new"
+        );
+        assert_eq!(
+            fs::read_to_string(repo.join("README.md")).unwrap(),
+            "edited"
+        );
         assert!(switch_branch(&repo, "other", true, &[])
             .unwrap_err()
             .contains("already exists"));
@@ -468,24 +477,45 @@ mod tests {
     #[test]
     fn remote_branches_check_out_as_tracking_branches_and_listing_marks_other_worktrees() {
         let repo = branch_repo();
-        run(&repo, &["remote", "add", "origin", "https://example.invalid/repo.git"]);
+        run(
+            &repo,
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://example.invalid/repo.git",
+            ],
+        );
         run(&repo, &["update-ref", "refs/remotes/origin/shared", "HEAD"]);
         run(&repo, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
-        run(&repo, &["worktree", "add", "-q", "-b", "task", ".worktrees/task"]);
+        run(
+            &repo,
+            &["worktree", "add", "-q", "-b", "task", ".worktrees/task"],
+        );
 
         let list = list_branches(&repo).unwrap();
         assert_eq!(list.current, "main");
         assert!(!list.changed);
         assert_eq!(list.remote, vec!["origin/shared".to_string()]);
-        assert!(list.local.iter().any(|b| b.name == "main" && b.worktree.is_none()));
         assert!(list
             .local
             .iter()
-            .any(|b| b.name == "task" && b.worktree.as_deref().is_some_and(|p| p.ends_with("task"))));
+            .any(|b| b.name == "main" && b.worktree.is_none()));
+        assert!(list.local.iter().any(
+            |b| b.name == "task" && b.worktree.as_deref().is_some_and(|p| p.ends_with("task"))
+        ));
 
-        assert_eq!(switch_branch(&repo, "origin/shared", false, &[]).unwrap(), "shared");
         assert_eq!(
-            repo::git(&repo, &["rev-parse", "--abbrev-ref", "@{upstream}"], Policy::Isolated).unwrap(),
+            switch_branch(&repo, "origin/shared", false, &[]).unwrap(),
+            "shared"
+        );
+        assert_eq!(
+            repo::git(
+                &repo,
+                &["rev-parse", "--abbrev-ref", "@{upstream}"],
+                Policy::Isolated
+            )
+            .unwrap(),
             "origin/shared"
         );
         assert!(switch_branch(&repo, "missing", false, &[]).is_err());
