@@ -167,5 +167,41 @@ fn main() {
         let destination = root.join("resources/desktop-control/jackalope-desktop-control");
         stage(&destination, &std::fs::read(&output).unwrap());
     }
-    tauri_build::build()
+    let mut windows = tauri_build::WindowsAttributes::new();
+    if target.ends_with("-windows-msvc") {
+        // Tauri's manifest requests Common Controls v6, which the dialog and menu code
+        // import TaskDialogIndirect from, but Tauri links it into the binaries only. A
+        // library test that reaches that code then loads System32's comctl32 5.82, which
+        // lacks it, and the test executable fails with STATUS_ENTRYPOINT_NOT_FOUND. The
+        // linker embeds the same manifest in every executable instead.
+        windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+        let manifest =
+            std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("app.manifest");
+        std::fs::write(&manifest, WINDOWS_APP_MANIFEST).unwrap();
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!("cargo:rustc-link-arg=/MANIFESTUAC:NO");
+        println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
+    }
+    if let Err(error) =
+        tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
+    {
+        panic!("{error:#}");
+    }
 }
+
+/// Tauri's default Windows application manifest.
+const WINDOWS_APP_MANIFEST: &str = r#"<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
+"#;
