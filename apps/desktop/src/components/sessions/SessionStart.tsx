@@ -260,7 +260,7 @@ ${incoming}`
     if (!attachedRef.current) return;
     await detach();
     setAttachNotice(
-      'The attached window wasn’t shared: it goes only to a single-agent conversation. Attach it from that conversation instead.',
+      'Plans and comparisons start several agents, so the attached window was detached. Attach it again in the conversation you want to use it in.',
     );
   };
   /** The last send's error, for a question asked from an attached window's badge. */
@@ -378,7 +378,14 @@ ${incoming}`
         return;
       }
       let autoStart = false;
-      if (choice === 'assess' && !limits.maxBatches && !limits.pauseAtEstimatedUsd) {
+      // An attached window belongs to one conversation, so skip the planning check and start
+      // that conversation; planning stays available from Options.
+      if (
+        choice === 'assess' &&
+        !attachedRef.current &&
+        !limits.maxBatches &&
+        !limits.pauseAtEstimatedUsd
+      ) {
         const result = await assessment.assess(request, value);
         autoStart = !!result.autoPlan && project.preferences?.automaticSubtasks !== false;
         if (!autoStart && result.strategy !== 'single') return;
