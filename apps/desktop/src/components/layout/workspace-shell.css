@@ -823,7 +823,7 @@ button.project-tree-toggle:hover {
 }
 .statusbar-details {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   width: min(420px, calc(100vw - 24px));
   max-height: min(520px, var(--radix-popover-content-available-height));
   overflow: hidden auto;
@@ -840,7 +840,8 @@ button.project-tree-toggle:hover {
   margin: 0;
   color: var(--color-text-secondary);
 }
-/* Label, value, copy: fixed side columns keep both rows' values and buttons aligned. */
+/* Label, value, copy: fixed side columns keep both rows' values and buttons aligned.
+   Copy appears on hover or focus, and always for touch. */
 .branch-facts {
   display: grid;
   margin: 0;
@@ -850,11 +851,11 @@ button.project-tree-toggle:hover {
 }
 .branch-facts > div {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 4px 4px 10px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 2px 2px 10px;
 }
 .branch-facts > div + div {
   border-top: 1px solid var(--color-border-subtle);
@@ -872,6 +873,22 @@ button.project-tree-toggle:hover {
 }
 .branch-facts .ui-button {
   grid-column: 3;
+  height: 26px;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.branch-facts > div:is(:hover, :focus-within) .ui-button {
+  opacity: 1;
+}
+@media (hover: none) {
+  .branch-facts .ui-button {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .branch-facts .ui-button {
+    transition: none;
+  }
 }
 .branch-facts .inline-notice {
   grid-column: 1 / -1;
@@ -883,6 +900,25 @@ button.project-tree-toggle:hover {
 .branch-switch h3 {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+}
+.branch-switch-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+.branch-switch-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.branch-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 /* The list scrolls on its own so the search field and actions stay in view. */
 .branch-switch ul {

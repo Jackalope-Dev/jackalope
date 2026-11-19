@@ -1,5 +1,5 @@
 import { describeError } from '@jackalope/contracts/errors';
-import { Button, CopyButton, InlineNotice, Popover, SearchField } from '@jackalope/ui';
+import { Button, CopyButton, InlineNotice, Input, Popover, SearchField } from '@jackalope/ui';
 import { Check, ChevronDown, GitBranch, Plus } from 'lucide-react';
 import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -61,26 +61,30 @@ interface BranchRow {
   /** Beneath the branch: the task using it, or why it cannot be picked. */
   detail?: string;
   current?: boolean;
-  create?: boolean;
   /** Undefined when another worktree that Jackalope did not start holds the branch. */
   pick?: () => void;
 }
 
 /**
  * The project checkout's branches. Picking one switches the checkout with `git switch`;
- * a branch a task worktree holds opens that task instead, and typing a new name offers
- * to create it at the current commit.
+ * a branch a task worktree holds opens that task instead. New branch names one to
+ * create at the current commit.
  */
 function BranchPicker({
   project,
   inCheckout,
   input,
+  creating,
+  setCreating,
   close,
 }: {
   project: Project;
   /** Whether the project checkout, not a task worktree, is in focus. */
   inCheckout: boolean;
   input: RefObject<HTMLInputElement | null>;
+  /** The new branch name being entered, or null while filtering; Escape leaves it in the popover. */
+  creating: string | null;
+  setCreating: (name: string | null) => void;
   close: () => void;
 }) {
   const work = useWorkspaceWork();
@@ -163,21 +167,15 @@ function BranchPicker({
       if (needle && !name.toLowerCase().includes(needle)) continue;
       rows.push({ key: `remote:${name}`, branch: name, pick: () => change(name, false) });
     }
-    const typed = query.trim();
     const exact = rows.findIndex((row) => row.branch.toLowerCase() === needle);
     if (exact > 0) rows.unshift(...rows.splice(exact, 1));
-    else if (typed && exact < 0) {
-      rows.unshift({
-        key: 'create',
-        branch: typed,
-        create: true,
-        detail: branches.changed
-          ? `From ${branches.current || 'the current commit'}, with your uncommitted changes`
-          : `From ${branches.current || 'the current commit'}`,
-        pick: () => change(typed, true),
-      });
-    }
   }
+  const startCreating = (name: string) => {
+    setError('');
+    setCreating(name);
+    requestAnimationFrame(() => input.current?.focus());
+  };
+  const from = branches?.current || 'the current commit';
 
   const buttons = () =>
     [...(list.current?.querySelectorAll('button:not(:disabled)') ?? [])] as HTMLButtonElement[];
@@ -187,7 +185,9 @@ function BranchPicker({
       buttons()[0]?.focus();
     } else if (event.key === 'Enter' && !busy) {
       event.preventDefault();
-      rows.find((row) => row.pick)?.pick?.();
+      const first = rows.find((row) => row.pick);
+      if (first) first.pick?.();
+      else if (query.trim()) startCreating(query.trim());
     }
   };
   const onListKey = (event: KeyboardEvent) => {
@@ -200,28 +200,92 @@ function BranchPicker({
     else all[Math.min(next, all.length - 1)]?.focus();
   };
 
+  if (creating !== null) {
+    const name = creating.trim();
+    const create = () => {
+      if (name && !busy) void change(name, true);
+    };
+    return (
+      <section className="branch-switch" aria-labelledby="branch-create-heading">
+        <div className="branch-switch-heading">
+          <h3 id="branch-create-heading">New branch</h3>
+        </div>
+        <Input
+          ref={input}
+          value={creating}
+          onChange={(event) => setCreating(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              create();
+            }
+          }}
+          placeholder="Branch name"
+          aria-label="New branch name"
+          aria-describedby="branch-create-from"
+          disabled={busy}
+        />
+        <p id="branch-create-from" className="branch-details-note">
+          {branches?.changed
+            ? `Starts from ${from} and takes your uncommitted changes with it.`
+            : `Starts from ${from}.`}
+        </p>
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <div className="branch-create-actions">
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setCreating(null)}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={!name} loading={busy} onClick={create}>
+            Create and switch
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="branch-switch" aria-labelledby="branch-switch-heading">
-      <h3 id="branch-switch-heading">Project branches</h3>
+      <div className="branch-switch-heading">
+        <h3 id="branch-switch-heading">Project branches</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || !branches}
+          onClick={() => startCreating('')}
+        >
+          <Plus size={14} aria-hidden="true" />
+          New branch
+        </Button>
+      </div>
       <SearchField
         ref={input}
         value={query}
         onValueChange={setQuery}
         onKeyDown={onInputKey}
-        placeholder="Filter or create a branch"
-        aria-label="Filter or create a branch"
+        placeholder="Filter branches"
+        aria-label="Filter branches"
         aria-controls="branch-switch-list"
         disabled={busy}
       />
       {branches?.changed && !error && (
         <p className="branch-details-note">
-          This checkout has uncommitted changes. Commit them before switching, or create a branch to
-          take them with you.
+          This checkout has uncommitted changes. Commit them before switching, or create a new
+          branch to take them with you.
         </p>
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {!branches && !error && <p className="branch-details-note">Loading branches…</p>}
-      {branches && rows.length === 0 && <p className="branch-details-note">No branches match.</p>}
+      {branches && rows.length === 0 && (
+        <div className="branch-switch-empty">
+          <p className="branch-details-note">No branches match.</p>
+          {query.trim() && (
+            <Button variant="secondary" size="sm" onClick={() => startCreating(query.trim())}>
+              <Plus size={14} aria-hidden="true" />
+              Create {query.trim()}
+            </Button>
+          )}
+        </div>
+      )}
       {rows.length > 0 && (
         <ul id="branch-switch-list" ref={list} onKeyDown={onListKey}>
           {rows.map((row) => (
@@ -234,14 +298,8 @@ function BranchPicker({
                 title={row.branch}
                 onClick={row.pick}
               >
-                {row.create ? (
-                  <Plus size={14} aria-hidden="true" className="branch-switch-icon" />
-                ) : (
-                  <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
-                )}
-                <span className="branch-switch-label">
-                  {row.create ? `Create ${row.branch}` : branchLabel(row.branch)}
-                </span>
+                <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
+                <span className="branch-switch-label">{branchLabel(row.branch)}</span>
                 {row.detail && <span className="branch-switch-name">{row.detail}</span>}
                 {row.current && (
                   <Check size={14} aria-label="Checked out" className="branch-switch-check" />
@@ -259,6 +317,7 @@ function BranchPicker({
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState<string | null>(null);
   const search = useRef<HTMLInputElement>(null);
   if (!project || host) return null;
   const branch = run
@@ -272,7 +331,13 @@ export function BranchIndicator() {
   const copyableBranch = run ? run.branch : !managed ? project.gitBranch : '';
   const location = run ? run.workspace : project.path;
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setCreating(null);
+      }}
+    >
       <Popover.Trigger asChild>
         <button
           type="button"
@@ -292,6 +357,11 @@ export function BranchIndicator() {
           align="start"
           sideOffset={6}
           collisionPadding={12}
+          onEscapeKeyDown={(event) => {
+            if (creating === null) return;
+            event.preventDefault();
+            setCreating(null);
+          }}
           onOpenAutoFocus={(event) => {
             if (!search.current) return;
             event.preventDefault();
@@ -333,7 +403,12 @@ export function BranchIndicator() {
               project={project}
               inCheckout={!managed && samePath(checkout, project.path)}
               input={search}
-              close={() => setOpen(false)}
+              creating={creating}
+              setCreating={setCreating}
+              close={() => {
+                setOpen(false);
+                setCreating(null);
+              }}
             />
           )}
           <div className="branch-actions">
