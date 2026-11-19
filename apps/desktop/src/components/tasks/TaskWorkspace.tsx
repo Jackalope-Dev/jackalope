@@ -107,9 +107,6 @@ export function TaskWorkspace({
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
   const [parallel, setParallel] = useState(false);
-  const [composerExpanded, setComposerExpanded] = useState(false);
-  /** Text typed into the one-line composer, handed to the full one as it opens. */
-  const [quickSeed, setQuickSeed] = useState<ComposerSeed | null>(null);
   const hasWork = !!(
     runs.length ||
     ideas.length ||
@@ -121,12 +118,6 @@ export function TaskWorkspace({
     useCompanionStore.getState().setOnWorkList(true);
     return () => useCompanionStore.getState().setOnWorkList(false);
   }, []);
-  const previousProject = useRef(activeProjectId);
-  useEffect(() => {
-    if (previousProject.current === activeProjectId) return;
-    previousProject.current = activeProjectId;
-    setComposerExpanded(false);
-  }, [activeProjectId]);
   const previousList = useRef(projectFilter);
   useEffect(() => {
     if (previousList.current === projectFilter) return;
@@ -136,7 +127,6 @@ export function TaskWorkspace({
   }, [projectFilter]);
   useEffect(() => {
     if (!composerFocus) return;
-    setComposerExpanded(true);
     setArchived(false);
     setParallel(false);
     const frame = requestAnimationFrame(() => {
@@ -285,14 +275,6 @@ export function TaskWorkspace({
       </Suspense>
     );
 
-  const openComposer = () => {
-    setComposerExpanded(true);
-    requestAnimationFrame(() => {
-      const input = document.querySelector<HTMLTextAreaElement>('.task-home textarea');
-      input?.focus();
-      input?.scrollIntoView({ block: 'center' });
-    });
-  };
   // The page's commands share the work list's menu; without a list they get their own.
   // New work is the composer bar, and Repo TODOs is a project page view.
   const pageMenuItems = project && (
@@ -301,33 +283,18 @@ export function TaskWorkspace({
       Plan feature work
     </Menu.Item>
   );
-  const composeFromBar = (text: string) => {
-    if (!text.trim()) return openComposer();
-    setQuickSeed({ id: `quick-${Date.now()}`, text });
-    setComposerExpanded(true);
-  };
   return (
     <WorkspacePage className="task-home">
-      <WorkHeader
-        scope={scope}
+      <WorkHeader scope={scope} project={project} onScopeChange={setScope} />
+      <SessionStart
+        embedded
+        seed={composerSeed}
+        onSeedApplied={(seed) => onComposerSeedApplied?.(seed)}
+        key={project?.id ?? 'none'}
         project={project}
-        onScopeChange={setScope}
-        onCompose={hasWork && !composerExpanded ? composeFromBar : undefined}
+        starters={!hasWork}
+        onOpenProject={() => useOnboardingStore.getState().begin()}
       />
-      {(!hasWork || composerExpanded) && (
-        <SessionStart
-          embedded
-          seed={quickSeed ?? composerSeed}
-          onSeedApplied={(seed) => {
-            if (seed === quickSeed) setQuickSeed(null);
-            else onComposerSeedApplied?.(seed);
-          }}
-          key={project?.id ?? 'none'}
-          project={project}
-          starters={!hasWork}
-          onOpenProject={() => useOnboardingStore.getState().begin()}
-        />
-      )}
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (
         <div className="sr-only">
           <WorkspaceSectionHeading titleId="task-work" title="Your work" />
