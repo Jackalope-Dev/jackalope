@@ -85,6 +85,7 @@ macro_rules! with_commands {
             commands::issues,
             commands::jev,
             commands::knowledge,
+            commands::library,
             commands::live_sessions,
             commands::local_ai,
             commands::local_detection,

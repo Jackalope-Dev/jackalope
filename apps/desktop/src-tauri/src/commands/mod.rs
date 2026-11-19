@@ -19,6 +19,7 @@ pub mod git;
 pub mod harness;
 pub mod helper;
 pub mod integration;
+pub mod library;
 pub mod live_sessions;
 pub mod mcp;
 pub mod mcp_broker;
