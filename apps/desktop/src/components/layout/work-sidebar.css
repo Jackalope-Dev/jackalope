@@ -1,7 +1,10 @@
-/* Favorites: large tiles above the project tree, like a browser's favorites row. */
+/* Favorites: tiles above the project tree, like a browser's favorites row. Up to four
+   share a row and fill it; fewer tiles are taller with larger marks. */
 .sidebar-favorites {
+  --favorite-height: 40px;
+  --favorite-mark: 22px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+  grid-template-columns: repeat(var(--favorites-columns, 4), minmax(0, 1fr));
   gap: 6px;
   margin: 0 0 10px;
   padding: 0 2px;
@@ -12,14 +15,15 @@
   display: grid;
   place-items: center;
   width: 100%;
-  height: 44px;
+  height: var(--favorite-height);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition:
-    background-color 120ms ease,
-    transform 120ms ease;
+    background-color var(--motion-fast) var(--ease-out),
+    height var(--motion-base) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
 }
 .sidebar-favorite:hover {
   background: color-mix(in srgb, var(--color-text-primary) 11%, transparent);
@@ -35,9 +39,17 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
 }
+.sidebar-favorites[data-size="medium"] {
+  --favorite-height: 48px;
+  --favorite-mark: 26px;
+}
+.sidebar-favorites[data-size="large"] {
+  --favorite-height: 56px;
+  --favorite-mark: 30px;
+}
 .sidebar-favorite > .project-tree-mark {
-  width: 24px;
-  height: 24px;
+  width: var(--favorite-mark);
+  height: var(--favorite-mark);
   font-size: var(--text-xs);
 }
 /* A favorite conversation's project, small in the corner, says where it lives. */

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
+  type CSSProperties,
   type FocusEvent,
   forwardRef,
   type ReactNode,
@@ -663,8 +664,15 @@ function FavoriteTiles({
     return item ? [{ key, item }] : [];
   });
   if (!tiles.length) return null;
+  // Like Arc's favorites: a few tiles share one row and grow; more wrap into smaller ones.
+  const size = tiles.length <= 2 ? 'large' : tiles.length === 3 ? 'medium' : 'small';
   return (
-    <ul className="sidebar-favorites" aria-label="Favorites">
+    <ul
+      className="sidebar-favorites"
+      aria-label="Favorites"
+      data-size={size}
+      style={{ '--favorites-columns': Math.min(tiles.length, 4) } as CSSProperties}
+    >
       {tiles.map((tile) => {
         if ('project' in tile) {
           const { project } = tile;
