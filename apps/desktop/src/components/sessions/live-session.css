@@ -588,6 +588,8 @@
 }
 .agent-picker-pane {
   display: grid;
+  /* A long model list scrolls; without this its rows shrink to their minimum height. */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 6px;
   min-width: 0;
