@@ -98,7 +98,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     title: 'Desktop control paused unexpectedly',
     symptom: 'Status bar displays "Jackalope is Paused" during window automation.',
     quickFix:
-      'Physical mouse movement, keyboard touch, or window focus change immediately pauses control for human safety. Click Resume to continue.',
+      'Moving the mouse, touching the keyboard or changing window focus pauses control right away. Click Resume to continue.',
     targetSlug: 'windows-desktop-control',
     targetAnchor: 'physical-interruption',
   },
@@ -463,7 +463,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'blocked-merge',
         question: 'Why is the merge blocked even though the agent finished?',
         paragraphs: [
-          'Finishing an attempt does not establish that the result is ready to integrate. Required checks, outcome acceptance, active work, queued messages, a running preview, or changed source and target files can prevent a merge. The diff remains available so you can inspect the work while resolving the blocker.',
+          'A finished attempt is not necessarily ready to merge. Required checks, outcome acceptance, active work, queued messages, a running preview, or changed source and target files can prevent a merge. The diff remains available so you can inspect the work while resolving the blocker.',
         ],
         bullets: [
           'If checks failed, inspect the output and send the relevant failure with a focused follow-up.',
@@ -519,7 +519,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
         steps: [
           'Open the settings button beside Close to review Ask context. Appearance and project context are on by default; saved choices are preserved.',
-          'Ask: “Preview a calm dark theme with a blue accent and low atmosphere.”',
+          'Ask: "Preview a calm dark theme with a blue accent and low atmosphere."',
           'Read the proposed values and open the preview. Try reading a task and its controls before choosing Keep theme, or cancel to restore your saved choice.',
         ],
         callout: {
@@ -841,7 +841,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Install the agent CLI, open Agents and choose Configure beside the agent. Select the intended default or named account.',
           'Complete that profile’s sign-in or key setup. Review provider billing and model access for the selected account.',
-          'Choose the account in the project settings, then create an explicitly assigned task: “Read the project instructions and summarize how to run the tests. Do not change files.”',
+          'Choose the account in the project settings, then create an explicitly assigned task: "Read the project instructions and summarize how to run the tests. Do not change files."',
           'Inspect the bound agent/account and the result. If access fails, repair that same profile before trying a larger task.',
         ],
         links: [
@@ -987,8 +987,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'visual-indicators',
         question: 'What visual indicators show that Jackalope is interacting with a window?',
         paragraphs: [
-          'Whenever an agent is actively controlling a granted window, Jackalope renders a high-visibility, top-centered status bar above your display, accompanied by a broad theme-colored perimeter glow around the active window.',
-          'The status bar explicitly announces "Jackalope is using your computer" and provides prominent, one-click Pause and Cancel buttons. You are never left wondering if an agent is currently controlling the machine.',
+          'While an agent controls a granted window, Jackalope shows a status bar at the top center of your screen and a theme-colored glow around the active window.',
+          'The status bar reads "Jackalope is using your computer" and has one-click Pause and Cancel buttons.',
         ],
       },
       {
@@ -996,14 +996,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question:
           'How do physical interruptions (mouse movement, focus loss, Escape) pause control?',
         paragraphs: [
-          'Human safety overrides agent automation at all times. Jackalope installs native low-level hardware hooks that monitor physical input devices.',
-          'If you move your physical mouse, touch the keyboard, switch active window focus, or press the physical Escape key, Jackalope instantly revokes the agent’s input lease and halts interaction.',
+          'Your own input always comes first. Jackalope installs native low-level hooks that watch your physical input devices.',
+          'If you move your physical mouse, touch the keyboard, switch active window focus, or press the physical Escape key, Jackalope immediately revokes the agent’s input lease and stops interacting.',
         ],
         bullets: [
-          'Physical mouse movement immediately transitions automation into the Paused state.',
-          'Pressing the Escape key immediately cancels the active desktop control lease.',
-          'Window focus loss or minimize events pause execution until you explicitly review and click Resume.',
-          'Resuming requires taking a fresh visual snapshot to prevent stale-state misclicks.',
+          'Moving the physical mouse puts control in the Paused state right away.',
+          'Pressing Escape cancels the active desktop control lease right away.',
+          'Losing window focus or minimizing the window pauses control until you review it and click Resume.',
+          'After you resume, the agent takes a fresh visual snapshot so it does not click on an outdated screen.',
         ],
       },
       {
@@ -1048,7 +1048,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'missing-cli-path',
         question: 'Did the task fail before the agent started?',
         paragraphs: [
-          'Read the first launch error. “Executable not found” points to installation or discovery; an authentication error points to the selected account; a capacity or eligibility message points to routing. Repeated retries will not fix a missing executable or an expired sign-in.',
+          'Read the first launch error. "Executable not found" points to installation or discovery; an authentication error points to the selected account; a capacity or eligibility message points to routing. Repeated retries will not fix a missing executable or an expired sign-in.',
         ],
         links: [
           {
@@ -1089,7 +1089,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Find the earliest substantive error in the result or command output. Later failures may only be consequences: for example, a test command cannot assess the code if dependencies never installed.',
         ],
         bullets: [
-          'Record the failing command, its working directory, exit status, and relevant error. Distinguish “could not run” from a test assertion failure.',
+          'Record the failing command, its working directory, exit status, and relevant error. Distinguish "could not run" from a test assertion failure.',
           'Check which files changed before retrying. An unsuccessful task may still have useful work or an unfinished edit.',
           'For browser or MCP failures, record the connection, requested action, and observed error. Remove tokens, private URLs, and personal data from anything you share.',
           'For support, explain the expected result, what actually happened, and the smallest steps that reproduce it. Include the app version from the support report.',
@@ -1131,7 +1131,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'fixing-cli-path-on-windows',
     category: 'troubleshooting',
-    title: 'Fix “CLI not found” on Windows',
+    title: 'Fix "CLI not found" on Windows',
     shortTitle: 'Fix CLI discovery',
     description:
       'Fix Windows CLI detection for Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity with PATH checks and restart steps.',
@@ -1154,7 +1154,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I check the installed command directory?',
         paragraphs: [
           'Use the installation method you actually chose. For npm, inspect its configured global prefix; for another installer, locate its executable directory. Do not add every common package-manager directory just in case.',
-          'Open Windows “Edit environment variables for your account”, edit the User Path, and add the verified directory if it is missing. Keep existing entries. The commands below inspect values; they do not change PATH.',
+          'Open Windows "Edit environment variables for your account", edit the User Path, and add the verified directory if it is missing. Keep existing entries. The commands below inspect values; they do not change PATH.',
         ],
         codeBox: {
           title: 'Inspect npm and User PATH',
@@ -1187,7 +1187,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Resolve a Git lock without losing work',
     shortTitle: 'Resolve Git locks',
     description:
-      'How to safely diagnose, remove, and prevent stale Git index locks and orphaned worktrees left by abnormal system termination.',
+      'How to safely diagnose, remove and prevent stale Git index locks and orphaned worktrees left behind by an unexpected shutdown.',
     readingTime: '2 min read',
     sections: [
       {
@@ -1221,7 +1221,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'after-unlock',
         question: 'What should I check after resolving the lock?',
         paragraphs: [
-          'Only remove the exact lock after confirming its owning operation has ended. Do not use a recursive “delete all lockfiles” command. If ownership is uncertain, leave it in place while you investigate.',
+          'Only remove the exact lock after confirming its owning operation has ended. Do not use a recursive "delete all lockfiles" command. If ownership is uncertain, leave it in place while you investigate.',
         ],
         steps: [
           'Run git status in the affected checkout and inspect remaining changes. Retry the single operation that was blocked.',
@@ -1297,7 +1297,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Ask for one known record or a read-only list from the connected service. Specify the connection name and expected kind of result, then inspect the task’s tool result. An agent saying it has access is not a connection test.',
         ],
         bullets: [
-          '“Command not found”: verify the local executable and its arguments.',
+          '"Command not found": verify the local executable and its arguments.',
           'Authentication failure: check the server credential or the bound CLI account, including its permissions.',
           'Connection probes successfully but no tool appears: review project scope, task selection, agent eligibility, and transport support.',
           'Tool returns the wrong data: check the server’s account, workspace, resource scope, and request arguments.',
@@ -1328,7 +1328,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'why-schedules',
         question: 'Why run coding agent tasks on recurring schedules?',
         paragraphs: [
-          'Certain engineering tasks should happen proactively rather than waiting for user requests: daily dependency vulnerability checks, nightly test suite refactors, documentation drift scans, or automated codebase health reports.',
+          'Some work is worth running on a schedule instead of waiting for someone to ask, such as daily dependency vulnerability checks, nightly test suite refactors, documentation drift scans or codebase health reports.',
           'Jackalope keeps recurring work with its project, instructions, account, and execution target. Each agent run has its own result and review history. Choose the checks in your instructions and inspect their evidence when the task returns.',
         ],
       },
@@ -1553,7 +1553,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'atmosphere-slider',
         question: 'What does the Atmosphere slider change?',
         paragraphs: [
-          'Atmosphere controls the color saturation and visual depth of background surfaces, sidebars, and elevation layers. At low atmosphere (8–12), the interface is whisper-quiet and neutral. At higher atmosphere (up to 64), your chosen accent tint gently permeates cards, elevated surfaces, and window glass.',
+          'Atmosphere controls the color saturation and visual depth of background surfaces, sidebars, and elevation layers. At low atmosphere (8–12), the interface stays quiet and neutral. At higher atmosphere (up to 64), your accent color tints cards, elevated surfaces and window glass.',
         ],
       },
       {
