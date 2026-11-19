@@ -1076,6 +1076,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'attach-window',
+        question: 'Can I hand an agent a window myself?',
+        paragraphs: [
+          'Yes. In a conversation, drag the agent at the top left out of Jackalope and drop it on any window. Jackalope names the window under your pointer, then asks whether the agent may see it or see and control it. Nothing is shared until you choose.',
+          "The agent's next request for one window uses the window you picked, without asking again, for up to 30 minutes. See-only lets it read and screenshot the window but not click or type. A chip beside the agent shows the attached window; click its × to detach it.",
+          'Prefer the keyboard? Focus the agent and press Enter to choose from a list of open windows. The drag works on Windows and macOS; Linux on X11 uses the list.',
+        ],
+      },
+      {
         id: 'platforms',
         question: 'Which platforms support desktop control?',
         paragraphs: [

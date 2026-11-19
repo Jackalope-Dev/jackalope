@@ -803,7 +803,10 @@ RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants 
 AT-SPI element actions, portal input and Screenshot-portal captures; physical input
 does not pause control there, and wlroots desktops without RemoteDesktop remain
 unavailable. The portal client compiles only in Linux CI and has no real-portal
-fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+fixture. XWayland alone is insufficient. A person can attach a window to a conversation by
+dragging its agent onto it (Windows and macOS) or picking it from a list, choosing see-only
+or see-and-control; the agent's next window request uses it without asking. The cross-app
+drag has unit and browser-fixture coverage only. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,

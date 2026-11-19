@@ -45,6 +45,25 @@ control at a time, including across Jackalope profiles through a per-user file l
 Calls serialize per attempt. The lease remains held until canceled in-flight work has
 returned. Other applications can still interact with the desktop.
 
+### Attaching a window from a conversation
+
+The person can pick the window instead of waiting for the agent to ask. Dragging the
+agent in a conversation's header out of Jackalope opens a small always-on-top overlay
+whose blob names the window under the pointer (the helpers' read-only `at` action,
+which runs without a grant like `list`); Enter or a click on the agent lists eligible
+windows instead. Jackalope's own windows, untitled windows, the desktop, taskbars, the
+Dock and other system surfaces are never targets. X11 offers only the list; Wayland
+portal desktops keep the portal picker.
+
+Dropping or choosing asks whether the agent may see the window or see and control it.
+Confirming stages that window for the conversation for 30 minutes. The conversation's
+next window-scope `request_access` takes it once instead of asking, if the handle,
+process and process start time still match; app and desktop requests ignore it. The
+grant then starts through the same path as an answered question, with the visible bar,
+pause and cancel behavior and site checks above, and is recorded as an answered
+"Desktop control" question. A see-only grant allows `snapshot`, `screenshot`,
+`wait_for` and `list_windows` and refuses every other action.
+
 ### Browsers and websites
 
 App and window grants on a known browser (Chrome, Edge, Firefox, Zen, Brave, Opera,

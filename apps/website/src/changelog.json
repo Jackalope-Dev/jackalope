@@ -1,5 +1,17 @@
 [
   {
+    "id": "hand-an-agent-a-window",
+    "date": "2026-11-19",
+    "title": "Hand an agent a window.",
+    "description": "Drag the agent out of a conversation and drop it on any window to let it see that window, or see and control it.",
+    "items": [
+      "Jackalope names the window under your pointer and asks before giving any access.",
+      "See-only lets the agent read and screenshot the window without clicking or typing.",
+      "Prefer the keyboard? Press Enter on the agent to pick from a list of open windows."
+    ],
+    "note": "The drag works on Windows and macOS. Linux X11 uses the window list, and Wayland keeps the system picker."
+  },
+  {
     "id": "inbox-library-and-a-sidebar-you-can-arrange",
     "date": "2026-11-19",
     "title": "Inbox, Library and a sidebar you can arrange.",
