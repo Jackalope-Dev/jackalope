@@ -60,3 +60,33 @@
     }
   }
 }
+/* Stays around an attached window: a calm line, dashed when the agent may only see it.
+   The window sits 6px outside it (attach/badge.rs EDGE_MARGIN). */
+.attach-edge {
+  position: fixed;
+  inset: 5px;
+  border: 1.5px dashed color-mix(in srgb, var(--color-accent) 75%, transparent);
+  border-radius: 11px;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  pointer-events: none;
+  animation: attach-edge-in 600ms var(--ease-out) 3.6s backwards;
+}
+.attach-edge[data-control] {
+  border-style: solid;
+}
+@keyframes attach-edge-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attach-edge {
+    animation: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .attach-edge {
+    border-color: var(--color-accent);
+    box-shadow: none;
+  }
+}

@@ -85,6 +85,10 @@
 .attach-badge-main:hover {
   background: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
 }
+.attach-badge-mode {
+  flex: none;
+  color: var(--color-accent-ink);
+}
 .attach-badge-text {
   overflow: hidden;
   text-overflow: ellipsis;

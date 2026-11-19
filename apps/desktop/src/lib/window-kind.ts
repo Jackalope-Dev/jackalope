@@ -2,7 +2,8 @@
  * Which root this webview renders. The native side opens secondary windows with
  * `?workPane=<run>&pane=<pane>` (work_windows.rs), `?liveSession=<id>`
  * (live_sessions/windows.rs), `?glob=1` for the agent being dragged onto a window, `?globFrame=1` for the outline
- * around the window it would attach to
+ * around the window it would attach to, `?attachEdge=control|see` for the thin edge that
+ * stays around an attached window
  * (desktop_control/attach/overlay.rs) or `?attachBadge=<label>` for an attached window's
  * badge (attach/badge.rs); the main window has none.
  */
@@ -12,6 +13,7 @@ export type WindowKind =
   | { kind: 'liveSession'; id: string }
   | { kind: 'glob' }
   | { kind: 'frame' }
+  | { kind: 'edge'; control: boolean }
   | { kind: 'badge'; label: string };
 
 export function windowKind(search = globalThis.location?.search ?? ''): WindowKind {
@@ -22,6 +24,8 @@ export function windowKind(search = globalThis.location?.search ?? ''): WindowKi
   if (liveSession) return { kind: 'liveSession', id: liveSession };
   if (parameters.get('glob') !== null) return { kind: 'glob' };
   if (parameters.get('globFrame') !== null) return { kind: 'frame' };
+  const edge = parameters.get('attachEdge');
+  if (edge) return { kind: 'edge', control: edge === 'control' };
   const badge = parameters.get('attachBadge');
   if (badge) return { kind: 'badge', label: badge };
   return { kind: 'main' };

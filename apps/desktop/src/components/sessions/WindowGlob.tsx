@@ -13,7 +13,7 @@ import {
   Tooltip,
 } from '@jackalope/ui';
 import { listen } from '@tauri-apps/api/event';
-import { AppWindow, Eye, MousePointerClick, X } from 'lucide-react';
+import { AppWindow, Eye, Link2, MousePointerClick, X } from 'lucide-react';
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -435,9 +435,9 @@ export function WindowGlob({
   const label = support.drag
     ? `Attach a window to ${agent}. Drag onto any window, or press Enter to choose from a list.`
     : `Attach a window to ${agent}`;
-  // While its window is attached, the agent is away on that window and its spot stays empty.
-  const socketed =
-    phase === 'free' || phase === 'out' || phase === 'home' || (phase === 'idle' && !!attached);
+  const socketed = phase === 'free' || phase === 'out' || phase === 'home';
+  // While its window is attached, the agent shows as away: dimmed, with a linked mark.
+  const away = phase === 'idle' && !!attached;
   const tooltipText = attached
     ? `${attached.title} · ${attached.control ? 'can control' : 'see only'}. Click × to detach.`
     : support.drag
@@ -496,6 +496,7 @@ export function WindowGlob({
           }
           data-phase={phase === 'idle' ? undefined : phase}
           data-socket={socketed || undefined}
+          data-away={away || undefined}
           data-target={hovered ? true : undefined}
           aria-label={label}
           disabled={disabled || !usable}
@@ -533,6 +534,11 @@ export function WindowGlob({
               {children}
             </span>
           </span>
+          {away && (
+            <span className="window-glob-away" aria-hidden="true">
+              <Link2 size={compact ? 9 : 11} strokeWidth={2.5} />
+            </span>
+          )}
         </button>
       </Tooltip>
       {hint && !active && (

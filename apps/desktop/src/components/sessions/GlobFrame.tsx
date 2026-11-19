@@ -38,3 +38,20 @@ export function GlobFrame() {
   if (mode === 'off') return null;
   return <div key={shown} className="glob-frame" data-mode={mode} aria-hidden="true" />;
 }
+
+/**
+ * The thin accent edge that stays around an attached window for as long as it waits for
+ * the agent: solid when the agent may control it, dashed when it may only see it.
+ * Native code keeps it on the window; it closes when the agent takes the window, so the
+ * grant's own frame and bar take over.
+ */
+export function AttachEdge({ control }: { control: boolean }) {
+  useWindowTheme(undefined);
+  useEffect(() => {
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => void overlayReady().catch(() => undefined));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return <div className="attach-edge" data-control={control || undefined} aria-hidden="true" />;
+}

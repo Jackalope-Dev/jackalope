@@ -1,7 +1,7 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { describeError } from '@jackalope/contracts/errors';
 import { emit, listen } from '@tauri-apps/api/event';
-import { ArrowUp, ChevronDown, X } from 'lucide-react';
+import { ArrowUp, ChevronDown, Eye, MousePointerClick, X } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
 import {
@@ -173,6 +173,11 @@ export function AttachBadge() {
             aria-label={`${state.agent} is attached to this window, ${mode}. ${open ? 'Close' : 'Ask about this window'}`}
             onClick={() => toggle(!open)}
           >
+            {state.control ? (
+              <MousePointerClick size={14} aria-hidden="true" className="attach-badge-mode" />
+            ) : (
+              <Eye size={14} aria-hidden="true" className="attach-badge-mode" />
+            )}
             <span className="attach-badge-text">
               <strong>Attached</strong> · {mode}
             </span>
