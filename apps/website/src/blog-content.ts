@@ -26,7 +26,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Pick work that is actually independent',
         paragraphs: [
           'A useful test: could these changes be merged in any order, and would each still make sense on its own? If yes, they are good parallel candidates. If one task needs a decision or an interface that another task is still producing, they are a sequence, however separate the prompts sound.',
-          'Split by outcome, not by layer. “Add the export button” split into a frontend agent and a backend agent creates two halves that only work together, and neither agent can check its own result. “Fix the date parsing bug” and “add keyboard shortcuts to the settings page” are separate outcomes, each with its own check.',
+          'Split by outcome, not by layer. "Add the export button" split into a frontend agent and a backend agent creates two halves that only work together, and neither agent can check its own result. "Fix the date parsing bug" and "add keyboard shortcuts to the settings page" are separate outcomes, each with its own check.',
         ],
         table: {
           caption: 'What to run in parallel and what to keep in sequence',
@@ -43,7 +43,7 @@ export const practicalPosts: BlogPost[] = [
             ['Docs or help text that does not depend on new code', 'Two schema migrations'],
             [
               'Investigations that only report findings',
-              'Any task whose brief says “whatever the other agent decides”',
+              'Any task whose brief says "whatever the other agent decides"',
             ],
           ],
         },
@@ -57,9 +57,9 @@ export const practicalPosts: BlogPost[] = [
         ],
         bullets: [
           'Lockfiles and dependency manifests: two agents adding packages conflict on every merge.',
-          'Database schema and migrations: numbered migrations collide, and a shared dev database lets one agent’s test data break another’s run.',
+          "Database schema and migrations: numbered migrations collide, and a shared dev database lets one agent's test data break another's run.",
           'Generated code: two agents regenerating the same client produce noisy, conflicting diffs.',
-          'Fixed ports: two dev servers on port 3000 means one agent tests the other’s build.',
+          "Fixed ports: two dev servers on port 3000 means one agent tests the other's build.",
           'Provider usage limits: several sessions on one account draw on the same allowance, so a busy run can stall every agent at once.',
         ],
         code: {
@@ -122,14 +122,14 @@ export const practicalPosts: BlogPost[] = [
         title: 'Know when to go back to one agent',
         paragraphs: [
           'Parallel work is a tool for a particular kind of backlog: several well-understood, separable changes. It is the wrong tool for exploratory work, for a design that has not settled, or for a change concentrated in one module. In those cases a single focused session, followed by review, is faster than coordinating several agents around an open question.',
-          'Watch for the signs: you rewrite briefs mid-run because the plan changed, agents keep touching each other’s files, or most of your time goes to resolving conflicts rather than reviewing behavior. Pause new tasks, finish what is running, and decide the open question before fanning out again.',
+          "Watch for the signs: you rewrite briefs mid-run because the plan changed, agents keep touching each other's files, or most of your time goes to resolving conflicts rather than reviewing behavior. Pause new tasks, finish what is running, and decide the open question before fanning out again.",
         ],
       },
       {
         id: 'where-jackalope-fits',
         title: 'Keep the plan and the review in one place',
         paragraphs: [
-          'Jackalope is a desktop workspace for running Codex, Claude Code and other coding agents side by side. A parallel plan holds each task’s brief, file scope, dependencies and assigned agent, with a concurrency limit per project. Each task can get its own Git worktree, and finished work returns to one review queue with its patch, checks and attempt history, so you can inspect the combined result before it reaches your branch.',
+          "Jackalope is a desktop workspace for running Codex, Claude Code and other coding agents side by side. A parallel plan holds each task's brief, file scope, dependencies and assigned agent, with a concurrency limit per project. Each task can get its own Git worktree, and finished work returns to one review queue with its patch, checks and attempt history, so you can inspect the combined result before it reaches your branch.",
           'It does not make independent tasks out of dependent ones. The choices above, what to split, what to share and how many agents to run, still decide whether parallel work saves time.',
         ],
         links: [
@@ -180,7 +180,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'which-file',
         title: 'Know which file each agent reads',
         paragraphs: [
-          'AGENTS.md is an open format supported by many tools, including Codex and OpenCode. Claude Code reads CLAUDE.md. Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool’s documentation for the version you run, because loading rules change.',
+          "AGENTS.md is an open format supported by many tools, including Codex and OpenCode. Claude Code reads CLAUDE.md. Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool's documentation for the version you run, because loading rules change.",
           'You rarely need three copies. Keep the shared guidance in AGENTS.md and make the other files thin pointers. Claude Code supports importing another file with an @ reference, so a one-line CLAUDE.md can pull in AGENTS.md and add only what is specific to Claude. Copies drift; one source with small agent-specific additions does not.',
         ],
         table: {
@@ -232,7 +232,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'write-for-following',
         title: 'Phrase rules so they can be followed',
         paragraphs: [
-          'Agents follow specific, checkable instructions far better than general advice. “Write clean code” changes nothing. “Run pnpm verify before reporting a task as done” changes behavior, and you can tell whether it happened.',
+          'Agents follow specific, checkable instructions far better than general advice. "Write clean code" changes nothing. "Run pnpm verify before reporting a task as done" changes behavior, and you can tell whether it happened.',
           'Give the reason when a rule looks arbitrary. An agent that knows why generated files are off limits will regenerate them instead of editing them by hand, and will ask when the situation is unclear. Keep the file short enough to read in full; if it grows past a page or two, move detail into linked guides and keep only the pointers at the top level.',
         ],
         table: {
@@ -251,7 +251,7 @@ export const practicalPosts: BlogPost[] = [
               'Follow our style.',
               'Use the shared Button component; do not add page-specific button styles.',
             ],
-            ['Don’t break things.', 'Keep exported function signatures in packages/api stable.'],
+            ["Don't break things.", 'Keep exported function signatures in packages/api stable.'],
           ],
         },
       },
@@ -267,7 +267,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'where-jackalope-fits',
         title: 'Keep guidance with every task',
         paragraphs: [
-          'Jackalope keeps project guidance, reusable workflows and editable lessons with each project, and shows the context that carries into a new task before it starts. The jackalope command’s /init asks an agent to write or refresh AGENTS.md for the current repository.',
+          "Jackalope keeps project guidance, reusable workflows and editable lessons with each project, and shows the context that carries into a new task before it starts. The jackalope command's /init asks an agent to write or refresh AGENTS.md for the current repository.",
           'An instruction file shapes what an agent tries. It does not guarantee the result. Keep reviewing the changes and checks, and fold what you learn back into the file.',
         ],
         links: [
@@ -330,7 +330,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Prepare the environment, not just the files',
         paragraphs: [
           'Before asking an agent to change code, make the unmodified checkout build using the commands documented by the project. This separates an environment problem from a regression. If the baseline already fails, capture the first meaningful error and resolve it or define its impact before interpreting later results.',
-          'Treat dependencies, local settings, ports, and services as an explicit setup step. For a pnpm project, that might mean pnpm install --frozen-lockfile inside each checkout. Other projects need different commands. Avoid casually linking generated folders between worktrees: one build can then replace files that another build is using.',
+          'Treat dependencies, local settings, ports, and services as an explicit setup step. For a pnpm project, that might mean pnpm install --frozen-lockfile inside each checkout. Other projects need different commands. Avoid casually linking generated folders between worktrees, since one build can then replace files that another build is using.',
           'Prepare a minimal development configuration from the project template. Check where it connects before starting the app. A different source directory does not automatically mean a different database, storage bucket, browser profile, or output directory. If both checkouts write to the same external service, their effects can overlap even when their Git diffs never do.',
         ],
         table: {
@@ -387,7 +387,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'A quiet checkout is not necessarily disposable. Before removal, confirm that no agent, editor operation, or development server is still using it. Check whether its changes have been integrated or intentionally retained elsewhere. Review ignored files too: a local database or scratch export can matter even though it never appears in the normal diff.',
           'Start with git worktree list and git -C ../search-keyboard status --short --ignored. Once you have checked and preserved anything needed, git worktree remove ../search-keyboard is the ordinary removal command. If Git refuses, investigate the reason; do not add force simply to make the error disappear. Removing a worktree and deleting its branch are separate operations.',
-          'For your next task, create a checkout from the current intended baseline. Reusing an old worktree without checking its history can bring yesterday’s assumptions into today’s change. Good cleanup leaves a clear record of what was accepted, what remains unfinished, and which environments can be retired.',
+          "For your next task, create a checkout from the current intended baseline. Reusing an old worktree without checking its history can bring yesterday's assumptions into today's change. Good cleanup leaves a clear record of what was accepted, what remains unfinished, and which environments can be retired.",
         ],
       },
       {
@@ -400,7 +400,7 @@ export const practicalPosts: BlogPost[] = [
       },
     ],
     related: [
-      { label: 'Jackalope’s worktree workflow', href: '/git-worktrees-for-ai-agents/' },
+      { label: "Jackalope's worktree workflow", href: '/git-worktrees-for-ai-agents/' },
       {
         label: 'Use Claude Code and Codex together',
         href: '/blog/claude-code-and-codex-together/',
@@ -424,7 +424,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'choose-the-work',
         title: 'Give two agents a reason to work together',
         paragraphs: [
-          'Using Claude Code and Codex together is most useful when you can describe separate responsibilities. More conversations do not automatically shorten a project. Someone still has to define the contract between tasks, answer questions, inspect output, and decide what should be integrated. Your attention and the project’s shared resources are part of the capacity limit.',
+          "Using Claude Code and Codex together is most useful when you can describe separate responsibilities. More conversations do not automatically shorten a project. Someone still has to define the contract between tasks, answer questions, inspect output, and decide what should be integrated. Your attention and the project's shared resources are part of the capacity limit.",
           'Consider an illustrative feature: users need a keyboard-accessible search box, and the help page needs to explain the shortcuts. The interface and documentation can be developed independently once the shortcut behavior is settled. Assign either agent to either task based on your own experience and available access. This is a workflow example, not a claim that one provider is always better at a particular kind of work.',
           'A different feature may call for sequential work. If the search API shape is undecided, complete that decision before asking a second agent to build the client. [Parallelize exploration or independent tests](/blog/run-ai-coding-agents-in-parallel/) while the contract is being resolved, then start implementation against the agreed result.',
         ],
@@ -434,7 +434,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Write the shared contract before the prompts',
         paragraphs: [
           'Begin with a short feature brief that both sessions receive. State who the feature serves, what observable behavior changes, and what remains outside the task. Define the pieces that would otherwise invite conflicting guesses: keyboard shortcuts, labels, route names, data shape, and empty-state behavior.',
-          'Then divide ownership. A boundary such as “frontend” versus “tests” can be awkward if every frontend edit needs a test change. Prefer a complete, reviewable outcome where possible. For the example, the interface task owns its interaction tests; the help task owns copy and documentation checks. Both use the same written shortcut contract.',
+          'Then divide ownership. A boundary such as "frontend" versus "tests" can be awkward if every frontend edit needs a test change. Prefer a complete, reviewable outcome where possible. For the example, the interface task owns its interaction tests; the help task owns copy and documentation checks. Both use the same written shortcut contract.',
           'Keep the shared brief small enough to inspect. Send the relevant paths and commands rather than pasting a whole repository into both conversations. If the contract changes, tell both agents what changed and which earlier assumption is no longer valid. A long transcript is not a substitute for an explicit decision.',
         ],
         table: {
@@ -459,7 +459,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'separate-workspaces',
         title: 'Start each session in its own checkout',
         paragraphs: [
-          'Use a separate worktree for each implementation task, created from the same intended commit. Record that baseline and make the project’s setup work before editing. Reserve different local ports and disposable service data if both agents will run the application. Keep their generated output separate as well.',
+          "Use a separate worktree for each implementation task, created from the same intended commit. Record that baseline and make the project's setup work before editing. Reserve different local ports and disposable service data if both agents will run the application. Keep their generated output separate as well.",
           'Claude Code documents worktree sessions, and OpenAI documents managed worktrees and handoff between a worktree and a local checkout. Those are useful native options. You can also prepare ordinary Git worktrees and start each installed CLI inside its assigned folder. Pick one method and follow the current documentation for that tool instead of mixing several checkout managers mid-task.',
           'Sign in to each provider through its supported flow. Check that you are using the intended work or personal account before sharing repository context. Having both agents in one workflow does not combine subscriptions, transfer provider permissions, or imply that their usage reports cover the same activity.',
         ],
@@ -484,7 +484,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'Give both agents the shared contract, then a task-specific brief. Ask them to identify baseline failures and dependencies before changing unrelated code. Tell them whether they may commit, install dependencies, or use connected services according to your actual project rules. Avoid leaving publication decisions implicit.',
           'Ask for progress only when it changes a decision: a blocker, a scope conflict, a completed check, or a result ready for review. Reading two streams of narration can consume the time you hoped to save. When one task is blocked, decide whether the other can continue independently or should pause before making assumptions.',
-          'The output below is deliberately small. It makes it possible to tell whether a result is ready without treating the agent’s confidence as evidence. Keep failures and untested behavior visible, even when the implementation looks finished.',
+          "The output below is deliberately small. It lets you tell whether a result is ready without treating the agent's confidence as evidence. Keep failures and untested behavior visible, even when the implementation looks finished.",
         ],
         code: {
           label: 'Append this handoff request to each task brief',
@@ -506,7 +506,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'integrate',
         title: 'Integrate once the shared assumptions agree',
         paragraphs: [
-          'Inspect each task independently, then combine the accepted changes through your normal Git workflow. Preserve unfinished work until it has been reviewed or intentionally set aside. If both tasks changed the same file, a conflict is a request for a decision about the intended result, not an invitation to choose whichever side is easier to apply.',
+          "Inspect each task independently, then combine the accepted changes through your normal Git workflow. Preserve unfinished work until it has been reviewed or intentionally set aside. If both tasks changed the same file, treat the conflict as a decision about the intended result. Don't just pick whichever side is easier to apply.",
           'Run the relevant checks on the combined state. Open the final search interface, follow the new help instructions, and exercise a failure or empty state. If one task renamed a shortcut while the other documented the original name, individual green checks may not catch the mismatch. The feature-level walkthrough should.',
           'When something fails, route the correction to the task that owns it and provide the reproduction. After further edits, repeat the affected checks against the new state. Do not keep citing the first successful run as evidence for a patch that has changed.',
         ],
@@ -517,7 +517,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'For your first few attempts, record elapsed time to an accepted result, time spent reviewing, repeated work, and meaningful defects found. Keep provider usage separate when its units or reporting coverage differ. A fast first response is only one part of the workflow; a result that takes an hour to reconcile may not save you time.',
           'Use one agent when the work is small or tightly coupled. Use several when tasks have clear boundaries and you can actually review them. If the same shared file keeps blocking progress, change the plan rather than increasing the number of sessions.',
-          'Jackalope brings supported agent tasks, account choices, worktrees, and review into one desktop workspace. It is in early access; the manual workflow here works independently of access to Jackalope. The app tour shows the intended experience, and the compatibility page distinguishes supported execution from agents still under evaluation.',
+          "Jackalope brings supported agent tasks, account choices, worktrees, and review into one desktop workspace. It's in early access, and the manual workflow here works without it. The app tour shows the intended experience, and the compatibility page distinguishes supported execution from agents still under evaluation.",
         ],
       },
     ],
@@ -547,7 +547,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Review the promised behavior before the summary',
         paragraphs: [
           'An agent can produce a convincing explanation alongside code that misses the requirement. Start a review by restating what should be different for the person using the software. Then find the code and evidence that establish that behavior. The summary is a useful index into the work, but the work is what you are accepting.',
-          'Suppose the task was to make a search menu usable with a keyboard. “Added key handlers and tests” sounds complete. The real requirement is more specific: arrow keys select an available result, Enter activates that result, Escape dismisses the menu, and focus remains usable. An empty result set, a changing query, and a failed request all affect whether those promises hold.',
+          'Suppose the task was to make a search menu usable with a keyboard. "Added key handlers and tests" sounds complete. The real requirement is more specific: arrow keys select an available result, Enter activates that result, Escape dismisses the menu, and focus remains usable. An empty result set, a changing query, and a failed request all affect whether those promises hold.',
           'This article uses small illustrative examples rather than a production implementation. Adapt the checks to your application and its risk. The goal is to find meaningful errors with a review you can explain, not to require every possible test for every patch.',
         ],
       },
@@ -557,7 +557,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'Confirm the repository, checkout, baseline, and current revision before reading findings from another session. Inspect changed files, staged edits, untracked additions, generated artifacts, and dependency changes. If the task was narrow but the patch rewrites shared infrastructure, ask what requirement made that necessary.',
           'Separate pre-existing failures from new ones. A project-wide failure may make a check inconclusive without proving that this patch caused it. Equally, one passing focused test cannot stand in for every broader check the change needs. Record the command, result, and state tested so someone else can judge the limitation.',
-          'Google’s engineering review guidance is a useful foundation: examine design, functionality, complexity, tests, naming, and documentation. Apply those questions to agent-written code just as you would to any other contribution. Pay particular attention to whether the tests are meaningful, because generated tests can repeat the implementation’s assumptions.',
+          "Google's engineering review guidance is a useful foundation: examine design, functionality, complexity, tests, naming, and documentation. Apply those questions to agent-written code just as you would to any other contribution. Pay particular attention to whether the tests are meaningful, because generated tests can repeat the implementation's assumptions.",
         ],
         links: [
           {
@@ -570,8 +570,8 @@ export const practicalPosts: BlogPost[] = [
         id: 'find-edge-case',
         title: 'Look for a concrete input that breaks the promise',
         paragraphs: [
-          'Consider the keyboard handler below. It looks reasonable when there are several results: increment the active index and wrap around. But JavaScript’s remainder operation with a zero divisor produces NaN. Pressing ArrowDown while results is empty therefore creates an invalid selection instead of keeping the “nothing selected” state.',
-          'The review finding should name that trigger and consequence. “Potential edge cases” leaves the author guessing. “ArrowDown with zero results sets activeIndex to NaN; preserve the no-selection state and add an empty-results interaction case” gives them something reproducible to fix.',
+          'Consider the keyboard handler below. It looks reasonable when there are several results: increment the active index and wrap around. But JavaScript\'s remainder operation with a zero divisor produces NaN. Pressing ArrowDown while results is empty therefore creates an invalid selection instead of keeping the "nothing selected" state.',
+          'The review finding should name that trigger and consequence. "Potential edge cases" leaves the author guessing. "ArrowDown with zero results sets activeIndex to NaN; preserve the no-selection state and add an empty-results interaction case" gives them something reproducible to fix.',
           'The appropriate fix depends on the component. It may use -1, null, or another representation for no selection. Check every consumer of that state, including Enter handling, highlighted rows, and accessibility attributes. A local guard can still leave another path activating an item that no longer exists.',
         ],
         code: {
@@ -591,9 +591,9 @@ export const practicalPosts: BlogPost[] = [
         id: 'test-the-test',
         title: 'Ask whether the test would catch a broken implementation',
         paragraphs: [
-          'A test named “supports keyboard navigation” can still assert only that the menu renders. Inspect what it does. Does it send a keyboard event? Does it observe the selected result? Does Enter activate the right destination? Would the test fail if the keyboard code were deleted?',
+          'A test named "supports keyboard navigation" can still assert only that the menu renders. Inspect what it does. Does it send a keyboard event? Does it observe the selected result? Does Enter activate the right destination? Would the test fail if the keyboard code were deleted?',
           'Use behavior assertions that match the requirement. A focused unit test can establish how an index function handles an empty list. A component interaction test can establish which result receives selection after ArrowDown. A browser check can establish that focus remains usable in the rendered application. These checks answer different questions and can complement each other.',
-          'The example below is a review scenario, not a drop-in test for a particular framework. Translate it into the project’s existing tools. Keep a small set of decisive cases rather than duplicating every internal implementation detail in assertions that must change whenever the code is refactored.',
+          "The example below is a review scenario, not a drop-in test for a particular framework. Translate it into the project's existing tools. Keep a small set of decisive cases rather than duplicating every internal implementation detail in assertions that must change whenever the code is refactored.",
         ],
         code: {
           label: 'A behavior-focused test scenario',
@@ -634,7 +634,7 @@ export const practicalPosts: BlogPost[] = [
           'Scope: every material change has a reason connected to the task.',
           'Correctness: boundary values, asynchronous changes, and error paths are handled where relevant.',
           'Compatibility: existing callers and saved data remain supported, or migration is explicit.',
-          'Access: permissions and sensitive data handling still follow the application’s rules.',
+          "Access: permissions and sensitive data handling still follow the application's rules.",
           'Tests: assertions would fail for a plausible broken implementation.',
           'Evidence: commands and manual checks refer to the current changed state.',
           'Integration: the combined result has been checked, with remaining uncertainty stated.',
@@ -644,14 +644,14 @@ export const practicalPosts: BlogPost[] = [
         id: 'close-the-loop',
         title: 'Return precise feedback and recheck the correction',
         paragraphs: [
-          'A good review comment connects a situation to a consequence and then to the expected behavior. For example: “If results refresh while the second row is selected, the selected index may exceed the new list length. Reconcile the selection when the list changes, and cover shortening the list while the menu is open.” That is more helpful than asking the author to make the code more robust.',
+          'A good review comment connects a situation to a consequence and then to the expected behavior. For example: "If results refresh while the second row is selected, the selected index may exceed the new list length. Reconcile the selection when the list changes, and cover shortening the list while the menu is open." That is more helpful than asking the author to make the code more robust.',
           'After a fix, inspect the new patch and rerun the affected checks. Revisit any earlier finding made stale by the correction. Do not accidentally accept an old screenshot or test run as evidence for new code, and do not resolve a finding solely because the author says it is fixed.',
           'Jackalope is designed to keep task results, changes, and recorded evidence together before integration. It is in early access. Whatever interface you use today, the final review should answer three questions: what changed, what establishes that it works, and what still needs a decision.',
         ],
       },
     ],
     related: [
-      { label: 'Jackalope’s review workflow', href: '/guides/review-ai-generated-code/' },
+      { label: "Jackalope's review workflow", href: '/guides/review-ai-generated-code/' },
       { label: 'From a brief to a considered review', href: '/blog/from-brief-to-review/' },
       { label: 'Coordinate Claude Code and Codex', href: '/blog/claude-code-and-codex-together/' },
     ],
@@ -674,7 +674,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'A coding agent can inspect a repository and still lack the information needed to finish a task. The acceptance criteria may live in an issue tracker, the current behavior in a browser, and the API explanation in maintained documentation. Model Context Protocol, or MCP, provides a common way for compatible applications to connect to tools and context.',
           'A useful setup begins with a question the agent cannot currently answer or an action it cannot currently perform. For an accessible-search task, that could mean reading the approved issue and inspecting the local page. Start with those capabilities. Add another connection only when its role in the workflow is clear.',
-          'This guide is an evaluation recipe rather than configuration for a particular server. Server names, transports, authentication, and client support vary. Use the chosen server’s official instructions alongside your agent’s documentation, and verify the actual tools exposed after connecting.',
+          "This guide is an evaluation recipe rather than configuration for a particular server. Server names, transports, authentication, and client support vary. Use the chosen server's official instructions alongside your agent's documentation, and verify the actual tools exposed after connecting.",
         ],
         links: [
           {
@@ -688,7 +688,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Separate the connection from the permission',
         paragraphs: [
           'Think about three separate decisions: which service or program you connect, which identity it uses, and which actions that identity can perform. A successful connection answers only the first part. A tool can appear in a list while its account lacks access to the project, or while the account has far broader access than the task requires.',
-          'The protocol distinguishes tools, resources, and prompts. A client may expose these differently. For practical evaluation, ask what the agent can read, what it can change, and what will require your decision. Check the server’s actual behavior rather than inferring permissions from a friendly tool name.',
+          "The protocol distinguishes tools, resources, and prompts. A client may expose these differently. For practical evaluation, ask what the agent can read, what it can change, and what will require your decision. Check the server's actual behavior rather than inferring permissions from a friendly tool name.",
           '[Project instructions](/blog/agents-md-claude-md-project-instructions/) can tell an agent to work within certain boundaries, but prose is not an access-control mechanism. If the service supports read-only or project-scoped credentials, use the appropriate scope. If it does not support the boundary you need, choose a different setup or keep that action manual.',
         ],
         links: [
@@ -702,9 +702,9 @@ export const practicalPosts: BlogPost[] = [
         id: 'choose-connections',
         title: 'Design a small tool plan for one real task',
         paragraphs: [
-          'For the search example, write down which connection supplies the brief, which checks the UI, and where the result will be reviewed. You may already have suitable built-in browser or repository tools. There is no benefit in introducing a second route to the same service unless it solves a specific limitation.',
+          "For the search example, write down which connection supplies the brief, which checks the UI, and where the result will be reviewed. You may already have suitable built-in browser or repository tools. Don't add a second route to the same service unless it solves a specific limitation.",
           'Decide whether writing back to the issue tracker is part of the task. Reading an issue does not imply authorization to change its status or post a comment. Keeping the first trial read-only where possible makes it easier to tell whether the integration returns the right information before giving it a larger role.',
-          'Use non-sensitive sample data for the first connection test. Ask the agent to identify the source of its answer and show the relevant result. If it guesses an issue’s contents after a tool failure, treat that as a failed workflow even if the answer sounds plausible.',
+          "Use non-sensitive sample data for the first connection test. Ask the agent to identify the source of its answer and show the relevant result. If it guesses an issue's contents after a tool failure, treat that as a failed workflow even if the answer sounds plausible.",
         ],
         table: {
           caption: 'An illustrative tool plan for an accessible-search task',
@@ -731,7 +731,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'A local stdio server is a program launched on your machine. Inspect its source, publisher, installation instructions, and exact startup command before running it. A remote HTTP server is a service you connect to; inspect its operator, authentication flow, and data handling. Neither choice is inherently trustworthy just because it uses MCP.',
           'The MCP security guidance explicitly treats local server execution as a security concern and discusses consent, access, and other protocol risks. In practice, a project folder or Git worktree is not a sandbox for a program running with your local privileges. Account profiles can organize credentials without creating separate operating-system users.',
-          'Keep credentials out of repository files and task transcripts. Use the storage and authentication mechanism documented for your client and service. When sharing a configuration example with a teammate, share the structure and setup steps, not a working secret. Recheck the destination and requested access when a server’s authentication flow changes.',
+          "Keep credentials out of repository files and task transcripts. Use the storage and authentication mechanism documented for your client and service. When sharing a configuration example with a teammate, share the structure and setup steps, not a working secret. Recheck the destination and requested access when a server's authentication flow changes.",
         ],
         links: [
           {
@@ -749,7 +749,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Test discovery, access, and failure separately',
         paragraphs: [
           'First check whether the client discovers the connection and lists the expected capability. Next perform a small operation against a resource whose contents you already know. Then verify a failure path, such as a nonexistent sample issue or an account without access to a disposable test project. These establish different things.',
-          'Ask what happens when a request times out or credentials expire. The agent should surface the failure and its effect on the task. It should not silently substitute invented data or retry a write until it happens twice. For operations that change external state, consult the server’s retry behavior and inspect the service before repeating an uncertain request.',
+          "Ask what happens when a request times out or credentials expire. The agent should surface the failure and its effect on the task. It should not silently substitute invented data or retry a write until it happens twice. For operations that change external state, consult the server's retry behavior and inspect the service before repeating an uncertain request.",
           'Keep the validation proportional. A read-only reference lookup needs less ceremony than a tool that changes production records. What matters is having enough evidence to understand the operation you are enabling and a clear way to stop using the connection when it no longer fits.',
         ],
         code: {
@@ -764,15 +764,15 @@ export const practicalPosts: BlogPost[] = [
         title: 'Keep retrieved material in its proper role',
         paragraphs: [
           'Issue comments, documents, and web pages may contain useful facts as well as incorrect or malicious instructions. Treat retrieved material as source content to evaluate. It should not acquire permission to change the task just because it came back through a tool. A comment asking for credentials is not part of implementing keyboard navigation.',
-          'Keep the task’s goal, approved scope, and relevant project instructions easy to distinguish from retrieved text. Ask for source attribution when the agent bases a decision on external content. If two sources disagree about the requirement, resolve the conflict rather than encouraging the agent to choose whichever is easier to implement.',
-          'Periodically remove connections that are no longer useful to the project. Check inherited client-level configuration as well as the project list. A clean project configuration does not necessarily describe every tool available through the underlying agent’s own settings.',
+          "Keep the task's goal, approved scope, and relevant project instructions easy to distinguish from retrieved text. Ask for source attribution when the agent bases a decision on external content. If two sources disagree about the requirement, resolve the conflict rather than encouraging the agent to choose whichever is easier to implement.",
+          "Periodically remove connections that are no longer useful to the project. Check inherited client-level configuration as well as the project list. A clean project configuration does not necessarily describe every tool available through the underlying agent's own settings.",
         ],
       },
       {
         id: 'jackalope-connections',
         title: 'Bring the connection into the project workflow',
         paragraphs: [
-          'Jackalope centralizes project connections and provides built-in task tools, with support depending on the selected agent and connection type. Its knowledgebase documents configuration and troubleshooting. A listing in the MCP marketplace is not an audit or an endorsement of a third-party server’s security, reliability, or data handling.',
+          "Jackalope centralizes project connections and provides built-in task tools, with support depending on the selected agent and connection type. Its knowledgebase documents configuration and troubleshooting. A listing in the MCP marketplace is not an audit or an endorsement of a third-party server's security, reliability, or data handling.",
           'Jackalope is in early access. While evaluating your current setup, keep a short record of what each connection is for, the identity and scope it uses, and the last operation you verified. That record is more useful than an impressive tool count when you need to understand why a task can read or change something.',
         ],
       },
@@ -819,14 +819,14 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'The agent performs the reasoning and tool-driven work. The workspace organizes how you start tasks, follow them, and inspect their output. The execution environment is where files, processes, credentials, and services live. A product can combine these layers, but they still answer different questions.',
           'If you want to keep using a particular agent, verify its actual execution support. A logo on a page may describe an integration, account setup, a terminal you can launch manually, or a complete task interface. Ask what works end to end: sign-in, streaming output, questions, cancellation, continuation, and review.',
-          'Likewise, “remote” can describe several arrangements. The agent may run on your own machine accessed remotely, on a host you manage, or in a vendor-managed environment. Write down where code and credentials go, how you reach local services, and what happens when your laptop disconnects. Evaluate the arrangement you will actually use.',
+          'Likewise, "remote" can describe several arrangements. The agent may run on your own machine accessed remotely, on a host you manage, or in a vendor-managed environment. Write down where code and credentials go, how you reach local services, and what happens when your laptop disconnects. Evaluate the arrangement you will actually use.',
         ],
       },
       {
         id: 'use-trial',
         title: 'Run the same small trial in each candidate',
         paragraphs: [
-          'Choose a familiar repository and a modest task with observable behavior. For example, improve a search menu’s keyboard interaction and update a help page. Keep the starting commit, acceptance criteria, and relevant instructions the same for each trial. Use disposable data so the evaluation does not depend on production access.',
+          "Choose a familiar repository and a modest task with observable behavior. For example, improve a search menu's keyboard interaction and update a help page. Keep the starting commit, acceptance criteria, and relevant instructions the same for each trial. Use disposable data so the evaluation does not depend on production access.",
           'Include one independent task and one real dependency. You want to see how the workspace handles parallel progress and how it represents work that cannot start yet. Also ask a follow-up after the first result. A product that makes the first prompt easy may still make continuation hard to follow.',
           'Do not treat a single trial as a scientific benchmark of model quality. Provider versions, access, caches, and task familiarity can change the outcome. Use it to observe your own workflow: what you had to configure, what you could inspect, and where you lost track of the work.',
         ],
@@ -841,7 +841,7 @@ export const practicalPosts: BlogPost[] = [
         id: 'scorecard',
         title: 'Use evidence instead of counting checkmarks',
         paragraphs: [
-          'For each capability, record a brief observation from the trial. Use “verified in my trial,” “documented but not tried,” or “unknown.” Unknown does not mean absent; it means you still need evidence before relying on the feature. This distinction matters especially when an integration works differently across agents or operating systems.',
+          'For each capability, record a brief observation from the trial. Use "verified in my trial," "documented but not tried," or "unknown." Unknown does not mean absent; it means you still need evidence before relying on the feature. This distinction matters especially when an integration works differently across agents or operating systems.',
           'Weight the rows by your actual needs. If all your work happens locally, a remote feature may have little value to you. If you switch between client projects every day, account selection and context may matter more than a polished first-run demo. Decide which requirements are essential before adding scores.',
         ],
         table: {
@@ -913,7 +913,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Choose the workflow with the fewest important gaps',
         paragraphs: [
           'After the trial, write a short decision: the essential requirements met, the important unknowns, and the limitations you are willing to accept. Keep the evidence beside that decision. If a feature is planned rather than available, evaluate the product without it and revisit when it ships.',
-          'A terminal and editor can be a good fit for one focused session. A provider’s own app may fit an established agent workflow. A workspace for multiple agents becomes attractive when projects, accounts, parallel tasks, and review need more structure. There is no need to make every project use the same interface if their needs differ.',
+          "A terminal and editor can be a good fit for one focused session. A provider's own app may fit an established agent workflow. A workspace for multiple agents becomes attractive when projects, accounts, parallel tasks, and review need more structure. You don't need to use the same interface for every project if their needs differ.",
           'Jackalope is in early access. Its app tour uses sample data and helps explain the interface; it does not replace a trial on your repository. Use the compatibility page and roadmap to understand current scope, then apply the same evaluation questions to Jackalope.',
         ],
         links: [

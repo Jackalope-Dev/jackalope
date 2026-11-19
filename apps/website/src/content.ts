@@ -60,10 +60,10 @@ export const posts: BlogPost[] = [
         ],
       },
       {
-        title: '02. Set the project’s account and context.',
+        title: "02. Set the project's account and context.",
         paragraphs: [
-          'Open Project → Settings. Choose the default task agent, restrict which agents are available for that project, and select an account for each supported agent. Pin Work for your client project and Personal for your own project instead of leaving both on “Whichever account is active.”',
-          'Add the project instructions and review the context included with a new task. Select the tools the task needs. Project-selected connections are additional to the agent’s existing configuration, so review any inherited provider or CLI-global tools too.',
+          'Open Project → Settings. Choose the default task agent, restrict which agents are available for that project, and select an account for each supported agent. Pin Work for your client project and Personal for your own project instead of leaving both on "Whichever account is active."',
+          "Add the project instructions and review the context included with a new task. Select the tools the task needs. Project-selected connections are additional to the agent's existing configuration, so review any inherited provider or CLI-global tools too.",
         ],
       },
       {
@@ -71,14 +71,14 @@ export const posts: BlogPost[] = [
         paragraphs: [
           'Jackalope records the account profile used for an attempt. Continuing that task retains the original profile even if you change the active account later. To work under another account, start a new task rather than moving an existing conversation between identities.',
           'Use Tasks to follow progress, answer questions, and inspect changes. Parallel plans coordinate agent work in separate Git worktrees, with scopes and dependencies; review and integration remain explicit decisions.',
-          'In Usage, filter by account, project, and period, then inspect or export the selected attempts. Token totals use reported usage from Jackalope tasks. Missing reports stay unavailable, and activity outside Jackalope is not a complete part of this view.',
+          "In Usage, filter by account, project, and period, then inspect or export the selected attempts. Token totals use reported usage from Jackalope tasks. Missing reports stay unavailable, and this view doesn't fully cover activity outside Jackalope.",
         ],
       },
       {
         title: 'Know what the separation means.',
         paragraphs: [
-          'Profiles separate supported agents’ sign-in and configuration directories. Project settings organize instructions and agent choices. They do not create separate operating-system users or prevent an agent with local permissions from reading other files.',
-          'Provider accounts, subscriptions, data policies, and connected tools still apply. Follow your organization’s requirements for repositories and credentials. Jackalope makes the choices easier to manage and inspect; it does not promise complete data isolation or a replacement for provider billing.',
+          "Profiles separate supported agents' sign-in and configuration directories. Project settings organize instructions and agent choices. They do not create separate operating-system users or prevent an agent with local permissions from reading other files.",
+          "Provider accounts, subscriptions, data policies, and connected tools still apply. Follow your organization's requirements for repositories and credentials. Jackalope makes the choices easier to manage and inspect; it does not promise complete data isolation or a replacement for provider billing.",
         ],
       },
     ],
@@ -112,14 +112,14 @@ export const posts: BlogPost[] = [
         title: 'The final call stays with you.',
         paragraphs: [
           'When an attempt is ready, read the result, inspect its patch, and run the project checks. Continue with feedback when something needs another pass. A completed agent response is a point for review, not a promise that the change is correct.',
-          'That is the rhythm we are designing for: an idea, room to explore, and a clear return to you.',
+          "That's the rhythm we're designing for: an idea, room to explore, and a clear return to you.",
         ],
       },
       {
         title: 'Growing in the open.',
         paragraphs: [
           'Sign up free to start using Jackalope. The app tour gives you a look at the workspace using sample project data.',
-          'We will share development notes and release announcements here.',
+          "We'll share development notes and release announcements here.",
         ],
       },
     ],
@@ -146,7 +146,7 @@ export const posts: BlogPost[] = [
       {
         title: '02. Describe the outcome.',
         paragraphs: [
-          'Open New task and describe what should be different when the work is done. For example: “Make search usable from the keyboard. Arrow keys should move through results, Enter should open the selected result, and Escape should close the list.”',
+          'Open New task and describe what should be different when the work is done. For example: "Make search usable from the keyboard. Arrow keys should move through results, Enter should open the selected result, and Escape should close the list."',
           'Open Customize task to review automatic guidance, agent selection, and the execution target. A separate worktree is useful when you want an experiment to have its own working directory. Save an idea for later when you are still shaping the brief.',
         ],
       },
@@ -154,7 +154,7 @@ export const posts: BlogPost[] = [
         title: '03. Stay available for the important decisions.',
         paragraphs: [
           'Follow the task as it runs and respond when it needs input. The result belongs to an attempt, so its context stays connected to the original task.',
-          'If the direction is wrong, stop and adjust the brief. Keeping the request specific is more useful than allowing a task to expand indefinitely.',
+          'If the direction is wrong, stop and adjust the brief. A specific request works better than letting a task keep growing.',
         ],
       },
       {
@@ -245,7 +245,7 @@ export const pages: SitePage[] = [
     path: '/terms/',
     title: 'Terms of service | Jackalope',
     description:
-      'Terms for Jackalope’s website and hosted early-access service, with desktop open-source license information.',
+      "Terms for Jackalope's website and hosted early-access service, with desktop open-source license information.",
   },
   {
     path: '/waitlist/',

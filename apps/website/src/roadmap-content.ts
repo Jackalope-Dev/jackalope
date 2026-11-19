@@ -1,6 +1,6 @@
 export const roadmapHeadline = 'A little further. A lot more possible.';
 export const roadmapLede =
-  'Explore what’s implemented, what we’re validating, and what we’re considering next. Plans may change as we learn from contributors and early users.';
+  "Explore what's implemented, what we're validating, and what we're considering next. Plans may change as we learn from contributors and early users.";
 
 export const roadmapStages = [
   {
@@ -36,7 +36,7 @@ export const roadmapStages = [
         title: 'From request to a result you can inspect.',
         summary: 'Shared work discovery, local previews, and a clear delivery handoff.',
         detail:
-          'Work combines conversations and the shared work list with explicit project scope, remembered views, and command search. Each row shows the assigned agent, live or next-action status, and the next useful step. Isolated results keep review, merge into the target branch, and workspace cleanup together; each project can instead work on a new branch, the current branch, or ask each time. Routine agent requests are approved automatically and listed in activity, while risky actions such as deletes, force pushes, deploys and credential access still ask. Project overview helps you resume unfinished work. Short task titles keep full instructions in Details. Results lead with output, and review puts the diff beside checks and evidence. Compact follow-up and visible action buttons keep the next step clear. Queue a follow-up or explicitly stop current work and send; saved queues pause after failures and restart. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. A pull request a task opens is followed afterwards: the work list shows whether it is waiting on checks or review, needs a fix, or is ready to merge, and one click drafts the fix for the task’s own agent. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
+          "Work combines conversations and the shared work list with explicit project scope, remembered views, and command search. Each row shows the assigned agent, live or next-action status, and the next useful step. Isolated results keep review, merge into the target branch, and workspace cleanup together; each project can instead work on a new branch, the current branch, or ask each time. Routine agent requests are approved automatically and listed in activity, while risky actions such as deletes, force pushes, deploys and credential access still ask. Project overview helps you resume unfinished work. Short task titles keep full instructions in Details. Results lead with output, and review puts the diff beside checks and evidence. Compact follow-up and visible action buttons keep the next step clear. Queue a follow-up or explicitly stop current work and send; saved queues pause after failures and restart. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. A pull request a task opens is followed afterwards: the work list shows whether it is waiting on checks or review, needs a fix, or is ready to merge, and one click drafts the fix for the task's own agent. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.",
       },
       {
         title: 'Keep the ideas coming.',
@@ -60,7 +60,7 @@ export const roadmapStages = [
         title: 'A local way to get started.',
         summary: 'Optional models, clear download choices, and guided setup.',
         detail:
-          'Local setup guides you through your computer’s requirements, OpenCode and Ollama installation, and an optional model download. A file edit and session check must pass before connection. Jackalope bundles no model weights. Help retrieves relevant documentation locally, while routing keeps every eligible model in consideration. Real-model quality, token savings, and installed setup still need validation.',
+          "Local setup guides you through your computer's requirements, OpenCode and Ollama installation, and an optional model download. A file edit and session check must pass before connection. Jackalope bundles no model weights. Help retrieves relevant documentation locally, while routing keeps every eligible model in consideration. Real-model quality, token savings, and installed setup still need validation.",
       },
       {
         title: 'One request, a reviewed approach.',
@@ -72,7 +72,7 @@ export const roadmapStages = [
         title: 'Room to work in parallel.',
         summary: 'Useful delegation, separate worktrees, and shared context.',
         detail:
-          'Lead agents decide when available subagent tools can help and remain responsible for the combined result. Repository-aware plans preserve the full request. Parallel queues prioritize dependencies and share capacity across projects. Optional verified snapshots let dependent tasks continue before final review, with structured progress reports and recorded execution timings. Saved ownership handoffs, interface agreements, and changed-file reviews help agents coordinate across worktrees and block unresolved work before integration. Projects can opt into agent conflict resolution and verified local merging, with source worktrees retained. Installed acceptance and repeated quality evaluations remain in progress. Tasks save checkpoints with project-level commit attribution. Review the patch and message, then merge as one commit and clean up finished worktrees and branches. Worktrees separate changes; they do not sandbox an agent’s access to your computer.',
+          "Lead agents decide when available subagent tools can help and remain responsible for the combined result. Repository-aware plans preserve the full request. Parallel queues prioritize dependencies and share capacity across projects. Optional verified snapshots let dependent tasks continue before final review, with structured progress reports and recorded execution timings. Saved ownership handoffs, interface agreements, and changed-file reviews help agents coordinate across worktrees and block unresolved work before integration. Projects can opt into agent conflict resolution and verified local merging, with source worktrees retained. Installed acceptance and repeated quality evaluations remain in progress. Tasks save checkpoints with project-level commit attribution. Review the patch and message, then merge as one commit and clean up finished worktrees and branches. Worktrees separate changes; they do not sandbox an agent's access to your computer.",
       },
       {
         title: 'Tools that travel with the work.',
@@ -89,7 +89,7 @@ export const roadmapStages = [
     status: 'Current focus · In development',
     title: 'Make it feel like home.',
     description:
-      'The next step is confidence: from the first sign-in to coming back to unfinished work. Native sleep prevention, macOS menus and Dock badges, and pairing with an existing WSL Linux host need installed validation. We’re preparing Jackalope for real projects and everyday use.',
+      "The next step is confidence: from the first sign-in to coming back to unfinished work. Native sleep prevention, macOS menus and Dock badges, and pairing with an existing WSL Linux host need installed validation. We're preparing Jackalope for real projects and everyday use.",
     next: 'A dependable local workspace comes before a wider release.',
     link: { label: 'Follow the development changelog', href: '/changelog/' },
     items: [
@@ -109,7 +109,7 @@ export const roadmapStages = [
         title: 'Bots that work on their own.',
         summary: 'Saved agents that wake up, work together and bring you decisions.',
         detail:
-          'Save a bot with a name, its own character and colour, standing instructions, an agent and model, the projects it works in and the connections it may use, or start from templates for review, research, testing, docs, security and more. The Bots page shows each project with the bots working in it. Message it to start or continue a conversation that stays on the Bots page; quick questions skip workspace setup. Bots remember notes and how recent conversations ended, can search their earlier conversations, follow edits to their instructions, and show when they are working or have replies you have not read. Bots can wake up on a schedule, when the project changes or when a connected app has new data, ask other bots for help, and bring you decisions, questions and sources to answer. They can also suggest new bots for you to create. Every wake-up and message between bots appears in their conversations. Connect apps such as GitHub, Slack and Gmail once through your own Composio project, and every agent can use them as tools. The Screen view shows the task browser’s current page and any window you allowed an agent to control, and lets you stop either. Each project, and any bot, can keep its own agent browser that stays signed in: you sign in once in a separate window, agents ask before using each site, and your everyday browser is never touched. A bot can also have its own computer, a Linux desktop with a browser running in Docker on your machine, on a cloud machine you run or on your own Agent37 account, which you can watch or take over. A project can run its Claude Code and Codex agents on such a computer while review and merging stay on your machine, and a swarm can spread its tasks across your machine and your computers, each going where it can run and there is room. Local sandboxes start when needed and stop when idle; hosted computers are planned. Choose an agent and model from a picker that lists every agent and why unavailable ones cannot run. Installed testing with real accounts is in progress.',
+          "Save a bot with a name, its own character and colour, standing instructions, an agent and model, the projects it works in and the connections it may use, or start from templates for review, research, testing, docs, security and more. The Bots page shows each project with the bots working in it. Message it to start or continue a conversation that stays on the Bots page; quick questions skip workspace setup. Bots remember notes and how recent conversations ended, can search their earlier conversations, follow edits to their instructions, and show when they are working or have replies you have not read. Bots can wake up on a schedule, when the project changes or when a connected app has new data, ask other bots for help, and bring you decisions, questions and sources to answer. They can also suggest new bots for you to create. Every wake-up and message between bots appears in their conversations. Connect apps such as GitHub, Slack and Gmail once through your own Composio project, and every agent can use them as tools. The Screen view shows the task browser's current page and any window you allowed an agent to control, and lets you stop either. Each project, and any bot, can keep its own agent browser that stays signed in: you sign in once in a separate window, agents ask before using each site, and your everyday browser is never touched. A bot can also have its own computer, a Linux desktop with a browser running in Docker on your machine, on a cloud machine you run or on your own Agent37 account, which you can watch or take over. A project can run its Claude Code and Codex agents on such a computer while review and merging stay on your machine, and a swarm can spread its tasks across your machine and your computers, each going where it can run and there is room. Local sandboxes start when needed and stop when idle; hosted computers are planned. Choose an agent and model from a picker that lists every agent and why unavailable ones cannot run. Installed testing with real accounts is in progress.",
       },
       {
         title: 'Work you can trust at a glance.',
@@ -127,13 +127,13 @@ export const roadmapStages = [
         title: 'A first run worth coming back to.',
         summary: 'Setup, agent sign-in, and a clear path to your first task.',
         detail:
-          'We’re validating project setup, account switching, helper actions, tool permissions, and real-agent task flows in the installed app. Clear retry and recovery paths should make it easy to pick up where you left off.',
+          "We're validating project setup, account switching, helper actions, tool permissions, and real-agent task flows in the installed app. Clear retry and recovery paths should make it easy to pick up where you left off.",
       },
       {
         title: 'Ready for your everyday machine.',
         summary: 'Installation, updates, and recovery of saved work.',
         detail:
-          'We’re preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Desktop control can use one window, one app such as your signed-in browser, or the whole desktop on Windows and macOS; Linux X11 and Ubuntu’s GNOME 46 Wayland desktop support single windows, GNOME through an optional extension. KDE Plasma and other Wayland desktops with the standard remote desktop portal support one app or the whole desktop after you approve the system prompt. Beta and stable release automation uses Microsoft Store for Windows and direct downloads for Mac and Linux. In-app Store update controls are prepared for testing. Downloads are public for all three platforms; signing in still requires waitlist approval. Device testing, signed installation and upgrades still need acceptance.',
+          "We're preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Desktop control can use one window, one app such as your signed-in browser, or the whole desktop on Windows and macOS; Linux X11 and Ubuntu's GNOME 46 Wayland desktop support single windows, GNOME through an optional extension. KDE Plasma and other Wayland desktops with the standard remote desktop portal support one app or the whole desktop after you approve the system prompt. Beta and stable release automation uses Microsoft Store for Windows and direct downloads for Mac and Linux. In-app Store update controls are prepared for testing. Downloads are public for all three platforms; signing in still requires waitlist approval. Device testing, signed installation and upgrades still need acceptance.",
       },
       {
         title: 'The small things that earn trust.',
@@ -151,8 +151,8 @@ export const roadmapStages = [
     title: 'Less juggling. More doing.',
     description:
       'Give your agents a better understanding of the work, connect more of your workflow, and make the choices around usage easier to understand.',
-    next: 'These priorities will evolve with what we learn from early users.',
-    link: { label: 'See today’s connected workspace', href: '/knowledge/' },
+    next: 'These priorities will change as we learn from early users.',
+    link: { label: "See today's connected workspace", href: '/knowledge/' },
     items: [
       {
         title: 'More agents at the table.',
@@ -181,7 +181,7 @@ export const roadmapStages = [
     status: 'Exploring · No committed scope',
     title: 'Your next idea could start anywhere.',
     description:
-      'A task shouldn’t lose its thread when you step away. We’re exploring how to bring the same continuity and control to work across machines.',
+      "A task shouldn't lose its thread when you step away. We're exploring how to bring the same continuity and control to work across machines.",
     next: 'Validate individual remote workflows before extending them to teams.',
     link: { label: 'Explore the local workflow', href: '/tour/' },
     items: [
@@ -189,7 +189,7 @@ export const roadmapStages = [
         title: 'Jackalope Cloud.',
         summary: 'An always-on home for your work.',
         detail:
-          'Today your phone and other computers reach work through the computer running it, so closing your laptop pauses what they can see. We are exploring an always-on Jackalope, on a workstation or in the cloud, that keeps coordinating work while your laptop is away, with your laptop and phone as equal clients. This is exploratory; we have not announced pricing or a release date.',
+          "Today your phone and other computers reach work through the computer running it, so closing your laptop pauses what they can see. We're exploring an always-on Jackalope, on a workstation or in the cloud, that keeps coordinating work while your laptop is away, with your laptop and phone as equal clients. This is exploratory, and we haven't announced pricing or a release date.",
       },
       {
         title: 'More ways to work together.',
