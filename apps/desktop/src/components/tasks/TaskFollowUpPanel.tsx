@@ -104,10 +104,15 @@ export function TaskFollowUpPanel({
         </ul>
       )}
       {canContinue ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer convenience; the field and buttons stay reachable by keyboard
         <form
           ref={form}
           className="task-followup-form"
           data-dragging={attachments.dragging || undefined}
+          onClick={(event) => {
+            // The card reads as the field, so a click on its padding focuses the draft.
+            if (event.target === event.currentTarget) replyField.current?.focus();
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             onSend();
