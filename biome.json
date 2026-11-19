@@ -10,7 +10,8 @@
     "includes": [
       "**",
       "!apps/mobile/src-tauri/gen/apple",
-      "!apps/desktop/src-tauri/resources/swarm-worker"
+      "!apps/desktop/src-tauri/resources/swarm-worker",
+      "!patches/whisper-rs-sys"
     ]
   },
   "css": { "parser": { "tailwindDirectives": true } },

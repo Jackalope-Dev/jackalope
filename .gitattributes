@@ -1,5 +1,7 @@
 * text=auto eol=lf
 patches/*.patch whitespace=-space-before-tab
+# Vendored upstream sources keep their original whitespace; provenance.json pins them.
+patches/whisper-rs-sys/** -whitespace
 *.png binary
 *.bmp binary
 *.ico binary

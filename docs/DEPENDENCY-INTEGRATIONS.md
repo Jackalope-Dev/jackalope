@@ -96,6 +96,11 @@ enables `alloc`. It keeps the unsound `heapless` 0.8 advisories out of the lockf
 and has the same provenance and source-override check. Remove it once `gix-hash`
 depends on a `faster-hex` release with optional `heapless`.
 
+The [whisper-rs-sys patch](../patches/whisper-rs-sys/README.md) limits the library
+search folders its build script declares. The published script declared every CMake
+folder, and on Windows Cargo puts those on `PATH` for tests and `cargo run`, which
+overflowed what `cmd.exe` reads. It has the same provenance and source-override check.
+
 Run the affected renderer, watcher, readiness and browser tests when upgrading
 these dependencies, then `pnpm verify`. Check the production CSP, keyboard access,
 themes, reduced motion and incomplete Markdown in the component lab. Native

@@ -15,6 +15,7 @@ const lock = read('apps/desktop/src-tauri/Cargo.lock');
 for (const { crate, label } of [
   { crate: 'glib', label: 'GLib' },
   { crate: 'faster-hex', label: 'faster-hex' },
+  { crate: 'whisper-rs-sys', label: 'whisper-rs-sys' },
 ]) {
   const directory = `patches/${crate}`;
   const provenance = JSON.parse(read(`${directory}/provenance.json`));
