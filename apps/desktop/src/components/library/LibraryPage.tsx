@@ -17,6 +17,7 @@ import {
   Camera,
   File,
   FileCode2,
+  FileDiff,
   FileText,
   FolderOpen,
   Images,
@@ -31,6 +32,7 @@ import { navigateWorkspace } from '../../lib/app-events';
 import { fileManagerName, revealInFileManager } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { openConversation, openRun, useAllRuns } from '../../lib/work-selection';
+import { useLibraryStore } from '../../stores/libraryStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectMark } from '../projects/ProjectMark';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -56,6 +58,7 @@ const ORIGIN_ICONS: Record<LibraryItem['origin'], LucideIcon> = {
   review: ScanEye,
   output: Sparkles,
   attachment: Paperclip,
+  changed: FileDiff,
 };
 
 function fileIcon(name: string): LucideIcon {
@@ -151,8 +154,9 @@ export function LibraryPage() {
   const projects = useProjectStore((state) => state.projects);
   const [files, setFiles] = useState<LibraryFile[] | null>(null);
   const [error, setError] = useState('');
-  const [project, setProject] = useState(ALL);
-  const [kind, setKind] = useState<LibraryKind | typeof ALL>(ALL);
+  const { project: savedProject, kind, setProject, setKind } = useLibraryStore();
+  // A remembered project that was since removed shows everything.
+  const project = projects.some((entry) => entry.id === savedProject) ? savedProject : ALL;
   const [shown, setShown] = useState(PAGE);
   const [selected, setSelected] = useState<LibraryItem | null>(null);
   const [actionError, setActionError] = useState('');
@@ -192,8 +196,8 @@ export function LibraryPage() {
     { id: 'images', label: 'Images', count: count('images') },
     { id: 'files', label: 'Files', count: count('files') },
   ];
-  const projectsWithItems = projects.filter((entry) =>
-    items.some((item) => item.projectId === entry.id),
+  const projectsWithItems = projects.filter(
+    (entry) => entry.id === project || items.some((item) => item.projectId === entry.id),
   );
   const projectOf = (id: string) => projects.find((entry) => entry.id === id);
 
@@ -277,7 +281,7 @@ export function LibraryPage() {
           <EmptyState
             icon={Images}
             title="Your library fills in as you work"
-            description="Screenshots agents take while checking their work, review captures, images you paste into prompts and files agents save all land here."
+            description="Screenshots agents take while checking their work, review captures, images you paste into prompts, files agents save and images or PDFs tasks change all land here."
             action={
               <Button variant="primary" onClick={() => navigateWorkspace('kanban')}>
                 Start work

@@ -5,8 +5,8 @@ import { runTitle } from '../../lib/task-title';
 export interface LibraryFile {
   path: string;
   name: string;
-  /** `output` for saved agent output, `attachment` for a pasted prompt image. */
-  source: 'output' | 'attachment';
+  /** `output` saved agent output, `attachment` a pasted prompt image, `changed` an image or PDF a task changed. */
+  source: 'output' | 'attachment' | 'changed';
   projectId: string;
   runId?: string | null;
   size: number;
@@ -17,7 +17,7 @@ export interface LibraryFile {
 export type LibraryKind = 'screenshots' | 'images' | 'files';
 
 /** Where an item came from, as its tile names it. */
-type Origin = 'screenshot' | 'desktop' | 'review' | 'output' | 'attachment';
+type Origin = 'screenshot' | 'desktop' | 'review' | 'output' | 'attachment' | 'changed';
 
 export interface LibraryItem {
   key: string;
@@ -40,6 +40,7 @@ export const ORIGIN_LABELS: Record<Origin, string> = {
   review: 'Review capture',
   output: 'Saved output',
   attachment: 'Pasted image',
+  changed: 'Changed in repo',
 };
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);

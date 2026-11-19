@@ -1,14 +1,17 @@
 //! Files Jackalope work left behind for the Library page: each workspace's saved
-//! agent output under `.jackalope/artifacts/` and each project's pasted prompt
-//! images under `.jackalope/attachments/`. Screenshots are listed from run
-//! records instead. The folders come from recorded runs, never from the caller,
-//! and previews and opens stay inside them.
+//! agent output under `.jackalope/artifacts/`, each project's pasted prompt images
+//! under `.jackalope/attachments/`, and images and PDFs a task changed in its
+//! workspace. Screenshots are listed from run records instead. Folders and changed
+//! files come from recorded runs, never from the caller, and previews and opens
+//! stay inside them.
 
+use super::repo::{self, Policy};
 use super::tasks::{TaskRun, TaskRuntime};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
@@ -18,6 +21,11 @@ const ATTACHMENTS: &str = ".jackalope/attachments";
 const MAX_FILES: usize = 2000;
 const MAX_DEPTH: usize = 4;
 const IMAGE_TYPES: [&str; 6] = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+/// What the Library shows from a task's changed files.
+const CHANGED_TYPES: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"];
+/// Workspaces whose changes are read per listing, newest first; each is one `git diff`.
+const MAX_CHANGED_WORKSPACES: usize = 60;
+const MAX_CHANGED_PER_WORKSPACE: usize = 100;
 /// Documents the default app may open. Agents write these folders, so anything that
 /// could run when opened (scripts, apps, installers) is only shown in the file manager.
 const OPENABLE_TYPES: [&str; 14] = [
@@ -41,10 +49,12 @@ pub(crate) use tauri_commands;
 pub struct LibraryFile {
     pub path: String,
     pub name: String,
-    /// `output` for saved agent output, `attachment` for a pasted prompt image.
+    /// `output` for saved agent output, `attachment` for a pasted prompt image,
+    /// `changed` for an image or PDF a task changed in its workspace.
     pub source: &'static str,
     pub project_id: String,
-    /// The newest attempt that worked in the file's workspace; absent for attachments.
+    /// The attempt that produced the file, or the newest one in its workspace; absent
+    /// for attachments.
     pub run_id: Option<String>,
     pub size: u64,
     /// Unix milliseconds.
@@ -149,14 +159,155 @@ fn list(roots: &[Root]) -> Vec<LibraryFile> {
     files
 }
 
-/// `path` when it is a regular file inside one of the Library's folders.
-fn confined(roots: &[Root], path: &str) -> Result<PathBuf, String> {
+fn file_extension(path: &Path) -> String {
+    path.extension()
+        .map(|extension| extension.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
+/// The newest attempt in each workspace that still exists, newest first. An attempt that
+/// edited the project checkout in place is skipped once the checkout moved past it, since
+/// its diff from the base would then include later work.
+fn changed_sources(runs: &[TaskRun]) -> Vec<&TaskRun> {
+    let mut newest: BTreeMap<&str, &TaskRun> = BTreeMap::new();
+    for run in runs {
+        if run.workspace.is_empty() || run.base_head.is_empty() {
+            continue;
+        }
+        if newest
+            .get(run.workspace.as_str())
+            .is_none_or(|known| run.started_at > known.started_at)
+        {
+            newest.insert(&run.workspace, run);
+        }
+    }
+    let mut sources: Vec<_> = newest.into_values().collect();
+    sources.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    sources
+        .into_iter()
+        .filter(|run| Path::new(&run.workspace).is_dir())
+        .filter(|run| {
+            let ended = super::change_stats::ended_in_place(
+                &run.workspace,
+                &run.project_path,
+                run.ended_at.as_deref(),
+            );
+            !ended.is_some_and(|ended| {
+                super::change_stats::moved_since(Path::new(&run.workspace), &run.base_head, ended)
+            })
+        })
+        .take(MAX_CHANGED_WORKSPACES)
+        .collect()
+}
+
+/// Images and PDFs each source attempt added or changed since its base, committed or not,
+/// leaving out Jackalope's own folders, which are listed separately.
+fn changed(runs: &[TaskRun]) -> Vec<LibraryFile> {
+    let mut files = Vec::new();
+    for run in changed_sources(runs) {
+        let workspace = Path::new(&run.workspace);
+        let Ok(root) = dunce::canonicalize(workspace) else {
+            continue;
+        };
+        let Ok(diff) = repo::git_exact(
+            workspace,
+            &[
+                "diff",
+                "--name-only",
+                "-z",
+                "--no-renames",
+                "--diff-filter=d",
+                &run.base_head,
+                "--",
+            ],
+            Policy::Inspection,
+        ) else {
+            continue;
+        };
+        let untracked = repo::untracked_files(workspace, Policy::Inspection).unwrap_or_default();
+        let mut seen = HashSet::new();
+        let mut kept = 0;
+        for relative in diff
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(str::to_string)
+            .chain(untracked)
+        {
+            if kept >= MAX_CHANGED_PER_WORKSPACE {
+                break;
+            }
+            let ours = relative.starts_with(".jackalope/") || relative.starts_with(".worktrees/");
+            if ours
+                || !CHANGED_TYPES.contains(&file_extension(Path::new(&relative)).as_str())
+                || !seen.insert(relative.clone())
+            {
+                continue;
+            }
+            let Ok(file) = dunce::canonicalize(root.join(&relative)) else {
+                continue;
+            };
+            let Ok(metadata) = std::fs::metadata(&file) else {
+                continue;
+            };
+            if !file.starts_with(&root) || !metadata.is_file() {
+                continue;
+            }
+            kept += 1;
+            files.push(LibraryFile {
+                name: file
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| relative.clone()),
+                path: file.to_string_lossy().into_owned(),
+                source: "changed",
+                project_id: run.project_id.clone(),
+                run_id: Some(run.id.clone()),
+                size: metadata.len(),
+                modified: metadata
+                    .modified()
+                    .ok()
+                    .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |since| since.as_millis() as u64),
+            });
+        }
+    }
+    files
+}
+
+/// Changed files from the latest listing. Previews and opens of a changed file are allowed
+/// only for paths a listing found, so the caller cannot name any other file in a repository.
+static CHANGED: Mutex<Option<HashSet<PathBuf>>> = Mutex::new(None);
+
+fn remember_changed(files: &[LibraryFile]) {
+    if let Ok(mut changed) = CHANGED.lock() {
+        *changed = Some(
+            files
+                .iter()
+                .filter(|file| file.source == "changed")
+                .map(|file| PathBuf::from(&file.path))
+                .collect(),
+        );
+    }
+}
+
+fn listed_changes() -> HashSet<PathBuf> {
+    CHANGED
+        .lock()
+        .ok()
+        .and_then(|changed| changed.clone())
+        .unwrap_or_default()
+}
+
+/// `path` when it is a regular file inside one of the Library's folders, or a changed file
+/// the latest listing found.
+fn confined(roots: &[Root], changed: &HashSet<PathBuf>, path: &str) -> Result<PathBuf, String> {
     let file = dunce::canonicalize(path).map_err(|_| "This file is no longer available")?;
-    let inside = roots
-        .iter()
-        .any(|root| dunce::canonicalize(&root.folder).is_ok_and(|folder| file.starts_with(folder)));
+    let inside = changed.contains(&file)
+        || roots.iter().any(|root| {
+            dunce::canonicalize(&root.folder).is_ok_and(|folder| file.starts_with(folder))
+        });
     if !inside || !file.is_file() {
-        return Err("Only files in Jackalope's output and attachment folders can be opened".into());
+        return Err("Only files Jackalope work saved or changed can be opened here".into());
     }
     Ok(file)
 }
@@ -164,9 +315,22 @@ fn confined(roots: &[Root], path: &str) -> Result<PathBuf, String> {
 #[tauri::command]
 pub async fn library_files(state: State<'_, TaskRuntime>) -> Result<Vec<LibraryFile>, String> {
     let runs = state.inner().integration_runs()?;
-    tauri::async_runtime::spawn_blocking(move || list(&roots(&runs)))
-        .await
-        .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let changed = changed(&runs);
+        remember_changed(&changed);
+        let mut files = list(&roots(&runs));
+        let known: HashSet<String> = files.iter().map(|file| file.path.clone()).collect();
+        files.extend(
+            changed
+                .into_iter()
+                .filter(|file| !known.contains(&file.path)),
+        );
+        files.sort_by(|a, b| b.modified.cmp(&a.modified).then(a.path.cmp(&b.path)));
+        files.truncate(MAX_FILES);
+        files
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// An image's bytes for a thumbnail, up to the screenshot preview limit.
@@ -177,12 +341,8 @@ pub async fn library_file_preview(
 ) -> Result<Vec<u8>, String> {
     let runs = state.inner().integration_runs()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let file = confined(&roots(&runs), &path)?;
-        let extension = file
-            .extension()
-            .map(|extension| extension.to_string_lossy().to_ascii_lowercase())
-            .unwrap_or_default();
-        if !IMAGE_TYPES.contains(&extension.as_str()) {
+        let file = confined(&roots(&runs), &listed_changes(), &path)?;
+        if !IMAGE_TYPES.contains(&file_extension(&file).as_str()) {
             return Err("Only images can be previewed".into());
         }
         match super::platform::read_capped(&file, super::artifacts::screenshot_limit()) {
@@ -205,13 +365,16 @@ pub async fn library_file_open(
     path: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
-    let file = confined(&roots(&state.inner().integration_runs()?), &path)?;
-    let extension = file
-        .extension()
-        .map(|extension| extension.to_string_lossy().to_ascii_lowercase())
-        .unwrap_or_default();
-    if !OPENABLE_TYPES.contains(&extension.as_str()) {
-        return Err("Only documents and images open from the Library. Show it in the file manager instead.".into());
+    let file = confined(
+        &roots(&state.inner().integration_runs()?),
+        &listed_changes(),
+        &path,
+    )?;
+    if !OPENABLE_TYPES.contains(&file_extension(&file).as_str()) {
+        return Err(
+            "Only documents and images open from the Library. Show it in the file manager instead."
+                .into(),
+        );
     }
     app.opener()
         .open_path(file.to_string_lossy(), None::<&str>)
@@ -269,15 +432,89 @@ mod tests {
             ]
         );
 
-        assert!(confined(&roots, &output.join("report.html").to_string_lossy()).is_ok());
-        assert!(confined(&roots, &base.join("private.png").to_string_lossy()).is_err());
         assert!(confined(
             &roots,
+            &HashSet::new(),
+            &output.join("report.html").to_string_lossy()
+        )
+        .is_ok());
+        assert!(confined(
+            &roots,
+            &HashSet::new(),
+            &base.join("private.png").to_string_lossy()
+        )
+        .is_err());
+        assert!(confined(
+            &roots,
+            &HashSet::new(),
             &output.join("../../../../private.png").to_string_lossy()
         )
         .is_err());
-        assert!(confined(&roots, &output.join("charts").to_string_lossy()).is_err());
+        assert!(confined(
+            &roots,
+            &HashSet::new(),
+            &output.join("charts").to_string_lossy()
+        )
+        .is_err());
         std::fs::remove_dir_all(&base).unwrap();
         assert!(list(&roots).is_empty());
+    }
+
+    #[test]
+    fn lists_images_and_pdfs_a_task_changed_and_only_those_open() {
+        let base = std::env::temp_dir().join(format!("jackalope-library-{}", uuid::Uuid::new_v4()));
+        let project = base.join("project");
+        std::fs::create_dir_all(project.join("assets")).unwrap();
+        let git = |args: &[&str]| repo::git(&project, args, Policy::Isolated).unwrap();
+        git(&["init", "-q", "-b", "main"]);
+        git(&["config", "user.email", "t@t"]);
+        git(&["config", "user.name", "t"]);
+        std::fs::write(project.join("assets/old.png"), "old").unwrap();
+        std::fs::write(project.join("assets/gone.png"), "gone").unwrap();
+        std::fs::write(project.join("untouched.png"), "same").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-qm", "base"]);
+        let base_head = git(&["rev-parse", "HEAD"]);
+        git(&["worktree", "add", "-q", "-b", "task", ".worktrees/task"]);
+        let worktree = project.join(".worktrees/task");
+        std::fs::write(worktree.join("assets/old.png"), "new").unwrap();
+        std::fs::remove_file(worktree.join("assets/gone.png")).unwrap();
+        std::fs::write(worktree.join("spec.pdf"), "pdf").unwrap();
+        std::fs::write(worktree.join("notes.md"), "md").unwrap();
+        std::fs::create_dir_all(worktree.join(".jackalope/artifacts")).unwrap();
+        std::fs::write(worktree.join(".jackalope/artifacts/out.png"), "out").unwrap();
+
+        let mut task = run("task", &project, &worktree, "2026-02-01T00:00:00Z");
+        task.base_head = base_head;
+        let files = changed(&[task.clone()]);
+        let mut names: Vec<_> = files
+            .iter()
+            .map(|file| (file.name.as_str(), file.source))
+            .collect();
+        names.sort();
+        assert_eq!(names, vec![("old.png", "changed"), ("spec.pdf", "changed")]);
+        assert!(files
+            .iter()
+            .all(|file| file.run_id.as_deref() == Some("task")));
+
+        let roots = roots(&[task]);
+        let allowed: HashSet<PathBuf> =
+            files.iter().map(|file| PathBuf::from(&file.path)).collect();
+        let changed_png = worktree.join("assets/old.png");
+        assert!(confined(&roots, &allowed, &changed_png.to_string_lossy()).is_ok());
+        assert!(confined(&roots, &HashSet::new(), &changed_png.to_string_lossy()).is_err());
+        assert!(confined(
+            &roots,
+            &allowed,
+            &worktree.join("untouched.png").to_string_lossy()
+        )
+        .is_err());
+        assert!(confined(
+            &roots,
+            &allowed,
+            &worktree.join("notes.md").to_string_lossy()
+        )
+        .is_err());
+        std::fs::remove_dir_all(&base).unwrap();
     }
 }
