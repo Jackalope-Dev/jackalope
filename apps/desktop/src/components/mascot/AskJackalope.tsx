@@ -137,52 +137,55 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
         <label className="sr-only" htmlFor="helper-message">
           Message Jackalope
         </label>
-        <Textarea
-          ref={input}
-          id="helper-message"
-          value={helper.draft}
-          maxLength={8000}
-          rows={2}
-          placeholder={native ? 'Ask Jackalope…' : 'Open the desktop app to use your agent'}
-          disabled={!native}
-          onChange={(event) => useHelperStore.setState({ draft: event.target.value })}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (!working) void helper.send();
-            }
-          }}
-        />
-        <div className="helper-buttons">
-          {!!count && (
-            <button
-              type="button"
-              className="helper-text-button"
-              disabled={working}
-              title="Archive this conversation locally and start a new one"
-              onClick={() => void action(() => invokeNative('helper_new_conversation'))}
-            >
-              New conversation
-            </button>
-          )}
-          {working ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => void action(() => invokeNative('helper_stop'))}
-            >
-              <Square size={14} /> Stop
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!native || !helper.draft.trim() || !!helper.view.error}
-            >
-              Send
-            </Button>
-          )}
+        {/* One field: the draft and its buttons share a single bordered box. */}
+        <div className="helper-field">
+          <Textarea
+            ref={input}
+            id="helper-message"
+            value={helper.draft}
+            maxLength={8000}
+            rows={2}
+            placeholder={native ? 'Ask Jackalope…' : 'Open the desktop app to use your agent'}
+            disabled={!native}
+            onChange={(event) => useHelperStore.setState({ draft: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                if (!working) void helper.send();
+              }
+            }}
+          />
+          <div className="helper-buttons">
+            {!!count && (
+              <button
+                type="button"
+                className="helper-text-button"
+                disabled={working}
+                title="Archive this conversation locally and start a new one"
+                onClick={() => void action(() => invokeNative('helper_new_conversation'))}
+              >
+                New conversation
+              </button>
+            )}
+            {working ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => void action(() => invokeNative('helper_stop'))}
+              >
+                <Square size={14} /> Stop
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!native || !helper.draft.trim() || !!helper.view.error}
+              >
+                Send
+              </Button>
+            )}
+          </div>
         </div>
         <small className="helper-disclaimer">
           {agent ? `Uses your default agent, ${agent}.` : 'Choose a default agent in Agents.'}{' '}

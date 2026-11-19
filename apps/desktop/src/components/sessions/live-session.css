@@ -275,26 +275,43 @@
   width: 76px;
   height: 76px;
 }
+/* The card is the field, like the new-work composer: no second box around the draft. */
 .live-composer {
-  padding: 12px;
+  padding: 10px 10px 8px 14px;
   margin: 12px max(20px, (100% - 56rem) / 2) 20px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
   flex: none;
+  cursor: text;
+}
+.live-composer:focus-within {
+  border-color: var(--color-border-focus);
+  outline: 1px solid var(--color-border-focus);
 }
 .live-composer textarea {
-  resize: vertical;
-  max-height: 180px;
+  field-sizing: content;
   width: 100%;
+  min-height: 48px;
+  max-height: 180px;
+  padding: 4px 2px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.live-composer textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .live-composer-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 4px;
+  cursor: default;
 }
 /* Attach sits on the left; sending actions stay on the right. */
 .live-composer-actions > [aria-label="Attach files"] {
