@@ -60,6 +60,21 @@ pub fn desktop_control_theme(
     Ok(())
 }
 
+/// Passes the bar's button presses and pauses to the dev app's terminal as
+/// `indicator:` lines; release builds ignore them.
+fn forward_trace(file: &std::path::Path) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return;
+    };
+    let _ = std::fs::remove_file(file);
+    for line in text.lines().filter(|line| !line.trim().is_empty()).take(50) {
+        eprintln!("indicator: {}", line.chars().take(200).collect::<String>());
+    }
+}
+
 /// Brings the attempt's conversation, or its task, forward in Jackalope.
 fn open_in_app(runtime: &TaskRuntime, id: &str) {
     use tauri::{Emitter, Manager};
@@ -208,13 +223,18 @@ impl Indicator {
     fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
         std::fs::write(directory.join("theme"), accent()).map_err(|e| e.to_string())?;
         std::fs::write(directory.join("look"), look()).map_err(|e| e.to_string())?;
+        std::fs::write(
+            directory.join("logo.png"),
+            include_bytes!("../../../icons/tray-icon-template.png"),
+        )
+        .map_err(|e| e.to_string())?;
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::platform::command(
             json!({"action":"indicator", "window":indicator_window(grant),
             "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
             "file":directory.join("state"),"theme":directory.join("theme"),
-            "look":directory.join("look"),"agent":grant.agent}),
+            "look":directory.join("look"),"logo":directory.join("logo.png"),"agent":grant.agent}),
         )?;
         command
             .stdin(Stdio::null())
@@ -375,6 +395,7 @@ impl Indicator {
         let theme_file = directory.join("theme");
         let look_file = directory.join("look");
         let open_file = directory.join("open");
+        let trace_file = directory.join("trace");
         std::thread::spawn(move || {
             let mut prior_color = String::new();
             let mut prior_look = String::new();
@@ -406,6 +427,7 @@ impl Indicator {
                 if std::fs::remove_file(&open_file).is_ok() {
                     open_in_app(&runtime, &id);
                 }
+                forward_trace(&trace_file);
             }
         });
     }

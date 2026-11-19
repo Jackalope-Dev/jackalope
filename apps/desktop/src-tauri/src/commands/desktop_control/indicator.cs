@@ -206,18 +206,20 @@ public sealed class JackalopeWindowIndicator : Form {
             bool ours=(key.Flags&0x10)!=0 && key.Extra.ToUInt64()==InputTag;
             if(!ours) {
                 if(key.Key==27 && ((int)message==0x100 || (int)message==0x104)) { Cancel(); return new IntPtr(1); }
-                if(((int)message==0x100 || (int)message==0x104) && GetForegroundWindow()!=Handle && state=="active") Pause("Keyboard activity detected");
+                if(((int)message==0x100 || (int)message==0x104) && GetForegroundWindow()!=Handle && state=="active") Pause("You pressed a key");
             }
         }
         return CallNextHookEx(keyboardHook,code,message,data);
     }
+    // WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN, WM_MOUSEWHEEL, WM_MOUSEHWHEEL.
+    static bool Retakes(int message) { return message==0x201 || message==0x204 || message==0x207 || message==0x20B || message==0x20A || message==0x20E; }
     IntPtr OnMouse(int code,IntPtr message,IntPtr data) {
         if(code>=0 && state=="active") {
             var input=(MouseData)Marshal.PtrToStructure(data,typeof(MouseData));
             bool ours=(input.Flags&1)!=0 && input.Extra.ToUInt64()==InputTag;
             if(ours) pointer=input.Point;
-            bool moved=Math.Abs(input.Point.X-pointer.X)>2 || Math.Abs(input.Point.Y-pointer.Y)>2;
-            if(!ours && ((int)message!=0x200 || moved) && !(Visible && Bounds.Contains(input.Point.X,input.Point.Y))) Pause("Mouse activity detected");
+            // Only taking control back pauses: a button press or a wheel turn, not moving.
+            if(!ours && Retakes((int)message) && !(Visible && Bounds.Contains(input.Point.X,input.Point.Y))) Pause((int)message==0x20A || (int)message==0x20E ? "You scrolled" : "You clicked");
         }
         return CallNextHookEx(mouseHook,code,message,data);
     }

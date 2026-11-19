@@ -722,7 +722,11 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         let first = AXUIElementCreateApplication(getpid())
         try require(refFor(first) == refFor(first), "Element refs are not stable.")
         try require(keyCodes["F12"] != nil && modifierFlags["Command"] != nil, "Key table is incomplete.")
-        return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards, element refs, keys"]
+        try require(Indicator.retakes(.leftMouseDown) && Indicator.retakes(.keyDown) && Indicator.retakes(.scrollWheel),
+                    "Clicks, key presses and scrolling must pause control.")
+        try require(!Indicator.retakes(.mouseMoved) && !Indicator.retakes(.leftMouseUp) && !Indicator.retakes(.flagsChanged),
+                    "Pointer movement, releases and modifiers alone must not pause control.")
+        return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards, element refs, keys, retaking input"]
     }
     if action == "request_permissions" {
         _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
@@ -923,17 +927,24 @@ final class Indicator: NSObject {
     let lookFile: URL?
     let tag = Int64.random(in: 1...Int64.max)
     let parent = getppid()
-    static let expandedSize = NSSize(width: 470, height: 40)
+    static let height: CGFloat = 40
+    static let maxWidth: CGFloat = 520
     static let collapsedSize = NSSize(width: 40, height: 40)
-    let panel = NSPanel(contentRect: NSRect(origin: .zero, size: Indicator.expandedSize),
+    let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 40),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     let pill = HoverView()
+    /// The Jackalope mark, as in the app's title bar.
+    let logo = NSImageView()
+    let logoFile: URL?
     let dot = NSView()
     let label = NSTextField(labelWithString: "")
-    let toggle = NSButton(title: "Resume", target: nil, action: nil)
-    let stop = NSButton(title: "Stop", target: nil, action: nil)
-    let open = NSButton(title: "Open", target: nil, action: nil)
+    let detail = NSTextField(labelWithString: "")
+    let toggle = NSButton(title: "", target: nil, action: nil)
+    let stop = NSButton(title: "", target: nil, action: nil)
+    let open = NSButton(title: "", target: nil, action: nil)
     let fold = NSButton(title: "", target: nil, action: nil)
+    /// After folding, hovering doesn't unfold until the pointer has left the pill once.
+    var holdFold = false
     /// Folded to a small chip by the person; hovering shows the full pill again. The chip and
     /// the frame always stay visible while control is active.
     var folded = false
@@ -945,6 +956,7 @@ final class Indicator: NSObject {
     var surface = hexColor("#1d1b22")!
     var textColor = hexColor("#f4f3f7")!
     var lookKey = ""
+    var lastFrameStatus = ""
     var status = "paused"
     var reason = "Click Resume to begin"
     var epoch: UInt64 = 1
@@ -964,6 +976,7 @@ final class Indicator: NSObject {
         if scope == "desktop" { selected = nil } else { selected = try SelectedWindow(identity) }
         stateFile = URL(fileURLWithPath: file); themeFile = URL(fileURLWithPath: theme)
         lookFile = (request["look"] as? String).map { URL(fileURLWithPath: $0) }
+        logoFile = (request["logo"] as? String).map { URL(fileURLWithPath: $0) }
         super.init()
         readTheme()
     }
@@ -999,45 +1012,93 @@ final class Indicator: NSObject {
         dot.layer?.backgroundColor = accent.cgColor
         dot.layer?.shadowColor = accent.cgColor
         label.textColor = textColor
-        for (button, emphasis) in [(toggle, true), (stop, false), (open, false)] {
-            button.attributedTitle = NSAttributedString(string: button.title, attributes: [
-                .foregroundColor: emphasis ? accent : textColor,
-                .font: NSFont.systemFont(ofSize: 12, weight: emphasis ? .semibold : .medium),
-            ])
-        }
-        fold.contentTintColor = textColor.withAlphaComponent(0.7)
+        logo.contentTintColor = textColor
+        dot.layer?.borderColor = surface.cgColor
+        detail.textColor = textColor.withAlphaComponent(0.62)
+        toggle.contentTintColor = accent
+        for button in [stop, open, fold] { button.contentTintColor = textColor.withAlphaComponent(0.78) }
         for frame in frames { styleFrame(frame) }
     }
 
-    /// Lays the pill out folded (a small chip) or full, keeping it centred where it was.
+    /// Lays the pill out folded (a small chip) or sized to its content, keeping it centred
+    /// where it was. Text never runs under the buttons; only a long pause reason shortens.
     func layoutPill() {
-        let showFull = !folded || hovering
-        let size = showFull ? Indicator.expandedSize : Indicator.collapsedSize
+        let showFull = !folded || (hovering && !holdFold)
+        let height = Indicator.height
+        let pad: CGFloat = 12, gap: CGFloat = 8, button: CGFloat = 28, buttonGap: CGFloat = 2
+        let buttons = [toggle, stop, open, fold]
+        let controls = CGFloat(buttons.count) * button + CGFloat(buttons.count - 1) * buttonGap
+        let titleSize = label.fittingSize
+        let mark: CGFloat = 16
+        let fixed = pad + mark + gap + titleSize.width + 6 + gap * 1.5 + controls + 6
+        let detailWidth = max(0, min(detail.fittingSize.width, Indicator.maxWidth - fixed))
+        let size = showFull ? NSSize(width: ceil(fixed + detailWidth), height: height) : Indicator.collapsedSize
         let old = panel.frame
         let origin = NSPoint(x: old.midX - size.width / 2, y: old.maxY - size.height)
         if old.size != size { panel.setFrame(NSRect(origin: origin, size: size), display: true) }
         pill.frame = NSRect(origin: .zero, size: size)
-        pill.layer?.cornerRadius = size.height / 2
-        dot.frame = showFull ? NSRect(x: 15, y: 15, width: 10, height: 10) : NSRect(x: 14, y: 14, width: 12, height: 12)
-        dot.layer?.cornerRadius = dot.frame.width / 2
-        for view in [label, toggle, stop, open, fold] as [NSView] { view.isHidden = !showFull }
-        label.frame = NSRect(x: 34, y: 11, width: 214, height: 18)
-        toggle.frame = NSRect(x: 252, y: 6, width: 62, height: 28)
-        stop.frame = NSRect(x: 316, y: 6, width: 48, height: 28)
-        open.frame = NSRect(x: 366, y: 6, width: 58, height: 28)
-        fold.frame = NSRect(x: 428, y: 8, width: 30, height: 24)
+        pill.layer?.cornerRadius = height / 2
+        let markX = showFull ? pad : (size.width - mark) / 2
+        logo.frame = NSRect(x: markX, y: (height - mark) / 2, width: mark, height: mark)
+        // The live dot sits on the mark's lower corner.
+        let dotSize: CGFloat = 7
+        dot.frame = NSRect(x: markX + mark - dotSize + 2, y: (height - mark) / 2 - 2, width: dotSize, height: dotSize)
+        dot.layer?.cornerRadius = dotSize / 2
+        for view in [label, detail] + buttons as [NSView] { view.isHidden = !showFull }
+        guard showFull else {
+            pill.setAccessibilityLabel("\(agent) is working here. Hover to show controls.")
+            return
+        }
+        pill.setAccessibilityLabel(nil)
+        var x = pad + mark + gap
+        label.frame = NSRect(x: x, y: (height - titleSize.height) / 2, width: titleSize.width, height: titleSize.height)
+        x += titleSize.width + 6
+        let detailHeight = detail.fittingSize.height
+        detail.frame = NSRect(x: x, y: (height - detailHeight) / 2, width: detailWidth, height: detailHeight)
+        x = size.width - 6 - controls
+        for item in buttons {
+            item.frame = NSRect(x: x, y: (height - button) / 2, width: button, height: button)
+            x += button + buttonGap
+        }
+        let active = status == "active"
+        toggle.image = NSImage(systemSymbolName: active ? "pause.fill" : "play.fill", accessibilityDescription: active ? "Pause" : "Resume")
+        toggle.toolTip = active ? "Pause" : "Resume"
+        stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: "Stop")
+        stop.toolTip = "Stop (Esc)"
+        open.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: "Open in Jackalope")
+        open.toolTip = "Open in Jackalope"
         fold.image = NSImage(systemSymbolName: folded ? "chevron.down" : "chevron.up", accessibilityDescription: folded ? "Show the full bar" : "Fold to a small chip")
-        pill.setAccessibilityLabel(showFull ? nil : "\(agent) is using \(subject). Hover to show controls.")
+        fold.toolTip = folded ? "Show the full bar" : "Fold to a small chip"
     }
 
     @objc func toggleFold() {
         folded.toggle()
+        // The pointer is on the pill right now; let the fold show until it leaves.
+        holdFold = folded
+        note("fold \(folded ? "folded" : "unfolded")")
         layoutPill()
+    }
+
+    /// A line for the app's debug trace (`indicator:` in the dev log).
+    func note(_ line: String) {
+        let file = stateFile.deletingLastPathComponent().appendingPathComponent("trace")
+        let entry = line.replacingOccurrences(of: "\n", with: " ") + "\n"
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile(); handle.write(entry.data(using: .utf8)!); try? handle.close()
+        } else {
+            try? entry.write(to: file, atomically: true, encoding: .utf8)
+        }
     }
 
     /// Asks Jackalope to bring this conversation forward.
     @objc func openInApp() {
+        note("open pressed")
         try? "open".write(to: stateFile.deletingLastPathComponent().appendingPathComponent("open"), atomically: true, encoding: .utf8)
+    }
+
+    /// "working here", or where the agent works for app and desktop grants.
+    var working: String {
+        scope == "desktop" ? "working on your computer" : scope == "app" ? "working in \(name)" : "working here"
     }
 
     var subject: String {
@@ -1054,10 +1115,15 @@ final class Indicator: NSObject {
         let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(reason.replacingOccurrences(of: "|", with: "/"))"
         do { try text.write(to: stateFile, atomically: true, encoding: .utf8) }
         catch { NSApp.terminate(nil) }
-        label.stringValue = status == "active" ? "\(agent) is using \(subject) · Esc stops" : "Paused · \(reason)"
-        let title = status == "active" ? "Pause" : "Resume"
-        if toggle.title != title { toggle.title = title; restyle() }
+        let title = status == "active" ? "\(agent) is \(working)" : "Paused"
+        let secondary = status == "active" ? "Esc to stop" : reason
+        if label.stringValue != title || detail.stringValue != secondary || toggle.toolTip != (status == "active" ? "Pause" : "Resume") {
+            label.stringValue = title
+            detail.stringValue = secondary
+            layoutPill()
+        }
         updateDot()
+        if lastFrameStatus != status { lastFrameStatus = status; for frame in frames { styleFrame(frame) } }
         updateFrames()
     }
 
@@ -1066,7 +1132,7 @@ final class Indicator: NSObject {
     func updateFrames() {
         var areas: [NSRect] = []
         let room = Indicator.frameRoom
-        if status == "active" {
+        if status == "active" || status == "paused" {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
             if scope == "window", let rect = try? selected?.bounds() {
                 areas = [NSRect(x: rect.minX - room, y: top - rect.maxY - room,
@@ -1093,6 +1159,16 @@ final class Indicator: NSObject {
             line.shadowOffset = .zero
             line.shadowRadius = 7
             frame.contentView?.layer?.addSublayer(line)
+            // A soft glow along the inside edges while the agent is in control: a wide
+            // shadowed stroke, masked to the window so only its inward half shows.
+            let glow = CAShapeLayer()
+            glow.fillColor = NSColor.clear.cgColor
+            glow.lineWidth = 2
+            glow.shadowOffset = .zero
+            glow.shadowRadius = 16
+            let mask = CAShapeLayer()
+            glow.mask = mask
+            frame.contentView?.layer?.insertSublayer(glow, below: line)
             frames.append(frame)
             styleFrame(frame)
         }
@@ -1112,14 +1188,40 @@ final class Indicator: NSObject {
     /// A thin accent line with a soft glow, rounded like the window's corners.
     func styleFrame(_ frame: NSWindow) {
         guard let view = frame.contentView, let line = view.layer?.sublayers?.first as? CAShapeLayer else { return }
-        let inset = Indicator.frameRoom - 2
+        // The line sits just inside the window's edge, so a window that fills the screen
+        // still shows it on all four sides.
+        let inset = Indicator.frameRoom + 1
         let rect = view.bounds.insetBy(dx: inset, dy: inset)
         let radius: CGFloat = scope == "window" ? 12 : 0
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        let active = status == "active"
+        // Paused reads as paused: a neutral, quieter line and no inner glow.
+        let tone = active ? accent : textColor.withAlphaComponent(0.45)
         line.frame = view.bounds
-        line.path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-        line.strokeColor = accent.cgColor
-        line.shadowColor = accent.cgColor
-        line.shadowOpacity = reduceTransparency ? 0 : 0.75
+        line.path = path
+        line.strokeColor = tone.cgColor
+        line.shadowColor = tone.cgColor
+        line.shadowOpacity = reduceTransparency || !active ? 0 : 0.75
+        guard let glow = view.layer?.sublayers?.first(where: { $0 !== line }) as? CAShapeLayer,
+              let mask = glow.mask as? CAShapeLayer else { return }
+        glow.frame = view.bounds
+        glow.path = path
+        glow.strokeColor = accent.withAlphaComponent(0.6).cgColor
+        glow.shadowColor = accent.cgColor
+        mask.frame = view.bounds
+        mask.path = path
+        let showGlow = active && !reduceTransparency
+        glow.isHidden = !showGlow
+        let breathing = glow.animation(forKey: "breathe") != nil
+        if showGlow && !reduceMotion && !breathing {
+            let breathe = CABasicAnimation(keyPath: "shadowOpacity")
+            breathe.fromValue = 0.55; breathe.toValue = 0.3; breathe.duration = 2.4
+            breathe.autoreverses = true; breathe.repeatCount = .infinity
+            glow.add(breathe, forKey: "breathe")
+        } else if (!showGlow || reduceMotion) && breathing {
+            glow.removeAnimation(forKey: "breathe")
+        }
+        glow.shadowOpacity = 0.5
     }
 
     /// The live dot pulses gently while the agent is in control.
@@ -1138,7 +1240,12 @@ final class Indicator: NSObject {
     }
 
     func pause(_ message: String) {
-        if status == "active" { status = "paused"; reason = message; epoch += 1; save() }
+        if status == "active" { note("paused: \(message)"); status = "paused"; reason = message; epoch += 1; save() }
+    }
+
+    @objc func stopPressed() {
+        note("stop pressed")
+        cancel()
     }
 
     @objc func cancel() {
@@ -1164,7 +1271,8 @@ final class Indicator: NSObject {
     }
 
     @objc func change() {
-        if status == "active" { pause("Paused by the user"); return }
+        note(status == "active" ? "pause pressed" : "resume pressed")
+        if status == "active" { pause("Paused by you"); return }
         do {
             try checkPermissions()
             guard let tap = tap else { throw ControlError("Input monitor unavailable") }
@@ -1188,12 +1296,28 @@ final class Indicator: NSObject {
         } catch { reason = String(describing: error); save() }
     }
 
+    /// Physical input that means the person is taking control back: a click, a key press or
+    /// a scroll. Moving the mouse alone doesn't pause, and neither do modifier keys on
+    /// their own or button and key releases.
+    static func retakes(_ type: CGEventType) -> Bool {
+        [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel].contains(type)
+    }
+
+    /// Whether a screen point (top-left origin) is on this indicator's own pill, whose
+    /// buttons act on a click instead of counting it as taking control back.
+    func onPill(_ point: CGPoint) -> Bool {
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        return panel.isVisible && panel.frame.contains(NSPoint(x: point.x, y: top - point.y))
+    }
+
     func event(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { resumeTicket += 1; pause("Input monitor interrupted"); return }
+        // The agent's own input carries this indicator's tag; everything else is the person.
         if event.getIntegerValueField(.eventSourceUserData) == tag { return }
+        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 { resumeTicket += 1; cancel(); return }
+        guard Indicator.retakes(type), !onPill(event.location) else { return }
         resumeTicket += 1
-        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 { cancel(); return }
-        pause("Physical input detected")
+        pause(type == .keyDown ? "You pressed a key" : type == .scrollWheel ? "You scrolled" : "You clicked")
     }
 
     func run() throws {
@@ -1229,20 +1353,30 @@ final class Indicator: NSObject {
         pill.onHover = { [weak self] inside in
             guard let self = self else { return }
             self.hovering = inside
+            if !inside { self.holdFold = false }
             if self.folded { self.layoutPill() }
         }
         dot.wantsLayer = true
-        dot.layer?.shadowOpacity = 0.9; dot.layer?.shadowRadius = 5; dot.layer?.shadowOffset = .zero
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.lineBreakMode = .byTruncatingTail
-        for (button, action) in [(toggle, #selector(change)), (stop, #selector(cancel)), (open, #selector(openInApp)), (fold, #selector(toggleFold))] {
+        dot.layer?.borderWidth = 1.5
+        dot.layer?.shadowOpacity = 0.9; dot.layer?.shadowRadius = 4; dot.layer?.shadowOffset = .zero
+        if let file = logoFile, let image = NSImage(contentsOf: file) {
+            image.isTemplate = true
+            logo.image = image
+        }
+        logo.imageScaling = .scaleProportionallyUpOrDown
+        logo.setAccessibilityElement(false)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        detail.font = .systemFont(ofSize: 12)
+        detail.lineBreakMode = .byTruncatingTail
+        for (button, action) in [(toggle, #selector(change)), (stop, #selector(stopPressed)), (open, #selector(openInApp)), (fold, #selector(toggleFold))] {
             button.isBordered = false; button.target = self; button.action = action
+            button.imagePosition = .imageOnly; button.imageScaling = .scaleProportionallyDown
+            button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         }
         stop.setAccessibilityLabel("Stop desktop control")
         open.setAccessibilityLabel("Open the conversation in Jackalope")
-        fold.imagePosition = .imageOnly
         panel.contentView = pill
-        for view in [dot, label, toggle, stop, open, fold] as [NSView] { pill.addSubview(view) }
+        for view in [logo, dot, label, detail, toggle, stop, open, fold] as [NSView] { pill.addSubview(view) }
         restyle()
         layoutPill()
         var screen = NSScreen.main
@@ -1252,8 +1386,8 @@ final class Indicator: NSObject {
             screen = NSScreen.screens.first(where: { $0.frame.contains(cocoaPoint) }) ?? NSScreen.main
         }
         guard let frame = screen?.visibleFrame else { throw ControlError("Selected display is unavailable.") }
-        panel.setFrameOrigin(NSPoint(x: frame.midX - Indicator.expandedSize.width / 2,
-                                     y: frame.maxY - Indicator.expandedSize.height - 8))
+        panel.setFrameOrigin(NSPoint(x: frame.midX - panel.frame.width / 2,
+                                     y: frame.maxY - Indicator.height - 8))
         panel.orderFrontRegardless()
         save()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
