@@ -2101,8 +2101,7 @@ mod tests {
     #[test]
     fn a_plan_for_a_deleted_project_does_not_fail_other_projects() {
         let fixture = Fixture::new();
-        let runs = vec![fixture.run(1, "kept.txt", "kept
-")];
+        let runs = vec![fixture.run(1, "kept.txt", "kept\n")];
         let plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
         let reachable = apply(&fixture.plans, &runs, &plan.id).unwrap();
         let mut gone = reachable.clone();
