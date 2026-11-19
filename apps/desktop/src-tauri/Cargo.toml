@@ -96,6 +96,7 @@ keyring = "=3.6.3"
 
 [patch.crates-io]
 glib = { path = "../../../patches/glib" }
+faster-hex = { path = "../../../patches/faster-hex" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", optional = true, features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }

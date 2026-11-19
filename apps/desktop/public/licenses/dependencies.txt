@@ -2750,13 +2750,11 @@ fnv 1.0.7 (LICENSE-APACHE)
 form_urlencoded 1.2.2 (LICENSE-APACHE)
 futures-lite 2.6.1 (LICENSE-APACHE)
 glob 0.3.4 (LICENSE-APACHE)
-hash32 0.3.1 (LICENSE-APACHE)
 hashbrown 0.12.3 (LICENSE-APACHE)
 hashbrown 0.14.5 (LICENSE-APACHE)
 hashbrown 0.15.5 (LICENSE-APACHE)
 hashbrown 0.16.1 (LICENSE-APACHE)
 hashbrown 0.17.1 (LICENSE-APACHE)
-heapless 0.8.0 (LICENSE-APACHE)
 heck 0.4.1 (LICENSE-APACHE)
 heck 0.5.0 (LICENSE-APACHE)
 hermit-abi 0.5.3 (LICENSE-APACHE)
@@ -11463,36 +11461,6 @@ SOFTWARE.
 
 ============================================================
 
-hash32 0.3.1 (LICENSE-MIT)
-
-Copyright (c) 2018 Jorge Aparicio
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-============================================================
-
 hashbrown 0.12.3 (LICENSE-MIT)
 hashbrown 0.14.5 (LICENSE-MIT)
 hashbrown 0.15.5 (LICENSE-MIT)
@@ -11500,36 +11468,6 @@ hashbrown 0.16.1 (LICENSE-MIT)
 hashbrown 0.17.1 (LICENSE-MIT)
 
 Copyright (c) 2016 Amanieu d'Antras
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-============================================================
-
-heapless 0.8.0 (LICENSE-MIT)
-
-Copyright (c) 2017 Jorge Aparicio
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
