@@ -125,7 +125,7 @@ changes must preserve both sides and old saved records.
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 
 Lock order is **coordinator state → execution guard → runtime state**, and the
-types carry it: coordinator code takes the guard through `Coordinator::transact` or
+types carry it. Coordinator code takes the guard through `Coordinator::transact` or
 `Coordinator::execution`, which need the locked coordinator state, and
 `TaskRuntime::start_locked` takes the `&ExecutionGuard` it runs under. Coordinated
 attempts start through `Coordinator::launch_assignment`, and ledger changes go through
@@ -319,4 +319,4 @@ and persistence. Rust tests use disposable repositories/profiles, with opt-in
 provider/browser trials separate. Worker tests use local workerd/D1/R2. Rendered
 checks and signed installed-upgrade trials supplement the suites; see [TODO.md](TODO.md).
 
-Store preview admission is owned by native `commands/execution_access.rs`: account verification supplies a bounded lease, checked before native launch/coordination/scheduled dispatch and PTY creation. The renderer presents connection/recovery state but cannot grant access. Store builds use Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).
+Store preview admission is owned by native `commands/execution_access.rs`. Account verification supplies a bounded lease, checked before native launch/coordination/scheduled dispatch and PTY creation. The renderer presents connection/recovery state but cannot grant access. Store builds use Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).

@@ -75,7 +75,7 @@ not an OS security boundary.
 Legacy profiles with no group remain readable. Grouping and renaming never change
 profile IDs or directories. Existing tasks retain their original profile binding
 when defaults change. Reconnecting the same profile with a different provider
-identity can change the credentials used by its continuations: use a new profile
+identity can change the credentials used by its continuations. Use a new profile
 for a different identity. Deleting an account deliberately blocks later uses of
 that saved profile instead of silently falling back to another account.
 
@@ -160,7 +160,7 @@ are replaced with `[redacted]` as written, JSON-escaped, base64 and URL-encoded 
 the result, activity, diagnostics, errors, questions, decisions, checks and
 streaming text before they are saved, shown or exported. Identifiers, statuses,
 timestamps and the person's own prompt are kept. The values live only in memory for
-the attempt. Redaction protects the record, not the value: the agent can still use
+the attempt. Redaction protects the record, not the value. The agent can still use
 or send what it can read, a value it transforms some other way is not recognized,
 and the agent CLI's own session files are outside Jackalope's record.
 

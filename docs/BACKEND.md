@@ -24,7 +24,7 @@ does not activate ingestion. See [BETA-MONITORING.md](BETA-MONITORING.md).
 
 ## Telemetry and feedback
 
-Configured official builds default telemetry **on**. Onboarding discloses collection
+Configured official builds default telemetry on. Onboarding discloses collection
 in a separate step with an opt-out. Settings can disable it later; disabling stops
 sending immediately. Enabled telemetry sends automatically without a per-event action.
 

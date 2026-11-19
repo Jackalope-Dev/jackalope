@@ -16,7 +16,7 @@ live outcome comparisons still need the paired evaluation protocol below.
 Quality receipts include native decision records for every attempt. Aggregation
 adds nonduplicated helper usage to agent usage, excludes routing records already
 accounted elsewhere and preserves unknown reports. Agent and helper token totals
-stay separate for pricing: Jev tokens must not be priced at the worker model's rate.
+stay separate for pricing. Jev tokens must not be priced at the worker model's rate.
 Older receipts without helper accounting are marked incomplete. Cached assessments
 charge only their original evaluation. Native request elapsed time is recorded
 separately from complete task duration; do not add overlapping timings together.
@@ -167,7 +167,7 @@ pnpm evaluate:quality -- --execute --agent=codex --model=gpt-6-astra --before=C:
 
 The executable arguments are native Rust test binaries containing
 `commands::coordination::quality_trial::installed_quality_trial`. Preserve the
-baseline binary **before** changing product behavior. The frozen prompt fixture under `scripts/evaluation/baselines/` is active input
+baseline binary before changing product behavior. The frozen prompt fixture under `scripts/evaluation/baselines/` is active input
 to the comparison driver and its resume regression tests, not a result receipt.
 Pair it with the matching native baseline executable. Build with
 `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --no-run --message-format=json`
@@ -182,7 +182,7 @@ interruptions separately; missing usage makes total experiment consumption unkno
 
 Variant order rotates across repetitions. Keep the account, explicit model,
 reasoning configuration, fixtures and limits matched. Report usage coverage; missing
-usage is unknown. Sum input and output across **all** attempts, including failures,
+usage is unknown. Sum input and output across all attempts, including failures,
 and divide by oracle successes. Cached input is reported separately and must not be
 added to input again. These tokens are not a subscription-quota or dollar estimate.
 The elapsed and reported-token limits are cancellation controls, not hard spending
@@ -196,7 +196,7 @@ experiments may contain failures for comparison; a successful driver exit alone
 does not mean the tasks passed. Neither mode establishes human acceptance.
 
 Summaries include elapsed p50/p95, measurement coverage and total milliseconds per
-oracle success, retaining failures in the numerator. Native receipts additionally
+oracle success, retaining failures in the numerator. Native receipts also
 record workspace preparation, routing, capacity, repository-map and process-spawn
 durations, the first useful worker event after process launch, avoided routing
 calls, map cache hits and reused helper servers. Timings can overlap (capacity is
@@ -313,7 +313,7 @@ source/build hashes, task IDs, configurations, counts, missing data and limitati
 All retained failed trials remain in totals. Duplicate trials are rejected.
 Pilot signals require matched configurations/cases, complete evidence, passing independent
 oracles, at least three cases with three repetitions each, and a positive lower
-bound from a deterministic case-cluster bootstrap for a **pilot signal only**.
+bound from a deterministic case-cluster bootstrap for a pilot signal only.
 `eligibleForScopedClaim` remains false in this exporter. These checks do not establish
 generalization or human quality equivalence. Report the exact
 suite and limitations beside any public number. Tokens are not dollars or quota;
@@ -332,7 +332,7 @@ The current quality gate subtracts the baseline upper Wilson bound from the
 candidate lower Wilson bound using independent source-family outcomes and z=1.96.
 Its 2-point tolerance requires at least 189 independent families even when both
 arms pass every task. The 50-task/20-family eligibility floor cannot by itself
-satisfy that gate. This feasibility calculation is not a power analysis: freeze
+satisfy that gate. This feasibility calculation is not a power analysis. Freeze
 sampling, family definitions, quality tolerance, method and power assumptions
 before collecting new held-out results. Repeated runs of a family do not increase
 its independent sample count.
@@ -348,7 +348,7 @@ on a separately frozen held-out suite before making a savings claim.
 The quality runner accepts per-variant `--after-task-approach=scoped`,
 `--after-tool-surface=available` and `--after-repo-map=off` switches; replace
 `after` with `control` as needed. `--after-result-queries=on` enables queries over
-captured MCP responses; `--after-result-preview=on` additionally bounds large
+captured MCP responses; `--after-result-preview=on` also bounds large
 unselected responses while keeping the complete source recoverable. Preview
 requires result queries. `--after-initial-tools=small` measures eager delivery of
 a complete bounded catalog. Keep these controls explicit in saved comparisons.
@@ -444,7 +444,7 @@ an exploratory review set of up to eight tasks and a separate assignment key. Th
 conceals provider identities and alternates diff-only and recorded-evidence conditions
 within a seeded task shuffle. It records visible focused review time, explicit
 decisions and notes. Human corrections remain unmeasured. One review set cannot
-establish a causal speedup: use counterbalanced reviewers, equivalent task difficulty,
+establish a causal speedup. Use counterbalanced reviewers, equivalent task difficulty,
 defect-detection checks and a preregistered review protocol before making that claim.
 After the human downloads their answers, run
 `node scripts/evaluation/review-results.mjs <study-directory> answers.json report.json [metadata.json]`.
@@ -515,7 +515,7 @@ Task history and usage exports record requested effort, launch prompt bytes,
 verification stdout before/after filtering, and bounded unique tool-call counts
 for Codex/Claude/Grok. Counts omit arguments and content; unavailable observations
 are not evidence of zero activity. Routing, execution and quota-handoff usage stay
-separate. Execution includes in-agent checking and internal retries: CLI reports
+separate. Execution includes in-agent checking and internal retries, because CLI reports
 cannot reliably assign model tokens to each tool or verification stage. Cache-read
 input is already included in input, and bytes are not tokens, dollars or quota.
 Include every continuation attempt when comparing the cost of completing a task.
@@ -817,7 +817,7 @@ drift. Raw receipts belong in ignored scratch output.
 `pnpm evaluate:jev <trials.json> [report.json]` summarizes independently reviewed
 trials without calling a provider or installing a routing policy. Supply an array
 with `id`, `caseId`, `configuration`, `category`, `variant` (`local`, `agent`, `jev`),
-`split` (`train`, `holdout`) and boolean `accepted`. Jev rows additionally require
+`split` (`train`, `holdout`) and boolean `accepted`. Jev rows also require
 `model`, `rubricRevision` and `inputHash` from their retained decision receipts.
 Record `totalTokens`, `totalCostUsd`, `elapsedMs`, `correctionMinutes` and optional
 `fallback`; unknown measurements use null. Include every attempt, assistance call,
