@@ -110,7 +110,7 @@
     flex-wrap: wrap;
     gap: 8px 12px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--radius-md, 8px);
     background: color-mix(in srgb, var(--notice-color) 7%, transparent);
     color: var(--notice-color);
     font-size: var(--text-sm, 0.875rem);
@@ -138,6 +138,15 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+  }
+  /* With an action, the icon, text and button share one center line rather than a short
+     line of text sitting at the top of a taller button. */
+  .inline-notice:has(> .inline-notice-action) {
+    align-items: center;
+    padding-block: 8px;
+  }
+  .inline-notice:has(> .inline-notice-action) > svg {
+    margin-top: 0;
   }
   @media (max-width: 600px) {
     .app-dialog.task-dialog {
