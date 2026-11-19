@@ -233,7 +233,7 @@ Do not publish outputs from a failed invocation. On a successful default build:
 | MSI installer and signature | `apps/desktop/src-tauri/target/release/bundle/msi/Jackalope_<version>_x64_en-US.msi` and adjacent `.msi.sig` |
 | Update manifest | `output/release/latest.json` |
 | Installer SHA-256 values | `output/release/checksums.json` |
-| Build configuration | `output/release/tauri.release.json` — retain with build evidence; not a required public asset |
+| Build configuration | `output/release/tauri.release.json` (retain with build evidence; not a required public asset) |
 
 The manifest contains version, notes, publication timestamp, and
 `windows-x86_64-nsis` / `windows-x86_64-msi` entries with artifact URL and signature
@@ -366,7 +366,7 @@ implemented in the current static-feed setup.
 
 | Symptom | Action |
 | --- | --- |
-| “No configured update service” | Inspect the candidate's merged release config/public key/feed; rebuild correctly. Settings cannot repair an old binary's missing trust configuration. |
+| "No configured update service" | Inspect the candidate's merged release config/public key/feed; rebuild correctly. Settings cannot repair an old binary's missing trust configuration. |
 | Check fails / no update appears | Inspect actual public JSON response, TLS/redirects, cache, version comparison and installer-specific platform entries. Confirm client opted in or use manual check. |
 | Manifest generation fails | Verify stable version, exact expected filenames, nonempty installers/signatures, notes path and HTTPS base URL. Do not publish a prior leftover `latest.json`. |
 | Signature rejected | Stop distribution; compare exact downloaded bytes, signature and pinned public key. Rebuild/re-sign intentionally; never disable verification. |

@@ -137,7 +137,7 @@ reports the intended `ingestionEnabled` value. Allow for deployment propagation
 before rerunning a failed post-deployment check. Keep one deployment controller
 per Worker, as described in [release automation](RELEASE-AUTOMATION.md).
 
-All remaining `pnpm exec wrangler --config wrangler.deploy.jsonc` examples run from **`apps/server`**. Open that
+All remaining `pnpm exec wrangler --config wrangler.deploy.jsonc` examples run from `apps/server`. Open that
 directory in a dedicated PowerShell terminal; do not mix root-relative commands
 from the release guide into this terminal. The pinned package provides Wrangler.
 
@@ -285,7 +285,7 @@ staging test data. Reset staging ingestion to false after the trial if unused.
 
 ## 7. Publish update files through R2
 
-In a **separate repository-root terminal**, prepare signed installers using
+In a separate repository-root terminal, prepare signed installers using
 [RELEASE.md](RELEASE.md). For the chosen release version, pass these values to
 `scripts/build-signed-release.ps1` along with its signing arguments:
 
@@ -301,7 +301,7 @@ The script emits installers plus `.sig` files, `output/release/checksums.json`,
 and `output/release/latest.json`. Complete signature and installed-upgrade trials
 before promoting a production manifest.
 
-Back in the **server terminal**, upload to staging first. Example for 0.2.0:
+Back in the server terminal, upload to staging first. Example for 0.2.0:
 
 ```powershell
 $releaseVersion = '0.2.0'
@@ -406,7 +406,7 @@ enable body dumps, full-URL request logging, session replay or raw-error tracing
 The five-minute job deletes at most 100,000 expired rows per class. Backlogs or failed
 cron runs extend actual retention until cleanup succeeds. Alert on expired rows
 remaining across two scheduled runs, then investigate load/failures. Changing the
-receipt/feedback retention vars affects only new rows (aggregate retention uses the current window); shortening existing lifetimes needs an
+receipt/feedback retention vars affects only new rows (aggregate retention uses the current window); shortening existing lifetimes needs a
 maintainer-reviewed SQL update and cleanup. Deleted records release quota atomically.
 
 Rate limits apply per edge location, not globally. Attackers may fill anonymous
