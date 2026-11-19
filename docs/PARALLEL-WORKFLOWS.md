@@ -320,8 +320,8 @@ for limits, migration/recovery and provider-independent delivery boundaries.
 Manual tasks appear in the project inventory with explicitly unknown scopes.
 Directed messages accept recipientTaskId (recipient_task_id in the MCP schema)
 from that inventory. Acknowledgments mean read, not agreement or permission.
-Codex receives the MCP bridge for all bridged tasks; Grok, OpenCode and Antigravity
-receive the same capabilities through permitted HTTP. See the current
+Codex, Claude, OpenCode and Kimi receive the MCP bridge on bridged tasks; Grok,
+Antigravity and Gemini receive the same capabilities through permitted HTTP. See the current
 [capability contract](ORCHESTRATION-CAPABILITIES.md) for limits and notifications.
 
 Named ownership claims and interface agreements persist alongside the queue.
