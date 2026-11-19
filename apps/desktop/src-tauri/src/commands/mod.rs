@@ -32,6 +32,7 @@ pub mod repo_todos;
 pub mod system;
 pub mod task_strategy;
 pub mod tasks;
+pub mod voice;
 pub mod work_terminal;
 pub mod work_windows;
 pub mod workspace_setup;

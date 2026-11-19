@@ -6,6 +6,7 @@ import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { startComparison } from '../../lib/compare-launch';
+import { insertDictation, placeCaret } from '../../lib/dictation';
 import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
@@ -24,10 +25,10 @@ import { useTaskStore } from '../../stores/taskStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
-import { DictationButton } from '../tasks/DictationButton';
 import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { DismissButton } from '../ui/DismissButton';
+import { VoiceButton } from '../voice/VoiceButton';
 import { ChatOptions } from './ChatOptions';
 import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './ComposerAgentPicker';
 import { SessionLimits } from './SessionLimits';
@@ -402,12 +403,13 @@ ${incoming}`
                   disabled={busy}
                 />
               )}
-              <DictationButton
+              <VoiceButton
                 disabled={busy}
                 onText={(value) => {
                   assessment.clear();
-                  setText((current) => (current.trim() ? `${current}\n${value}` : value));
-                  input.current?.focus();
+                  const next = insertDictation(text, value, input.current);
+                  setText(next.text);
+                  placeCaret(input.current, next.caret);
                 }}
               />
               <SharpenButton state={sharpen} draft={text} disabled={busy} />

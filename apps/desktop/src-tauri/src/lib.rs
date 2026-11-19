@@ -112,6 +112,7 @@ macro_rules! with_commands {
             commands::task_strategy,
             commands::tasks,
             commands::verification,
+            commands::voice,
             commands::work_terminal,
             commands::work_windows,
             commands::workflow_feedback,

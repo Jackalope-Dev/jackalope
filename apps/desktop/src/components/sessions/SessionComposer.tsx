@@ -2,6 +2,7 @@ import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { insertDictation, placeCaret } from '../../lib/dictation';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
@@ -10,9 +11,9 @@ import { stopAndSettle, stopPreview } from '../../lib/task-client';
 import { windowKind } from '../../lib/window-kind';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { AttachButton } from '../tasks/AttachButton';
-import { DictationButton } from '../tasks/DictationButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
 import { DismissButton } from '../ui/DismissButton';
+import { VoiceButton } from '../voice/VoiceButton';
 
 export function SessionComposer({
   session,
@@ -196,14 +197,6 @@ export function SessionComposer({
         void send();
       }}
     >
-      <DictationButton
-        disabled={saving}
-        onText={(value) => {
-          editing.current = true;
-          setText((current) => (current.trim() ? `${current}\n${value}` : value));
-          input.current?.focus();
-        }}
-      />
       <Textarea
         ref={input}
         aria-label="Message"
@@ -250,6 +243,15 @@ export function SessionComposer({
         </InlineNotice>
       )}
       <div className="live-composer-actions">
+        <VoiceButton
+          disabled={saving || session.closed}
+          onText={(value) => {
+            editing.current = true;
+            const next = insertDictation(text, value, input.current);
+            setText(next.text);
+            placeCaret(input.current, next.caret);
+          }}
+        />
         {attachments.available && (
           <AttachButton
             onPick={() => void attachments.pick()}
