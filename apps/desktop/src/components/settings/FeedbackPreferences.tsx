@@ -14,7 +14,7 @@ export function FeedbackPreferences() {
     <SettingGroup
       aria-label="Feedback invitations"
       title="Help shape Jackalope"
-      description="Occasional, quiet invitations after you’ve had time to use the app. You can always send feedback in Updates & support."
+      description="Occasional, quiet invitations after you’ve had time to use the app. You can always send feedback in Help & community."
     >
       <SettingRow
         title="Allow in-app feedback invitations"
