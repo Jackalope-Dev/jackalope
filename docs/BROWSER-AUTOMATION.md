@@ -18,7 +18,7 @@ Both native MCP and the authenticated task HTTP bridge expose the same tools:
 | `browser_inspect` | Read element text/value/visibility/enabled/checked state, console messages, page errors, or run an axe accessibility audit. |
 | `browser_tabs` | List, open, switch and close tabs within the same task session. |
 | `browser_screenshot` | Save a full-page PNG through the existing task screenshot artifact and review flow. |
-| `browser_open_profile` | Switch the task's browser tools to a persistent profile: `profile: "project"` (default) or `"bot"` in a bot conversation. See [Persistent agent browser profiles](#persistent-agent-browser-profiles). HTTP bridge: `POST /v1/browser/profile`. |
+| `browser_open_profile` | Switch the task's browser tools to a persistent profile: `profile: "project"` (default) or `"bot"` in a bot conversation. See [persistent agent browser profiles](#persistent-agent-browser-profiles). HTTP bridge: `POST /v1/browser/profile`. |
 
 Take a new snapshot after navigation or a page change before using references.
 The default snapshot includes static text and status output; interactive-only

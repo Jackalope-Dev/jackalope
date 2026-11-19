@@ -279,7 +279,7 @@ without `judge` or `combine` fields and work as before.
 
 The native `Coordinator` owns a durable queue. It validates a complete imported plan,
 rejects missing dependencies/cycles/invalid scopes, and saves it atomically before
-dispatch. A mutex and the runtime’s shared integration exclusion serialize eligibility
+dispatch. A mutex and the runtime's shared integration exclusion serialize eligibility
 checks, reservation and launch. A persisted run ID is the claim; a missing or failed
 attempt is not silently reclaimed after restart. History and queue ownership locks
 prevent two app instances from using the same journals concurrently.
@@ -304,7 +304,7 @@ are capped at 16 KiB and message text at 4,000 bytes. Messages are untrusted wor
 observations. They never start another task, grant permission, mark a result successful,
 or merge work. Codex/Grok use their allowed shell/network tools to call REST. Claude receives
 a per-run `--mcp-config` with an environment placeholder and explicit permission
-for just `mcp__jackalope__project` and `mcp__jackalope__message`. This uses Claude’s
+for just `mcp__jackalope__project` and `mcp__jackalope__message`. This uses Claude's
 supported tool interface without weakening its shell policy or writing credentials
 to configuration files. MCP validates the current credential for every request;
 stateless transport prevents authorization leaking between client sessions. It is not a security boundary against
@@ -340,13 +340,13 @@ or interrupted ownership, and snapshots all tracked/staged/untracked nonignored 
 through a separate temporary Git index. Forced additions already in the source index are
 preserved. The source index and files are not staged, reset or committed in place.
 
-Git `commit-tree` and `merge-tree` prepare the combined result against captured the target branch.
+Git `commit-tree` and `merge-tree` prepare the combined result against the captured target branch.
 The app retains a reference and durable review receipt. A conflict produces a blocked
 review with the conflicting paths; it does not touch the target branch. Reiterate an affected task,
 or resolve with ordinary Git tools and prepare a new review. There is no conflict editor yet.
 
-Apply rechecks the selected sources’ HEAD, content tree and index/worktree state, current
-the target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
+Apply rechecks the selected sources' HEAD, content tree and index/worktree state, the current
+target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
 performs a fast-forward only, with automatic stash and ignored-file overwrite disabled.
 No push or destructive reset is performed. When selected in the approval, cleanup
 rechecks each source and removes its worktree and matching local branch. A cleanup
@@ -397,7 +397,7 @@ are deleted. Old applied receipts and saved task data remain readable.
 ## Usage and capacity
 
 Task token history remains attributable to attempts/projects. Connected capacity adds
-the signed-in Codex account’s supported app-server limits, with native windows, shared
+the signed-in Codex account's supported app-server limits, with native windows, shared
 pool identity, source time, reset times, unknown values and stale/error states. The
 reader initializes a bounded short-lived app-server process and requests
 `account/rateLimits/read`; it does not launch a model task or read private auth files.
@@ -448,7 +448,7 @@ Sources and reuse: [Axum](https://docs.rs/axum/latest/axum/) (MIT),
 [Claude per-run MCP configuration](https://code.claude.com/docs/en/mcp),
 [Codex app-server](https://learn.chatgpt.com/docs/app-server),
 [Claude status-line telemetry](https://code.claude.com/docs/en/statusline).
-The bridge uses the application’s existing Tokio runtime; no sidecar runtime is required.
+The bridge uses the application's existing Tokio runtime; no sidecar runtime is required.
 
 ## Verification
 
