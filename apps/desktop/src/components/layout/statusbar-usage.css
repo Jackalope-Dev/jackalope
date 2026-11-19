@@ -171,9 +171,161 @@
   }
 }
 
-/* One line per agent, so the tooltip also names the agents behind "+N". */
-.statusbar-usage-tooltip {
+/* The hover card: one tile per account, so it also shows the agents behind "+N". */
+.ui-tooltip.usage-card-tooltip {
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  padding: 4px 14px 10px;
+}
+.usage-card {
   display: grid;
-  gap: 2px;
   text-align: left;
+}
+.usage-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.usage-tile-text {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+.usage-tile-agent,
+.usage-tile-detail {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-tile-detail {
+  color: var(--color-text-muted);
+}
+.usage-tile-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--color-text-secondary);
+}
+.usage-tile-value {
+  color: var(--color-text-primary);
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.usage-tile[data-tone="unknown"] .usage-tile-value {
+  color: var(--color-text-muted);
+}
+.usage-tone-cue {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+  font-weight: 600;
+}
+.usage-tone-cue[data-tone="low"] {
+  color: var(--color-warning);
+}
+.usage-tone-cue[data-tone="empty"] {
+  color: var(--color-danger);
+}
+/* Further windows of the same account: a small ring, the name, what is left, the reset. */
+.usage-tile-window {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  min-width: 0;
+}
+.usage-tile-window-name {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-tile-window-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.usage-tile-window[data-tone="unknown"] .usage-tile-window-value {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.usage-tile-window-reset {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.usage-card-footer {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+}
+.usage-card-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-danger);
+}
+
+/* The arc carries the status color; its track is a light step of that same color. */
+.usage-ring {
+  --usage-tone: var(--color-accent-ink);
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+}
+.usage-ring[data-tone="low"] {
+  --usage-tone: var(--color-warning);
+}
+.usage-ring[data-tone="empty"] {
+  --usage-tone: var(--color-danger);
+}
+.usage-ring > svg {
+  position: absolute;
+  inset: 0;
+  fill: none;
+}
+.usage-ring-track {
+  stroke: color-mix(in srgb, var(--usage-tone) 20%, transparent);
+}
+.usage-ring[data-tone="empty"] .usage-ring-track {
+  stroke: color-mix(in srgb, var(--usage-tone) 35%, transparent);
+}
+.usage-ring[data-tone="unknown"] .usage-ring-track {
+  stroke: var(--color-border);
+  stroke-dasharray: 4 4;
+}
+.usage-ring-value {
+  stroke: var(--usage-tone);
+  stroke-linecap: round;
+}
+.usage-ring-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .usage-ring-value {
+    animation: usage-ring-fill calc(var(--motion-slow, 240ms) * 2) var(--ease-out);
+  }
+}
+@keyframes usage-ring-fill {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+@media (forced-colors: active) {
+  .usage-ring-track {
+    stroke: GrayText;
+  }
+  .usage-ring-value {
+    stroke: Highlight;
+  }
 }
