@@ -407,14 +407,39 @@
 .live-start-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   flex-wrap: wrap;
 }
 .live-start-buttons {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   margin-left: auto;
+}
+/* Composer controls belong to the box rather than floating on it: compact pills with no
+   plastic shell at rest, filling on hover. Send keeps its colour at the same size. */
+:is(.live-start-actions, .live-composer-actions) .ui-button {
+  height: var(--control-height-compact, 32px);
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+}
+:is(.live-start-actions, .live-composer-actions) .ui-button[data-size="icon"] {
+  width: var(--control-height-compact, 32px);
+  padding: 0;
+}
+:is(.live-start-actions, .live-composer-actions) .ui-button:not([data-variant="primary"]) {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--color-text-secondary);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:is(.live-start-actions, .live-composer-actions)
+  .ui-button:not([data-variant="primary"]):is(:hover, [data-state="open"]) {
+  background-color: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+  color: var(--color-text-primary);
 }
 .live-session-detached .live-header {
   padding: 16px 10px 10px 14px;
