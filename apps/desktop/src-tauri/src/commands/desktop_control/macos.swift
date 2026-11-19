@@ -486,7 +486,7 @@ struct Target {
         // Window and app grants never pull a window in front of the person's work; only a
         // desktop grant may switch windows.
         try require(scope == "desktop" || (scope == "app" && NSWorkspace.shared.frontmostApplication?.processIdentifier == window.pid),
-                    "The window is in the background. Use element actions by ref, or wait until the person brings it back.")
+                    backgroundRefusal)
         try window.focus()
         let deadline = Date().addingTimeInterval(1)
         while !window.isForeground(rect) && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
@@ -585,6 +585,21 @@ func invoke(_ element: AXUIElement) throws -> [String: Any] {
     throw ControlError("This element has no accessibility action. Use click instead.")
 }
 
+/// The vertical scroll bar of the element's nearest scroll area, if Accessibility lets its
+/// value change.
+func scrollBar(_ element: AXUIElement) throws -> AXUIElement {
+    var current: AXUIElement? = element
+    for _ in 0..<12 {
+        guard let candidate = current else { break }
+        if (attribute(candidate, kAXRoleAttribute) as? String) == kAXScrollAreaRole as String,
+           let bar = elementAttribute(candidate, kAXVerticalScrollBarAttribute), settable(bar, kAXValueAttribute) {
+            return bar
+        }
+        current = elementAttribute(candidate, kAXParentAttribute)
+    }
+    throw ControlError(backgroundRefusal)
+}
+
 func input(_ action: String, _ request: [String: Any], _ target: Target) throws -> [String: Any] {
     switch action {
     case "invoke":
@@ -638,6 +653,15 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
         return sent("keyboard", true, "The control has no writable value, so Jackalope focused it, selected all and typed.")
     case "scroll":
         guard let count = request["wheel"] as? Int32, count != 0, abs(count) <= 10 else { throw ControlError("Invalid scroll input.") }
+        // In the background, move the nearest scroll bar through Accessibility instead of
+        // sending a wheel event that would reach whatever is under the pointer.
+        if let window = target.window, request["element"] is String, target.scope != "desktop", !window.isForeground(target.rect) {
+            let bar = try scrollBar(try referenced(request, "element"))
+            let current = (attribute(bar, kAXValueAttribute) as? NSNumber)?.doubleValue ?? 0
+            let next = min(1, max(0, current - Double(count) * 0.05))
+            try require(AXUIElementSetAttributeValue(bar, kAXValueAttribute as CFString, NSNumber(value: next)) == .success, backgroundRefusal)
+            return sent("accessibility", false, "Scrolled through Accessibility; the window stayed in the background.")
+        }
         let changed = try target.ensureForeground()
         let point = try target.point(request, "element", "x", "y")
         guard let event = CGEvent(scrollWheelEvent2Source: target.source, units: .line, wheelCount: 1, wheel1: count, wheel2: 0, wheel3: 0) else { throw ControlError("Invalid scroll input.") }
@@ -667,7 +691,10 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
             let element = try referenced(request, "element")
             // In the background, keys would reach the person's app; add the text through
             // the control's value instead when it has one.
-            if let window = target.window, !window.isForeground(target.rect), settable(element, kAXValueAttribute) {
+            if let window = target.window, !window.isForeground(target.rect), target.scope != "desktop" {
+                try require(!secure(element), "Password controls are protected. Enter secrets yourself.")
+                try require(settable(element, kAXValueAttribute), backgroundRefusal)
+                _ = window
                 let current = attribute(element, kAXValueAttribute) as? String ?? ""
                 try require(AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, (current + text) as CFString) == .success,
                             "The app refused the new value.")
@@ -871,6 +898,10 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     case "focus":
         if request["element"] is String { break }
         guard let window = window else { throw ControlError("Switch to a window first.") }
+        // Raising a window would pull it in front of the person's work; only a desktop grant
+        // may, or an app grant whose app is already in front.
+        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        try require(scope == "desktop" || window.isForeground(rect) || (scope == "app" && front == window.pid), backgroundRefusal)
         try window.focus()
         return ["status": "focused", "bounds": boundsJSON(rect)]
     default:
@@ -930,6 +961,9 @@ func hexColor(_ text: String) -> NSColor? {
 func minimized(_ window: SelectedWindow) -> Bool {
     !visibleWindows().contains { ($0[kCGWindowNumber as String] as? UInt32) == window.id }
 }
+
+/// How the helper refuses input that a background window can't take without focus.
+let backgroundRefusal = "The window is in the background. Use element actions by ref, or wait until the person brings it back."
 
 final class Indicator: NSObject {
     let selected: SelectedWindow?

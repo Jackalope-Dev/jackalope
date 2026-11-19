@@ -31,7 +31,7 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct DesktopRequest {
     #[schemars(
-        description = "request_access (scope window, app or desktop), snapshot, screenshot, wait_for, focus, list_windows, switch_window, open_app, click, double_click, right_click, drag, type, set_value, press, scroll, invoke, select, clipboard_read, clipboard_write, or release. Ask for the narrowest scope that fits. Escape/Stop/release revokes access. While control is paused (a new grant, or the person clicked or typed in the window), calls wait for the person to click Resume on the bar and return status paused if it takes longer: call again instead of asking in the conversation. The person may keep working in other apps while you work: a granted window in the background still answers snapshot, screenshot, wait_for and element actions by ref (invoke, select, set_value, focus, click and type with an element), but coordinate clicks, drags, scrolling, key presses and typing without an element need the window in front; they wait for it and return status background. Prefer element refs."
+        description = "request_access (scope window, app or desktop), snapshot, screenshot, wait_for, focus, list_windows, switch_window, open_app, click, double_click, right_click, drag, type, set_value, press, scroll, invoke, select, clipboard_read, clipboard_write, or release. Ask for the narrowest scope that fits. Escape/Stop/release revokes access. While control is paused (a new grant, or the person clicked or typed in the window), calls wait for the person to click Resume on the bar and return status paused if it takes longer: call again instead of asking in the conversation. The person may keep working in other apps while you work. A granted window in the background still answers snapshot, screenshot, wait_for, invoke, select and set_value; click with an element presses it, type with an element appends to the control's value, and scroll with an element moves its scroll area (all through Accessibility on macOS and UI Automation on Windows). Use set_value to replace text. Coordinate clicks, double and right clicks, drags, key presses, scroll or type without an element, focus, switch_window and open_app need the window in front: they wait and return status background without taking focus. Prefer element refs."
     )]
     pub action: String,
     #[schemars(
@@ -1331,13 +1331,15 @@ pub(crate) enum Gate {
     Ended,
 }
 
-/// Actions that need the window in front: raw pointer input and keyboard input with no
-/// element to act on through Accessibility or UI Automation.
+/// Actions that need the window in front: raw pointer and keyboard input with no element to
+/// act on through Accessibility or UI Automation, and anything that raises or opens a
+/// window. While the person works in another app these wait rather than take focus.
+/// Element actions go to the helper, which uses an accessibility path in the background
+/// and refuses (status background) when there is none.
 pub(crate) fn needs_focus(request: &DesktopRequest) -> bool {
     match request.action.as_str() {
-        "click" => request.element.is_none(),
-        "double_click" | "right_click" | "press" | "drag" | "scroll" => true,
-        "type" => request.element.is_none(),
+        "click" | "type" | "scroll" | "focus" => request.element.is_none(),
+        "double_click" | "right_click" | "press" | "drag" | "switch_window" | "open_app" => true,
         _ => false,
     }
 }

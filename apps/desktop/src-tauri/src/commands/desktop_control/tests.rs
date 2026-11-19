@@ -945,7 +945,14 @@ fn only_raw_pointer_and_keyboard_input_needs_the_window_in_front() {
     assert!(needs_focus(&desktop("double_click", Some("e3"))));
     assert!(needs_focus(&desktop("type", None)));
     assert!(!needs_focus(&desktop("type", Some("e3"))));
-    for action in ["press", "drag", "scroll"] {
+    for action in [
+        "press",
+        "drag",
+        "scroll",
+        "focus",
+        "switch_window",
+        "open_app",
+    ] {
         assert!(needs_focus(&desktop(action, None)), "{action}");
     }
     for action in [
@@ -1026,4 +1033,28 @@ fn a_paused_reply_asks_to_call_again_until_it_has_waited_long_enough() {
         .unwrap_err()
         .contains("Ask the person"));
     assert_eq!(background_reply()["status"], BACKGROUND);
+}
+
+#[test]
+fn element_actions_try_their_accessibility_path_in_the_background() {
+    // Scroll, type and focus with an element reach the helper, which scrolls the scroll area,
+    // appends to the value or focuses without raising, and refuses otherwise.
+    for action in ["scroll", "type", "focus", "click"] {
+        assert!(!needs_focus(&desktop(action, Some("e2"))), "{action}");
+    }
+    // Raising or opening a window never happens while the person works elsewhere.
+    assert!(needs_focus(&desktop("switch_window", Some("e2"))));
+    assert!(needs_focus(&desktop("open_app", None)));
+}
+
+#[test]
+fn a_helper_refusal_for_a_background_window_reads_as_background() {
+    let refusal = "The window is in the background. Use element actions by ref, or wait until the person brings it back.";
+    assert!(refusal.contains(BACKGROUND_REFUSAL));
+    for helper in [include_str!("macos.swift"), include_str!("windows.cs")] {
+        assert!(
+            helper.contains(refusal),
+            "both helpers refuse with the shared text"
+        );
+    }
 }
