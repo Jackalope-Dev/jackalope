@@ -167,6 +167,9 @@
   .project-tree-name,
   .work-sidebar-item,
   .work-sidebar-close,
+  .work-sidebar-options,
+  .work-sidebar-folder,
+  .work-sidebar-rename,
   .project-rail-item
 ) {
   min-width: 0;
@@ -1186,6 +1189,7 @@ button.project-tree-toggle:hover {
   }
   .project-tree-action,
   .work-sidebar-close,
+  .work-sidebar-options,
   .workspace-statusbar > .statusbar-icon,
   .companion-inline .companion-avatar {
     width: 44px;
