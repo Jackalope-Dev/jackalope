@@ -878,22 +878,25 @@ button.project-tree-toggle:hover {
 }
 .branch-switch {
   display: grid;
-  gap: 4px;
+  gap: 8px;
 }
 .branch-switch h3 {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
+/* The list scrolls on its own so the search field and actions stay in view. */
 .branch-switch ul {
   display: grid;
+  max-height: 240px;
   margin: 0 -8px;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
-/* The task title leads; its branch sits beneath it in the mono face. */
+/* The branch leads; the task using it, or where it is checked out, sits beneath. */
 .branch-switch-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   column-gap: 10px;
   row-gap: 2px;
   align-items: center;
@@ -907,15 +910,26 @@ button.project-tree-toggle:hover {
   text-align: left;
   cursor: pointer;
 }
-.branch-switch-icon {
+.branch-switch-icon,
+.branch-switch-check {
   grid-row: 1 / span 2;
 }
-.branch-switch-item:hover {
+.branch-switch-check {
+  grid-column: 3;
+  color: var(--color-accent-ink);
+}
+.branch-switch-item[aria-current="true"] {
+  background: var(--color-accent-subtle);
+}
+.branch-switch-item:not(:disabled):hover {
   background: var(--color-surface-hover);
 }
 .branch-switch-item:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
+}
+.branch-switch-item:disabled {
+  cursor: default;
 }
 .branch-switch-label,
 .branch-switch-name {
@@ -926,12 +940,15 @@ button.project-tree-toggle:hover {
 }
 .branch-switch-label {
   color: var(--color-text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-sm);
 }
 .branch-switch-name {
   color: var(--color-text-muted);
-  font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-xs);
+}
+.branch-switch-item:disabled .branch-switch-label {
+  color: var(--color-text-muted);
 }
 /* Two equal actions; a lone one (plans have no single checkout to review) fills the row. */
 .branch-actions {

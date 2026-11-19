@@ -19,13 +19,16 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 100%;
+  /* The negative margin lines the mark up with the page edge; the cap adds it back so
+     the heading, which is sized without it, does not clip the name. */
+  max-width: calc(100% + 8px);
   height: var(--control-height, 36px);
   margin-left: -8px;
   padding: 0 8px;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
   font: inherit;
+  text-align: start;
   cursor: pointer;
 }
 .work-header-switch:hover,
@@ -41,10 +44,11 @@
   color: var(--color-text-secondary);
 }
 /* Only very long names truncate; the full name stays in the text, so it is still the
-   accessible name, and in the tooltip. */
+   accessible name, and in the tooltip. A percentage minimum here would be ignored when
+   the button sizes itself and then push the chevron past its edge. */
 .work-header-name {
   flex: 0 1 auto;
-  min-width: min(8ch, 100%);
+  min-width: 0;
   max-width: 40ch;
   overflow: hidden;
   text-overflow: ellipsis;
