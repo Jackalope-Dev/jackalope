@@ -93,19 +93,24 @@ corners, shared logo, display-scaled type and real Pause/Resume and Cancel butto
 keep the status and Escape hint readable. The center of the screen stays clear.
 The overlay has no taskbar entry, does not activate on arrival and uses no animation.
 
-Physical Escape cancels access. Mouse movement and typing pause control. A window
-grant also pauses when that window loses focus, is minimized, moves or resizes; an app
-grant pauses when another app comes forward; a desktop grant pauses only on physical
-input. Only the human
+Physical Escape cancels access. On Windows and macOS a physical click, key press or
+scroll pauses control and the bar names which; moving the mouse, releasing a button or
+key, modifier keys alone and clicks on the bar's own buttons do not. On X11 any physical
+input pauses. A window grant also pauses when that window loses focus, is minimized,
+moves or resizes; an app grant pauses when another app comes forward; a desktop grant
+pauses only on the person's input. Only the human
 can Resume from the bar. Agent-generated input is tagged so it does not trigger
 its own pause; an agent's Escape remains scoped to the selected application.
 Every pause/resume invalidates previous snapshots, so resumed work must inspect
 the window again. Paused access also blocks snapshots and captures.
 
-macOS and X11 use a native bar with Pause/Resume and Cancel. Grants start paused;
-click Resume to activate the granted window or app and begin. On macOS an accent
-frame surrounds the granted window, or the screens for app and desktop grants,
-while control is active; the bar and frames are excluded from screen capture. macOS uses a listening
+macOS and X11 use a native bar. Grants start paused; click Resume to activate the
+granted window or app and begin. On macOS the bar carries the Jackalope mark, the
+agent's status and Pause/Resume, Stop, Open in Jackalope and fold buttons, takes the
+app's theme colors and folds to a small chip until the pointer leaves it. A thin accent
+frame sits just inside the granted window, or the screens for app and desktop grants,
+with an inner accent glow while control is active; paused control turns it neutral.
+The bar and frames are excluded from screen capture. macOS uses a listening
 Core Graphics event tap; X11 listens to XInput2 raw device events and excludes the
 XTEST virtual devices used for its own input. Other programs using XTEST share
 that exemption; this remains an interaction guard, not an input-security boundary.

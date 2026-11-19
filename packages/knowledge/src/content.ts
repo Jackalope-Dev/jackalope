@@ -98,7 +98,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     title: 'Desktop control paused unexpectedly',
     symptom: 'The desktop control bar shows Paused while an agent is using an app.',
     quickFix:
-      'Moving the mouse, touching the keyboard or changing window focus pauses control right away. Click Resume to continue.',
+      'Clicking, typing or scrolling yourself, or the window losing focus, pauses control right away. Moving the mouse does not. Click Resume to continue.',
     targetSlug: 'windows-desktop-control',
     targetAnchor: 'physical-interruption',
   },
@@ -1111,10 +1111,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'physical-interruption',
         question: 'What pauses or cancels control?',
         paragraphs: [
-          'On Windows, macOS and Linux X11, your own input always comes first. Jackalope watches your physical mouse and keyboard and stops interacting right away when you use them.',
+          'Your own input always comes first. When you start using the computer yourself, Jackalope stops interacting right away.',
         ],
         bullets: [
-          'Moving the physical mouse or typing puts control in the Paused state right away.',
+          'On Windows and macOS, clicking, typing or scrolling pauses control right away, and the bar says which. Just moving the mouse does not, so you can watch without interrupting. On Linux X11, any mouse or keyboard input pauses it.',
           'Pressing the physical Escape key cancels access right away.',
           'With a window grant, the window losing focus, being minimized, moved or resized pauses control. With an app grant, another app coming forward pauses it. A desktop grant pauses only on your input.',
           'Only you can click Resume. After you resume, the agent takes a fresh snapshot so it does not click on an outdated screen.',

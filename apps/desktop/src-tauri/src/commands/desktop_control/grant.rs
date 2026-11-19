@@ -165,7 +165,7 @@ pub fn question(scope: Scope, project: &str, reason: Option<&str>, portal: bool)
     let control = if portal {
         "Your desktop then asks you to approve remote control, and its sharing indicator shows while control is active. Stopping the share there, Stop or Revoke ends access at once; on this desktop your own mouse and keyboard input does not pause the agent."
     } else {
-        "A frame and bar show while control is active. Escape, Stop or Revoke ends access at once; moving the mouse or typing pauses it until you click Resume."
+        "A frame and bar show while control is active. Escape, Stop or Revoke ends access at once; clicking or typing yourself pauses it until you click Resume."
     };
     format!("Allow desktop control in {project}?{reason} {what} {control} Input can change files or send data, so do not choose anything showing secrets.")
 }
