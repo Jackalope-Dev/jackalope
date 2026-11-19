@@ -1,13 +1,16 @@
 import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
+import { useUpdateBlockers } from './UpdateBlockers';
 import { UpdateSettings } from './UpdateSettings';
 
 export function UpdateNotice() {
   const update = useUpdateStore();
-  const [open, setOpen] = useState(false);
+  const open = update.detailsOpen;
+  const setOpen = update.showDetails;
+  const blocked = useUpdateBlockers().length > 0;
   useEffect(() => {
     void update.load();
     const check = () => {
@@ -57,11 +60,11 @@ export function UpdateNotice() {
                 : update.release?.storeManaged
                   ? 'Install update'
                   : 'Download and install',
-              // Installing checks for active work natively; the details dialog
-              // opens alongside so progress and any blocking reason stay visible.
+              // The details dialog opens alongside so progress stays visible; while tasks
+              // block the install it lists them instead of trying and failing.
               onOpen: () => {
                 setOpen(true);
-                void useUpdateStore.getState().install();
+                if (!blocked) void useUpdateStore.getState().install();
               },
               onDismiss: update.installing ? undefined : update.dismiss,
             },
