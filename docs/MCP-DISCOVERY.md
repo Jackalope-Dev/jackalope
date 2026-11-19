@@ -216,7 +216,7 @@ Selected responses expose the same payload as text and `structuredContent` for
 programmatic consumers. HTTP help describes row-query inputs, selected-row paths
 and captured-result queries when the experiment is enabled.
 
-With queries enabled, `JACKALOPE_RESULT_PREVIEW=on` additionally captures text/JSON
+With queries enabled, `JACKALOPE_RESULT_PREVIEW=on` also captures text/JSON
 results larger than 16 KB when no output selection was requested, returning an
 explicitly truncated 2,000-character preview and partial array paths. The full
 original stays queryable through its handle; previews never establish all matching

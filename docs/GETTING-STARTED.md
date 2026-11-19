@@ -14,7 +14,7 @@ still apply.
    draft. Decisions, Git behavior and appearance start from defaults that you can
    change in Project settings.
 2. Setup detects preparation, check and preview commands automatically without
-   running them or replacing saved choices. Review or edit them in Project Settings
+   running them or replacing saved choices. Review or edit them in Project settings
    and choose a committed local target branch.
 3. In **Tasks → Chat**, describe one concrete result. Chat uses a separate workspace.
    Commit any existing changes the agent needs before starting. Optional workflow

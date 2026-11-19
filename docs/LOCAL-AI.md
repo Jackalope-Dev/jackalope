@@ -38,8 +38,8 @@ Open **Agents → Try a local agent**, or use the same entry during onboarding.
 | Qwen3 Coder 30B | 19 GB | 48 GB |
 | Recursive Flint 40B | 23 GB | 48 GB |
 
-Memory figures are conservative starting points, **not measured acceptance
-thresholds or speed guarantees**. Context, GPU memory and other apps affect
+Memory figures are conservative starting points, not measured acceptance
+thresholds or speed guarantees. Context, GPU memory and other apps affect
 whether a model fits. Ollama's Windows documentation also requires at least
 4 GB for its runtime, separate from weights. Recursive Flint needs Ollama 0.40.8 or
 newer; an older Ollama stops its download and asks for an update. The private OpenCode runner uses the version and integrity pins described in
@@ -51,7 +51,7 @@ indeterminate until reported. Closing setup cancels its current operation. Ollam
 retains reusable layers, and tools/models remain installed when setup is skipped.
 The prepared alias shares weight layers with its base model. To reclaim those
 layers, remove both models in Ollama. Owned check folders are removed after the
-check; a locked leftover may remain under the native profiles `local-checks` directory.
+check; a locked leftover may remain under the native profile's `local-checks` directory.
 
 Connecting creates or reuses a named OpenCode account and selects it for future
 OpenCode work. It preserves other accounts and their model preferences. Onboarding

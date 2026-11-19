@@ -6,8 +6,8 @@ For matched before/after prompt and native-tool trials, see
 Feature planning inspects the repository before proposing ownership and dependencies.
 The default unspecialized draft keeps one worker and the complete request. Every
 saved feature task retains that full request alongside its assigned instructions.
-Automatic routing checks native policy and quota at launch; UI recommendations no
-longer assign specialties from agent names. A sole eligible native candidate skips
+Automatic routing checks native policy and quota at launch; UI recommendations do
+not assign specialties from agent names. A sole eligible native candidate skips
 the routing model call. Historical project/model outcome counts supplement routing;
 they do not establish causal superiority or a specialty from a small sample.
 

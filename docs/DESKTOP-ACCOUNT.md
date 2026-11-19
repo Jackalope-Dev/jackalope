@@ -9,7 +9,7 @@ Account connection does not sync projects, enable remote execution or change
 Microsoft Store audience membership. Optional settings sync, and opt-in sync of
 learned lessons on top of it, are described in [settings sync](SETTINGS-SYNC.md).
 Connection and optional settings sync are enabled on Windows, macOS and Linux;
-macOS/Linux no longer report unavailable solely because of the platform. Their
+macOS/Linux do not report unavailable solely because of the platform. Their
 installed connection, expiry and revocation flows still require acceptance.
 
 ## User flow
