@@ -120,8 +120,10 @@
 }
 .task-detail .task-next {
   margin-top: 8px;
-  /* Room for the field's focus outline inside the scroll area. */
+  /* Room for the field's focus outline inside the scroll area. The field is its own
+     edge, so the divider the generic follow-up section draws above it is dropped. */
   padding: 1px;
+  border-top: 0;
   max-height: min(35vh, 280px);
   overflow-y: auto;
 }

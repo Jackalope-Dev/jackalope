@@ -128,6 +128,7 @@ body {
 :where(input[type="checkbox"], input[type="radio"]) {
   accent-color: var(--color-accent-ink);
 }
+/* Containers focused only by code (tabindex="-1"), such as popovers and dialogs, get no ring. */
 :where(
   a,
   summary,
@@ -135,7 +136,7 @@ body {
   input[type="checkbox"],
   input[type="radio"],
   input[type="range"],
-  [tabindex]
+  [tabindex]:not([tabindex="-1"])
 ):focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;

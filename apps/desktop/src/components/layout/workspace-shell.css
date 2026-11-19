@@ -873,12 +873,28 @@ button.project-tree-toggle:hover {
 }
 .branch-facts .ui-button {
   grid-column: 3;
-  height: 26px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-sm);
   opacity: 0;
   transition: opacity var(--motion-fast) var(--ease-out);
 }
 .branch-facts > div:is(:hover, :focus-within) .ui-button {
   opacity: 1;
+}
+/* Icon only: the label stays for screen readers, which also hear "Copied". */
+.statusbar-details .branch-facts .ui-button > span[aria-live] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.branch-facts .ui-button svg {
+  width: 14px;
+  height: 14px;
 }
 @media (hover: none) {
   .branch-facts .ui-button {
