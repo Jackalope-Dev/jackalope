@@ -120,7 +120,7 @@ const comparisons: Comparison[] = [
         title: 'Check the execution boundary and the finished result.',
         paragraphs: [
           "Codex documents a Cloud mode as well as execution on your computer. Jackalope task execution is local today. If work must continue on a hosted environment while your development computer is off, that's a real difference to weigh.",
-          'For a local comparison, use a small change with a failing test and one follow-up. Check which files were tested, how review comments reach the agent, and how the result returns to the target branch. Jackalope remains prerelease, and provider access is supplied by your own account.',
+          'For a local comparison, use a small change with a failing test and one follow-up. Check which files were tested, how review comments reach the agent, and how the result returns to the target branch. Provider access is supplied by your own account.',
         ],
         links: [
           { label: 'Jackalope review and merge controls', href: '/knowledge/review-and-merge/' },
@@ -203,7 +203,7 @@ const comparisons: Comparison[] = [
         title: 'Compare a complete change, including one correction.',
         paragraphs: [
           'Use an existing repository and a small change with a clear acceptance check. Review the first result, send a focused correction, then inspect the final files and test output. Compare the effort required to recover context and deliver the change, rather than using agent count as a quality score.',
-          "Consider Jackalope early access if coordinating several supported CLIs is the missing part of your workflow. Consider Cursor's documented local and cloud flows when you want those capabilities within Cursor. Jackalope is prerelease; this comparison does not establish performance or cost advantages.",
+          "Consider Jackalope if coordinating several supported CLIs is the missing part of your workflow. Consider Cursor's documented local and cloud flows when you want those capabilities within Cursor. This comparison does not establish performance or cost advantages.",
         ],
         links: [{ label: 'Supported Jackalope agents', href: '/agents/' }],
       },
@@ -304,7 +304,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Which workflow should you try?',
         paragraphs: [
-          'Our take: put Superset on your shortlist if remote hosts or scripting the workspace are central to how you work. Try Jackalope early access if your main problem is keeping task continuity and bringing dependent changes together for one deliberate review.',
+          'Our take: put Superset on your shortlist if remote hosts or scripting the workspace are central to how you work. Try Jackalope if your main problem is keeping task continuity and bringing dependent changes together for one deliberate review.',
           'Try a small feature split into a backend change, a user interface change, and a verification task. Record how often you must repeat context, how a blocked task becomes visible, and what evidence survives a follow-up. Those observations are more useful than counting how many sessions you can open.',
         ],
       },
@@ -323,7 +323,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Can I download Jackalope now?',
         answer:
-          'Jackalope is in early access: download it for Windows, macOS or Linux, then sign in with a free account. Public pricing has not been announced.',
+          'Download Jackalope for Windows, macOS or Linux, then sign in with a free account. Public pricing has not been announced.',
       },
     ],
   },
@@ -522,8 +522,8 @@ const comparisons: Comparison[] = [
       {
         title: 'Availability and the right fit',
         paragraphs: [
-          'Our take: look at Conductor first if you need shared cloud workspaces and live teammate participation. Try Jackalope early access if you want to coordinate local agents with project context and explicit review of dependent changes.',
-          'Jackalope is in early access, and public pricing has not been announced. Your provider account supplies model access. If you are budgeting for a cloud workflow, compare workspace subscription, execution resources, and model usage separately rather than treating the agent subscription as the whole cost.',
+          'Our take: look at Conductor first if you need shared cloud workspaces and live teammate participation. Try Jackalope if you want to coordinate local agents with project context and explicit review of dependent changes.',
+          'Signing up for Jackalope is free, and public pricing has not been announced. Your provider account supplies model access. If you are budgeting for a cloud workflow, compare workspace subscription, execution resources, and model usage separately rather than treating the agent subscription as the whole cost.',
         ],
       },
     ],
@@ -629,7 +629,7 @@ const comparisons: Comparison[] = [
         title: 'Choose by the work around the agent',
         paragraphs: [
           'Our take: look at Emdash if a broad agent catalog, issue intake, or remote development is central to your workflow. Look at Jackalope if your priority is carrying context and evidence through a local task lifecycle, with dependent work and combined review.',
-          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Jackalope is in early access, and signing up is free. Model access remains with your provider, and public Jackalope pricing has not been announced.',
+          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Signing up for Jackalope is free. Model access remains with your provider, and public Jackalope pricing has not been announced.',
         ],
       },
     ],
@@ -732,7 +732,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Make the decision with a real branch lifecycle',
         paragraphs: [
-          'Our take: Braid is worth trying if you want project setup, editing, sessions, and GitHub review close together. Try Jackalope early access if you want task history and explicit integration of dependent results to organize your work.',
+          'Our take: Braid is worth trying if you want project setup, editing, sessions, and GitHub review close together. Try Jackalope if you want task history and explicit integration of dependent results to organize your work.',
           'Run the trial through review and cleanup rather than stopping when the agent replies. Verify that important uncommitted files remain available, identify which branch owns the final change, and confirm your normal checks on the combined result. Jackalope is in early access, with model access supplied by your provider and public pricing still unannounced.',
         ],
       },
@@ -942,7 +942,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Compare the full operating cost',
         paragraphs: [
-          'Our take: look at Codius if cross-device access to your own hosts is a priority. Try Jackalope early access if you want local task supervision, project continuity, and combined review without making remote access part of the workflow.',
+          'Our take: look at Codius if cross-device access to your own hosts is a priority. Try Jackalope if you want local task supervision, project continuity, and combined review without making remote access part of the workflow.',
           'List model usage, host resources, and any workspace or connection plan separately when comparing costs. Jackalope does not include an AI subscription and has not announced public pricing. For a local trial, include the practical cost of keeping your development environment available for scheduled tasks.',
         ],
       },

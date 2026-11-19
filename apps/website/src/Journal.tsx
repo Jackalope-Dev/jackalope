@@ -328,8 +328,8 @@ export function JournalPage({ path }: { path: string }) {
         <div className="release-status">
           <MailIcon size={20} aria-hidden="true" />
           <p>
-            <strong>Get the next update.</strong> Join our newsletter for launch news and occasional
-            product notes. <a href="#newsletter">Sign up for updates</a>.
+            <strong>Get the next update.</strong> Sign up free and opt in to occasional product
+            notes. <a href="#newsletter">Sign up</a>.
           </p>
         </div>
         <div className="changelog-list">

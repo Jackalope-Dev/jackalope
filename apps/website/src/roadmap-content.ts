@@ -1,16 +1,16 @@
 export const roadmapHeadline = 'A little further. A lot more possible.';
 export const roadmapLede =
-  "Explore what's implemented, what we're validating, and what we're considering next. Plans may change as we learn from contributors and early users.";
+  "Explore what's implemented, what we're validating, and what we're considering next. Plans may change as we learn from contributors and people using Jackalope.";
 
 export const roadmapStages = [
   {
     id: 'built',
     label: 'Built',
     caption: 'The foundation',
-    status: 'Implemented · Prerelease',
+    status: 'Implemented · Available now',
     title: 'Your work, together.',
     description:
-      'One place for your projects, agents, and everything between an idea and a reviewed result. The local workspace is built; release validation is still underway.',
+      'One place for your projects, agents, and everything between an idea and a reviewed result. Jackalope is out for Windows, macOS and Linux, with free signup. Installed validation of newer features continues.',
     next: 'Next, make that foundation ready for everyday work.',
     link: { label: 'Explore agent compatibility', href: '/agents/' },
     items: [
@@ -30,7 +30,7 @@ export const roadmapStages = [
         title: 'Sign up and start.',
         summary: 'Free signup with email confirmation, then pair the desktop.',
         detail:
-          'Sign up with your email and confirm it to create your account, then connect the desktop by comparing a code. Optional bot protection guards signup. Connections survive restarts, and the download page shows desktop platform availability. Deployed and installed acceptance remain in progress.',
+          'Signup is open to everyone. Sign up with your email and confirm it to create your account, then connect the desktop by comparing a code. Optional bot protection guards signup. Connections survive restarts, and the download page lists builds for Windows, macOS and Linux. Installed acceptance remains in progress.',
       },
       {
         title: 'From request to a result you can inspect.',
@@ -85,12 +85,12 @@ export const roadmapStages = [
   {
     id: 'now',
     label: 'In progress',
-    caption: 'Getting launch-ready',
+    caption: 'Ready for everyday work',
     status: 'Current focus · In development',
     title: 'Make it feel like home.',
     description:
-      "The next step is confidence: from the first sign-in to coming back to unfinished work. Native sleep prevention, macOS menus and Dock badges, and pairing with an existing WSL Linux host need installed validation. We're preparing Jackalope for real projects and everyday use.",
-    next: 'A dependable local workspace comes before a wider release.',
+      "The next step is confidence: from the first sign-in to coming back to unfinished work. Native sleep prevention, macOS menus and Dock badges, and pairing with an existing WSL Linux host need installed validation. We're making Jackalope dependable for real projects and everyday use.",
+    next: 'A dependable local workspace comes before remote and team features.',
     link: { label: 'Follow the development changelog', href: '/changelog/' },
     items: [
       {
@@ -133,13 +133,13 @@ export const roadmapStages = [
         title: 'Ready for your everyday machine.',
         summary: 'Installation, updates, and recovery of saved work.',
         detail:
-          "We're preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Desktop control can use one window, one app such as your signed-in browser, or the whole desktop on Windows and macOS; Linux X11 and Ubuntu's GNOME 46 Wayland desktop support single windows, GNOME through an optional extension. KDE Plasma and other Wayland desktops with the standard remote desktop portal support one app or the whole desktop after you approve the system prompt. Beta and stable release automation uses Microsoft Store for Windows and direct downloads for Mac and Linux. In-app Store update controls are prepared for testing. Downloads are public for all three platforms; signing in still requires waitlist approval. Device testing, signed installation and upgrades still need acceptance.",
+          "Jackalope runs on macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Desktop control can use one window, one app such as your signed-in browser, or the whole desktop on Windows and macOS; Linux X11 and Ubuntu's GNOME 46 Wayland desktop support single windows, GNOME through an optional extension. KDE Plasma and other Wayland desktops with the standard remote desktop portal support one app or the whole desktop after you approve the system prompt. Beta and stable release automation uses Microsoft Store for Windows and direct downloads for Mac and Linux. In-app Store update controls are prepared for testing. Downloads are public for all three platforms, and anyone can sign up free. Device testing, signed installation and upgrades still need acceptance.",
       },
       {
         title: 'The small things that earn trust.',
-        summary: 'Keyboard access, performance, and feedback from early users.',
+        summary: 'Keyboard access, performance, and feedback from people using it.',
         detail:
-          'Task updates, history loading, and rich rendering have local performance improvements. Concurrent account checks, focused codebase maps, scoped task guidance and reusable context help avoid repeated work. Ordinary tasks use concise instructions and final automatic saved checks, with local syntax caching. Connected tools can return selected data while keeping complete responses recoverable without repeating the remote call. OpenCode tasks compact recognized passing-test output while keeping diagnostics and full recovery files; fresh-profile setup and broader task benefits remain in validation. Local agents can use a separately checked title model, and local helpers can reuse short-lived servers. Further evaluation covers loading optional OpenCode tools only when requested and reusing source context across longer tasks. Matched tool and continuation comparisons retain correctness, complete-attempt usage, latency and missing measurements. Repository-derived repair fixtures, randomized review sets and an external repository benchmark adapter support testing. Comparisons preserve upstream grading and use the same agent with and without Jackalope. OpenCode tasks can surface permission requests and structured questions through a task-owned server. Provider effort and output filtering retain separate validation; broader savings claims still need independent confirmation. Installed startup, memory, accessibility, saved-data recovery, and external beta trials remain release work. Required account access, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
+          'Task updates, history loading, and rich rendering have local performance improvements. Concurrent account checks, focused codebase maps, scoped task guidance and reusable context help avoid repeated work. Ordinary tasks use concise instructions and final automatic saved checks, with local syntax caching. Connected tools can return selected data while keeping complete responses recoverable without repeating the remote call. OpenCode tasks compact recognized passing-test output while keeping diagnostics and full recovery files; fresh-profile setup and broader task benefits remain in validation. Local agents can use a separately checked title model, and local helpers can reuse short-lived servers. Further evaluation covers loading optional OpenCode tools only when requested and reusing source context across longer tasks. Matched tool and continuation comparisons retain correctness, complete-attempt usage, latency and missing measurements. Repository-derived repair fixtures, randomized review sets and an external repository benchmark adapter support testing. Comparisons preserve upstream grading and use the same agent with and without Jackalope. OpenCode tasks can surface permission requests and structured questions through a task-owned server. Provider effort and output filtering retain separate validation; broader savings claims still need independent confirmation. Installed startup, memory, accessibility and saved-data recovery checks continue. Account access, optional settings sync, and feedback flows also need more installed-app and delivery checks.',
       },
     ],
   },
@@ -151,7 +151,7 @@ export const roadmapStages = [
     title: 'Less juggling. More doing.',
     description:
       'Give your agents a better understanding of the work, connect more of your workflow, and make the choices around usage easier to understand.',
-    next: 'These priorities will change as we learn from early users.',
+    next: 'These priorities will change as we learn from people using Jackalope.',
     link: { label: "See today's connected workspace", href: '/knowledge/' },
     items: [
       {

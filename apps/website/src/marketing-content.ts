@@ -215,7 +215,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Current agent compatibility',
         paragraphs: [
-          'These are implemented capabilities. Jackalope is in early access; validate your installed CLI version, sign-in, and required tool flow on your machine.',
+          'These are implemented capabilities. Validate your installed CLI version, sign-in, and required tool flow on your machine.',
         ],
         table: {
           columns: ['Agent', 'Project tools', 'Account behavior'],
@@ -350,7 +350,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'How do I connect Gemini CLI?',
         paragraphs: [
-          'Install Gemini CLI using its official instructions and complete provider sign-in before launching a task. In Jackalope, open Agents → Configuration, check the executable, and select the account for your project. Approved Jackalope access and your own provider access are required.',
+          'Install Gemini CLI using its official instructions and complete provider sign-in before launching a task. In Jackalope, open Agents → Configuration, check the executable, and select the account for your project. A free Jackalope account and your own provider access are required.',
           'Try a small task in a local Git project with passing baseline checks. A missing or expired login must be renewed through account setup; task processes do not open a browser to sign you in.',
         ],
         links: [
@@ -383,7 +383,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Can Gemini choose agents or answer Ask Jackalope?',
         paragraphs: [
           'Gemini CLI currently runs as a worker. It does not supply the tool-free interface used for routing coordination or Ask Jackalope. Use an eligible coordinator or local decision rules, and assign Gemini to the supported work you want it to perform.',
-          'Jackalope is prerelease. CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download, then test a focused change.',
+          'CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download, then test a focused change.',
         ],
         links: [{ label: 'Agent compatibility', href: '/agents/' }],
       },
@@ -465,7 +465,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Continue, check, and review the change.',
         paragraphs: [
           'Ask for a correction under the same task to retain its account and history. Inspect the patch and the parser test output, then try a nearby edge case. For work alongside Claude Code, give each task a separate scope and make dependent changes wait for integration.',
-          'Jackalope is in early access. These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
+          'These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
         ],
         links: [
           {
@@ -553,7 +553,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Use a second agent where the work is independent.',
         paragraphs: [
           'While Claude Code fixes the invitation screen, [another agent can update unrelated documentation](/guides/run-codex-and-claude-code-in-parallel/) in its own worktree. If the documentation depends on a new resend contract, make it wait until that change is accepted. Review both outputs together and exercise the invitation flow before integration.',
-          'Jackalope is in early access. Its Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.',
+          "Jackalope's Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.",
         ],
         links: [
           {
@@ -630,7 +630,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Validate the actual command behavior.',
         paragraphs: [
           'For the missing-output example, run the command with a writable destination and with a failing destination. Check the file, exit status, and error message together. A successful agent response alone cannot establish that the command now reports failures correctly.',
-          'Jackalope is in early access. Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
+          'Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
         ],
         links: [
           {
@@ -712,7 +712,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Continue the task, then inspect the combination.',
         paragraphs: [
           'Ask for a missed edge case under the same task to preserve its history and account binding. If another agent is changing a caller of the sorting function, review that interaction before integration; two separate worktrees can still disagree about expected behavior.',
-          'Jackalope is in early access. The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
+          'The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
         ],
         links: [
           {

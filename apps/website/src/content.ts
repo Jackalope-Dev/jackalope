@@ -239,13 +239,13 @@ export const pages: SitePage[] = [
     path: '/privacy/',
     title: 'Privacy policy | Jackalope',
     description:
-      'How Jackalope handles website, early-access, desktop, feedback, and optional usage information.',
+      'How Jackalope handles website, account, desktop, feedback, and optional usage information.',
   },
   {
     path: '/terms/',
     title: 'Terms of service | Jackalope',
     description:
-      "Terms for Jackalope's website and hosted early-access service, with desktop open-source license information.",
+      "Terms for Jackalope's website and hosted account service, with desktop open-source license information.",
   },
   {
     path: '/waitlist/',

@@ -183,7 +183,13 @@ export function AccessPage() {
     <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
       <header className="access-heading">
         <h1>{member ? 'Your account' : invite ? 'You’re invited' : 'Sign in'}</h1>
-        {member && <p>Download Jackalope and share your Instant Access Passes.</p>}
+        {member && (
+          <p>
+            {member.openSignup
+              ? 'Download Jackalope and connect your desktop.'
+              : 'Download Jackalope and share your Instant Access Passes.'}
+          </p>
+        )}
       </header>
       {error && (
         <p className="access-alert" role="alert">
@@ -197,10 +203,10 @@ export function AccessPage() {
       <DesktopConnection email={member?.email ?? null} refreshMembership={refreshMembership} />
       {loading ? null : !accessOrigin ? (
         <Panel variant="plain" className="access-card access-entry">
-          <h2>Join the waitlist</h2>
-          <p>Sign-in is not available yet. Join the waitlist to hear when early access opens.</p>
+          <h2>Sign-in isn’t available here</h2>
+          <p>This site isn’t connected to Jackalope accounts. Sign up for product notes instead.</p>
           <a className="button button-primary" href="/#newsletter">
-            Join the waitlist <ArrowRight size={17} />
+            Sign up <ArrowRight size={17} />
           </a>
         </Panel>
       ) : member ? (

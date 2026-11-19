@@ -167,7 +167,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Separate availability from a roadmap.',
         paragraphs: [
-          "Jackalope is in early access. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative's own site before making a purchase or migration decision.",
+          "Signing up for Jackalope is free, and downloads are public for Windows, macOS and Linux. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative's own site before making a purchase or migration decision.",
           'Treat workspace fees, model usage, and remote compute as separate costs. A documented feature is a reason to run a trial, not evidence that a particular account, repository, or deployment has passed one.',
         ],
         links: [
@@ -234,7 +234,7 @@ export const growthPages: MarketingPage[] = [
         title: 'Recognize the point where bookkeeping becomes work.',
         paragraphs: [
           'Try your next two tasks with a short record beside each terminal: project, branch, account, requested result, and current blocker. If that is easy to maintain and your review tools preserve the evidence you need, a terminal workflow may be enough.',
-          "A workspace becomes more useful when you repeatedly reopen sessions to remember a decision, miss a waiting question, or lose track of which patch a test run covered. Those are observable costs you can compare with Jackalope's task history and review flow when early access is available.",
+          "A workspace becomes more useful when you repeatedly reopen sessions to remember a decision, miss a waiting question, or lose track of which patch a test run covered. Those are observable costs you can compare with Jackalope's task history and review flow.",
         ],
       },
       {
@@ -342,7 +342,7 @@ export const growthPost = {
   date: '2026-09-08',
   readingTime: '2 min read',
   description:
-    'Tell us which agents and workflows matter to you, and bring other developers into early access.',
+    'Tell us which agents and workflows matter to you, and bring other developers along.',
   sections: [
     {
       title: 'A workspace for the way you build.',
@@ -360,8 +360,8 @@ export const growthPost = {
     {
       title: 'Bring someone who would use it.',
       paragraphs: [
-        'Approved members receive five Instant Access Passes. A valid invitation grants access once the recipient verifies their email, without another manual approval, and that person receives five passes of their own. Downloads appear when a reviewed build is available.',
-        'Share with people who would find the workflow useful. The person you invite gets direct access.',
+        'Signup is open, so anyone can create a free account with their email and download Jackalope for Windows, macOS or Linux.',
+        'Share it with people who would find the workflow useful.',
       ],
     },
   ],

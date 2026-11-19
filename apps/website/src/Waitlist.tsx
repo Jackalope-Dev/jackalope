@@ -381,7 +381,7 @@ export function WaitlistPage() {
               </Button>
             </form>
           ) : (
-            <p>Waitlist status will be available when sign-in opens.</p>
+            <p>Sign-in isn’t available on this site.</p>
           )}
           <p>
             New here? <a href="/#newsletter">Sign up free</a>. Already have an account?{' '}

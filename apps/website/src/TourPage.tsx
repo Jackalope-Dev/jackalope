@@ -365,8 +365,8 @@ export function TourPage({ dark }: { dark: boolean }) {
         </div>
         <div>
           <Signup />
-          <a className="tour-member-link" href="/waitlist/">
-            Already on the list? Check your place <ArrowRight size={14} />
+          <a className="tour-member-link" href="/access/">
+            Already have an account? Sign in <ArrowRight size={14} />
           </a>
         </div>
       </section>
