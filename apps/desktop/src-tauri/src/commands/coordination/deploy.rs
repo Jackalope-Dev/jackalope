@@ -308,6 +308,11 @@ async fn pass(service: &Coordinator) -> Result<(), String> {
     }
     for policy in view.assist_policies.iter().filter(|policy| policy.merge) {
         let project = PathBuf::from(&policy.project_path);
+        // A project whose folder was moved or deleted has nothing to deploy, and must not
+        // stop delivery for the others.
+        if !project.is_dir() {
+            continue;
+        }
         let target = latest
             .get(&policy.project_id)
             .map(|(_, branch)| branch.clone());
