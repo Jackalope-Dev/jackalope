@@ -1,125 +1,103 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useRef, useState } from 'react';
-import { type AttachTarget, GLOB_TARGET_EVENT } from '../../lib/window-attach';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type AttachTarget,
+  GLOB_BEGIN_EVENT,
+  GLOB_FINISH_EVENT,
+  GLOB_TARGET_EVENT,
+  overlayReady,
+} from '../../lib/window-attach';
 import { useWindowTheme } from '../../window-bootstrap';
+import { GlobFigure } from './GlobFigure';
+import { GlobMotion } from './glob-motion';
 import './glob-overlay.css';
 
-/** How far the trailing drop may lag behind the blob, in CSS pixels. */
-const MAX_STRETCH = 30;
+type Finish = { kind: 'drop' } | { kind: 'return'; dx: number; dy: number };
 
-const reduced = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+/** The target window sits under the pointer, up and left of the agent. */
+const TOWARD_POINTER = { x: -0.75, y: -0.65 };
 
 /**
- * The transparent window that follows the pointer while the person drags their agent
- * across the desktop. Native code moves the window; this page turns its movement into a
- * gooey blob that stretches behind the pointer and settles when it stops, and names the
- * window under the pointer.
+ * The transparent window that carries the agent across the desktop. Native code moves
+ * the window with the pointer; this page turns that movement into the agent's swing,
+ * names the window under the pointer, and plays the splat on a drop or the spring home on
+ * a cancel. It is reused for every drag and reports its first painted frame, so the
+ * window never shows before it is transparent.
  */
-export function GlobOverlay({ provider }: { provider: string }) {
+export function GlobOverlay() {
   useWindowTheme(undefined);
+  const motion = useMemo(() => new GlobMotion(), []);
+  const [provider, setProvider] = useState('auto');
   const [target, setTarget] = useState<AttachTarget | null>(null);
-  const tail = useRef<SVGCircleElement>(null);
-  const drip = useRef<SVGCircleElement>(null);
+  const [finish, setFinish] = useState<Finish | null>(null);
+  /** Bumped when a target is lost, to replay the shiver. */
+  const [missed, setMissed] = useState(0);
+  const targetRef = useRef(target);
+  targetRef.current = target;
 
   useEffect(() => {
-    document.documentElement.classList.add('glob-page');
-    return () => document.documentElement.classList.remove('glob-page');
+    // Two frames: the transparent page has been composited, not just laid out.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => void overlayReady().catch(() => undefined));
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void listen<AttachTarget | null>(GLOB_TARGET_EVENT, (event) => setTarget(event.payload)).then(
-      (stop) => {
-        unlisten = stop;
-      },
-    );
-    return () => unlisten?.();
-  }, []);
-
-  useEffect(() => {
-    if (reduced()) return;
+    const stops: Array<Promise<() => void>> = [
+      listen<{ provider: string }>(GLOB_BEGIN_EVENT, (event) => {
+        motion.reset();
+        setProvider(event.payload.provider || 'auto');
+        setTarget(null);
+        setFinish(null);
+      }),
+      listen<AttachTarget | null>(GLOB_TARGET_EVENT, (event) => {
+        if (!event.payload && targetRef.current) setMissed((value) => value + 1);
+        setTarget(event.payload);
+      }),
+      listen<Finish>(GLOB_FINISH_EVENT, (event) => setFinish(event.payload)),
+    ];
     const window = getCurrentWindow();
-    // The drop springs toward an offset opposite the window's velocity.
-    let last: { x: number; y: number; at: number } | null = null;
-    let wanted = { x: 0, y: 0 };
-    const offset = { x: 0, y: 0 };
-    const speed = { x: 0, y: 0 };
-    let frame = 0;
-    let stop: (() => void) | undefined;
-    void window
-      .onMoved(({ payload }) => {
-        const now = performance.now();
-        if (last) {
-          const dt = Math.max(8, now - last.at);
-          const scale = globalThis.devicePixelRatio || 1;
-          const vx = (payload.x - last.x) / scale / dt;
-          const vy = (payload.y - last.y) / scale / dt;
-          const length = Math.hypot(vx, vy);
-          const stretch = Math.min(MAX_STRETCH, length * 22);
-          wanted = length ? { x: (-vx / length) * stretch, y: (-vy / length) * stretch } : wanted;
-        }
-        last = { x: payload.x, y: payload.y, at: now };
-      })
-      .then((unlisten) => {
-        stop = unlisten;
-      });
-    const step = () => {
-      // Wanted drifts back to rest; the drop follows it on a spring, overshooting a little.
-      wanted = { x: wanted.x * 0.86, y: wanted.y * 0.86 };
-      speed.x = (speed.x + (wanted.x - offset.x) * 0.22) * 0.72;
-      speed.y = (speed.y + (wanted.y - offset.y) * 0.22) * 0.72;
-      offset.x += speed.x;
-      offset.y += speed.y;
-      tail.current?.setAttribute('cx', String(48 + offset.x));
-      tail.current?.setAttribute('cy', String(48 + offset.y));
-      drip.current?.setAttribute('cx', String(48 + offset.x * 1.7));
-      drip.current?.setAttribute('cy', String(48 + offset.y * 1.7));
-      frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
+    const scale = () => globalThis.devicePixelRatio || 1;
+    stops.push(
+      window.onMoved(({ payload }) => motion.push(payload.x / scale(), payload.y / scale())),
+    );
     return () => {
-      cancelAnimationFrame(frame);
-      stop?.();
+      for (const stop of stops) void stop.then((unlisten) => unlisten());
     };
-  }, []);
+  }, [motion]);
 
+  const style =
+    finish?.kind === 'return'
+      ? ({ '--home-x': finish.dx, '--home-y': finish.dy } as CSSProperties)
+      : undefined;
   return (
-    <div className="glob-overlay" data-target={target ? true : undefined}>
-      <div className="glob-blob">
-        <svg viewBox="0 0 96 96" aria-hidden="true">
-          <defs>
-            <filter id="glob-goo">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur" />
-              <feColorMatrix
-                in="blur"
-                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9"
-                result="goo"
-              />
-              <feComposite in="SourceGraphic" in2="goo" operator="atop" />
-            </filter>
-          </defs>
-          <g filter="url(#glob-goo)" className="glob-body">
-            <circle cx="48" cy="48" r="27" />
-            <circle ref={tail} cx="48" cy="48" r="19" />
-            <circle ref={drip} cx="48" cy="48" r="10" />
-          </g>
-        </svg>
-        <span className="glob-character">
-          <AgentCharacter provider={provider} state={target ? 'working' : 'idle'} />
+    <div className="glob-overlay" data-finish={finish?.kind} style={style}>
+      <span className="glob-anchor">
+        <span key={missed} className="glob-shake" data-missed={missed > 0 || undefined}>
+          <GlobFigure
+            provider={provider}
+            motion={motion}
+            over={!!target}
+            lookAt={target ? TOWARD_POINTER : null}
+          />
         </span>
-      </div>
-      <p className="glob-label" role="status">
-        {target ? (
-          <>
-            <span>Attach to {target.app}</span>
-            <small>{target.title}</small>
-          </>
-        ) : (
-          <span>Drop on a window</span>
-        )}
-      </p>
+        {target && <span key={target.handle} className="glob-ripple" />}
+        {finish?.kind === 'drop' && <span className="glob-splat" />}
+      </span>
+      {!finish && (
+        <p className="glob-label" role="status" key={target?.handle ?? 'none'}>
+          {target ? (
+            <>
+              <span>Attach to {target.app}</span>
+              <small>{target.title}</small>
+            </>
+          ) : (
+            <span>Drop on any window</span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

@@ -236,6 +236,15 @@ public static class JackalopeDesktop {
         if (action == "hello") return new Dictionary<string, object> { {"protocol", 1} };
         if (action == "list") return new Dictionary<string, object> { {"windows", ListWindows(Deny(request))}, {"monitors", Monitors()} };
         if (action == "at") return new Dictionary<string, object> { {"window", WindowAtCursor(Deny(request))} };
+        // Bounds of one window, for the badge on an attached window; geometry only.
+        if (action == "bounds") {
+            try {
+                var identity = Map(request, "window");
+                var handle = Verify(identity);
+                if (Deny(request).Contains(Pid(handle))) return new Dictionary<string, object> { {"bounds", null} };
+                return new Dictionary<string, object> { {"bounds", Bounds(handle)} };
+            } catch { return new Dictionary<string, object> { {"bounds", null} }; }
+        }
         var guard = Map(request, "guard");
         if (guard == null) throw new Exception("Desktop indicator grant is required.");
         GuardFile = Text(guard, "file");

@@ -15,17 +15,34 @@ const WorkPaneWindow = React.lazy(() => import('./components/tasks/WorkPaneWindo
 const GlobOverlay = React.lazy(() =>
   import('./components/sessions/GlobOverlay').then((m) => ({ default: m.GlobOverlay })),
 );
+const AttachBadge = React.lazy(() =>
+  import('./components/sessions/AttachBadge').then((m) => ({ default: m.AttachBadge })),
+);
 const root = windowKind();
+const overlay = root.kind === 'glob' || root.kind === 'badge';
+// Overlay windows are transparent from their very first paint: the page background, the
+// theme class and the body's background utility would otherwise flash as a solid box.
+if (overlay) {
+  for (const element of [document.documentElement, document.body]) {
+    element.style.setProperty('background', 'transparent', 'important');
+    element.classList.remove('bg-background');
+  }
+  document.documentElement.classList.add('overlay-page');
+}
 // Paired phones show each shared project's icon; only the main window owns the project list.
 if (root.kind === 'main') startProjectIconSync();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      {root.kind !== 'glob' && <DesktopExperience />}
+      {!overlay && <DesktopExperience />}
       {root.kind === 'glob' ? (
         <React.Suspense fallback={null}>
-          <GlobOverlay provider={root.provider} />
+          <GlobOverlay />
+        </React.Suspense>
+      ) : root.kind === 'badge' ? (
+        <React.Suspense fallback={null}>
+          <AttachBadge />
         </React.Suspense>
       ) : root.kind === 'workPane' ? (
         <React.Suspense fallback={<p>Loading task…</p>}>

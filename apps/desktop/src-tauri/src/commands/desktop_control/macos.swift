@@ -764,6 +764,14 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         }
         return ["window": NSNull()]
     }
+    // Bounds of one window, for the badge on an attached window. Like list and at it reads
+    // only window geometry; a closed, replaced or off-screen window has none.
+    if action == "bounds" {
+        guard let identity = request["window"] as? [String: Any],
+              let window = try? SelectedWindow(identity), !deny.contains(window.pid),
+              let rect = try? window.bounds() else { return ["bounds": NSNull()] }
+        return ["bounds": boundsJSON(rect)]
+    }
     guard let guardJSON = request["guard"] as? [String: Any] else {
         throw ControlError("An active indicator is required.")
     }

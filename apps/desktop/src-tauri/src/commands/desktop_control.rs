@@ -567,9 +567,7 @@ impl Call<'_> {
         if self.access.prompt_id.is_empty() {
             let scope = Scope::parse(request.scope.as_deref())?;
             platform::capabilities().scope(scope)?;
-            if let Some(conversation) = fresh
-                .live_session_id
-                .as_deref()
+            if let Some(conversation) = attach::owner(fresh)
                 .filter(|id| scope == Scope::Window && attach::staged(id).is_some())
             {
                 let (windows, _) = self.windows()?;

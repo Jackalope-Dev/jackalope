@@ -1,5 +1,6 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
+import { emit, listen } from '@tauri-apps/api/event';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
@@ -16,6 +17,17 @@ import { appendAttachments } from '../../lib/prompt-attachments';
 import { isQuestionOnly } from '../../lib/question-intent';
 import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
+import {
+  ATTACH_ASK_EVENT,
+  ATTACH_ASK_RESULT_EVENT,
+  type AttachAsk,
+  type AttachAskResult,
+  type AttachedWindow,
+  clearAttached,
+  clearDraftAttachments,
+  draftAttachKey,
+  handOffAttached,
+} from '../../lib/window-attach';
 import { workspaceRequest } from '../../lib/workspace-mode';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -32,6 +44,7 @@ import { VoiceButton } from '../voice/VoiceButton';
 import { ChatOptions } from './ChatOptions';
 import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './ComposerAgentPicker';
 import { SessionLimits } from './SessionLimits';
+import { WindowGlob } from './WindowGlob';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
 import { describeError } from '@jackalope/contracts/errors';
@@ -129,6 +142,12 @@ export function SessionStart({
     }
   });
   const [error, setError] = useState('');
+  /** A window attached before Send; it goes to the conversation Send creates. */
+  const attachKey = project ? draftAttachKey(project.id) : '';
+  const [attached, setAttached] = useState<AttachedWindow | null>(null);
+  const [attachRefresh, setAttachRefresh] = useState(0);
+  const [attachNotice, setAttachNotice] = useState('');
+  const attachMarkRef = useRef<HTMLSpanElement>(null);
   const [isFocused, setIsFocused] = useState(true);
   const markRef = useRef<HTMLDivElement>(null);
   const gaze = useAgentGaze(markRef, { text, isFocused });
@@ -219,8 +238,69 @@ ${incoming}`
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
   }, [draftKey, text, context, limits, codexSpeed, agentChoice, modelChoice]);
-  const send = async (choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess') => {
-    const value = text.trim();
+  // A window attached for one project's draft never follows the person to another project.
+  useEffect(() => {
+    if (!attachKey || !isTauriEnvironment()) return;
+    void clearDraftAttachments(attachKey).catch(() => undefined);
+  }, [attachKey]);
+  const detach = async () => {
+    if (!attachKey) return;
+    await clearAttached(attachKey).catch(() => undefined);
+    setAttachRefresh((value) => value + 1);
+  };
+  // Clearing the draft detaches its window too.
+  const attachedRef = useRef(attached);
+  attachedRef.current = attached;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: detach only reacts to the draft emptying
+  useEffect(() => {
+    if (!text.trim() && attachedRef.current) void detach();
+  }, [text]);
+  /** Comparisons and plans start several runs, so none of them receives the window. */
+  const skipAttached = async () => {
+    if (!attachedRef.current) return;
+    await detach();
+    setAttachNotice(
+      'The attached window wasn’t shared: it goes only to a single-agent conversation. Attach it from that conversation instead.',
+    );
+  };
+  /** The last send's error, for a question asked from an attached window's badge. */
+  const sendError = useRef('');
+  /**
+   * Sends the draft; `override` sends that text instead of the composer's. Resolves to
+   * the conversation it started, if it started one.
+   */
+  // A question typed on the attached window's badge becomes this draft's first message.
+  useEffect(() => {
+    if (!attachKey || !isTauriEnvironment()) return;
+    const stop = listen<AttachAsk>(ATTACH_ASK_EVENT, async (event) => {
+      if (event.payload.key !== attachKey) return;
+      const reply = (result: Omit<AttachAskResult, 'requestId'>) =>
+        void emit(ATTACH_ASK_RESULT_EVENT, { requestId: event.payload.requestId, ...result });
+      if (comparingRef.current) {
+        reply({ error: 'Pick one agent in Jackalope to ask about this window.' });
+        return;
+      }
+      const draft = latest.current.trim();
+      const composed = draft ? `${draft}\n\n${event.payload.text}` : event.payload.text;
+      latest.current = composed;
+      setText(composed);
+      const conversation = await sendRef.current('single', composed);
+      reply(
+        conversation
+          ? { conversation }
+          : { error: sendError.current || 'Open Jackalope to finish sending it.' },
+      );
+    });
+    return () => void stop.then((unlisten) => unlisten());
+  }, [attachKey]);
+  const comparingRef = useRef(comparing);
+  comparingRef.current = comparing;
+  const send = async (
+    choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess',
+    override?: string,
+  ): Promise<string | undefined> => {
+    sendError.current = '';
+    const value = (override ?? text).trim();
     if (!project || !value || sending.current) return;
     if ([...value].length > 12000) {
       setError(
@@ -234,6 +314,8 @@ ${incoming}`
     sending.current = true;
     setBusy(true);
     setError('');
+    setAttachNotice('');
+    let handedOff = false;
     try {
       if (comparing && choice !== 'interview') {
         const comparison = await startComparison({
@@ -247,6 +329,7 @@ ${incoming}`
         localStorage.removeItem(`${draftKey}:context`);
         // A comparison is a one-off choice; the next message goes back to the project default.
         localStorage.removeItem(`${draftKey}:agents`);
+        await skipAttached();
         finishOrigin();
         if (mounted.current) {
           setText(latest.current.trim() === value ? '' : latest.current);
@@ -285,6 +368,7 @@ ${incoming}`
       };
       if (choice === 'interview') {
         const plan = await planCommands.start(request, value);
+        await skipAttached();
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
         finishOrigin();
@@ -301,11 +385,15 @@ ${incoming}`
       }
       if (choice === 'plan' || autoStart) {
         await assessment.create(request, value, autoStart);
+        await skipAttached();
         finishOrigin();
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
         return;
       }
+      // The conversation's first window request takes the attached window, so it moves
+      // before the conversation exists, and back if creating it fails.
+      if (attachedRef.current) handedOff = await handOffAttached(attachKey, attempt.id);
       await sessionCommand('create', {
         id: attempt.id,
         request,
@@ -318,14 +406,23 @@ ${incoming}`
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
       localStorage.removeItem(draftKey);
       localStorage.removeItem(`${draftKey}:context`);
+      if (handedOff) setAttachRefresh((value) => value + 1);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
+      return attempt.id;
     } catch (cause) {
-      if (mounted.current) setError(describeError(cause));
+      if (handedOff) {
+        await handOffAttached(attempt.id, attachKey).catch(() => undefined);
+        setAttachRefresh((value) => value + 1);
+      }
+      sendError.current = describeError(cause);
+      if (mounted.current) setError(sendError.current);
     } finally {
       sending.current = false;
       if (mounted.current) setBusy(false);
     }
   };
+  const sendRef = useRef(send);
+  sendRef.current = send;
   return (
     <div className={`live-start${embedded ? ' live-start-embedded' : ''}`}>
       {!embedded && (
@@ -377,6 +474,11 @@ ${incoming}`
               {error}
             </InlineNotice>
           )}
+          {attachNotice && (
+            <InlineNotice action={<DismissButton onDismiss={() => setAttachNotice('')} />}>
+              {attachNotice}
+            </InlineNotice>
+          )}
           <SharpenNotice state={sharpen} />
           {attachments.error && (
             <InlineNotice
@@ -396,6 +498,31 @@ ${incoming}`
           />
           <div className="live-start-actions">
             <div className="live-start-tools">
+              {isTauriEnvironment() && (
+                <WindowGlob
+                  compact
+                  conversation={attachKey}
+                  provider={chosen[0]?.id ?? project.preferences?.preferredRunner ?? 'auto'}
+                  agent={chosen.length === 1 ? chosen[0].name : 'your agent'}
+                  disabled={busy}
+                  mascotRef={attachMarkRef}
+                  refresh={attachRefresh}
+                  onAttachedChange={setAttached}
+                  note="It goes to the conversation you start here; comparisons and plans don’t receive it."
+                  onAttached={async (line) => {
+                    assessment.clear();
+                    setAttachNotice('');
+                    setText((current) =>
+                      current.trim() ? `${current.trimEnd()}\n\n${line}` : line,
+                    );
+                    input.current?.focus();
+                  }}
+                >
+                  <AgentCharacter
+                    provider={chosen[0]?.id ?? project.preferences?.preferredRunner ?? 'auto'}
+                  />
+                </WindowGlob>
+              )}
               {attachments.available && (
                 <AttachButton
                   onPick={() => void attachments.pick()}

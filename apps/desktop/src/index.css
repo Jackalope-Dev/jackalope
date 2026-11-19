@@ -112,6 +112,16 @@ body {
   overflow: hidden;
 }
 
+/* Drag overlay and attached-window badge windows draw only their content. */
+.overlay-page,
+.overlay-page body,
+.overlay-page #root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
 :where(button, [role="button"], [role="menuitem"], select, summary) {
   touch-action: manipulation;
 }

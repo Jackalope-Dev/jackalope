@@ -25,6 +25,7 @@ import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/sh
 import { swarmConnection } from '../../lib/swarm';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useSavedActionsMigration } from '../../lib/use-saved-actions-migration';
+import { ATTACH_OPEN_DRAFT_EVENT } from '../../lib/window-attach';
 import { WindowGlass } from '../../lib/window-glass';
 import { openConversation, openRun, selectWork } from '../../lib/work-selection';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
@@ -184,6 +185,14 @@ export function Shell({
       }
     },
   );
+  // An attached window's badge asks to show the new-work composer it was attached from.
+  useTauriEvent<string>(ATTACH_OPEN_DRAFT_EVENT, (projectId) => {
+    if (!useProjectStore.getState().projects.some((project) => project.id === projectId)) return;
+    useProjectStore.getState().selectProject(projectId);
+    useWorkViewStore.getState().setScope('project');
+    selectWork();
+    setActiveTab('kanban');
+  });
   useTauriEvent<string>('live-session-open', async (payload) => {
     await useLiveSessionStore.getState().refresh(payload);
     const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
