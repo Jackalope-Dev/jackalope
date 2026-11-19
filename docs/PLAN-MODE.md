@@ -179,7 +179,8 @@ the plan or asking the planner for changes creates a new draft revision that nee
 own approval.
 
 Every shape becomes a managed task linked to the plan revision (`plan` on the task). The
-task's request is the self-contained plan, so each worker starts from a fresh context:
+task's request is the self-contained plan, so each worker starts from a fresh context and
+reads its task's briefing there rather than a second time in its assignment:
 
 | Shape | Assignments |
 | --- | --- |

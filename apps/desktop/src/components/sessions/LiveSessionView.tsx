@@ -29,6 +29,7 @@ import {
 } from '../../lib/live-session';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import type { TaskRun } from '../../lib/run-types';
+import { sessionMarkdown } from '../../lib/session-export';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
 import { selectWork } from '../../lib/work-selection';
@@ -43,6 +44,7 @@ import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
 import { DecisionTrail } from '../tasks/DecisionTrail';
+import { DesktopPermissionNotice } from '../tasks/DesktopPermissionNotice';
 import { MergeReview } from '../tasks/MergeReview';
 import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
@@ -51,8 +53,9 @@ import { TaskPreview } from '../tasks/TaskPreview';
 import { useWorkSeen, WorkContextDetails } from '../tasks/WorkContext';
 import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
-import { useWorkspaceActions } from '../tasks/WorkTools';
+import { isPopOutPane, PopOutButton, useWorkspaceActions } from '../tasks/WorkTools';
 import { ChatOptions } from './ChatOptions';
+import { ReadAloudButton } from './ReadAloudButton';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
@@ -271,6 +274,7 @@ export function LiveSessionView({
             detached
               ? []
               : [
+                  ...(workspace.editor ? [workspace.editor] : []),
                   ...(integrated
                     ? []
                     : [{ id: 'pause', label: pauseLabel, onSelect: togglePause, disabled: busy }]),
@@ -290,6 +294,26 @@ export function LiveSessionView({
                         },
                       ]
                     : []),
+                  ...(session.messages.length
+                    ? [
+                        {
+                          id: 'copy-conversation',
+                          label: 'Copy conversation as Markdown',
+                          onSelect: () =>
+                            void act(() =>
+                              navigator.clipboard.writeText(
+                                sessionMarkdown(
+                                  session,
+                                  runs,
+                                  latest?.agent && latest.agent !== 'auto'
+                                    ? latest.agent
+                                    : 'Jackalope',
+                                ),
+                              ),
+                            ),
+                        },
+                      ]
+                    : []),
                   ...(simple
                     ? []
                     : [
@@ -304,8 +328,8 @@ export function LiveSessionView({
                 ]
           }
           submenus={
-            workspace.groups.length
-              ? [{ id: 'workspace', label: 'Workspace', groups: workspace.groups }]
+            workspace.more.length
+              ? [{ id: 'open-in', label: 'Open in…', groups: [workspace.more] }]
               : []
           }
           items={[
@@ -591,6 +615,10 @@ export function LiveSessionView({
                   ]),
             ]}
           />
+          {/* A conversation pops out its review, preview and terminal; the transcript stays. */}
+          {workspace.popOut && tab !== 'conversation' && isPopOutPane(tab) && (
+            <PopOutButton pane={tab} onPopOut={workspace.popOut} />
+          )}
         </div>
       )}
       <div className="live-columns">
@@ -700,6 +728,7 @@ export function LiveSessionView({
                                 text={run.result}
                                 label="Copy reply"
                               />
+                              <ReadAloudButton className="live-copy" text={run.result} />
                             </div>
                           )}
                         </div>
@@ -767,6 +796,7 @@ export function LiveSessionView({
                   </Button>
                 </div>
               )}
+              {latest && <DesktopPermissionNotice key={latest.id} run={latest} />}
               {questions.map((prompt) => (
                 <AgentQuestion
                   key={prompt.id}
@@ -852,6 +882,7 @@ export function LiveSessionView({
                         run={latest}
                         integrated={integrated}
                         onHandoff={integrated ? nextChat : append}
+                        onFollowUp={session.closed ? undefined : append}
                       />
                       <TaskLearning run={latest} allowSave />
                     </>

@@ -1,0 +1,277 @@
+/* A bot as a character card. The stage takes a wash of the bot's own colour; text sits
+   below it on the plain surface so it keeps full contrast in both themes. */
+.bots-cast {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  text-align: left;
+}
+.bots-cast-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 92px;
+  background: color-mix(
+    in srgb,
+    var(--bot-tint, var(--color-text-primary)) 13%,
+    var(--color-surface)
+  );
+}
+.bots-cast-stage[data-hero] .bots-avatar {
+  view-transition-name: bot-hero;
+}
+.bots-cast-copy {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px 14px;
+}
+.bots-cast-copy strong {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Two lines always reserved, so every card in a row keeps one height. */
+.bots-cast-line {
+  display: -webkit-box;
+  min-height: calc(2 * 1.45em);
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Template groups. */
+.bots-template-group {
+  display: grid;
+  gap: 10px;
+}
+.bots-template-group-title {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* The whole card is the button; "Use template" surfaces on hover and focus. */
+.bots-template-use {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  box-shadow: var(--shadow-flat);
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out;
+}
+.bots-template:is(:hover, :focus-visible):not(:disabled) .bots-template-use {
+  opacity: 1;
+  transform: none;
+}
+
+/* The character wakes on hover or focus: the echo layers fold in, it blinks, the card lifts.
+   It only answers the pointer or keyboard; nothing here suggests the bot is working. */
+.bots-template .brand-agent-echo:nth-child(1) {
+  --echo-x: 12px;
+  --echo-y: 6px;
+}
+.bots-template .brand-agent-echo:nth-child(2) {
+  --echo-x: 9px;
+  --echo-y: 4.5px;
+}
+.bots-template .brand-agent-echo:nth-child(3) {
+  --echo-x: 6px;
+  --echo-y: 3px;
+}
+.bots-template .brand-agent-echo:nth-child(4) {
+  --echo-x: 3px;
+  --echo-y: 1.5px;
+}
+@keyframes bots-echo-fold {
+  0%,
+  100% {
+    transform: translate(var(--echo-x), var(--echo-y));
+  }
+  45%,
+  55% {
+    transform: translate(calc(var(--echo-x) * 0.15), calc(var(--echo-y) * -0.05));
+  }
+}
+@keyframes bots-blink-now {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  15% {
+    transform: scaleY(0.08);
+  }
+  30% {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bots-template {
+    transition:
+      border-color 140ms,
+      box-shadow 180ms ease-out,
+      transform 180ms ease-out;
+  }
+  .bots-template:is(:hover, :focus-visible):not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-selection);
+  }
+  .bots-template:is(:hover, :focus-visible):not(:disabled) .brand-agent-echo {
+    animation: bots-echo-fold 2.4s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  }
+  .bots-template:is(:hover, :focus-visible):not(:disabled) .brand-agent-face {
+    animation: bots-blink-now 900ms ease-in-out 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bots-template-use {
+    transition: none;
+  }
+}
+
+/* An unread reply: a small speech bubble on the character's shoulder. */
+.bots-avatar-bubble {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  width: 12px;
+  height: 10px;
+  border-radius: 6px 6px 6px 2px;
+  background: var(--color-action);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+/* A new bot's hello. */
+.bots-hello {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in srgb,
+    var(--bot-tint, var(--color-text-primary)) 8%,
+    var(--color-surface)
+  );
+}
+.bots-hello p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.bots-hello-character {
+  display: grid;
+}
+@keyframes bots-hello-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-8px) rotate(-6deg);
+  }
+  55% {
+    transform: translateY(0) rotate(0);
+  }
+  72% {
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bots-hello-character {
+    animation: bots-hello-bounce 900ms cubic-bezier(0.3, 0, 0.3, 1) 200ms 1 both;
+  }
+}
+
+/* Next wakes on the Schedules page: a day-long strip and the same times as a list. */
+.bots-next {
+  display: grid;
+  gap: 12px;
+}
+.bots-next-strip {
+  position: relative;
+  height: 56px;
+  margin: 0 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+.bots-next-tick {
+  position: absolute;
+  bottom: -20px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.bots-next-tick[data-edge="start"] {
+  left: 0;
+  transform: translateX(-50%);
+}
+.bots-next-tick[data-edge="end"] {
+  right: 0;
+  transform: translateX(50%);
+}
+.bots-next-mark {
+  position: absolute;
+  bottom: 6px;
+  left: calc(var(--at) * 100%);
+  transform: translateX(-50%);
+}
+.bots-next-list {
+  display: grid;
+  gap: 4px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.bots-next-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.bots-next-list time {
+  min-width: 5.5em;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.bots-next-list span {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bots-next-empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.bot-appearance-shuffle {
+  display: flex;
+  justify-content: center;
+  margin-top: -4px;
+}

@@ -4,9 +4,10 @@ import {
   DialogContent,
   DialogHeader,
   DropdownMenu as Menu,
+  Tooltip,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ChevronDown, SquareTerminal } from 'lucide-react';
+import { ChevronDown, PictureInPicture2, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAction } from '../../hooks/useAction';
 import { sessionCommand } from '../../lib/live-session';
@@ -31,7 +32,9 @@ export function WorkTools({
   hideTerminal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const { groups, error } = useWorkspaceActions(run);
+  const { editor, more, popOuts, error } = useWorkspaceActions(run);
+  // This toolbar has no panels to carry pop-out buttons, so it keeps them in its menu.
+  const groups = [popOuts, [...(editor ? [editor] : []), ...more]].filter((group) => group.length);
   useEffect(() => {
     if (requestRevision && !onTerminal) setOpen(true);
   }, [requestRevision, onTerminal]);
@@ -92,31 +95,51 @@ export function WorkTools({
 
 type WorkspaceAction = { id: string; label: string; onSelect: () => void };
 
-/** Pop-out windows, then editors and the workspace path, for a run. */
+/** Task panels that open in a window of their own. */
+const POP_OUT_PANES = ['result', 'changes', 'preview', 'terminal'] as const;
+export type PopOutPane = (typeof POP_OUT_PANES)[number];
+
+export const isPopOutPane = (value: string): value is PopOutPane =>
+  (POP_OUT_PANES as readonly string[]).includes(value);
+
+const popOutLabel = (pane: PopOutPane) => `Pop out ${pane === 'changes' ? 'review' : pane}`;
+
+/**
+ * Workspace commands for a run: the preferred editor on its own, the other editor and copy
+ * commands for an "Open in…" submenu, and pop-out windows for panels (see PopOutButton).
+ */
 export function useWorkspaceActions(run?: TaskRun) {
   const { run: act, error } = useAction();
   const preferredEditor = useSettingsStore((state) => state.preferredEditor);
-  if (!run) return { groups: [] as WorkspaceAction[][], error };
-  const windows: WorkspaceAction[] = (['result', 'changes', 'preview', 'terminal'] as const).map(
-    (pane) => ({
-      id: `pop-${pane}`,
-      label: `Pop out ${pane === 'changes' ? 'review' : pane}`,
+  if (!run)
+    return {
+      editor: undefined,
+      more: [] as WorkspaceAction[],
+      popOuts: [] as WorkspaceAction[],
+      popOut: undefined,
+      error,
+    };
+  const popOut = (pane: PopOutPane) =>
+    void act(async () => {
+      if (run.liveSessionId && ['changes', 'preview'].includes(pane))
+        await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
+      await invokeNative('task_work_window', { id: run.id, pane, action: 'open' });
+    });
+  const popOuts: WorkspaceAction[] = POP_OUT_PANES.map((pane) => ({
+    id: `pop-${pane}`,
+    label: popOutLabel(pane),
+    onSelect: () => popOut(pane),
+  }));
+  const [editor, ...otherEditors]: WorkspaceAction[] = [...(['vscode', 'cursor'] as const)]
+    .sort((a) => (a === preferredEditor ? -1 : 1))
+    .map((name) => ({
+      id: name,
+      label: `Open in ${name === 'vscode' ? 'VS Code' : 'Cursor'}`,
       onSelect: () =>
-        void act(async () => {
-          if (run.liveSessionId && ['changes', 'preview'].includes(pane))
-            await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
-          await invokeNative('task_work_window', { id: run.id, pane, action: 'open' });
-        }),
-    }),
-  );
-  const workspace: WorkspaceAction[] = [
-    ...[...(['vscode', 'cursor'] as const)]
-      .sort((a) => (a === preferredEditor ? -1 : 1))
-      .map((editor) => ({
-        id: editor,
-        label: `Open in ${editor === 'vscode' ? 'VS Code' : 'Cursor'}${editor === preferredEditor ? ' (preferred)' : ''}`,
-        onSelect: () => void act(() => invokeNative('task_open_editor', { id: run.id, editor })),
-      })),
+        void act(() => invokeNative('task_open_editor', { id: run.id, editor: name })),
+    }));
+  const more: WorkspaceAction[] = [
+    ...otherEditors,
     {
       id: 'copy-path',
       label: 'Copy workspace path',
@@ -132,5 +155,23 @@ export function useWorkspaceActions(run?: TaskRun) {
         ]
       : []),
   ];
-  return { groups: [windows, workspace], error };
+  return { editor, more, popOuts, popOut, error };
+}
+
+/** Opens a panel in its own window; it sits with the panel's tabs. */
+export function PopOutButton({
+  pane,
+  onPopOut,
+}: {
+  pane: PopOutPane;
+  onPopOut: (pane: PopOutPane) => void;
+}) {
+  const label = popOutLabel(pane);
+  return (
+    <Tooltip content={label}>
+      <Button variant="ghost" size="icon" aria-label={label} onClick={() => onPopOut(pane)}>
+        <PictureInPicture2 size={16} aria-hidden="true" />
+      </Button>
+    </Tooltip>
+  );
 }

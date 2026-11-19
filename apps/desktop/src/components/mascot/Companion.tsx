@@ -3,9 +3,20 @@ import { Button, ExternalLinkIcon, Popover, SearchIcon, SegmentedNav } from '@ja
 import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
+import {
+  announcedIds,
+  type CompanionHint,
+  coalesce,
+  companionBadge,
+  freshNotices,
+  hintStillRelevant,
+  markAnnounced,
+} from '../../lib/companion-announce';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
-import { taskTitle } from '../../lib/task-title';
+import { runTitle } from '../../lib/task-title';
+import { selectWork } from '../../lib/work-selection';
 import {
   type CompanionNotice,
   shouldNotify,
@@ -16,6 +27,8 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
+import { useNeedsYouCount } from '../layout/WorkSidebar';
 import { AskJackalope } from './AskJackalope';
 import { CompanionSettings } from './CompanionSettings';
 import { openCompanionTask } from './CompanionSources';
@@ -52,7 +65,7 @@ export function Companion({
   );
   const interactedOutside = useRef(false);
   const pendingAction = useRef<(() => void) | null>(null);
-  const [hint, setHint] = useState<Pick<CompanionNotice, 'id' | 'title' | 'kind'> | null>(null);
+  const [hint, setHint] = useState<CompanionHint | null>(null);
   const { sources, readIds, markRead, markUnread } = useCompanionStore(
     useShallow((s) => ({
       sources: s.sources,
@@ -70,24 +83,74 @@ export function Companion({
   const level = useSettingsStore((state) => state.notifications);
   const notices = sortNotices(Object.values(sources).flat());
   const unread = notices.filter((notice) => !readIds.includes(notice.id));
-  const unreadCount = unread.length;
+  const needsYou = useNeedsYouCount();
+  const badge = companionBadge({ needsYou, notices, readIds, proposals });
   useEffect(() => {
     if (isTauriEnvironment())
-      void invokeNative('desktop_unread_badge', { count: unreadCount }).catch(() => {});
-  }, [unreadCount]);
-  const announce = unread.filter((notice) => shouldNotify(notice.kind, level));
-  const announcementKey = JSON.stringify(
-    announce.map(({ id, title, kind }) => ({ id, title, kind })),
-  );
-  const seen = useRef(new Set<string>());
+      void invokeNative('desktop_unread_badge', { count: badge }).catch(() => {});
+  }, [badge]);
+  const onWorkList = useCompanionStore((state) => state.onWorkList);
+  const viewing = useWorkViewStore((state) => state.viewing);
+  // Announce transitions only: whatever exists once history first loads is recorded as already
+  // announced, and every id is remembered across launches, so restarts never repeat a bubble.
+  const noticeKey = notices.map(({ id, kind }) => `${id}|${kind}`).join('\n');
+  const seeded = useRef(false);
+  const arrivals = useRef<CompanionNotice[]>([]);
+  const flush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const live = useRef({ notices, readIds, level, open, quiet: false });
+  live.current = { notices, readIds, level, open, quiet: onWorkList && !viewing };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: noticeKey stands in for notices.
   useEffect(() => {
-    const current: Pick<CompanionNotice, 'id' | 'title' | 'kind'>[] = JSON.parse(announcementKey);
-    const next = current.find((notice) => !seen.current.has(notice.id));
-    for (const notice of current) seen.current.add(notice.id);
-    if (next && !open) setHint(next);
-  }, [announcementKey, open]);
-  const hintNotice = hint ? notices.find((notice) => notice.id === hint.id) : undefined;
-  const hintAction = hintNotice?.onOpen && hintNotice.actionLabel ? hintNotice : undefined;
+    if (loading) return;
+    const current = live.current.notices;
+    if (!seeded.current) {
+      seeded.current = true;
+      markAnnounced(current.map((notice) => notice.id));
+      return;
+    }
+    const fresh = freshNotices(current, announcedIds(), true);
+    if (!fresh.length) return;
+    markAnnounced(fresh.map((notice) => notice.id));
+    const { readIds: read, level: wanted, open: panelOpen, quiet } = live.current;
+    // Work the open list already shows, or the open panel, needs no bubble.
+    if (panelOpen || quiet) return;
+    arrivals.current.push(
+      ...fresh.filter((notice) => !read.includes(notice.id) && shouldNotify(notice.kind, wanted)),
+    );
+    if (!arrivals.current.length || flush.current) return;
+    // Arrivals within a moment of each other share one bubble.
+    flush.current = setTimeout(() => {
+      flush.current = null;
+      const batch = arrivals.current;
+      arrivals.current = [];
+      setHint((shown) => coalesce(batch, shown));
+    }, 1200);
+  }, [noticeKey, loading]);
+  useEffect(
+    () => () => {
+      if (flush.current) clearTimeout(flush.current);
+    },
+    [],
+  );
+  // A bubble clears itself once nothing it announced still waits.
+  useEffect(() => {
+    if (hint && !hintStillRelevant(hint, notices)) setHint(null);
+  }, [hint, notices]);
+  const hintNotice =
+    hint?.ids.length === 1 ? notices.find((notice) => notice.id === hint.id) : undefined;
+  const openNeedsYou = () => {
+    selectWork();
+    useWorkViewStore.getState().setScope('all');
+    useWorkViewStore.getState().openList('attention');
+    navigateWorkspace('kanban');
+  };
+  const hintAction: { label: string; ids: string[]; run: () => void } | undefined = hint
+    ? hint.ids.length > 1
+      ? { label: 'Open Work', ids: hint.ids, run: openNeedsYou }
+      : hintNotice?.onOpen && hintNotice.actionLabel
+        ? { label: hintNotice.actionLabel, ids: [hintNotice.id], run: hintNotice.onOpen }
+        : undefined
+    : undefined;
   useEffect(() => {
     if (!hint) return;
     // A bubble with an action stays long enough to reach it.
@@ -125,38 +188,34 @@ export function Companion({
     <Popover.Root open={open} onOpenChange={setOpen}>
       <div className={compact ? 'companion-dock companion-inline' : 'companion-dock'}>
         <div className="companion-caption" aria-hidden="true" hidden={compact}>
-          <span>{announce.length ? `${announce.length} unread` : 'Jackalope'}</span>
+          <span>{badge ? `${badge} need${badge === 1 ? 's' : ''} you` : 'Jackalope'}</span>
           <small>{activity}</small>
         </div>
         <Popover.Anchor asChild>
           <div className="companion-anchor">
-            {!open &&
-              !message &&
-              hint &&
-              !readIds.includes(hint.id) &&
-              shouldNotify(hint.kind, level) && (
-                <MascotSpeech
-                  key={hint.id}
-                  motion={reactions}
-                  dismissLabel="Dismiss notification preview"
-                  onDismiss={() => setHint(null)}
-                >
-                  {hint.title}
-                  {hintAction && (
-                    <button
-                      type="button"
-                      className="mascot-speech-action"
-                      onClick={() => {
-                        setHint(null);
-                        markRead([hintAction.id]);
-                        hintAction.onOpen?.();
-                      }}
-                    >
-                      {hintAction.actionLabel}
-                    </button>
-                  )}
-                </MascotSpeech>
-              )}
+            {!open && !message && hint?.ids.some((id) => !readIds.includes(id)) && (
+              <MascotSpeech
+                key={hint.id}
+                motion={reactions}
+                dismissLabel="Dismiss notification preview"
+                onDismiss={() => setHint(null)}
+              >
+                {hint.title}
+                {hintAction && (
+                  <button
+                    type="button"
+                    className="mascot-speech-action"
+                    onClick={() => {
+                      setHint(null);
+                      markRead(hintAction.ids);
+                      hintAction.run();
+                    }}
+                  >
+                    {hintAction.label}
+                  </button>
+                )}
+              </MascotSpeech>
+            )}
             <JackalopeMascot
               size={compact ? 'xs' : 'sm'}
               className="companion-avatar"
@@ -167,11 +226,11 @@ export function Companion({
               buttonId="jackalope-companion-trigger"
               expanded={open}
               controls={open ? 'jackalope-companion-panel' : undefined}
-              label={`Open Jackalope helper${announce.length ? `, ${announce.length} unread notifications` : ''}${proposals ? `, ${proposals} actions to review` : ''}. ${activity}`}
+              label={`Open Jackalope helper${badge ? `, ${badge} need${badge === 1 ? 's' : ''} you` : ''}${proposals ? `, including ${proposals} actions to review` : ''}. ${activity}`}
             />
-            {!!(announce.length + proposals) && (
+            {!!badge && (
               <span className="companion-badge" aria-hidden="true">
-                {announce.length + proposals > 99 ? '99+' : announce.length + proposals}
+                {badge > 99 ? '99+' : badge}
               </span>
             )}
           </div>
@@ -329,7 +388,7 @@ export function Companion({
                                 onClick={() => activate(() => openCompanionTask(run))}
                               >
                                 <span>
-                                  {taskTitle(run.prompt)}
+                                  {runTitle(run)}
                                   <small>
                                     {run.projectName} ·{' '}
                                     {run.prompts?.some((prompt) => prompt.status === 'pending')

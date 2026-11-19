@@ -48,6 +48,74 @@ function appIsDark() {
   return (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255 < 0.5;
 }
 
+/** Screens currently asking for the frosted window; the OS effect stays on while any do. */
+let holders = 0;
+/** The applied effect's theme observer, or null while the window is opaque. */
+let applied: MutationObserver | null = null;
+/**
+ * Native effect calls run one at a time. Screens hand the window over by unmounting one
+ * WindowGlass and mounting the next (and dev StrictMode remounts), so unordered calls could
+ * clear the effect after the next screen applied it, leaving `data-window-glass` panes over
+ * an unblurred desktop.
+ */
+let queue: Promise<void> = Promise.resolve();
+
+/** Brings the OS effect in line with whether any screen holds it. */
+function syncGlass() {
+  queue = queue
+    .then(async () => {
+      if (holders > 0 && !applied) await applyGlass();
+      else if (holders === 0 && applied) await clearGlass();
+    })
+    .catch(() => {});
+}
+
+async function applyGlass() {
+  if (!(await supportsGlass())) return;
+  const { Effect, EffectState, getCurrentWindow } = await import('@tauri-apps/api/window');
+  const window = getCurrentWindow();
+  const root = document.documentElement;
+  // An automatic theme leaves the window following the system, so the system preference
+  // stays readable; otherwise the material follows the app's chosen appearance.
+  const windowTheme = (): 'dark' | 'light' | null =>
+    themeFollowsSystem() ? null : appIsDark() ? 'dark' : 'light';
+  let theme = windowTheme();
+  await window.setTheme(theme);
+  settleAppearance();
+  // Active keeps the window frosted while another app has focus; following the window's
+  // active state would drop to the flat inactive material.
+  await window.setEffects(
+    isMacPlatform()
+      ? { effects: [Effect.Sidebar], state: EffectState.Active }
+      : { effects: [Effect.Acrylic] },
+  );
+  root.dataset.windowGlass = '';
+  // Theme tokens are applied as inline styles on the root element.
+  const observer = new MutationObserver(() => {
+    const next = windowTheme();
+    if (next === theme) return;
+    theme = next;
+    // Releasing the window theme can flip the scheme an automatic theme reads.
+    void window
+      .setTheme(theme)
+      .then(settleAppearance)
+      .catch(() => {});
+  });
+  observer.observe(root, { attributes: true, attributeFilter: ['style'] });
+  applied = observer;
+}
+
+async function clearGlass() {
+  applied?.disconnect();
+  applied = null;
+  delete document.documentElement.dataset.windowGlass;
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  const window = getCurrentWindow();
+  await window.clearEffects();
+  await window.setTheme(null);
+  settleAppearance();
+}
+
 /**
  * Shows the desktop through a frosted window while the calling screen is mounted.
  * The window is transparent on Windows and macOS (tauri.windows.conf.json and
@@ -61,62 +129,11 @@ function useWindowGlass() {
   const enabled = useSettingsStore((state) => state.frostedWindow);
   useEffect(() => {
     if (!enabled || !isTauriEnvironment()) return;
-    let alive = true;
-    let applied = false;
-    let observer: MutationObserver | undefined;
-    const root = document.documentElement;
-    void (async () => {
-      if (!(await supportsGlass()) || !alive) return;
-      const { Effect, EffectState, getCurrentWindow } = await import('@tauri-apps/api/window');
-      const window = getCurrentWindow();
-      // An automatic theme leaves the window following the system, so the system preference
-      // stays readable; otherwise the material follows the app's chosen appearance.
-      const windowTheme = (): 'dark' | 'light' | null =>
-        themeFollowsSystem() ? null : appIsDark() ? 'dark' : 'light';
-      let theme = windowTheme();
-      await window.setTheme(theme);
-      settleAppearance();
-      await window.setEffects(
-        isMacPlatform()
-          ? {
-              effects: [Effect.Sidebar],
-              state: EffectState.FollowsWindowActiveState,
-            }
-          : { effects: [Effect.Acrylic] },
-      );
-      applied = true;
-      if (!alive) {
-        void window.clearEffects();
-        void window.setTheme(null);
-        return;
-      }
-      root.dataset.windowGlass = '';
-      // Theme tokens are applied as inline styles on the root element.
-      observer = new MutationObserver(() => {
-        const next = windowTheme();
-        if (next === theme) return;
-        theme = next;
-        // Releasing the window theme can flip the scheme an automatic theme reads.
-        void window
-          .setTheme(theme)
-          .then(settleAppearance)
-          .catch(() => {});
-      });
-      observer.observe(root, { attributes: true, attributeFilter: ['style'] });
-    })().catch(() => {});
+    holders += 1;
+    syncGlass();
     return () => {
-      alive = false;
-      observer?.disconnect();
-      delete root.dataset.windowGlass;
-      if (applied)
-        void import('@tauri-apps/api/window')
-          .then(async ({ getCurrentWindow }) => {
-            const window = getCurrentWindow();
-            await window.clearEffects();
-            await window.setTheme(null);
-            settleAppearance();
-          })
-          .catch(() => {});
+      holders -= 1;
+      syncGlass();
     };
   }, [enabled]);
 }

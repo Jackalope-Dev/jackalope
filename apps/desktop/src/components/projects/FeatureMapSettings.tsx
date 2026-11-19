@@ -349,6 +349,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
                   Drop missing paths
                 </Menu.Item>
               )}
+              {problem && <Menu.Separator className="menu-separator" />}
               <Menu.Item className="workspace-menu-item" onSelect={() => setRemoving(index)}>
                 Remove…
               </Menu.Item>

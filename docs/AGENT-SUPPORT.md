@@ -23,7 +23,10 @@ code. A turn whose only answer is a printed provider error (Claude Code's
 reaching review; an error the CLI retried past keeps the later answer. Beside the
 message, `tasks/failure.rs` records a kind (authentication, quota exhausted, rate
 limited, provider refused, model unavailable, context too long or agent exited).
-Authentication is judged on the message's first line only. The kind is descriptive;
+Authentication is judged on the message's first line only. Claude Code's rejected
+`rate_limit_event` means a five-hour, weekly or extra-usage window is used up: it is
+recorded as quota exhausted, naming the window and, when the event carries `resetsAt`,
+when it resets. A 429 or "too many requests" stays rate limited. The kind is descriptive;
 quota handoff still requires a provider quota event.
 
 The requested model is saved separately from the model the agent reports serving.
@@ -173,10 +176,14 @@ session starts a new conversation in the same workspace, with the earlier reques
 the quota handoff's progress context in the prompt, and the attempt's activity says so.
 A store without the expected `sessions/` directory, or one too large to read, leaves
 the decision to the CLI. Codex reporting a different thread on resume is recorded in
-activity. Claude Code, OpenCode's server and ACP agents refuse an unknown session
-themselves; the attempt fails as a lost conversation and asks for a new task. Gemini CLI
-and Antigravity fail when a different session comes back. Continuations on a computer
-rely on the CLI there.
+activity. Claude Code (`No conversation found with session ID`), OpenCode's server (HTTP
+404 for the session) and ACP agents (a failed `session/load`) refuse an unknown session
+themselves. On this device the attempt then starts once more as a new conversation with
+the same earlier request and progress; activity keeps the CLI's own refusal and says so.
+It starts over at most once, and a failure of the new conversation fails the attempt
+with its own error. A continuation of a session from outside Jackalope never starts
+over: a lost session fails it as a lost conversation. Gemini CLI and Antigravity fail
+when a different session comes back. Continuations on a computer rely on the CLI there.
 
 Gemini account setup uses `GEMINI_CLI_HOME` as the parent of `.gemini` and
 `GEMINI_FORCE_FILE_STORAGE=true` to isolate credentials from the shared keychain.
@@ -189,7 +196,13 @@ native Keychain/Secret Service storage on Unix. Existing account identities rema
 The desktop never marks Grok or OpenCode authenticated merely because an
 executable or saved credential exists. Profiles are account organization,
 not a sandbox: inherited provider environment variables, CLI plugins, project
-configuration and filesystem permissions still apply. Real account switching
+configuration and filesystem permissions still apply. Child processes do not
+inherit Jackalope's own `JACKALOPE_*` credentials (keys, tokens, secrets and
+passwords) from the app's environment; one reaches a process only when Jackalope
+sets it for that process, as it does an attempt's bridge token. Values an attempt
+gives its agent are redacted from its record
+([project secrets](AGENT-ACCOUNTS.md#project-secrets)). Grok's prompt file is created
+new, owner-only on Unix, and removed when the attempt ends. Real account switching
 between two authenticated identities, revoked/expired credentials and every
 provider/model combination remain release acceptance work.
 
@@ -263,8 +276,18 @@ Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/ki
 
 An installed CLI that speaks the Agent Client Protocol can be added from Agents with its
 executable path and arguments. Jackalope starts that process over ACP and keeps the CLI's
-own sign-in. It does not probe that sign-in. Copilot and other agents without ACP or a
-native adapter cannot execute tasks.
+own sign-in. It does not probe that sign-in. Agents without ACP or a native adapter
+cannot execute tasks.
+
+Add agent offers known ACP CLIs by name from `lib/acp-presets.ts`, with the command and
+arguments each CLI's own documentation gives: Cursor (`cursor-agent acp`), GitHub Copilot
+CLI (`copilot --acp`, 1.0.93 or newer), Goose (`goose acp`), Qwen Code (`qwen --acp`,
+0.16 or newer), Auggie (`auggie --acp`), Kiro (`kiro-cli acp`), Hermes Agent
+(`hermes acp`) and Command Code (`cmd acp`, `cmdc acp` on Windows). `agent_locate_executables`
+looks for those commands on PATH and in the usual install folders without running them, and
+a preset found there fills in its path. A preset is only a starting point for the form: it
+runs as a generic ACP agent, with the same permission, question and session handling, and
+has not been accepted with each CLI.
 
 A loopback OpenAI-compatible server, such as LM Studio or vLLM, is saved as an OpenCode
 account after `GET /v1/models` succeeds. Only `127.0.0.1`, `localhost` and `::1` are accepted.
@@ -338,3 +361,37 @@ Use `codex`, `claude` or `grok` without `JACKALOPE_AGENT_MODEL` to use that CLI'
 configured model. Free-model availability can change. Install OpenCode from
 [its official documentation](https://opencode.ai/docs/); the Windows npm binary
 layout and `.opencode/bin` are discovered alongside PATH executables.
+
+### Agent × model matrix
+
+The ignored `installed_agent_matrix` test runs scenarios per listed agent and model on
+the lifecycle trial's fixtures, each pair in its own disposable repository and history.
+It spends provider usage only when invoked and never runs in `pnpm verify` or CI.
+List every pair explicitly: each model is a pair, the next model listed for that
+agent is its switch partner, and an agent without models uses its CLI default.
+
+```powershell
+$env:JACKALOPE_AGENT_MATRIX = 'claude=claude-haiku-4-5,claude-sonnet-4-5;codex'
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features installed_agent_matrix -- --ignored --nocapture
+Remove-Item Env:JACKALOPE_AGENT_MATRIX
+```
+
+One session per pair runs, in order: a first turn, a follow-up that must keep the
+session, a switch to the partner model and back, a named file with exact content
+in the attempt's worktree, and a restart. The restart closes the runtime as an app
+exit does (warm sessions and helpers end), reopens the same history, checks the
+saved attempt, session and file came back, then asks for the first turn's word. It
+proves continuation from saved history and the CLI's own session store. A pair
+stops at its first failing scenario; a scenario without an answer within
+`JACKALOPE_AGENT_MATRIX_TURN_SECONDS` (default 300) fails. An adapter failure runs
+the pair once more and keeps the first try beside the retry.
+
+Findings are reported apart from verdicts: a served model other than the requested
+one (`served_model.rs`), a completed turn that named no served model, a Claude pair
+with at least 10,000 input tokens and no cache reads, and missing usage. Pairs with
+a substituted or unconfirmed served model are left out of the pass count.
+Authentication, quota, rate-limit and model-access failures (`failure.rs`) stop the
+pair as account findings, without a retry. `report.json` and `report.md` go to
+ignored `output/agent-matrix/<time>/`, or the absolute `JACKALOPE_AGENT_MATRIX_OUT`;
+fixtures stay in the temporary folder for diagnosis. Agent sign-ins and global CLI
+configuration are shared with your everyday use.

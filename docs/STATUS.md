@@ -23,8 +23,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a project row opens that project's work and its menu opens project pages. The title
   bar holds command search; the bottom bar shows the focused project, branch, local
   activity and visual account allowances with freshness and reset times.
-  Settings → Desktop holds sleep prevention, owned terminals and preview ports.
+  Settings → Editor & terminal holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
+- Claude Code and Codex conversations people had outside Jackalope (a terminal, another
+  app) appear read-only under each project in an Outside Jackalope group, read locally from
+  those CLIs' session files for the accounts Jackalope uses; Jackalope's own attempts are
+  left out. Continue in Jackalope starts a conversation that resumes the CLI's session
+  directly in the checkout or worktree it ran in. Settings → Privacy turns reading off.
+  See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
 - The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
   text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
   Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
@@ -36,7 +42,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   explicit Run action. Optional dictation inserts editable text through a separately
   configured loopback transcription service and never sends the task automatically.
 - Idle-sleep prevention supports off, active-work and app-open modes using native
-  Windows, macOS and Linux APIs. macOS retains native traffic lights and application
+  Windows, macOS and Linux APIs, and starts on active work, so an agent run is not cut
+  short by the computer idling to sleep. macOS retains native traffic lights and application
   menus, with an unread Dock count. Notifications can be marked unread again.
   Native platform acceptance remains open.
 - Windows can pair with an already running Linux Jackalope host inside a selected
@@ -57,8 +64,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   VS Code/Cursor workspace links and separate result, review, preview and terminal
   windows. A running task terminal reserves its workspace against agent work, checks,
   previews, integration and cleanup. Closing a pane keeps it running; quitting stops it.
-  Two terminal panes can share a task workspace, with output search and explicit
-  saved-command execution. Optional local output retention restores a stopped
+  Two terminal panes can share a task workspace, with output search and buttons for the
+  project's preparation, verification and terminal commands (Project settings), each run
+  only when chosen. Saved prompts from earlier versions become project workflows and saved
+  commands become terminal commands when a project first opens; the saved list is kept
+  unchanged. Local output retention, on by default, restores a stopped
   snapshot of up to 256 KiB per pane; it never restarts commands.
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
@@ -102,6 +112,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   while an earlier run is still active is skipped instead of queued.
 - Project setup asks for the project, its agents and an optional first task;
   decisions, Git behavior and appearance start from defaults edited in Project settings.
+  Project settings open from the project's own Settings tab and group into Basics,
+  Commands, Automation, Secrets, Integrations and Feature map; Automation's Hands-on,
+  Balanced and Autonomous presets set the task, learning and plan-autonomy switches
+  together, read back from those switches and undoable.
   When no agent is detected, the agents step offers API-key and local-server
   connections through the private runner, applied app-wide. It re-scans agents when the
   window regains focus, signs a signed-out account in through the in-app sign-in, and
@@ -214,6 +228,33 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   restores the task branch. Both draft the commit message from the changes and push only
   when chosen. Worktree tasks keep their guarded integration. Publishing and deployment
   remain explicit user-approved steps; a local merge does not establish either.
+- Finished work is checked with the project's saved check command by default, in every
+  place work starts and in Project settings alike; turning off Check results automatically
+  stops it. The Balanced automation preset includes it.
+- The board view shows Needs you, Working, In review, Drafts and Finished as side-by-side
+  lanes that scroll sideways in a narrow window instead of wrapping, and stack below 640
+  pixels. Work rows and cards say why they need the person (a waiting question, a failed
+  check, a failure message, stopped or interrupted work) rather than a general status.
+- Replies in a conversation offer Read aloud, which speaks the reply with the system voice
+  on this computer after naming code blocks and dropping tables and link addresses. It
+  appears only where the webview has speech synthesis and has not been accepted in the
+  installed app on each platform.
+- A pull request a task opens, or one found on its branch by Check pull request and CI, is
+  followed on this device: the GitHub CLI is read every 45 seconds while checks run and
+  every three minutes otherwise (half as often while the window is hidden), one pull
+  request at a time, until it merges or closes. The work list, board and sidebar place the
+  task by it: failed checks, requested changes and conflicts under Needs you, a pull
+  request waiting on checks or reviewers in an In review lane, an approved, mergeable one
+  as PR ready to merge, and a merged one as finished. Moving into a failing, changes-requested,
+  conflicting, ready or merged state raises a notification under the existing preferences.
+  Delivery shows the pull request with its checks and one next step: an editable follow-up
+  to the task's own agent for failed checks, review threads (read through the CLI) or a
+  conflict, Push update (commits remaining changes and pushes, after confirmation) and
+  Merge pull request with a chosen method, after confirmation. Nothing is sent to an agent,
+  pushed or merged automatically. Pull requests opened from the terminal command or the
+  phone are not followed until Delivery finds them, required-review rules are read only as
+  GitHub's review decision, and following has not been accepted against a live repository
+  in an installed app.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. Chat
   starts a session from the first message and groups history automatically.
@@ -230,8 +271,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   unknown cost blocking further dispatch when a cost threshold is set. These are not billing caps.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity and Gemini CLI adapters with
   [provider-specific capabilities](AGENT-SUPPORT.md). A continuation whose native session
-  the CLI no longer has is reported in the attempt rather than answered as if resumed; Codex
-  and Grok start a new conversation in the same workspace with the earlier progress.
+  the CLI no longer has is reported in the attempt rather than answered as if resumed; it
+  starts once as a new conversation in the same workspace with the earlier progress (Codex
+  and Grok before launch, Claude Code, Kimi, ACP agents and OpenCode's server after they
+  refuse it). Continuations of sessions from outside Jackalope fail instead.
 - Project-scoped agent lists, task defaults and account choices; app-wide limits
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
@@ -240,6 +283,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.
   An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
+  Add agent lists known ACP CLIs by name (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
+  Auggie, Kiro, Hermes Agent and Command Code), marks the ones found on this computer and
+  fills in their path and arguments, which stay editable. None of these has been run
+  through Jackalope in an installed app.
   First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
@@ -366,10 +413,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   lesson, especially one agents keep missing, into an architecture, type, lint or test
   check proven against a past instance; accepting it marks the lesson enforced and
   retires learned lessons, and a check that later disappears restores or flags the
-  lesson. Off by default per project: agent
-  reflection with the default agent after work ends (bounded, on that account's
-  quota, through the same gate), and mirroring active lessons into a marked
-  `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
+  lesson. On by default per project: agent
+  reflection with the default agent after work ends (bounded to 4 an hour and 20 a
+  day, on that account's quota, through the same gate). Off by default: mirroring
+  active lessons into a marked `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
   off by default and layered on settings sync, matches projects by repository and
   merges by revision; evidence, use counts and paths stay local. Installed
   multi-desktop sync, real-provider agent reflection and exported-file use by other
@@ -466,7 +513,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Project secrets (Project settings → Secrets) give a project's task agents environment
   variables such as service API keys, on this device, on its computer or both. Values
   stay in protected storage and reach only agent processes; the app shows names and
-  save times. See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
+  save times. Their values and managed keys given to an agent are redacted from the
+  attempt's saved and displayed record; the agent itself can still use or send them.
+  See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
@@ -480,6 +529,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   preparation and automatic checks and open only on the Bots page. Bots keep up to 30
   notes for later conversations and recall how their latest conversations ended; the
   roster shows real activity and unread replies.
+  A project's bots can be saved as one file (Share these bots) and added to another
+  project or computer after a review (Import bots). The file holds names, descriptions,
+  instructions, looks and schedule or project-change wake-ups; credential-shaped text is
+  removed and reported. Imported bots use Automatic, have no connections and arrive with
+  wake-ups off. Bot rows have a right-click menu matching their options menu, with Mark as
+  read and Mark as unread.
   Bots wake themselves on schedules, project changes or new results from a read-only
   connection tool, message each other with replies routed back, show decision, input,
   action, source and update cards, and suggest new bots for the person to review. Every
@@ -519,7 +574,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Usage separates context a provider read as new from cached re-reads, with a cache
   hit rate, and reports model calls and average context, because cumulative tokens
   track turn count rather than work done. Per-message usage is recorded for Claude,
-  Grok and OpenCode.
+  Grok and OpenCode; an attempt that ends without the agent's final total (stopped,
+  failed or interrupted) keeps the sum of the calls it observed, without a cost, and
+  says so in its activity.
 - Failed attempts keep the agent's own message with a typed kind (authentication,
   quota, rate limit, provider refusal, unavailable model, context length or exit),
   and a next step for sign-in, model and context-length failures. Requested and served models are compared;
@@ -563,8 +620,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a plain push of an existing non-protected local branch to a configured remote,
   history or working-tree loss, piped or encoded code, elevated or system changes,
   software installs beyond the project (system packages, toolchains, global tools),
-  credential files, publishing and deploys, process kills and writes outside the
-  workspace. Here-document bodies read as data, such as commit messages, and command
+  credential files, publishing and deploys, writes outside the workspace, and process
+  kills. On macOS and Linux, `kill` by ID of a process the attempt started, in its
+  agent's process tree or running inside the attempt's own worktree (never the project
+  checkout), is routine; kills by name (`pkill`, `killall`) always ask. Here-document bodies read as data, such as commit messages, and command
   output assigned to a variable are not parsed as commands. Agents are asked to edit
   files with their edit tools so each edit is checked, and `record_decision` replies
   flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the
@@ -614,7 +673,7 @@ media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling uses Windows Store MSIX and macOS/Linux Cloud candidates.
 Store builds offer in-app update checks and user-initiated installation through
 Microsoft Store; Store-managed background delivery remains independent. Other desktop builds
-can optionally download a found update in the background; installation still waits
+download a found update in the background unless that is turned off; installation still waits
 for idle work and the title bar's Restart to update action. Store members can request
 beta flight membership in the app; the operator applies it in Partner Center from
 the admin console's request list. Branch-based
@@ -646,8 +705,8 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm, which appears once a swarm Worker is connected. Its Settings card
-appears once Artifacts is connected, or while a Worker is saved. Set up Swarm deploys the
+forks on Project → Swarm, which appears once a swarm Worker is connected. Its card in
+Settings → Swarm appears once Artifacts is connected, or while a Worker is saved. Set up Swarm deploys the
 Worker bundled with the app to the connected account (bound to the connected namespace, with
 a generated token in protected storage), publishes it on workers.dev, checks it and connects
 it, with per-step progress and retry; it shows Update Swarm Worker when the bundle or namespace
@@ -694,15 +753,23 @@ Which product scopes Connect Cloudflare grants, and provisioning against a live 
 not yet accepted.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
-Settings → Remote access scopes paired devices to selected projects. Before it is on, every
+Devices → Let devices use this one scopes paired devices to selected projects. Before it is on, every
 project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
 Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
 address or private Tailscale Serve, which Remote access sets up through detected steps.
 Pairing shows a ten-character code (or a QR link for phones) that works once, expires after
 five minutes and allows ten attempts; a phone paired under a generic model name takes the
-computer owner's first name. Work continues through client disconnection. Live multi-device,
-provider, Tailscale and cross-platform acceptance remain open.
+computer owner's first name. Work continues through client disconnection. Shared projects
+reach phones with their sidebar icon and, when names clash, the parent folders that tell them
+apart (never a full path). With "Let paired computers invite phones" turned on in Devices → Let
+devices use this one (off by default), a paired computer can show that host's one-time phone code
+from Use from your phone; the phone then pairs with the host directly over its HTTPS address,
+is listed as invited by that computer and is revoked with it. Replies that aren't Jackalope's,
+such as a Tailscale Serve 502 when nothing listens behind it, name the status instead of a
+generic error, and the Tailscale steps warn when Serve points at a different port than Remote
+access listens on. Live multi-device, provider, Tailscale and cross-platform acceptance remain
+open.
 
 ## Known limits
 
@@ -740,6 +807,12 @@ computers have no viewer. The image workflow has not run, so no image is publish
 Placing swarm forks across hosts is covered by unit tests of the placer, the dispatcher and
 the lost-host retry; no swarm has yet run across this device and real computers, and host
 health is learned only from runs and resets when the app restarts.
+
+Conversations from outside Jackalope cover Claude Code and Codex session stores as
+their current versions write them, with fixture tests only; Gemini CLI, OpenCode, Kimi
+Code and Grok stores are not read. Continuing one has not been accepted against a real
+CLI session in an installed app, and attempts that retention archived are not excluded
+by session ID.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

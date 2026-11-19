@@ -9,6 +9,9 @@ import {
   SearchField,
   SegmentedControl,
   SegmentedNav,
+  SettingGroup,
+  SettingRow,
+  Switch,
 } from '@jackalope/ui';
 import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -290,7 +293,7 @@ export function McpWorkspace({
                           setCustomModalOpen(true);
                         }}
                       >
-                        Custom connection
+                        Add custom connection…
                       </Menu.Item>
                       <Menu.Item
                         className="workspace-menu-item"
@@ -589,23 +592,19 @@ export function McpWorkspace({
 
           {activeTab === 'marketplace' && (
             <section>
-              {!useMcpMarketplace ? (
-                <div className="mcp-privacy-banner">
-                  <div>
-                    <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-                      MCP Marketplace is currently disabled
-                    </h3>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setUseMcpMarketplace(true);
-                    }}
-                  >
-                    <Globe size={15} />
-                    Enable Marketplace
-                  </Button>
-                </div>
-              ) : (
+              <SettingGroup>
+                <SettingRow
+                  title="Use MCP marketplace"
+                  description="Searches and server details come from allmcps.com, which publicly logs requests. Publisher avatars load from GitHub. Your connected agents and MCP servers use their own services."
+                >
+                  <Switch
+                    label="Use MCP marketplace"
+                    checked={useMcpMarketplace}
+                    onCheckedChange={setUseMcpMarketplace}
+                  />
+                </SettingRow>
+              </SettingGroup>
+              {!useMcpMarketplace ? null : (
                 <>
                   <div className="mcp-search-bar relative">
                     <SearchField

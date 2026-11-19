@@ -158,6 +158,7 @@ impl TaskRuntime {
                             let _ = runtime.save(&run);
                         }
                         if run.status.is_active() {
+                            settle_usage(&mut run);
                             run.status = if cfg!(windows) && run.process_contained {
                                 RunStatus::Stopped
                             } else {
@@ -373,6 +374,7 @@ impl TaskRuntime {
         }
         run.persistence_error = None;
         if run.status.is_active() {
+            settle_usage(&mut run);
             run.status = RunStatus::Interrupted;
             run.error.get_or_insert_with(|| {
                 "Restored from a recovery copy of an unfinished attempt; it was not rerun.".into()
@@ -389,7 +391,9 @@ impl TaskRuntime {
     }
 
     pub(super) fn save(&self, run: &TaskRun) -> Result<(), String> {
-        journal::Writer::wait(self.writer.submit(run.clone(), true)?)
+        let mut run = run.clone();
+        run.redact_secrets();
+        journal::Writer::wait(self.writer.submit(run, true)?)
     }
 
     pub(in crate::commands) fn update_output(
@@ -414,6 +418,7 @@ impl TaskRuntime {
     }
 
     fn bound_output(run: &mut TaskRun) {
+        run.redact_secrets();
         if !run.status.is_active() {
             run.progress = None;
         }

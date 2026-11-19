@@ -7,10 +7,13 @@
 //! session that is gone starts a new conversation in the same workspace, with the quota
 //! handoff's progress context in place of the history, and the attempt says so. Codex is
 //! also caught after the fact when it reports a different thread. Claude Code, OpenCode's
-//! server and ACP agents refuse an unknown session themselves; that refusal is reported as
-//! a lost conversation rather than a generic failure.
+//! server and ACP agents refuse an unknown session themselves; the refusal is recorded
+//! ([`refused`]) and the attempt starts once more as a new conversation with the same
+//! stand-in. A continuation of a session from outside Jackalope exists for that session,
+//! so it never starts over: it fails as a lost conversation instead.
 
 use super::*;
+use crate::commands::external_sessions::codex;
 
 /// Directory entries a store check reads before it gives up without an answer.
 const SCAN_LIMIT: usize = 100_000;
@@ -50,19 +53,17 @@ fn stored(adapter: &str, home: &Path, session: &str) -> Stored {
     }
     let mut budget = SCAN_LIMIT;
     match adapter {
-        // One rollout per thread, rollout-<time>-<thread id>.jsonl, compressed to
-        // .jsonl.zst once idle, under sessions/YYYY/MM/DD/ or archived_sessions/
-        // (Codex 0.156).
+        // Rollouts are named by thread ID; see `external_sessions::codex` for the layout.
         "codex" => {
-            let sessions = home.join("sessions");
-            if !sessions.is_dir() {
+            let roots = codex::roots(home);
+            if !roots[0].is_dir() {
                 return Stored::Unknown;
             }
-            for root in [sessions, home.join("archived_sessions")] {
+            for root in roots {
                 if !root.is_dir() {
                     continue;
                 }
-                match names_file(&root, session, 4, &mut budget) {
+                match names_file(&root, session, codex::DEPTH, &mut budget) {
                     Some(true) => return Stored::Present,
                     Some(false) => {}
                     None => return Stored::Unknown,
@@ -109,6 +110,37 @@ fn names_file(directory: &Path, needle: &str, depth: usize, budget: &mut usize) 
         }
     }
     Some(false)
+}
+
+/// The failure of a continuation of a session from outside Jackalope that is gone.
+pub(super) fn gone(previous: &TaskRun) -> String {
+    format!(
+        "{} no longer has this conversation in {}.",
+        crate::commands::agents::name(&previous.agent),
+        previous
+            .account_binding
+            .as_ref()
+            .map_or_else(String::new, |binding| binding
+                .directory
+                .display()
+                .to_string())
+    )
+}
+
+/// Records the CLI's own `message` refusing to resume a session it no longer has.
+pub(super) fn refused(run: &mut TaskRun, message: &str) {
+    run.session_refused = Some(message.trim().chars().take(300).collect());
+}
+
+/// The activity entries of an attempt that starts again after the CLI refused its session.
+pub(super) fn restarted_after(adapter: &str, refusal: &str) -> [String; 2] {
+    [
+        format!(
+            "{} could not resume the earlier conversation: {refusal}",
+            crate::commands::agents::name(adapter)
+        ),
+        restarted(adapter),
+    ]
 }
 
 /// The activity entry of a continuation whose session was gone before launch.
@@ -177,8 +209,10 @@ pub(super) fn explain_refusal(run: &mut TaskRun, adapter: &str, requested: Optio
         .iter()
         .chain(run.diagnostics.iter())
         .find(|line| line.contains(CLAUDE_REFUSAL))
-        .map(|line| line.trim().chars().take(300).collect::<String>());
+        .cloned();
     if let Some(refusal) = refusal {
+        refused(run, &refusal);
+        let refusal = run.session_refused.as_deref().unwrap_or_default();
         run.error = Some(format!("Claude Code no longer has this task's earlier conversation: {refusal}. Start a new task with the relevant context."));
     }
 }
@@ -346,6 +380,10 @@ mod tests {
             "claude",
             Some("5f0e1d2c-3b4a-4958-a6b7-c8d9e0f1a2b3"),
         );
+        assert_eq!(
+            run.session_refused.as_deref(),
+            Some("No conversation found with session ID: 5f0e1d2c-3b4a-4958-a6b7-c8d9e0f1a2b3")
+        );
         let error = run.error.unwrap();
         assert!(error.starts_with("Claude Code no longer has this task's earlier conversation: No conversation found with session ID: 5f0e1d2c"), "{error}");
 
@@ -374,6 +412,7 @@ mod tests {
             Some("5f0e1d2c-3b4a-4958-a6b7-c8d9e0f1a2b3"),
         );
         assert_eq!(fresh.error.as_deref(), Some("You've hit your limit"));
+        assert!(fresh.session_refused.is_none());
     }
 
     #[test]
@@ -393,5 +432,14 @@ mod tests {
         assert!(
             restarted("codex").starts_with("Codex no longer had this task's earlier conversation")
         );
+        let [refusal, restart] = restarted_after("kimi", "Session not found: saved");
+        assert_eq!(
+            refusal,
+            "Kimi Code could not resume the earlier conversation: Session not found: saved"
+        );
+        assert_eq!(restart, restarted("kimi"));
+        let mut run = super::super::tests::sample("kimi");
+        refused(&mut run, &format!("  {}  ", "x".repeat(400)));
+        assert_eq!(run.session_refused.unwrap().len(), 300);
     }
 }

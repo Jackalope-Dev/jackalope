@@ -1,3 +1,4 @@
+import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { ChevronLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ProviderMark } from '../../desktop/src/components/agents/ProviderMark';
@@ -42,6 +43,24 @@ export function Avatar({ agent, working }: { agent?: string; working?: boolean }
       aria-hidden="true"
     >
       <ProviderMark provider={agentProvider(agent)} size={24} />
+    </span>
+  );
+}
+
+/**
+ * The agent's character at card size, in the desktop's shapes: it bobs while the agent
+ * works and tilts while it waits on you, only when that is true.
+ */
+export function Character({
+  agent,
+  state,
+}: {
+  agent?: string;
+  state: 'idle' | 'working' | 'waiting';
+}) {
+  return (
+    <span className="mobile-character" data-state={state} aria-hidden="true">
+      <AgentCharacter provider={agentProvider(agent)} state={state} />
     </span>
   );
 }

@@ -12,6 +12,10 @@ release dates.
   credentials, generic notification text), signed device builds and CI builds for both
   platforms, and on-device checks of the keyboard over the reply bar, camera scanning and
   Tailscale HTTPS pairing before any store listing.
+- [ ] Design an always-on host (Jackalope Cloud): Jackalope running on a workstation or cloud
+  machine as the coordinator, with the laptop and phone as clients, so work and the phone keep
+  going while the laptop is offline. Today hosts don't relay to each other and agent computers
+  depend on the desktop that drives them.
 - [ ] Decide how a desktop coordinates work across several hosts: a combined view of every
   paired host's work, and whether new work can be routed to an available host, while each
   host keeps execution ownership.
@@ -141,6 +145,18 @@ release dates.
   while preserving existing adapters and encrypted saved data.
 - [ ] Add broader GitHub remote publication, review-thread resolution and proactive
   proposals, preserving explicit authorization for remote writes.
+- [ ] Accept followed pull requests in the installed app on Windows and macOS against a
+  live repository: a pull request opened from Delivery moving through running, failed and
+  passing checks, a requested change, a conflict, approval and merge, with the lane,
+  notification and next step for each; Push update after an agent's fix; each merge method
+  and a merge GitHub refuses; GitHub CLI signed out or offline keeping the last state.
+  Then decide whether a project may opt into sending failed checks and review comments to
+  the task's agent without a click, follow pull requests opened from the terminal command
+  and the phone, and show the state in the phone companion.
+- [ ] Run each known ACP agent preset (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
+  Auggie, Kiro, Hermes Agent, Command Code) through a task with permissions, a question and
+  a continuation, on Windows and macOS, and remove or correct any whose command differs.
+  Give custom ACP agents their model list from the session and a product mark.
 - [ ] Tune swarm assignment and subtask limits from installed swarm trials: how often
   agents use peers, peer_adopt and propose_subtask, duplicate implementations avoided,
   conflicts caught before completion, and whether planner briefings reduce worker discovery.

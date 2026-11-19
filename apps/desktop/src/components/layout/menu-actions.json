@@ -3,5 +3,8 @@
   "tray-settings": "settings",
   "app-settings": "settings",
   "app-new-work": "newWork",
-  "app-search": "search"
+  "app-search": "search",
+  "app-help": "help",
+  "app-feedback": "feedback",
+  "app-discord": "discord"
 }

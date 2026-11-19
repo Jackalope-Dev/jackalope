@@ -2,7 +2,7 @@
 //! turned off. Routing, task strategy, learning reflection and the in-app
 //! helper all start their agent here.
 
-use super::agent_process::AgentProcess;
+use super::agent_process::{AgentProcess, PrivateFile};
 use super::*;
 use crate::commands::{agent_profiles::AccountBinding, process_control::read_bounded};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -168,15 +168,11 @@ impl Turn<'_> {
             cmd.args(["--model", model]);
         }
         arguments(&mut cmd);
-        let file_input = configuration.input == Input::File;
-        if file_input {
-            std::fs::write(&self.prompt_path, self.prompt).map_err(|e| e.to_string())?;
-        }
-        let answer = self.answer(runtime, cmd, configuration.input, canceled, started);
-        if file_input {
-            let _ = std::fs::remove_file(&self.prompt_path);
-        }
-        answer
+        let _prompt_file = (configuration.input == Input::File)
+            .then(|| PrivateFile::create(self.prompt_path.clone(), self.prompt))
+            .transpose()
+            .map_err(|e| e.to_string())?;
+        self.answer(runtime, cmd, configuration.input, canceled, started)
     }
 
     fn answer(
@@ -297,16 +293,8 @@ pub(in crate::commands::tasks) enum Input {
 
 pub(in crate::commands::tasks) struct Configuration {
     /// A file the configuration wrote, removed when it is dropped.
-    file: Option<PathBuf>,
+    _file: Option<PrivateFile>,
     pub input: Input,
-}
-
-impl Drop for Configuration {
-    fn drop(&mut self) {
-        if let Some(path) = &self.file {
-            let _ = std::fs::remove_file(path);
-        }
-    }
 }
 
 /// Each agent's flags for answering one prompt with no tools, no MCP servers
@@ -318,7 +306,7 @@ pub(in crate::commands::tasks) fn configure(
     prompt: &str,
 ) -> Result<Configuration, String> {
     let mut configuration = Configuration {
-        file: None,
+        _file: None,
         input: match crate::commands::agents::find(adapter).map(|agent| agent.prompt) {
             Some(crate::commands::agents::Prompt::File) => Input::File,
             _ => Input::Stdin,
@@ -334,13 +322,8 @@ pub(in crate::commands::tasks) fn configure(
         }
         "kimi" => {
             let path = prompt_path.with_extension("agent.md");
-            let mut options = std::fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)] { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
-            let mut file = options.open(&path).map_err(|_| "Could not create the Kimi helper configuration.")?;
-            configuration.file = Some(path.clone());
+            configuration._file = Some(PrivateFile::create(path.clone(), &format!("---\nname: jackalope-helper\ndescription: Answer the supplied Jackalope request without tools.\ntools: []\nsubagents: []\n---\n{prompt}\n")).map_err(|_| "Could not create the Kimi helper configuration.")?);
             configuration.input = Input::Arguments;
-            file.write_all(format!("---\nname: jackalope-helper\ndescription: Answer the supplied Jackalope request without tools.\ntools: []\nsubagents: []\n---\n{prompt}\n").as_bytes()).map_err(|_| "Could not write the Kimi helper configuration.")?;
             cmd.args(["--agent-file"]).arg(path).args(["--output-format", "stream-json", "--prompt", "Answer the supplied Jackalope request. Follow its output format."]);
         }
         _ => return Err(format!("This default agent has no supported routing-only interface. Choose {} as the default orchestrator. Other agents remain available as workers.", crate::commands::agents::orchestrator_names())),

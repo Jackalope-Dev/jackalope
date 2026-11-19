@@ -1,5 +1,16 @@
 import { isActive, isDone } from '@jackalope/contracts/runs';
+import { pullRequestPhaseView, type TrackedPullRequest } from './pull-requests.ts';
 import type { TaskRun } from './run-types.ts';
+
+/**
+ * Whether the attempt holds a question the person can still answer: a live attempt that is
+ * not stopping or checking its result, or one that ended in review with its question open.
+ * The work list's group, row action and presence all read this, so they never disagree.
+ */
+export function hasOpenQuestion(run: TaskRun): boolean {
+  if (!run.prompts?.some((prompt) => prompt.status === 'pending')) return false;
+  return isActive(run) ? run.status !== 'stopping' && !run.finishing : run.status === 'review';
+}
 
 /**
  * The task's headline state and next action. Checks surface inside review, not here.
@@ -17,7 +28,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
     return state('History needs saving', 'Recover saved history', 'recovery', 'warning');
   if (active) {
     if (run.status === 'stopping') return state('Stopping', 'View activity', 'activity');
-    if (!run.finishing && run.prompts?.some((p) => p.status === 'pending'))
+    if (hasOpenQuestion(run))
       return state('Waiting for your answer', 'Answer question', 'question', 'warning');
     if (run.finishing) return state('Checking result', 'View checks', 'changes');
     return state(
@@ -29,7 +40,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
   if (integrated)
     return state('Changes integrated locally', 'View delivery', 'delivery', 'success');
   if (run.status === 'interrupted') return state('Work interrupted', 'Resume', 'resume', 'warning');
-  if (run.status === 'review' && run.prompts?.some((p) => p.status === 'pending'))
+  if (hasOpenQuestion(run))
     return state('Question left open', 'Answer question', 'question', 'warning');
   if (!isDone(run))
     return state(
@@ -55,6 +66,27 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
   return isolated
     ? state('Ready for your review', 'Review and merge', 'integrate')
     : state('Ready for your review', 'Review result', 'changes');
+}
+
+/**
+ * Lets a followed pull request lead a finished task's headline, so the task says what the
+ * work list says: fix its checks, wait for review, or merge it. Work that is running,
+ * asking or failed keeps its own headline.
+ */
+export function pullRequestDecision(
+  decision: ReturnType<typeof taskDecision>,
+  pullRequest: TrackedPullRequest | undefined,
+) {
+  if (!pullRequest || !['integrate', 'delivery', 'result', 'changes'].includes(decision.section))
+    return decision;
+  const view = pullRequestPhaseView(pullRequest.phase);
+  if (!view.stage) return decision;
+  return {
+    label: view.label,
+    action: view.stage === 'finished' ? 'View delivery' : view.action,
+    section: 'delivery',
+    tone: view.tone,
+  };
 }
 
 /**

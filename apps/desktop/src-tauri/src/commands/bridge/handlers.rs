@@ -355,7 +355,7 @@ pub(super) async fn ask_user(call: Call, mut input: AskUserInput) -> Result<Valu
         call.transport.question_wait(),
     )
     .await;
-    call.runtime().record_prompt(&prompt);
+    call.runtime().record_asked_prompt(&prompt);
     json(prompt)
 }
 
@@ -376,7 +376,7 @@ pub(super) async fn request_human_action(
         |prompt| runtime.record_prompt(prompt),
     )
     .await;
-    runtime.record_prompt(&prompt);
+    runtime.record_asked_prompt(&prompt);
     json(prompt)
 }
 
@@ -389,6 +389,13 @@ pub(super) async fn user_response(
     call: Call,
     input: UserResponseInput,
 ) -> Result<Value, ToolError> {
+    if let Some(answered) = call
+        .runtime()
+        .take_late_answers(&call.run().id, Some(&input.id))
+        .pop()
+    {
+        return json(answered);
+    }
     let prompt = call
         .run()
         .prompts

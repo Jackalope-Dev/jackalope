@@ -303,3 +303,21 @@ select option {
   display: grid;
   gap: 12px;
 }
+
+.task-pull-request {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.task-pull-request-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.task-pull-request-title {
+  font-weight: 500;
+}

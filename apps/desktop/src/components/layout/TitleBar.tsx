@@ -1,12 +1,23 @@
-import { Tooltip } from '@jackalope/ui';
-import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
+import { DiscordIcon, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
+import {
+  ArrowLeft,
+  ArrowRight,
+  LifeBuoy,
+  Minus,
+  RotateCw,
+  Settings2,
+  Square,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/native/env';
+import { DISCORD_URL } from '../../lib/community';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { openHelp } from '../../lib/navigation';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { HISTORY_KEYS } from './useWorkspaceHistory';
 
 const isMac = isMacPlatform();
 
@@ -30,12 +41,15 @@ export function TitleBar({
   themePicker = false,
   center,
   settings,
+  history,
 }: {
   themePicker?: boolean;
   /** Workspace controls centred in the bar, such as search. */
   center?: ReactNode;
   /** Opens Settings from the bar; screens without a settings page leave it out. */
   settings?: { open: () => void; shortcut: string; current: boolean };
+  /** Back and Forward through visited pages; a step that is not there is left undefined. */
+  history?: { back?: () => void; forward?: () => void };
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
@@ -88,6 +102,39 @@ export function TitleBar({
             <span>Jackalope{edition}</span>
           </div>
         )}
+        {history && (
+          // biome-ignore lint/a11y/useSemanticElements: a fieldset would add form semantics to window chrome.
+          <div
+            className="app-titlebar-history"
+            role="group"
+            aria-label="Page history"
+            onMouseDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            <Tooltip content={`Back (${HISTORY_KEYS.back})`}>
+              <button
+                type="button"
+                className="app-titlebar-history-step"
+                aria-label="Back"
+                disabled={!history.back}
+                onClick={history.back}
+              >
+                <ArrowLeft size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+            <Tooltip content={`Forward (${HISTORY_KEYS.forward})`}>
+              <button
+                type="button"
+                className="app-titlebar-history-step"
+                aria-label="Forward"
+                disabled={!history.forward}
+                onClick={history.forward}
+              >
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+          </div>
+        )}
       </div>
       {center ? (
         <div className="app-titlebar-center">{center}</div>
@@ -130,18 +177,36 @@ export function TitleBar({
             </button>
           </Tooltip>
         )}
-        <Tooltip content="Help Center">
-          <button
-            type="button"
-            className={`app-titlebar-button app-titlebar-help ${isMac ? 'app-titlebar-help-last' : ''}`}
-            aria-label="Help and knowledgebase"
-            onMouseDown={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onClick={() => void openHelp()}
-          >
-            <LifeBuoy size={16} />
-          </button>
-        </Tooltip>
+        <Menu.Root>
+          <Tooltip content="Help and community">
+            <Menu.Trigger asChild>
+              <button
+                type="button"
+                className={`app-titlebar-button app-titlebar-help ${isMac ? 'app-titlebar-help-last' : ''}`}
+                aria-label="Help and community"
+                onMouseDown={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                <LifeBuoy size={16} />
+              </button>
+            </Menu.Trigger>
+          </Tooltip>
+          <Menu.Portal>
+            <Menu.Content className="workspace-menu min-w-52" align="end" sideOffset={8}>
+              <Menu.Item className="workspace-menu-item" onSelect={() => void openHelp()}>
+                <LifeBuoy size={16} aria-hidden="true" />
+                Help Center
+              </Menu.Item>
+              <Menu.Item
+                className="workspace-menu-item"
+                onSelect={() => void openExternalUrl(DISCORD_URL)}
+              >
+                <DiscordIcon size={16} aria-hidden="true" />
+                Join the Discord
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
         {native && !isMac && (
           <>
             <button

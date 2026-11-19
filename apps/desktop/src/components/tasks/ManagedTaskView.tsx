@@ -16,6 +16,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAction } from '../../hooks/useAction';
 import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { parseDispatchPaused, pausedDispatchMessages } from '../../lib/dispatch-paused';
 import {
   type FeatureStep,
   type ManagedTask,
@@ -38,6 +39,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
+import { DispatchPausedNotice } from './DispatchPausedNotice';
 import { ManagedAssignments } from './ManagedAssignments';
 import { ManagedTaskAgent } from './ManagedTaskAgent';
 import { ManagedTaskDetails } from './ManagedTaskDetails';
@@ -70,6 +72,8 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
     useShallow((s) => ({ runs: s.runs, select: s.select, start: s.start })),
   );
   const work = managedTaskWork(task, queue, runs);
+  // A paused dispatch is explained by its own notice rather than as a raw error.
+  const shownQueueError = parseDispatchPaused(queueError) ? null : queueError;
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === task.request.projectId),
   );
@@ -389,8 +393,12 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
           {notice}
         </InlineNotice>
       )}
-      {(error || queueError || task.error) && (
-        <InlineNotice tone="error">{error || queueError || task.error}</InlineNotice>
+      {project &&
+        pausedDispatchMessages(queue?.pausedIntegrations, queueError, project.path).map(
+          (message) => <DispatchPausedNotice key={message} error={message} />,
+        )}
+      {(error || shownQueueError || task.error) && (
+        <InlineNotice tone="error">{error || shownQueueError || task.error}</InlineNotice>
       )}
       {work.missingAttempts.length > 0 && (
         <InlineNotice tone="warning">

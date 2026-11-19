@@ -5,6 +5,7 @@ import { agentAccountFor, type Project } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
 import { attemptLabel, buildJudgePrompt } from './compare-judge';
 import type { ContextSelection } from './knowledge-types';
+import { checksAutomatically } from './project-automation.ts';
 import type { RunRequest, TaskRun } from './run-types';
 import { taskReview } from './task-client';
 import { taskTitle } from './task-title';
@@ -52,7 +53,7 @@ export async function startComparison({
           verifyCommand: project.preferences?.verifyCommand,
           prepareCommand: project.preferences?.prepareCommand,
           setupFiles: project.preferences?.setupFiles,
-          autoVerify: project.preferences?.autoVerify ?? true,
+          autoVerify: checksAutomatically(project.preferences),
           effort: 'balanced',
           codexSpeed,
           contextSelection,

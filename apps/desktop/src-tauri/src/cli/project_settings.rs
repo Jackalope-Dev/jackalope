@@ -87,7 +87,7 @@ impl Default for ProjectSettings {
             learn_automatically: true,
             learning_cadence: DEFAULT_LEARNING_CADENCE,
             sync_lessons: true,
-            agent_reflection: false,
+            agent_reflection: true,
             export_lessons: false,
             review_captures: true,
         }

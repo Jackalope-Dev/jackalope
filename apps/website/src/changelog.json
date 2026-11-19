@@ -1,5 +1,82 @@
 [
   {
+    "id": "back-and-forward-and-settings-that-stay-in-settings",
+    "date": "2026-11-16",
+    "title": "Back and Forward, and settings that stay in Settings",
+    "description": "Easier to move around the app and find your way back.",
+    "items": [
+      "Back and Forward buttons sit beside the app name; Alt+Left and Alt+Right (Cmd+[ and Cmd+] on Mac) and a mouse's side buttons work too.",
+      "Agents, Routing, Tools, Connected apps and Devices now open inside Settings instead of taking you to another page.",
+      "A site icon fetched for a project shows in the icon dialog straight away."
+    ]
+  },
+  {
+    "id": "a-clearer-board-better-defaults-and-a-button-fix",
+    "date": "2026-11-15",
+    "title": "A clearer board, better defaults and a button fix",
+    "description": "A round of polish across the work board, project setup and first-run defaults.",
+    "items": [
+      "The board shows Needs you, Working, In review, Drafts and Finished as side-by-side lanes, and rows say why they need you, such as a failed check.",
+      "Finished work is checked automatically, your computer stays awake while agents work, and updates download in the background. Each can be turned off.",
+      "Replies can be read aloud, and a conversation can be copied as Markdown.",
+      "Fixed primary buttons, including Connect account, showing a faint label in installed builds."
+    ]
+  },
+  {
+    "id": "follow-pull-requests-from-the-work-list",
+    "date": "2026-11-15",
+    "title": "Follow pull requests from the work list",
+    "description": "Jackalope keeps watching a pull request after a task opens it, so you can see what it needs without checking GitHub.",
+    "items": [
+      "The work list and board show whether a pull request is waiting on checks or review, needs a fix, or is ready to merge, and notify you when that changes.",
+      "One click drafts a fix for failed checks, review comments or a conflict for the task's own agent; pushing the update and merging each ask first.",
+      "Add agent lists known ACP agents such as Cursor, GitHub Copilot CLI, Goose and Qwen Code, and fills in the ones installed on your computer.",
+      "Share a project's bots as one file and import a shared file after reviewing it."
+    ]
+  },
+  {
+    "id": "a-cleaner-guided-jackalope-on-desktop-and-phone",
+    "date": "2026-11-12",
+    "title": "A cleaner, guided Jackalope on desktop and phone",
+    "description": "Settings, setup and the everyday screens are reorganised and guided, with a new look for buttons and the frosted window.",
+    "items": [
+      "Settings are regrouped so things are easier to find: Devices brings Hosts and Remote access together, Agents holds Routing, and project settings live on each project in tabs, with a How hands-on? preset.",
+      "Setup screens guide you step by step, show what's connected with a live diagram, and check keys and codes as you type.",
+      "The sidebar starts with an Inbox of what needs you, and each project lists only its live work.",
+      "Projects can use their website's icon, and project menus can open the folder in your editor or Finder.",
+      "Bots have a new gallery with characters that come alive, and schedules use one clear When picker.",
+      "Fewer bottom-right alerts: only new things that need you, grouped together.",
+      "The phone app has a new look, shows offline computers, and a laptop can show a phone pairing code for another computer that allows it."
+    ],
+    "note": "Not yet tested in the installed app or on a device."
+  },
+  {
+    "id": "pick-up-terminal-conversations-in-jackalope",
+    "date": "2026-11-12",
+    "title": "Pick up terminal conversations in Jackalope.",
+    "description": "Claude Code and Codex conversations you had in a terminal or another app now show up under the project they worked in.",
+    "items": [
+      "Open one to read it, with the tools the agent used.",
+      "Continue in Jackalope resumes that conversation in the same checkout or worktree, under the same account.",
+      "Sessions are read only on this computer and nothing is uploaded. Turn it off in Settings under Privacy."
+    ],
+    "note": "Claude Code and Codex only for now."
+  },
+  {
+    "id": "agents-waste-less-time-on-long-runs",
+    "date": "2026-11-12",
+    "title": "Agents waste less time on long runs",
+    "description": "Changes from studying a long desktop task that spent most of its hour waiting.",
+    "items": [
+      "With auto-approve on, an agent can stop a process it started, such as a dev server in its own worktree, without asking you first. Stopping processes by name still asks.",
+      "If you answer a question after the agent stopped waiting, your answer reaches the agent with its next step instead of waiting for it to check. Questions can link straight to a System Settings pane.",
+      "When an agent can't control your Mac because a permission is missing, the task shows which one, opens the right System Settings pane and offers a restart once the work has stopped.",
+      "Large planned tasks are split into steps that can each be checked, starting with a read-only audit when the work needs one. Steps from an approved plan no longer repeat the same briefing.",
+      "A run that ends early still shows the tokens it used."
+    ],
+    "note": "Not yet tested in the installed app."
+  },
+  {
     "id": "resume-work-jackalope-closed-in-the-middle-of",
     "date": "2026-11-12",
     "title": "Resume work Jackalope closed in the middle of",

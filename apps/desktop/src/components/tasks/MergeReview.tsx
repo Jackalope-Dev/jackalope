@@ -14,7 +14,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
 import { applyIntegration, integrationPlans, prepareIntegration } from '../../lib/queue';
 import type { TaskRun } from '../../lib/run-types';
-import { taskTitle } from '../../lib/task-title';
+import { runTitle } from '../../lib/task-title';
 import { mergeDestination } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
@@ -51,7 +51,7 @@ export function MergeReview({
     const item = items.find((item) =>
       runs.some((original) => original.id === item.runId && original.taskId === run?.taskId),
     );
-    return item?.title ?? (run ? taskTitle(run.prompt) : id);
+    return item?.title ?? (run ? runTitle(run) : id);
   };
   const [selected, setSelected] = useState<string[]>(onlyRunIds ?? (onlyRunId ? [onlyRunId] : []));
   const [plans, setPlans] = useState<IntegrationPlan[]>([]);
@@ -128,7 +128,7 @@ export function MergeReview({
       const next = await prepareIntegration(chosen, message);
       setPlan(next);
       setPreparedMessage(message);
-      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
+      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? true);
       await load();
     } catch (error) {
       setError(describeError(error));

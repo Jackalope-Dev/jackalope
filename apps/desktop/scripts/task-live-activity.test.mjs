@@ -46,5 +46,17 @@ test('questions and stopping do not imply that the agent is still editing', () =
   assert.deepEqual(liveActivity({ ...run, status: 'stopping' }).recent, []);
   assert.equal(liveActivity({ ...run, status: 'review' }), null);
   assert.equal(liveActivity({ ...run, activity: ['Tool request failed'] }).kind, 'attention');
+  for (const line of [
+    'Running pnpm failed: exit 1',
+    'Editing src/a.rs failed: text to replace not found',
+    'Using create_issue failed',
+    'Tool request failed: permission denied',
+  ]) {
+    assert.equal(liveActivity({ ...run, activity: [line] }).kind, 'attention', line);
+  }
+  assert.equal(
+    liveActivity({ ...run, activity: ['The build failed: it needs a key'] }).kind,
+    'activity',
+  );
   assert.equal(liveActivity({ ...run, activity: ['Reading src/error-handler.ts'] }).kind, 'read');
 });

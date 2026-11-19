@@ -67,6 +67,24 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Work has no visible heading row, so its composer starts at the top of the page. */
+.task-home > .live-start-embedded {
+  margin-top: 0;
+}
+/* The empty composer rests at two lines; writing room opens on focus or with a draft. */
+.task-home .live-start-composer:is(:focus-within, :has(textarea:not(:placeholder-shown))) textarea {
+  min-height: 88px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .task-home .live-start-composer textarea {
+    transition: min-height var(--motion-base, 150ms) var(--ease-out, ease-out);
+  }
+}
+.work-toolbar-solo {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
 .task-dialog.task-tools-dialog {
   width: min(960px, calc(100vw - 48px));
 }

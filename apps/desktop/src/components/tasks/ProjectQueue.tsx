@@ -2,6 +2,7 @@ import { isActive, isDone, isRetryable, statusLabel } from '@jackalope/contracts
 import {
   Badge,
   Button,
+  ConfirmDialog,
   Disclosure,
   DisclosureSummary,
   InlineNotice,
@@ -16,6 +17,7 @@ import {
   ArrowRight,
   CircleAlert,
   Clock3,
+  FileInput,
   GitMerge,
   GitPullRequest,
   Layers3,
@@ -208,10 +210,11 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
             <Menu.Portal>
               <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
                 <Menu.Item className="workspace-menu-item" onSelect={() => setAdding(true)}>
-                  <ListPlus size={16} />
+                  <ListPlus size={16} aria-hidden="true" />
                   Add work
                 </Menu.Item>
                 <Menu.Item className="workspace-menu-item" onSelect={() => setImporting(true)}>
+                  <FileInput size={16} aria-hidden="true" />
                   Import a plan
                 </Menu.Item>
               </Menu.Content>
@@ -454,48 +457,42 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                             Retry in a new worktree
                           </Button>
                         )}
-                        {phase !== 'merged' && (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                aria-label={`More actions for ${item.title}`}
-                                disabled={busy}
-                              >
-                                <MoreHorizontal size={16} />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Portal>
-                              <Menu.Content className="workspace-menu" align="start" sideOffset={8}>
-                                {run && isActive(run) ? (
-                                  <Menu.Item
-                                    className="workspace-menu-item"
-                                    onSelect={() => void runAction(() => stopTask(run.id))}
-                                  >
-                                    Stop agent
-                                  </Menu.Item>
-                                ) : item.runId ? (
-                                  <Menu.Item
-                                    className="workspace-menu-item"
-                                    onSelect={() =>
-                                      void act('queue_release', { id: item.id, retry: false })
-                                    }
-                                  >
-                                    Abandon & release scope
-                                  </Menu.Item>
-                                ) : (
-                                  <Menu.Item
-                                    className="workspace-menu-item"
-                                    onSelect={() => void act('queue_cancel', { id: item.id })}
-                                  >
-                                    Remove from plan
-                                  </Menu.Item>
-                                )}
-                              </Menu.Content>
-                            </Menu.Portal>
-                          </Menu.Root>
-                        )}
+                        {phase !== 'merged' &&
+                          (run && isActive(run) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void runAction(() => stopTask(run.id))}
+                            >
+                              Stop agent
+                            </Button>
+                          ) : (
+                            <ConfirmDialog
+                              trigger={
+                                <Button variant="ghost" size="sm" disabled={busy}>
+                                  {item.runId ? 'Abandon' : 'Remove'}
+                                </Button>
+                              }
+                              title={
+                                item.runId
+                                  ? `Abandon ${item.title}?`
+                                  : `Remove ${item.title} from the plan?`
+                              }
+                              description={
+                                item.runId
+                                  ? 'It leaves the plan and the files it reserved are released for other work. Its attempt and worktree are kept.'
+                                  : 'It leaves the plan before any agent starts on it.'
+                              }
+                              label={item.runId ? 'Abandon and release scope' : 'Remove from plan'}
+                              busyLabel={item.runId ? 'Releasing…' : 'Removing…'}
+                              onConfirm={async () => {
+                                await (item.runId
+                                  ? act('queue_release', { id: item.id, retry: false })
+                                  : act('queue_cancel', { id: item.id }));
+                              }}
+                            />
+                          ))}
                       </div>
                     </div>
                   </article>

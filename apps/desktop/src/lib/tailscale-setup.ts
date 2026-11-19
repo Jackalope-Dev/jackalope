@@ -8,6 +8,20 @@ export interface TailscaleStatus {
   phones: string[];
   /** Tailscale's own message when it could not report status. */
   error: string | null;
+  /** The local port Tailscale Serve sends HTTPS port 8443 to, when it's a plain local proxy. */
+  servePort?: number;
+  /** The port Remote access listens on here, sent alongside `servePort`. */
+  listenPort?: number;
+}
+
+/**
+ * Tailscale Serve already proxies HTTPS to another local port than this Jackalope listens
+ * on, often another Jackalope profile or one that isn't running, so phones get a 502.
+ */
+export function servePortMismatch(status: TailscaleStatus | null) {
+  if (!status?.servePort || !status.listenPort || status.servePort === status.listenPort)
+    return null;
+  return { serves: status.servePort, listens: status.listenPort };
 }
 
 /**

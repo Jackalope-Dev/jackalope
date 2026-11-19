@@ -212,8 +212,8 @@ impl AttemptRunner for RemoteRunner {
             crate::commands::project_secrets::Place::Computer,
         )
         .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+        let names: Vec<String> = secrets.iter().map(|(name, _)| name.clone()).collect();
         if !secrets.is_empty() {
-            let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
             runtime.update(id, |run| {
                 activity(
                     run,
@@ -226,6 +226,13 @@ impl AttemptRunner for RemoteRunner {
             });
         }
         runs::add_secrets(&mut env, secrets);
+        let protected = crate::commands::redaction::injected(
+            env.iter().map(|(name, value)| (name, value)),
+            &names,
+        );
+        if !protected.is_empty() {
+            runtime.update_checked(id, |run| run.protect(protected))?;
+        }
         self.argv = argv;
         self.env = env;
         // Where each tool runs follows the runner's capabilities; desktop

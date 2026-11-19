@@ -10,6 +10,7 @@ import {
   Input,
   LinkButton,
   LoadingState,
+  SecretField,
   Stepper,
   type StepperStep,
   Textarea,
@@ -319,6 +320,7 @@ export function CloudResources() {
             }
           >
             <Input
+              className="cloud-resources-prefix"
               value={draft.prefix}
               spellCheck={false}
               maxLength={40}
@@ -344,24 +346,26 @@ export function CloudResources() {
                       </span>
                     </label>
                     {checked && option.needs === 'postgres' && (
-                      <FormField
+                      <SecretField
                         className="cloud-resources-input"
                         label="Postgres connection string"
                         description="Kept in this computer’s protected storage and sent only to Cloudflare."
-                      >
-                        <Input
-                          type="password"
-                          autoComplete="off"
-                          spellCheck={false}
-                          value={postgresUrl}
-                          placeholder={
-                            needsPostgres
-                              ? 'postgres://user:password@host:5432/database'
-                              : 'Saved. Leave empty to keep it.'
-                          }
-                          onChange={(event) => setPostgresUrl(event.target.value)}
-                        />
-                      </FormField>
+                        value={postgresUrl}
+                        placeholder={
+                          needsPostgres
+                            ? 'postgres://user:password@host:5432/database'
+                            : 'Saved. Leave empty to keep it.'
+                        }
+                        onValueChange={setPostgresUrl}
+                        check={(value) =>
+                          /^postgres(ql)?:\/\/[^\s]+@[^\s]+/i.test(value.trim())
+                            ? { tone: 'ok', message: 'Looks like a Postgres connection string.' }
+                            : {
+                                tone: 'info',
+                                message: 'Usually postgres://user:password@host:5432/database.',
+                              }
+                        }
+                      />
                     )}
                     {checked && option.needs === 'domains' && (
                       <FormField
@@ -554,17 +558,23 @@ function ResourceRow({
             </IconButton>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end">
-              <DropdownMenu.Item onSelect={onForget}>Remove from Jackalope</DropdownMenu.Item>
+            <DropdownMenu.Content className="workspace-menu" align="end">
+              <DropdownMenu.Item className="workspace-menu-item" onSelect={onForget}>
+                Remove from Jackalope
+              </DropdownMenu.Item>
               {isProvisioned(resource.kind) && (
-                <DropdownMenu.Item
-                  onSelect={() => {
-                    setAcknowledged(false);
-                    setConfirming(true);
-                  }}
-                >
-                  Delete from Cloudflare…
-                </DropdownMenu.Item>
+                <>
+                  <DropdownMenu.Separator className="menu-separator" />
+                  <DropdownMenu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      setAcknowledged(false);
+                      setConfirming(true);
+                    }}
+                  >
+                    Delete from Cloudflare…
+                  </DropdownMenu.Item>
+                </>
               )}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

@@ -345,15 +345,23 @@ mod tests {
             ),
             Some(FailureKind::QuotaExhausted)
         );
-        assert_eq!(
-            classify(
-                "",
-                Some(&quota(
-                    "The provider rejected further requests because its rate limit was reached."
-                ))
-            ),
-            Some(FailureKind::RateLimited)
-        );
+        for info in [
+            serde_json::json!({"status":"rejected","rateLimitType":"five_hour","resetsAt":1_794_520_800}),
+            serde_json::json!({"status":"rejected","rateLimitType":"seven_day_sonnet"}),
+            serde_json::json!({"status":"rejected","rateLimitType":"overage"}),
+            serde_json::json!({"status":"rejected"}),
+        ] {
+            let used_up = super::super::routing::quota_failure(
+                &serde_json::json!({"type":"rate_limit_event","rate_limit_info":info}),
+            )
+            .unwrap();
+            assert_eq!(
+                classify("", Some(&used_up)),
+                Some(FailureKind::QuotaExhausted),
+                "{}",
+                used_up.message
+            );
+        }
         assert_eq!(
             classify("", Some(&quota("429 Too Many Requests"))),
             Some(FailureKind::RateLimited)

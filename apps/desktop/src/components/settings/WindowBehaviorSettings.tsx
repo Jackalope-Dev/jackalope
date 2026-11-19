@@ -52,7 +52,7 @@ export function WindowBehaviorSettings() {
   };
 
   return (
-    <SettingGroup title="Window & startup">
+    <SettingGroup title="Window & startup" data-settings-tile>
       <SettingRow
         title="Close to system tray"
         controlId="close-to-tray"

@@ -22,6 +22,8 @@ interface AppEvents {
   'helper-draft': string;
   'configure-agent': string;
   'open-shortcuts': undefined;
+  /** Opens the feedback dialog the status bar holds. */
+  'open-feedback': undefined;
   /** Adds attachment lines to the open new-work composer. */
   'attach-to-composer': string[];
   /** Working-tree changes were committed or discarded. */
@@ -70,3 +72,5 @@ export const openHelperDraft = (key: string) => emitAppEvent('helper-draft', key
 export const openAgentConfiguration = (agentId: string) => emitAppEvent('configure-agent', agentId);
 
 export const openShortcuts = () => emitAppEvent('open-shortcuts');
+
+export const openFeedback = () => emitAppEvent('open-feedback');

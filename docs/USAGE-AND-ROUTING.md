@@ -19,7 +19,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for task ownership and
 
 ## Current routing contract
 
-Settings → Decisions selects an app default and optional project overrides. Project
+Agents → Routing selects an app default and optional project overrides. Project
 onboarding includes the same choice. Existing installations retain agent-powered
 routing. Local rules use project preference, capacity and active workload without
 a model call. Agent-powered routing uses the configured default agent. Jev-assisted
@@ -88,7 +88,7 @@ optional assistance has a separate ledger so those calls are not counted twice.
 
 ## Optional Jev assistance
 
-Routing goals and optional assistance in Settings → Decisions can inherit app
+Routing goals and optional assistance in Agents → Routing can inherit app
 settings or use project overrides. All additional helpers default off. While enabled
 and Jev is connected for that scope, relevant repository guidance, candidate lessons,
 diffs, results and check output may be sent to TypeSafe. Each call records usage even

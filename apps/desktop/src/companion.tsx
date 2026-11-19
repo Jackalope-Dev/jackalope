@@ -128,7 +128,7 @@ function Companion() {
           }}
         >
           <h2>Connect to your host</h2>
-          <p>Create a pairing link in Jackalope → Settings → Remote access.</p>
+          <p>Create a pairing link in Jackalope → Devices → Let devices use this one.</p>
           <FormField label="Device name">
             <Input
               value={name}

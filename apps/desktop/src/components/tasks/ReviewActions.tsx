@@ -7,7 +7,15 @@ import {
   DropdownMenu as Menu,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { MoreHorizontal } from 'lucide-react';
+import {
+  FileDiff,
+  type LucideIcon,
+  MoreHorizontal,
+  RefreshCw,
+  Star,
+  Swords,
+  Waypoints,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { TaskRun } from '../../lib/run-types';
 import { ChallengeDialog } from './ChallengeReview';
@@ -19,6 +27,11 @@ const titles = {
   progress: 'Changes since last review',
   impact: 'Affected files',
   rating: 'Rate this result',
+};
+const icons: Record<keyof typeof titles, LucideIcon> = {
+  progress: FileDiff,
+  impact: Waypoints,
+  rating: Star,
 };
 export function ReviewActions({
   run,
@@ -44,24 +57,26 @@ export function ReviewActions({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+            <Menu.Item className="workspace-menu-item" onSelect={onRefresh}>
+              <RefreshCw size={16} aria-hidden="true" />
+              Refresh changes
+            </Menu.Item>
             {!!review.diff && (
               <Menu.Item className="workspace-menu-item" onSelect={() => setChallenging(true)}>
+                <Swords size={16} aria-hidden="true" />
                 Challenge this change
               </Menu.Item>
             )}
-            <Menu.Item className="workspace-menu-item" onSelect={onRefresh}>
-              Refresh changes
-            </Menu.Item>
             <Menu.Separator className="menu-separator" />
-            {Object.entries(titles).map(([key, title]) => (
-              <Menu.Item
-                key={key}
-                className="workspace-menu-item"
-                onSelect={() => setTool(key as keyof typeof titles)}
-              >
-                {title}
-              </Menu.Item>
-            ))}
+            {(Object.keys(titles) as (keyof typeof titles)[]).map((key) => {
+              const Icon = icons[key];
+              return (
+                <Menu.Item key={key} className="workspace-menu-item" onSelect={() => setTool(key)}>
+                  <Icon size={16} aria-hidden="true" />
+                  {titles[key]}
+                </Menu.Item>
+              );
+            })}
           </Menu.Content>
         </Menu.Portal>
       </Menu.Root>

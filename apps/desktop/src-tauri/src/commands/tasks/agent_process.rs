@@ -14,6 +14,7 @@ pub(super) const STDERR_LINE_LIMIT: usize = 6000;
 
 pub(in crate::commands) struct AgentProcess {
     child: Mutex<Child>,
+    pid: u32,
     tree: ProcessTree,
     _lease: Option<UseGuard>,
 }
@@ -79,6 +80,7 @@ impl AgentProcess {
             (child.stdin.take(), child.stdout.take(), child.stderr.take());
         Ok(Spawned {
             process: Arc::new(Self {
+                pid: child.id(),
                 child: Mutex::new(child),
                 tree,
                 _lease: lease,
@@ -95,9 +97,9 @@ impl AgentProcess {
         self.child.lock().unwrap().try_wait()
     }
 
-    #[cfg(test)]
+    /// The agent's process ID, which on Unix also names the process group it heads.
     pub(in crate::commands) fn id(&self) -> u32 {
-        self.child.lock().unwrap().id()
+        self.pid
     }
 
     pub(in crate::commands) fn alive(&self) -> bool {
@@ -155,6 +157,12 @@ impl TaskRuntime {
 
     pub(super) fn unregister_process(&self, id: &str) {
         self.inner.lock().unwrap().processes.remove(id);
+    }
+
+    /// The process ID of attempt `id`'s running agent, when it runs on this device.
+    pub(in crate::commands) fn agent_pid(&self, id: &str) -> Option<u32> {
+        let inner = self.inner.lock().unwrap();
+        inner.processes.get(id).map(|process| process.id())
     }
 
     /// Whether attempt `id` was not stopped and its agent process still runs.
@@ -225,4 +233,65 @@ pub(super) fn read_diagnostics(stderr: impl std::io::Read, mut consume: impl FnM
             consume(line);
         },
     );
+}
+
+/// A file an agent reads its prompt or configuration from, readable only by
+/// this user and removed when dropped. It is always created new, so it never
+/// follows a link or replaces a file already at its path.
+pub(super) struct PrivateFile(PathBuf);
+
+impl PrivateFile {
+    pub(super) fn create(path: PathBuf, contents: &str) -> std::io::Result<Self> {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&path)?;
+        let created = Self(path);
+        std::io::Write::write_all(&mut file, contents.as_bytes())?;
+        Ok(created)
+    }
+}
+
+impl Drop for PrivateFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+#[cfg(test)]
+mod private_file_tests {
+    use super::PrivateFile;
+
+    #[test]
+    fn a_private_file_is_new_owner_only_and_removed_when_dropped() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-private-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("prompt");
+        let file = PrivateFile::create(path.clone(), "the prompt").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "the prompt");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+        assert!(PrivateFile::create(path.clone(), "again").is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "the prompt");
+        drop(file);
+        assert!(!path.exists());
+        #[cfg(unix)]
+        {
+            let target = folder.join("target");
+            std::fs::write(&target, "kept").unwrap();
+            std::os::unix::fs::symlink(&target, &path).unwrap();
+            assert!(PrivateFile::create(path.clone(), "redirected").is_err());
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "kept");
+        }
+        std::fs::remove_dir_all(folder).unwrap();
+    }
 }

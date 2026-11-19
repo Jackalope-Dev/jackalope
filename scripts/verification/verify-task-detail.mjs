@@ -144,13 +144,13 @@ try {
   const menu = page.getByRole('button', { name: 'More task actions' });
   await menu.focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('menuitem', { name: 'Task details' }).waitFor();
+  await page.getByRole('menuitem', { name: 'Activity details' }).waitFor();
   await page.keyboard.press('Escape');
   await page.waitForFunction(
     () => document.activeElement?.getAttribute('aria-label') === 'More task actions',
   );
   await menu.click();
-  await page.getByRole('menuitem', { name: 'Task details' }).click();
+  await page.getByRole('menuitem', { name: 'Activity details' }).click();
   await page.getByText('Provider confirmation is unavailable.', { exact: false }).waitFor();
   await page.getByText('Execution timing', { exact: true }).click();
   await page.getByText('Waiting for check capacity', { exact: true }).waitFor();
@@ -489,7 +489,7 @@ try {
   await page.locator('.task-detail').evaluate((el) => (el.scrollTop = 0));
   await page.screenshot({ path: `${output}/review-tools-960-dark.png` });
   await page.getByRole('button', { name: 'More task actions', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Task details', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Activity details', exact: true }).click();
   await page.getByText('Example model', { exact: true }).waitFor();
   await page.getByText('Original request', { exact: true }).click();
   await page.getByText('Example model', { exact: true }).scrollIntoViewIfNeeded();

@@ -16,6 +16,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { checksAutomatically } from '../../lib/project-automation';
 import type { QueueItem } from '../../lib/queue';
 import { queueCommand } from '../../lib/queue';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -75,7 +76,7 @@ export function AddWork({
           verifyCommand: project.preferences?.verifyCommand,
           prepareCommand: project.preferences?.prepareCommand,
           setupFiles: project.preferences?.setupFiles,
-          autoVerify: project.preferences?.autoVerify === true,
+          autoVerify: checksAutomatically(project.preferences),
           agentProfileId: project.preferences?.agentAccounts?.[draft.agent],
           scopes: draft.scopes
             .split(',')

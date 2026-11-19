@@ -197,7 +197,18 @@ impl TaskRuntime {
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
         let mut resume = previous;
+        // A session from outside Jackalope is the point of its continuation, so a lost one
+        // is never replaced by a new conversation.
+        let continues = self
+            .run_snapshot(id)
+            .is_some_and(|run| run.continues.is_some());
+        if let (None, Some(continued)) = (&resume, &request.continues) {
+            resume = Some(self.continued_run(id, &request, continued));
+        }
         if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
+            if continues {
+                return Err(super::resume::gone(old));
+            }
             let adapter = old
                 .account_binding
                 .as_ref()
@@ -208,6 +219,8 @@ impl TaskRuntime {
             self.update_checked(id, |run| activity(run, &super::resume::restarted(adapter)))?;
             resume = None;
         }
+        // A session the CLI itself refuses to resume starts over the same way, once.
+        let mut refusable = resume.clone().filter(|_| !continues);
         let mut routed = true;
         loop {
             if !self.is_running(id) {
@@ -242,14 +255,62 @@ impl TaskRuntime {
                 .get(id)
                 .cloned()
                 .ok_or("Attempt not found")?;
-            if run.status != RunStatus::Starting
-                || run.routing.is_none()
-                || run.quota_failure.is_none()
-            {
+            if run.status != RunStatus::Starting {
                 return Ok(());
             }
-            request = self.handoff(req, &run)?;
+            if run.routing.is_some() && run.quota_failure.is_some() {
+                request = self.handoff(req, &run)?;
+                continue;
+            }
+            let Some(refusal) = run.session_refused else {
+                return Ok(());
+            };
+            let old = refusable
+                .take()
+                .ok_or_else(|| run.error.clone().unwrap_or_else(|| refusal.clone()))?;
+            let adapter = self.policy()?.adapter(&request.agent)?;
+            request
+                .prompt
+                .push_str(&super::resume::earlier_progress(&adapter, &old));
+            self.relaunch(id, |run| {
+                // The refusal is kept in activity; a failure of the new conversation is its own.
+                run.diagnostics.clear();
+                for line in super::resume::restarted_after(&adapter, &refusal) {
+                    activity(run, &line);
+                }
+            })?;
         }
+    }
+
+    /// Returns attempt `id` to starting for a new agent conversation in the same workspace,
+    /// after `change`: what the last turn reported is cleared, and its tool connections and
+    /// browser close so the next turn gets its own.
+    pub(super) fn relaunch(
+        &self,
+        id: &str,
+        change: impl FnOnce(&mut TaskRun),
+    ) -> Result<(), String> {
+        self.update_checked(id, |run| {
+            change(run);
+            run.session_id = None;
+            run.result.clear();
+            run.error = None;
+            run.quota_failure = None;
+            run.failure_kind = None;
+            run.provider_error = None;
+            run.session_refused = None;
+            run.model_mismatch = None;
+            run.model_reported = false;
+            run.usage = Usage::default();
+            run.usage_observations.clear();
+            run.exit_code = None;
+            run.ended_at = None;
+            run.status = RunStatus::Starting;
+        })?;
+        self.mcp_broker.close(id);
+        crate::commands::browser::close(id);
+        crate::commands::browser::register(id);
+        Ok(())
     }
 
     /// Places the project's Jackalope context into this attempt's workspace, every
@@ -281,12 +342,63 @@ impl TaskRuntime {
         });
     }
 
+    /// What a continuation of a session from outside Jackalope resumes: the CLI's own
+    /// session, in the folder this attempt claimed for it.
+    fn continued_run(&self, id: &str, req: &RunRequest, continued: &ContinuedSession) -> TaskRun {
+        TaskRun {
+            agent: continued.adapter.clone(),
+            session_id: Some(continued.session_id.clone()),
+            workspace: self
+                .run_snapshot(id)
+                .map_or_else(|| continued.workspace.clone(), |run| run.workspace),
+            account_binding: req.account_binding.clone(),
+            ..Default::default()
+        }
+    }
+
+    /// Claims the folder a session from outside Jackalope ran in, the person's own
+    /// checkout or worktree, and works there directly from its current commit.
+    fn prepare_continued(&self, id: &str, continued: &ContinuedSession) -> Result<(), String> {
+        let workspace = continued.workspace.as_str();
+        if !Path::new(workspace).is_dir() {
+            return Err(format!("{workspace} no longer exists."));
+        }
+        self.claim_checkout(id, workspace)?;
+        let (branch, head) = if plain_folder(workspace)?.is_some() {
+            (String::new(), String::new())
+        } else {
+            (
+                git(workspace, &["branch", "--show-current"]).unwrap_or_default(),
+                git(workspace, &["rev-parse", "HEAD"])?,
+            )
+        };
+        let agent = crate::commands::agents::name(&continued.adapter);
+        self.update_checked(id, |run| {
+            activity(
+                run,
+                &if branch.is_empty() {
+                    format!("Continuing the {agent} conversation directly in {workspace}.")
+                } else {
+                    format!(
+                        "Continuing the {agent} conversation directly in {workspace} on {branch}."
+                    )
+                },
+            );
+            run.workspace = workspace.to_string();
+            run.branch = branch.clone();
+            run.base_head = head.clone();
+        })
+    }
+
     pub(super) fn prepare_workspace(
         &self,
         id: &str,
         req: &RunRequest,
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
+        if let (Some(continued), None) = (&req.continues, &previous) {
+            return self.prepare_continued(id, continued);
+        }
         if let Some(folder) = plain_folder(&req.project_path)? {
             return self.prepare_plain_folder(id, req, previous, &folder);
         }
@@ -630,6 +742,9 @@ impl TaskRuntime {
         let spec = crate::commands::agents::find(&adapter)
             .ok_or("Choose a supported CLI adapter for this agent.")?;
         let remote = self.placed_target(id, req, &adapter, previous.as_ref())?;
+        if remote.is_some() && req.continues.is_some() {
+            return Err("This conversation's history is on this device, but this project's agents run on a computer. Continue it in a terminal.".into());
+        }
         let executable = match remote {
             Some(_) => PathBuf::from(&adapter),
             None => policy.resolve(&req.agent)?.1,
@@ -858,6 +973,7 @@ impl TaskRuntime {
             run.requested_model = selected_model.clone();
             run.fallback_model = fallback.map(str::to_string);
             run.model_mismatch = None;
+            run.model_reported = false;
         })?;
         if let Some(settings) = &claude {
             super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
@@ -1055,6 +1171,7 @@ impl TaskRuntime {
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
         // Project secrets reach the agent process only; an agent on a computer
         // receives its own set when its run starts there.
+        let mut secret_names = Vec::new();
         if remote.is_none() {
             let secrets = crate::commands::project_secrets::environment(
                 &self.project_secrets_root(),
@@ -1062,18 +1179,22 @@ impl TaskRuntime {
                 crate::commands::project_secrets::Place::Local,
             )
             .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+            secret_names = secrets.iter().map(|(name, _)| name.clone()).collect();
             if !secrets.is_empty() {
-                let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
                 self.update_checked(id, |run| {
                     activity(
                         run,
-                        &format!("Project secrets for the agent: {}.", names.join(", ")),
+                        &format!(
+                            "Project secrets for the agent: {}.",
+                            secret_names.join(", ")
+                        ),
                     )
                 })?;
             }
             cmd.envs(secrets);
         }
-        if req.previous_run_id.is_none() {
+        // A resumed session already has its context.
+        if req.previous_run_id.is_none() && req.continues.is_none() {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
             // run with and without it is otherwise identical and the difference is measurable.
             if !crate::commands::experiments::is(
@@ -1211,10 +1332,16 @@ impl TaskRuntime {
                 Path::new(&req.project_path)
             )
         ));
-        if spec.prompt == Prompt::File {
-            std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
-                .map_err(|e| e.to_string())?;
-        }
+        // Removed when the attempt ends, however it ends.
+        let _prompt_file = (spec.prompt == Prompt::File)
+            .then(|| {
+                super::agent_process::PrivateFile::create(
+                    self.directory.join(format!("{id}.prompt")),
+                    &input,
+                )
+            })
+            .transpose()
+            .map_err(|e| format!("The agent's prompt file could not be written: {e}"))?;
         if adapter == "antigravity" {
             input = antigravity::input(&input, &workspace);
         }
@@ -1266,7 +1393,10 @@ impl TaskRuntime {
         })?;
         #[cfg(test)]
         cmd.env_remove("JACKALOPE_QUALITY_SPEC");
-        cmd.env_remove("JACKALOPE_JEV_TEST_KEY");
+        let protected = crate::commands::redaction::injected_into(&cmd, &secret_names);
+        if !protected.is_empty() {
+            self.update_checked(id, |run| run.protect(protected))?;
+        }
         #[cfg(test)]
         if std::env::var_os("JACKALOPE_QUALITY_SPEC").is_some() {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
@@ -1375,7 +1505,10 @@ impl TaskRuntime {
                 })?;
             }
         }
-        if self.is_running(id) && !quota_stopped {
+        let restarting = self
+            .run_snapshot(id)
+            .is_some_and(|run| run.session_refused.is_some() && run.continues.is_none());
+        if self.is_running(id) && !quota_stopped && !restarting {
             let current = self
                 .integration_runs()?
                 .into_iter()
@@ -1394,12 +1527,13 @@ impl TaskRuntime {
         crate::commands::decision_trail::check_evidence(self, id);
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
+            settle_usage(r);
             r.finishing = false;
             r.exit_code = exit_code;
             r.ended_at = Some(Utc::now().to_rfc3339());
             r.status = if canceled || r.status == RunStatus::Stopping {
                 RunStatus::Stopped
-            } else if r.routing.is_some() && r.quota_failure.is_some() {
+            } else if (r.routing.is_some() && r.quota_failure.is_some()) || restarting {
                 r.ended_at = None;
                 RunStatus::Starting
             } else if success && r.error.is_none() && !r.result.is_empty() {
@@ -1424,17 +1558,58 @@ impl TaskRuntime {
         &self,
         prompt: &crate::commands::harness::PendingUserPrompt,
     ) {
+        self.update(&prompt.run_id, |run| merge_prompt(run, prompt));
+    }
+
+    /// Records the prompt an agent's own ask returned. When it returned
+    /// unanswered, the answer is owed to the agent until it is fetched.
+    pub(in crate::commands) fn record_asked_prompt(
+        &self,
+        prompt: &crate::commands::harness::PendingUserPrompt,
+    ) {
         self.update(&prompt.run_id, |run| {
-            if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
-                // A saved prompt only moves forward: a stale copy returned after the
-                // wait must not undo an escalation or an answer saved meanwhile.
-                if existing.status != "answered" && prompt.status == "answered" {
-                    *existing = prompt.clone();
-                }
-            } else {
-                run.prompts.push(prompt.clone());
+            merge_prompt(run, prompt);
+            if prompt.status != "answered" && !run.awaiting_answers.contains(&prompt.id) {
+                run.awaiting_answers.push(prompt.id.clone());
             }
         });
+    }
+
+    /// Answered questions the agent was told were pending and has not received,
+    /// optionally only `only`. They count as delivered once returned.
+    pub(in crate::commands) fn take_late_answers(
+        &self,
+        run_id: &str,
+        only: Option<&str>,
+    ) -> Vec<crate::commands::harness::PendingUserPrompt> {
+        let Ok(mut inner) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let Some(run) = inner.runs.get_mut(run_id) else {
+            return Vec::new();
+        };
+        let answered: Vec<_> = run
+            .prompts
+            .iter()
+            .filter(|prompt| {
+                prompt.status == "answered"
+                    && only.is_none_or(|id| id == prompt.id)
+                    && run.awaiting_answers.contains(&prompt.id)
+            })
+            .cloned()
+            .collect();
+        if answered.is_empty() {
+            return answered;
+        }
+        run.awaiting_answers
+            .retain(|id| !answered.iter().any(|prompt| &prompt.id == id));
+        match self.save(run) {
+            Ok(()) => run.persistence_error = None,
+            Err(error) => {
+                run.persistence_error = Some(format!("History could not be saved: {error}"))
+            }
+        }
+        answered
     }
 
     pub(in crate::commands) fn respond_prompt(
@@ -1778,6 +1953,7 @@ impl TaskRuntime {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
+            continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
         })
@@ -1823,6 +1999,14 @@ impl TaskRuntime {
         }
         if request.previous_run_id.is_some() {
             request.workspace_mode = None;
+            request.continues = None;
+        }
+        if let Some(continued) = &request.continues {
+            // It works where the session ran, which is never a worktree Jackalope made.
+            request.workspace_mode = None;
+            request.isolated = false;
+            crate::commands::previews::ensure_idle(&continued.workspace)?;
+            crate::commands::verification::ensure_idle(&continued.workspace)?;
         }
         if let Some(mode) = request.workspace_mode {
             request.isolated = mode == WorkspaceMode::Worktree;
@@ -1912,6 +2096,9 @@ impl TaskRuntime {
                 })
                 .transpose()?;
             if let Some(ref old) = retried {
+                if old.continues.is_some() {
+                    return Err("This work continues a conversation from outside Jackalope. Send a follow-up in its conversation instead of retrying it.".into());
+                }
                 if old.status.is_active() {
                     return Err("This attempt is still running. Stop it before retrying.".into());
                 }
@@ -1982,6 +2169,20 @@ impl TaskRuntime {
                     request.agent_profile_id.as_deref(),
                 )?
             };
+            if let Some(continued) = &request.continues {
+                if adapter != continued.adapter
+                    || !crate::commands::external_sessions::same_directory(
+                        &binding.directory,
+                        &continued.home,
+                    )
+                {
+                    return Err(format!(
+                        "This conversation was saved under {}, which is no longer the {} account Jackalope would use. Continue it in a terminal.",
+                        continued.home.display(),
+                        crate::commands::agents::name(&continued.adapter)
+                    ));
+                }
+            }
             if request.agent != "auto" && adapter == "opencode" {
                 let requested = request
                     .model
@@ -2092,6 +2293,10 @@ impl TaskRuntime {
                 progress: None,
                 preparation: None,
                 retry_of: request.retry_of.clone(),
+                continues: previous
+                    .as_ref()
+                    .and_then(|old| old.continues.clone())
+                    .or_else(|| request.continues.clone()),
                 dependency_snapshot: previous
                     .as_ref()
                     .or(retried.as_ref())
@@ -2103,6 +2308,7 @@ impl TaskRuntime {
                 quota_failure: None,
                 failure_kind: None,
                 provider_error: None,
+                session_refused: None,
                 contract,
                 understanding: None,
                 monitor_change: previous
@@ -2140,6 +2346,7 @@ impl TaskRuntime {
                 requested_model: None,
                 fallback_model: None,
                 model_mismatch: None,
+                model_reported: false,
                 prompt: request.prompt.clone(),
                 status: RunStatus::Starting,
                 started_at: Utc::now().to_rfc3339(),
@@ -2147,6 +2354,7 @@ impl TaskRuntime {
                 session_id: None,
                 result: String::new(),
                 streaming: String::new(),
+                pending_tools: Default::default(),
                 details_omitted: false,
                 activity: notes,
                 diagnostics: vec![],
@@ -2157,14 +2365,17 @@ impl TaskRuntime {
                 mcp_usage: None,
                 usage_observations: vec![],
                 prompts: vec![],
+                awaiting_answers: Vec::new(),
                 validation_steps: vec![],
                 decisions: vec![],
                 screenshots: vec![],
+                desktop_permissions: Vec::new(),
                 desktop_actions: vec![],
                 visited_pages: vec![],
                 review_captures: None,
                 review_capturing: false,
                 challenge_of: retried.as_ref().and_then(|old| old.challenge_of.clone()),
+                secrets: None,
             };
             self.save(&run)?;
             crate::commands::browser::register(&run.id);
@@ -2199,6 +2410,18 @@ impl TaskRuntime {
             crate::commands::computers::release_run(&request.id);
         });
         Ok(id)
+    }
+}
+
+/// Saves `prompt` into `run`. A saved prompt only moves forward: a stale copy
+/// returned after the wait must not undo an escalation or an answer saved meanwhile.
+fn merge_prompt(run: &mut TaskRun, prompt: &crate::commands::harness::PendingUserPrompt) {
+    if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
+        if existing.status != "answered" && prompt.status == "answered" {
+            *existing = prompt.clone();
+        }
+    } else {
+        run.prompts.push(prompt.clone());
     }
 }
 

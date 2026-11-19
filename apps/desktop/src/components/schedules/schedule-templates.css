@@ -79,37 +79,21 @@
   flex: 1;
   min-height: 0;
 }
-.schedule-editor-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: 28px;
-  padding: 0 32px 24px;
-  overflow: auto;
-  min-height: 0;
+/* The editor walks three steps (What to do, When, How it runs) in one scrolling column. */
+.schedule-editor-steps {
   flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 32px 24px;
 }
-.schedule-editor-column,
-.schedule-editor-section {
-  display: flex;
-  flex-direction: column;
+.schedule-step {
+  display: grid;
   gap: 16px;
   min-width: 0;
+  max-width: 60rem;
 }
-.schedule-editor-column {
-  gap: 28px;
-}
-.schedule-editor-section h3 {
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.schedule-editor-section > label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--text-sm);
-}
-.schedule-editor-section > label > button {
-  width: 100%;
+.schedule-step > .ui-button {
+  justify-self: start;
 }
 .schedule-fields {
   font-size: var(--text-sm);
@@ -118,23 +102,13 @@
 .schedule-fields > .schedule-field-wide {
   grid-column: 1 / -1;
 }
-.schedule-run-policy {
+.schedule-timezone-field {
   display: grid;
   gap: 4px;
+  align-content: start;
 }
-.schedule-run-policy label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: var(--control-height, 36px);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.schedule-run-policy input {
-  accent-color: var(--color-action);
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
+.schedule-timezone {
+  width: min(18rem, 100%);
 }
 .schedule-editor-footer {
   flex-shrink: 0;
@@ -145,12 +119,6 @@
 .schedule-editor-footer > p {
   margin-top: 8px;
 }
-@media (max-width: 800px) {
-  .schedule-editor-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .schedule-editor textarea {
   resize: vertical;
 }
@@ -206,4 +174,28 @@
 .schedule-row .ui-disclosure {
   flex-basis: 100%;
   min-width: 0;
+}
+
+/* Webhook values sit beside their copy buttons; the example command wraps instead of scrolling. */
+.schedule-webhook-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 12px;
+}
+.schedule-webhook-example {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.schedule-webhook-example code {
+  flex: 1 1 18rem;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
 }

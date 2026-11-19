@@ -159,8 +159,15 @@ pub(in crate::commands) async fn project_snapshot(
         "arguments":{}
     });
     let desktop = super::desktop_control::platform::supported();
+    let missing = if desktop {
+        tauri::async_runtime::spawn_blocking(super::desktop_control::platform::missing_permissions)
+            .await
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     Ok(
-        serde_json::json!({"assignedTaskId":item.id,"verification":verification,"tasks":tasks,"agreements":view.agreements.iter().filter(|a| a.project_id == item.project_id).collect::<Vec<_>>(),"scopeAudits":view.scope_audits.iter().filter(|a| a.project_id == item.project_id).collect::<Vec<_>>(),"messages":view.messages.iter().filter(|m| inbox::visible(m, &item)).collect::<Vec<_>>(),"capabilities":{"version":1,"project":true,"messages":true,"directedMessages":true,"acknowledgments":true,"userQuestions":true,"browser":true,"desktopControl":desktop,"desktopControlRequiresWindowGrant":true,"validation":true,"automaticWake":false,"automaticStartupContext":true,"automaticLifecycleMessages":true,"checkpointUpdates":true,"structuredReports":true,"messageResolution":true,"inboxWaitMs":30000,"ownershipAgreements":true,"interfaceGates":true,"scopeAudits":true},"inventory":"Loaded task history and queued work; archived runs are excluded. Unknown scopes are not permission to overlap."}),
+        serde_json::json!({"assignedTaskId":item.id,"verification":verification,"tasks":tasks,"agreements":view.agreements.iter().filter(|a| a.project_id == item.project_id).collect::<Vec<_>>(),"scopeAudits":view.scope_audits.iter().filter(|a| a.project_id == item.project_id).collect::<Vec<_>>(),"messages":view.messages.iter().filter(|m| inbox::visible(m, &item)).collect::<Vec<_>>(),"capabilities":{"version":1,"project":true,"messages":true,"directedMessages":true,"acknowledgments":true,"userQuestions":true,"browser":true,"desktopControl":desktop,"desktopControlMissing":missing,"desktopControlRequiresWindowGrant":true,"validation":true,"automaticWake":false,"automaticStartupContext":true,"automaticLifecycleMessages":true,"checkpointUpdates":true,"structuredReports":true,"messageResolution":true,"inboxWaitMs":30000,"ownershipAgreements":true,"interfaceGates":true,"scopeAudits":true},"inventory":"Loaded task history and queued work; archived runs are excluded. Unknown scopes are not permission to overlap."}),
     )
 }
 

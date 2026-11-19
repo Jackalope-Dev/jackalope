@@ -202,14 +202,15 @@ fn effort_uses_only_advertised_enabled_variants_and_preserves_unknown_models() {
 #[test]
 fn a_session_missing_from_the_server_reads_as_a_lost_conversation() {
     assert!(
-        lost_session("OpenCode /session/ses_gone returned HTTP 404.".into())
+        lost_session("OpenCode /session/ses_gone returned HTTP 404.")
+            .unwrap()
             .starts_with("OpenCode no longer has this task's earlier conversation")
     );
     for other in [
         "OpenCode /session/ses_gone returned HTTP 500.",
         "Could not reach the task's OpenCode server for /session/ses_gone.",
     ] {
-        assert_eq!(lost_session(other.into()), other);
+        assert_eq!(lost_session(other), None);
     }
 }
 
@@ -277,15 +278,19 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     )
     .unwrap();
     let mut request:RunRequest=serde_json::from_value(json!({"id":"opencode-fixture-first","projectId":"fixture","projectName":"Fixture","projectPath":root,"agent":"opencode-fixture","isolated":false,"prompt":"Fixture task","autoVerify":false,"model":"fixture/worker","effort":"quick"})).unwrap();
-    for attempt in 0..8 {
+    for attempt in 0..9 {
         request.prompt = match attempt {
             2 => "Continue fixture",
             5 => "Question fixture",
             6 => "Repeat fixture",
             7 => "Limit fixture",
+            8 => "Lost fixture",
             _ => "Fixture task",
         }
         .into();
+        if attempt == 8 {
+            std::fs::write(folder.join("forget-session"), "").unwrap();
+        }
         runtime.start(request.clone()).unwrap();
         let deadline =
             std::time::Instant::now() + Duration::from_secs(if attempt == 0 { 10 } else { 20 });
@@ -329,7 +334,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
         assert_eq!(
             completed.status,
             match attempt {
-                0 | 1 | 2 | 5 => RunStatus::Review,
+                0 | 1 | 2 | 5 | 8 => RunStatus::Review,
                 4 => RunStatus::Stopped,
                 _ => RunStatus::Failed,
             },
@@ -360,7 +365,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                 "xx"
             );
         }
-        if matches!(attempt, 0 | 1 | 2 | 5) {
+        if matches!(attempt, 0 | 1 | 2 | 5 | 8) {
             assert_eq!(completed.result, "Fixture complete");
             assert_eq!(completed.usage.input, 15);
             assert_eq!(completed.reasoning_effort.as_deref(), Some("low"));
@@ -381,13 +386,32 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                 .unwrap()
                 .contains("limit of denied actions"));
         }
+        if attempt == 8 {
+            // The server no longer had the session: the turn started over as a new one.
+            let refused = completed
+                .activity
+                .iter()
+                .position(|line| {
+                    line == "OpenCode could not resume the earlier conversation: OpenCode /session/ses_fixture returned HTTP 404."
+                })
+                .expect("refusal in activity");
+            assert!(completed.activity[refused + 1]
+                .starts_with("OpenCode no longer had this task's earlier conversation"));
+            assert!(completed.error.is_none());
+            let prompt = std::fs::read_to_string(folder.join("prompt.txt")).unwrap();
+            assert!(prompt.contains("Task:\nLost fixture\n"), "{prompt}");
+            assert!(
+                prompt.contains("Earlier request:\nLimit fixture"),
+                "{prompt}"
+            );
+        }
         assert!(runtime.inner.lock().unwrap().processes.is_empty());
         request.previous_run_id = Some(request.id.clone());
         request.id = format!("opencode-fixture-next-{attempt}");
     }
     assert_eq!(
         std::fs::read_to_string(folder.join("authorized.txt")).unwrap(),
-        "xxx"
+        "xxxx"
     );
     assert_eq!(
         std::fs::read_to_string(folder.join("independent.txt")).unwrap(),
@@ -400,7 +424,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     }
     drop(runtime);
     let runtime = TaskRuntime::new(folder.join("history")).unwrap();
-    assert_eq!(runtime.integration_runs().unwrap().len(), 8);
+    assert_eq!(runtime.integration_runs().unwrap().len(), 9);
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
 }

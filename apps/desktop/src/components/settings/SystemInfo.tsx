@@ -11,6 +11,7 @@ import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import {
+  DESKTOP_PERMISSION_LABELS,
   type DesktopPermission,
   getSystemInfo,
   openDesktopPermissionSettings,
@@ -18,12 +19,6 @@ import {
   restartForDesktopPermissions,
   type SystemInfo,
 } from '../../lib/system-info';
-
-const PERMISSION_LABELS: Record<DesktopPermission, string> = {
-  accessibility: 'Accessibility',
-  screenRecording: 'Screen Recording',
-  inputMonitoring: 'Input Monitoring',
-};
 
 export function SystemInfoView() {
   const [host, setHost] = useState<SystemInfo | null>(null);
@@ -153,7 +148,7 @@ export function SystemInfoView() {
                   {host.desktop_control.missing.map((permission) => (
                     <li key={permission}>
                       <Button variant="outline" onClick={() => void openSettings(permission)}>
-                        Open {PERMISSION_LABELS[permission]}
+                        Open {DESKTOP_PERMISSION_LABELS[permission]}
                       </Button>
                     </li>
                   ))}

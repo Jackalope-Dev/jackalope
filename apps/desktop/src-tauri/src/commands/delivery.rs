@@ -34,6 +34,73 @@ fn read(path: &Path, args: &[&str]) -> Result<String, String> {
     Ok(result.stdout.trim().into())
 }
 
+/// What Jackalope reads about a pull request: identity, state, review and checks.
+const PULL_REQUEST_FIELDS: &str =
+    "number,title,url,state,isDraft,headRefOid,reviewDecision,mergeable,statusCheckRollup";
+
+/// A GitHub CLI call that never prompts.
+fn gh(path: &Path, args: &[&str]) -> Command {
+    let mut command = Command::new("gh");
+    command
+        .current_dir(path)
+        .args(args)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("GIT_TERMINAL_PROMPT", "0");
+    process_control::hidden(&mut command);
+    command
+}
+
+/// Reads a pull request through the person's GitHub CLI: the one named by `url`, or the
+/// checked-out branch's. `None` when there is none to read or GitHub could not be reached.
+fn view_pull_request(path: &Path, url: Option<&str>) -> Result<Option<Value>, String> {
+    let mut args = vec!["pr", "view"];
+    args.extend(url);
+    args.extend(["--json", PULL_REQUEST_FIELDS]);
+    let Ok(result) = process_control::run(gh(path, &args), Duration::from_secs(15)) else {
+        return Ok(None);
+    };
+    if !result.success {
+        return Ok(None);
+    }
+    match serde_json::from_str::<Value>(&result.stdout) {
+        Ok(value)
+            if value["url"]
+                .as_str()
+                .is_some_and(|url| url.starts_with("https://")) =>
+        {
+            Ok(Some(value))
+        }
+        _ => Err("GitHub returned an unreadable PR record. Retry the check.".into()),
+    }
+}
+
+/// Whether `url` is a pull request address, so nothing else reaches the GitHub CLI.
+fn pull_request_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let parts: Vec<_> = rest.trim_end_matches('/').split('/').collect();
+    parts.len() == 5
+        && parts[3] == "pull"
+        && parts[4].parse::<u64>().is_ok_and(|number| number > 0)
+        && parts[..3].iter().all(|part| {
+            !part.is_empty()
+                && !part.starts_with('-')
+                && part
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+        })
+}
+
+/// The task checkout the GitHub CLI runs in, or the project once the workspace is gone.
+fn checkout<'a>(workspace: &'a str, project: &'a str) -> &'a Path {
+    if !workspace.is_empty() && Path::new(workspace).is_dir() {
+        Path::new(workspace)
+    } else {
+        Path::new(project)
+    }
+}
+
 fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
     let head = read(path, &["rev-parse", "--verify", "HEAD"])?;
     let branch = read(path, &["branch", "--show-current"])?;
@@ -76,29 +143,13 @@ fn inspect(path: &Path, remote: bool) -> Result<DeliveryStatus, String> {
         checked_at: chrono::Utc::now().to_rfc3339(),
     };
     if remote {
-        let mut command = Command::new("gh");
-        command
-            .current_dir(path)
-            .args([
-                "pr",
-                "view",
-                "--json",
-                "url,state,headRefOid,statusCheckRollup",
-            ])
-            .env("GH_PROMPT_DISABLED", "1")
-            .env("GIT_TERMINAL_PROMPT", "0");
-        process_control::hidden(&mut command);
-        match process_control::run(command, Duration::from_secs(15)) {
-            Ok(result) if result.success => {
-                match serde_json::from_str::<Value>(&result.stdout) {
-                    Ok(value) if value["url"].as_str().is_some_and(|url| url.starts_with("https://")) => {
-                        status.pull_request = Some(value);
-                        status.remote_note = "PR and CI read through your GitHub CLI. Deployment has not been verified.".into();
-                    },
-                    _ => status.remote_note = "GitHub returned an unreadable PR record. Retry the check.".into(),
-                }
+        match view_pull_request(path, None) {
+            Ok(Some(value)) => {
+                status.pull_request = Some(value);
+                status.remote_note = "PR and CI read through your GitHub CLI. Deployment has not been verified.".into();
             },
-            _ => status.remote_note = "No PR could be read. Check GitHub CLI installation, sign-in, network and the current branch's PR, then retry.".into(),
+            Ok(None) => status.remote_note = "No PR could be read. Check GitHub CLI installation, sign-in, network and the current branch's PR, then retry.".into(),
+            Err(error) => status.remote_note = error,
         }
     }
     Ok(status)
@@ -109,6 +160,8 @@ macro_rules! tauri_commands {
         $next!($finish [$($done)*
             commands::delivery::task_delivery_status,
             commands::delivery::task_pull_request_create,
+            commands::delivery::task_pull_request_status,
+            commands::delivery::task_pull_request_merge,
             commands::delivery::task_merge_locally,
         ] $($rest)*)
     };
@@ -221,6 +274,78 @@ pub async fn task_pull_request_create(
     .map_err(|error| error.to_string())?
 }
 
+/// Reads a task's tracked pull request, its review state and its checks. Read-only.
+#[tauri::command]
+pub async fn task_pull_request_status(
+    id: String,
+    url: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Value, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !pull_request_url(&url) {
+            return Err("This is not a pull request address.".into());
+        }
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        view_pull_request(checkout(&run.workspace, &run.project_path), Some(&url))?.ok_or_else(
+            || "The pull request could not be read. Check GitHub CLI sign-in and network.".into(),
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Merges a task's pull request on GitHub through the person's GitHub CLI, with the
+/// method they chose. GitHub enforces the repository's own rules; nothing local changes.
+#[tauri::command]
+pub async fn task_pull_request_merge(
+    id: String,
+    url: String,
+    method: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !pull_request_url(&url) {
+            return Err("This is not a pull request address.".into());
+        }
+        let method = match method.as_str() {
+            "merge" => "--merge",
+            "squash" => "--squash",
+            "rebase" => "--rebase",
+            _ => return Err("Choose merge, squash or rebase.".into()),
+        };
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        let command = gh(
+            checkout(&run.workspace, &run.project_path),
+            &["pr", "merge", &url, method],
+        );
+        let result = process_control::run(command, Duration::from_secs(60))?;
+        if !result.success {
+            let detail = result.stderr.trim();
+            return Err(if detail.is_empty() {
+                "GitHub CLI could not merge the pull request. Check that it is installed and signed in.".into()
+            } else {
+                format!(
+                    "GitHub did not merge the pull request: {}",
+                    detail.chars().take(2000).collect::<String>()
+                )
+            });
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 /// Runs a Git command that changes the checkout, reporting Git's own message on failure.
 fn change(path: &Path, args: &[&str]) -> Result<String, String> {
     let mut command = repo::command(path, args, Policy::Isolated);
@@ -318,6 +443,20 @@ mod tests {
             Some("https://github.com/o/r/pull/7")
         );
         assert_eq!(created_url("warning only"), None);
+        assert!(pull_request_url("https://github.com/o/r/pull/7"));
+        assert!(pull_request_url(
+            "https://github.example.com/o/r.git/pull/7/"
+        ));
+        for url in [
+            "http://github.com/o/r/pull/7",
+            "https://github.com/o/r/pull/0",
+            "https://github.com/o/r/issues/7",
+            "https://github.com/o/r/pull/7/files",
+            "https://github.com/--flag/r/pull/7",
+            "https://github.com/o/r/pull/7 --admin",
+        ] {
+            assert!(!pull_request_url(url), "{url}");
+        }
     }
 
     #[test]

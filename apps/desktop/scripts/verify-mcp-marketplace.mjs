@@ -160,7 +160,7 @@ try {
   assert.equal(await page.getByRole('article', { name: 'GitHub', exact: true }).count(), 1);
   await page.getByRole('searchbox', { name: 'Search MCP marketplace' }).fill('');
   await page.getByRole('button', { name: 'Connection options', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Custom connection', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add custom connection…', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Name', { exact: true }).fill('Sample tools');
   await dialog.getByLabel('Endpoint URL').fill('https://example.com/mcp');
@@ -213,7 +213,7 @@ try {
   assert.ok(!copied.includes('fixture-token'));
   assert.ok(!copied.includes('Bearer'));
   await page.getByRole('button', { name: 'Connection options', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Custom connection', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add custom connection…', exact: true }).click();
   await dialog.getByLabel('Name', { exact: true }).fill('Sample tools');
   await dialog.getByLabel('Endpoint URL').fill('https://example.com/mcp');
   await dialog.getByRole('button', { name: 'All projects', exact: true }).click();

@@ -157,6 +157,9 @@ fn login_command(
     command.args(agent_profiles::login_args(&binding.adapter));
     command.cwd(&binding.directory);
     command.env("TERM", "xterm-256color");
+    for name in super::process_control::inherited_credentials() {
+        command.env_remove(name);
+    }
     // Use the same environment overrides as task execution, including removals.
     let mut environment = std::process::Command::new(executable);
     agent_profiles::apply_binding(&mut environment, binding)?;

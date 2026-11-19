@@ -64,6 +64,7 @@ impl computers::Transport for StandIn {
 fn request(id: &str, workspace: &Path) -> RunRequest {
     RunRequest {
         retry_of: None,
+        continues: None,
         live_session_id: None,
         effort: None,
         codex_speed: None,

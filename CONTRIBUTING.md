@@ -38,7 +38,8 @@ pnpm tauri dev
 ```
 
 Run each development server in its own terminal. The desktop preview uses port
-5173 and the website uses 5180. Browser previews cannot execute native tasks;
+5173 and the website uses 5180. `pnpm tauri dev` starts the desktop preview itself,
+so run `pnpm dev` on its own only for a browser preview. Browser previews cannot execute native tasks;
 the component lab at `/design-lab.html` contains explicitly fictional UI fixtures.
 For a separate static lab build, use `pnpm --filter @jackalope/desktop build:lab`.
 Ordinary desktop builds exclude that entry point.

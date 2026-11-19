@@ -12,18 +12,18 @@ import {
   Button,
   FormField,
   InlineNotice,
-  DropdownMenu as Menu,
   Select,
   SelectItem,
   Textarea,
 } from '@jackalope/ui';
-import { ArrowUp, Ellipsis, Pause, Play, Square } from 'lucide-react';
+import { ArrowUp, Pause, Play, Square } from 'lucide-react';
 import { useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRemoteWorkspace } from '../../desktop/src/components/remote/useRemoteWorkspace';
 import { AgentQuestion } from '../../desktop/src/components/tasks/AgentQuestion';
 import { ChangedFiles } from '../../desktop/src/components/tasks/ChangedFiles';
+import { withoutLeadingId } from '../../desktop/src/lib/task-title.ts';
 import { Avatar, Bar } from './Bar';
 import { workspaceKey } from './drafts';
 import { type Host, request as nativeRequest } from './native';
@@ -109,7 +109,7 @@ function Conversation({
       : session && sessionStatus(session);
   const working = Boolean(task && isActive(task));
   const canSend = Boolean(session || (task && !task.sessionId));
-  // Review is the next step once work stops; stop, pause and resume wait in the menu.
+  // Review is the next step once work stops; stop, pause and resume sit under the bar.
   const canReview = Boolean(task && !working);
   const options: { label: string; icon: typeof Pause; action: RemoteAction }[] = [];
   if (task && working)
@@ -135,7 +135,7 @@ function Conversation({
   return (
     <main className="mobile-screen mobile-conversation">
       <Bar
-        title={task ? workTitle(task.title) : session?.title || 'Conversation'}
+        title={withoutLeadingId(task ? workTitle(task.title) : session?.title || 'Conversation')}
         subtitle={
           (status || context) && (
             <span className="mobile-bar-meta">
@@ -145,36 +145,23 @@ function Conversation({
           )
         }
         onBack={work.review ? work.closeReview : onBack}
-      >
-        {options.length > 0 && !work.review && (
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <button
-                type="button"
-                className="mobile-icon-button"
-                aria-label="Conversation options"
-                disabled={work.busy}
-              >
-                <Ellipsis size={20} aria-hidden="true" />
-              </button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content className="workspace-menu" align="end">
-                {options.map((item) => (
-                  <Menu.Item
-                    key={item.label}
-                    className="workspace-menu-item"
-                    onSelect={() => void work.act(item.action)}
-                  >
-                    <item.icon size={16} aria-hidden="true" />
-                    {item.label}
-                  </Menu.Item>
-                ))}
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
-        )}
-      </Bar>
+      />
+      {options.length > 0 && !work.review && (
+        <div className="mobile-actions">
+          {options.map((item) => (
+            <Button
+              key={item.label}
+              variant="outline"
+              size="sm"
+              disabled={work.busy}
+              onClick={() => void work.act(item.action)}
+            >
+              <item.icon size={16} aria-hidden="true" />
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      )}
       {work.error && <InlineNotice tone="error">{work.error}</InlineNotice>}
       {work.connectionError && <InlineNotice tone="warning">{work.connectionError}</InlineNotice>}
       {work.review ? (
@@ -298,7 +285,7 @@ function NewWork({
           >
             {projects.map((project) => (
               <SelectItem value={project.id} key={project.id}>
-                {project.name}
+                {project.hint ? `${project.name} (${project.hint})` : project.name}
               </SelectItem>
             ))}
           </Select>
@@ -312,14 +299,17 @@ function NewWork({
             rows={5}
           />
         </FormField>
-        <Button
-          type="submit"
-          disabled={work.busy || !work.draft.trim() || !projects.length}
-          loading={work.busy}
-          loadingLabel="Starting…"
-        >
-          Start
-        </Button>
+        <div className="mobile-sticky-actions">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={work.busy || !work.draft.trim() || !projects.length}
+            loading={work.busy}
+            loadingLabel="Starting…"
+          >
+            Start
+          </Button>
+        </div>
       </form>
     </main>
   );

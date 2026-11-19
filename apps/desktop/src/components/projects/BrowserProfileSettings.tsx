@@ -7,6 +7,7 @@ import {
   SettingBody,
   SettingGroup,
   SettingRow,
+  SetupList,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -174,6 +175,7 @@ export function BrowserProfileSettings({
           >
             <Input
               type="url"
+              className="project-setting-input"
               value={url}
               placeholder="https://example.com/login"
               onChange={(event) => setUrl(event.target.value)}
@@ -181,51 +183,62 @@ export function BrowserProfileSettings({
           </FormField>
         </SettingBody>
       )}
-      {status && status.signedInSites.length === 0 && (
+      {status && (
         <SettingBody>
-          <p className="settings-section-subtitle">No sites have saved data in this profile yet.</p>
+          <SetupList
+            label="Sites with saved data"
+            empty="No sites have saved data in this profile yet."
+            items={status.signedInSites.map((site) => ({
+              id: site,
+              title: site,
+              description: 'Has cookies or stored data in this profile.',
+              actions: (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={busy === `site:${site}`}
+                  loadingLabel="Clearing…"
+                  disabled={!!busy || !!status.inUse}
+                  aria-label={`Clear site data for ${site}`}
+                  onClick={() =>
+                    void run(`site:${site}`, () => clearBrowserProfileSite(status.id, site))
+                  }
+                >
+                  Clear site data
+                </Button>
+              ),
+            }))}
+          />
         </SettingBody>
       )}
-      {status?.signedInSites.map((site) => (
-        <SettingRow
-          key={site}
-          title={site}
-          description="Has cookies or stored data in this profile."
-        >
-          <Button
-            type="button"
-            variant="outline"
-            loading={busy === `site:${site}`}
-            loadingLabel="Clearing…"
-            disabled={!!busy || !!status.inUse}
-            aria-label={`Clear site data for ${site}`}
-            onClick={() => void run(`site:${site}`, () => clearBrowserProfileSite(status.id, site))}
-          >
-            Clear site data
-          </Button>
-        </SettingRow>
-      ))}
-      {decisions.map((site) => (
-        <SettingRow
-          key={site.id}
-          title={site.host}
-          description={
-            site.allow ? `Always allowed for ${owner.name}.` : `Never allowed for ${owner.name}.`
-          }
-        >
-          <Button
-            type="button"
-            variant="outline"
-            loading={busy === `decision:${site.id}`}
-            loadingLabel="Removing…"
-            disabled={!!busy}
-            aria-label={`Remove website decision for ${site.host}`}
-            onClick={() => void forget(site.id)}
-          >
-            Remove
-          </Button>
-        </SettingRow>
-      ))}
+      {decisions.length > 0 && (
+        <SettingBody>
+          <SetupList
+            label="Website decisions"
+            items={decisions.map((site) => ({
+              id: site.id,
+              title: site.host,
+              status: site.allow ? 'Always allowed' : 'Never allowed',
+              description: `For ${owner.name}.`,
+              actions: (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={busy === `decision:${site.id}`}
+                  loadingLabel="Removing…"
+                  disabled={!!busy}
+                  aria-label={`Remove website decision for ${site.host}`}
+                  onClick={() => void forget(site.id)}
+                >
+                  Remove
+                </Button>
+              ),
+            }))}
+          />
+        </SettingBody>
+      )}
       {status && (
         <SettingRow
           title="Delete profile"

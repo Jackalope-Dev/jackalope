@@ -311,6 +311,42 @@ fn main() {
 }
 
 #[test]
+fn claude_rejecting_requests_names_the_used_up_window_and_when_it_resets() {
+    // Field names as the Claude Agent SDK types SDKRateLimitInfo; resetsAt is Unix seconds.
+    let event = |info: serde_json::Value| {
+        quota_failure(&serde_json::json!({"type":"rate_limit_event","rate_limit_info":info,"uuid":"0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f","session_id":"5f0e1d2c-3b4a-4958-a6b7-c8d9e0f1a2b3"}))
+            .unwrap()
+    };
+    let resets = chrono::TimeZone::timestamp_opt(&chrono::Local, 1_794_520_800, 0)
+        .unwrap()
+        .format("%b %-d at %-I:%M %p")
+        .to_string();
+    let weekly = event(
+        serde_json::json!({"status":"rejected","resetsAt":1_794_520_800,"rateLimitType":"seven_day","utilization":1.0}),
+    );
+    assert_eq!(
+        weekly.message,
+        format!("Claude's weekly usage limit is used up. It resets {resets}.")
+    );
+    assert!(!weekly.model_only);
+    assert_eq!(
+        event(serde_json::json!({"status":"rejected","rateLimitType":"five_hour"})).message,
+        "Claude's five-hour usage limit is used up until it resets."
+    );
+    assert_eq!(
+        event(
+            serde_json::json!({"status":"rejected","rateLimitType":"seven_day_opus","resetsAt":0})
+        )
+        .message,
+        "Claude's weekly Opus usage limit is used up until it resets."
+    );
+    assert_eq!(
+        event(serde_json::json!({"status":"rejected"})).message,
+        "Claude's usage limit is used up until it resets."
+    );
+}
+
+#[test]
 fn quota_detection_requires_provider_errors_not_task_text() {
     assert!(quota_failure(
         &serde_json::json!({"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}})

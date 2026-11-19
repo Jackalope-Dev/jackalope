@@ -111,8 +111,10 @@ fn pairing_target(address: &str, code: Option<&str>) -> Result<(String, String),
     Ok((url.origin().ascii_serialization(), code))
 }
 
+/// `name` is what the person calls this computer, used in errors about its replies.
 async fn post(
     origin: &str,
+    name: &str,
     route: &str,
     token: Option<&str>,
     body: &Value,
@@ -128,6 +130,11 @@ async fn post(
     }
     let mut response = request.send().await.map_err(|_| pairing::UNREACHABLE)?;
     let status = response.status();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
     let mut bytes = Vec::new();
     while let Some(chunk) = response
         .chunk()
@@ -139,7 +146,7 @@ async fn post(
         }
         bytes.extend_from_slice(&chunk);
     }
-    pairing::reply(status.is_success(), &bytes)
+    pairing::reply(status.as_u16(), content_type.as_deref(), &bytes, name)
 }
 
 #[tauri::command]
@@ -195,6 +202,7 @@ async fn companion_pair(
     }
     let response = post(
         &origin,
+        &host_label(&origin, None),
         pairing::PAIR_ROUTE,
         None,
         &json!({"code": code, "name": name}),
@@ -232,7 +240,14 @@ async fn companion_request(
     state: State<'_, Companion>,
 ) -> Result<Value, String> {
     let host = state.host(&host)?;
-    post(&host.origin, pairing::REQUEST_ROUTE, Some(&host.token), &action).await
+    post(
+        &host.origin,
+        &host.label,
+        pairing::REQUEST_ROUTE,
+        Some(&host.token),
+        &action,
+    )
+    .await
 }
 
 /// Forgets a host on this phone. The host keeps the device until it is removed there.

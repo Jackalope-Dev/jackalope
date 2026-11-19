@@ -7,7 +7,7 @@ use std::{
 pub const OUTPUT_LIMIT: usize = 128_000;
 
 mod console;
-pub use console::{hidden, isolated, CREATE_NO_WINDOW};
+pub use console::{credential_variable, hidden, inherited_credentials, isolated, CREATE_NO_WINDOW};
 
 pub fn read_bounded(mut reader: impl Read, limit: usize) -> std::io::Result<(String, bool)> {
     read_observed(&mut reader, limit, |_| {})

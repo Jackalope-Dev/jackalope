@@ -7,9 +7,31 @@ export interface ComputerState {
   /** The last list this computer returned; kept while it is unreachable. */
   snapshot: Snapshot | null;
   error: string;
+  /** When this phone last heard from it (ISO), kept across launches. */
+  lastSeen?: string;
 }
 
 const POLL_MS = 4000;
+const LAST_SEEN_KEY = 'jackalope-companion-last-seen-v1';
+
+/** Last contact per computer id; storage can be unavailable, which only loses the time. */
+function readLastSeen(): Record<string, string> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_SEEN_KEY) ?? '{}');
+    return saved && typeof saved === 'object' ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberLastSeen(id: string, at: string, paired: Set<string>) {
+  try {
+    const kept = Object.entries(readLastSeen()).filter(([host]) => paired.has(host));
+    localStorage.setItem(LAST_SEEN_KEY, JSON.stringify({ ...Object.fromEntries(kept), [id]: at }));
+  } catch {
+    // Without storage only the last-seen time is lost.
+  }
+}
 
 /**
  * Every paired computer's work, each polled on its own so one unreachable computer never
@@ -32,9 +54,15 @@ export function useComputers(hosts: Host[], active: boolean) {
     };
     try {
       const snapshot = await request<Snapshot>(host.id, { action: 'snapshot' });
-      settle(() => ({ snapshot, error: '' }));
+      const at = new Date().toISOString();
+      settle(() => ({ snapshot, error: '', lastSeen: at }));
+      rememberLastSeen(host.id, at, paired.current);
     } catch (cause) {
-      settle((current) => ({ snapshot: current?.snapshot ?? null, error: describeError(cause) }));
+      settle((current) => ({
+        snapshot: current?.snapshot ?? null,
+        error: describeError(cause),
+        lastSeen: current?.lastSeen ?? readLastSeen()[host.id],
+      }));
     }
   }, []);
   const refresh = useCallback(() => Promise.all(hosts.map((host) => load(host))), [hosts, load]);

@@ -100,6 +100,8 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
   const [editing, setEditing] = useState('');
   const [replacement, setReplacement] = useState('');
   const [editAvailability, setEditAvailability] = useState<SecretAvailability>('both');
+  /** Saved secrets come first; the add form opens on request, or straight away when empty. */
+  const [adding, setAdding] = useState(false);
   const duration = motionSeconds('--motion-base', 180);
 
   useEffect(() => {
@@ -139,6 +141,7 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
       setName('');
       setValue('');
       setAvailableTo('both');
+      setAdding(false);
     }
   };
 
@@ -266,55 +269,77 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
           ))}
         </AnimatePresence>
       </MotionConfig>
-      <SettingBody>
-        <form className="project-secret-form" onSubmit={(event) => void add(event)}>
-          <div className="project-secret-fields">
-            <FormField
-              label="Name"
-              error={invalidName || undefined}
-              description={existing ? 'Saving replaces the saved value.' : undefined}
-            >
-              <Input
-                id="project-secret-name"
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={128}
-                placeholder="HIGGSFIELD_API_KEY"
-                value={name}
-                onChange={(event) => setName(toName(event.target.value))}
-              />
-            </FormField>
-            <FormField label="Value">
-              <Input
-                id="project-secret-value"
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={SECRET_VALUE_MAX_CHARS}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-              />
-            </FormField>
-          </div>
-          <AvailabilityChoices
-            label="Available to"
-            value={availableTo}
-            onChange={setAvailableTo}
-            disabled={!!busy}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="submit"
-              variant="outline"
-              loading={busy === 'add'}
-              loadingLabel="Saving…"
-              disabled={!canAdd}
-            >
-              {existing ? 'Replace secret' : 'Add secret'}
-            </Button>
-          </div>
-        </form>
-      </SettingBody>
+      {secrets.length > 0 && !adding ? (
+        <SettingBody>
+          <Button variant="outline" size="sm" disabled={!!busy} onClick={() => setAdding(true)}>
+            Add secret
+          </Button>
+        </SettingBody>
+      ) : (
+        <SettingBody>
+          <form className="project-secret-form" onSubmit={(event) => void add(event)}>
+            <div className="project-secret-fields">
+              <FormField
+                label="Name"
+                error={invalidName || undefined}
+                description={existing ? 'Saving replaces the saved value.' : undefined}
+              >
+                <Input
+                  id="project-secret-name"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={128}
+                  placeholder="HIGGSFIELD_API_KEY"
+                  value={name}
+                  onChange={(event) => setName(toName(event.target.value))}
+                />
+              </FormField>
+              <FormField label="Value">
+                <Input
+                  id="project-secret-value"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={SECRET_VALUE_MAX_CHARS}
+                  value={value}
+                  onChange={(event) => setValue(event.target.value)}
+                />
+              </FormField>
+            </div>
+            <AvailabilityChoices
+              label="Available to"
+              value={availableTo}
+              onChange={setAvailableTo}
+              disabled={!!busy}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                variant="outline"
+                loading={busy === 'add'}
+                loadingLabel="Saving…"
+                disabled={!canAdd}
+              >
+                {existing ? 'Replace secret' : 'Add secret'}
+              </Button>
+              {secrets.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={busy === 'add'}
+                  onClick={() => {
+                    setAdding(false);
+                    setName('');
+                    setValue('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </SettingBody>
+      )}
     </SettingGroup>
   );
 }

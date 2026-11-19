@@ -1,10 +1,10 @@
 import {
   Button,
+  CopyButton,
   Disclosure,
   DisclosureSummary,
   EmptyState,
   InlineNotice,
-  DropdownMenu as Menu,
   SettingGroup,
   SettingRow,
 } from '@jackalope/ui';
@@ -12,7 +12,6 @@ import {
   FolderOpen,
   GitBranch,
   MonitorPlay,
-  MoreHorizontal,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -22,14 +21,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
+import { checksAutomatically } from '../../lib/project-automation';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
-import { taskTitle } from '../../lib/task-title';
+import { runTitle } from '../../lib/task-title';
 import { selectWork, useAllRuns, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useActiveProject, useProjectStore } from '../../stores/projectStore';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { IssuePicker } from '../tasks/IssuePicker';
@@ -91,10 +92,18 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     };
   }, [project?.path, fetchReadiness]);
 
+  const pullRequests = usePullRequestStore((state) => state.tracked);
   const unfinished = useMemo(
     () =>
-      project ? returnToProject(allRuns, project.id, integrated, { ideas, sessions, queue }) : [],
-    [allRuns, project, integrated, ideas, sessions, queue],
+      project
+        ? returnToProject(allRuns, project.id, integrated, {
+            ideas,
+            sessions,
+            queue,
+            pullRequests,
+          })
+        : [],
+    [allRuns, project, integrated, ideas, sessions, queue, pullRequests],
   );
   const openTask = (item: WorkItem) => {
     // A task opens through its list row rather than straight to its page.
@@ -155,35 +164,13 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   <Plus size={14} />
                   New task
                 </Button>
-                <Menu.Root>
-                  <Menu.Trigger asChild>
-                    <Button variant="outline" size="sm" aria-label="Project options">
-                      <MoreHorizontal size={16} aria-hidden="true" />
-                    </Button>
-                  </Menu.Trigger>
-                  <Menu.Portal>
-                    <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-                      <Menu.Item
-                        className="workspace-menu-item"
-                        onSelect={() => {
-                          useWorkViewStore.getState().setScope('project');
-                          selectWork();
-                          navigateWorkspace('kanban');
-                        }}
-                      >
-                        Open task board
-                      </Menu.Item>
-                      <Menu.Separator className="menu-separator" />
-                      <Menu.Item
-                        className="workspace-menu-item"
-                        title={project.path}
-                        onSelect={() => void navigator.clipboard.writeText(project.path)}
-                      >
-                        Copy folder path
-                      </Menu.Item>
-                    </Menu.Content>
-                  </Menu.Portal>
-                </Menu.Root>
+                <CopyButton
+                  variant="outline"
+                  size="sm"
+                  text={project.path}
+                  label="Copy folder path"
+                  title={project.path}
+                />
               </div>
             }
           />
@@ -283,7 +270,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   savedVerify ? (
                     <>
                       <code>{savedVerify}</code>
-                      {project.preferences?.autoVerify
+                      {checksAutomatically(project.preferences)
                         ? ' · runs after each task'
                         : ' · runs when you ask'}
                     </>
@@ -423,7 +410,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 {deliveries.map((run) => (
                   <SettingRow
                     key={run.id}
-                    title={taskTitle(run.prompt)}
+                    title={runTitle(run)}
                     description={`Integrated locally · ${new Date(run.startedAt).toLocaleDateString(
                       undefined,
                       { month: 'short', day: 'numeric', year: 'numeric' },

@@ -89,7 +89,9 @@ export function ShortcutSheet() {
             </section>
           ))}
         </div>
-        <p className="task-muted text-xs">Change workspace shortcuts in Settings → Desktop.</p>
+        <p className="task-muted text-xs">
+          Change workspace shortcuts in Settings → Keyboard shortcuts.
+        </p>
       </DialogContent>
     </Dialog.Root>
   );

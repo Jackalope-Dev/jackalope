@@ -7,6 +7,10 @@ const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve
 /// captured screenshot is evidence only once it has been compared with the request.
 const EVIDENCE: &str = "Change files with the edit and write tools, not shell scripts or heredocs, so Jackalope can check and track each edit. Before reporting visual work as done, compare your screenshots with the request.\n";
 
+/// A watcher or server left running keeps rebuilding and holding ports after the task ends.
+/// The permission check approves `kill $PID` and `kill -- -$PGID` but asks about literal IDs.
+const PROCESSES: &str = "Run servers and watchers without file watching when possible, such as --no-watch. Wait for readiness by polling a port, URL or plain-text marker, not colored log output. Before finishing, stop every process you started and its children; kill $PID and kill -- -$PGID with a saved ID need no approval.\n";
+
 const WORKFLOW_GUIDANCE: &str = "Use supplied context, batch independent reads, and expand investigation when needed. Complete implementation before batching required checks, except when repository instructions or a necessary diagnostic require an earlier check. Recheck changed code or failed checks; preserve successful unchanged evidence. Keep small or coupled tasks with one agent; delegate only permitted independent work whose benefit exceeds coordination and duplicate context costs.\n";
 
 /// `JACKALOPE_SCOPE_GUARD=on` restores the workflow and scope guidance for comparison runs.
@@ -27,6 +31,7 @@ fn lean_contract(workflow: bool) -> String {
     let parts = [
         CORE,
         EVIDENCE,
+        PROCESSES,
         if workflow { WORKFLOW_GUIDANCE } else { "" },
     ];
     let line = parts
@@ -39,7 +44,7 @@ fn lean_contract(workflow: bool) -> String {
 }
 
 pub(super) fn preamble() -> String {
-    format!("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n{EVIDENCE}{}{}\nJackalope manages commits and attribution. Leave changes uncommitted. If files changed, end your result with: Commit message: <imperative summary of the actual changes>.\n", super::efficiency::INSTRUCTIONS, super::delegation::INSTRUCTIONS)
+    format!("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n{EVIDENCE}{PROCESSES}{}{}\nJackalope manages commits and attribution. Leave changes uncommitted. If files changed, end your result with: Commit message: <imperative summary of the actual changes>.\n", super::efficiency::INSTRUCTIONS, super::delegation::INSTRUCTIONS)
 }
 
 #[cfg(test)]
@@ -52,6 +57,13 @@ mod tests {
             let contract = lean_contract(workflow);
             assert!(!contract.trim_end().contains(['\r', '\n']), "{contract:?}");
             assert!(contract.ends_with('\n'));
+        }
+    }
+
+    #[test]
+    fn focused_and_managed_launches_both_stop_their_background_processes() {
+        for contract in [lean_contract(false), lean_contract(true), preamble()] {
+            assert!(contract.contains(PROCESSES.trim()), "{contract}");
         }
     }
 

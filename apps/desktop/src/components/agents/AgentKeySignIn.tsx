@@ -1,11 +1,12 @@
 import { describeError } from '@jackalope/contracts/errors';
-import { Button, Checkbox, Input, Select, SelectItem, useDialogFocus } from '@jackalope/ui';
+import { Button, Checkbox, Select, SelectItem, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
 import { apiProviders } from '../../lib/api-providers';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { ActionError } from '../ui/ActionError';
+import { CredentialStep, providerMarkFor } from './CredentialStep';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 export function AgentKeySignIn({
@@ -31,6 +32,10 @@ export function AgentKeySignIn({
   const [useForTasks, setUseForTasks] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Which step failed, so a save failure shows on the provider link and others below.
+  const [keyFailed, setKeyFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const chosen = apiProviders.find((item) => item.key === provider);
   const close = async () => {
     if (busy) return;
     setBusy(true);
@@ -78,16 +83,22 @@ export function AgentKeySignIn({
             onSubmit={async (event) => {
               event.preventDefault();
               setBusy(true);
+              setSaving(true);
               setError('');
+              setKeyFailed(false);
+              let saved = false;
               try {
                 if (agentId === 'opencode') await runner.prepare();
                 await saveAgentProfileKey(agentId, profile.id, provider, key);
+                saved = true;
                 setKey('');
                 await onSaved(useForTasks);
                 await onClose();
               } catch (error) {
+                setKeyFailed(!saved);
                 setError(describeError(error));
               } finally {
+                setSaving(false);
                 setBusy(false);
               }
             }}
@@ -106,23 +117,17 @@ export function AgentKeySignIn({
                 ))}
               </Select>
             )}
-            <label className="task-label">
-              API key
-              <Input
-                className="task-input"
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={key}
-                onChange={(event) => setKey(event.target.value)}
-                required
-                disabled={busy}
-                maxLength={8192}
-              />
-            </label>
-            <p className="task-muted text-sm">
-              Stored locally. Sent only to the selected agent for authentication.
-            </p>
+            <CredentialStep
+              providerName={chosen?.name ?? 'Provider'}
+              providerIcon={chosen ? providerMarkFor(chosen.id, 16) : undefined}
+              envKey={provider}
+              value={key}
+              onValueChange={setKey}
+              state={saving ? 'checking' : keyFailed ? 'failed' : 'idle'}
+              error={keyFailed ? error : undefined}
+              disabled={busy}
+              description="Stored locally. Sent only to the selected agent for authentication."
+            />
             <label className="flex items-center gap-3 min-h-11">
               <Checkbox
                 checked={useForTasks}
@@ -139,7 +144,7 @@ export function AgentKeySignIn({
                 }
               />
             )}
-            <ActionError error={error} />
+            <ActionError error={keyFailed ? '' : error} />
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
                 Cancel

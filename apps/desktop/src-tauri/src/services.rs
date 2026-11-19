@@ -2,9 +2,10 @@
 
 use crate::commands::{
     agent_sign_in::SignInService, bot_hub::BotHub, browser, cli_host::CliHost, computers,
-    coordination::Coordinator, desktop_integration::DesktopIntegration, helper::Helper,
-    live_sessions::LiveSessions, notifications::Notifications, previews, remote,
-    remote::RemoteAccess, schedules::Scheduler, tasks::TaskRuntime, work_terminal,
+    coordination::Coordinator, desktop_integration::DesktopIntegration,
+    external_sessions::ExternalSessions, helper::Helper, live_sessions::LiveSessions,
+    notifications::Notifications, previews, remote, remote::RemoteAccess, schedules::Scheduler,
+    tasks::TaskRuntime, work_terminal,
 };
 use tauri::{AppHandle, Manager};
 
@@ -52,6 +53,7 @@ const SHUTDOWN: &[fn(&AppHandle)] = &[
     close_tunnels,
     stop::<Scheduler>,
     stop::<BotHub>,
+    stop::<ExternalSessions>,
     stop::<Notifications>,
     stop::<LiveSessions>,
     close_browsers,

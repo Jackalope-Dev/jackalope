@@ -15,14 +15,18 @@ import {
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
+  BookOpen,
   CalendarClock,
   Check,
   ChevronRight,
+  Code,
   Copy,
-  GitMerge,
+  GitBranch,
+  ListTree,
   MailPlus,
   MoreHorizontal,
   Square,
+  SquareArrowOutUpRight,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -41,9 +45,10 @@ import {
   stopTask,
 } from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';
-import { latestAttempt, taskDecision } from '../../lib/task-workflow';
+import { latestAttempt, pullRequestDecision, taskDecision } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
@@ -53,6 +58,7 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentScreen } from './AgentScreen';
 import { DecisionTrail } from './DecisionTrail';
+import { DesktopPermissionNotice } from './DesktopPermissionNotice';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ResumeInterrupted, resumePrompt } from './ResumeInterrupted';
@@ -80,7 +86,7 @@ import { WorkFeedbackInbox } from './WorkFeedbackInbox';
 import { ChangeSize } from './WorkSignals';
 import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
-import { useWorkspaceActions } from './WorkTools';
+import { isPopOutPane, PopOutButton, useWorkspaceActions } from './WorkTools';
 import './task-detail.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { ActionError } from '../ui/ActionError';
@@ -200,6 +206,7 @@ export function TaskDetail({
   const title = taskTitle(
     sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt,
     sourceIdea?.title,
+    [run.projectPath, run.workspace],
   );
   /** Adds review or preview feedback to the follow-up draft, keeping what is typed. */
   const addToReply = (text: string, focus = false) => {
@@ -224,7 +231,11 @@ export function TaskDetail({
         useWorkViewStore.getState().setViewing(null);
     };
   }, [run.id]);
-  const decision = taskDecision(run, integrated, changedFiles);
+  const pullRequest = usePullRequestStore((state) => state.tracked[run.taskId]);
+  const decision = pullRequestDecision(
+    taskDecision(run, integrated, changedFiles),
+    isLatest ? pullRequest : undefined,
+  );
   const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
     run,
     draftKey: key,
@@ -520,80 +531,52 @@ export function TaskDetail({
                 sideOffset={8}
                 collisionPadding={12}
               >
-                {!!run.result && (
-                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
-                    <Copy size={16} />
-                    Copy output
-                  </Menu.Item>
-                )}
-                {finished && isLatest && (
-                  <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
-                    <CalendarClock size={16} />
-                    Make recurring
-                  </Menu.Item>
-                )}
-                {finished && isLatest && run.status === 'review' && (
+                {workspaceActions.editor && (
                   <Menu.Item
                     className="workspace-menu-item"
-                    disabled={acting || !!run.persistenceError}
-                    onSelect={() => void act(() => markReviewed(run.id))}
+                    onSelect={workspaceActions.editor.onSelect}
                   >
-                    <Check size={16} /> Mark reviewed
+                    <Code size={16} aria-hidden="true" />
+                    {workspaceActions.editor.label}
                   </Menu.Item>
                 )}
-                {finished && (
-                  <Menu.Item
-                    className="workspace-menu-item"
-                    onSelect={() => {
-                      setTab('changes');
-                      if (isLatest && isolated) setIntegrating(true);
-                      setReviewSection('delivery');
-                    }}
-                  >
-                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Merge and publish'}
-                  </Menu.Item>
-                )}
-                <Menu.Item className="workspace-menu-item" onSelect={() => setContextOpen(true)}>
-                  Task context
-                </Menu.Item>
-                {!!workspaceActions.groups.length && (
+                {!!workspaceActions.more.length && (
                   <Menu.Sub>
                     <Menu.SubTrigger className="workspace-menu-item workspace-menu-sub">
-                      Workspace
+                      <SquareArrowOutUpRight size={16} aria-hidden="true" />
+                      Open in…
                       <ChevronRight size={14} aria-hidden="true" />
                     </Menu.SubTrigger>
                     <Menu.Portal>
                       <Menu.SubContent className="workspace-menu">
-                        {workspaceActions.groups.map((group, index) => [
-                          index > 0 && (
-                            <Menu.Separator
-                              key={`separator-${group[0]?.id}`}
-                              className="menu-separator"
-                            />
-                          ),
-                          ...group.map((entry) => (
+                        {workspaceActions.more.map((entry) => {
+                          const Icon =
+                            entry.id === 'copy-branch'
+                              ? GitBranch
+                              : entry.id === 'copy-path'
+                                ? Copy
+                                : Code;
+                          return (
                             <Menu.Item
                               key={entry.id}
                               className="workspace-menu-item"
                               onSelect={entry.onSelect}
                             >
+                              <Icon size={16} aria-hidden="true" />
                               {entry.label}
                             </Menu.Item>
-                          )),
-                        ])}
+                          );
+                        })}
                       </Menu.SubContent>
                     </Menu.Portal>
                   </Menu.Sub>
                 )}
-                <Menu.Item
-                  className="workspace-menu-item"
-                  onSelect={() => {
-                    setTab('activity');
-                    setDetailsOpen(true);
-                  }}
-                >
-                  Task details
-                </Menu.Item>
+                {!!run.result && (
+                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
+                    <Copy size={16} aria-hidden="true" />
+                    Copy output
+                  </Menu.Item>
+                )}
                 <Menu.Item
                   className="workspace-menu-item"
                   onSelect={() => {
@@ -601,8 +584,38 @@ export function TaskDetail({
                     onBack();
                   }}
                 >
-                  <MailPlus size={16} /> Mark unread
+                  <MailPlus size={16} aria-hidden="true" /> Mark unread
                 </Menu.Item>
+                <Menu.Separator className="menu-separator" />
+                {finished && isLatest && (
+                  <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
+                    <CalendarClock size={16} aria-hidden="true" />
+                    Make recurring…
+                  </Menu.Item>
+                )}
+                <Menu.Item className="workspace-menu-item" onSelect={() => setContextOpen(true)}>
+                  <BookOpen size={16} aria-hidden="true" />
+                  Context…
+                </Menu.Item>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    setTab('activity');
+                    setDetailsOpen(true);
+                  }}
+                >
+                  <ListTree size={16} aria-hidden="true" />
+                  Activity details
+                </Menu.Item>
+                {finished && isLatest && run.status === 'review' && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    disabled={acting || !!run.persistenceError}
+                    onSelect={() => void act(() => markReviewed(run.id))}
+                  >
+                    <Check size={16} aria-hidden="true" /> Mark reviewed without opening
+                  </Menu.Item>
+                )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
@@ -648,7 +661,7 @@ export function TaskDetail({
           />
         )}
       </div>
-      <ActionError error={error} />
+      <ActionError error={error || workspaceActions.error} />
       {notice && (
         <p role="status" className="task-muted">
           {notice}
@@ -681,6 +694,7 @@ export function TaskDetail({
           onInspect={() => setTab('activity')}
         />
       )}
+      <DesktopPermissionNotice key={run.id} run={run} />
       {!!pending.length && (
         <TaskQuestions>
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
@@ -716,6 +730,9 @@ export function TaskDetail({
               </Tabs.Trigger>
             ))}
           </Tabs.List>
+          {workspaceActions.popOut && isPopOutPane(tab) && (
+            <PopOutButton pane={tab} onPopOut={workspaceActions.popOut} />
+          )}
         </div>
         <div className="result-canvas">
           <Tabs.Content value="result" forceMount hidden={tab !== 'result'}>
@@ -820,6 +837,7 @@ export function TaskDetail({
                         key={run.id}
                         run={run}
                         integrated={integrated}
+                        onFollowUp={canContinue ? (text) => addToReply(text, true) : undefined}
                         onHandoff={(text) => {
                           const id = useTaskStore.getState().addTask({
                             projectId: run.projectId,

@@ -10,6 +10,7 @@ import { searchFiles } from '../../lib/file-search';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { type ActiveTab, WORKSPACE_VIEWS } from '../../lib/navigation';
+import { projectNameHints } from '../../lib/project-name-hints';
 import { attachmentReference } from '../../lib/prompt-attachments';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workShape } from '../../lib/task-collection';
@@ -92,6 +93,7 @@ export function CommandPalette({
   const matchingProjects = projects
     .filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(search))
     .slice(0, 6);
+  const projectHints = projectNameHints(projects);
   const actions = current
     ? [
         { label: taskDecision(current).action, section: taskDecision(current).section },
@@ -243,7 +245,14 @@ export function CommandPalette({
                 }}
               >
                 <Folder size={16} />
-                <span>{project.name}</span>
+                <span className="min-w-0 truncate">
+                  {project.name}
+                  {projectHints.has(project.id) && (
+                    <small className="ml-2 text-[var(--color-text-secondary)]">
+                      {projectHints.get(project.id)}
+                    </small>
+                  )}
+                </span>
               </button>
             ))}
             {files.length > 0 && activeProject && (

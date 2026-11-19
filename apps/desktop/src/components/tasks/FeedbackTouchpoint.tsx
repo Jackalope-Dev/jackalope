@@ -116,7 +116,7 @@ export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: b
           </div>
         </>
       ) : (
-        <Button variant="ghost" onClick={() => openSettings('Updates & support')}>
+        <Button variant="ghost" onClick={() => openSettings('Help & community')}>
           Share feedback on Jackalope
         </Button>
       )}

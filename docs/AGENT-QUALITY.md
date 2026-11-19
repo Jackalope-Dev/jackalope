@@ -692,7 +692,9 @@ when the process started remain registered for later turns, which answer with no
 decision when a check does not apply. Edit checks run the project's `editCheck`
 command (`{file}` becomes the quoted workspace path; paths needing more escaping skip
 the check) for up to 60 seconds; set it as **Check after each edit** in the
-project's checks settings.
+project's checks settings. On bridged tasks an always-registered `PostToolUse` callback
+delivers answers to questions that returned pending, once, as `additionalContext`; an
+answer `user_response` already returned is not repeated.
 
 Claude Code 2.1.312 accepts these registrations with `--include-partial-messages`,
 `--strict-mcp-config`, `--setting-sources project,local` and `--fallback-model`, sends

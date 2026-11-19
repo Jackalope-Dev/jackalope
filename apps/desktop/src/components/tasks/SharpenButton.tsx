@@ -92,7 +92,8 @@ export function useSharpen({
   };
 }
 
-/** The composer control: Sharpen, Stop while it runs, then Undo sharpen. */
+/** The composer control: Sharpen, Stop while it runs, then Undo sharpen. Labelled, since
+ * a bare sparkle does not say what it does. */
 export function SharpenButton({
   state,
   draft,
@@ -108,12 +109,12 @@ export function SharpenButton({
         <Button
           type="button"
           variant="ghost"
-          size="icon"
           aria-label="Stop sharpening"
           aria-busy
           onClick={state.stop}
         >
           <Square size={16} aria-hidden="true" />
+          Stop
         </Button>
       </Tooltip>
     );
@@ -123,28 +124,24 @@ export function SharpenButton({
         <Button
           type="button"
           variant="ghost"
-          size="icon"
           aria-label="Undo sharpen"
           disabled={disabled}
           onClick={state.undo}
         >
           <Undo2 size={18} aria-hidden="true" />
+          Undo
         </Button>
       </Tooltip>
     );
-  const unavailable = state.reason ?? (draft.trim() ? undefined : 'Write a draft to sharpen.');
+  const unavailable = state.reason ?? (draft.trim() ? undefined : 'Write a draft first.');
+  const about =
+    'Rewrites your draft into a deeper version of the same task. Uses one agent call; nothing is sent.';
   return (
-    <Tooltip
-      content={
-        unavailable ??
-        'Sharpen: rewrite this draft into a deeper version of the same task. Uses one agent call; nothing is sent.'
-      }
-    >
+    <Tooltip content={unavailable ? `${about} ${unavailable}` : about}>
       {/* aria-disabled keeps the reason reachable by hover and keyboard focus. */}
       <Button
         type="button"
         variant="ghost"
-        size="icon"
         aria-label={unavailable ? `Sharpen draft. ${unavailable}` : 'Sharpen draft'}
         aria-disabled={!!unavailable || disabled || undefined}
         onClick={() => {
@@ -152,6 +149,7 @@ export function SharpenButton({
         }}
       >
         <Sparkles size={18} aria-hidden="true" />
+        Sharpen
       </Button>
     </Tooltip>
   );

@@ -14,6 +14,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { checksAutomatically } from '../../lib/project-automation';
 import { queueCommand } from '../../lib/queue';
 import { agentName, useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
@@ -216,7 +217,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
             verifyCommand: project.preferences?.verifyCommand,
             prepareCommand: project.preferences?.prepareCommand,
             setupFiles: project.preferences?.setupFiles,
-            autoVerify: project.preferences?.autoVerify === true,
+            autoVerify: checksAutomatically(project.preferences),
             agentAccounts: project.preferences?.agentAccounts,
             items: preview,
           },

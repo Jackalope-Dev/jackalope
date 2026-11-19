@@ -167,7 +167,9 @@ pub async fn remote_private_https(service: State<'_, RemoteAccess>) -> Result<Va
         let dns = status["Self"]["DNSName"].as_str().ok_or("Tailscale has no hostname for this device.")?.trim_end_matches('.');
         let address = origin(&format!("https://{dns}:8443"))?;
         let serve = tailscale(&["serve", "status", "--json"])?;
-        if !serve["TCP"]["8443"].is_null() { return Err("Tailscale port 8443 is already configured. Enter its existing HTTPS address, or choose an unused port in Tailscale without replacing other services.".into()); }
+        // A plain local proxy on 8443 is Jackalope's own setup, perhaps from another profile
+        // or port; repointing it is what the person asked for. Anything else stays untouched.
+        if !serve["TCP"]["8443"].is_null() && serve_target(&serve, 8443).is_none() { return Err("Tailscale port 8443 is already configured. Enter its existing HTTPS address, or choose an unused port in Tailscale without replacing other services.".into()); }
         let program = tailscale_program().ok_or("Tailscale isn't installed on this computer.")?;
         let mut cmd = command(&program.to_string_lossy()); cmd.args(["serve", "--bg", "--https=8443", "--yes", &format!("http://127.0.0.1:{}",config.port)]);
         let result = process_control::run(cmd, Duration::from_secs(30))?;
@@ -177,6 +179,26 @@ pub async fn remote_private_https(service: State<'_, RemoteAccess>) -> Result<Va
         copy.save(&config)?; inner.config = config;
         drop(inner); copy.status()
     }).await.map_err(|e| e.to_string())?
+}
+
+/// The local port Tailscale Serve proxies HTTPS `port` to, when that port serves one plain
+/// `http://127.0.0.1:N` (or localhost) proxy at `/`, which is how Jackalope sets it up.
+fn serve_target(serve: &Value, port: u16) -> Option<u16> {
+    let suffix = format!(":{port}");
+    serve["Web"].as_object()?.iter().find_map(|(host, web)| {
+        if !host.ends_with(&suffix) {
+            return None;
+        }
+        let handlers = web["Handlers"].as_object()?;
+        if handlers.len() != 1 {
+            return None;
+        }
+        let proxy = handlers.get("/")?["Proxy"].as_str()?;
+        let rest = proxy
+            .strip_prefix("http://127.0.0.1:")
+            .or_else(|| proxy.strip_prefix("http://localhost:"))?;
+        rest.trim_end_matches('/').parse().ok()
+    })
 }
 
 /// Where Tailscale setup stands for private HTTPS, one field per step the person takes.
@@ -202,13 +224,25 @@ fn tailscale_setup(status: &Value) -> Value {
     })
 }
 #[tauri::command]
-pub async fn remote_tailscale_status() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+pub async fn remote_tailscale_status(service: State<'_, RemoteAccess>) -> Result<Value, String> {
+    let listening = service.inner.lock().map_err(|e| e.to_string())?.config.port;
+    tauri::async_runtime::spawn_blocking(move || {
         if tailscale_program().is_none() {
             return json!({"installed":false,"signedIn":false,"magicDns":false,"https":false,"phones":[],"error":null});
         }
         match tailscale(&["status", "--json"]) {
-            Ok(status) => tailscale_setup(&status),
+            Ok(status) => {
+                let mut setup = tailscale_setup(&status);
+                // Serve status is extra detail: an unreadable one leaves these out.
+                if let Some(target) = tailscale(&["serve", "status", "--json"])
+                    .ok()
+                    .and_then(|serve| serve_target(&serve, 8443))
+                {
+                    setup["servePort"] = json!(target);
+                    setup["listenPort"] = json!(listening);
+                }
+                setup
+            }
             // A stopped or signed-out Tailscale can refuse status; report its own words.
             Err(error) => json!({"installed":true,"signedIn":false,"magicDns":false,"https":false,"phones":[],"error":error}),
         }
@@ -220,6 +254,26 @@ pub async fn remote_tailscale_status() -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn serve_target_reads_only_a_plain_local_proxy() {
+        let serve = |proxy: &str| serde_json::json!({"TCP":{"8443":{"HTTPS":true}},"Web":{"reindeer.tail1234.ts.net:8443":{"Handlers":{"/":{"Proxy":proxy}}}}});
+        assert_eq!(
+            serve_target(&serve("http://127.0.0.1:9472"), 8443),
+            Some(9472)
+        );
+        assert_eq!(
+            serve_target(&serve("http://localhost:9473/"), 8443),
+            Some(9473)
+        );
+        assert_eq!(serve_target(&serve("http://10.0.0.2:9472"), 8443), None);
+        assert_eq!(serve_target(&serve("http://127.0.0.1:9472"), 443), None);
+        let two = serde_json::json!({"Web":{"h:8443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:1"},"/api":{"Proxy":"http://127.0.0.1:2"}}}}});
+        assert_eq!(
+            serve_target(&two, 8443),
+            None,
+            "a shared port with other routes is left alone"
+        );
+    }
     #[test]
     fn tailscale_setup_reports_each_step_from_status() {
         let ready = tailscale_setup(&serde_json::json!({

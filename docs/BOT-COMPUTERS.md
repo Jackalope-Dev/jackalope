@@ -14,7 +14,7 @@ paired) or **Agent37** (a machine on the person's own Agent37 account). A task g
 only when its agent calls `computer_request` and the person answers **Allow a sandbox
 computer** or **Allow, and share this project read-only**; the computer then belongs to
 that task and is reused by its later attempts. A project can have one too, chosen in
-Project settings under **Agents run on**; its task agents then run there (see
+Project settings → Integrations under **Agents run on**; its task agents then run there (see
 [agents on a computer](#agents-on-a-computer)). Settings → Computers lists every
 computer, paired cloud machine, the Agent37 connection, agent sign-ins for computers and
 Docker's readiness.
@@ -276,7 +276,7 @@ Planned and swarm work (each assignment of an approved plan or automatic subtask
 combined review and a swarm round's work) is placed across a capacity pool: this device
 and the computers that support runs (local sandboxes, cloud machines and Agent37
 computers). The pool holds the project's own computer, which the project pins, and any
-other computers the person adds under **Swarms run on** in Project settings (saved per
+other computers the person adds under **Swarms run on** in Project settings → Integrations (saved per
 project in `computers/pool.json`). **Swarms run on** chooses **Anywhere**, **Computers
 only** or **This device only**; a project that never chose runs anywhere, which without
 added computers places every fork where it ran before the pool existed: on the project's

@@ -66,6 +66,11 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
         .await
         .map_err(|_| super::pairing::UNREACHABLE)?;
     let status = response.status();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
     let bytes = crate::commands::http::read_bounded(&mut response, super::pairing::RESPONSE_LIMIT)
         .await
         .map_err(|error| match error {
@@ -74,7 +79,7 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
             }
             crate::commands::http::BodyError::TooLarge => super::pairing::TOO_LARGE,
         })?;
-    super::pairing::reply(status.is_success(), &bytes)
+    super::pairing::reply(status.as_u16(), content_type.as_deref(), &bytes, &host.name)
 }
 #[tauri::command]
 pub fn remote_hosts(state: State<'_, TaskRuntime>) -> Result<Vec<Value>, String> {
@@ -126,7 +131,7 @@ pub async fn remote_host_pair(
     let response = match request(
         &host,
         super::pairing::PAIR_ROUTE,
-        json!({"code":code,"name":device}),
+        json!({"code":code,"name":device,"kind":"computer"}),
     )
     .await
     {
@@ -171,6 +176,35 @@ pub async fn remote_host_request(
         serde_json::to_value(action).map_err(|e| e.to_string())?,
     )
     .await
+}
+/// Asks a paired host for a one-time phone pairing code, which the host allows only when
+/// its owner turned on invitations from paired computers. The phone then pairs with the
+/// host directly over its HTTPS address; nothing is relayed through this computer.
+#[tauri::command]
+pub async fn remote_host_invite_phone(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Value, String> {
+    let host = hosts(&state)?
+        .into_iter()
+        .find(|h| h.id == id)
+        .ok_or("Connect this host again.")?;
+    request(
+        &host,
+        super::pairing::REQUEST_ROUTE,
+        json!({"action":"invitePhone"}),
+    )
+    .await
+    .map_err(|error| {
+        if error.contains("not available remotely") {
+            format!(
+                "Update Jackalope on {} to invite phones from here.",
+                host.name
+            )
+        } else {
+            error
+        }
+    })
 }
 #[tauri::command]
 pub fn remote_host_remove(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {

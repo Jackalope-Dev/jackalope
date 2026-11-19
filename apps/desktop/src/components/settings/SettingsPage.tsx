@@ -2,39 +2,40 @@ import {
   Button,
   FormField,
   Input,
+  LoadingState,
   SearchField,
-  SegmentedControl,
-  Select,
-  SelectItem,
   SettingActions,
   SettingBody,
   SettingGroup,
   SettingRow,
-  Switch,
 } from '@jackalope/ui';
-import { KeyRound } from 'lucide-react';
+import { ArrowUpRight, KeyRound } from 'lucide-react';
 
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { type ActiveTab, highlightedView, type PageTab } from '../../lib/navigation';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { useViewTabStore } from '../../stores/viewTabStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
-import { ProjectPreferences } from '../projects/ProjectPreferences';
+import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
+import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
-import { RoutingPreferences } from './RoutingSetup';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
@@ -51,20 +52,30 @@ import { ArtifactsConnection } from './ArtifactsConnection';
 import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
-import { RemoteAccess } from './RemoteAccess';
-import { SavedActions } from './SavedActions';
+import { SwarmSettings } from './SwarmConnection';
 
 interface SettingsPageProps {
   onClose: () => void;
-  initialScope?: 'app' | 'project';
+  /** The project a project link (openProjectSettings) asked about. */
   initialProjectId?: string;
-  initialCategory?: SettingsCategory;
+  /** The open category; Shell holds it so Back and Forward step through categories. */
+  category: SettingsCategory;
+  onCategory: (category: SettingsCategory) => void;
+  /** Renders a workspace page inside Settings; `open` is where its own links lead. */
+  renderPage: (tab: PageTab, open: (tab: ActiveTab) => void) => ReactNode;
 }
+/**
+ * App-wide settings. Categories that are also workspace pages (Agents, Routing, Tools,
+ * Connected apps, Devices) show that page here. Project links: a project's settings open its
+ * page's Settings tab, its routing shows here scoped to it, and its appearance opens here
+ * with that project's override.
+ */
 export function SettingsPage({
   onClose,
-  initialScope = 'app',
-  initialCategory,
+  category: openCategory,
+  onCategory,
   initialProjectId,
+  renderPage,
 }: SettingsPageProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -73,20 +84,29 @@ export function SettingsPage({
   const settings = useSettingsStore();
   const agents = useAgentConfigStore();
   const { currentTheme } = useThemeStore(useShallow((s) => ({ currentTheme: s.currentTheme })));
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const [scope, setScope] = useState<'app' | 'project'>(initialScope);
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    initialProjectId ?? activeProjectId ?? '',
-  );
-  const project = projects.find((project) => project.id === selectedProjectId);
-  const scopedCategories = SETTINGS_CATEGORIES.filter((entry) =>
-    scope === 'project' ? 'project' in entry : !('app' in entry),
-  ).map((entry) => entry.id);
-  const [category, setCategory] = useState<SettingsCategory>(
-    initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
-  );
+  const selectProject = useProjectStore((s) => s.selectProject);
+  const redirect = Boolean(initialProjectId) && openCategory === 'Project';
+  useLayoutEffect(() => {
+    if (!initialProjectId) return;
+    if (openCategory === 'Project') {
+      selectProject(initialProjectId);
+      navigateWorkspace('project-settings');
+    } else if (openCategory === 'Routing') {
+      selectProject(initialProjectId);
+      useAgentScopeStore.getState().setScope('project');
+    }
+  }, [initialProjectId, openCategory, selectProject]);
+  const categories = SETTINGS_CATEGORIES.map((entry) => entry.id);
+  const category: SettingsCategory = redirect ? 'General' : openCategory;
+  /** A page reached from a category's own page (the tool marketplace from Tools). */
+  const [within, setWithin] = useState<{ category: SettingsCategory; tab: PageTab }>();
+  const categoryPage = settingsCategory(category).page as PageTab | undefined;
+  const pageTab = within?.category === category ? within.tab : categoryPage;
+  const openFromPage = (tab: ActiveTab) => {
+    if (categoryPage && highlightedView(tab) === categoryPage)
+      setWithin({ category, tab: tab as PageTab });
+    else navigateWorkspace(tab);
+  };
   const selectedSection = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -106,7 +126,21 @@ export function SettingsPage({
           .toLowerCase()
           .includes(query.trim().toLowerCase())
       : sidebarCategory(section) === sidebarCategory(category);
-  const visible = scopedCategories.filter(matches);
+  // Search-only entries (hidden) appear for a query, never as the open page.
+  const visible = categories.filter(
+    (c) => matches(c) && (query.trim() !== '' || !('hidden' in settingsCategory(c))),
+  );
+  const select = (next: SettingsCategory) => {
+    // Devices opens on sharing this computer, the part that is a setting.
+    if (settingsCategory(next).page === 'remote-hosts')
+      useViewTabStore.getState().setDevices('share');
+    onCategory(next);
+    setWithin(undefined);
+    setQuery('');
+    setMessage('');
+    setConfirming(false);
+    setConfirmation('');
+  };
   const exportConfig = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -161,48 +195,11 @@ export function SettingsPage({
         General, appearance, agents, privacy, project preferences and local data. Changes save
         immediately unless a Save button is shown.
       </p>
-      <div className="settings-scope-bar">
-        <SegmentedControl
-          label="Settings scope"
-          value={scope}
-          onChange={(value) => {
-            setScope(value);
-            setCategory(value === 'app' ? 'General' : 'Project');
-            setQuery('');
-          }}
-          items={[
-            { id: 'app', label: 'App-wide' },
-            { id: 'project', label: 'Per project' },
-          ]}
-        />
-        {scope === 'project' && (
-          <Select
-            aria-label="Project to configure"
-            value={selectedProjectId || '__none'}
-            onValueChange={setSelectedProjectId}
-          >
-            {!projects.length && (
-              <SelectItem value="__none" disabled>
-                No projects added
-              </SelectItem>
-            )}
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </Select>
-        )}
-        {scope === 'project' && <p className="task-muted">App-wide restrictions still apply.</p>}
-      </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
           {SETTINGS_GROUPS.map((group) => {
             const items = SETTINGS_CATEGORIES.filter(
-              (entry) =>
-                entry.group === group &&
-                !('within' in entry) &&
-                scopedCategories.includes(entry.id),
+              (entry) => entry.group === group && !('within' in entry) && !('hidden' in entry),
             );
             if (!items.length) return null;
             return (
@@ -217,13 +214,7 @@ export function SettingsPage({
                       type="button"
                       className={`settings-nav-item ${sidebarCategory(category) === c && !query ? 'is-active' : ''}`}
                       aria-current={sidebarCategory(category) === c && !query ? 'page' : undefined}
-                      onClick={() => {
-                        setCategory(c);
-                        setQuery('');
-                        setMessage('');
-                        setConfirming(false);
-                        setConfirmation('');
-                      }}
+                      onClick={() => select(c)}
                     >
                       <Icon size={16} aria-hidden="true" />
                       {c}
@@ -236,160 +227,176 @@ export function SettingsPage({
         </nav>
         <div className="settings-content" ref={content}>
           {!visible.length && <p>No settings match “{query}”.</p>}
-          {visible.map((c) => (
-            <section
-              key={c}
-              className="settings-section"
-              ref={c === category ? selectedSection : undefined}
-            >
-              <WorkspaceSectionHeading title={c === 'Project' ? 'Project settings' : c} />
-              {c === 'Jackalope account' && (
-                <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
-              )}
-              {c === 'Connected work' && <IssueConnections />}
-              {c === 'Computers' && <ComputersSettings />}
-              {c === 'Cloudflare' && <ArtifactsConnection />}
-              {c === 'Desktop' && <DesktopPreferences />}
-              {c === 'Saved actions' && <SavedActions />}
-              {c === 'Remote access' && <RemoteAccess />}
-              {c === 'Invitations' && (
-                <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
-              )}
-              {c === 'Decisions' && (
-                <RoutingPreferences
-                  key={scope === 'project' ? project?.id : 'app'}
-                  projectId={scope === 'project' ? project?.id : undefined}
-                />
-              )}
-              {c === 'General' && (
-                <>
-                  <WindowBehaviorSettings />
-                  <NotificationSettings />
-                  <SettingGroup>
-                    <SettingRow
-                      title="Guided setup"
-                      description="Walk through project and agent setup again. Your saved work stays."
-                    >
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          onClose();
-                          useOnboardingStore.getState().begin();
-                        }}
-                      >
-                        Open guided setup
-                      </Button>
-                    </SettingRow>
-                  </SettingGroup>
-                </>
-              )}
-              {c === 'Appearance' && (scope === 'app' || project) && (
-                <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />
-              )}
-              {c === 'Privacy' && (
-                <>
-                  <PrivacySettings />
-                  <SettingGroup>
-                    <SettingRow
-                      title="Use MCP marketplace"
-                      description="Allow searches and server details from allmcps.com."
-                    >
-                      <Switch
-                        label="Use MCP marketplace"
-                        checked={settings.useMcpMarketplace}
-                        onCheckedChange={settings.setUseMcpMarketplace}
-                      />
-                    </SettingRow>
-                    <SettingBody>
-                      <p className="settings-row-description">
-                        Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
-                        which publicly logs requests. Your connected agents and MCP servers use
-                        their own services.
-                      </p>
-                    </SettingBody>
-                  </SettingGroup>
-                </>
-              )}
-              {c === 'Project' && (
-                <ProjectPreferences embedded projectId={project?.id ?? '__none'} />
-              )}
-              {c === 'System' && <SystemInfoView />}
-              {c === 'Diagnostics' && <AuditLogWorkspace />}
-              {c === 'Updates & support' && <ReleaseSupport />}
-              {c === 'Data & reset' && (
-                <>
-                  <SettingGroup>
-                    <SettingRow
-                      title="Preferences"
-                      description="Copy this profile's preferences as JSON, for support or to compare settings."
-                    >
-                      <Button variant="outline" onClick={() => void exportConfig()}>
-                        Copy preferences
-                      </Button>
-                    </SettingRow>
-                  </SettingGroup>
-                  <ArchivedHistory />
-                  <SettingGroup
-                    tone="danger"
-                    title="Reset Jackalope"
-                    description="Erase this profile's projects, task history, drafts, queue, audit log, agent selections and appearance. Jackalope restarts for first-time setup. Repositories, worktrees, external agent sign-ins and agent MCP configuration files are preserved."
-                  >
-                    <SettingBody>
-                      <p className="settings-row-description">
-                        Stop active tasks and pause queues before resetting. Existing worktrees will
-                        remain on disk and can be managed after reopening the repository.
-                      </p>
-                      {confirming && (
-                        <FormField label="Type RESET to confirm permanent deletion">
-                          <Input
-                            id="reset-confirmation"
-                            autoComplete="off"
-                            value={confirmation}
-                            disabled={resetting}
-                            onChange={(e) => setConfirmation(e.target.value)}
-                          />
-                        </FormField>
-                      )}
-                    </SettingBody>
-                    <SettingActions>
-                      {!confirming ? (
+          {visible.map((c) => {
+            const entry = settingsCategory(c);
+            // The open category shows its page; search lists it as a row that leads there.
+            const page = entry.page && !entry.hidden && !query.trim() ? pageTab : undefined;
+            const elsewhere = entry.hidden ? entry.page : undefined;
+            return (
+              <section
+                key={c}
+                className="settings-section"
+                ref={c === category ? selectedSection : undefined}
+              >
+                <PageErrorBoundary key={c} feature="settings">
+                  {!page && (
+                    <WorkspaceSectionHeading title={c === 'Project' ? 'Project settings' : c} />
+                  )}
+                  {entry.page && !page && (
+                    <SettingGroup>
+                      <SettingRow title={c} description={entry.summary}>
                         <Button
                           variant="outline"
-                          onClick={() => {
-                            setConfirming(true);
-                            setConfirmation('');
-                          }}
+                          onClick={() => (elsewhere ? navigateWorkspace(elsewhere) : select(c))}
                         >
-                          Reset all local data…
+                          Open {c === 'Project' ? 'project settings' : c}
+                          {elsewhere && <ArrowUpRight size={14} aria-hidden="true" />}
                         </Button>
-                      ) : (
-                        <>
+                      </SettingRow>
+                    </SettingGroup>
+                  )}
+                  {page && (
+                    <Suspense fallback={<LoadingState compact label={`Opening ${c}…`} />}>
+                      {renderPage(page, openFromPage)}
+                    </Suspense>
+                  )}
+                  {c === 'Jackalope account' && (
+                    <JackalopeAccount onInvitations={() => select('Invitations')} />
+                  )}
+                  {c === 'Connected work' && <IssueConnections />}
+                  {c === 'Computers' && <ComputersSettings />}
+                  {c === 'Cloudflare' && <ArtifactsConnection />}
+                  {c === 'Swarm' && <SwarmSettings />}
+                  {c === 'Editor & terminal' && <DesktopPreferences />}
+                  {c === 'Keyboard shortcuts' && <KeyboardShortcuts />}
+                  {c === 'Invitations' && (
+                    <ReferralSettings onAccount={() => select('Jackalope account')} />
+                  )}
+                  {c === 'General' && (
+                    <>
+                      <WindowBehaviorSettings />
+                      <NotificationSettings />
+                      <SettingGroup>
+                        <SettingRow
+                          title="Guided setup"
+                          description="Walk through project and agent setup again. Your saved work stays."
+                        >
                           <Button
-                            disabled={confirmation !== 'RESET' || resetting}
-                            onClick={() => void reset()}
-                            loading={resetting}
-                            loadingLabel="Restarting…"
-                          >
-                            Erase local data and restart
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            disabled={resetting}
+                            variant="outline"
                             onClick={() => {
-                              setConfirming(false);
-                              setConfirmation('');
+                              onClose();
+                              useOnboardingStore.getState().begin();
                             }}
                           >
-                            Cancel
+                            Open guided setup
                           </Button>
-                        </>
-                      )}
-                    </SettingActions>
-                  </SettingGroup>
-                </>
-              )}
-            </section>
-          ))}
+                        </SettingRow>
+                      </SettingGroup>
+                    </>
+                  )}
+                  {c === 'Appearance' && (
+                    <AppearancePreferences overrideProjectId={initialProjectId} />
+                  )}
+                  {c === 'Privacy' && <PrivacySettings />}
+                  {c === 'System' && <SystemInfoView />}
+                  {c === 'Diagnostics' && <AuditLogWorkspace />}
+                  {c === 'Help & community' && <ReleaseSupport />}
+                  {c === 'Data & reset' && (
+                    <>
+                      <SettingGroup>
+                        <SettingRow
+                          title="Preferences"
+                          description="Copy this profile's preferences as JSON, for support or to compare settings."
+                        >
+                          <Button variant="outline" onClick={() => void exportConfig()}>
+                            Copy preferences
+                          </Button>
+                        </SettingRow>
+                      </SettingGroup>
+                      <ArchivedHistory />
+                      <SettingGroup
+                        tone="danger"
+                        title="Reset Jackalope"
+                        description="Start this profile over. Jackalope restarts for first-time setup."
+                      >
+                        <SettingBody>
+                          <div className="settings-reset-scope">
+                            <div>
+                              <h4>Erased</h4>
+                              <ul>
+                                <li>Projects and their settings</li>
+                                <li>Task history, drafts and queue</li>
+                                <li>Audit log</li>
+                                <li>Agent selections and appearance</li>
+                              </ul>
+                            </div>
+                            <div>
+                              <h4>Kept</h4>
+                              <ul>
+                                <li>Your repositories and worktrees</li>
+                                <li>Agent sign-ins outside Jackalope</li>
+                                <li>Agent MCP configuration files</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <p className="settings-row-description">
+                            Stop active tasks and pause queues before resetting. Existing worktrees
+                            will remain on disk and can be managed after reopening the repository.
+                          </p>
+                          {confirming && (
+                            <FormField label="Type RESET to confirm permanent deletion">
+                              <Input
+                                id="reset-confirmation"
+                                className="settings-reset-input"
+                                autoComplete="off"
+                                value={confirmation}
+                                disabled={resetting}
+                                onChange={(e) => setConfirmation(e.target.value)}
+                              />
+                            </FormField>
+                          )}
+                        </SettingBody>
+                        <SettingActions>
+                          {!confirming ? (
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setConfirming(true);
+                                setConfirmation('');
+                              }}
+                            >
+                              Reset all local data…
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                disabled={confirmation !== 'RESET' || resetting}
+                                onClick={() => void reset()}
+                                loading={resetting}
+                                loadingLabel="Restarting…"
+                              >
+                                Erase local data and restart
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                disabled={resetting}
+                                onClick={() => {
+                                  setConfirming(false);
+                                  setConfirmation('');
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          )}
+                        </SettingActions>
+                      </SettingGroup>
+                    </>
+                  )}
+                </PageErrorBoundary>
+              </section>
+            );
+          })}
           {message && (
             <p role="status" className="settings-disclosure-box">
               {message}

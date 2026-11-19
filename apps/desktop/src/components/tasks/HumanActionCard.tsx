@@ -5,6 +5,7 @@ import { useId, useRef, useState } from 'react';
 import './agent-decision.css';
 import './task-experience.css';
 import { describeError } from '@jackalope/contracts/errors';
+import { isSystemSettingsLink } from '../../lib/native/env';
 import { ActionError } from '../ui/ActionError';
 
 const DONE = 'Done';
@@ -69,6 +70,8 @@ export function HumanActionCard({
   };
   const open = (url: string) =>
     onOpenLink ? onOpenLink(url) : window.open(url, '_blank', 'noopener,noreferrer');
+  // Views of another device's work pass no onOpenLink, and its System Settings are not here.
+  const settingsLink = !!action.url && isSystemSettingsLink(action.url);
   return (
     <section
       className="agent-question"
@@ -102,10 +105,10 @@ export function HumanActionCard({
               . Never paste a secret into a conversation.
             </p>
           )}
-          {action.url && (
+          {action.url && (!settingsLink || onOpenLink) && (
             <p>
               <LinkButton external onClick={() => open(action.url ?? '')}>
-                Open {linkHost(action.url)}
+                {settingsLink ? 'Open System Settings' : `Open ${linkHost(action.url)}`}
               </LinkButton>
             </p>
           )}

@@ -13,7 +13,10 @@ impl Coordinator {
 
     pub(super) fn view(&self) -> Result<QueueView, String> {
         self.ensure_storage_loaded()?;
-        let merged_run_ids = crate::commands::integration::applied_run_ids(&self.runtime)?;
+        // The view lists what is reachable and names paused merges instead of failing,
+        // so one stale integration does not hide every plan; dispatch still waits.
+        let (merged_run_ids, paused_integrations) =
+            crate::commands::integration::applied_view(&self.runtime)?;
         let inner = self.state();
         Ok(QueueView {
             managed_tasks: inner.ledger.managed_tasks.clone(),
@@ -30,6 +33,7 @@ impl Coordinator {
             bridge_url: inner.url.clone(),
             bridge_error: inner.error.clone(),
             merged_run_ids,
+            paused_integrations,
         })
     }
 

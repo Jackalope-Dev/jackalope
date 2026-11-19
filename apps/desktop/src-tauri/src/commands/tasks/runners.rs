@@ -108,6 +108,21 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
             return Ok(path);
         }
     }
+    if let Some(found) = crate::commands::platform::find_executable(binary, &install_dirs(agent)) {
+        return Ok(found);
+    }
+    Err(format!(
+        "Install {agent} and make its executable available on PATH, then refresh."
+    ))
+}
+
+/// Finds a CLI by its command name on PATH and in the places installers put agent CLIs.
+pub(in crate::commands) fn locate(binary: &str) -> Option<PathBuf> {
+    crate::commands::platform::find_executable(binary, &install_dirs(""))
+}
+
+/// Directories agent CLIs are commonly installed to, searched besides PATH.
+fn install_dirs(agent: &str) -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Some(home_path) = crate::commands::platform::home_dir() {
         dirs.push(home_path.join(".local/bin"));
@@ -154,12 +169,7 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
         dirs.push(PathBuf::from("/usr/local/bin"));
         dirs.push(PathBuf::from("/opt/homebrew/bin"));
     }
-    if let Some(found) = crate::commands::platform::find_executable(binary, &dirs) {
-        return Ok(found);
-    }
-    Err(format!(
-        "Install {agent} and make its executable available on PATH, then refresh."
-    ))
+    dirs
 }
 
 fn antigravity_desktop_installed() -> bool {

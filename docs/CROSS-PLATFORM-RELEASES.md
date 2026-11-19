@@ -60,7 +60,7 @@ relevant native jobs and device checks before claiming platform acceptance.
 
 ### Workspace integrations
 
-Settings → Desktop controls interface zoom, task-terminal shell and font, editor
+Settings → Editor & terminal controls interface zoom, task-terminal shell and font, editor
 links, keyboard shortcuts and idle-sleep prevention. Windows uses a thread execution
 state lease; macOS uses an IOKit power assertion; Linux uses a login1 inhibitor.
 Failure is shown in the bottom status bar. Explicit user sleep, shutdown and lid

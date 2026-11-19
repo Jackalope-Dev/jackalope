@@ -9,10 +9,14 @@ import {
   collectWork,
   collectWorkspaceWork,
   matchesWorkFilter,
+  needsYou,
+  OPEN_SECTION_LIMIT,
   workGroup,
   workPresence,
+  workRowStatus,
 } from '../src/lib/task-collection.ts';
 import {
+  hasOpenQuestion,
   latestAttempt,
   looksLikePlan,
   mergeDestination,
@@ -360,4 +364,96 @@ test('routing and interrupted workers retain separate account usage without dupl
     ]).length,
     1,
   );
+});
+
+test('one open-question rule decides the group, the row action and the waiting state', () => {
+  const asked = [{ id: 'q', status: 'pending' }];
+  assert.equal(hasOpenQuestion({ ...run, status: 'running', prompts: asked }), true);
+  assert.equal(hasOpenQuestion({ ...run, status: 'review', prompts: asked }), true);
+  assert.equal(
+    hasOpenQuestion({ ...run, status: 'running', finishing: true, prompts: asked }),
+    false,
+  );
+  assert.equal(hasOpenQuestion({ ...run, status: 'stopping', prompts: asked }), false);
+  assert.equal(hasOpenQuestion({ ...run, status: 'interrupted', prompts: asked }), false);
+  assert.equal(
+    hasOpenQuestion({ ...run, status: 'running', prompts: [{ status: 'answered' }] }),
+    false,
+  );
+
+  const session = {
+    id: 'chat',
+    title: 'Chat',
+    request: { projectId: 'a' },
+    updatedAt: '2026-09-02',
+    messages: [],
+    batches: [{ runId: 'chat-run' }],
+    closed: false,
+    paused: false,
+  };
+  const chatRun = { ...run, id: 'chat-run', taskId: 'chat-task', liveSessionId: 'chat' };
+  // A live question: the conversation needs you and asks for the answer.
+  const [asking] = collectWorkspaceWork('a', [{ ...chatRun, status: 'running', prompts: asked }], {
+    sessions: [session],
+  });
+  assert.equal(workGroup(asking.stage), 'attention');
+  assert.equal(workPresence(asking).action, 'Answer question');
+  assert.equal(workPresence(asking).state, 'waiting');
+  // A question left open on an attempt in review, with a follow-up queued: this used to sit
+  // under Working while offering "Answer question".
+  const [leftOpen] = collectWorkspaceWork('a', [{ ...chatRun, status: 'review', prompts: asked }], {
+    sessions: [{ ...session, messages: [{ id: 'm', text: 'Next' }] }],
+  });
+  assert.equal(workGroup(leftOpen.stage), 'attention');
+  assert.equal(workPresence(leftOpen).action, 'Answer question');
+  // A closed conversation can't take an answer, so a question left in it is finished work.
+  const [closed] = collectWorkspaceWork('a', [{ ...chatRun, status: 'review', prompts: asked }], {
+    sessions: [{ ...session, closed: true }],
+  });
+  assert.equal(closed.stage, 'finished');
+  assert.notEqual(workPresence(closed).action, 'Answer question');
+  // An attempt checking its result is working; its pending prompt is not answerable yet.
+  const [checking] = collectWorkspaceWork(
+    'a',
+    [{ ...chatRun, status: 'running', finishing: true, prompts: asked }],
+    { sessions: [session] },
+  );
+  assert.equal(checking.stage, 'working');
+  assert.equal(workPresence(checking).action, 'View activity');
+  assert.notEqual(workPresence(checking).state, 'waiting');
+});
+
+test('row meta leaves out a status the action or section already says', () => {
+  const row = (stage, statusLabel) => ({ id: 'w', title: 't', date: '', stage, statusLabel });
+  assert.equal(workRowStatus(row('review', 'Ready for your review'), 'Review result'), undefined);
+  assert.equal(workRowStatus(row('review', 'Ready to review'), 'Reply'), undefined);
+  assert.equal(
+    workRowStatus(row('attention', 'Waiting for your answer'), 'Answer question'),
+    undefined,
+  );
+  assert.equal(workRowStatus(row('review', 'Ready to merge'), 'Merge into main'), undefined);
+  assert.equal(workRowStatus(row('working', 'Working'), 'View activity'), undefined);
+  assert.equal(
+    workRowStatus(row('attention', 'Question left open'), 'Answer question'),
+    'Question left open',
+  );
+  assert.equal(
+    workRowStatus(row('attention', 'Failed · exit 1'), 'Inspect task'),
+    'Failed · exit 1',
+  );
+  assert.equal(workRowStatus(row('working', 'Checking result'), 'View checks'), 'Checking result');
+  // The same status stays when the action does not repeat it.
+  assert.equal(
+    workRowStatus(row('review', 'Ready for your review'), 'Open draft'),
+    'Ready for your review',
+  );
+  assert.equal(workRowStatus(row('finished', 'Integrated'), 'Open result'), undefined);
+});
+
+test('needs-you matches the sidebar count and small sections start open', () => {
+  assert.deepEqual(
+    ['attention', 'review', 'working', 'finished', 'ideas'].map((stage) => needsYou({ stage })),
+    [true, true, false, false, false],
+  );
+  assert.equal(OPEN_SECTION_LIMIT, 5);
 });

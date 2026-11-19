@@ -208,8 +208,7 @@ try {
   await connect.waitFor({ state: 'hidden' });
   assert.equal(await newRow().count(), 1);
   await page.goto(`${url}?agent=opencode`);
-  await page.getByRole('combobox', { name: 'OpenCode connection method' }).click();
-  await page.getByRole('option', { name: 'Provider API key (including DeepSeek)' }).click();
+  await page.getByRole('radio', { name: /^API key/ }).check();
   await page.getByRole('button', { name: 'Add account & connect', exact: true }).click();
   const openCodeKey = page.getByRole('dialog', { name: /Connect OpenCode/ });
   await openCodeKey.getByRole('combobox', { name: 'API provider' }).click();

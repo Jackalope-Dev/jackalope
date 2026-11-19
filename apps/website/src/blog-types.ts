@@ -17,6 +17,26 @@ export type EditorialCover = {
   label: string;
 };
 
+export const blogImageKinds = ['title_card', 'artwork'] as const;
+
+/**
+ * A cover LopeBase publishes with a post. A title card draws the post title on the
+ * brand colors; artwork sets the title beside generated art. Both are 1200x630.
+ * An image without a kind has an unknown size.
+ */
+export type BlogImage = {
+  url: string;
+  alt: string;
+  kind?: (typeof blogImageKinds)[number];
+};
+
+export const blogImageSize = (image: BlogImage) =>
+  image.kind ? { width: 1200, height: 630 } : undefined;
+
+/** The image shown at the top of the post. A title card repeats the H1, so it only serves link previews. */
+export const postPageImage = (post: BlogPost) =>
+  post.image?.kind === 'title_card' ? undefined : post.image;
+
 export type BlogSection = {
   id?: string;
   title: string;
@@ -41,6 +61,8 @@ export type BlogPost = {
   readingTime: string;
   description: string;
   cover?: EditorialCover;
+  /** Link-preview image, and the page cover unless it is a title card. */
+  image?: BlogImage;
   /** Markdown before the first section. */
   intro?: string;
   sections: BlogSection[];

@@ -30,10 +30,10 @@ import { describeError } from '@jackalope/contracts/errors';
 import { projectReadiness } from '../../lib/readiness';
 import { ActionError } from '../ui/ActionError';
 
-const steps: { id: OnboardingStep; label: string }[] = [
-  { id: 'project', label: 'Project' },
-  { id: 'agent', label: 'Agents' },
-  { id: 'task', label: 'First task' },
+const steps: { id: OnboardingStep; label: string; hint: string }[] = [
+  { id: 'project', label: 'Project', hint: 'The repository your agents work in' },
+  { id: 'agent', label: 'Agents', hint: 'Who does the work' },
+  { id: 'task', label: 'First task', hint: 'Optional, something to start with' },
 ];
 const setupTips: Record<OnboardingStep, string[]> = {
   project: ['Choose the Git repository your agent will work in, or create a new project.'],
@@ -302,7 +302,10 @@ export function OnboardingFlow({
                 <span className="onboarding-step-number">
                   {itemIndex < index ? <Check size={16} /> : itemIndex + 1}
                 </span>
-                <strong>{item.label}</strong>
+                <span className="onboarding-step-copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.hint}</small>
+                </span>
               </li>
             ))}
           </ol>

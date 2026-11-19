@@ -1,6 +1,7 @@
 import { describeError } from '@jackalope/contracts/errors';
 import {
   Button,
+  ChoiceCards,
   ConfirmDialog,
   DialogContent,
   DialogFooter,
@@ -16,7 +17,7 @@ import {
   useDialogFocus,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Circle, KeyRound, LogIn, Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -235,7 +236,7 @@ export function AgentAccounts({
   const [group, setGroup] = useState<AgentProfile['group']>('work');
   const [busy, setBusy] = useState('');
   const [keyModalOpen, setKeyModalOpen] = useState(false);
-  const [connectionMethod, setConnectionMethod] = useState('signIn');
+  const [connectionMethod, setConnectionMethod] = useState<'signIn' | 'apiKey'>('signIn');
   const statuses = accountData?.statuses ?? {};
   const [signIn, setSignIn] = useState<AgentProfile>();
   const [signInWithKey, setSignInWithKey] = useState(false);
@@ -335,15 +336,26 @@ export function AgentAccounts({
           </p>
         </div>
         {agentId === 'opencode' && (
-          <Select
-            aria-label="OpenCode connection method"
+          <ChoiceCards
+            label="OpenCode connection method"
             value={connectionMethod}
             onValueChange={setConnectionMethod}
             disabled={locked}
-          >
-            <SelectItem value="signIn">Provider sign-in</SelectItem>
-            <SelectItem value="apiKey">Provider API key (including DeepSeek)</SelectItem>
-          </Select>
+            options={[
+              {
+                value: 'signIn',
+                title: 'Sign in',
+                description: "Use the provider's own sign-in in a browser.",
+                icon: <LogIn size={18} />,
+              },
+              {
+                value: 'apiKey',
+                title: 'API key',
+                description: 'Paste a provider key, including DeepSeek. Billed by the provider.',
+                icon: <KeyRound size={18} />,
+              },
+            ]}
+          />
         )}
         <AccountGroup
           value={group}

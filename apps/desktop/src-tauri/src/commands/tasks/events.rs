@@ -2,11 +2,18 @@ use super::*;
 
 /// Activity entries a run keeps; older ones are dropped.
 pub(in crate::commands) const ACTIVITY_KEPT: usize = 150;
+/// Tool calls remembered while waiting for their result; agents run a few at once.
+const PENDING_TOOLS_KEPT: usize = 64;
 
 pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
     if text.trim().is_empty() {
         return;
     }
+    // Redacted before it is shortened, so the cut cannot leave part of a value.
+    let text = match &run.secrets {
+        Some(secrets) => secrets.redacted(text),
+        None => std::borrow::Cow::Borrowed(text),
+    };
     let bounded: String = text.chars().take(6000).collect();
     run.activity.push(bounded);
     if run.activity.len() > ACTIVITY_KEPT {
@@ -16,6 +23,35 @@ pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
 
 pub(super) fn num(value: &Value, key: &str) -> u64 {
     value[key].as_u64().unwrap_or(0)
+}
+
+/// Totals the per-call usage an attempt observed when its agent ended without reporting
+/// its own total (stopped, failed, or interrupted when Jackalope closed), so the attempt
+/// still records what it used. Each call counts once, subagent calls included; calls the
+/// agent made after its last observation, and the cost, stay unknown.
+pub(in crate::commands) fn settle_usage(run: &mut TaskRun) {
+    if run.usage.reported || run.usage_observations.is_empty() {
+        return;
+    }
+    let mut usage = Usage {
+        reported: true,
+        ..Usage::default()
+    };
+    for observed in &run.usage_observations {
+        usage.input = usage.input.saturating_add(observed.input);
+        usage.output = usage.output.saturating_add(observed.output);
+        usage.cache_read = usage.cache_read.saturating_add(observed.cache_read);
+        usage.cache_write = usage.cache_write.saturating_add(observed.cache_write);
+    }
+    run.usage = usage;
+    let calls = run.usage_observations.len();
+    activity(
+        run,
+        &format!(
+            "Usage totals the {calls} model call{} observed; the agent ended without reporting its own total or cost.",
+            if calls == 1 { "" } else { "s" }
+        ),
+    );
 }
 
 #[cfg(test)]
@@ -60,15 +96,21 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         let usage = &message["usage"];
         if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {
             if usage["input_tokens"].is_u64() && usage["output_tokens"].is_u64() {
+                let (read, write) = (
+                    num(usage, "cache_read_input_tokens"),
+                    num(usage, "cache_creation_input_tokens"),
+                );
                 let observation = UsageObservation {
                     session_id: None,
                     message_id: id.to_string(),
                     parent_tool_use_id: child.map(str::to_string),
                     model: message["model"].as_str().map(str::to_string),
                     input: num(usage, "input_tokens")
-                        .saturating_add(num(usage, "cache_read_input_tokens"))
-                        .saturating_add(num(usage, "cache_creation_input_tokens")),
+                        .saturating_add(read)
+                        .saturating_add(write),
                     output: num(usage, "output_tokens"),
+                    cache_read: read,
+                    cache_write: write,
                 };
                 if let Some(old) = run
                     .usage_observations
@@ -134,14 +176,18 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     );
                 }
             } else if item["type"] == "mcp_tool_call" {
-                activity(
-                    run,
-                    if item["status"] == "failed" {
-                        "Tool request failed"
-                    } else {
-                        "Tool finished"
-                    },
-                );
+                if item["status"] == "failed" {
+                    let step = item["tool"]
+                        .as_str()
+                        .map(|tool| super::tool_activity::label(tool, item, &run.workspace));
+                    let error = item["error"]["message"]
+                        .as_str()
+                        .or(item["error"].as_str())
+                        .unwrap_or("");
+                    activity(run, &super::tool_activity::failure(step.as_deref(), error));
+                } else {
+                    activity(run, "Tool finished");
+                }
             } else if let Some(command) = item["command"].as_str() {
                 activity(
                     run,
@@ -198,6 +244,12 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                             let label =
                                 super::tool_activity::label(name, &block["input"], &run.workspace);
                             activity(run, &label);
+                            if let Some(id) = block["id"].as_str() {
+                                if run.pending_tools.len() >= PENDING_TOOLS_KEPT {
+                                    run.pending_tools.clear();
+                                }
+                                run.pending_tools.insert(id.into(), label);
+                            }
                         }
                     }
                 }
@@ -205,8 +257,23 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         }
         (Some(Protocol::ClaudeStream), "user") => {
             for block in event["message"]["content"].as_array().into_iter().flatten() {
-                if block["type"] == "tool_result" && block["is_error"] == true {
-                    activity(run, "Tool request failed");
+                if block["type"] != "tool_result" {
+                    continue;
+                }
+                let step = block["tool_use_id"]
+                    .as_str()
+                    .and_then(|id| run.pending_tools.remove(id));
+                if block["is_error"] == true {
+                    let error = match &block["content"] {
+                        Value::String(text) => text.clone(),
+                        Value::Array(parts) => parts
+                            .iter()
+                            .filter_map(|part| part["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        _ => String::new(),
+                    };
+                    activity(run, &super::tool_activity::failure(step.as_deref(), &error));
                 }
             }
         }
@@ -309,6 +376,8 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
                 model: run.model.clone(),
                 input,
                 output,
+                cache_read: read,
+                cache_write: write,
             });
             run.usage.input = run.usage.input.saturating_add(input);
             run.usage.output = run.usage.output.saturating_add(output);

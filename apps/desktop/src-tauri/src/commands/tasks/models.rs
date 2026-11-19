@@ -21,8 +21,13 @@ pub struct UsageObservation {
     pub session_id: Option<String>,
     pub parent_tool_use_id: Option<String>,
     pub model: Option<String>,
+    /// Includes the cache reads and writes below.
     pub input: u64,
     pub output: u64,
+    #[serde(default)]
+    pub cache_read: u64,
+    #[serde(default)]
+    pub cache_write: u64,
 }
 
 /// Where an attempt's agent ran when a project computer ran it.
@@ -31,6 +36,17 @@ pub struct UsageObservation {
 pub struct RemoteExecution {
     pub computer_id: String,
     pub computer_name: String,
+}
+
+/// A Claude Code or Codex session someone started outside Jackalope that an attempt
+/// continues, in the folder it ran in and under the account directory it was saved in.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContinuedSession {
+    pub adapter: String,
+    pub session_id: String,
+    pub workspace: String,
+    pub home: std::path::PathBuf,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -63,6 +79,9 @@ pub struct TaskRun {
     /// The attempt this run retried, linking a retry back to what it replaced.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// The session from outside Jackalope this task continued, carried by every attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues: Option<ContinuedSession>,
     #[serde(default)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(default)]
@@ -79,6 +98,10 @@ pub struct TaskRun {
     /// A provider error the agent printed as assistant text, used if the turn ends unanswered.
     #[serde(skip)]
     pub provider_error: Option<String>,
+    /// The CLI's own refusal to resume a session it no longer has. The attempt then starts
+    /// once more as a new conversation, unless it continues a session from outside Jackalope.
+    #[serde(skip)]
+    pub session_refused: Option<String>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     /// The agent's own restatement of the task, reported once at the start.
@@ -137,6 +160,9 @@ pub struct TaskRun {
     pub fallback_model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_mismatch: Option<super::served_model::ModelMismatch>,
+    /// The agent named the model serving this attempt; until it does, `model` is the request.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub model_reported: bool,
     pub prompt: String,
     pub status: RunStatus,
     pub started_at: String,
@@ -147,6 +173,10 @@ pub struct TaskRun {
     /// cleared when the message completes into activity or `result`.
     #[serde(skip)]
     pub streaming: String,
+    /// Labels of tool calls still waiting for their result, by call id, so a failed
+    /// result can name the step. Kept in memory only.
+    #[serde(skip)]
+    pub pending_tools: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub details_omitted: bool,
     pub activity: Vec<String>,
@@ -162,6 +192,10 @@ pub struct TaskRun {
     pub usage_observations: Vec<UsageObservation>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
+    /// Questions whose ask returned to the agent unanswered and whose answer has
+    /// not reached it yet, through `user_response` or a Claude Code hook.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub awaiting_answers: Vec<String>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
     /// Append-only decision trail the agent reported for this attempt.
@@ -169,6 +203,10 @@ pub struct TaskRun {
     pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// macOS permissions this attempt's last desktop-control call lacked, such as
+    /// `accessibility`, for the task view's setup notice. Cleared when a call succeeds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub desktop_permissions: Vec<String>,
     /// Desktop-control actions for the Screen view, newest last and bounded.
     #[serde(default)]
     pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
@@ -184,19 +222,67 @@ pub struct TaskRun {
     /// The result this attempt challenges, when it is a Challenge reviewer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
+    /// Secret values the agent was given, which the record never shows. Kept
+    /// in memory only, for as long as the attempt can still produce output.
+    #[serde(skip)]
+    pub(crate) secrets: Option<std::sync::Arc<crate::commands::redaction::KnownSecrets>>,
 }
 
 impl TaskRun {
     pub fn mark_stopped(&mut self) {
+        super::events::settle_usage(self);
         self.status = RunStatus::Stopped;
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
     }
 
     pub fn mark_failed(&mut self, error: String) {
+        super::events::settle_usage(self);
         self.status = RunStatus::Failed;
         self.error = Some(error);
         self.ended_at = Some(chrono::Utc::now().to_rfc3339());
         self.progress = None;
+    }
+
+    /// Adds `values` to the secrets this attempt's record never shows, and
+    /// redacts what it already holds.
+    pub(in crate::commands) fn protect(&mut self, values: Vec<String>) {
+        if let Some(secrets) =
+            crate::commands::redaction::KnownSecrets::with(self.secrets.as_deref(), values)
+        {
+            self.secrets = Some(std::sync::Arc::new(secrets));
+            self.redact_secrets();
+        }
+    }
+
+    /// Replaces the attempt's secret values wherever the record keeps what the
+    /// agent wrote, asked, decided, checked or showed. The person's prompt and
+    /// the record's identifiers, paths and statuses are left as they are.
+    pub(in crate::commands) fn redact_secrets(&mut self) {
+        let Some(secrets) = self.secrets.clone() else {
+            return;
+        };
+        secrets.text(&mut self.result);
+        secrets.streaming(&mut self.streaming);
+        for text in self
+            .activity
+            .iter_mut()
+            .chain(&mut self.diagnostics)
+            .chain(&mut self.visited_pages)
+            .chain(&mut self.error)
+            .chain(&mut self.verification_error)
+            .chain(&mut self.checkpoint_error)
+        {
+            secrets.text(text);
+        }
+        secrets.record(&mut self.prompts);
+        secrets.record(&mut self.validation_steps);
+        secrets.record(&mut self.decisions);
+        secrets.record(&mut self.understanding);
+        secrets.record(&mut self.screenshots);
+        secrets.record(&mut self.desktop_actions);
+        secrets.record(&mut self.quota_failure);
+        secrets.record(&mut self.verification);
+        secrets.record(&mut self.progress);
     }
 }
 
@@ -253,6 +339,9 @@ pub struct RunRequest {
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// A first attempt that resumes a session from outside Jackalope where it ran.
+    #[serde(skip)]
+    pub continues: Option<ContinuedSession>,
     #[serde(default)]
     pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
@@ -295,6 +384,7 @@ impl RunRequest {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: None,
+            continues: None,
             connection_ids: None,
             coordination: None,
         }
@@ -371,6 +461,7 @@ impl TaskRun {
             progress: self.progress.clone(),
             preparation: self.preparation.clone(),
             retry_of: self.retry_of.clone(),
+            continues: self.continues.clone(),
             dependency_snapshot: self.dependency_snapshot.clone(),
             checkpoint: self.checkpoint.clone(),
             checkpoint_error: self.checkpoint_error.clone(),
@@ -378,6 +469,7 @@ impl TaskRun {
             quota_failure: self.quota_failure.clone(),
             failure_kind: self.failure_kind,
             provider_error: None,
+            session_refused: None,
             contract: self.contract.clone(),
             understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
@@ -409,6 +501,7 @@ impl TaskRun {
             requested_model: self.requested_model.clone(),
             fallback_model: self.fallback_model.clone(),
             model_mismatch: self.model_mismatch.clone(),
+            model_reported: self.model_reported,
             prompt: self.prompt.chars().take(500).collect(),
             status: self.status.clone(),
             started_at: self.started_at.clone(),
@@ -416,6 +509,7 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             streaming: String::new(),
+            pending_tools: Default::default(),
             details_omitted: true,
             activity: if self.status.is_active() {
                 self.activity
@@ -436,15 +530,18 @@ impl TaskRun {
             mcp_usage: self.mcp_usage.clone(),
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
+            awaiting_answers: self.awaiting_answers.clone(),
             validation_steps: self.validation_steps.clone(),
             decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_permissions: self.desktop_permissions.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
             visited_pages: self.visited_pages.clone(),
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
             challenge_of: self.challenge_of.clone(),
+            secrets: None,
         }
     }
 }

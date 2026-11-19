@@ -152,6 +152,18 @@ secrets the agent received. An unreadable record fails the attempt with the stor
 instead of starting the agent without them. Anything an agent can read it can use or
 leak, so prefer keys with spending limits.
 
+`commands/redaction.rs` keeps the values an attempt gives its agent out of that
+attempt's record: project secrets and every credential variable Jackalope sets
+(names ending in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD`, such as a managed
+account's provider key or the bridge token). Values of at least eight characters
+are replaced with `[redacted]` as written, JSON-escaped, base64 and URL-encoded in
+the result, activity, diagnostics, errors, questions, decisions, checks and
+streaming text before they are saved, shown or exported. Identifiers, statuses,
+timestamps and the person's own prompt are kept. The values live only in memory for
+the attempt. Redaction protects the record, not the value: the agent can still use
+or send what it can read, a value it transforms some other way is not recognized,
+and the agent CLI's own session files are outside Jackalope's record.
+
 ## Verification
 
 Automated regression coverage and isolated native trials are described in

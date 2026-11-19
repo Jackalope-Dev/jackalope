@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { type Author, authorPath, authors, findAuthor } from './authors';
-import type { BlogPost, BlogSection } from './blog-types';
+import { type BlogPost, type BlogSection, blogImageSize, postPageImage } from './blog-types';
 import { posts, updates } from './content';
 import { EditorialArt } from './EditorialArt';
 import { InlineLinks } from './InlineLinks';
@@ -160,6 +160,7 @@ function JournalIndex({
 
 export function JournalPage({ path }: { path: string }) {
   const post = posts.find((item) => path === `/blog/${item.slug}/`);
+  const pageImage = post && postPageImage(post);
   if (post)
     return (
       <main id="main" className="article page-width">
@@ -185,6 +186,18 @@ export function JournalPage({ path }: { path: string }) {
             {post.readingTime}
           </div>
         </header>
+        {pageImage && (
+          <figure className="article-cover">
+            <img
+              src={pageImage.url}
+              alt={pageImage.alt}
+              {...blogImageSize(pageImage)}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+            />
+          </figure>
+        )}
         <div className="article-body blog-body">
           {post.sections.length >= 3 && (
             <nav className="blog-contents" aria-label="On this page">

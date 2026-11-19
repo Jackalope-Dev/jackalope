@@ -304,7 +304,7 @@ the public feed with rehearsal versions.
 3. Open the old app: the automatic check should occur shortly after the workspace
    opens; confirm notes and version. Opt out, restart, and verify no automatic check.
    Manual checking must still work. Later dismisses the notice for that session and
-   version; Settings → Updates & support keeps the update accessible.
+   version; Settings → Help & community keeps the update accessible.
 4. While a task is active/interrupted or history is unsaved, try installation.
    It must be blocked. Resolve the condition, choose Install, inspect progress,
    and verify new work/integration cannot race installation.

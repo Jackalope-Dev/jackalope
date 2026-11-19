@@ -49,15 +49,94 @@ pub fn device_token(reply: &Value) -> Result<&str, String> {
         .ok_or_else(|| "The host did not return a device token.".into())
 }
 
-/// A host reply read as JSON; a refusal carries its reason in `error`.
-pub fn reply(success: bool, body: &[u8]) -> Result<Value, String> {
-    let value: Value =
-        serde_json::from_slice(body).map_err(|_| "The host returned an unreadable response.")?;
-    if !success {
-        return Err(value["error"]
-            .as_str()
-            .unwrap_or("The host declined this request.")
-            .into());
+/// A host reply read as JSON; a refusal carries its reason in `error`. A reply that isn't
+/// Jackalope's JSON names what answered instead: most often an HTTPS proxy (such as
+/// Tailscale Serve) whose Jackalope behind it isn't running or listens on another port.
+pub fn reply(
+    status: u16,
+    content_type: Option<&str>,
+    body: &[u8],
+    host: &str,
+) -> Result<Value, String> {
+    let success = (200..300).contains(&status);
+    if let Ok(value) = serde_json::from_slice::<Value>(body) {
+        if success {
+            return Ok(value);
+        }
+        if let Some(error) = value["error"].as_str() {
+            return Err(error.into());
+        }
     }
-    Ok(value)
+    let host = if host.trim().is_empty() {
+        "The computer"
+    } else {
+        host.trim()
+    };
+    let empty = body.iter().all(u8::is_ascii_whitespace);
+    if matches!(status, 502..=504) || (empty && !success) {
+        return Err(format!(
+            "{host}'s address answered, but Jackalope isn't responding behind it (HTTP {status}). Open Jackalope on {host}, and check that Remote access's private HTTPS points to the port it listens on."
+        ));
+    }
+    let what = match content_type.map(|t| t.split(';').next().unwrap_or(t).trim()) {
+        Some(kind) if !kind.is_empty() && !empty => kind.to_owned(),
+        _ if empty => "an empty reply".to_owned(),
+        _ => "a reply that isn't JSON".to_owned(),
+    };
+    Err(format!(
+        "{host} answered HTTP {status} with {what}, not Jackalope. Check the address and that Jackalope's Remote access is on there."
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_replies_and_refusals_read_as_before() {
+        assert_eq!(
+            reply(200, Some("application/json"), br#"{"ok":1}"#, "Reindeer").unwrap()["ok"],
+            1
+        );
+        assert_eq!(
+            reply(
+                403,
+                Some("application/json"),
+                br#"{"error":"Pair this device again."}"#,
+                "Reindeer"
+            )
+            .unwrap_err(),
+            "Pair this device again."
+        );
+    }
+
+    #[test]
+    fn a_proxy_with_nothing_behind_it_says_jackalope_is_not_responding() {
+        for status in [502, 503, 504] {
+            let error = reply(status, None, b"", "Reindeer").unwrap_err();
+            assert!(
+                error.starts_with("Reindeer's address answered, but Jackalope isn't responding"),
+                "{error}"
+            );
+            assert!(error.contains(&format!("HTTP {status}")));
+        }
+        assert!(reply(500, None, b"  ", "Reindeer")
+            .unwrap_err()
+            .contains("isn't responding"));
+    }
+
+    #[test]
+    fn other_non_json_replies_name_the_status_and_content_type() {
+        let error =
+            reply(404, Some("text/html; charset=utf-8"), b"<html>", "Reindeer").unwrap_err();
+        assert!(
+            error.contains("HTTP 404 with text/html, not Jackalope"),
+            "{error}"
+        );
+        let error = reply(200, None, b"hello", "").unwrap_err();
+        assert!(
+            error.starts_with("The computer answered HTTP 200 with a reply that isn't JSON"),
+            "{error}"
+        );
+    }
 }

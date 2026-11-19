@@ -1,13 +1,15 @@
 import { X } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef } from 'react';
 import { navigateWorkspace } from '../../lib/app-events';
 import { matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workPresence } from '../../lib/task-collection';
-import { openWork, useWorkspaceWork } from '../../lib/work-selection';
+import { openWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useOpenWorkStore } from '../../stores/openWorkStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { AgentStack } from '../agents/AgentAvatar';
+import { ProjectMark } from '../projects/ProjectMark';
 import { isUnread, signalKey, useOpenSignalKey, useWorkSignals } from '../tasks/WorkSignals';
 import './work-tabs.css';
 
@@ -24,6 +26,8 @@ export function WorkTabs() {
   const openKey = useOpenSignalKey();
   const signals = useWorkSignals();
   const shortcuts = useSettingsStore((state) => state.shortcuts);
+  const projects = useProjectStore((state) => state.projects);
+  const strip = useRef<HTMLElement>(null);
   const byKey = useMemo(() => new Map(work.map((item) => [signalKey(item), item])), [work]);
   const tabs = keys.flatMap((key) => {
     const item = byKey.get(key);
@@ -33,6 +37,13 @@ export function WorkTabs() {
     // Drop tabs whose work was deleted, once history has loaded.
     if (!loading) useOpenWorkStore.getState().retain(new Set(byKey.keys()));
   }, [byKey, loading]);
+  useEffect(() => {
+    // The strip has no scrollbar, so keep the current tab in view when it changes.
+    if (openKey)
+      strip.current
+        ?.querySelector('[data-current]')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [openKey]);
   useEffect(() => {
     if (tabs.length < 2) return;
     const handle = (event: KeyboardEvent) => {
@@ -57,24 +68,46 @@ export function WorkTabs() {
   }, [tabs, openKey, shortcuts]);
   if (tabs.length < 2) return null;
   return (
-    <nav className="work-tabs" aria-label="Open work">
+    <nav ref={strip} className="work-tabs" aria-label="Open work">
       {tabs.map(({ key, item }, index) => {
         const presence = workPresence(item);
         const current = key === openKey;
         const unread = isUnread(item, signals, openKey);
+        const projectId = workProjectId(item);
+        const project = projectId ? projects.find((entry) => entry.id === projectId) : undefined;
+        const projectAccent = project?.preferences?.theme?.accentHex;
+        const label = project ? `${project.name} · ${item.title}` : item.title;
         return (
           <div key={key} className="work-tab" data-current={current || undefined}>
             <button
               type="button"
               className="work-tab-open"
               aria-current={current ? 'page' : undefined}
-              title={`${item.title}${index < 9 ? ` (${isMac ? '⌘' : 'Ctrl+'}${index + 1})` : ''}`}
+              title={`${label}${index < 9 ? ` (${isMac ? '⌘' : 'Ctrl+'}${index + 1})` : ''}`}
               onClick={() => {
                 openWork(item);
                 navigateWorkspace('kanban');
               }}
             >
-              <AgentStack agents={presence.agents} state={presence.state} size="xs" />
+              {project ? (
+                <span
+                  className="work-tab-marks"
+                  data-themed={projectAccent ? true : undefined}
+                  style={
+                    projectAccent
+                      ? ({ '--project-accent': projectAccent } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  <ProjectMark project={project} />
+                  <span className="work-tab-agent">
+                    <AgentStack agents={presence.agents} state={presence.state} size="xs" />
+                  </span>
+                  <span className="ui-sr-only">{project.name}: </span>
+                </span>
+              ) : (
+                <AgentStack agents={presence.agents} state={presence.state} size="xs" />
+              )}
               <span className="work-tab-title">{item.title}</span>
               {unread && (
                 <span className="work-signal-unread" role="img" aria-label="Unread">
@@ -85,7 +118,7 @@ export function WorkTabs() {
             <button
               type="button"
               className="work-tab-close"
-              aria-label={`Close tab ${item.title}`}
+              aria-label={`Close tab ${label}`}
               onClick={() => useOpenWorkStore.getState().close(key)}
             >
               <X size={14} aria-hidden="true" />

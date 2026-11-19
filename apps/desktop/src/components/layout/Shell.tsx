@@ -1,6 +1,6 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { InlineNotice, LoadingState, SearchIcon, Tooltip } from '@jackalope/ui';
-import { PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
+import { Inbox, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import {
   type CSSProperties,
   lazy,
@@ -16,13 +16,15 @@ import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
+import { editorName, openProjectInEditor } from '../../lib/editor';
 import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
-import { isTauriEnvironment } from '../../lib/native/env';
+import { fileManagerName, isTauriEnvironment, revealInFileManager } from '../../lib/native/env';
 import { planningDraft } from '../../lib/planning';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { swarmConnection } from '../../lib/swarm';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
+import { useSavedActionsMigration } from '../../lib/use-saved-actions-migration';
 import { WindowGlass } from '../../lib/window-glass';
 import { openConversation, openRun, selectWork } from '../../lib/work-selection';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
@@ -30,6 +32,7 @@ import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useBotStore } from '../../stores/botStore';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { observeExternalSessions } from '../../stores/externalSessionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -41,6 +44,7 @@ import {
   useActiveProject,
   useProjectStore,
 } from '../../stores/projectStore';
+import { observePullRequests } from '../../stores/pullRequestStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -66,7 +70,10 @@ import {
   viewLabel,
   workspaceView,
 } from '../../lib/navigation';
-import type { SettingsCategory } from '../../lib/settings-categories';
+import {
+  settingsCategory as categoryEntry,
+  type SettingsCategory,
+} from '../../lib/settings-categories';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { ComposerSeed } from '../sessions/SessionStart';
@@ -82,6 +89,7 @@ import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import { COMMANDS, type Command, type CommandContext, findCommand } from './commands';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
+import { useWorkspaceHistory } from './useWorkspaceHistory';
 import { VIEW_PAGES, type ViewContext } from './workspace-views';
 
 // The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
@@ -131,6 +139,7 @@ export function Shell({
   focusOnMount?: boolean;
 } = {}) {
   useEffect(observeLiveSessions, []);
+  useEffect(observeExternalSessions, []);
   useEffect(observeBots, []);
   const botsWaiting = useBotHubStore((state) => needsYou(state).count);
   const { botSessions, botRuns } = useLiveSessionStore(
@@ -144,6 +153,7 @@ export function Shell({
     [botSessions, botRuns, seen, seenFloor],
   );
   useEffect(observeManagedTasks, []);
+  useEffect(observePullRequests, []);
   const canvas = useRef<HTMLElement>(null);
   const removeReturnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -316,6 +326,7 @@ export function Shell({
     setActiveTab(tab);
   };
   useTrackOpenWork();
+  useSavedActionsMigration();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const selectedManagedId = useManagedTaskStore((state) => state.selectedId);
@@ -355,6 +366,9 @@ export function Shell({
   }, []);
   useAppEvent('navigate', navigate);
   useAppEvent('open-settings', (destination) => {
+    // Search-only entries stand for a page outside Settings, so they open it.
+    const entry = typeof destination === 'string' ? categoryEntry(destination) : undefined;
+    if (entry?.page && entry.hidden) return navigate(entry.page);
     setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
     setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
     setActiveTab('preferences');
@@ -367,6 +381,27 @@ export function Shell({
     selectProject(projectId);
     setActiveTab('cloud-resources');
   });
+  const history = useWorkspaceHistory(
+    {
+      tab: activeTab,
+      projectId: activeProjectId,
+      ...(activeTab === 'preferences' && { category: settingsCategory, settingsProjectId }),
+    },
+    (target) => {
+      const known = projects.some((item) => item.id === target.projectId);
+      const reached = { ...target, projectId: known ? target.projectId : activeProjectId };
+      if (reached.projectId && reached.projectId !== activeProjectId) {
+        selectWork();
+        selectProject(reached.projectId);
+      }
+      if (reached.tab === 'preferences') {
+        setSettingsCategory((reached.category as SettingsCategory | undefined) ?? 'General');
+        setSettingsProjectId(reached.settingsProjectId);
+      }
+      setActiveTab(reached.tab as ActiveTab);
+      return reached;
+    },
+  );
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
@@ -463,6 +498,22 @@ export function Shell({
           setCommandError(`Could not copy the path of ${item.name}: ${describeError(cause)}`),
         );
     },
+    onRevealPath: (item: Project) => {
+      setCommandError('');
+      void revealInFileManager(item.path).catch((cause) =>
+        setCommandError(
+          `Could not show ${item.name} in ${fileManagerName()}: ${describeError(cause)}`,
+        ),
+      );
+    },
+    onOpenInEditor: (item: Project, editor: 'vscode' | 'cursor') => {
+      setCommandError('');
+      void openProjectInEditor(item.id, editor).catch((cause) =>
+        setCommandError(
+          `Could not open ${item.name} in ${editorName(editor)}: ${describeError(cause)}`,
+        ),
+      );
+    },
     onRemoveProject: (item: Project) => {
       removeReturnFocus.current = document.activeElement as HTMLElement | null;
       setRemovingProject(item);
@@ -477,6 +528,7 @@ export function Shell({
       <ResizeHandles />
       <TitleBar
         themePicker
+        history={history}
         settings={{
           open: toggleSettings,
           shortcut: displayShortcut(shortcuts.settings),
@@ -515,7 +567,9 @@ export function Shell({
             <Tooltip side="right" content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
                 type="button"
-                className="workspace-new-work"
+                className="ui-button workspace-new-work"
+                data-variant="primary"
+                data-size="sm"
                 onClick={focusComposer}
                 aria-label="New work"
               >
@@ -539,31 +593,51 @@ export function Shell({
             </Tooltip>
           </div>
           <nav aria-label="Workspace" className="workspace-nav-list">
-            {PRIMARY_VIEWS.map((item) => (
+            {/* Inbox is the cross-project scope: everything waiting on the person. A project row
+                scopes Work to that project; the page header names the scope either way. */}
+            <button
+              type="button"
+              onClick={() => {
+                selectWork();
+                useWorkViewStore.getState().openList('attention');
+                setActiveTab('kanban');
+              }}
+              aria-current={
+                activeTab === 'kanban' &&
+                !selectedTaskId &&
+                !selectedSessionId &&
+                !selectedManagedId &&
+                workScope === 'all'
+                  ? 'page'
+                  : undefined
+              }
+              aria-label="Inbox"
+              title="Inbox: work across every project that needs you"
+              className="workspace-nav-item"
+            >
+              <Inbox aria-hidden="true" />
+              <span>Inbox</span>
+              <NeedsYouCount />
+            </button>
+          </nav>
+          {navCollapsed ? (
+            <CollapsedProjects {...projectActions} />
+          ) : (
+            <WorkSidebar
+              {...projectActions}
+              activeTab={activeTab}
+              onOpen={() => setActiveTab('kanban')}
+              onAddProject={openProjectSetup}
+            />
+          )}
+          <nav aria-label="Setup" className="workspace-nav-list workspace-setup">
+            <h2 className="workspace-nav-heading">Setup</h2>
+            {PRIMARY_VIEWS.filter((item) => item.id !== 'kanban').map((item) => (
               <button
                 type="button"
                 key={item.id}
-                onClick={() => {
-                  if (item.id === 'kanban') {
-                    // Work lists every project; a project row opens one project's work.
-                    selectWork();
-                    useWorkViewStore.getState().setScope('all');
-                  }
-                  setActiveTab(item.id);
-                }}
-                aria-current={
-                  item.id === 'kanban'
-                    ? activeTab === 'kanban' &&
-                      !selectedTaskId &&
-                      !selectedSessionId &&
-                      !selectedManagedId &&
-                      workScope === 'all'
-                      ? 'page'
-                      : undefined
-                    : view.group === item.group
-                      ? 'page'
-                      : undefined
-                }
+                onClick={() => setActiveTab(item.id)}
+                aria-current={view.group === item.group ? 'page' : undefined}
                 aria-label={
                   item.id === 'bots' && (botsWaiting > 0 || botsUnread > 0)
                     ? [
@@ -583,7 +657,6 @@ export function Shell({
               >
                 <item.icon aria-hidden="true" />
                 <span>{item.label}</span>
-                {item.id === 'kanban' && <NeedsYouCount />}
                 {item.id === 'bots' && botsWaiting > 0 && (
                   <small className="workspace-nav-count" aria-hidden="true">
                     {botsWaiting}
@@ -592,16 +665,6 @@ export function Shell({
               </button>
             ))}
           </nav>
-          {navCollapsed ? (
-            <CollapsedProjects {...projectActions} />
-          ) : (
-            <WorkSidebar
-              {...projectActions}
-              activeTab={activeTab}
-              onOpen={() => setActiveTab('kanban')}
-              onAddProject={openProjectSetup}
-            />
-          )}
           <Tooltip side="right" content={`Settings (${displayShortcut(shortcuts.settings)})`}>
             <button
               type="button"
@@ -654,7 +717,7 @@ export function Shell({
           {activeTab === 'kanban' && <WorkTabs />}
           <PageErrorBoundary
             feature={view.feature}
-            key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
+            key={`${activeTab}:${activeProjectId}`}
             onBack={
               activeTab === DEFAULT_WORKSPACE_TAB
                 ? undefined
@@ -701,11 +764,6 @@ export function Shell({
         onSearch={() => setCommandsOpen(true)}
         onSettings={() => {
           setSettingsCategory('General');
-          setActiveTab('preferences');
-        }}
-        onInvitations={() => {
-          setSettingsProjectId(undefined);
-          setSettingsCategory('Invitations');
           setActiveTab('preferences');
         }}
       />

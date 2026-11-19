@@ -1,5 +1,5 @@
 import { isActive } from '@jackalope/contracts/runs';
-import { Button, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
+import { Button, InlineNotice, Input } from '@jackalope/ui';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
@@ -8,8 +8,9 @@ import { sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import type { TaskRun } from '../../lib/run-types';
+import { projectTerminalCommands, type TerminalCommand } from '../../lib/terminal-commands';
 import { saveWorkFeedback } from '../../lib/work-feedback';
-import { useSavedActionsStore } from '../../stores/savedActionsStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import '@xterm/xterm/css/xterm.css';
@@ -68,12 +69,10 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
   const [query, setQuery] = useState('');
   const [searchMessage, setSearchMessage] = useState('');
   const searchLine = useRef(-1);
-  const savedCommands = useSavedActionsStore((state) => state.actions).filter(
-    (action) =>
-      action.kind === 'command' && (!action.projectId || action.projectId === run.projectId),
+  const preferences = useProjectStore(
+    (state) => state.projects.find((project) => project.id === run.projectId)?.preferences,
   );
-  const [commandId, setCommandId] = useState('');
-  const command = savedCommands.find((action) => action.id === commandId);
+  const commands = projectTerminalCommands(preferences);
   const findOutput = () => {
     const terminal = terminalRef.current;
     if (!terminal || !query) return;
@@ -329,41 +328,33 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
         </Button>
       </div>
       <p className="work-context-path">{workspace}</p>
-      {!!savedCommands.length && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label="Saved terminal command"
-            value={commandId || '__choose'}
-            onValueChange={setCommandId}
-          >
-            <SelectItem value="__choose" disabled>
-              Choose a saved command…
-            </SelectItem>
-            {savedCommands.map((action) => (
-              <SelectItem key={action.id} value={action.id}>
-                {action.name}
-              </SelectItem>
-            ))}
-          </Select>
-          <Button
-            variant="outline"
-            disabled={!command || !running || busy}
-            onClick={() => {
-              if (!command) return;
-              setBusy(true);
-              void invokeNative('task_terminal_write', {
-                id: terminalId,
-                generation: generationRef.current,
-                input: `${command.body}\r`,
-              })
-                .catch((reason) => setError(describeError(reason)))
-                .finally(() => setBusy(false));
-            }}
-          >
-            Run command
-          </Button>
-          {command && <code className="work-context-path">{command.body}</code>}
-        </div>
+      {!!commands.length && (
+        <fieldset className="flex flex-wrap items-center gap-2">
+          <legend className="ui-sr-only">Project commands</legend>
+          {commands.map((item: TerminalCommand) => (
+            <Button
+              key={item.id}
+              variant="outline"
+              size="sm"
+              title={item.command}
+              aria-label={`Run ${item.name}: ${item.command}`}
+              disabled={!running || busy}
+              onClick={() => {
+                setBusy(true);
+                void invokeNative('task_terminal_write', {
+                  id: terminalId,
+                  generation: generationRef.current,
+                  input: `${item.command}\r`,
+                })
+                  .catch((reason) => setError(describeError(reason)))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {item.name}
+            </Button>
+          ))}
+          {!running && <span className="task-muted text-sm">Start the terminal to run these.</span>}
+        </fieldset>
       )}
       <form
         className="flex flex-wrap items-center gap-2"

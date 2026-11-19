@@ -5,12 +5,13 @@ import {
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
+  FlowDiagram,
   FormField,
-  InlineNotice,
   Input,
 } from '@jackalope/ui';
-import { ChevronLeft, QrCode } from 'lucide-react';
+import { ChevronLeft, Monitor, QrCode, Smartphone } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { checkPairingCode, formatPairingCode } from '../../desktop/src/lib/remote-checks.ts';
 import { type Host, pair, scanPairingCode } from './native';
 
 /** A starting name the person can keep: phones rarely need telling apart beyond their kind. */
@@ -21,8 +22,11 @@ function defaultName() {
   return 'My phone';
 }
 
+/** The clicks on the computer that bring up its pairing QR code. */
+const COMPUTER_PATH = ['Devices', 'Let devices use this one', 'Pair a phone'];
+
 /**
- * Pairs this phone with a computer. Scanning the QR code Remote access shows is the path;
+ * Pairs this phone with a computer. Scanning the QR code Devices shows is the path;
  * typing the computer's address and code, or pasting a pairing link, waits in a collapsed
  * section with the phone's name, which the computer fills in from its owner when generic.
  */
@@ -38,6 +42,7 @@ export function Pairing({
   const [code, setCode] = useState('');
   // A pasted pairing link carries its own code.
   const linked = /#pair=/.test(link);
+  const codeCheck = checkPairingCode(code);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const attempt = useRef(0);
@@ -85,12 +90,48 @@ export function Pairing({
       >
         <div className="mobile-pairing-intro">
           <h2 id="pair-title">Connect to your computer</h2>
-          <p>
-            On your computer, open Jackalope → Settings → Remote access, create a pairing code and
-            scan it.
-          </p>
+          <p>Follow work, answer questions and start tasks on your computer from this phone.</p>
         </div>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ol className="mobile-steps">
+          <li className="mobile-step">
+            <span className="mobile-step-number" aria-hidden="true">
+              1
+            </span>
+            <span className="mobile-step-body">
+              <strong>On your computer, open Jackalope</strong>
+              <span className="mobile-path">
+                {COMPUTER_PATH.map((part, index) => (
+                  <span key={part}>
+                    {index > 0 && (
+                      <span className="mobile-path-sep" aria-hidden="true">
+                        ›
+                      </span>
+                    )}
+                    <span className="mobile-path-chip">{part}</span>
+                  </span>
+                ))}
+              </span>
+            </span>
+          </li>
+          <li className="mobile-step">
+            <span className="mobile-step-number" aria-hidden="true">
+              2
+            </span>
+            <span className="mobile-step-body">
+              <strong>Scan the QR code it shows</strong>
+              <span className="mobile-step-hint">Each code works once, for five minutes.</span>
+            </span>
+          </li>
+        </ol>
+        {/* The link this screen is building, in its real state: waiting, connecting, or the
+            computer's own refusal. */}
+        <FlowDiagram
+          className="mobile-flow"
+          from={{ label: 'This phone', icon: <Smartphone size={16} /> }}
+          to={{ label: 'Your computer', icon: <Monitor size={16} /> }}
+          state={busy ? 'checking' : error ? 'failed' : 'idle'}
+          error={error}
+        />
         <Button
           size="lg"
           disabled={busy}
@@ -136,9 +177,20 @@ export function Pairing({
                     autoCorrect="off"
                     spellCheck={false}
                     placeholder="ABCDE-FGHJK"
-                    onChange={(event) => setCode(event.target.value)}
+                    aria-describedby="pair-code-check"
+                    onChange={(event) => setCode(formatPairingCode(event.target.value))}
                   />
                 </FormField>
+              )}
+              {!linked && codeCheck && (
+                <p
+                  id="pair-code-check"
+                  className="mobile-field-check"
+                  data-tone={codeCheck.tone}
+                  aria-live="polite"
+                >
+                  {codeCheck.message}
+                </p>
               )}
               <FormField label="This phone's name">
                 <Input
@@ -152,8 +204,12 @@ export function Pairing({
               </FormField>
               <Button
                 type="submit"
-                variant="outline"
-                disabled={busy || !link.trim() || !name.trim() || (!linked && !code.trim())}
+                disabled={
+                  busy ||
+                  !link.trim() ||
+                  !name.trim() ||
+                  (!linked && (!code.trim() || codeCheck?.tone === 'error'))
+                }
               >
                 Connect
               </Button>

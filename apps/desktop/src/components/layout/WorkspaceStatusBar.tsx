@@ -1,11 +1,20 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { isActive } from '@jackalope/contracts/runs';
-import { DropdownMenu as Menu } from '@jackalope/ui';
-import { Ellipsis, ListTodo, Megaphone, Monitor, PauseCircle, SquareTerminal } from 'lucide-react';
+import { DiscordIcon, Tooltip } from '@jackalope/ui';
+import {
+  ListTodo,
+  Megaphone,
+  Monitor,
+  MonitorSmartphone,
+  PauseCircle,
+  SquareTerminal,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
-import { navigateWorkspace } from '../../lib/app-events';
+import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import { DISCORD_URL } from '../../lib/community';
+import { openExternalUrl } from '../../lib/native/env';
 import { selectWork, useWorkspaceWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
@@ -14,24 +23,23 @@ import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { BranchIndicator, useFocusedWork } from './BranchIndicator';
-import { InvitationsMenuItem } from './InvitationsMenuItem';
 import { StatusBarChanges } from './StatusBarChanges';
 import { StatusBarUsage } from './StatusBarUsage';
 
 export function WorkspaceStatusBar({
   onSearch,
   onSettings,
-  onInvitations,
 }: {
   onSearch: () => void;
   onSettings: () => void;
-  onInvitations?: () => void;
 }) {
   const host = useHostContextStore((state) => state.host);
   const wakeUpsPaused = useBotHubStore((state) => state.paused);
   const [terminalError, setTerminalError] = useState('');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const moreButton = useRef<HTMLButtonElement>(null);
+  const feedbackButton = useRef<HTMLButtonElement>(null);
+  // The Help menu and command search open feedback through this event.
+  useAppEvent('open-feedback', () => setFeedbackOpen(true));
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const runs = useExecutionStore((state) => state.runs);
   const sessionRuns = useLiveSessionStore((state) => state.runs);
@@ -55,11 +63,6 @@ export function WorkspaceStatusBar({
           <Monitor size={15} aria-hidden="true" />
           {`${host.wsl ? 'WSL · ' : ''}${host.name}`}
         </button>
-      )}
-      {project && !host && (
-        <span className="statusbar-project" title={project.path}>
-          {project.name}
-        </span>
       )}
       <BranchIndicator />
       {project && !host && <StatusBarChanges projectPath={project.path} checkout={checkout} />}
@@ -106,43 +109,39 @@ export function WorkspaceStatusBar({
         </span>
       )}
       <StatusBarUsage remote={Boolean(host)} />
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <button
-            ref={moreButton}
-            type="button"
-            className="statusbar-icon"
-            aria-label="More"
-            title="More"
-          >
-            <Ellipsis size={15} aria-hidden="true" />
-          </button>
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Content className="workspace-menu min-w-56" side="top" align="end">
-            {!host && (
-              <Menu.Item
-                className="workspace-menu-item"
-                onSelect={() => navigateWorkspace('remote-hosts')}
-              >
-                <Monitor size={16} aria-hidden="true" />
-                Hosts
-              </Menu.Item>
-            )}
-            {onInvitations && <InvitationsMenuItem onSelect={onInvitations} />}
-            <Menu.Item className="workspace-menu-item" onSelect={() => setFeedbackOpen(true)}>
-              <Megaphone size={16} aria-hidden="true" />
-              Send feedback
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu.Root>
+      {!host && (
+        <button type="button" onClick={() => navigateWorkspace('remote-hosts')}>
+          <MonitorSmartphone size={15} aria-hidden="true" />
+          <span className="statusbar-label">Devices</span>
+        </button>
+      )}
+      <Tooltip side="top" content="Community and help on Discord">
+        <button
+          type="button"
+          className="statusbar-icon"
+          aria-label="Join the Jackalope Discord"
+          onClick={() => void openExternalUrl(DISCORD_URL)}
+        >
+          <DiscordIcon size={15} aria-hidden="true" />
+        </button>
+      </Tooltip>
+      <Tooltip side="top" content="Send feedback">
+        <button
+          ref={feedbackButton}
+          type="button"
+          className="statusbar-icon"
+          aria-label="Send feedback"
+          onClick={() => setFeedbackOpen(true)}
+        >
+          <Megaphone size={15} aria-hidden="true" />
+        </button>
+      </Tooltip>
       <FeedbackDialog
         open={feedbackOpen}
         onOpenChange={setFeedbackOpen}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          moreButton.current?.focus();
+          feedbackButton.current?.focus();
         }}
       />
       <Companion compact onSearch={onSearch} onSettings={onSettings} />

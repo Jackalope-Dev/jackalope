@@ -14,6 +14,7 @@ pub mod commit_graph;
 pub mod coordination;
 pub mod desktop_integration;
 pub mod dictation;
+pub mod external_sessions;
 pub mod git;
 pub mod harness;
 pub mod helper;
@@ -52,6 +53,7 @@ pub mod local_ai;
 pub mod local_detection;
 pub mod managed_runtime;
 pub mod openai_endpoint;
+pub mod project_favicon;
 mod retrieval;
 
 pub mod history;
@@ -104,6 +106,7 @@ mod file_lock;
 pub mod first_commit;
 mod git_command;
 pub mod notifications;
+mod redaction;
 mod repo;
 mod scope_path;
 

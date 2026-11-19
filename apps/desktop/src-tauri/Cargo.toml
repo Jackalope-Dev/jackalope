@@ -65,6 +65,9 @@ notify-debouncer-mini = "=0.7.0"
 gix = { version = "=0.90.0", default-features = false, features = ["sha1", "sha256"] }
 flate2 = "1.1.10"
 tar = "0.4.46"
+# Reads Codex session rollouts that Codex compresses once idle. Decoding only;
+# frame checksums are not verified, so the hash dependency stays out.
+ruzstd = { version = "0.9.1", default-features = false, features = ["std"] }
 # Terminal UI for the `jackalope` binary. Only the crossterm backend is used;
 # the termwiz and termina backends would add dependencies and licence notices
 # for code that never runs. `unstable-rendered-line-info` measures wrapped

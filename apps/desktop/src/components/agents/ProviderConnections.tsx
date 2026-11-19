@@ -5,14 +5,16 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  FlowDiagram,
   FormField,
   Input,
+  SecretField,
   Select,
   SelectItem,
   useDialogFocus,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { KeyRound } from 'lucide-react';
+import { Laptop, Server } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { agentModels, type ModelCatalog } from '../../lib/agent-models';
 import {
@@ -31,7 +33,9 @@ import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigS
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
+import { CredentialStep, providerMarkFor } from './CredentialStep';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
+import './provider-connections.css';
 
 function ConnectProvider({
   provider,
@@ -59,6 +63,8 @@ function ConnectProvider({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [keySaved, setKeySaved] = useState(false);
+  // Set while saving the key or reading models, so the provider link shows a real request.
+  const [checking, setChecking] = useState(false);
   const models = catalog?.models.filter((model) => model.id.startsWith(`${provider.id}/`)) ?? [];
   const close = async () => {
     if (busy) return;
@@ -112,6 +118,7 @@ function ConnectProvider({
             try {
               if (!keySaved) {
                 await runner.prepare();
+                setChecking(true);
                 profile.current ??= await createAgentProfile('opencode', name.trim(), null);
                 await saveAgentProfileKey('opencode', profile.current.id, provider.key, key);
                 setKey('');
@@ -120,6 +127,7 @@ function ConnectProvider({
                 return;
               }
               if (!catalog || !models.length) {
+                setChecking(true);
                 await readModels();
                 return;
               }
@@ -153,6 +161,7 @@ function ConnectProvider({
                   : describeError(cause),
               );
             } finally {
+              setChecking(false);
               setBusy(false);
             }
           }}
@@ -168,24 +177,31 @@ function ConnectProvider({
                   disabled={busy || !!profile.current}
                 />
               </FormField>
-              <FormField
-                label="API key"
+              <CredentialStep
+                providerName={provider.name}
+                providerIcon={providerMarkFor(provider.id, 16)}
+                envKey={provider.key}
+                value={key}
+                onValueChange={setKey}
+                state={checking ? 'checking' : error ? 'failed' : 'idle'}
+                error={error || undefined}
+                disabled={busy}
                 description="Kept in protected local storage for this account."
-              >
-                <Input
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={key}
-                  onChange={(event) => setKey(event.target.value)}
-                  required
-                  maxLength={8192}
-                  disabled={busy}
-                />
-              </FormField>
+              />
             </>
           ) : (
             <>
+              <FlowDiagram
+                from={{ label: 'This computer', icon: <Laptop size={16} /> }}
+                to={{ label: provider.name, icon: providerMarkFor(provider.id, 16) }}
+                via="API key"
+                state={checking ? 'checking' : models.length ? 'connected' : 'failed'}
+                error={
+                  !checking && !models.length
+                    ? `No ${provider.name} models were returned.`
+                    : undefined
+                }
+              />
               <p className="task-muted">
                 The key is saved. Model access and available credit are checked when a task runs.
               </p>
@@ -234,7 +250,7 @@ function ConnectProvider({
               onCancel={() => void runner.cancel().catch((cause) => setError(describeError(cause)))}
             />
           )}
-          <ActionError error={error} />
+          <ActionError error={keySaved ? error : ''} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
               {saved.current ? 'Close' : 'Cancel'}
@@ -306,6 +322,13 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
             title="Local model server"
             description="LM Studio, vLLM, or another OpenAI-compatible server on this computer. Jackalope reads its model list and saves the connection as an OpenCode account."
           />
+          <FlowDiagram
+            from={{ label: 'Jackalope', icon: <Laptop size={16} /> }}
+            to={{ label: name.trim() || 'Local server', icon: <Server size={16} /> }}
+            via="OpenAI API"
+            state={busy ? 'checking' : error ? 'failed' : models.length ? 'connected' : 'idle'}
+            error={error || undefined}
+          />
           <FormField label="Name">
             <Input
               value={name}
@@ -319,6 +342,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
             description="http://127.0.0.1, localhost, or ::1, with a port."
           >
             <Input
+              className="provider-address"
               value={baseUrl}
               onChange={(event) => {
                 setBaseUrl(event.target.value);
@@ -329,18 +353,12 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               spellCheck={false}
             />
           </FormField>
-          <FormField
+          <SecretField
             label="API key"
             description="Optional. Stored with this account and not shown again."
-          >
-            <Input
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              maxLength={8192}
-            />
-          </FormField>
+            value={apiKey}
+            onValueChange={setApiKey}
+          />
           {models.length > 0 && (
             <FormField label="Model">
               <Select aria-label="Endpoint model" value={model} onValueChange={setModel}>
@@ -352,7 +370,6 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               </Select>
             </FormField>
           )}
-          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
@@ -385,23 +402,29 @@ export function ProviderConnections({ setup = false }: { setup?: boolean } = {})
           Use your own provider key or a local OpenAI-compatible server. Nothing else to install.
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="provider-tiles">
         {apiProviders.map((provider) => (
           <Button
             key={provider.id}
             variant="outline"
+            className="provider-tile"
             disabled={!isTauriEnvironment()}
+            aria-label={`Connect ${provider.name}`}
             onClick={() => setProvider(provider)}
           >
-            <KeyRound size={16} /> {provider.name}
+            {providerMarkFor(provider.id, 20)}
+            <span>{provider.name}</span>
           </Button>
         ))}
         <Button
           variant="outline"
+          className="provider-tile"
           disabled={!isTauriEnvironment()}
+          aria-label="Connect a local model server"
           onClick={() => setEndpoint(true)}
         >
-          Local server
+          <Server size={20} aria-hidden="true" />
+          <span>Local server</span>
         </Button>
       </div>
       {provider && (

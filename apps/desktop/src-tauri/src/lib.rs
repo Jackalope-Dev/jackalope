@@ -76,6 +76,7 @@ macro_rules! with_commands {
             commands::desktop_integration,
             commands::dictation,
             commands::execution_access,
+            commands::external_sessions,
             commands::first_commit,
             commands::git,
             commands::github_workflows,
@@ -94,6 +95,7 @@ macro_rules! with_commands {
             commands::outcomes,
             commands::planning,
             commands::previews,
+            commands::project_favicon,
             commands::project_files,
             commands::project_git,
             commands::project_registry,
@@ -347,6 +349,12 @@ pub fn run(launch: Launch) {
             );
             bot_hub.launch(app.handle().clone());
             app.manage(bot_hub);
+            let external = commands::external_sessions::ExternalSessions::new(
+                runtime.clone(),
+                sessions.clone(),
+            );
+            external.launch(app.handle().clone());
+            app.manage(external);
             app.manage(sessions);
             let scheduler = Scheduler::new(paths.schedules(), coordinator.clone());
             scheduler.launch();

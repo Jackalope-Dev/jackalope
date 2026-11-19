@@ -10,6 +10,7 @@ import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
+import { checksAutomatically } from '../../lib/project-automation';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { isQuestionOnly } from '../../lib/question-intent';
 import type { RunRequest } from '../../lib/run-types';
@@ -24,7 +25,6 @@ import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
-import { PromptPresets } from '../tasks/PromptPresets';
 import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { DismissButton } from '../ui/DismissButton';
@@ -279,7 +279,7 @@ ${incoming}`
             ? undefined
             : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
-        autoVerify: !origin.readOnly && (project.preferences?.autoVerify ?? true),
+        autoVerify: !origin.readOnly && checksAutomatically(project.preferences),
         contextSelection: context,
       };
       if (choice === 'interview') {
@@ -402,14 +402,6 @@ ${incoming}`
                   disabled={busy}
                 />
               )}
-              <PromptPresets
-                projectId={project.id}
-                onInsert={(prompt) => {
-                  assessment.clear();
-                  setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-                  input.current?.focus();
-                }}
-              />
               <DictationButton
                 disabled={busy}
                 onText={(value) => {

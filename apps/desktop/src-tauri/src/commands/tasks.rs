@@ -24,6 +24,8 @@ mod routing;
 pub(in crate::commands) mod runner;
 mod runners;
 mod runtime;
+#[cfg(test)]
+mod secret_canary_tests;
 pub(super) mod served_model;
 pub(crate) mod snapshots;
 pub(super) mod speed;
@@ -33,7 +35,7 @@ mod tests;
 pub(super) mod timing;
 pub(in crate::commands) mod tool_activity;
 mod warm_opencode;
-mod workspace_processes;
+pub(in crate::commands) mod workspace_processes;
 
 pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;
@@ -44,7 +46,7 @@ pub(super) use opencode::OpenCodeConfig;
 pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;
-pub(super) use runners::executable;
+pub(super) use runners::{executable, locate};
 pub use snapshots::{task_changes, TaskHighlight};
 
 use super::agents::{Bridge, Prompt, Protocol};
@@ -99,6 +101,24 @@ impl TaskRuntime {
     pub(super) fn invalidate_account_helpers(&self, directory: &Path) {
         self.warm_helpers.invalidate_account(directory);
         self.claude_sessions.invalidate_account(directory);
+    }
+
+    /// The agent sessions loaded attempts ran or continued, without cloning run records.
+    pub(in crate::commands) fn recorded_sessions(&self) -> std::collections::HashSet<String> {
+        let Ok(inner) = self.inner.lock() else {
+            return Default::default();
+        };
+        inner
+            .runs
+            .values()
+            .flat_map(|run| {
+                [
+                    run.session_id.clone(),
+                    run.continues.as_ref().map(|c| c.session_id.clone()),
+                ]
+            })
+            .flatten()
+            .collect()
     }
 
     /// Every loaded run's tool-call total and whether it finished, without
