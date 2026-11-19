@@ -688,6 +688,7 @@ impl Call<'_> {
     ) -> Result<(), String> {
         let mut grant = Grant::from_choice(choice);
         grant.remembered = saved.as_ref().map(|saved| saved.id.clone());
+        grant.agent = crate::commands::agents::name(&self.run.agent).to_owned();
         let indicator = self.session.start_indicator(
             &grant,
             &self.runtime.preferences_directory(),
