@@ -23,6 +23,7 @@ import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { ActionError } from '../ui/ActionError';
 import { DispatchPausedNotices } from './DispatchPausedNotice';
+import { ProjectLaunchpad } from './ProjectLaunchpad';
 import { WorkCatchUp } from './WorkCatchUp';
 import { WorkHeader } from './WorkHeader';
 
@@ -107,6 +108,8 @@ export function TaskWorkspace({
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
   const [parallel, setParallel] = useState(false);
+  /** A launchpad starting point, handed to the composer like any other seed. */
+  const [starterSeed, setStarterSeed] = useState<ComposerSeed | null>(null);
   const hasWork = !!(
     runs.length ||
     ideas.length ||
@@ -283,16 +286,25 @@ export function TaskWorkspace({
       Plan feature work
     </Menu.Item>
   );
+  const launchpad = project && projectFilter !== 'all' && (
+    <ProjectLaunchpad
+      project={project}
+      onStart={(text) => setStarterSeed({ id: crypto.randomUUID(), text })}
+    />
+  );
   return (
     <WorkspacePage className="task-home">
       <WorkHeader scope={scope} project={project} onScopeChange={setScope} />
       <SessionStart
         embedded
-        seed={composerSeed}
-        onSeedApplied={(seed) => onComposerSeedApplied?.(seed)}
+        seed={starterSeed ?? composerSeed}
+        onSeedApplied={(seed) => {
+          if (seed.id === starterSeed?.id) setStarterSeed(null);
+          else onComposerSeedApplied?.(seed);
+        }}
         key={project?.id ?? 'none'}
         project={project}
-        starters={!hasWork}
+        starters={!hasWork && !launchpad}
         onOpenProject={() => useOnboardingStore.getState().begin()}
       />
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (
@@ -319,33 +331,37 @@ export function TaskWorkspace({
             onArchivedChange={setArchived}
             menuItems={pageMenuItems}
             emptyState={
-              <EmptyState
-                icon={FolderOpen}
-                title={
-                  archived
-                    ? 'No archived tasks'
-                    : projectFilter === 'all'
-                      ? 'No current tasks'
-                      : 'No tasks in this project'
-                }
-                description={
-                  archived
-                    ? 'Tasks you archive will appear here.'
-                    : 'Start new work, or browse repository TODOs to find tasks.'
-                }
-                action={
-                  projectFilter !== 'all' && projects.length > 1 ? (
-                    <Button variant="outline" onClick={() => setScope('all')}>
-                      Show all projects
-                    </Button>
-                  ) : archived ? undefined : (
-                    <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
-                      <ListTodo size={16} />
-                      Browse Repo TODOs
-                    </Button>
-                  )
-                }
-              />
+              !archived && launchpad ? (
+                launchpad
+              ) : (
+                <EmptyState
+                  icon={FolderOpen}
+                  title={
+                    archived
+                      ? 'No archived tasks'
+                      : projectFilter === 'all'
+                        ? 'No current tasks'
+                        : 'No tasks in this project'
+                  }
+                  description={
+                    archived
+                      ? 'Tasks you archive will appear here.'
+                      : 'Start new work, or browse repository TODOs to find tasks.'
+                  }
+                  action={
+                    projectFilter !== 'all' && projects.length > 1 ? (
+                      <Button variant="outline" onClick={() => setScope('all')}>
+                        Show all projects
+                      </Button>
+                    ) : archived ? undefined : (
+                      <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+                        <ListTodo size={16} />
+                        Browse Repo TODOs
+                      </Button>
+                    )
+                  }
+                />
+              )
             }
             view={view}
             onViewChange={setView}
@@ -353,22 +369,27 @@ export function TaskWorkspace({
             onOpen={openItem}
           />
         </Suspense>
-      ) : pageMenuItems ? (
-        <div className="work-toolbar work-toolbar-solo">
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button variant="ghost" aria-label="Work actions">
-                <MoreHorizontal size={18} />
-              </Button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
-                {pageMenuItems}
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
-        </div>
-      ) : null}
+      ) : (
+        <>
+          {pageMenuItems && (
+            <div className="work-toolbar work-toolbar-solo">
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="ghost" aria-label="Work actions">
+                    <MoreHorizontal size={18} />
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                    {pageMenuItems}
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu.Root>
+            </div>
+          )}
+          {launchpad}
+        </>
+      )}
       {archived && (
         <Suspense fallback={<LoadingState label="Loading archive…" />}>
           <ArchivedHistory />
