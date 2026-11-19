@@ -4,20 +4,35 @@ import {
   Code2,
   Copy,
   Ellipsis,
+  Folder,
+  FolderInput,
+  FolderMinus,
   FolderOpen,
+  FolderPlus,
   LayoutGrid,
+  Palette,
+  Pencil,
+  Pin,
+  PinOff,
   Plus,
   Smile,
+  Star,
+  StarOff,
   Trash2,
   X,
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
+  type FocusEvent,
   forwardRef,
   type ReactNode,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { openProjectSettings } from '../../lib/app-events';
 import { type Editor, editorName } from '../../lib/editor';
 import { fileManagerName } from '../../lib/native/env';
 import { type ActiveTab, workspaceView } from '../../lib/navigation';
@@ -35,6 +50,7 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { type SidebarFolder, useSidebarStore } from '../../stores/sidebarStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { LatestAgent } from '../agents/AgentAvatar';
@@ -47,6 +63,7 @@ import {
   WorkSignals,
 } from '../tasks/WorkSignals';
 import { ExternalSessionRows } from './ExternalSessionRows';
+import './work-sidebar.css';
 
 /** A project's conversations from outside Jackalope, newest first. */
 function useExternalByProject() {
@@ -99,6 +116,21 @@ export function useProjectWork() {
   }, [work, dismissed]);
 }
 
+/** A new folder in the project, opened for naming; `workId` moves that work into it. */
+function newFolder(projectId: string, workId?: string) {
+  const store = useSidebarStore.getState();
+  const id = store.addFolder(projectId, 'New folder');
+  if (workId) store.place(workId, id);
+  const view = useWorkViewStore.getState();
+  if (view.collapsedProjects[projectId]) view.toggleProject(projectId);
+  store.setRenaming(id);
+}
+
+/** A closing menu returns focus to its trigger, which would end a rename it just started. */
+function keepRenameFocus(event: Event) {
+  if (useSidebarStore.getState().renaming) event.preventDefault();
+}
+
 type ProjectActions = {
   onOpenProject: (projectId: string, view: ActiveTab) => void;
   onNewWork: (projectId: string) => void;
@@ -128,6 +160,7 @@ function ProjectMenuItems({
   onSetIcon: (project: Project) => void;
 }) {
   const editor = useSettingsStore((state) => state.preferredEditor);
+  const favorite = useSidebarStore((state) => state.favorites.includes(`project:${project.id}`));
   return (
     <>
       <M.Item className="workspace-menu-item" onSelect={() => onNewWork(project.id)}>
@@ -151,9 +184,32 @@ function ProjectMenuItems({
         <FolderOpen size={16} aria-hidden="true" />
         Reveal in {fileManagerName()}
       </M.Item>
+      <M.Separator className="menu-separator" />
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => useSidebarStore.getState().toggleFavorite(`project:${project.id}`)}
+      >
+        {favorite ? (
+          <StarOff size={16} aria-hidden="true" />
+        ) : (
+          <Star size={16} aria-hidden="true" />
+        )}
+        {favorite ? 'Remove from favorites' : 'Add to favorites'}
+      </M.Item>
+      <M.Item className="workspace-menu-item" onSelect={() => newFolder(project.id)}>
+        <FolderPlus size={16} aria-hidden="true" />
+        New folder
+      </M.Item>
       <M.Item className="workspace-menu-item" onSelect={() => onSetIcon(project)}>
         <Smile size={16} aria-hidden="true" />
         Set icon…
+      </M.Item>
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => openProjectSettings(project.id, 'Appearance')}
+      >
+        <Palette size={16} aria-hidden="true" />
+        Appearance…
       </M.Item>
       <M.Item className="workspace-menu-item" onSelect={() => onCopyPath(project)}>
         <Copy size={16} aria-hidden="true" />
@@ -201,7 +257,7 @@ const ProjectContextMenu = forwardRef<
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="workspace-menu min-w-52">
+        <ContextMenu.Content className="workspace-menu min-w-52" onCloseAutoFocus={keepRenameFocus}>
           <ProjectMenuItems
             menu={ContextMenu}
             project={project}
@@ -219,6 +275,465 @@ const ProjectContextMenu = forwardRef<
   ),
 );
 ProjectContextMenu.displayName = 'ProjectContextMenu';
+
+/** What every work row in the tree reads, computed once for the whole sidebar. */
+type RowContext = {
+  signals: ReturnType<typeof useWorkSignals>;
+  openKey: ReturnType<typeof useOpenSignalKey>;
+  stats: ReturnType<typeof useChangeStats>;
+  selected: (item: WorkItem) => boolean;
+  open: (item: WorkItem) => void;
+};
+
+/** A work row's actions, shared by its options button and its right-click menu. */
+function WorkMenuItems({
+  menu: M,
+  item,
+  folders,
+}: {
+  menu: typeof Menu | typeof ContextMenu;
+  item: WorkItem;
+  folders: SidebarFolder[];
+}) {
+  const { pinned, favorite, folder } = useSidebarStore(
+    useShallow((state) => ({
+      pinned: state.pinnedWork.includes(item.id),
+      favorite: state.favorites.includes(`work:${item.id}`),
+      folder: state.placement[item.id],
+    })),
+  );
+  const store = useSidebarStore.getState;
+  const projectId = workProjectId(item);
+  return (
+    <>
+      <M.Item className="workspace-menu-item" onSelect={() => store().togglePinnedWork(item.id)}>
+        {pinned ? <PinOff size={16} aria-hidden="true" /> : <Pin size={16} aria-hidden="true" />}
+        {pinned ? 'Unpin' : 'Pin'}
+      </M.Item>
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => store().toggleFavorite(`work:${item.id}`)}
+      >
+        {favorite ? (
+          <StarOff size={16} aria-hidden="true" />
+        ) : (
+          <Star size={16} aria-hidden="true" />
+        )}
+        {favorite ? 'Remove from favorites' : 'Add to favorites'}
+      </M.Item>
+      {projectId && (
+        <>
+          <M.Separator className="menu-separator" />
+          {folders
+            .filter((candidate) => candidate.id !== folder)
+            .map((candidate) => (
+              <M.Item
+                key={candidate.id}
+                className="workspace-menu-item"
+                onSelect={() => store().place(item.id, candidate.id)}
+              >
+                <FolderInput size={16} aria-hidden="true" />
+                <span className="work-sidebar-menu-label">Move to {candidate.name}</span>
+              </M.Item>
+            ))}
+          {folder && folders.some((candidate) => candidate.id === folder) && (
+            <M.Item className="workspace-menu-item" onSelect={() => store().place(item.id, null)}>
+              <FolderMinus size={16} aria-hidden="true" />
+              Remove from folder
+            </M.Item>
+          )}
+          <M.Item className="workspace-menu-item" onSelect={() => newFolder(projectId, item.id)}>
+            <FolderPlus size={16} aria-hidden="true" />
+            Move to new folder
+          </M.Item>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Opens `children`'s menu at the pointer on right-click; the ref reaches the trigger so a Tooltip can wrap it. */
+const RowContextMenu = forwardRef<
+  HTMLElement,
+  Omit<ComponentPropsWithoutRef<typeof ContextMenu.Trigger>, 'children' | 'content'> & {
+    content: ReactNode;
+    children: ReactNode;
+  }
+>(({ content, children, ...trigger }, ref) => (
+  <ContextMenu.Root>
+    <ContextMenu.Trigger asChild ref={ref} {...trigger}>
+      {children}
+    </ContextMenu.Trigger>
+    <ContextMenu.Portal>
+      <ContextMenu.Content className="workspace-menu min-w-52" onCloseAutoFocus={keepRenameFocus}>
+        {content}
+      </ContextMenu.Content>
+    </ContextMenu.Portal>
+  </ContextMenu.Root>
+));
+RowContextMenu.displayName = 'RowContextMenu';
+
+/** The options button that appears beside a row on hover or focus. */
+function RowOptions({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <button type="button" className="work-sidebar-options" aria-label={label}>
+          <Ellipsis size={14} aria-hidden="true" />
+        </button>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content
+          className="workspace-menu min-w-52"
+          side="right"
+          align="start"
+          collisionPadding={12}
+          onCloseAutoFocus={keepRenameFocus}
+        >
+          {children}
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+/**
+ * One piece of work in the tree. Pinned rows and rows in folders always show, so only the
+ * rest can be closed.
+ */
+function WorkRow({
+  item,
+  row,
+  folders,
+  pinned,
+  closable,
+}: {
+  item: WorkItem;
+  row: RowContext;
+  folders: SidebarFolder[];
+  pinned?: boolean;
+  closable?: boolean;
+}) {
+  const presence = workPresence(item);
+  const selected = row.selected(item);
+  const unread = isUnread(item, row.signals, row.openKey);
+  const needsYou = ['attention', 'review'].includes(item.stage);
+  const status =
+    (needsYou && item.statusLabel !== 'Ready to review' ? attentionReason(item) : undefined) ??
+    item.statusLabel ??
+    presence.action;
+  const change = item.run ? row.stats[item.run.id]?.value : undefined;
+  const tooltip = [item.title, status, change?.files ? changeSummary(change) : '']
+    .filter(Boolean)
+    .join('\n');
+  const close = closable && item.stage !== 'working';
+  return (
+    <li className="work-sidebar-row" data-actions={close ? 2 : 1}>
+      <RowContextMenu content={<WorkMenuItems menu={ContextMenu} item={item} folders={folders} />}>
+        <button
+          type="button"
+          aria-current={selected ? 'page' : undefined}
+          className="work-sidebar-item"
+          data-stage={item.stage}
+          data-unread={unread || undefined}
+          data-pinned={pinned || undefined}
+          title={tooltip}
+          onClick={() => row.open(item)}
+        >
+          <LatestAgent agents={presence.agents} state={presence.state} size="xs" />
+          <span className="work-sidebar-title">
+            {item.title}
+            {status && <span className="sr-only">, {status}</span>}
+            {pinned && <span className="sr-only">, pinned</span>}
+          </span>
+          <WorkSignals item={item} unread={unread} stats={change} compact />
+          {needsYou && (
+            <span
+              className="work-sidebar-state"
+              data-tone={item.stage === 'review' ? 'review' : 'attention'}
+              aria-hidden="true"
+            />
+          )}
+        </button>
+      </RowContextMenu>
+      <span className="work-sidebar-actions">
+        <RowOptions label={`${item.title} options`}>
+          <WorkMenuItems menu={Menu} item={item} folders={folders} />
+        </RowOptions>
+        {close && (
+          <Tooltip
+            side="right"
+            content="Close · it stays on the Work page and returns when it changes"
+          >
+            <button
+              type="button"
+              className="work-sidebar-close"
+              aria-label={`Close ${item.title}`}
+              onClick={(event) => {
+                // Keep keyboard focus in the tree once this row is gone.
+                const rows = [
+                  ...(event.currentTarget
+                    .closest('nav')
+                    ?.querySelectorAll<HTMLElement>('.work-sidebar-item') ?? []),
+                ];
+                const current = event.currentTarget
+                  .closest('.work-sidebar-row')
+                  ?.querySelector<HTMLElement>('.work-sidebar-item');
+                const index = current ? rows.indexOf(current) : -1;
+                const next = rows[index + 1] ?? rows[index - 1];
+                useWorkSignalsStore.getState().dismiss(item.id, closedState(item));
+                next?.focus();
+              }}
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        )}
+      </span>
+    </li>
+  );
+}
+
+/** Edits a folder's name in place: Enter or leaving the field saves, Escape cancels. */
+function FolderName({ projectId, folder }: { projectId: string; folder: SidebarFolder }) {
+  const input = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    // After the menu that started the rename has closed.
+    const frame = requestAnimationFrame(() => {
+      input.current?.focus();
+      input.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    const name = input.current?.value.trim();
+    const store = useSidebarStore.getState();
+    if (save && name) store.renameFolder(projectId, folder.id, name);
+    store.setRenaming(null);
+  };
+  return (
+    <span className="work-sidebar-item work-sidebar-folder-head" data-editing>
+      <FolderOpen size={15} aria-hidden="true" className="work-sidebar-folder-icon" />
+      <input
+        ref={input}
+        className="work-sidebar-rename"
+        defaultValue={folder.name}
+        aria-label="Folder name"
+        maxLength={60}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            finish(true);
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            finish(false);
+          }
+        }}
+        onBlur={(event: FocusEvent<HTMLInputElement>) => {
+          if (event.currentTarget.isConnected) finish(true);
+        }}
+      />
+    </span>
+  );
+}
+
+/** A named group of a project's work; removing it puts the work back in the project's list. */
+function FolderGroup({
+  projectId,
+  folder,
+  items,
+  row,
+  folders,
+}: {
+  projectId: string;
+  folder: SidebarFolder;
+  items: WorkItem[];
+  row: RowContext;
+  folders: SidebarFolder[];
+}) {
+  const { open, renaming } = useSidebarStore(
+    useShallow((state) => ({
+      open: !state.collapsedFolders[folder.id],
+      renaming: state.renaming === folder.id,
+    })),
+  );
+  const attention = items.filter((item) => ['attention', 'review'].includes(item.stage)).length;
+  const listId = `sidebar-folder-${folder.id}`;
+  const store = useSidebarStore.getState;
+  const menu = (M: typeof Menu | typeof ContextMenu) => (
+    <>
+      <M.Item className="workspace-menu-item" onSelect={() => store().setRenaming(folder.id)}>
+        <Pencil size={16} aria-hidden="true" />
+        Rename
+      </M.Item>
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => store().removeFolder(projectId, folder.id)}
+      >
+        <Trash2 size={16} aria-hidden="true" />
+        Remove folder, keep its work
+      </M.Item>
+    </>
+  );
+  return (
+    <li className="work-sidebar-folder">
+      <div className="work-sidebar-row" data-actions={1}>
+        {renaming ? (
+          <FolderName projectId={projectId} folder={folder} />
+        ) : (
+          <>
+            <RowContextMenu content={menu(ContextMenu)}>
+              <button
+                type="button"
+                className="work-sidebar-item work-sidebar-folder-head"
+                aria-expanded={open}
+                aria-controls={open && items.length ? listId : undefined}
+                onClick={() => store().toggleFolder(folder.id)}
+                onDoubleClick={() => store().setRenaming(folder.id)}
+              >
+                {open ? (
+                  <FolderOpen size={15} aria-hidden="true" className="work-sidebar-folder-icon" />
+                ) : (
+                  <Folder size={15} aria-hidden="true" className="work-sidebar-folder-icon" />
+                )}
+                <span className="work-sidebar-title">{folder.name}</span>
+                {(!open || !items.length) && (
+                  <span className="work-sidebar-folder-count">
+                    {items.length}
+                    <span className="sr-only"> items</span>
+                  </span>
+                )}
+                {!open && attention > 0 && (
+                  <span className="work-sidebar-state" aria-hidden="true" />
+                )}
+              </button>
+            </RowContextMenu>
+            <span className="work-sidebar-actions">
+              <RowOptions label={`${folder.name} folder options`}>{menu(Menu)}</RowOptions>
+            </span>
+          </>
+        )}
+      </div>
+      {open && items.length > 0 && (
+        <ul id={listId} className="project-tree-items work-sidebar-folder-items">
+          {items.map((item) => (
+            <WorkRow key={item.id} item={item} row={row} folders={folders} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Favorite projects and work as large tiles above the tree, like a browser's favorites row.
+ * Nothing shows until something is added.
+ */
+function FavoriteTiles({
+  favorites,
+  projects,
+  work,
+  byProject,
+  activeProject,
+  row,
+  actions,
+  onSetIcon,
+}: {
+  favorites: string[];
+  projects: Project[];
+  work: WorkItem[];
+  byProject: Map<string, WorkItem[]>;
+  activeProject: string | null;
+  row: RowContext;
+  actions: ProjectActions;
+  onSetIcon: (project: Project) => void;
+}) {
+  type Tile = { key: string; project: Project } | { key: string; item: WorkItem };
+  const tiles = favorites.flatMap((key): Tile[] => {
+    const [kind, ...rest] = key.split(':');
+    const id = rest.join(':');
+    if (kind === 'project') {
+      const project = projects.find((candidate) => candidate.id === id);
+      return project ? [{ key, project }] : [];
+    }
+    const item = work.find((candidate) => candidate.id === id);
+    return item ? [{ key, item }] : [];
+  });
+  if (!tiles.length) return null;
+  return (
+    <ul className="sidebar-favorites" aria-label="Favorites">
+      {tiles.map((tile) => {
+        if ('project' in tile) {
+          const { project } = tile;
+          const attention = (byProject.get(project.id) ?? []).filter((item) =>
+            ['attention', 'review'].includes(item.stage),
+          ).length;
+          return (
+            <li key={tile.key}>
+              <Tooltip side="bottom" content={project.name}>
+                <ProjectContextMenu project={project} onSetIcon={onSetIcon} {...actions}>
+                  <button
+                    type="button"
+                    className="sidebar-favorite"
+                    aria-label={attention ? `${project.name}, ${attention} need you` : project.name}
+                    data-active={project.id === activeProject || undefined}
+                    onClick={() => actions.onOpenProject(project.id, 'kanban')}
+                  >
+                    <ProjectMark project={project} />
+                    {attention > 0 && <span className="sidebar-favorite-dot" aria-hidden="true" />}
+                  </button>
+                </ProjectContextMenu>
+              </Tooltip>
+            </li>
+          );
+        }
+        const { item } = tile;
+        const presence = workPresence(item);
+        const needsYou = ['attention', 'review'].includes(item.stage);
+        const project = projects.find((candidate) => candidate.id === workProjectId(item));
+        return (
+          <li key={tile.key}>
+            <Tooltip
+              side="bottom"
+              content={project ? `${item.title} · ${project.name}` : item.title}
+            >
+              <RowContextMenu
+                content={
+                  <ContextMenu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => useSidebarStore.getState().toggleFavorite(tile.key)}
+                  >
+                    <StarOff size={16} aria-hidden="true" />
+                    Remove from favorites
+                  </ContextMenu.Item>
+                }
+              >
+                <button
+                  type="button"
+                  className="sidebar-favorite"
+                  aria-label={needsYou ? `${item.title}, needs you` : item.title}
+                  aria-current={row.selected(item) ? 'page' : undefined}
+                  onClick={() => row.open(item)}
+                >
+                  <LatestAgent agents={presence.agents} state={presence.state} size="sm" />
+                  {project && (
+                    <span className="sidebar-favorite-project">
+                      <ProjectMark project={project} />
+                    </span>
+                  )}
+                  {needsYou && <span className="sidebar-favorite-dot" aria-hidden="true" />}
+                </button>
+              </RowContextMenu>
+            </Tooltip>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export function WorkSidebar({
   activeTab,
@@ -254,12 +769,50 @@ export function WorkSidebar({
     selectedRun || selectedSession || selectedManaged || selectedExternal,
   );
   const projectView = workspaceView(activeTab).group === 'project';
-  const open = (item: WorkItem) => {
-    openWork(item);
-    onOpen();
+  const allWork = useWorkspaceWork();
+  const allByProject = useMemo(() => {
+    const grouped = new Map<string, WorkItem[]>();
+    for (const item of allWork) {
+      const projectId = item.run || item.session || item.managed ? workProjectId(item) : null;
+      if (projectId) grouped.set(projectId, [...(grouped.get(projectId) ?? []), item]);
+    }
+    return grouped;
+  }, [allWork]);
+  const { favorites, pinnedWork, folders, placement } = useSidebarStore(
+    useShallow((state) => ({
+      favorites: state.favorites,
+      pinnedWork: state.pinnedWork,
+      folders: state.folders,
+      placement: state.placement,
+    })),
+  );
+  const row: RowContext = {
+    signals,
+    openKey,
+    stats,
+    selected: (item) =>
+      item.managed
+        ? item.managed.id === selectedManaged
+        : item.session
+          ? item.session.id === selectedSession
+          : item.run?.id === selectedRun,
+    open: (item) => {
+      openWork(item);
+      onOpen();
+    },
   };
   return (
     <nav className="project-tree" aria-label="Projects">
+      <FavoriteTiles
+        favorites={favorites}
+        projects={projects}
+        work={allWork}
+        byProject={byProject}
+        activeProject={activeProject}
+        row={row}
+        actions={actions}
+        onSetIcon={setIconFor}
+      />
       <div className="project-tree-heading">
         <h2>Projects</h2>
         <Tooltip side="right" content="Add a project">
@@ -274,26 +827,33 @@ export function WorkSidebar({
         </Tooltip>
       </div>
       {projects.map((project) => {
-        const items = byProject.get(project.id) ?? [];
+        const live = byProject.get(project.id) ?? [];
         const outside = external.get(project.id) ?? [];
         const expanded = !collapsed[project.id];
-        const attention = items.filter((item) =>
+        const attention = live.filter((item) =>
           ['attention', 'review'].includes(item.stage),
         ).length;
-        const running = items.filter((item) => item.stage === 'working').length;
+        const running = live.filter((item) => item.stage === 'working').length;
+        const all = allByProject.get(project.id) ?? [];
+        const folderList = folders[project.id] ?? [];
+        const folderIds = new Set(folderList.map((folder) => folder.id));
+        // Pinned work and work in folders always shows, in its own place above the rest.
+        const pinned = pinnedWork.flatMap((id) => all.find((item) => item.id === id) ?? []);
+        const pinnedIds = new Set(pinned.map((item) => item.id));
+        const inFolder = (folderId: string) =>
+          all.filter((item) => placement[item.id] === folderId && !pinnedIds.has(item.id));
+        const items = live.filter(
+          (item) => !pinnedIds.has(item.id) && !folderIds.has(placement[item.id] ?? ''),
+        );
         // The tree keeps only live work: rows that need the person, are running, are unread or
         // are open. The rest stays one click away on the project's Work page.
-        const shown = items.filter(
+        const rest = items.filter(
           (item) =>
             ['attention', 'review', 'working'].includes(item.stage) ||
             isUnread(item, signals, openKey) ||
-            (item.managed
-              ? item.managed.id === selectedManaged
-              : item.session
-                ? item.session.id === selectedSession
-                : item.run?.id === selectedRun),
+            row.selected(item),
         );
-        const more = items.length - shown.length;
+        const more = items.length - rest.length;
         // The project row is "where you are" when its page or its unfiltered work list is open.
         const current =
           project.id === activeProject &&
@@ -306,13 +866,13 @@ export function WorkSidebar({
                 className="project-tree-head"
                 data-active={project.id === activeProject || undefined}
               >
-                {items.length || outside.length ? (
+                {live.length || outside.length || pinned.length || folderList.length ? (
                   <button
                     type="button"
                     className="project-tree-toggle"
                     aria-label={`${expanded ? 'Collapse' : 'Expand'} ${project.name}`}
                     aria-expanded={expanded}
-                    aria-controls={expanded && items.length ? listId : undefined}
+                    aria-controls={expanded ? listId : undefined}
                     onClick={() => useWorkViewStore.getState().toggleProject(project.id)}
                   >
                     <ChevronRight size={14} aria-hidden="true" className="project-tree-chevron" />
@@ -376,6 +936,7 @@ export function WorkSidebar({
                         side="right"
                         align="start"
                         collisionPadding={12}
+                        onCloseAutoFocus={keepRenameFocus}
                       >
                         <ProjectMenuItems
                           menu={Menu}
@@ -389,84 +950,27 @@ export function WorkSidebar({
                 </span>
               </div>
             </ProjectContextMenu>
-            {expanded && items.length > 0 && (
+            {expanded && (pinned.length > 0 || folderList.length > 0 || items.length > 0) && (
               <ul id={listId} className="project-tree-items">
-                {shown.map((item) => {
-                  const presence = workPresence(item);
-                  const selected = item.managed
-                    ? item.managed.id === selectedManaged
-                    : item.session
-                      ? item.session.id === selectedSession
-                      : item.run?.id === selectedRun;
-                  const unread = isUnread(item, signals, openKey);
-                  const needsYou = ['attention', 'review'].includes(item.stage);
-                  const status =
-                    (needsYou && item.statusLabel !== 'Ready to review'
-                      ? attentionReason(item)
-                      : undefined) ??
-                    item.statusLabel ??
-                    presence.action;
-                  const change = item.run ? stats[item.run.id]?.value : undefined;
-                  const tooltip = [item.title, status, change?.files ? changeSummary(change) : '']
-                    .filter(Boolean)
-                    .join('\n');
-                  return (
-                    <li key={item.id} className="work-sidebar-row">
-                      <button
-                        type="button"
-                        aria-current={selected ? 'page' : undefined}
-                        className="work-sidebar-item"
-                        data-stage={item.stage}
-                        data-unread={unread || undefined}
-                        title={tooltip}
-                        onClick={() => open(item)}
-                      >
-                        <LatestAgent agents={presence.agents} state={presence.state} size="xs" />
-                        <span className="work-sidebar-title">
-                          {item.title}
-                          {status && <span className="sr-only">, {status}</span>}
-                        </span>
-                        <WorkSignals item={item} unread={unread} stats={change} compact />
-                        {needsYou && (
-                          <span
-                            className="work-sidebar-state"
-                            data-tone={item.stage === 'review' ? 'review' : 'attention'}
-                            aria-hidden="true"
-                          />
-                        )}
-                      </button>
-                      {item.stage !== 'working' && (
-                        <Tooltip
-                          side="right"
-                          content="Close · it stays on the Work page and returns when it changes"
-                        >
-                          <button
-                            type="button"
-                            className="work-sidebar-close"
-                            aria-label={`Close ${item.title}`}
-                            onClick={(event) => {
-                              // Keep keyboard focus in the tree once this row is gone.
-                              const rows = [
-                                ...(event.currentTarget
-                                  .closest('nav')
-                                  ?.querySelectorAll<HTMLElement>('.work-sidebar-item') ?? []),
-                              ];
-                              const row = event.currentTarget
-                                .closest('.work-sidebar-row')
-                                ?.querySelector<HTMLElement>('.work-sidebar-item');
-                              const index = row ? rows.indexOf(row) : -1;
-                              const next = rows[index + 1] ?? rows[index - 1];
-                              useWorkSignalsStore.getState().dismiss(item.id, closedState(item));
-                              next?.focus();
-                            }}
-                          >
-                            <X size={13} aria-hidden="true" />
-                          </button>
-                        </Tooltip>
-                      )}
-                    </li>
-                  );
-                })}
+                {pinned.map((item) => (
+                  <WorkRow key={item.id} item={item} row={row} folders={folderList} pinned />
+                ))}
+                {folderList.map((folder) => (
+                  <FolderGroup
+                    key={folder.id}
+                    projectId={project.id}
+                    folder={folder}
+                    items={inFolder(folder.id)}
+                    row={row}
+                    folders={folderList}
+                  />
+                ))}
+                {(pinned.length > 0 || folderList.length > 0) && (rest.length > 0 || more > 0) && (
+                  <li className="work-sidebar-divider" aria-hidden="true" />
+                )}
+                {rest.map((item) => (
+                  <WorkRow key={item.id} item={item} row={row} folders={folderList} closable />
+                ))}
                 {more > 0 && (
                   <li className="work-sidebar-row">
                     <button
