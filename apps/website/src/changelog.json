@@ -1,5 +1,29 @@
 [
   {
+    "id": "inbox-library-and-a-sidebar-you-can-arrange",
+    "date": "2026-11-19",
+    "title": "Inbox, Library and a sidebar you can arrange.",
+    "description": "Inbox gathers what needs you across projects, and Library collects the screenshots and files your work made.",
+    "items": [
+      "Pin projects and conversations as favorites, pin work to the top of a project, and group work into folders.",
+      "Inbox shows questions, failed checks, reviews, new results and app alerts like a low allowance in one place.",
+      "Library filters by project and kind and remembers your choice.",
+      "Switch or create branches from the branch menu in the status bar.",
+      "A project with no work yet shows starting points and its pages instead of an empty list."
+    ]
+  },
+  {
+    "id": "talk-instead-of-typing",
+    "date": "2026-11-19",
+    "title": "Talk instead of typing.",
+    "description": "Every composer has a mic button that turns speech into text on your computer.",
+    "items": [
+      "Pick a Fast, Balanced or Most accurate Whisper model the first time you use it. It downloads once and resumes if interrupted.",
+      "Recordings stay on your computer and aren't saved.",
+      "Your own local transcription server still works as an option in Settings."
+    ]
+  },
+  {
     "id": "back-and-forward-and-settings-that-stay-in-settings",
     "date": "2026-11-16",
     "title": "Back and Forward, and settings that stay in Settings",

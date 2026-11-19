@@ -20,9 +20,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 - Work is the shared entry point for conversations, tasks and plans. The sidebar
   lists projects as a tree of their work, needs-you first, then running and recent;
-  a project row opens that project's work and its menu opens project pages. The title
-  bar holds command search; the bottom bar shows the focused project, branch, local
-  activity and visual account allowances with freshness and reset times.
+  a project row opens that project's work and its menu opens project pages, including
+  Appearance. Favorites sit above the tree as tiles sized by how many there are; pinned
+  work stays at the top of its project and folders group a project's work, all saved
+  locally. A project with no work shows a launchpad of starting points and project pages.
+  Inbox gathers work that needs the person, new results, app alerts (including low
+  allowances), running work and pull requests waiting on others across projects. Library
+  shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
+  attachments and images or PDFs a task's latest workspace changed, filtered by project
+  and kind. The title bar holds command search; the bottom bar shows the focused project,
+  branch, local activity and visual account allowances with freshness and reset times.
+  The branch menu switches the project checkout to a local or remote branch or creates
+  one at the current commit; switching needs a clean checkout and waits for tasks working
+  in it, and a branch held by a task worktree opens that task.
   Settings → Editor & terminal holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
 - Claude Code and Codex conversations people had outside Jackalope (a terminal, another
@@ -39,8 +49,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
   prompts and commands can apply to all projects or one project; commands require an
-  explicit Run action. Optional dictation inserts editable text through a separately
-  configured loopback transcription service and never sends the task automatically.
+  explicit Run action. Voice to text inserts editable text at the cursor and never sends
+  the task automatically. It transcribes on the computer with a downloaded Whisper model
+  (base, small or large-v3-turbo, pinned and checksum-verified, Metal on macOS); a
+  configured loopback transcription service remains an option. Native microphone and
+  download acceptance remain open.
 - Idle-sleep prevention supports off, active-work and app-open modes using native
   Windows, macOS and Linux APIs, and starts on active work, so an agent run is not cut
   short by the computer idling to sleep. macOS retains native traffic lights and application

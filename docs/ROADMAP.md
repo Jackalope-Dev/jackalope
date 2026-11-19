@@ -20,12 +20,13 @@ representative benefit and installed-platform acceptance remain open.
 
 - One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
   activity and quota freshness. Desktop preferences include power, running services, zoom,
-  shortcuts, editor/shell choices and optional local dictation. Task terminals offer each
+  shortcuts, editor/shell choices and local voice to text. Task terminals offer each
   project's preparation, verification and saved commands as buttons, and split terminals
   can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
 - One workspace layout keeps recent work in a collapsible sidebar beside the open item,
-  with list and board views of the work list.
+  with favorites, pinned work and folders, an Inbox of what needs you, a Library of
+  screenshots and files from work, and list and board views of the work list.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
@@ -72,7 +73,7 @@ for the detailed inventory and [contributor priorities](TODO.md) for outstanding
 Native sleep prevention, macOS window/menu and unread-badge integration, and Windows
 pairing with a separately configured WSL Linux host are implemented for native
 acceptance. WSL requires its own running Jackalope host, Linux projects/accounts and
-Python 3. Dictation requires a local transcription service. Installed permissions,
+Python 3. Local voice to text needs native microphone and model-download acceptance. Installed permissions,
 recovery and cross-platform behavior still require validation.
 
 Trusted-host pairing and a responsive web companion support scoped task check-ins,
