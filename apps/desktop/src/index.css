@@ -125,9 +125,10 @@ body {
 :where(button, [role="button"], [role="menuitem"], select, summary) {
   touch-action: manipulation;
 }
-/* Shared segments, menu rows and links size themselves. */
+/* Shared segments, menu rows, choice rows and links size themselves. A fixed minimum on a
+   choice row would let a short scrolling list squeeze it below its two lines of text. */
 :where(button, [role="button"], [role="menuitem"]):where(
-  :not(.ui-segment, .ui-tabs-trigger, .ui-menu-item, .workspace-menu-item, .ui-link)
+  :not(.ui-segment, .ui-tabs-trigger, .ui-menu-item, .workspace-menu-item, .ui-link, .ui-choice)
 ) {
   min-height: var(--control-height, 36px);
   min-width: var(--control-height, 36px);
