@@ -55,20 +55,23 @@ reports the grant as in the background while the granted window (or, for an app 
 the app) is not in front. A move or resize still makes earlier snapshots stale.
 
 In the background, `snapshot`, per-window `screenshot`, `wait_for`, `list_windows` and
-element actions by ref keep working: `invoke`, `select`, `set_value`, `focus` with an
-element, and `click` with an element that has an Accessibility or UI Automation action.
-On macOS, `type` with an element adds the text through the control's Accessibility value
-when it is settable. Coordinate clicks, `double_click`, `right_click`, `drag`, `scroll`,
-`press`, `type` without an element, and element actions that fall back to pointer or
-keyboard input need the window in front. Calls that need it wait for it like paused
-calls; any that still find it behind, including element actions that fall back, return
-`{"status":"background"}` with an instruction to use element refs or call again.
+element actions by ref keep working: `invoke`, `select`, `set_value`, `click` with an
+element that has an Accessibility or UI Automation action, `type` with an element (the
+text is appended through the control's value; password and read-only controls are
+refused), and `scroll` with an element (its scroll area moves through Accessibility or
+UI Automation). `focus` with an element works in the background on macOS and waits on
+Windows, where UI Automation focus would raise the window. Coordinate clicks,
+`double_click`, `right_click`, `drag`, `scroll` and `type` without an element, `press`,
+`focus` without an element, `switch_window`, `open_app`, and element actions that fall
+back to pointer or keyboard input need the window in front. Calls that need it wait for
+it like paused calls; any that still find it behind return `{"status":"background"}`
+with an instruction to use element refs or call again.
 
-Input never brings a window or app in front of the person's work. A window grant never
-changes focus for input. An app grant switches between its app's windows only while that
-app is already in front. Only a desktop grant may bring a granted window forward for
-input, and the result reports it. The explicit `focus` action without an element and
-`switch_window` still raise their window.
+Nothing brings a window or app in front of the person's work. A window grant never
+changes focus. An app grant switches between its app's windows only while that app is
+already in front. A desktop grant is never in the background, so it may bring a granted
+window forward, and the result reports it. On Windows the helper checks that the window
+is in front before any UI Automation call that would move focus.
 
 ### Attaching a window from a conversation
 
