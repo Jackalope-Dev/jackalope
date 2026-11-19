@@ -8,6 +8,7 @@ pnpm-debug.log*
 
 # Rust & Tauri
 target/
+target-*/
 src-tauri/target/
 **/gen/schemas/
 apps/desktop/src-tauri/resources/agent-browser/agent-browser*
