@@ -11,7 +11,7 @@ const PAGE_RECORDS = 100;
 
 // The desktop never sends these; refusing them keeps a faulty client from
 // storing an obvious credential.
-const CREDENTIAL =
+export const CREDENTIAL =
   /-----BEGIN [A-Z ]*PRIVATE KEY|\b(?:AKIA|ASIA)[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_\w{20,}|\bsk-[A-Za-z0-9_-]{20,}|\bxox[abps]-[A-Za-z0-9-]{10,}/;
 const text = (max: number, min = 0) =>
   z

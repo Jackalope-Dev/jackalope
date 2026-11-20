@@ -10,6 +10,7 @@ use tauri_plugin_opener::OpenerExt;
 pub mod beta;
 pub mod feedback;
 pub mod lesson_sync;
+pub mod skill_sync;
 pub mod settings_sync;
 mod waitlist;
 
@@ -390,6 +391,7 @@ macro_rules! tauri_commands {
             commands::account::app_account_status,
             commands::account::settings_sync::app_settings_sync,
             commands::account::lesson_sync::app_lesson_sync,
+            commands::account::skill_sync::app_skill_sync,
             commands::account::app_account_connect,
             commands::account::app_account_open_browser,
             commands::account::app_account_referrals,

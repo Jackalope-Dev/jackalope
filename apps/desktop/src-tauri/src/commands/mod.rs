@@ -80,6 +80,7 @@ pub mod question_risk;
 pub mod readiness;
 pub mod resources;
 pub mod schedules;
+pub mod skills;
 mod site_gate;
 
 pub mod agent_screen;
