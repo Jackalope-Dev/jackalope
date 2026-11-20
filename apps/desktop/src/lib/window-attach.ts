@@ -33,6 +33,10 @@ export interface BadgeState extends AttachedWindow {
   agent: string;
   /** The agent's character. */
   provider: string;
+  /** Control was paused when the agent's turn ended; Resume picks it back up. */
+  resumable: boolean;
+  /** The conversation's agent is working right now. */
+  running: boolean;
 }
 
 /** Emitted while dragging with the window under the pointer, or null. */
@@ -90,6 +94,7 @@ export const confirmAttach = (
   control: boolean,
   agent: string,
   provider: string,
+  site: string | null,
 ) =>
   invokeNative<AttachedWindow>('desktop_attach_confirm', {
     conversation,
@@ -97,7 +102,12 @@ export const confirmAttach = (
     control,
     agent,
     provider,
+    site,
   });
+
+/** The website open in a browser window, which attaching it allows; null for other apps. */
+export const attachSite = (conversation: string, handle: string) =>
+  invokeNative<string | null>('desktop_attach_site', { conversation, handle });
 
 export const attachedWindow = (conversation: string) =>
   invokeNative<AttachedWindow | null>('desktop_attach_get', { conversation });
@@ -147,6 +157,9 @@ export const resizeBadge = (expanded: boolean) =>
   invokeNative<void>('desktop_badge_resize', { expanded });
 export const detachFromBadge = () => invokeNative<void>('desktop_badge_detach');
 export const openFromBadge = () => invokeNative<void>('desktop_badge_open');
+/** The badge's Resume; wakes an idle conversation once. */
+export const resumeFromBadge = () =>
+  invokeNative<{ sent: boolean; running: boolean }>('desktop_badge_resume');
 
 /** The line added to the composer, so the next message tells the agent about the window. */
 export function attachMessage(window: Pick<AttachedWindow, 'title' | 'app' | 'control'>) {

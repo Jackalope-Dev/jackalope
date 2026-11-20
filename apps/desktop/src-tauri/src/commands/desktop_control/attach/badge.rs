@@ -25,7 +25,7 @@ const PREFIX: &str = "desktop-attach-";
 /// Asks the badge with this label to bounce.
 pub const PULSE_EVENT: &str = "desktop-badge-pulse";
 /// Logical sizes: the collapsed badge, and the badge with its question box open.
-pub const COLLAPSED: (f64, f64) = (264.0, 56.0);
+pub const COLLAPSED: (f64, f64) = (340.0, 56.0);
 pub const EXPANDED: (f64, f64) = (340.0, 184.0);
 /// The badge hangs this far inside the window's top edge.
 const INSET: f64 = 6.0;
@@ -401,13 +401,83 @@ pub struct BadgeState {
     pub provider: String,
     pub control: bool,
     pub minutes_left: u64,
+    /// Control was paused when the agent's turn ended; Resume picks it back up.
+    pub resumable: bool,
+    /// The conversation's agent is working right now.
+    pub running: bool,
+}
+
+/// Whether the conversation behind `key` has an attempt running now.
+fn running(runtime: &crate::commands::tasks::TaskRuntime, key: &str) -> bool {
+    runtime.integration_runs().is_ok_and(|runs| {
+        runs.iter()
+            .any(|run| run.live_session_id.as_deref() == Some(key) && run.status.is_active())
+    })
+}
+
+/// The note sent on the person's behalf when they click Resume on the badge.
+pub fn resume_note(title: &str) -> String {
+    format!("Resumed desktop control on \u{201c}{title}\u{201d}. Continue.")
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Resumed {
+    /// A note went into the conversation to wake its agent.
+    pub sent: bool,
+    pub running: bool,
+}
+
+/// The badge's Resume: the next grant on this window starts already resumed, and an idle
+/// conversation gets one automatic note so its agent continues. Sent once per resume,
+/// never while the agent is working; grants nothing by itself.
+#[tauri::command]
+pub fn desktop_badge_resume(
+    window: WebviewWindow,
+    runtime: tauri::State<'_, crate::commands::tasks::TaskRuntime>,
+    sessions: tauri::State<'_, crate::commands::live_sessions::LiveSessions>,
+) -> Result<Resumed, String> {
+    let (id, _, _) = staged_for(&window)?;
+    let (key, title, first) =
+        super::mark_resumed(&id).ok_or("This window is no longer attached.")?;
+    let running = running(runtime.inner(), &key);
+    let sent = first && !running && !key.starts_with(DRAFT);
+    if sent {
+        sessions.post(
+            &key,
+            &resume_note(&title),
+            crate::commands::live_sessions::MessageOrigin {
+                kind: "wake".into(),
+                label: "Desktop control resumed".into(),
+                bot_id: None,
+                bot_name: None,
+                session_id: None,
+            },
+        )?;
+    }
+    super::overlay::trace(format_args!(
+        "badge Resume on {title}: {}",
+        if sent {
+            "woke the conversation"
+        } else if running {
+            "agent already working"
+        } else {
+            "already resumed"
+        }
+    ));
+    Ok(Resumed { sent, running })
 }
 
 #[tauri::command]
-pub fn desktop_badge_state(window: WebviewWindow) -> Result<BadgeState, String> {
+pub fn desktop_badge_state(
+    window: WebviewWindow,
+    runtime: tauri::State<'_, crate::commands::tasks::TaskRuntime>,
+) -> Result<BadgeState, String> {
     let (_, key, staged) = staged_for(&window)?;
     let attached = super::AttachedWindow::of(&staged);
     Ok(BadgeState {
+        resumable: staged.resume_offered && !staged.resumed,
+        running: running(runtime.inner(), &key),
         draft: key.starts_with(DRAFT),
         key,
         title: attached.title,
@@ -508,8 +578,8 @@ mod tests {
             width: 800.0,
             height: 600.0,
         };
-        assert_eq!(position(bounds, COLLAPSED, 2.0, true), (368.0, 56.0));
-        assert_eq!(position(bounds, COLLAPSED, 2.0, false), (236.0, 62.0));
+        assert_eq!(position(bounds, COLLAPSED, 2.0, true), (330.0, 56.0));
+        assert_eq!(position(bounds, COLLAPSED, 2.0, false), (160.0, 62.0));
     }
 
     #[test]
@@ -522,6 +592,14 @@ mod tests {
         };
         assert_eq!(edge_rect(bounds, 2.0, true), (94.0, 44.0, 812.0, 612.0));
         assert_eq!(edge_rect(bounds, 2.0, false), (88.0, 38.0, 824.0, 624.0));
+    }
+
+    #[test]
+    fn the_resume_note_names_the_window() {
+        assert_eq!(
+            resume_note("GitHub"),
+            "Resumed desktop control on \u{201c}GitHub\u{201d}. Continue."
+        );
     }
 
     #[test]

@@ -111,7 +111,13 @@ pub(super) async fn desktop_control(
     call: Call,
     input: crate::commands::desktop_control::DesktopRequest,
 ) -> Result<Value, ToolError> {
-    crate::commands::desktop_control::execute(call.runtime().clone(), call.caller.run, input)
+    // An MCP call can wait within its tool timeout; an HTTP agent's shell command can't,
+    // so it gets the status at once and calls again.
+    let wait = match call.transport {
+        super::Transport::Mcp => crate::commands::desktop_control::MCP_WAIT,
+        super::Transport::Http => std::time::Duration::ZERO,
+    };
+    crate::commands::desktop_control::execute(call.runtime().clone(), call.caller.run, input, wait)
         .await
         .map_err(ToolError::refused)
 }

@@ -22,6 +22,9 @@ and [task outcomes](TASK-OUTCOMES.md).
 
 Match the work to the request. A question should not wait on workspace preparation or
 automatic checks; reserve full setup and verification for work that changes files.
+Non-code work, such as operating a web page or an attached window, skips the worktree,
+preparation, checks and planning check, and Options → Treat as code work reverses an
+inferred guess.
 
 ## Navigation and copy
 

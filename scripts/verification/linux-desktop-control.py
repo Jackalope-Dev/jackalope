@@ -229,15 +229,22 @@ def trial(helper):
             activate()
             guard['epoch'] = int(state()[1])
             call({'action': 'type', 'window': window, 'guard': guard, 'bounds': snapshot['bounds'], 'text': 'must fail'}, error='moved')
+            # The Resume click above is XTEST input, which counts as Jackalope's own; wait out
+            # the clash window so this key is a lone press, not one that lands on the agent's.
+            time.sleep(1)
             physical_key(0x61)
-            wait(lambda: state()[0] == 'paused' and 'Physical' in state()[5], 'physical-device key pauses access')
+            time.sleep(1)
+            assert state()[0] == 'active', f'a single physical key must not pause access: {state()}'
+            for _ in range(3):
+                physical_key(0x61)
+            wait(lambda: state()[0] == 'paused' and 'using this window' in state()[5], 'repeated physical keys pause access')
             call({'action': 'focus', 'window': window, 'guard': guard}, error='paused')
             activate()
             guard['epoch'] = int(state()[1])
             physical_key(0xff1b)
-            indicator.wait(timeout=5)
-            call({'action': 'snapshot', 'window': window, 'guard': guard}, error='ended')
-            print('PASS: X11 inventory, native Resume, snapshots, password rejection, Unicode typing, replacement, click, scroll, PNG, focus/movement/physical-device pause, Escape, epochs and indicator loss')
+            wait(lambda: state()[0] == 'paused' and 'Escape' in state()[5], 'Escape pauses access')
+            call({'action': 'snapshot', 'window': window, 'guard': guard}, error='paused')
+            print('PASS: X11 inventory, native Resume, snapshots, password rejection, Unicode typing, replacement, click, scroll, PNG, focus/movement pause, single keys passing, repeated-key and Escape pause, epochs and indicator loss')
         finally:
             for child in reversed(children):
                 if child.poll() is None:
