@@ -358,6 +358,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
+- The queue's limit on agents at once on this device is Automatic by default: one per two
+  CPUs and per 4 GiB of memory, whichever allows fewer, from 1 to 16, marked as
+  recommended in the menu. A chosen number (1 to 16) is saved and kept, with a note
+  above the recommendation; swarm placement and plan size use the effective limit.
 - New tasks can assess focused work, investigation or a plan through the project's
   Decisions preference. Substantial requests are split into subtasks that start
   without a review click by default; a project setting or Review before starting

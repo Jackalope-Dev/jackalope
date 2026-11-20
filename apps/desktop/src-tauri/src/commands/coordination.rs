@@ -7,6 +7,7 @@ mod automatic_trial;
 pub(super) mod autonomy;
 pub mod cloud;
 pub mod deploy;
+mod device_slots;
 pub(super) mod inbox;
 pub mod managed;
 pub(super) mod managed_delivery;
@@ -413,20 +414,49 @@ pub async fn queue_import(
         .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
-pub async fn queue_dispatch(
-    project_id: String,
-    enabled: bool,
-    concurrency: usize,
-    remote_concurrency: Option<usize>,
-    state: State<'_, Coordinator>,
-) -> Result<(), String> {
-    let service = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service.state();
-        if !(1..=6).contains(&concurrency) {
-            return Err("Choose between one and six concurrent agents.".into());
+/// A queue concurrency choice: a number of agents, or `"automatic"` to follow
+/// this device's recommendation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum ConcurrencyChoice {
+    Agents(usize),
+    Automatic(Automatic),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Automatic {
+    Automatic,
+}
+
+impl ConcurrencyChoice {
+    /// The value saved in the ledger: the chosen number, or none for Automatic.
+    fn saved(self) -> Result<Option<usize>, String> {
+        match self {
+            Self::Automatic(_) => Ok(None),
+            Self::Agents(agents) if (1..=device_slots::MAX_CONCURRENCY).contains(&agents) => {
+                Ok(Some(agents))
+            }
+            Self::Agents(_) => Err(format!(
+                "Choose between 1 and {} concurrent agents.",
+                device_slots::MAX_CONCURRENCY
+            )),
         }
+    }
+}
+
+impl Coordinator {
+    /// Turns dispatch on or off for a project and applies any new limits.
+    /// Without a concurrency choice, the saved one stays.
+    fn dispatch(
+        &self,
+        project_id: String,
+        enabled: bool,
+        concurrency: Option<ConcurrencyChoice>,
+        remote_concurrency: Option<usize>,
+    ) -> Result<(), String> {
+        let mut inner = self.state();
+        let saved = concurrency.map(ConcurrencyChoice::saved).transpose()?;
         if let Some(remote) = remote_concurrency {
             if !(1..=MAX_REMOTE_CONCURRENCY).contains(&remote) {
                 return Err("Choose between 1 and 32 agents on computers.".into());
@@ -434,18 +464,39 @@ pub async fn queue_dispatch(
             inner.remote_concurrency = remote;
         }
         if enabled {
-            service.ensure_storage_loaded()?;
+            self.ensure_storage_loaded()?;
         }
         if enabled && inner.url.is_none() {
             return Err("The coordination bridge is unavailable.".into());
         }
-        inner.concurrency = concurrency;
+        if let Some(saved) = saved.filter(|saved| *saved != inner.ledger.concurrency) {
+            self.commit(&mut inner, |ledger| {
+                ledger.concurrency = saved;
+                Ok::<_, String>(())
+            })?;
+        }
+        inner.concurrency =
+            device_slots::effective(inner.ledger.concurrency, device_slots::recommended());
         if enabled {
             inner.enabled.insert(project_id);
         } else {
             inner.enabled.remove(&project_id);
         }
         Ok(())
+    }
+}
+
+#[tauri::command]
+pub async fn queue_dispatch(
+    project_id: String,
+    enabled: bool,
+    concurrency: Option<ConcurrencyChoice>,
+    remote_concurrency: Option<usize>,
+    state: State<'_, Coordinator>,
+) -> Result<(), String> {
+    let service = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        service.dispatch(project_id, enabled, concurrency, remote_concurrency)
     })
     .await
     .map_err(|e| e.to_string())?
