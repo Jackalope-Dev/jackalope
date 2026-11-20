@@ -43,7 +43,7 @@ Project readiness uses isolated gix metadata reads with Git fallback. Review ren
 uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integration
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
 Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
-and MCP connections and marketplace. Workspace views are registered once in
+MCP connections and marketplace, and Skills. Workspace views are registered once in
 lib/navigation.ts (label, group, icon, telemetry feature, search keywords) with
 their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
 read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
@@ -113,6 +113,8 @@ changes must preserve both sides and old saved records.
 | computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
 | tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), one record of what workspace tools did, and the recovery of changes a lost attempt left on a computer, saved as a patch and never applied |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
+| skills.rs, skills/ | Agent skills on this computer for the Skills page: personal and project skill folders, bounded reading, Git tracking and what keeps a skill local, creation, import and export, saved skill sync state, sync and conflict decisions, and the only writes of synced content, which refuse tracked files |
+| account/skill_sync.rs | Opt-in account sync of chosen skills behind settings sync consent: account binding, the per-account choice, pull, revision-checked push, device holdings and deletion |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |

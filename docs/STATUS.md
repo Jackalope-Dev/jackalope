@@ -660,6 +660,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Shared appearance, guided onboarding, task notifications, optional settings sync
   and opt-in learned-lesson sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
+- Skill Sync on the Skills page in Agents: it lists personal and project agent skills
+  (folders with a `SKILL.md` in the Claude Code, Codex and shared `.agents` skill
+  folders) and syncs the ones the person chooses through their account. It is off by
+  default, needs settings sync, matches project skills by repository root commits instead
+  of paths, never writes into tracked files and adds new project skills to the
+  repository's local exclude file. Committed, oversized, binary or credential-like
+  skills stay local. Edits on two computers become a conflict the person resolves. Synced
+  skill text is not end-to-end encrypted. Two-desktop acceptance in the installed app is
+  pending. There is no skills directory: **Export a copy** writes a folder to share, and
+  Browse is marked Coming later. See [settings sync](SETTINGS-SYNC.md#skills).
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
 

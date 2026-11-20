@@ -1,5 +1,18 @@
 [
   {
+    "id": "your-skills-on-every-computer",
+    "date": "2026-11-20",
+    "title": "Your skills on every computer.",
+    "description": "Skills you keep outside the repo can now sync between your computers through your account, without ever being committed.",
+    "items": [
+      "The new Skills page in Agents shows your Claude Code, Codex and shared agent skills, personal and per project.",
+      "You choose which skills sync. Skill sync is off until you turn it on, and it needs settings sync.",
+      "If a skill changed on two computers, Jackalope shows both copies and waits for you to pick one. Nothing gets overwritten.",
+      "Synced project skills never go into a file the repo tracks, and new ones are kept out of your commits."
+    ],
+    "note": "Committed skills already travel with the repo, so they stay as they are. Skills that look like they hold a credential stay on the computer."
+  },
+  {
     "id": "hand-an-agent-a-window",
     "date": "2026-11-19",
     "title": "Hand an agent a window.",
