@@ -283,7 +283,8 @@ added computers places every fork where it ran before the pool existed: on the p
 computer when it has one, otherwise on this device. The choice is offered once there is
 a computer to run on.
 
-Each host has a concurrency limit. This device keeps the queue's limit of one to six;
+Each host has a concurrency limit. This device keeps the queue's limit (Automatic by
+default, or 1 to 16);
 computers together keep the queue's limit on agents on computers (8 by default). The
 project's computer may take up to that shared limit whatever its runner reports. An
 added computer takes the `slots` (1 to 32) its runner reports in `hello` or

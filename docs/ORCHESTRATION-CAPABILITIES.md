@@ -218,7 +218,8 @@ when the plan asks first, or for a deciding agent once the merged round passed i
 when the project lets agents approve rounds. Up to 4 orchestrators can review a large plan's areas in
 parallel; their verdicts merge into one (done only when every area is done, next
 assignments deduplicated and sequenced where scopes overlap). A round runs at least 8 and at most 24
-assignments, sized to the slots of the project's capacity pool. Every planned or swarm
+assignments, sized to the slots of the project's capacity pool; this device's slots are the
+queue's effective limit, Automatic from its CPUs and memory unless a number is chosen. Every planned or swarm
 fork is placed on one host of that pool (this device or one of the person's computers) by
 what it needs, the project's **Swarms run on** choice and which host has room; the reason
 is recorded in its activity. Under **Computers only** a fork on a computer never falls
