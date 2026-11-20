@@ -1,24 +1,30 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { Check, ChevronDown } from 'lucide-react';
 import { useMemo } from 'react';
+import { openGeneralProject } from '../../lib/general-project';
 import { projectNameHints } from '../../lib/project-name-hints';
-import { type Project, useProjectStore } from '../../stores/projectStore';
+import { GENERAL_PROJECT_ID, type Project, useProjectStore } from '../../stores/projectStore';
 import { ProjectMark } from '../projects/ProjectMark';
 import './work-header.css';
 
 /**
- * The Work page's title row: the heading doubles as the project switcher.
+ * The Work page's title row: the heading doubles as the project switcher. General, for
+ * work without a project, is offered until it exists and then lists like any project.
  */
 export function WorkHeader({
   scope,
   project,
   onScopeChange,
+  onError,
 }: {
   scope: 'all' | 'project';
   project: Project | undefined;
   onScopeChange: (scope: 'all' | 'project') => void;
+  onError?: (message: string) => void;
 }) {
   const projects = useProjectStore((state) => state.projects);
+  const hasGeneral = projects.some((item) => item.id === GENERAL_PROJECT_ID);
   const hints = useMemo(() => projectNameHints(projects), [projects]);
   const showProject = scope === 'project' && project;
   const value = scope === 'all' ? 'all' : (project?.id ?? 'all');
@@ -43,6 +49,12 @@ export function WorkHeader({
                 value={value}
                 onValueChange={(next) => {
                   if (next === 'all') return onScopeChange('all');
+                  if (next === GENERAL_PROJECT_ID && !hasGeneral) {
+                    void openGeneralProject()
+                      .then(() => onScopeChange('project'))
+                      .catch((cause) => onError?.(describeError(cause)));
+                    return;
+                  }
                   useProjectStore.getState().selectProject(next);
                   onScopeChange('project');
                 }}
@@ -66,6 +78,13 @@ export function WorkHeader({
                     </Menu.ItemIndicator>
                   </Menu.RadioItem>
                 ))}
+                {!hasGeneral && (
+                  <Menu.RadioItem className="workspace-menu-item" value={GENERAL_PROJECT_ID}>
+                    <ProjectMark project={{ id: GENERAL_PROJECT_ID, name: 'General' }} />
+                    <span className="work-header-option">General</span>
+                    <span className="work-header-hint">No project</span>
+                  </Menu.RadioItem>
+                )}
               </Menu.RadioGroup>
             </Menu.Content>
           </Menu.Portal>

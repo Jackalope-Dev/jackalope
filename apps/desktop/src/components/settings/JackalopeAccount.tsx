@@ -176,7 +176,9 @@ export function JackalopeAccount({
             {account.userCode?.slice(0, 4)}–{account.userCode?.slice(4)}
           </p>
           <p className="settings-row-description">
-            Sign in to check your access. This connection request expires in 10 minutes.
+            {account.state === 'waiting'
+              ? 'Sign in to check your access. This connection request expires in 10 minutes.'
+              : 'Sign in or create a free account to connect this desktop. This connection request expires in 10 minutes.'}
           </p>
         </div>
       )}

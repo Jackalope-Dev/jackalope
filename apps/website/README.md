@@ -108,7 +108,7 @@ npx --yes --package @playwright/cli playwright-cli -s=website-check open http://
 npx --yes --package @playwright/cli playwright-cli -s=website-check run-code --filename apps/website/scripts/verify-page.js
 ~~~
 
-`verify-page.js` expects the default waitlist configuration. `verify-contrast.js` measures
+`verify-page.js` expects the default signup configuration. `verify-contrast.js` measures
 text contrast across palettes and appearances against a preview on port 5182.
 `verify-launch.js` exercises
 routes, discovery output and mocked signup validation, rate limits, retry and focus.
@@ -123,8 +123,9 @@ the no-JavaScript form action also uses that route. Public form IDs are not API
 credentials. Forks must configure their own endpoints and consent settings before
 accepting signups. See the [service README](../server/README.md).
 
-Service-backed signup queues a transactional email confirmation; approval and
-access links arrive separately. Optional newsletter consent syncs independently to
+Service-backed signup queues a transactional email confirmation. With the service's
+open signup on, confirming that email approves the account and signs the person in;
+in waitlist mode, approval and access links arrive separately. Optional newsletter consent syncs independently to
 Sequenzy, whose private API credential stays on the server. Legacy saved-form
 submissions use Sequenzy's confirmation settings and bypass that queue. The popup
 uses the site's shared dialog; it does not inject a hosted provider widget.
@@ -141,7 +142,7 @@ They are embedded in static output and must never contain secrets.
 
 | Variable | Purpose |
 | --- | --- |
-| `VITE_ACCESS_API` | Optional early-access service URL. |
+| `VITE_ACCESS_API` | Optional account access service URL. |
 | `VITE_WINDOWS_DOWNLOAD_URL` | Verified, published HTTPS Windows x64 installer URL. |
 | `VITE_WINDOWS_STORE_URL` | Usable Microsoft Store product URL; takes precedence over the Windows installer. |
 | `VITE_MACOS_DOWNLOAD_URL` | Verified, published HTTPS macOS download URL. |
@@ -165,7 +166,8 @@ The ordinary account and waitlist email links keep their existing destinations.
 Approved members use the authenticated Store download endpoint when configured,
 preserving download milestones; public visitors use the configured listing link.
 
-Without a configured download the site offers the waitlist. Enable a download only
+A platform without a configured download shows Coming soon, and signup stays
+available. Enable a download only
 after the relevant [release gates](../../docs/RELEASE.md). The build rejects insecure
 or incomplete download configuration. Update the privacy notice whenever hosting,
 tracking, storage or email behavior changes.

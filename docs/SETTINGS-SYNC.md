@@ -20,10 +20,10 @@ preferences. Legacy account/theme steps without a provisional project resume at
 Project; new Appearance steps resume with their saved draft. No database migration
 is required; the existing persisted-state merge supplies the new optional fields.
 
-Browser pairing can share a verified waitlist membership with the requesting
-desktop. That reports waiting, issues no device credential and grants neither
-execution nor settings access. Pairing expires after ten minutes. After admission,
-the member signs in with their approved email and reconnects if needed.
+In waitlist mode, browser pairing can share a verified waitlist membership with the
+requesting desktop. That reports waiting, issues no device credential and grants
+neither execution nor settings access. Pairing expires after ten minutes. After
+admission, the member signs in with their approved email and reconnects if needed.
 
 ## Preferences and privacy
 

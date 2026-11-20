@@ -144,6 +144,10 @@ pub struct TaskRun {
     pub setup_files: Vec<String>,
     #[serde(default)]
     pub auto_verify: bool,
+    /// Work that changes no code, such as operating a web page or checking a connection:
+    /// it read the project folder where it is, with no worktree, preparation or checks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub non_code: bool,
     #[serde(default)]
     pub verification: Option<crate::commands::verification::Verification>,
     #[serde(default)]
@@ -322,6 +326,11 @@ pub struct RunRequest {
     pub setup_files: Vec<String>,
     #[serde(default)]
     pub auto_verify: bool,
+    /// Work that changes no code, such as operating a web page, checking a connection or
+    /// research. It works in the project folder as it is (a plain folder stays a plain
+    /// folder): no worktree, branch change, setup files, preparation or automatic checks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub non_code: bool,
     #[serde(default)]
     pub target_branch: Option<String>,
     #[serde(skip)]
@@ -377,6 +386,7 @@ impl RunRequest {
             prepare_command: None,
             setup_files: Vec::new(),
             auto_verify: false,
+            non_code: false,
             target_branch: None,
             account_binding: None,
             prompt,
@@ -494,6 +504,7 @@ impl TaskRun {
             prepare_command: self.prepare_command.clone(),
             setup_files: self.setup_files.clone(),
             auto_verify: self.auto_verify.clone(),
+            non_code: self.non_code,
             verification: verification,
             finishing: self.finishing.clone(),
             verification_error: self.verification_error.clone(),

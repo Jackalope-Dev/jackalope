@@ -76,7 +76,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           ? 'Check your email and confirm it to finish creating your account.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
-            : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
+            : 'Thanks for making room for Jackalope. Watch your inbox for occasional product notes.',
       );
       form.reset();
     } catch (error) {
@@ -169,7 +169,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             <noscript>
               <p className="signup-consent">
                 Without JavaScript, this form joins the email list for launch news and product notes
-                rather than creating an access request. Unsubscribe anytime.
+                rather than creating an account. Unsubscribe anytime.
               </p>
             </noscript>
           )}

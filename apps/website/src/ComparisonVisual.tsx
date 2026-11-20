@@ -18,7 +18,7 @@ export function ComparisonVisual({ comparison }: { comparison: Comparison }) {
           </span>
           <h2>Jackalope</h2>
           <p>{comparison.overview.jackalope}</p>
-          <span className="comparison-availability">Early access</span>
+          <span className="comparison-availability">Free to sign up</span>
         </div>
         <div className="comparison-contender">
           <span className="comparison-emblem" aria-hidden="true">

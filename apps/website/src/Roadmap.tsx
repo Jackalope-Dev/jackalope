@@ -120,7 +120,7 @@ export function RoadmapPage() {
       <section className="page-width roadmap-follow" aria-labelledby="roadmap-follow-title">
         <div>
           <h2 id="roadmap-follow-title">Help shape the next chapter.</h2>
-          <p>Sign up, tell us how you want to work, and follow along as Jackalope takes shape.</p>
+          <p>Sign up free, tell us how you want to work, and follow along as Jackalope grows.</p>
           <div className="roadmap-follow-actions">
             <WaitlistButton />
             <a className="text-link" href="/changelog/">

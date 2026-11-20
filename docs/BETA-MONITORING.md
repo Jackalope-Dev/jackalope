@@ -20,7 +20,7 @@ direct installers only, with the endpoint examples describing the legacy R2 path
 Use [Cloud configuration](CRABNEBULA-RELEASE.md) for active Mac/Linux release feeds.
 
 Both feeds use the same trusted updater key and app identity. Numeric versions must
-increase: a user leaving beta waits until the stable feed offers a higher version.
+increase, so a user leaving beta waits until the stable feed offers a higher version.
 Settings → Help & community persists the selection in the native profile. A channel
 change clears the offered update and is blocked during checking/installation; the
 native install command also rechecks the chosen channel and version. The telemetry
@@ -58,7 +58,7 @@ previews, recovery, Chat, queues, integration, schedules, knowledge, MCP connect
 worktrees, agent setup and Ask Jackalope. The closed command inventory lives in
 `apps/desktop/src/lib/telemetry.ts`; `operation-telemetry.ts` maps explicit commands
 and semantic results. Polling and draft autosaves are excluded. Accepted means a
-native acknowledgement: a queued message or accepted launch has not necessarily
+native acknowledgement. A queued message or accepted launch has not necessarily
 finished execution. Failed checks/probes, blocked integration, canceled recovery
 dialogs and applied merges with incomplete cleanup have distinct results.
 
@@ -101,7 +101,7 @@ or stacks are accepted. The server atomically increments daily totals and saves 
 an event UUID/hash/expiry receipt for retry deduplication. Default retention is 30 days;
 daily buckets expire at UTC day boundaries. Legacy v1 event rows expire through the
 old cleanup path; v1 ingestion returns 410. D1/application logs exclude raw IPs and
-headers. Cloudflare still processes network addresses and login identities: configure
+headers. Cloudflare still processes network addresses and login identities. Configure
 edge, security, Access and backup retention separately. Do not claim that transport
 infrastructure never sees identifying data.
 
@@ -112,7 +112,7 @@ and every `/admin/*` path. Permit only the owner's verified email with an approp
 identity provider. Restrict the origin's alternate hostnames as well; the Worker
 independently verifies the signed assertion, exact issuer/audience and owner email,
 so an unprotected workers.dev URL cannot bypass the application check. Protect only
-admin paths: desktop ingestion and updater downloads do not use browser Access.
+admin paths. Desktop ingestion and updater downloads do not use browser Access.
 
 Set deployment configuration, never app source:
 
@@ -170,7 +170,7 @@ the request's background task tries delivery, and the five-minute cron retries w
 a lease and backoff, up to five attempts. Provider failures never discard feedback.
 The dashboard displays delivery state. After resolving a persistent delivery fault,
 an operator can reset `email_attempts=0, email_next=0, email_state='pending'` for a
-confirmed report ID in private D1. Delivery is at least once: a process failure after
+confirmed report ID in private D1. Delivery is at least once. A process failure after
 send but before acknowledgement may duplicate email. Use the report UUID to recognize it.
 Mail copies and Cloudflare backups have separate retention from D1; handle deletions
 in all of them. Do not forward private reports into public issues automatically.

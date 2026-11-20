@@ -167,6 +167,9 @@
   .project-tree-name,
   .work-sidebar-item,
   .work-sidebar-close,
+  .work-sidebar-options,
+  .work-sidebar-folder,
+  .work-sidebar-rename,
   .project-rail-item
 ) {
   min-width: 0;
@@ -823,7 +826,7 @@ button.project-tree-toggle:hover {
 }
 .statusbar-details {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   width: min(420px, calc(100vw - 24px));
   max-height: min(520px, var(--radix-popover-content-available-height));
   overflow: hidden auto;
@@ -840,7 +843,8 @@ button.project-tree-toggle:hover {
   margin: 0;
   color: var(--color-text-secondary);
 }
-/* Label, value, copy: fixed side columns keep both rows' values and buttons aligned. */
+/* Label, value, copy: fixed side columns keep both rows' values and buttons aligned.
+   Copy appears on hover or focus, and always for touch. */
 .branch-facts {
   display: grid;
   margin: 0;
@@ -850,11 +854,11 @@ button.project-tree-toggle:hover {
 }
 .branch-facts > div {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 4px 4px 10px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 2px 2px 10px;
 }
 .branch-facts > div + div {
   border-top: 1px solid var(--color-border-subtle);
@@ -872,28 +876,82 @@ button.project-tree-toggle:hover {
 }
 .branch-facts .ui-button {
   grid-column: 3;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.branch-facts > div:is(:hover, :focus-within) .ui-button {
+  opacity: 1;
+}
+/* Icon only: the label stays for screen readers, which also hear "Copied". */
+.statusbar-details .branch-facts .ui-button > span[aria-live] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.branch-facts .ui-button svg {
+  width: 14px;
+  height: 14px;
+}
+@media (hover: none) {
+  .branch-facts .ui-button {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .branch-facts .ui-button {
+    transition: none;
+  }
 }
 .branch-facts .inline-notice {
   grid-column: 1 / -1;
 }
 .branch-switch {
   display: grid;
-  gap: 4px;
+  gap: 8px;
 }
 .branch-switch h3 {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
+.branch-switch-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+.branch-switch-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.branch-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* The list scrolls on its own so the search field and actions stay in view. */
 .branch-switch ul {
   display: grid;
+  max-height: 240px;
   margin: 0 -8px;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
-/* The task title leads; its branch sits beneath it in the mono face. */
+/* The branch leads; the task using it, or where it is checked out, sits beneath. */
 .branch-switch-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   column-gap: 10px;
   row-gap: 2px;
   align-items: center;
@@ -907,15 +965,26 @@ button.project-tree-toggle:hover {
   text-align: left;
   cursor: pointer;
 }
-.branch-switch-icon {
+.branch-switch-icon,
+.branch-switch-check {
   grid-row: 1 / span 2;
 }
-.branch-switch-item:hover {
+.branch-switch-check {
+  grid-column: 3;
+  color: var(--color-accent-ink);
+}
+.branch-switch-item[aria-current="true"] {
+  background: var(--color-accent-subtle);
+}
+.branch-switch-item:not(:disabled):hover {
   background: var(--color-surface-hover);
 }
 .branch-switch-item:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
+}
+.branch-switch-item:disabled {
+  cursor: default;
 }
 .branch-switch-label,
 .branch-switch-name {
@@ -926,12 +995,15 @@ button.project-tree-toggle:hover {
 }
 .branch-switch-label {
   color: var(--color-text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-sm);
 }
 .branch-switch-name {
   color: var(--color-text-muted);
-  font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-xs);
+}
+.branch-switch-item:disabled .branch-switch-label {
+  color: var(--color-text-muted);
 }
 /* Two equal actions; a lone one (plans have no single checkout to review) fills the row. */
 .branch-actions {
@@ -1117,6 +1189,7 @@ button.project-tree-toggle:hover {
   }
   .project-tree-action,
   .work-sidebar-close,
+  .work-sidebar-options,
   .workspace-statusbar > .statusbar-icon,
   .companion-inline .companion-avatar {
     width: 44px;

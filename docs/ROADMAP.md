@@ -20,12 +20,13 @@ representative benefit and installed-platform acceptance remain open.
 
 - One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
   activity and quota freshness. Desktop preferences include power, running services, zoom,
-  shortcuts, editor/shell choices and optional local dictation. Task terminals offer each
+  shortcuts, editor/shell choices and local voice to text. Task terminals offer each
   project's preparation, verification and saved commands as buttons, and split terminals
   can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
 - One workspace layout keeps recent work in a collapsible sidebar beside the open item,
-  with list and board views of the work list.
+  with favorites, pinned work and folders, an Inbox of what needs you, a Library of
+  screenshots and files from work, and list and board views of the work list.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
@@ -59,9 +60,9 @@ representative benefit and installed-platform acceptance remain open.
   connections with curated discovery and guided setup, browser tools and Ask Jackalope.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
-- Account connection with optional open signup and Turnstile-protected signup,
-  waitlist/referral progress, platform download guidance and optional settings sync,
-  feedback and reporting.
+- Free signup with email confirmation and Turnstile protection, desktop account
+  connection, platform downloads, optional settings sync, feedback and reporting.
+  A configurable waitlist mode with referral progress remains available to operators.
 
 These capabilities describe source behavior. Provider, platform, delivery and
 installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
@@ -72,7 +73,7 @@ for the detailed inventory and [contributor priorities](TODO.md) for outstanding
 Native sleep prevention, macOS window/menu and unread-badge integration, and Windows
 pairing with a separately configured WSL Linux host are implemented for native
 acceptance. WSL requires its own running Jackalope host, Linux projects/accounts and
-Python 3. Dictation requires a local transcription service. Installed permissions,
+Python 3. Local voice to text needs native microphone and model-download acceptance. Installed permissions,
 recovery and cross-platform behavior still require validation.
 
 Trusted-host pairing and a responsive web companion support scoped task check-ins,
@@ -142,8 +143,8 @@ and background rich rendering are implemented. Local [performance fixtures](PERF
 exercise these contracts; installed startup, memory and responsiveness acceptance remains open.
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
-large-project performance in installed builds. Complete signing, installation,
-updates and secure storage for each intended platform. Required account access
+large-project performance in installed builds. Validate installation, updates and
+secure storage on each platform. Required account access
 in every build, optional settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
@@ -151,9 +152,9 @@ account/settings sync, Unix process guardians and tray/Dock recovery. macOS and 
 window-control helpers, a GNOME 46 Wayland extension and an XDG desktop portal
 backend for other Wayland desktops are implemented for validation.
 Installed acceptance remains in progress. Cross-platform signing and branch-based
-release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
-update checks and installation are implemented for validation; live signing, publication and
-installed upgrades remain acceptance work,
+release automation use Windows Store and Mac/Linux Cloud candidates, and public
+downloads are available for all three platforms. In-app Store update checks and
+installation are implemented; installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. KDE Plasma and other GNOME versions use the portal backend, which still
 needs installed acceptance; desktops without the RemoteDesktop portal remain unsupported.

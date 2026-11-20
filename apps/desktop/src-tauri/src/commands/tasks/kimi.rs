@@ -1126,6 +1126,7 @@ setInterval(()=>{},1000);
             prepare_command: None,
             setup_files: Vec::new(),
             auto_verify: false,
+            non_code: false,
             target_branch: None,
             account_binding: None,
             model: None,

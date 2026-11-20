@@ -131,8 +131,9 @@ as described in [release automation](RELEASE-AUTOMATION.md#enablement-and-first-
    signatures and receipts. Use **Publish Cloud candidate** to publish the exact
    tested run. Beta assets are accessible by public URLs even if not advertised.
 4. In the older installation, open App updates and choose **Check for updates**,
-   then **Install and restart**. Automatic checks discover updates; installation
-   remains a user action. Confirm the newer version after restart and saved work.
+   then **Restart to update** once the background download finishes (**Install and
+   restart** while it is unfinished or background download is off). Automatic checks
+   discover and download updates; installation remains a user action. Confirm the newer version after restart and saved work.
 5. Exercise active-task blocking, offline/download recovery, account expiry/revocation,
    channel selection and rejection of a wrongly signed artifact on a separate
    controlled test feed. On macOS check both architectures and permission continuity;

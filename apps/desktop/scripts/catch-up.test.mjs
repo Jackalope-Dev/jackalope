@@ -198,6 +198,18 @@ test('with nothing waiting the headline says so', () => {
   assert.equal(catchUpHeadline([]), 'Nothing needs you right now.');
 });
 
+test('the headline names each kind and puts unnamed ones last as more', () => {
+  const kinds = ['other', 'question', 'failed-check', 'other', 'review'];
+  assert.equal(
+    catchUpHeadline(kinds.map((kind, index) => ({ kind, title: `Item ${index}` }))),
+    '5 things need you: a question, a failed check, a review and 2 more.',
+  );
+  assert.equal(
+    catchUpHeadline(['question', 'other'].map((kind) => ({ kind, title: kind }))),
+    '2 things need you: a question and one more.',
+  );
+});
+
 test('plain summaries skip headings, paths, hashes and code', () => {
   assert.equal(
     plainSummary('# Summary\n```\ncode\n```\nFixed the login redirect. Also more.'),

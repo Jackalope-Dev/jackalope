@@ -109,7 +109,7 @@ export function FeedbackPage() {
         ) : (
           <>
             <p>
-              Stop feedback emails without changing your early access. You can still share thoughts
+              Stop feedback emails without changing your account. You can still share thoughts
               whenever you want.
             </p>
             <Button

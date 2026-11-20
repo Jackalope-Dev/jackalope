@@ -84,23 +84,44 @@
   border-top: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
-.helper-composer textarea {
-  width: 100%;
-  resize: vertical;
-  max-height: 120px;
-  min-height: 60px;
-  padding: 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
+.helper-field {
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
   background: var(--color-surface);
+  cursor: text;
+}
+.helper-field:focus-within {
+  border-color: var(--color-border-focus);
+  outline: 1px solid var(--color-border-focus);
+}
+.helper-composer .helper-field textarea {
+  width: 100%;
+  field-sizing: content;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--color-text-primary);
+}
+.helper-composer .helper-field textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .helper-buttons {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  cursor: default;
+}
+.helper-buttons .ui-button {
+  height: var(--control-height-compact, 32px);
+  padding: 0 14px;
+  border-radius: var(--radius-full);
 }
 .helper-text-button {
   min-height: var(--control-height, 36px);

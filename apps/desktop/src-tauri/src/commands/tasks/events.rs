@@ -6,7 +6,9 @@ pub(in crate::commands) const ACTIVITY_KEPT: usize = 150;
 const PENDING_TOOLS_KEPT: usize = 64;
 
 pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
-    if text.trim().is_empty() {
+    let trimmed = text.trim();
+    // An agent's bare "error:" with no message says nothing and showed up as a failure.
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("error:") {
         return;
     }
     // Redacted before it is shortened, so the cut cannot leave part of a value.

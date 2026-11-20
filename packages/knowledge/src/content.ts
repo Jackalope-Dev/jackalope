@@ -96,16 +96,16 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
   {
     id: 'input-paused',
     title: 'Desktop control paused unexpectedly',
-    symptom: 'Status bar displays "Jackalope is Paused" during window automation.',
+    symptom: 'The desktop control bar shows Paused while an agent is using an app.',
     quickFix:
-      'Physical mouse movement, keyboard touch, or window focus change immediately pauses control for human safety. Click Resume to continue.',
+      'Moving the mouse, touching the keyboard or changing window focus pauses control right away. Click Resume to continue.',
     targetSlug: 'windows-desktop-control',
     targetAnchor: 'physical-interruption',
   },
   {
     id: 'mcp-timeout',
     title: 'MCP tool connection failed or timed out',
-    symptom: 'Agent fails to discover or execute tools configured in MCP → Connections.',
+    symptom: 'Agent fails to discover or execute tools configured in Agents → Tools.',
     quickFix:
       'Check the executable or endpoint, authentication, and selected agent’s transport support. Then verify a real tool request.',
     targetSlug: 'mcp-and-browser-automation',
@@ -153,17 +153,17 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'getting-started-in-the-beta',
     category: 'workflows',
-    title: 'Get started with the Jackalope beta',
+    title: 'Get started with Jackalope',
     shortTitle: 'Getting started',
     description:
-      'Install Jackalope, connect your account, find your way around and send feedback while the app is in beta.',
+      'Install Jackalope, create a free account, find your way around and send feedback.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'install',
         question: 'How do I install Jackalope?',
         paragraphs: [
-          'On Windows, install Jackalope from the Microsoft Store. On macOS, download the Apple silicon or Intel build. On Linux, download the AppImage. Your approval email links to each one, and the download page lists them too.',
+          'On Windows, install Jackalope from the Microsoft Store. On macOS, download the Apple silicon or Intel build. On Linux, download the AppImage. The download page lists each one.',
           'The download page offers the Stable release by default. Beta builds arrive sooner and may be less polished; choose Beta in the release picker only if you want them.',
         ],
         links: [{ label: 'Download Jackalope', href: '/download/' }],
@@ -172,7 +172,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'connect',
         question: 'How do I connect my account?',
         paragraphs: [
-          'Running tasks needs a Jackalope account. Sign up on the website if you have not, then choose Connect account; your browser opens and the app shows a code. Sign in, check that the code matches and confirm. The app then shows your email and approved access.',
+          'Running tasks needs a Jackalope account. Anyone can create one for free. Choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. The app then shows your email and Signed in.',
           'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
         ],
       },
@@ -181,7 +181,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What do I see the first time I open it?',
         paragraphs: [
           'A short welcome introduces the main features and how to reach us. Project setup then asks for your repository, its agents and an optional first task. Routing, commit behavior and colors start from defaults you can change in Project settings.',
-          'The Work page holds your conversations, tasks and plans. The sidebar lists recent work grouped by Needs you, In progress and Recent, and an open item shows review, preview and terminal beside its conversation.',
+          'The Work page holds your conversations, tasks and plans. The sidebar lists each project with its work, things that need you first. Inbox collects what needs you across projects, and Library keeps screenshots and files from your work. An open item shows review, preview and terminal beside its conversation.',
         ],
       },
       {
@@ -192,14 +192,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
         callout: {
           kind: 'tip',
-          text: 'The Discord is a good place to compare workflows with other beta members and hear about changes as they ship.',
+          text: 'The Discord is a good place to compare workflows with other people using Jackalope and hear about changes as they ship.',
         },
       },
       {
         id: 'updates',
         question: 'How do updates work?',
         paragraphs: [
-          'Jackalope checks for updates every hour and offers to install them. Turn on Download updates automatically in Settings → Updates & support to have them ready in advance; Restart to update then appears in the title bar. Microsoft Store builds update through the Store.',
+          'Jackalope checks for updates every hour and offers to install them. Turn on Download updates automatically in Settings → Help & community to have them ready in advance; Restart to update then appears in the title bar. Microsoft Store builds update through the Store.',
         ],
       },
     ],
@@ -207,19 +207,52 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'workspace-modes',
     category: 'workflows',
-    title: 'Find your way around the Work page',
-    shortTitle: 'The Work page',
+    title: 'Find your way around Work, Inbox and Library',
+    shortTitle: 'Work, Inbox & Library',
     description:
-      'The sidebar keeps every piece of work in view, a board shows everything in progress, and the sidebar folds away when you want one thing on screen.',
-    readingTime: '2 min read',
+      'The sidebar keeps your projects and work in view. Inbox shows what needs you, Library keeps screenshots and files, and pins and folders keep work close.',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'which-mode',
         question: 'How is the Work page laid out?',
         paragraphs: [
-          'The sidebar lists your work in three groups: Needs you, In progress and Recent. Selecting an item opens its result, with review, preview, terminal and activity beside the conversation.',
+          'The sidebar lists each project with its work. Inside a project, work that needs you comes first, then running work, then a few recent results. Select an item to open its result, with review, preview, terminal and activity beside the conversation. A project with no work yet shows a launchpad of ways to start and links to its pages.',
           'The work list on the page can show a list or a board. Use the board when several agents are running and you want every stage in view.',
           'Collapse the sidebar with Ctrl+B (Cmd+B on macOS) to keep one conversation on screen, and press it again to bring your work back.',
+        ],
+      },
+      {
+        id: 'favorites-and-folders',
+        question: 'How do I keep important work close?',
+        paragraphs: [
+          'Right-click a project or a piece of work in the sidebar, or use its options button, to find these.',
+        ],
+        bullets: [
+          'Add to favorites puts a project or piece of work in a row of tiles at the top of the sidebar. Choose Remove from favorites to take it off.',
+          'Pin keeps a piece of work at the top of its project. Choose Unpin to let it move with the rest.',
+          'New folder on a project creates a folder you can name. Move work into it with Move to or Move to new folder, and take it out with Remove from folder. Double-click a folder to rename it. Remove folder, keep its work puts its work back in the project list.',
+        ],
+        callout: {
+          kind: 'note',
+          text: 'Favorites, pins and folders are saved on this computer. They do not change the work itself or sync to other devices.',
+        },
+      },
+      {
+        id: 'inbox',
+        question: 'What is the Inbox?',
+        paragraphs: [
+          'Inbox, at the top of the sidebar, gathers what needs you across every project. Its count shows how many items are waiting on you.',
+          'Needs you lists questions, results ready to review, failed checks and work that needs recovery. Each card shows how risky the decision is and, when the evidence is clear, a suggested next step. New results shows what finished recently, with screenshots first. Alerts collects app notices, including an agent allowance that is running low or used up. Running now and Waiting on others show work in progress and pull requests waiting on someone else.',
+          'Filter by Everything, Needs you, Alerts or Activity, or pick one project. Mark all read clears the new markers on results or alerts. Open any item to go straight to it.',
+        ],
+      },
+      {
+        id: 'library',
+        question: 'Where do screenshots and files from my work go?',
+        paragraphs: [
+          'Library, at the top of the sidebar, shows screenshots agents took while checking their work, review captures, images you pasted into prompts, files agents saved under .jackalope/artifacts and images or PDFs a task changed. Newest items come first.',
+          'Filter by project and by Screenshots, Images or Files. Select an item to see where it came from. Show in Finder (Explorer on Windows, Files on Linux) finds it on disk, Open file opens images, PDFs and text files, and Open work goes to the work that made it. Other file types only open from the file manager, since agents write these folders.',
         ],
       },
       {
@@ -227,7 +260,6 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What happened to Focus, Build and Oversee?',
         paragraphs: [
           'They became one layout: a collapsed sidebar covers what Focus did, and the board view covers Oversee. Your work, drafts and saved filters are unchanged.',
-          'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
         ],
       },
       {
@@ -237,6 +269,63 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'After 15 minutes away from Jackalope, the Work page opens with Since you left. It starts with one line about what needs you, then lists what finished or failed while you were away, with screenshots first.',
           'Below that, every item waiting on you has its own card: the decision to make, what it changes, the checks and screenshots behind it, and how risky it is. When the evidence is clear, such as passing checks on a finished task, the card suggests a next step. Open an item from its card, or dismiss the summary when you are done.',
           'Jackalope builds this from your recorded work on your computer, without asking a model. If nothing changed while you were away, it stays hidden.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'voice-to-text',
+    category: 'workflows',
+    title: 'Talk instead of typing with voice to text',
+    shortTitle: 'Voice to text',
+    description:
+      'Dictate into any composer. Jackalope turns speech into text on your computer with a Whisper model you download once.',
+    readingTime: '2 min read',
+    sections: [
+      {
+        id: 'dictate',
+        question: 'How do I dictate a message?',
+        paragraphs: [
+          'Click the mic in a composer, say what you need, then click it again. Your words appear at your cursor, ready to edit. Nothing is sent until you send it yourself.',
+          'Press Escape while recording to throw the recording away. A recording stops on its own after about a minute and is then transcribed. The spoken language is detected automatically.',
+        ],
+      },
+      {
+        id: 'first-use',
+        question: 'What happens the first time?',
+        paragraphs: [
+          'The first time you click the mic, Jackalope asks you to pick a voice model and downloads it once from Hugging Face. It checks the download before using it.',
+        ],
+        bullets: [
+          'Fast: Whisper base, about 60 MB. Quick on any computer.',
+          'Balanced: Whisper small, about 190 MB. More accurate, still quick.',
+          'Most accurate: Whisper large v3 turbo, about 574 MB. Best with accents and jargon.',
+        ],
+        callout: {
+          kind: 'tip',
+          text: 'Jackalope recommends Most accurate on Apple silicon Macs and Fast everywhere else. Pause download stops a download, and installing again picks up where it stopped.',
+        },
+      },
+      {
+        id: 'privacy',
+        question: 'Where does my voice go?',
+        paragraphs: [
+          'The mic records only while it is on. Speech is turned into text on this computer, and Jackalope does not save the audio.',
+          'If Jackalope cannot use the microphone, it shows the reason. Allow microphone access for Jackalope in your system settings and try again.',
+        ],
+      },
+      {
+        id: 'manage-models',
+        question: 'How do I change or remove a voice model?',
+        paragraphs: [
+          'Open Settings → Editor & terminal → Voice to text. Each model shows its size and whether it is in use. Use switches to an installed model, Delete removes one, and Install downloads another.',
+        ],
+      },
+      {
+        id: 'own-server',
+        question: 'Can I use my own transcription server?',
+        paragraphs: [
+          'Yes, but you do not need one. Under Your own transcription server, enter an OpenAI-compatible endpoint on this computer, at 127.0.0.1 or [::1], and its model name. Jackalope uses it only when no voice model is in use, and recordings then go to that server.',
         ],
       },
     ],
@@ -314,7 +403,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I start a conversation from the terminal?',
         paragraphs: [
           'Open a terminal in your project and run jackalope. Describe the work; Jackalope chooses the agent and shows which one it picked and why, the step it is on and the output as it arrives. The directory becomes a project in the app if it was not one already. In a directory that is not a Git repository yet, jackalope asks before creating one and making an initial commit of the current files. Answering no edits that folder directly, with no separate worktree or patch. jackalope --init creates the repository without the question. Home directories and drive roots are left unchanged.',
-          'The command uses the same sessions, accounts and approved access as the app. Replies go to the same conversation. When an agent asks a question, its choices open in the terminal so you can answer with one keypress. Type /help for commands such as /agent to choose the next agent, /diff to review and commit in the app, /stop and /sessions.',
+          'The command uses the same sessions, agent accounts and Jackalope sign-in as the app. Replies go to the same conversation. When an agent asks a question, its choices open in the terminal so you can answer with one keypress. Type /help for commands such as /agent to choose the next agent, /diff to review and commit in the app, /stop and /sessions.',
         ],
         codeBox: {
           title: 'Common commands',
@@ -404,10 +493,6 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new conversation from the updated branch. The delivered conversation retains its history and cannot start more work in the old workspace.',
         ],
         links: [{ label: 'Review and merge step by step', href: '/knowledge/review-and-merge/' }],
-        callout: {
-          kind: 'note',
-          text: 'These workflows are implemented in prerelease source. Installed-provider, recovery, and native-window acceptance remain in progress; check Download for platform availability.',
-        },
       },
     ],
   },
@@ -463,7 +548,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'blocked-merge',
         question: 'Why is the merge blocked even though the agent finished?',
         paragraphs: [
-          'Finishing an attempt does not establish that the result is ready to integrate. Required checks, outcome acceptance, active work, queued messages, a running preview, or changed source and target files can prevent a merge. The diff remains available so you can inspect the work while resolving the blocker.',
+          'A finished attempt is not necessarily ready to merge. Required checks, outcome acceptance, active work, queued messages, a running preview, or changed source and target files can prevent a merge. The diff remains available so you can inspect the work while resolving the blocker.',
         ],
         bullets: [
           'If checks failed, inspect the output and send the relevant failure with a focused follow-up.',
@@ -482,7 +567,6 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Inspect the target branch, combined patch, checks, and proposed commit message before applying the merge. A successful local merge puts the reviewed change on that branch. Workspace cleanup is explicit. If cleanup fails, retain the receipt and retry cleanup; do not assume the merge itself failed.',
           'A local merge does not push a branch, create a pull request, or deploy. Delivery can read local Git and optional GitHub PR and CI state through your authenticated CLI and prepare an editable next-step draft. Review its destination and effects before starting publication work.',
-          'Review and integration safeguards are implemented in prerelease source. Installed-provider and recovery acceptance remain in progress.',
         ],
         links: [
           {
@@ -519,7 +603,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
         steps: [
           'Open the settings button beside Close to review Ask context. Appearance and project context are on by default; saved choices are preserved.',
-          'Ask: “Preview a calm dark theme with a blue accent and low atmosphere.”',
+          'Ask: "Preview a calm dark theme with a blue accent and low atmosphere."',
           'Read the proposed values and open the preview. Try reading a task and its controls before choosing Keep theme, or cancel to restore your saved choice.',
         ],
         callout: {
@@ -628,7 +712,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'concurrency-collisions',
         question: 'How does Jackalope coordinate parallel work?',
         paragraphs: [
-          'Substantial requests are split into subtasks automatically: your selected development agent plans independent pieces with separate file ownership, and they start without a review step. Small requests go straight to one agent. Choose Review before starting while it plans to check the assignments first, or turn off Split work into subtasks in Project settings to always review plans. One parent keeps planning, worker attempts, usage, and the combined result together.',
+          'Substantial requests are split into subtasks automatically: your selected development agent plans independent pieces with separate file ownership, and they start without a review step. Small requests go straight to one agent. Choose Review before starting while it plans to check the assignments first, or turn off Split work into subtasks in Project settings → Automation to always review plans. One parent keeps planning, worker attempts, usage, and the combined result together.',
           'While subtasks run, agents can read each other’s in-progress files, copy a finished interface into their own workspace, and hear right away when their changes stop merging. An agent that finds separable work can split it off to a new parallel worker, and Split this task asks a running agent to do the same. Each piece keeps separate file ownership and joins the combined review.',
           '[Parallel plans](/parallel-coding-agents/) record task scopes, dependencies, and a concurrency limit. The coordinator reserves work before launching an agent; dependencies wait for the changes they need to be integrated.',
           'New managed plans combine groups of completed assignments while other work continues. Shared contracts have one owner or an explicit dependency. Jackalope resolves overlaps in a separate workspace and checks the combined result before handing it to dependent work or final review.',
@@ -644,6 +728,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Open Review & merge, select finished tasks, and prepare their combined patch. Inspect the results, changes, and saved checks before choosing Merge tasks into the target branch.',
           'Applying the review rechecks source and target state, dirty files, and saved evidence, then uses a guarded fast-forward. It does not automatically stash, push, or remove task worktrees. A prepared patch does not prove that the combined code builds.',
+        ],
+      },
+      {
+        id: 'switch-branches',
+        question: 'How do I switch or create a branch for the project?',
+        paragraphs: [
+          'Click the branch name in the bottom status bar. Under Project branches, filter the list and choose a branch to switch the project checkout to it. Choosing a remote branch creates a local branch that tracks it; Jackalope does not fetch first. New branch creates a branch at the current commit and switches to it, taking your uncommitted changes with it.',
+          "Switching to an existing branch needs a clean checkout, so commit your changes first or create a new branch to take them with you. Jackalope also refuses while a task works in the project checkout. A branch that a task's worktree has checked out opens that task instead, and a branch checked out in another folder shows where. The same menu offers Review changes and Manage worktrees.",
         ],
       },
       {
@@ -709,7 +801,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I create a new project on Artifacts or move an existing one?',
         paragraphs: [
           'In project setup, choose Create on Artifacts. Jackalope creates the repository, a local project folder with Git, and pushes the first commit.',
-          'For an existing repository, open Project settings → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local. A repository without commits offers Create first commit, which commits your files as your Git identity after showing how many there are.',
+          'For an existing repository, open Project settings → Integrations → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local. A repository without commits offers Create first commit, which commits your files as your Git identity after showing how many there are.',
         ],
         callout: {
           kind: 'note',
@@ -747,7 +839,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'routing-subprocess',
         question: 'How does automatic agent selection work?',
         paragraphs: [
-          'Settings → Decisions chooses local rules, agent-powered reasoning, or Jev-assisted decisions. Projects inherit the app default unless you override it. Automatic tasks select among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
+          'Agents → Routing chooses Local rules, Agent-powered or Jev-assisted decisions. Projects inherit the app default unless you override it. Automatic tasks select among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
           'Local rules use preferences and current capacity without a model call. Agent-powered routing uses your default agent. Optional Jev uses your TypeSafe key and may reduce routing cost and latency; savings are not guaranteed. Jackalope validates the decision and saves its reason and any reported usage. For Jev uncertainty or service errors, choose Local (the default, with no extra model cost) or Agent-powered fallback, which uses agent tokens or subscription capacity. If that agent attempt fails, local rules take over. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity and Gemini CLI run as workers. Explicit assignments remain available.',
           'Under Routing goals and optional assistance, choose Quality first, Balanced or Economical. Cost-aware choices need sufficient relevant history with complete recorded costs; otherwise quality ranking stays in place. You can add sourced facts for exact models. Unknown capabilities and costs remain unknown.',
           'Additional Jev helpers are off by default. Enable relevant context selection, failure categories, requirement coverage, review priorities, unrelated-change filtering or Automatic assignment matching per app or project. These calls may send guidance, candidate lessons, diffs, results and check output to TypeSafe and have separate API costs. Advice cannot approve work, change explicit assignments or retry a denied action. Usage lists their purposes separately, including calls that launched no worker.',
@@ -841,7 +933,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Install the agent CLI, open Agents and choose Configure beside the agent. Select the intended default or named account.',
           'Complete that profile’s sign-in or key setup. Review provider billing and model access for the selected account.',
-          'Choose the account in the project settings, then create an explicitly assigned task: “Read the project instructions and summarize how to run the tests. Do not change files.”',
+          'Choose the account in the project settings, then create an explicitly assigned task: "Read the project instructions and summarize how to run the tests. Do not change files."',
           'Inspect the bound agent/account and the result. If access fails, repair that same profile before trying a larger task.',
         ],
         links: [
@@ -903,7 +995,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'central-broker',
         question: 'How are project MCP tools delivered?',
         paragraphs: [
-          'Configure connections in MCP → Connections and select the project tools for a task. Codex supports direct stdio and HTTP connections; Claude Code also supports SSE.',
+          'Configure connections in Agents → Tools and select the project tools for a task. Codex supports direct stdio and HTTP connections; Claude Code also supports SSE.',
           'Supported task adapters offer on-demand discovery for stdio and HTTP connections. Grok, Antigravity, and Gemini CLI use an HTTP bridge and need permission for an HTTP client. Direct delivery supports Codex, Claude Code, OpenCode, and Kimi Code; CLI-global tools still use the agent’s own configuration.',
         ],
       },
@@ -941,7 +1033,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
             href: '/knowledge/connecting-custom-mcp-servers/',
           },
           {
-            label: 'Use a native Windows window instead',
+            label: 'Use a desktop app instead',
             href: '/knowledge/windows-desktop-control/',
           },
         ],
@@ -968,42 +1060,65 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     slug: 'windows-desktop-control',
     category: 'desktop-control',
     title: 'Let an agent work in your apps',
-    shortTitle: 'Windows desktop control',
+    shortTitle: 'Desktop control',
     description:
-      'Grant a window, an app or your desktop for a task, understand its control status, and pause or cancel when you need your computer.',
-    readingTime: '2 min read',
+      'Grant a window, an app or your desktop for a task, see which platforms support which grants, and pause or cancel when you need your computer.',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'window-grants',
         question: 'How do window, app and desktop grants work?',
         paragraphs: [
           'When an agent asks, you choose what it may use for the current task: one window, every window of one app, or your whole desktop. Jackalope’s own windows are always off limits. Jackalope’s desktop tools check that grant before accessibility reads, captures, and native input.',
-          'For a window or app you can choose Always allow for the project, so later tasks that name that app start without asking. Full desktop access is asked for every task. Remove remembered apps and websites in Project settings under Desktop control.',
+          'For a window or app you can choose Always allow for the project, so later tasks that name that app start without asking. Full desktop access is asked for every task. Remove remembered apps and websites in Project settings → Integrations → Desktop control.',
           'To use your signed-in web accounts, grant your browser as an app. The first time the agent reaches a website, Jackalope asks whether to allow it for this task, always, or never.',
-          'These grants control Jackalope’s desktop tools, not the agent’s other local capabilities. Desktop control operates the live user session and does not create an OS sandbox. This guide covers Windows. macOS, Linux X11, GNOME 46 Wayland and Wayland desktop portal backends require platform acceptance before release; GNOME Wayland uses the Jackalope Window Control extension when it is enabled. Other Wayland desktops, such as KDE Plasma, offer app and full-desktop grants when they provide the remote desktop portal: approve your desktop’s prompt to begin, and stop sharing from its indicator to end access. Your own input does not pause control there. Headless Linux sessions and Wayland desktops without that portal are unsupported.',
+          'These grants control Jackalope’s desktop tools, not the agent’s other local capabilities. Desktop control operates your live session and does not create an OS sandbox.',
+        ],
+      },
+      {
+        id: 'attach-window',
+        question: 'Can I hand an agent a window myself?',
+        paragraphs: [
+          'Yes. In a conversation, drag the agent at the top left out of Jackalope and drop it on any window. Jackalope names the window under your pointer, then asks whether the agent may see it or see and control it. Nothing is shared until you choose.',
+          "The agent's next request for one window uses the window you picked, without asking again, for up to 30 minutes. See-only lets it read and screenshot the window but not click or type. A chip beside the agent shows the attached window; click its × to detach it.",
+          'Prefer the keyboard? Focus the agent and press Enter to choose from a list of open windows. The drag works on Windows and macOS; Linux on X11 uses the list.',
+        ],
+      },
+      {
+        id: 'platforms',
+        question: 'Which platforms support desktop control?',
+        paragraphs: [
+          'What an agent can use depends on your system. Windows has had the most real-world use; macOS and Linux support is newer and still being tested on real devices.',
+        ],
+        bullets: [
+          'Windows and macOS: one window, one app or the whole desktop.',
+          'Linux on X11: one window.',
+          "Ubuntu's GNOME 46 on Wayland: one window, through the Jackalope Window Control extension once it is enabled.",
+          'KDE Plasma, GNOME 44 and later, and other Wayland desktops with the standard remote desktop portal: one app or the whole desktop. Single windows are not offered there.',
+          'Sway, Hyprland and other Wayland desktops without the remote desktop portal, and headless Linux sessions, are not supported.',
         ],
       },
       {
         id: 'visual-indicators',
-        question: 'What visual indicators show that Jackalope is interacting with a window?',
+        question: 'How do I know an agent is using my computer?',
         paragraphs: [
-          'Whenever an agent is actively controlling a granted window, Jackalope renders a high-visibility, top-centered status bar above your display, accompanied by a broad theme-colored perimeter glow around the active window.',
-          'The status bar explicitly announces "Jackalope is using your computer" and provides prominent, one-click Pause and Cancel buttons. You are never left wondering if an agent is currently controlling the machine.',
+          'On Windows, a bar at the top of the screen names what the agent controls, such as "Jackalope is using your computer", and a glow in your accent color surrounds the active window. On macOS and Linux X11 a similar bar appears, and macOS adds a frame around the granted window or screens. Each bar has Pause or Resume and Cancel buttons.',
+          'On macOS and Linux X11, a grant starts paused. Click Resume on the bar to begin.',
+          "On Wayland desktops that use the remote desktop portal, there is no Jackalope bar. Approve your desktop's own sharing prompt to begin, and use its sharing indicator to see or stop access. The task's Screen view shows control on every platform.",
         ],
       },
       {
         id: 'physical-interruption',
-        question:
-          'How do physical interruptions (mouse movement, focus loss, Escape) pause control?',
+        question: 'What pauses or cancels control?',
         paragraphs: [
-          'Human safety overrides agent automation at all times. Jackalope installs native low-level hardware hooks that monitor physical input devices.',
-          'If you move your physical mouse, touch the keyboard, switch active window focus, or press the physical Escape key, Jackalope instantly revokes the agent’s input lease and halts interaction.',
+          'On Windows, macOS and Linux X11, your own input always comes first. Jackalope watches your physical mouse and keyboard and stops interacting right away when you use them.',
         ],
         bullets: [
-          'Physical mouse movement immediately transitions automation into the Paused state.',
-          'Pressing the Escape key immediately cancels the active desktop control lease.',
-          'Window focus loss or minimize events pause execution until you explicitly review and click Resume.',
-          'Resuming requires taking a fresh visual snapshot to prevent stale-state misclicks.',
+          'Moving the physical mouse or typing puts control in the Paused state right away.',
+          'Pressing the physical Escape key cancels access right away.',
+          'With a window grant, the window losing focus, being minimized, moved or resized pauses control. With an app grant, another app coming forward pauses it. A desktop grant pauses only on your input.',
+          'Only you can click Resume. After you resume, the agent takes a fresh snapshot so it does not click on an outdated screen.',
+          "On portal desktops, your input does not pause control and Escape does not cancel. Stop sharing from your desktop's indicator, or stop the task, to end access.",
         ],
       },
       {
@@ -1020,9 +1135,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Begin with an inspection task, such as reading the labels in a sample app. Public pages usually fit the built-in browser tools; desktop control is for your own apps and your signed-in browser.',
         ],
         steps: [
-          'Open the application in your Windows session and choose its window or app when the agent asks. State the intended action and anything that requires your review.',
+          'Open the application and choose its window or app when the agent asks. State the intended action and anything that requires your review.',
           'Follow along in the task’s Screen view, which lists each action, how it was sent and a small capture afterwards.',
-          'Keep the target visible and watch the control status. If you need the computer, pause or cancel through the status bar.',
+          "Keep the target visible and watch the control status. If you need the computer, pause or cancel from the control bar, or from your desktop's sharing indicator on portal desktops.",
           'After an interruption, review the current window before resuming. The agent needs a fresh snapshot because the UI may have changed.',
           'Read the task result and inspect the application itself. A completed input action is not proof that an external service accepted or saved it.',
         ],
@@ -1048,7 +1163,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'missing-cli-path',
         question: 'Did the task fail before the agent started?',
         paragraphs: [
-          'Read the first launch error. “Executable not found” points to installation or discovery; an authentication error points to the selected account; a capacity or eligibility message points to routing. Repeated retries will not fix a missing executable or an expired sign-in.',
+          'Read the first launch error. "Executable not found" points to installation or discovery; an authentication error points to the selected account; a capacity or eligibility message points to routing. Repeated retries will not fix a missing executable or an expired sign-in.',
         ],
         links: [
           {
@@ -1089,7 +1204,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Find the earliest substantive error in the result or command output. Later failures may only be consequences: for example, a test command cannot assess the code if dependencies never installed.',
         ],
         bullets: [
-          'Record the failing command, its working directory, exit status, and relevant error. Distinguish “could not run” from a test assertion failure.',
+          'Record the failing command, its working directory, exit status, and relevant error. Distinguish "could not run" from a test assertion failure.',
           'Check which files changed before retrying. An unsuccessful task may still have useful work or an unfinished edit.',
           'For browser or MCP failures, record the connection, requested action, and observed error. Remove tokens, private URLs, and personal data from anything you share.',
           'For support, explain the expected result, what actually happened, and the smallest steps that reproduce it. Include the app version from the support report.',
@@ -1107,15 +1222,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'app-updates',
         question: 'How does Jackalope update itself?',
         paragraphs: [
-          'Installed Jackalope checks for updates shortly after it opens and every hour while its window is in use. When a newer version is ready, Jackalope tells you and offers Download and install. To get updates ready sooner, turn on Download updates automatically in Settings → Updates & support; when a download finishes, Restart to update appears in the title bar. Nothing installs until you choose it, and installing waits until running tasks finish. Microsoft Store builds update through the Store.',
-          'In Settings → Updates & support you can check now, turn automatic checks off and, when offered, choose the Stable or Beta update channel. If a check fails, the notice shows the reason.',
+          'Installed Jackalope checks for updates shortly after it opens and every hour while its window is in use. When a newer version is ready, Jackalope tells you and offers Download and install. To get updates ready sooner, turn on Download updates automatically in Settings → Help & community; when a download finishes, Restart to update appears in the title bar. Nothing installs until you choose it, and installing waits until running tasks finish. Microsoft Store builds update through the Store.',
+          'In Settings → Help & community you can check now, turn automatic checks off and, when offered, choose the Stable or Beta update channel. If a check fails, the notice shows the reason.',
         ],
       },
       {
         id: 'diagnostic-bundles',
         question: 'How do I prepare a support report?',
         paragraphs: [
-          'In Settings → Updates & support, choose Preview support report. It shows app version, OS, and task outcome counts, excluding account names, credentials, project paths, prompts, code, and command output.',
+          'In Settings → Help & community, choose Preview support report. It shows app version, OS, and task outcome counts, excluding account names, credentials, project paths, prompts, code, and command output.',
           'Add reproduction details, then choose Copy report and feedback. Review your own text for sensitive information before sharing. Copying the report does not send it.',
         ],
       },
@@ -1123,7 +1238,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'verification-checklist',
         question: 'What should I check before requesting support?',
         paragraphs: [
-          'Check that the CLI works in a terminal, inspect git status and git worktree list, and review the selected profile in Agents → Configuration. Check Settings → Updates & support for update information. Include the actual error and reproduction steps in your report.',
+          'Check that the CLI works in a terminal, inspect git status and git worktree list, and review the selected profile by opening Agents and choosing Configure beside the agent. Check Settings → Help & community for update information. Include the actual error and reproduction steps in your report.',
         ],
       },
     ],
@@ -1131,7 +1246,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'fixing-cli-path-on-windows',
     category: 'troubleshooting',
-    title: 'Fix “CLI not found” on Windows',
+    title: 'Fix "CLI not found" on Windows',
     shortTitle: 'Fix CLI discovery',
     description:
       'Fix Windows CLI detection for Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity with PATH checks and restart steps.',
@@ -1154,7 +1269,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I check the installed command directory?',
         paragraphs: [
           'Use the installation method you actually chose. For npm, inspect its configured global prefix; for another installer, locate its executable directory. Do not add every common package-manager directory just in case.',
-          'Open Windows “Edit environment variables for your account”, edit the User Path, and add the verified directory if it is missing. Keep existing entries. The commands below inspect values; they do not change PATH.',
+          'Open Windows "Edit environment variables for your account", edit the User Path, and add the verified directory if it is missing. Keep existing entries. The commands below inspect values; they do not change PATH.',
         ],
         codeBox: {
           title: 'Inspect npm and User PATH',
@@ -1169,7 +1284,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
         steps: [
           'Fully quit Jackalope, including its tray instance, and reopen it after saving the persistent PATH change.',
-          'Check discovery in Agents → Configuration. If the app still inherits an old environment, save your other work and sign out of Windows, then sign back in.',
+          'Check discovery in Agents, then choose Configure beside the agent. If the app still inherits an old environment, save your other work and sign out of Windows, then sign back in.',
           'Select the intended account and run a small task. If discovery succeeds but the provider rejects the request, continue with account setup rather than changing PATH again.',
         ],
         links: [
@@ -1187,7 +1302,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Resolve a Git lock without losing work',
     shortTitle: 'Resolve Git locks',
     description:
-      'How to safely diagnose, remove, and prevent stale Git index locks and orphaned worktrees left by abnormal system termination.',
+      'How to safely diagnose, remove and prevent stale Git index locks and orphaned worktrees left behind by an unexpected shutdown.',
     readingTime: '2 min read',
     sections: [
       {
@@ -1221,7 +1336,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'after-unlock',
         question: 'What should I check after resolving the lock?',
         paragraphs: [
-          'Only remove the exact lock after confirming its owning operation has ended. Do not use a recursive “delete all lockfiles” command. If ownership is uncertain, leave it in place while you investigate.',
+          'Only remove the exact lock after confirming its owning operation has ended. Do not use a recursive "delete all lockfiles" command. If ownership is uncertain, leave it in place while you investigate.',
         ],
         steps: [
           'Run git status in the affected checkout and inspect remaining changes. Retry the single operation that was blocked.',
@@ -1254,7 +1369,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'mcp-overview',
         question: 'How do I connect project tools?',
         paragraphs: [
-          'Open Agents → Tools and choose Add tools for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
+          'Open Agents → Tools and choose Add tools for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Add custom connection for your own endpoint or local command.',
         ],
       },
       {
@@ -1297,7 +1412,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Ask for one known record or a read-only list from the connected service. Specify the connection name and expected kind of result, then inspect the task’s tool result. An agent saying it has access is not a connection test.',
         ],
         bullets: [
-          '“Command not found”: verify the local executable and its arguments.',
+          '"Command not found": verify the local executable and its arguments.',
           'Authentication failure: check the server credential or the bound CLI account, including its permissions.',
           'Connection probes successfully but no tool appears: review project scope, task selection, agent eligibility, and transport support.',
           'Tool returns the wrong data: check the server’s account, workspace, resource scope, and request arguments.',
@@ -1328,7 +1443,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'why-schedules',
         question: 'Why run coding agent tasks on recurring schedules?',
         paragraphs: [
-          'Certain engineering tasks should happen proactively rather than waiting for user requests: daily dependency vulnerability checks, nightly test suite refactors, documentation drift scans, or automated codebase health reports.',
+          'Some work is worth running on a schedule instead of waiting for someone to ask, such as daily dependency vulnerability checks, nightly test suite refactors, documentation drift scans or codebase health reports.',
           'Jackalope keeps recurring work with its project, instructions, account, and execution target. Each agent run has its own result and review history. Choose the checks in your instructions and inspect their evidence when the task returns.',
         ],
       },
@@ -1336,7 +1451,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-schedule',
         question: 'Try it: a weekday documentation check',
         paragraphs: [
-          'Start with a report-only task so you can inspect its output before giving recurring work permission to edit. In Tasks → Recurring, create a schedule for the intended project.',
+          'Start with a report-only task so you can inspect its output before giving recurring work permission to edit. In Bots → Schedules, choose New schedule for the intended project.',
         ],
         steps: [
           'Choose the agent/account and execution target. Write a narrow brief that identifies the files to inspect and the expected report.',
@@ -1400,7 +1515,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Try it: improve one empty state',
         paragraphs: [
           'Work opens with a composer. Send a message to start a conversation, or use Options for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
-          'Project setup takes three steps: your repository, your agents, and an optional first task. Decisions, Git behavior and colors start from defaults you can change in Project Settings. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
+          'Project setup takes three steps: your repository, your agents, and an optional first task. Routing, Git behavior and colors start from defaults you can change in Project settings. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project settings → Commands before starting work; setup does not run commands or enable automatic checks.',
           'Select Sharpen, the sparkle button under the message box, to rewrite your draft into a deeper version of the same task: what an expert would also check, the raw material to start from, the methods to use and an outside check that proves the result. Choices that are yours stay open. It uses one agent call, never sends, and Undo sharpen brings back your draft until you edit it. In the terminal, /sharpen <draft> does the same.',
           'The composer offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
@@ -1434,7 +1549,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'task-speed',
         question: 'Can I speed up tasks without reducing model effort?',
         paragraphs: [
-          'Choose Codex speed under Customize task, or in the options for a new conversation. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
+          "Choose Codex speed in the composer's Options. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.",
           'The choice follows planned assignments, retries and continuations. Task details record the requested tier and offer Execution timing for measured setup, context and check stages. Some stages overlap, and older records may have no measurements. Provider acceptance and actual speed gains require observation.',
           'Jackalope supplies relevant repository context and completed setup facts, reuses matching saved checks and schedules independent work through workspace safeguards. Required verification and review still apply.',
         ],
@@ -1451,9 +1566,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'remote-access',
         question: 'How do I continue from another computer or my phone?',
         paragraphs: [
-          'On the machine that runs your work, open Settings → Remote access, enable paired devices, select projects and save. Keep Jackalope running. Selected projects share task content and allow paired devices to start isolated tasks, answer questions and send follow-ups using the host’s saved settings.',
-          'For another desktop, select This computer in the bottom bar, then choose Connect a host. Use an SSH alias that already signs in with a verified host key, or an HTTPS address. Create a pairing code on the host and paste it on the connecting desktop.',
-          'For a phone, set up private HTTPS with Tailscale after signing both devices into Tailscale, or enter your existing HTTPS proxy address under Connection settings. Create a pairing link, open it on the phone and name the device. Links work once and expire after five minutes. Revoke devices from the host settings.',
+          'On the machine that runs your work, open Settings → Devices → Let devices use this one, choose the projects to share, turn on remote access and save. Keep Jackalope running. Selected projects share task content and allow paired devices to start isolated tasks, answer questions and send follow-ups using the host’s saved settings.',
+          'For another desktop, open Settings → Devices → Use other computers and choose Connect a host. Use an SSH alias that already signs in with a verified host key, or an HTTPS address. Create a pairing code on the host and paste it on the connecting desktop.',
+          "For a phone, set up private HTTPS with Tailscale after signing both devices into Tailscale, or enter your existing HTTPS proxy address under Connection settings. Create a pairing link, open it on the phone and name the device. Links work once and expire after five minutes. Revoke devices from the host's Devices page.",
           'Work continues on the host when you disconnect. Refresh status before retrying an interrupted action. Reconnecting reuses saved send identifiers to avoid duplicate messages. Host restart retains normal paused/recovery behavior. Phone and multi-device installed acceptance remain in progress; native mobile applications and managed hosting are not included.',
         ],
       },
@@ -1553,7 +1668,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'atmosphere-slider',
         question: 'What does the Atmosphere slider change?',
         paragraphs: [
-          'Atmosphere controls the color saturation and visual depth of background surfaces, sidebars, and elevation layers. At low atmosphere (8–12), the interface is whisper-quiet and neutral. At higher atmosphere (up to 64), your chosen accent tint gently permeates cards, elevated surfaces, and window glass.',
+          'Atmosphere controls the color saturation and visual depth of background surfaces, sidebars, and elevation layers. At low atmosphere (8–12), the interface stays quiet and neutral. At higher atmosphere (up to 64), your accent color tints cards, elevated surfaces and window glass.',
         ],
       },
       {

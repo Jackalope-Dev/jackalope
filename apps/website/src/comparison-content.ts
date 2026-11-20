@@ -57,7 +57,7 @@ const comparisons: Comparison[] = [
     reviewed: '2026-09-17',
     description:
       'Jackalope vs Codex app: compare local worktrees, cloud execution, code review, and using Codex alongside other coding-agent CLIs.',
-    lede: 'Both support parallel work in Git worktrees and reviewing changes. Jackalope brings multiple supported agent CLIs into one local workflow; OpenAI’s Codex experience also offers cloud environments.',
+    lede: "Both support parallel work in Git worktrees and reviewing changes. Jackalope brings multiple supported agent CLIs into one local workflow; OpenAI's Codex experience also offers cloud environments.",
     signals: ['Git worktrees', 'Agent choice', 'Local or cloud', 'Code review'],
     overview: {
       jackalope: 'Coordinate supported agent CLIs, accounts, and combined local review.',
@@ -82,7 +82,7 @@ const comparisons: Comparison[] = [
       {
         topic: 'Agent workflow',
         jackalope: 'Codex, Claude Code, Gemini CLI, and other supported local adapters.',
-        competitor: 'The Codex experience documented in OpenAI’s desktop app.',
+        competitor: "The Codex experience documented in OpenAI's desktop app.",
       },
       {
         topic: 'Execution environment',
@@ -104,7 +104,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Which Codex product is being compared?',
         paragraphs: [
-          'This page compares the desktop Codex workflow, currently documented by OpenAI within the ChatGPT desktop app. The Codex CLI is a separate interface and is the adapter Jackalope launches. Connecting that CLI to Jackalope does not embed or control OpenAI’s desktop app.',
+          "This page compares the desktop Codex workflow, currently documented by OpenAI within the ChatGPT desktop app. The Codex CLI is a separate interface and is the adapter Jackalope launches. Connecting that CLI to Jackalope does not embed or control OpenAI's desktop app.",
           'OpenAI documents parallel chats in worktrees, local setup scripts, and Git review controls. Worktree support is common ground here. Choose around the surrounding workflow and where execution needs to happen.',
         ],
       },
@@ -112,15 +112,15 @@ const comparisons: Comparison[] = [
         title: 'When does a multi-agent workspace help?',
         paragraphs: [
           'Consider Jackalope when you use Codex alongside Claude Code or another supported CLI and want project accounts, task history, checks, and related changes together. [A reviewed plan can coordinate separate assignments](/parallel-coding-agents/) while keeping one parent result to inspect.',
-          'If your work already fits Codex’s local or cloud workflow, try its existing worktree and review controls first. A second workspace is useful when it removes a concrete coordination problem, not merely because it can open more sessions.',
+          "If your work already fits Codex's local or cloud workflow, try its existing worktree and review controls first. A second workspace is worth adding when it fixes a concrete coordination problem. Being able to open more sessions isn't a reason on its own.",
         ],
         links: [{ label: 'Codex CLI integration in Jackalope', href: '/agents/codex/' }],
       },
       {
         title: 'Check the execution boundary and the finished result.',
         paragraphs: [
-          'Codex documents a Cloud mode as well as execution on your computer. Jackalope task execution is local today. If work must continue on a hosted environment while your development computer is off, that is a material difference to evaluate.',
-          'For a local comparison, use a small change with a failing test and one follow-up. Check which files were tested, how review comments reach the agent, and how the result returns to the target branch. Jackalope remains prerelease, and provider access is supplied by your own account.',
+          "Codex documents a Cloud mode as well as execution on your computer. Jackalope task execution is local today. If work must continue on a hosted environment while your development computer is off, that's a real difference to weigh.",
+          'For a local comparison, use a small change with a failing test and one follow-up. Check which files were tested, how review comments reach the agent, and how the result returns to the target branch. Provider access is supplied by your own account.',
         ],
         links: [
           { label: 'Jackalope review and merge controls', href: '/knowledge/review-and-merge/' },
@@ -163,7 +163,7 @@ const comparisons: Comparison[] = [
       {
         topic: 'Agent workflow',
         jackalope: 'Bring supported CLIs and their provider accounts into a shared workspace.',
-        competitor: 'Cursor Agent edits files, uses tools, and runs commands in Cursor’s workflow.',
+        competitor: "Cursor Agent edits files, uses tools, and runs commands in Cursor's workflow.",
       },
       {
         topic: 'Parallel work',
@@ -187,23 +187,23 @@ const comparisons: Comparison[] = [
       {
         title: 'Cursor is more than an autocomplete comparison.',
         paragraphs: [
-          'Cursor’s current documentation covers an agent that edits code and runs tools, worktrees for parallel changes, and Cloud Agents. Its UI worktree controls live in the Agents Window; the IDE also has worktree skills. Evaluate the surface you intend to use.',
-          'Jackalope’s focus is the work around installed agent CLIs: which project and account own a task, what context carries forward, and how [several changes reach a reviewable result](/parallel-coding-agents/). It does not replace every editing feature in an IDE.',
+          "Cursor's current documentation covers an agent that edits code and runs tools, worktrees for parallel changes, and Cloud Agents. Its UI worktree controls live in the Agents Window; the IDE also has worktree skills. Evaluate the surface you intend to use.",
+          "Jackalope's focus is the work around installed agent CLIs: which project and account own a task, what context carries forward, and how [several changes reach a reviewable result](/parallel-coding-agents/). It does not replace every editing feature in an IDE.",
         ],
       },
       {
         title: 'Decide where the work must run.',
         paragraphs: [
-          'Cursor documents cloud execution on separate virtual machines with browser and desktop capabilities. That is relevant when a task must continue without your laptop online. Jackalope’s tasks, recurring work, and local change monitors depend on the machine running the app; remote execution remains roadmap work.',
+          "Cursor documents cloud execution on separate virtual machines with browser and desktop capabilities. That matters when a task must continue without your laptop online. Jackalope's tasks, recurring work, and local change monitors depend on the machine running the app; remote execution remains roadmap work.",
           'Worktree separation alone does not isolate processes from local operating-system permissions. Check the tools, credentials, and environment used by the exact workflow you select in either product.',
         ],
-        links: [{ label: 'Jackalope’s current roadmap', href: '/roadmap/' }],
+        links: [{ label: "Jackalope's current roadmap", href: '/roadmap/' }],
       },
       {
         title: 'Compare a complete change, including one correction.',
         paragraphs: [
           'Use an existing repository and a small change with a clear acceptance check. Review the first result, send a focused correction, then inspect the final files and test output. Compare the effort required to recover context and deliver the change, rather than using agent count as a quality score.',
-          'Consider Jackalope early access if coordinating several supported CLIs is the missing part of your workflow. Consider Cursor’s documented local and cloud flows when you want those capabilities within Cursor. Jackalope is prerelease; this comparison does not establish performance or cost advantages.',
+          "Consider Jackalope if coordinating several supported CLIs is the missing part of your workflow. Consider Cursor's documented local and cloud flows when you want those capabilities within Cursor. This comparison does not establish performance or cost advantages.",
         ],
         links: [{ label: 'Supported Jackalope agents', href: '/agents/' }],
       },
@@ -270,9 +270,9 @@ const comparisons: Comparison[] = [
           'Superset presents an agent-independent workspace with parallel worktrees, recurring automation, remote hosts, and a built-in review flow. It lets developers retain their agent accounts and switch agents by task. Its documentation also describes a CLI, TypeScript SDK, and MCP server for controlling the workspace programmatically.',
         ],
         links: [
-          { label: 'Read Superset’s product overview', href: 'https://superset.sh/' },
+          { label: "Read Superset's product overview", href: 'https://superset.sh/' },
           {
-            label: 'Browse Superset’s documentation',
+            label: "Browse Superset's documentation",
             href: 'https://docs.superset.sh/',
           },
           { label: 'Superset automations', href: 'https://docs.superset.sh/automations' },
@@ -290,13 +290,13 @@ const comparisons: Comparison[] = [
         title: 'Compare integration, not just parallel execution',
         paragraphs: [
           'A good evaluation should include two agents changing related behavior. [Separate worktrees](/git-worktrees-for-ai-agents/) prevent edits from colliding in one directory, but they cannot prevent incompatible assumptions about an API or data shape. You still need a review of the combined result.',
-          'Jackalope prepares a combined patch from selected results and rechecks the source and target before an explicit integration action. Assess whether that step helps you catch problems earlier than reviewing independent branches alone. Keep your project checks in the trial: neither a completed agent response nor a clean merge establishes correct behavior.',
+          "Jackalope prepares a combined patch from selected results and rechecks the source and target before an explicit integration action. Assess whether that step helps you catch problems earlier than reviewing independent branches alone. Keep your project checks in the trial. A completed agent response or a clean merge doesn't prove the behavior is correct.",
         ],
       },
       {
         title: 'Accounts, automation, and cost',
         paragraphs: [
-          'Superset requires a Pro or Enterprise plan to create, run, or resume automations. Its automation documentation distinguishes a created workspace from a successful agent outcome: run history records dispatch, while the workspace contains the resulting work. It also documents failed dispatch to offline hosts. Include both the scheduled run and the agent’s actual result when evaluating recurring work.',
+          "Superset requires a Pro or Enterprise plan to create, run, or resume automations. Its automation documentation distinguishes a created workspace from a successful agent outcome: run history records dispatch, while the workspace contains the resulting work. It also documents failed dispatch to offline hosts. Include both the scheduled run and the agent's actual result when evaluating recurring work.",
           'For either workspace, list the agents and accounts you actually need before choosing. In Jackalope, provider support differs by adapter, and a catalog entry does not by itself mean task execution is implemented. Use the compatibility page to check your required agent and tool flow.',
           'Jackalope uses your installed agents and provider access; model usage is not included. Its public price has not been announced. Separate workspace charges, model usage, and any remote compute when estimating cost. For unattended local tasks, include the practical requirement that the host and required services remain available.',
         ],
@@ -304,7 +304,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Which workflow should you try?',
         paragraphs: [
-          'Our assessment: include Superset in your shortlist when remote hosts or scripting the workspace is central to the way you work. Consider Jackalope early access when your main challenge is maintaining task continuity and bringing dependent changes together for one deliberate review.',
+          'Our take: put Superset on your shortlist if remote hosts or scripting the workspace are central to how you work. Try Jackalope if your main problem is keeping task continuity and bringing dependent changes together for one deliberate review.',
           'Try a small feature split into a backend change, a user interface change, and a verification task. Record how often you must repeat context, how a blocked task becomes visible, and what evidence survives a follow-up. Those observations are more useful than counting how many sessions you can open.',
         ],
       },
@@ -323,7 +323,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Can I download Jackalope now?',
         answer:
-          'Jackalope is in early access: download it for Windows, macOS or Linux, then sign in with a free account. Public pricing has not been announced.',
+          'Download Jackalope for Windows, macOS or Linux, then sign in with a free account. Public pricing has not been announced.',
       },
     ],
   },
@@ -376,8 +376,8 @@ const comparisons: Comparison[] = [
           'Orca combines agent terminals, Git worktrees, editing, browser tools, and diffs. Its product page describes Design Mode, inline diff comments sent to agents, GitHub and Linear integration, SSH worktrees, and mobile access. Its documentation positions remote compute on machines and cloud accounts you control.',
         ],
         links: [
-          { label: 'Explore Orca’s published features', href: 'https://www.onorca.dev/' },
-          { label: 'Read Orca’s workspace model', href: 'https://www.onorca.dev/docs' },
+          { label: "Explore Orca's published features", href: 'https://www.onorca.dev/' },
+          { label: "Read Orca's workspace model", href: 'https://www.onorca.dev/docs' },
           { label: 'Orca Design Mode', href: 'https://www.onorca.dev/docs/browser/design-mode' },
           { label: 'Orca mobile companion', href: 'https://www.onorca.dev/docs/mobile' },
         ],
@@ -392,29 +392,29 @@ const comparisons: Comparison[] = [
       {
         title: 'Browser inspection should end in usable evidence',
         paragraphs: [
-          'For a user interface fix, include the reproduction steps, the expected result, a narrow viewport, and keyboard behavior in the task brief. Jackalope’s browser workflow can retain screenshots and accessibility findings with the task so that review has more to go on than the agent’s summary.',
+          "For a user interface fix, include the reproduction steps, the expected result, a narrow viewport, and keyboard behavior in the task brief. Jackalope's browser workflow can retain screenshots and accessibility findings with the task so that review has more to go on than the agent's summary.",
           'Compare how naturally each workspace lets you move from an observed defect to a focused correction and then to evidence of the repaired behavior. A screenshot is one state, not proof that the entire flow works. Keep an explicit check for the original bug and any important failure state.',
         ],
       },
       {
         title: 'Review across more than one branch',
         paragraphs: [
-          'Jackalope can prepare a combined patch from [parallel task results](/parallel-coding-agents/) before integration. For a feature with dependencies, its plan records which work must be integrated before the next task begins. These controls help separate “the agent finished” from “the change is ready for dependent work.”',
-          'An effective trial includes a deliberately overlapping edit. Ask what happens when one task changes a shared type and another uses the old contract. Evaluate the review information, recovery path, and amount of manual explanation needed. Worktree isolation alone cannot resolve that kind of disagreement.',
+          'Jackalope can prepare a combined patch from [parallel task results](/parallel-coding-agents/) before integration. For a feature with dependencies, its plan records which work must be integrated before the next task begins. These controls help separate "the agent finished" from "the change is ready for dependent work."',
+          'A good trial includes a deliberately overlapping edit. Ask what happens when one task changes a shared type and another uses the old contract. Evaluate the review information, recovery path, and amount of manual explanation needed. Worktree isolation alone cannot resolve that kind of disagreement.',
         ],
       },
       {
         title: 'Choose around your daily loop',
         paragraphs: [
-          'Orca’s mobile companion documentation labels it beta and describes pairing to a desktop, with status, recent output, and selected controls available from a phone. Check the required host connection and the actions you need before treating mobile access as a replacement for the desktop review workflow.',
-          'Our assessment: Orca deserves consideration if a pane-based development environment, direct visual feedback to agents, or access to remote work is essential. Jackalope is worth evaluating if you want project context, task continuity, and combined review to organize your local agent work.',
+          "Orca's mobile companion documentation labels it beta and describes pairing to a desktop, with status, recent output, and selected controls available from a phone. Check the required host connection and the actions you need before treating mobile access as a replacement for the desktop review workflow.",
+          'Our take: Orca is worth a look if a pane-based development environment, direct visual feedback to agents, or access to remote work is essential. Jackalope is worth trying if you want project context, task continuity, and combined review to organize your local agent work.',
           'Keep account requirements in the trial as well. Jackalope supports named agent profiles where the adapter permits them, but provider coverage differs. Model access comes from your own provider, and public Jackalope pricing has not been announced. Start with a disposable project and one familiar agent before moving a demanding workflow.',
         ],
       },
     ],
     faqs: [
       {
-        question: 'Does Jackalope have Orca’s mobile workflow?',
+        question: "Does Jackalope have Orca's mobile workflow?",
         answer:
           'No. Phone access and remote hosts remain future work for Jackalope. A workflow that requires those today needs a product with that capability already available.',
       },
@@ -483,14 +483,14 @@ const comparisons: Comparison[] = [
       {
         title: 'Where Conductor fits',
         paragraphs: [
-          'Conductor’s current site emphasizes cloud sandboxes and multiplayer workspaces. It describes isolated microVMs, shared workspace links, presence, and prompting agents together. Its documentation also describes local workspaces and a workflow from agent execution through diff review, pull requests, merge, and archive.',
+          "Conductor's current site emphasizes cloud sandboxes and multiplayer workspaces. It describes isolated microVMs, shared workspace links, presence, and prompting agents together. Its documentation also describes local workspaces and a workflow from agent execution through diff review, pull requests, merge, and archive.",
         ],
         links: [
           {
-            label: 'Read Conductor’s cloud and multiplayer overview',
+            label: "Read Conductor's cloud and multiplayer overview",
             href: 'https://www.conductor.build/',
           },
-          { label: 'Read Conductor’s introduction', href: 'https://www.conductor.build/docs' },
+          { label: "Read Conductor's introduction", href: 'https://www.conductor.build/docs' },
           {
             label: 'Conductor multiplayer',
             href: 'https://www.conductor.build/docs/cloud/collaboration',
@@ -498,16 +498,16 @@ const comparisons: Comparison[] = [
         ],
       },
       {
-        title: 'Local coordination is Jackalope’s starting point',
+        title: "Local coordination is Jackalope's starting point",
         paragraphs: [
           'Jackalope operates around installed agents and local Git projects. The task carries its instructions, account, context, attempts, and review evidence. This is useful when your development workflow depends on tools and services already configured on your computer and you want to supervise the work there.',
-          'For multiple tasks, Jackalope can [create isolated worktrees](/git-worktrees-for-ai-agents/) and record dependencies. If a migration or API change needs to land first, dependent work waits for integration. Human collaboration in a shared live session is a different requirement; Jackalope’s agent coordination should not be mistaken for a multiplayer product.',
+          "For multiple tasks, Jackalope can [create isolated worktrees](/git-worktrees-for-ai-agents/) and record dependencies. If a migration or API change needs to land first, dependent work waits for integration. Human collaboration in a shared live session is a different requirement; Jackalope's agent coordination should not be mistaken for a multiplayer product.",
         ],
       },
       {
         title: 'Choose the execution environment before the interface',
         paragraphs: [
-          'Conductor’s multiplayer documentation describes organization members opening shared workspaces and chats, seeing live output and presence, and reassigning work to teammates. Its direct workspace link is for organization members. That is a concrete human handoff flow to test if collaboration is your reason for choosing cloud execution.',
+          "Conductor's multiplayer documentation describes organization members opening shared workspaces and chats, seeing live output and presence, and reassigning work to teammates. Its direct workspace link is for organization members. That is a concrete human handoff flow to test if collaboration is your reason for choosing cloud execution.",
           'List what your project needs to run: a database, private packages, environment variables, a browser preview, and any platform-specific tooling. Then decide which of those can move to another environment. A remote workspace is useful only if it can reproduce the conditions under which your changes need to work.',
           'For a local Jackalope trial, start with a working checkout and establish a baseline build before asking an agent to edit it. Give each task clear setup and validation instructions. Local execution keeps the files on the host, but agents may still send code and context to their model providers.',
         ],
@@ -516,14 +516,14 @@ const comparisons: Comparison[] = [
         title: 'Test how dependent changes reach review',
         paragraphs: [
           'A practical comparison is a feature with one shared contract and two callers. Let the first task propose the contract change, inspect it, and then let dependent work continue against the accepted result. Watch whether the tool makes the prerequisite and its status easy to understand.',
-          'Jackalope’s combined patch preparation provides a separate decision point before integration. You can examine selected outputs together, with source and target checks guarding against stale preparation. Project tests remain necessary: a conflict-free combination can still break behavior.',
+          "Jackalope's combined patch preparation provides a separate decision point before integration. You can examine selected outputs together, with source and target checks guarding against stale preparation. You still need project tests. A conflict-free combination can still break behavior.",
         ],
       },
       {
         title: 'Availability and the right fit',
         paragraphs: [
-          'Our assessment: prioritize Conductor in your evaluation when shared cloud workspaces and live teammate participation are requirements. Consider Jackalope early access when you want to coordinate local agents with project context and explicit review of dependent changes.',
-          'Jackalope is in early access, and public pricing has not been announced. Your provider account supplies model access. If you are budgeting for a cloud workflow, compare workspace subscription, execution resources, and model usage separately rather than treating the agent subscription as the whole cost.',
+          'Our take: look at Conductor first if you need shared cloud workspaces and live teammate participation. Try Jackalope if you want to coordinate local agents with project context and explicit review of dependent changes.',
+          'Signing up for Jackalope is free, and public pricing has not been announced. Your provider account supplies model access. If you are budgeting for a cloud workflow, compare workspace subscription, execution resources, and model usage separately rather than treating the agent subscription as the whole cost.',
         ],
       },
     ],
@@ -594,8 +594,8 @@ const comparisons: Comparison[] = [
           'Emdash describes an open-source development environment with parallel agents, recurring work, an in-app browser, and reusable prompts, skills, and MCP servers. Its documentation includes issue intake, GitHub checks, remote development, and persistent terminal sessions. It advertises broad CLI agent coverage and desktop downloads for macOS, Windows, and Linux.',
         ],
         links: [
-          { label: 'Explore Emdash’s product', href: 'https://emdash.com/' },
-          { label: 'Read Emdash’s capability overview', href: 'https://emdash.com/docs' },
+          { label: "Explore Emdash's product", href: 'https://emdash.com/' },
+          { label: "Read Emdash's capability overview", href: 'https://emdash.com/docs' },
           {
             label: 'Emdash remote development',
             href: 'https://emdash.com/docs/remote-development',
@@ -607,14 +607,14 @@ const comparisons: Comparison[] = [
         title: 'Project context should survive changing agents',
         paragraphs: [
           'Jackalope keeps [project instructions and selected tools at the project level](/features/project-context-for-coding-agents/), with relevant context attached to the task. The goal is continuity when you change workers or revisit unfinished work. A follow-up should begin with an understandable brief and previous result, rather than requiring a fresh explanation of the entire project.',
-          'When comparing resource libraries, bring one real project rule, one reusable workflow, and one external tool. Check whether each reaches the agent that needs it and whether you can inspect the effective configuration. A large library has little value if its instructions are not applied to the intended task.',
+          "When comparing resource libraries, bring one real project rule, one reusable workflow, and one external tool. Check whether each reaches the agent that needs it and whether you can inspect the effective configuration. A large library doesn't help much if its instructions never reach the intended task.",
         ],
       },
       {
         title: 'Tool availability is a contract to check',
         paragraphs: [
-          'Emdash’s MCP library writes configuration into the selected agents’ native config files, making those connections available in sessions outside Emdash too. Jackalope’s project selection is a different delivery model. When evaluating either, check whether a tool should follow the account everywhere or be selected for a particular project and task.',
-          'Jackalope’s MCP support depends on the selected agent adapter and connection. It manages project-selected tools centrally, but that does not mean every provider supports the same delivery method or interaction. Check compatibility for the exact agent and service combination you plan to use.',
+          "Emdash's MCP library writes configuration into the selected agents' native config files, making those connections available in sessions outside Emdash too. Jackalope's project selection is a different delivery model. When evaluating either, check whether a tool should follow the account everywhere or be selected for a particular project and task.",
+          "Jackalope's MCP support depends on the selected agent adapter and connection. It manages project-selected tools centrally, but that does not mean every provider supports the same delivery method or interaction. Check compatibility for the exact agent and service combination you plan to use.",
           'Use a harmless read operation in your first trial. Confirm which project supplied the connection, whether the agent can discover the relevant capability, and what happens when access fails. Keep credentials and production write permissions out of a comparison exercise until you understand the flow.',
         ],
       },
@@ -628,16 +628,16 @@ const comparisons: Comparison[] = [
       {
         title: 'Choose by the work around the agent',
         paragraphs: [
-          'Our assessment: evaluate Emdash when a broad agent catalog, issue intake, or remote development is central to your workflow. Evaluate Jackalope when your priority is carrying context and evidence through a local task lifecycle, with dependent work and combined review.',
-          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Jackalope is in early access, and signing up is free. Model access remains with your provider, and public Jackalope pricing has not been announced.',
+          'Our take: look at Emdash if a broad agent catalog, issue intake, or remote development is central to your workflow. Look at Jackalope if your priority is carrying context and evidence through a local task lifecycle, with dependent work and combined review.',
+          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Signing up for Jackalope is free. Model access remains with your provider, and public Jackalope pricing has not been announced.',
         ],
       },
     ],
     faqs: [
       {
-        question: 'Does Jackalope support every agent in Emdash’s catalog?',
+        question: "Does Jackalope support every agent in Emdash's catalog?",
         answer:
-          'No such parity is claimed. Jackalope implements specific adapters, and some catalog entries support setup without task execution. Check the current compatibility page for your agent.',
+          'No. Jackalope implements specific adapters, and some catalog entries support setup without task execution. Check the current compatibility page for your agent.',
       },
       {
         question: 'Does adding an MCP server make every tool available everywhere?',
@@ -701,9 +701,9 @@ const comparisons: Comparison[] = [
           'Braid presents a desktop workspace with Git worktrees, agent sessions, terminals, an editor, and GitHub review controls. Its documentation describes per-project setup, run, and archive scripts, plus copying local configuration into new worktrees. Worktree navigation includes status indicators and pull request badges.',
         ],
         links: [
-          { label: 'Explore Braid’s features', href: 'https://getbraid.dev/' },
+          { label: "Explore Braid's features", href: 'https://getbraid.dev/' },
           {
-            label: 'Read Braid’s project setup documentation',
+            label: "Read Braid's project setup documentation",
             href: 'https://getbraid.dev/docs/features/projects-and-worktrees/',
           },
         ],
@@ -718,21 +718,21 @@ const comparisons: Comparison[] = [
       {
         title: 'Follow the outcome through multiple attempts',
         paragraphs: [
-          'In Jackalope, a task keeps the brief, agent, account, questions, follow-up attempts, and result together. That makes a distinction between the work you requested and any single run that tried to complete it. A correction remains part of the same outcome instead of becoming an unrelated session.',
+          'In Jackalope, a task keeps the brief, agent, account, questions, follow-up attempts, and result together. That separates the work you asked for from any single run that tried to complete it. A correction remains part of the same outcome instead of becoming an unrelated session.',
           'Test this with a bug that needs a second pass. Ask the agent to fix the reproduction, inspect the result, and then supply a missed edge case. Compare how easy it is to understand the original requirement, the rejected behavior, and the latest change without reopening every conversation.',
         ],
       },
       {
         title: 'Review the relationship between branches',
         paragraphs: [
-          'Jackalope’s [parallel plans](/parallel-coding-agents/) can express dependencies and delay downstream work until an upstream change is integrated. Its review preparation combines selected task outputs and rechecks the source and target state before integration. This is especially useful to evaluate on changes that share a public interface.',
+          "Jackalope's [parallel plans](/parallel-coding-agents/) can express dependencies and delay downstream work until an upstream change is integrated. Its review preparation combines selected task outputs and rechecks the source and target state before integration. Test this on changes that share a public interface.",
           'For example, split a settings feature into persistence, validation, and presentation. Decide which pieces can run independently and which require an accepted contract first. A workspace helps when it makes that sequence visible; opening all three agents at once is not necessarily the fastest route to a correct result.',
         ],
       },
       {
         title: 'Make the decision with a real branch lifecycle',
         paragraphs: [
-          'Our assessment: Braid is worth evaluating if you want project setup, editing, sessions, and GitHub review close together. Consider Jackalope early access if you want task history and explicit integration of dependent results to organize your work.',
+          'Our take: Braid is worth trying if you want project setup, editing, sessions, and GitHub review close together. Try Jackalope if you want task history and explicit integration of dependent results to organize your work.',
           'Run the trial through review and cleanup rather than stopping when the agent replies. Verify that important uncommitted files remain available, identify which branch owns the final change, and confirm your normal checks on the combined result. Jackalope is in early access, with model access supplied by your provider and public pricing still unannounced.',
         ],
       },
@@ -801,10 +801,10 @@ const comparisons: Comparison[] = [
       {
         title: 'Where Worktree fits',
         paragraphs: [
-          'Worktree brings shared agent conversations, code changes, and human collaboration into a desktop workspace. Its docs distinguish private local execution, shared local workspaces, and managed cloud environments. Shared local work requires the owner’s computer to remain online. Providers and MCP tools connect at the workspace level.',
+          "Worktree brings shared agent conversations, code changes, and human collaboration into a desktop workspace. Its docs distinguish private local execution, shared local workspaces, and managed cloud environments. Shared local work requires the owner's computer to remain online. Providers and MCP tools connect at the workspace level.",
         ],
         links: [
-          { label: 'Explore Worktree’s collaboration model', href: 'https://tryworktree.com/' },
+          { label: "Explore Worktree's collaboration model", href: 'https://tryworktree.com/' },
           {
             label: 'Read the Local, Shared Local, and Cloud documentation',
             href: 'https://tryworktree.com/docs',
@@ -820,13 +820,13 @@ const comparisons: Comparison[] = [
         title: 'Separate team collaboration from agent coordination',
         paragraphs: [
           'Jackalope organizes tasks assigned to coding agents. It can carry project context, account choices, task dependencies, and results across a local workflow. That helps one operator supervise several pieces of work without confusing their branches or losing the original brief.',
-          'A team sharing a live conversation has additional needs: who can join, who can send instructions, who owns the environment, and who makes the final review decision. Jackalope’s current agent coordination does not implement that shared-human-workspace model. Treat that as a functional requirement, not a cosmetic difference.',
+          "A team sharing a live conversation has additional needs: who can join, who can send instructions, who owns the environment, and who makes the final review decision. Jackalope's current agent coordination does not implement that shared-human-workspace model. If your team needs that, it's a real gap, not a cosmetic one.",
         ],
       },
       {
         title: 'Decide who needs the execution environment',
         paragraphs: [
-          'Worktree’s connection documentation says Cloud and shared Local Threads accept API connections, while supported personal OAuth connections remain available in private Local Threads. Check this distinction if your current workflow depends on a subscription sign-in; do not assume that sharing a workspace preserves the same authentication option.',
+          "Worktree's connection documentation says Cloud and shared Local Threads accept API connections, while supported personal OAuth connections remain available in private Local Threads. Check this distinction if your current workflow depends on a subscription sign-in; do not assume that sharing a workspace preserves the same authentication option.",
           'If the same developer always runs and reviews the project, a local workflow may be sufficient. If a teammate needs to continue while that developer is offline, the lifetime and accessibility of the environment become part of the product choice. Write down those requirements before trialing tools.',
           'In Jackalope, repositories and task workspaces live on your computer. Agents and connected services can still transmit context according to their configuration. Local storage does not imply that no data reaches a provider, and separate account profiles do not isolate access to local files.',
         ],
@@ -834,18 +834,18 @@ const comparisons: Comparison[] = [
       {
         title: 'Review with enough context to make a decision',
         paragraphs: [
-          'Jackalope keeps the task’s requested outcome, attempts, evidence, and resulting patch connected. For parallel work, [combined review](/parallel-coding-agents/) helps you inspect how changes fit together before integration. A dependency can wait for the prerequisite’s actual integration rather than trusting a completion message.',
+          "Jackalope keeps the task's requested outcome, attempts, evidence, and resulting patch connected. For parallel work, [combined review](/parallel-coding-agents/) helps you inspect how changes fit together before integration. A dependency can wait for the prerequisite's actual integration rather than trusting a completion message.",
           'Try a bug investigation followed by an implementation and a verification pass. Ask whether another reviewer can identify what was requested, what changed, which checks ran, and what remains uncertain. A useful record makes those questions answerable without a separate verbal handoff.',
         ],
       },
       {
         title: 'Choose the collaboration you actually need',
         paragraphs: [
-          'Our assessment: shortlist Worktree when teammates must participate in the same agent conversation or share an execution environment. Consider Jackalope when your requirement is local coordination of independent and dependent agent tasks with a clear review decision.',
-          'For costs, Worktree’s documentation distinguishes private local use from paid sharing and cloud capacity. Check its current plans for the configuration you need. Jackalope’s public pricing is unannounced, and its early-access workflow uses your own agent provider access. Avoid comparing only subscription labels when hosting and model costs differ.',
+          'Our take: shortlist Worktree if teammates must participate in the same agent conversation or share an execution environment. Try Jackalope if your requirement is local coordination of independent and dependent agent tasks with a clear review decision.',
+          "For costs, Worktree's documentation distinguishes private local use from paid sharing and cloud capacity. Check its current plans for the configuration you need. Jackalope's public pricing is unannounced, and its early-access workflow uses your own agent provider access. Avoid comparing only subscription labels when hosting and model costs differ.",
         ],
         links: [
-          { label: 'Worktree’s workspace and plan overview', href: 'https://tryworktree.com/docs' },
+          { label: "Worktree's workspace and plan overview", href: 'https://tryworktree.com/docs' },
         ],
       },
     ],
@@ -914,7 +914,7 @@ const comparisons: Comparison[] = [
           'Codius advertises desktop, browser, and phone access to coding agents running on hosts you control. Its site describes direct or relay connections, isolated worktrees, schedules, browser previews, and a provider catalog. The CLI covers host, pairing, schedule, and daemon workflows. Optional Codius model access is distinct from bringing an existing agent account.',
         ],
         links: [
-          { label: 'Read Codius’s product and provider overview', href: 'https://codius.ai/' },
+          { label: "Read Codius's product and provider overview", href: 'https://codius.ai/' },
           { label: 'Explore the Codius CLI', href: 'https://codius.ai/codius-cli' },
         ],
       },
@@ -922,14 +922,14 @@ const comparisons: Comparison[] = [
         title: 'Access and coordination are separate decisions',
         paragraphs: [
           'Being able to reach an agent from another device solves an access problem. Knowing which task needs attention, which account ran it, and whether related changes are ready to integrate solves a coordination problem. Some workflows need both; others are primarily local.',
-          'Jackalope concentrates on the latter through tasks with project context, attempts, questions, results, and evidence. It does not currently provide remote-host or mobile execution control. If checking in from a phone is essential to your day, make that a requirement before weighing the rest of the interface.',
+          'Jackalope focuses on coordination, through tasks with project context, attempts, questions, results, and evidence. It does not currently provide remote-host or mobile execution control. If checking in from a phone is essential to your day, make that a requirement before weighing the rest of the interface.',
         ],
       },
       {
         title: 'Keep the account and project attached to the work',
         paragraphs: [
           'Jackalope supports project-level agent choices and named account profiles where the adapter permits them. A task continuation retains its original account binding. This is useful when work and personal projects must use different provider identities and you need to understand which identity belongs to an existing task.',
-          'Evaluate the actual agent you intend to use rather than a provider logo. Authentication, model selection, tools, usage reporting, and continuation support can differ between adapters. A successful sign-in is not enough: run a small task and a follow-up, then inspect the recorded result.',
+          'Evaluate the actual agent you intend to use rather than a provider logo. Authentication, model selection, tools, usage reporting, and continuation support can differ between adapters. A successful sign-in is not enough. Run a small task and a follow-up, then inspect the recorded result.',
         ],
       },
       {
@@ -942,7 +942,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Compare the full operating cost',
         paragraphs: [
-          'Our assessment: consider Codius when cross-device access to your own hosts is a priority. Consider Jackalope early access when you want local task supervision, project continuity, and combined review without making remote access part of the workflow.',
+          'Our take: look at Codius if cross-device access to your own hosts is a priority. Try Jackalope if you want local task supervision, project continuity, and combined review without making remote access part of the workflow.',
           'List model usage, host resources, and any workspace or connection plan separately when comparing costs. Jackalope does not include an AI subscription and has not announced public pricing. For a local trial, include the practical cost of keeping your development environment available for scheduled tasks.',
         ],
       },
@@ -1017,7 +1017,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Where Hermes Agent fits',
         paragraphs: [
-          'Nous Research’s Hermes Agent combines persistent memory, skills, tools, messaging integrations, scheduling, and subagents. Its documentation describes configurable model providers and multiple execution backends. It is a general-purpose agent that can perform coding and other work, rather than solely an interface for supervising independent coding-agent products.',
+          "Nous Research's Hermes Agent combines persistent memory, skills, tools, messaging integrations, scheduling, and subagents. Its documentation describes configurable model providers and multiple execution backends. It is a general-purpose agent that can perform coding and other work, rather than solely an interface for supervising independent coding-agent products.",
         ],
         links: [
           { label: 'Explore Hermes Agent', href: 'https://hermes-agent.nousresearch.com/' },
@@ -1039,7 +1039,7 @@ const comparisons: Comparison[] = [
         title: 'Choose the layer you need to change',
         paragraphs: [
           'If you want a different agent to reason, use tools, and remember previous work, you are evaluating the worker. If you already use several coding agents and want to organize their projects, accounts, tasks, and results, you are evaluating the workspace around those workers.',
-          'Jackalope addresses that workspace layer. It retains the task brief, selected agent and account, worktree, attempts, questions, and evidence. It does not promise to make every provider behave identically or to replace the agent’s reasoning. Its value needs to be judged through the supervision and review work it helps you do.',
+          "Jackalope addresses that workspace layer. It retains the task brief, selected agent and account, worktree, attempts, questions, and evidence. It does not promise to make every provider behave identically or to replace the agent's reasoning. Judge it by the supervision and review work it helps you do.",
         ],
       },
       {
@@ -1060,8 +1060,8 @@ const comparisons: Comparison[] = [
       {
         title: 'A complementary idea is not an implemented integration',
         paragraphs: [
-          'Our assessment: evaluate Hermes when you want a persistent general-purpose agent with automation and messaging. Evaluate Jackalope when you want to supervise supported coding agents in local projects and retain a reviewable history of their work.',
-          'Jackalope does not currently advertise a native Hermes task adapter. Do not assume that the products can be connected simply because their roles could complement one another. Check supported adapters before planning a combined workflow. Jackalope is in early access, public pricing is unannounced, and model access comes from your own provider.',
+          'Our take: look at Hermes if you want a persistent general-purpose agent with automation and messaging. Look at Jackalope if you want to supervise supported coding agents in local projects and retain a reviewable history of their work.',
+          "Jackalope does not currently advertise a native Hermes task adapter. Don't assume the two can be connected just because their roles could fit together. Check supported adapters before planning a combined workflow. Jackalope is in early access, public pricing is unannounced, and model access comes from your own provider.",
         ],
       },
     ],

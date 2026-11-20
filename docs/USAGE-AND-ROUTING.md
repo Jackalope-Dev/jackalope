@@ -286,8 +286,7 @@ See [parallel workflows](PARALLEL-WORKFLOWS.md) for recovery and review behavior
 Users should be able to answer: what did Jackalope use, for which work, what
 capacity remains, and what can I change? Give Usage a clear global destination,
 a project-scoped entry point and a task-level breakdown. Validate its placement
-in navigation; monitoring is a purposeful surface, not a reason to turn the
-working home into a wall of metrics.
+in navigation, and do not turn the working home into a wall of metrics.
 
 - Start with a readable period selector and All projects/project filter. Offer
   grouping and sorting by project, agent, model and account, with task drilldown.

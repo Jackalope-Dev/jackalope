@@ -5,37 +5,48 @@ import path from 'node:path';
 import { root } from '../lib/paths.mjs';
 
 const read = (file) => readFileSync(path.join(root, file), 'utf8');
-const provenance = JSON.parse(read('patches/glib/provenance.json'));
 const files = (directory) =>
   readdirSync(path.join(root, directory), { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? files(`${directory}/${entry.name}`) : [`${directory}/${entry.name}`],
   );
-const retained = files('patches/glib')
-  .filter(
-    (file) =>
-      !file.endsWith('/provenance.json') &&
-      !file.includes('/target/') &&
-      !file.endsWith('/Cargo.lock'),
-  )
-  .sort();
-if (JSON.stringify(retained) !== JSON.stringify(Object.keys(provenance.files).sort()))
-  throw new Error('Vendored GLib files differ from the reviewed manifest.');
-for (const file of retained) {
-  const hash = createHash('sha256').update(read(file).replaceAll('\r\n', '\n')).digest('hex');
-  if (hash !== provenance.files[file]) throw new Error(`Vendored GLib checksum mismatch: ${file}`);
-}
 const manifest = read('apps/desktop/src-tauri/Cargo.toml');
 const lock = read('apps/desktop/src-tauri/Cargo.lock');
-const glib = lock.split('[[package]]').find((block) => /^name = "glib"$/m.test(block));
-if (
-  !manifest.includes('glib = { path = "../../../patches/glib" }') ||
-  !glib ||
-  /^source =/m.test(glib) ||
-  !/^version = "0.18.5"$/m.test(glib)
-)
-  throw new Error('The patched GLib source is not locked.');
+/** Vendored crate overrides: each file matches its reviewed manifest and Cargo locks the local copy. */
+for (const { crate, label } of [
+  { crate: 'glib', label: 'GLib' },
+  { crate: 'faster-hex', label: 'faster-hex' },
+  { crate: 'whisper-rs-sys', label: 'whisper-rs-sys' },
+]) {
+  const directory = `patches/${crate}`;
+  const provenance = JSON.parse(read(`${directory}/provenance.json`));
+  const retained = files(directory)
+    .filter(
+      (file) =>
+        !file.endsWith('/provenance.json') &&
+        !file.includes('/target/') &&
+        !file.endsWith('/Cargo.lock'),
+    )
+    .sort();
+  if (JSON.stringify(retained) !== JSON.stringify(Object.keys(provenance.files).sort()))
+    throw new Error(`Vendored ${label} files differ from the reviewed manifest.`);
+  for (const file of retained) {
+    const hash = createHash('sha256').update(read(file).replaceAll('\r\n', '\n')).digest('hex');
+    if (hash !== provenance.files[file])
+      throw new Error(`Vendored ${label} checksum mismatch: ${file}`);
+  }
+  const locked = lock
+    .split('[[package]]')
+    .find((block) => new RegExp(`^name = "${crate}"$`, 'm').test(block));
+  if (
+    !manifest.includes(`${crate} = { path = "../../../${directory}" }`) ||
+    !locked ||
+    /^source =/m.test(locked) ||
+    !new RegExp(`^version = "${provenance.version.replaceAll('.', '\\.')}"$`, 'm').test(locked)
+  )
+    throw new Error(`The patched ${label} source is not locked.`);
+}
 if (process.argv.includes('--patch-only')) {
-  console.log('Vendored GLib provenance and source override verified.');
+  console.log('Vendored crate provenance and source overrides verified.');
   process.exit(0);
 }
 const runJson = (command, args) => {

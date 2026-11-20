@@ -24,6 +24,8 @@ export interface SettingsState {
   shortcuts: Record<string, string>;
   dictationEndpoint: string;
   dictationModel: string;
+  /** The local voice model used for dictation; empty until one is installed. */
+  voiceModel: string;
 
   // Runners & execution
   defaultRunner: DefaultRunnerId;
@@ -75,6 +77,7 @@ const DEFAULT_SETTINGS: Omit<
   shortcuts: {},
   dictationEndpoint: '',
   dictationModel: 'whisper-1',
+  voiceModel: '',
 
   defaultRunner: 'codex' as const,
   concurrencyLimit: 2,

@@ -57,7 +57,7 @@ printf 'Saved tracked-change patches to %s\n' "$backup_dir"
 
 These patches are not a complete backup. They don't include untracked or ignored files, and restoring them later may require resolving conflicts. Copy important new files separately. If the work is valuable or the state is confusing, make a filesystem copy of the task directory, including hidden files, before proceeding. Store that copy somewhere appropriate for the repository's secrets.
 
-A backup branch alone isn't enough: it points to a commit, not your uncommitted file contents.
+A backup branch alone isn't enough. It points to a commit, not your uncommitted file contents.
 
 ## Undo only the changes you mean to remove
 
@@ -67,7 +67,7 @@ Use the same paths you inspected above. Replace the example filenames and commit
 
 Interactive restore lets you discard selected diff hunks rather than an entire file. It fits when the agent changed a file that also contains your work.
 
-**Best for:** Keeping useful edits while removing a separate, unwanted change.
+Use it to keep useful edits while removing a separate, unwanted change.
 
 If the file has staged changes, first unstage it without changing its working-tree contents. Then review its differences from `HEAD` interactively:
 
@@ -84,7 +84,7 @@ If human and agent edits occupy the same hunk, split it where possible or edit t
 
 Path-scoped restore replaces selected tracked files with a known committed version. It fits when nothing uncommitted in those files needs to survive.
 
-**Best for:** Discarding an isolated experiment in specific files.
+Use it to throw away an isolated experiment in specific files.
 
 To restore both the staging area and working tree from the current commit:
 
@@ -101,7 +101,7 @@ Keep the path list explicit. A command targeting the entire checkout can turn a 
 
 A revert creates a new commit that reverses an earlier commit's changes. It fits committed work, especially when others may already have fetched the branch.
 
-**Best for:** Undoing a committed task while preserving shared history.
+Use it to undo a committed task while preserving shared history.
 
 Inspect the commit before reversing it:
 
@@ -125,7 +125,7 @@ See the official [git revert documentation](https://git-scm.com/docs/git-revert)
 
 Git clean deletes files outside Git's tracked contents. It fits agent-created scratch files or unwanted tests, after you've checked their contents.
 
-**Best for:** Removing specific new files that restoring tracked files leaves behind.
+Use it to remove specific new files that restoring tracked files leaves behind.
 
 Preview the exact path, then remove it only if the preview is correct:
 
@@ -134,7 +134,7 @@ git clean -n -- tests/parser.generated.test.ts
 git clean -f -- tests/parser.generated.test.ts
 ```
 
-According to the official [git clean documentation](https://git-scm.com/docs/git-clean), `-n` previews removal and `-f` permits it. Avoid adding `-x` casually: that also includes ignored files, which may contain local configuration or other data you need. Don't replace the specific filename with a broad directory until you've reviewed everything it would remove.
+According to the official [git clean documentation](https://git-scm.com/docs/git-clean), `-n` previews removal and `-f` permits it. Avoid adding `-x` casually. It also includes ignored files, which may contain local configuration or other data you need. Don't replace the specific filename with a broad directory until you've reviewed everything it would remove.
 
 ## Check what Git cannot undo
 
@@ -144,7 +144,7 @@ A database migration may need a separate rollback or recovery from a backup. A p
 
 Credential exposure is also separate from code cleanup. Removing a token from a file doesn't invalidate it or erase copies in commits, logs, or external systems. Revoke or rotate exposed credentials through the issuing service, then investigate where they were stored.
 
-Don't ask the agent to broadly “undo everything” and assume that covers these effects. Give it a bounded inspection task, such as identifying commands that modified the database, and review the proposed recovery before execution.
+Don't ask the agent to broadly "undo everything" and assume that covers these effects. Give it a bounded inspection task, such as identifying commands that modified the database, and review the proposed recovery before execution.
 
 ## Make the next task cheaper to discard
 
@@ -158,7 +158,7 @@ That gives you a reference for reviewing the task's changes, rather than reconst
 
 Jackalope gives each task its own Git worktree, lets you choose the agent and work or personal account per project, and brings finished work back with checks and evidence for review. That separation helps contain a rejected task's file changes. It doesn't make external actions reversible.
 
-Small checkpoints also reduce coding-agent costs: you can reject one failed approach without paying for a broad rewrite of work you wanted to keep. Set a review boundary before expensive follow-up work, such as checking the parser change before requesting a full test-suite expansion. Apply the same boundary to open source agents and hosted tools. Recovery depends on the changes they make, not their licensing model.
+Small checkpoints also reduce coding-agent costs. You can reject one failed approach without paying for a broad rewrite of work you wanted to keep. Set a review boundary before expensive follow-up work, such as checking the parser change before requesting a full test-suite expansion. Apply the same boundary to open source agents and hosted tools. Recovery depends on the changes they make, not their licensing model.
 
 ## Verify the rollback before resuming work
 

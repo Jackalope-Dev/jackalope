@@ -4,20 +4,78 @@ use std::process::Stdio;
 use std::{path::PathBuf, process::Child};
 
 static ACCENT: OnceLock<Mutex<String>> = OnceLock::new();
+/// `dark|#surface|#text` for the macOS control bar, so it matches the app's look.
+static LOOK: OnceLock<Mutex<String>> = OnceLock::new();
+/// Lets the control bar's Open bring the conversation forward.
+static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+/// The brand's default accent and surfaces, until the app reports its theme.
+const DEFAULT_ACCENT: &str = "#8b5cf6";
+const DEFAULT_LOOK: &str = "dark|#1d1b22|#f4f3f7";
+
+fn hex(value: &str) -> bool {
+    value.len() == 7 && value.starts_with('#') && value[1..].bytes().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Whether a look string is `dark|#rrggbb|#rrggbb` or the light equivalent.
+pub(super) fn valid_look(look: &str) -> bool {
+    let parts: Vec<_> = look.split('|').collect();
+    parts.len() == 3 && ["dark", "light"].contains(&parts[0]) && hex(parts[1]) && hex(parts[2])
+}
+
+fn accent() -> String {
+    ACCENT
+        .get_or_init(|| Mutex::new(DEFAULT_ACCENT.into()))
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| DEFAULT_ACCENT.into())
+}
+
+fn look() -> String {
+    LOOK.get_or_init(|| Mutex::new(DEFAULT_LOOK.into()))
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| DEFAULT_LOOK.into())
+}
 
 #[tauri::command]
-pub fn desktop_control_theme(accent: String) -> Result<(), String> {
-    if accent.len() != 7
-        || !accent.starts_with('#')
-        || !accent[1..].bytes().all(|c| c.is_ascii_hexdigit())
-    {
+pub fn desktop_control_theme(
+    app: tauri::AppHandle,
+    accent: String,
+    look: Option<String>,
+) -> Result<(), String> {
+    let _ = APP.set(app);
+    if !hex(&accent) {
         return Err("Expected a six-digit theme color.".into());
     }
     *ACCENT
-        .get_or_init(|| Mutex::new("#8b5cf6".into()))
+        .get_or_init(|| Mutex::new(DEFAULT_ACCENT.into()))
         .lock()
         .map_err(|e| e.to_string())? = accent;
+    if let Some(look) = look.filter(|look| valid_look(look)) {
+        *LOOK
+            .get_or_init(|| Mutex::new(DEFAULT_LOOK.into()))
+            .lock()
+            .map_err(|e| e.to_string())? = look;
+    }
     Ok(())
+}
+
+/// Brings the attempt's conversation, or its task, forward in Jackalope.
+fn open_in_app(runtime: &TaskRuntime, id: &str) {
+    use tauri::{Emitter, Manager};
+    let Some(app) = APP.get() else {
+        return;
+    };
+    let run = runtime.run_snapshot(id);
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+        let _ = main.emit(
+            "work-pane-open",
+            json!({"id": id, "pane": "result", "sessionId": run.and_then(|run| run.live_session_id)}),
+        );
+    }
 }
 
 pub(super) struct Indicator {
@@ -91,12 +149,7 @@ impl Indicator {
         let directory =
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
-        let accent = ACCENT
-            .get_or_init(|| Mutex::new("#8b5cf6".into()))
-            .lock()
-            .unwrap()
-            .clone();
-        std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("theme"), accent()).map_err(|e| e.to_string())?;
         std::fs::write(
             directory.join("logo.png"),
             include_bytes!("../../../icons/32x32.png"),
@@ -153,18 +206,15 @@ impl Indicator {
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
-        let accent = ACCENT
-            .get_or_init(|| Mutex::new("#8b5cf6".into()))
-            .lock()
-            .unwrap()
-            .clone();
-        std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("theme"), accent()).map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("look"), look()).map_err(|e| e.to_string())?;
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::platform::command(
             json!({"action":"indicator", "window":indicator_window(grant),
             "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
-            "file":directory.join("state"),"theme":directory.join("theme")}),
+            "file":directory.join("state"),"theme":directory.join("theme"),
+            "look":directory.join("look"),"agent":grant.agent}),
         )?;
         command
             .stdin(Stdio::null())
@@ -323,8 +373,11 @@ impl Indicator {
         };
         let state_file = directory.join("state");
         let theme_file = directory.join("theme");
+        let look_file = directory.join("look");
+        let open_file = directory.join("open");
         std::thread::spawn(move || {
             let mut prior_color = String::new();
+            let mut prior_look = String::new();
             loop {
                 std::thread::sleep(Duration::from_millis(100));
                 let Some(session) = weak.upgrade() else {
@@ -341,11 +394,17 @@ impl Indicator {
                     let _ = runtime.update_checked(&id, |run|run.activity.push("Desktop access ended: Escape was pressed or the indicator closed. A new grant is required.".into()));
                     break;
                 }
-                let color = ACCENT.get().unwrap().lock().unwrap().clone();
-                if color != prior_color {
-                    if std::fs::write(&theme_file, &color).is_ok() {
-                        prior_color = color;
-                    }
+                let color = accent();
+                if color != prior_color && std::fs::write(&theme_file, &color).is_ok() {
+                    prior_color = color;
+                }
+                let current = look();
+                if current != prior_look && std::fs::write(&look_file, &current).is_ok() {
+                    prior_look = current;
+                }
+                // The bar's Open asks for the conversation; it never changes the grant.
+                if std::fs::remove_file(&open_file).is_ok() {
+                    open_in_app(&runtime, &id);
                 }
             }
         });
@@ -372,6 +431,16 @@ impl Drop for Indicator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn the_control_bar_look_is_checked_before_it_reaches_the_helper() {
+        assert!(valid_look("dark|#1d1b22|#f4f3f7"));
+        assert!(valid_look("light|#ffffff|#111111"));
+        assert!(!valid_look("dim|#1d1b22|#f4f3f7"));
+        assert!(!valid_look("dark|#1d1b22"));
+        assert!(!valid_look("dark|1d1b22|#f4f3f7"));
+        assert!(!valid_look("dark|#1d1b22|#f4f3f7|extra"));
+    }
+
     #[test]
     fn indicator_fails_closed_on_missing_stale_or_invalid_state() {
         assert!(parse_state("active|4|1000|1|2|", 4001).is_err());

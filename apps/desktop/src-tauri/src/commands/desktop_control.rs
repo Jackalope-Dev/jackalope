@@ -5,6 +5,7 @@ use super::{
 };
 use rmcp::schemars;
 mod actions;
+pub mod attach;
 pub(crate) mod computer;
 mod elements;
 pub mod grant;
@@ -125,6 +126,8 @@ pub struct DesktopActionRecord {
 const ACTION_LOG_LIMIT: usize = 200;
 /// The person's own browser: their local services are asked about like any site.
 const SITE_LOOPBACK: Loopback = Loopback::Asked;
+/// Refusal for anything but observing a window attached for reading.
+const READ_ONLY: &str = "The person attached this window for reading only. Snapshot, screenshot, wait_for and list_windows work; ask in the conversation if you need to click or type.";
 /// How long a snapshot's refs may be used for input.
 const SNAPSHOT_TTL: Duration = Duration::from_secs(60);
 /// The pause between a `wait_for`'s snapshots.
@@ -562,11 +565,20 @@ impl Call<'_> {
         fresh: &TaskRun,
     ) -> Result<Option<Value>, Failure> {
         if self.access.prompt_id.is_empty() {
+            let scope = Scope::parse(request.scope.as_deref())?;
+            platform::capabilities().scope(scope)?;
+            if let Some(conversation) = attach::owner(fresh)
+                .filter(|id| scope == Scope::Window && attach::staged(id).is_some())
+            {
+                let (windows, _) = self.windows()?;
+                if let Some(staged) = attach::take_for(conversation, &windows, &self.denied()) {
+                    self.attached(staged)?;
+                    return Ok(None);
+                }
+            }
             if !super::harness::can_ask(fresh) {
                 return Err(super::harness::QUESTION_LIMIT_REACHED.into());
             }
-            let scope = Scope::parse(request.scope.as_deref())?;
-            platform::capabilities().scope(scope)?;
             let (windows, _) = self.windows()?;
             if scope != Scope::Desktop && windows.is_empty() {
                 return Err("No available desktop windows were found.".into());
@@ -639,6 +651,26 @@ impl Call<'_> {
         Ok(None)
     }
 
+    /// Starts a window grant from a window the person attached to the conversation,
+    /// recording it as an answered access question.
+    fn attached(&mut self, staged: attach::Staged) -> Result<(), String> {
+        self.push_prompt(&attach::answered_prompt(
+            &self.run.id,
+            &self.run.project_name,
+            &staged,
+        ))?;
+        let title: String = staged.window.title.chars().take(80).collect();
+        self.activate(Choice::Window(staged.window), None)?;
+        if let Some(grant) = self.access.grant.as_mut() {
+            grant.read_only = !staged.control;
+        }
+        self.activity(if staged.control {
+            format!("You attached \u{201c}{title}\u{201d} to this conversation. The agent may read and control that one window.")
+        } else {
+            format!("You attached \u{201c}{title}\u{201d} to this conversation for reading. The agent may read and capture it but not click or type.")
+        })
+    }
+
     fn push_prompt(&self, prompt: &PendingUserPrompt) -> Result<(), String> {
         current(self.runtime, &self.run.id)?;
         self.runtime.update_checked(&self.run.id, |r| {
@@ -656,6 +688,7 @@ impl Call<'_> {
     ) -> Result<(), String> {
         let mut grant = Grant::from_choice(choice);
         grant.remembered = saved.as_ref().map(|saved| saved.id.clone());
+        grant.agent = crate::commands::agents::name(&self.run.agent).to_owned();
         let indicator = self.session.start_indicator(
             &grant,
             &self.runtime.preferences_directory(),
@@ -1043,6 +1076,9 @@ impl Call<'_> {
     fn dispatch(&mut self, request: &DesktopRequest, epoch: u64) -> Result<Value, String> {
         let grant = self.access.grant.clone().unwrap();
         let action = request.action.as_str();
+        if grant.read_only && !actions::OBSERVE.contains(&action) && action != "list_windows" {
+            return Err(READ_ONLY.into());
+        }
         if actions::is_input(request) {
             return self.input(request, epoch);
         }

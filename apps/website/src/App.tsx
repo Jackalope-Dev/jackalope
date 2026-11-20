@@ -135,7 +135,7 @@ export function App({ path = '/' }: { path?: string }) {
           <div className="header-actions">
             {path !== '/access/' && (
               <a className="member-entry" href="/access/">
-                Member access
+                Sign in
               </a>
             )}
             <a
@@ -182,8 +182,7 @@ export function App({ path = '/' }: { path?: string }) {
                   </Menu.Item>
                   {[
                     ['Download Jackalope', '/download/'],
-                    ['Your account', '/access/'],
-                    ['Member access', '/access/'],
+                    ['Sign in', '/access/'],
                     ['Compare workflows', '/compare/'],
                     ['Product tour', '/tour/'],
                     ['Knowledgebase & Guides', '/knowledge/'],

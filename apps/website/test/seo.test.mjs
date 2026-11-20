@@ -52,7 +52,7 @@ test('discovery availability follows each configured platform, including Store w
       assert.ok(!availability.includes(unavailable), `${path}: ${unavailable}`);
       assert.ok(availability.includes(`${origin}/download/`));
       assert.ok(!availability.includes('/#download'));
-      assert.match(availability, /requires waitlist approval/);
+      assert.match(availability, /requires a free Jackalope account/);
     }
   }
 });

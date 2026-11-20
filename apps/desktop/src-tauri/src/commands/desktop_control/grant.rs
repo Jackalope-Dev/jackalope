@@ -80,6 +80,10 @@ pub struct Grant {
     pub window: Option<Window>,
     /// Remembered grant used instead of asking, if any.
     pub remembered: Option<String>,
+    /// A window the person attached for reading only: observe actions work, input does not.
+    pub read_only: bool,
+    /// The agent's display name, for the control bar.
+    pub agent: String,
 }
 
 impl Grant {
@@ -91,6 +95,8 @@ impl Grant {
                 label: app_label(&window),
                 window: Some(window),
                 remembered: None,
+                read_only: false,
+                agent: String::new(),
             },
             Choice::App {
                 key,
@@ -103,6 +109,8 @@ impl Grant {
                 label,
                 window: Some(primary),
                 remembered: None,
+                read_only: false,
+                agent: String::new(),
             },
             Choice::Desktop => Self {
                 scope: Scope::Desktop,
@@ -110,6 +118,8 @@ impl Grant {
                 label: "your computer".into(),
                 window: None,
                 remembered: None,
+                read_only: false,
+                agent: String::new(),
             },
         }
     }

@@ -140,13 +140,12 @@ export function Companion({
     hint?.ids.length === 1 ? notices.find((notice) => notice.id === hint.id) : undefined;
   const openNeedsYou = () => {
     selectWork();
-    useWorkViewStore.getState().setScope('all');
-    useWorkViewStore.getState().openList('attention');
+    useWorkViewStore.getState().openInbox();
     navigateWorkspace('kanban');
   };
   const hintAction: { label: string; ids: string[]; run: () => void } | undefined = hint
     ? hint.ids.length > 1
-      ? { label: 'Open Work', ids: hint.ids, run: openNeedsYou }
+      ? { label: 'Open Inbox', ids: hint.ids, run: openNeedsYou }
       : hintNotice?.onOpen && hintNotice.actionLabel
         ? { label: hintNotice.actionLabel, ids: [hintNotice.id], run: hintNotice.onOpen }
         : undefined

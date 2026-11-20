@@ -7,9 +7,12 @@ export function Tooltip({
   content,
   side = 'bottom',
   className,
+  label,
 }: {
   children: ReactElement;
   content: ReactNode;
+  /** Text screen readers get instead of `content`, for rich visual content. */
+  label?: string;
   side?: ComponentPropsWithoutRef<typeof Primitive.Content>['side'];
   className?: string;
 }) {
@@ -23,6 +26,7 @@ export function Tooltip({
             side={side}
             sideOffset={8}
             collisionPadding={12}
+            aria-label={label}
           >
             {content}
           </Primitive.Content>

@@ -81,6 +81,9 @@ crossterm = "0.29.0"
 # Already in the graph through ratatui; the CLI measures input columns with it.
 unicode-width = "0.2.2"
 qrcode = { version = "0.14", default-features = false }
+# Local voice to text with whisper.cpp; builds it from source, so cmake and a C++
+# compiler are required. macOS adds Metal below.
+whisper-rs = "0.16"
 
 [features]
 default = ["custom-protocol"]
@@ -93,6 +96,8 @@ keyring = "=3.6.3"
 
 [patch.crates-io]
 glib = { path = "../../../patches/glib" }
+faster-hex = { path = "../../../patches/faster-hex" }
+whisper-rs-sys = { path = "../../../patches/whisper-rs-sys" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", optional = true, features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }
@@ -109,6 +114,7 @@ keyring = { version = "=3.6.3", features = ["apple-native"] }
 objc2 = "0.6"
 objc2-foundation = "0.3"
 objc2-user-notifications = "0.3"
+whisper-rs = { version = "0.16", features = ["metal"] }
 block2 = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]

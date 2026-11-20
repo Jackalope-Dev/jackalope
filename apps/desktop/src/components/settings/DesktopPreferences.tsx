@@ -16,6 +16,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { VoiceSettings } from '../voice/VoiceSettings';
 import { CliCommandSetting } from './CliCommandSetting';
 
 export interface DesktopActivity {
@@ -215,12 +216,15 @@ export function DesktopPreferences() {
       </SettingGroup>
       <SettingGroup
         data-settings-tile
-        title="Local dictation"
-        description="Connect an OpenAI-compatible transcription server running on this computer. Dictate records only when clicked, then adds text to your draft for review. Jackalope does not save the audio."
+        title="Voice to text"
+        description="The mic in each composer records only while it is on, then puts the text at your cursor for review. Speech is transcribed on this computer, and Jackalope does not save the audio."
       >
+        <SettingRow title="Voice model" description="Downloaded once and run on this computer.">
+          <VoiceSettings />
+        </SettingRow>
         <SettingRow
-          title="Local transcription endpoint"
-          description="Leave empty to disable dictation."
+          title="Your own transcription server"
+          description="Optional. An OpenAI-compatible server on this computer, used only when no voice model is in use."
         >
           <div className="settings-field-stack">
             <Input
@@ -235,9 +239,9 @@ export function DesktopPreferences() {
             <DictationCheck endpoint={settings.dictationEndpoint} />
           </div>
         </SettingRow>
-        <SettingRow title="Transcription model">
+        <SettingRow title="Server model name">
           <Input
-            aria-label="Transcription model"
+            aria-label="Server model name"
             value={settings.dictationModel}
             onChange={(event) => settings.updateSettings({ dictationModel: event.target.value })}
           />
@@ -253,7 +257,7 @@ export function DesktopPreferences() {
 /** What the endpoint field means right now, from the same URL rule the dictation request uses. */
 function dictationState(endpoint: string): { tone: 'ok' | 'error' | 'info'; message: string } {
   const value = endpoint.trim();
-  if (!value) return { tone: 'info', message: 'Dictation is off. Add an endpoint to turn it on.' };
+  if (!value) return { tone: 'info', message: 'Not set. Dictation uses the voice model above.' };
   let url: URL;
   try {
     url = new URL(value);
@@ -264,7 +268,7 @@ function dictationState(endpoint: string): { tone: 'ok' | 'error' | 'info'; mess
     return { tone: 'error', message: 'Use an http:// or https:// address.' };
   return {
     tone: 'ok',
-    message: `Dictation sends recordings to ${url.host} when you click Dictate.`,
+    message: `Used when no voice model is in use; recordings go to ${url.host}.`,
   };
 }
 

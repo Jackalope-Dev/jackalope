@@ -1,7 +1,8 @@
 # Current capabilities and limits
 
-Jackalope is prerelease software. This page describes source behavior, not a record
-of completed trials or deployed environments. See [contributor priorities](TODO.md)
+Jackalope is publicly available for Windows, macOS and Linux, with open signup.
+This page describes source behavior, not a record of completed trials or deployed
+environments. See [contributor priorities](TODO.md)
 and [release requirements](RELEASE.md) for outstanding acceptance work.
 
 Provider connections retain per-account models. Private runner settings support
@@ -20,9 +21,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 - Work is the shared entry point for conversations, tasks and plans. The sidebar
   lists projects as a tree of their work, needs-you first, then running and recent;
-  a project row opens that project's work and its menu opens project pages. The title
-  bar holds command search; the bottom bar shows the focused project, branch, local
-  activity and visual account allowances with freshness and reset times.
+  a project row opens that project's work and its menu opens project pages, including
+  Appearance. Favorites sit above the tree as tiles sized by how many there are; pinned
+  work stays at the top of its project and folders group a project's work, all saved
+  locally. A project with no work shows a launchpad of starting points and project pages.
+  Inbox gathers work that needs the person, new results, app alerts (including low
+  allowances), running work and pull requests waiting on others across projects. Library
+  shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
+  attachments and images or PDFs a task's latest workspace changed, filtered by project
+  and kind. The title bar holds command search; the bottom bar shows the focused project,
+  branch, local activity and visual account allowances with freshness and reset times.
+  The branch menu switches the project checkout to a local or remote branch or creates
+  one at the current commit; switching needs a clean checkout and waits for tasks working
+  in it, and a branch held by a task worktree opens that task.
   Settings → Editor & terminal holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
 - Claude Code and Codex conversations people had outside Jackalope (a terminal, another
@@ -39,8 +50,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
   prompts and commands can apply to all projects or one project; commands require an
-  explicit Run action. Optional dictation inserts editable text through a separately
-  configured loopback transcription service and never sends the task automatically.
+  explicit Run action. Voice to text inserts editable text at the cursor and never sends
+  the task automatically. It transcribes on the computer with a downloaded Whisper model
+  (base, small or large-v3-turbo, pinned and checksum-verified, Metal on macOS); a
+  configured loopback transcription service remains an option. Native microphone and
+  download acceptance remain open.
 - Idle-sleep prevention supports off, active-work and app-open modes using native
   Windows, macOS and Linux APIs, and starts on active work, so an agent run is not cut
   short by the computer idling to sleep. macOS retains native traffic lights and application
@@ -651,17 +665,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 ## Services and distribution
 
-The website download page lists Windows, macOS and Linux availability, prioritizes
+The website download page lists Windows, macOS and Linux downloads, prioritizes
 the visitor's likely desktop platform and explains free signup with email
-confirmation. With the service's open-signup switch on, confirming the email
-approves the account and signs the person in; with it off, owner approval and
-friend passes still apply. Acceptance emails lead through explicit email confirmation on that page.
-Unconfigured platforms remain Coming soon; page visits never start a download.
+confirmation. The service's `OPEN_SIGNUP` switch is on in the tracked production
+configuration: confirming the email approves the account and signs the person in.
+With it off (waitlist mode), owner approval and friend passes apply instead.
+Acceptance emails lead through explicit email confirmation on that page. A platform
+without a configured download shows Coming soon; page visits never start a download.
 
-Verified waitlist members can connect the desktop to see their queue position,
-referral progress and share link, with website and tour links before approval.
-Connections persist across restarts and detect approval; offline progress remains
-labeled and cannot authorize execution. Installed and deployed acceptance remain open.
+In waitlist mode, verified waitlist members can connect the desktop to see their
+queue position, referral progress and share link, with website and tour links before
+approval. Connections persist across restarts and detect approval; offline progress
+remains labeled and cannot authorize execution. Installed and deployed acceptance of
+waitlist mode remain open.
 
 New execution requires approved account access in every desktop build. Previously
 verified accounts retain bounded offline access; saved work remains reviewable after
@@ -787,7 +803,10 @@ RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants 
 AT-SPI element actions, portal input and Screenshot-portal captures; physical input
 does not pause control there, and wlroots desktops without RemoteDesktop remain
 unavailable. The portal client compiles only in Linux CI and has no real-portal
-fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+fixture. XWayland alone is insufficient. A person can attach a window to a conversation by
+dragging its agent onto it (Windows and macOS) or picking it from a list, choosing see-only
+or see-and-control; the agent's next window request uses it without asking. The cross-app
+drag has unit and browser-fixture coverage only. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,

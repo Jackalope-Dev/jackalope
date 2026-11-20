@@ -58,7 +58,7 @@ prior turns from cumulative result counters to a continuation. Fresh runs can
 fall back to the final usage envelope; missing resumed usage remains unknown.
 The observed CLI reports uncached input and cache reads separately, and includes
 thinking in output tokens. Jackalope adds cache reads to input and does not add
-thinking twice. Subscription quota is read separately from the CLI’s structured
+thinking twice. Subscription quota is read separately from the CLI's structured
 `-p /usage --output-format json` command. The reader checks the CLI version first
 (minimum 1.1.11), requires a successful zero-turn command receipt, and keeps model
 groups and reset windows distinct. Missing percentages remain unknown. Gemini API-key profiles use

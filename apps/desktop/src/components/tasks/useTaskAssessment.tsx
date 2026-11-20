@@ -101,11 +101,14 @@ export function TaskAssessmentNotice({
 }) {
   if (busy)
     return (
-      <InlineNotice>
+      <InlineNotice
+        action={
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+            Cancel assessment
+          </Button>
+        }
+      >
         <span role="status">Checking the best approach…</span>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel assessment
-        </Button>
       </InlineNotice>
     );
   if (!assessment || assessment.strategy === 'single') return null;

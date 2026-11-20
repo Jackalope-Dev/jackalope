@@ -28,6 +28,8 @@ const shareMessage = (approved: boolean) =>
 export function WaitlistPage() {
   const [place, setPlace] = useState<Place | null>(null);
   const [token, setToken] = useState('');
+  /** With open signup there is no line to look up, so the page points to sign-in instead. */
+  const [openSignup, setOpenSignup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -74,6 +76,10 @@ export function WaitlistPage() {
     readLink();
     window.addEventListener('hashchange', readLink);
     const controller = new AbortController();
+    if (accessOrigin)
+      void accessRequest<{ openSignup?: boolean }>('status', undefined, controller.signal)
+        .then((status) => setOpenSignup(status.openSignup === true))
+        .catch(() => undefined);
     if (accessOrigin)
       void accessRequest<Place>('waitlist/me', undefined, controller.signal)
         .then(setPlace)
@@ -344,6 +350,22 @@ export function WaitlistPage() {
             </aside>
           )}
         </>
+      ) : openSignup ? (
+        <Panel variant="plain" className="access-card access-entry">
+          <h2>There's no waitlist anymore.</h2>
+          <p>
+            Anyone can create a free Jackalope account. Sign in with your email, or sign up free.
+          </p>
+          <div className="access-entry-actions">
+            <a className="button button-primary" href="/access/">
+              Sign in
+              <ArrowRight size={18} />
+            </a>
+            <a className="button button-secondary" href="/#newsletter">
+              Sign up free
+            </a>
+          </div>
+        </Panel>
       ) : (
         <Panel variant="plain" className="access-card access-entry">
           <h2>{sent ? 'Check your inbox.' : 'Find your place.'}</h2>
@@ -381,7 +403,7 @@ export function WaitlistPage() {
               </Button>
             </form>
           ) : (
-            <p>Waitlist status will be available when sign-in opens.</p>
+            <p>Sign-in isn’t available on this site.</p>
           )}
           <p>
             New here? <a href="/#newsletter">Sign up free</a>. Already have an account?{' '}

@@ -264,11 +264,27 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
     Ok(record)
 }
 
+/// The folder for work without a project, created on first use in the profile's data
+/// directory. It stays a plain folder: Jackalope never makes it a repository, and refuses
+/// one inside a repository so general work never runs in someone's checkout.
+pub fn general_folder(data: &Path) -> Result<String, String> {
+    let folder = data.join("general");
+    std::fs::create_dir_all(&folder)
+        .map_err(|error| format!("The folder for general work could not be created: {error}"))?;
+    super::tasks::plain_folder(&folder.to_string_lossy())?.ok_or_else(|| {
+        format!(
+            "{} is inside a Git repository, so it cannot hold general work.",
+            folder.display()
+        )
+    })
+}
+
 macro_rules! tauri_commands {
     ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
         $next!($finish [$($done)*
             commands::project_registry::project_registry_list,
             commands::project_registry::project_registry_save,
+            commands::project_registry::project_general_folder,
         ] $($rest)*)
     };
 }
@@ -287,10 +303,36 @@ pub fn project_registry_save(
     save(&state, projects)
 }
 
+#[tauri::command]
+pub async fn project_general_folder(state: State<'_, TaskRuntime>) -> Result<String, String> {
+    let data = state.data_directory().to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || general_folder(&data))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::cli_protocol::WorkspaceMode;
+
+    #[test]
+    fn the_general_folder_is_a_plain_folder_and_never_one_inside_a_repository() {
+        let root = std::env::temp_dir().join(format!("jl-general-{}", uuid::Uuid::new_v4()));
+        let data = root.join("profile");
+        std::fs::create_dir_all(&data).unwrap();
+        let folder = general_folder(&data).unwrap();
+        assert!(Path::new(&folder).is_dir());
+        assert!(!Path::new(&folder).join(".git").exists());
+        assert_eq!(general_folder(&data).unwrap(), folder);
+
+        let repository = root.join("repository");
+        std::fs::create_dir_all(&repository).unwrap();
+        crate::commands::tasks::git(&repository.to_string_lossy(), &["init"]).unwrap();
+        let refused = general_folder(&repository.join("profile")).unwrap_err();
+        assert!(refused.contains("inside a Git repository"), "{refused}");
+        let _ = std::fs::remove_dir_all(root);
+    }
 
     #[test]
     fn saved_project_accent_notifies_clients_and_preserves_other_projects() {

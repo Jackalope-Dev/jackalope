@@ -337,7 +337,7 @@ Saved drafts preserve the workflow selection and skipped-lesson settings.
 
 ## Local change monitors
 
-In **Tasks → Recurring → New schedule**, choose a run policy:
+In **Bots → Schedules → New schedule**, choose a run policy:
 
 - **Run an agent every time** preserves ordinary scheduled execution.
 - **Run an agent only after code changes** checks locally first and launches the

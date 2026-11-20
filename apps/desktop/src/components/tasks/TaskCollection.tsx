@@ -154,9 +154,9 @@ export function TaskCollection({
       <button
         type="button"
         className="work-elsewhere-action"
-        onClick={() => useWorkViewStore.getState().setScope('all')}
+        onClick={() => useWorkViewStore.getState().openInbox()}
       >
-        Show all
+        Open Inbox
       </button>
     </p>
   );

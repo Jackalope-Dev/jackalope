@@ -75,8 +75,8 @@ Ordinary commits never silently bump versions. Publication workflows create immu
 channel/version tags only after their source and artifact checks pass.
 
 Agents can use the repository [release skill](../.agents/skills/jackalope-release/SKILL.md)
-for requests such as “prepare the next beta from master” or “promote this tested beta
-SHA to stable.” It follows the same commands and leaves commits to the maintainer.
+for requests such as "prepare the next beta from master" or "promote this tested beta
+SHA to stable." It follows the same commands and leaves commits to the maintainer.
 
 ## Windows Store releases
 

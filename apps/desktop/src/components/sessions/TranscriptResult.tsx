@@ -1,4 +1,4 @@
-import { Button } from '@jackalope/ui';
+import { LinkButton } from '@jackalope/ui';
 import { lazy, Suspense, useState } from 'react';
 
 const TaskMarkdown = lazy(() => import('../tasks/TaskMarkdown'));
@@ -22,9 +22,9 @@ export function TranscriptResult({
   ) : (
     <>
       <p className="whitespace-pre-wrap">{content}</p>
-      <Button variant="ghost" onClick={() => setFormatted(true)}>
+      <LinkButton className="transcript-format" onClick={() => setFormatted(true)}>
         Format earlier response
-      </Button>
+      </LinkButton>
     </>
   );
 }

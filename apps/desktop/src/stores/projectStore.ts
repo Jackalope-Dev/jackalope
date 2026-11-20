@@ -120,6 +120,16 @@ export interface Project {
   agentProvider?: string;
 }
 
+/**
+ * The General project: a plain folder Jackalope keeps in its data directory for work
+ * without a project, such as operating a web page or checking a connection. A fixed id
+ * keeps it one project across windows and the terminal's project mirror.
+ */
+export const GENERAL_PROJECT_ID = 'jackalope-general';
+
+export const isGeneralProject = (project: Pick<Project, 'id'> | undefined) =>
+  project?.id === GENERAL_PROJECT_ID;
+
 interface ProjectState {
   projects: Project[];
   activeProjectId: string | null;
@@ -429,6 +439,7 @@ export async function mergeProjectRegistry() {
         name: record.name,
         path: ordinaryProjectPath(record.path),
         gitBranch: '',
+        ...(record.id === GENERAL_PROJECT_ID ? { plainFolder: true } : {}),
         worktrees: [],
       }));
     if (added.length) {

@@ -402,6 +402,9 @@ impl TaskRuntime {
         if let Some(folder) = plain_folder(&req.project_path)? {
             return self.prepare_plain_folder(id, req, previous, &folder);
         }
+        if req.non_code {
+            return self.prepare_non_code(id, req, previous);
+        }
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
         let mode = if previous.is_some() || req.isolated {
             WorkspaceMode::Worktree
@@ -594,8 +597,10 @@ impl TaskRuntime {
         let canonical = |path: &str| dunce::canonicalize(path).ok();
         let target = canonical(root);
         let mut inner = self.inner.lock().unwrap();
+        // Non-code work only reads the checkout, so it never holds it.
         if inner.runs.values().any(|other| {
             other.id != id
+                && !other.non_code
                 && !other.workspace.is_empty()
                 && other.status.is_active()
                 && (Path::new(&other.workspace) == Path::new(root)
@@ -701,7 +706,7 @@ impl TaskRuntime {
             run.branch.clear();
             run.base_head.clear();
         })?;
-        if previous.is_none() {
+        if previous.is_none() && !req.non_code {
             let command = req
                 .prepare_command
                 .as_deref()
@@ -719,6 +724,56 @@ impl TaskRuntime {
             }
         }
         Ok(())
+    }
+
+    /// Work that changes no code runs in the project checkout as it is: no worktree,
+    /// branch change, setup files or preparation, and whatever branch is checked out.
+    /// It does not reserve the checkout, so in-place work is not held up by it; a
+    /// continuation stays in the folder its conversation started in.
+    fn prepare_non_code(
+        &self,
+        id: &str,
+        req: &RunRequest,
+        previous: Option<TaskRun>,
+    ) -> Result<(), String> {
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new(
+                "workspace",
+                "Using the project folder",
+                1,
+            ))
+        });
+        let (workspace, branch, base_head) = match &previous {
+            Some(old) => {
+                if old.session_id.is_none() && req.live_session_id.is_none() {
+                    return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
+                }
+                (
+                    old.workspace.clone(),
+                    old.branch.clone(),
+                    old.base_head.clone(),
+                )
+            }
+            None => {
+                let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
+                // A detached checkout has no branch and a repository without commits no head.
+                let branch = git(&root, &["branch", "--show-current"]).unwrap_or_default();
+                let head =
+                    git(&root, &["rev-parse", "--verify", "--quiet", "HEAD"]).unwrap_or_default();
+                (root, branch, head)
+            }
+        };
+        self.update_checked(id, |run| {
+            if previous.is_none() {
+                activity(
+                    run,
+                    "Working in the project folder without a worktree, setup or automatic checks.",
+                );
+            }
+            run.workspace = workspace.clone();
+            run.branch = branch;
+            run.base_head = base_head;
+        })
     }
 
     fn execute_agent(
@@ -1946,6 +2001,7 @@ impl TaskRuntime {
             prepare_command: run.prepare_command.clone(),
             setup_files: run.setup_files.clone(),
             auto_verify: run.auto_verify,
+            non_code: run.non_code,
             target_branch: run.target_branch.clone(),
             account_binding: None,
             prompt: run.prompt.clone(),
@@ -2204,6 +2260,9 @@ impl TaskRuntime {
                     "This account is disabled in Settings. Choose an enabled account.".into(),
                 );
             }
+            if let Some(old) = previous.as_ref().or(retried.as_ref()) {
+                request.non_code = old.non_code;
+            }
             if let Some(folder) = plain_folder(&request.project_path)? {
                 request.project_path = folder;
                 request.isolated = false;
@@ -2213,10 +2272,14 @@ impl TaskRuntime {
                 request.target_branch =
                     Some(old.target_branch.clone().unwrap_or_else(|| "master".into()));
             } else {
-                request.target_branch = Some(resolve_target_branch(
-                    &request.project_path,
-                    request.target_branch.as_deref(),
-                )?);
+                let target =
+                    resolve_target_branch(&request.project_path, request.target_branch.as_deref());
+                // Non-code work stays on whatever is checked out, so it needs no target.
+                request.target_branch = if request.non_code {
+                    target.ok()
+                } else {
+                    Some(target?)
+                };
             }
             request.account_binding = Some(binding.clone());
             if let Some(old) = &previous {
@@ -2241,6 +2304,12 @@ impl TaskRuntime {
                 if request.connection_ids.is_none() {
                     request.connection_ids = old.connection_ids.clone();
                 }
+            }
+            // Non-code work never prepares the workspace or checks it automatically.
+            if request.non_code {
+                request.prepare_command = None;
+                request.setup_files.clear();
+                request.auto_verify = false;
             }
             let mut context_receipt = if let Some(old) = previous.as_ref().or(retried.as_ref()) {
                 old.context_receipt.clone()
@@ -2339,6 +2408,7 @@ impl TaskRuntime {
                 prepare_command: request.prepare_command.clone(),
                 setup_files: request.setup_files.clone(),
                 auto_verify: request.auto_verify,
+                non_code: request.non_code,
                 finishing: false,
                 verification_error: None,
                 verification: None,

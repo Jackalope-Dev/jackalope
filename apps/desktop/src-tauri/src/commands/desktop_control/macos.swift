@@ -745,6 +745,38 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         }
         return ["windows": Array(windows.prefix(200)), "monitors": monitors()]
     }
+    // The topmost window under the pointer, for attaching a window by dragging onto it.
+    // Anything above normal windows (menus, the Dock, panels) or a denied process is no target.
+    if action == "at" {
+        // Panels, menus and system layers (the Dock keeps a full-screen window above
+        // everything) are looked through; the first normal window under the pointer is the
+        // target, unless it is Jackalope's own. Untitled windows go by their app's name.
+        let point = CGEvent(source: nil)?.location ?? .zero
+        for value in visibleWindows() {
+            guard let bounds = value[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.contains(point),
+                  (value[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  (value[kCGWindowLayer as String] as? Int) == 0 else { continue }
+            guard let id = value[kCGWindowNumber as String] as? UInt32,
+                  let pid = value[kCGWindowOwnerPID as String] as? Int32, !deny.contains(pid),
+                  let start = started(pid), let app = NSRunningApplication(processIdentifier: pid),
+                  let bundle = app.bundleIdentifier else { return ["window": NSNull()] }
+            let name = app.localizedName ?? bundle
+            let title = (value[kCGWindowName as String] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? name
+            return ["window": ["handle": String(id), "pid": pid, "started": start, "title": title, "class": bundle,
+                               "app": bundle, "appName": name],
+                    "bounds": boundsJSON(rect)]
+        }
+        return ["window": NSNull()]
+    }
+    // Bounds of one window, for the badge on an attached window. Like list and at it reads
+    // only window geometry; a closed, replaced or off-screen window has none.
+    if action == "bounds" {
+        guard let identity = request["window"] as? [String: Any],
+              let window = try? SelectedWindow(identity), !deny.contains(window.pid),
+              let rect = try? window.bounds() else { return ["bounds": NSNull()] }
+        return ["bounds": boundsJSON(rect)]
+    }
     guard let guardJSON = request["guard"] as? [String: Any] else {
         throw ControlError("An active indicator is required.")
     }
@@ -859,21 +891,60 @@ func serve() {
     }
 }
 
+/// A view that reports the pointer entering and leaving it.
+final class HoverView: NSView {
+    var onHover: ((Bool) -> Void)?
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    override func mouseEntered(with event: NSEvent) { onHover?(true) }
+    override func mouseExited(with event: NSEvent) { onHover?(false) }
+}
+
+func hexColor(_ text: String) -> NSColor? {
+    let hex = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard hex.count == 7, hex.hasPrefix("#"), let rgb = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+    return NSColor(srgbRed: Double((rgb >> 16) & 255) / 255, green: Double((rgb >> 8) & 255) / 255,
+                   blue: Double(rgb & 255) / 255, alpha: 1)
+}
+
 final class Indicator: NSObject {
     let selected: SelectedWindow?
     let scope: String
     let app: String
     let name: String
+    /// The agent's display name, for "Codex is using this window".
+    let agent: String
     let stateFile: URL
     let themeFile: URL
+    /// `dark|#surface|#text` from the app's theme; older apps don't write it.
+    let lookFile: URL?
     let tag = Int64.random(in: 1...Int64.max)
     let parent = getppid()
-    let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 56),
+    static let expandedSize = NSSize(width: 470, height: 40)
+    static let collapsedSize = NSSize(width: 40, height: 40)
+    let panel = NSPanel(contentRect: NSRect(origin: .zero, size: Indicator.expandedSize),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    let pill = HoverView()
+    let dot = NSView()
     let label = NSTextField(labelWithString: "")
     let toggle = NSButton(title: "Resume", target: nil, action: nil)
+    let stop = NSButton(title: "Stop", target: nil, action: nil)
+    let open = NSButton(title: "Open", target: nil, action: nil)
+    let fold = NSButton(title: "", target: nil, action: nil)
+    /// Folded to a small chip by the person; hovering shows the full pill again. The chip and
+    /// the frame always stay visible while control is active.
+    var folded = false
+    var hovering = false
     var frames: [NSWindow] = []
-    var accent = NSColor(srgbRed: 99 / 255, green: 102 / 255, blue: 241 / 255, alpha: 1)
+    /// The brand's default accent until the app's theme is read.
+    var accent = hexColor("#8b5cf6")!
+    var dark = true
+    var surface = hexColor("#1d1b22")!
+    var textColor = hexColor("#f4f3f7")!
+    var lookKey = ""
     var status = "paused"
     var reason = "Click Resume to begin"
     var epoch: UInt64 = 1
@@ -889,9 +960,84 @@ final class Indicator: NSObject {
         scope = request["scope"] as? String ?? "window"
         app = (request["app"] as? String ?? "").lowercased()
         name = request["label"] as? String ?? ""
+        agent = (request["agent"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Jackalope"
         if scope == "desktop" { selected = nil } else { selected = try SelectedWindow(identity) }
         stateFile = URL(fileURLWithPath: file); themeFile = URL(fileURLWithPath: theme)
+        lookFile = (request["look"] as? String).map { URL(fileURLWithPath: $0) }
         super.init()
+        readTheme()
+    }
+
+    /// Reads the app's accent and surface colours; returns whether they changed.
+    @discardableResult
+    func readTheme() -> Bool {
+        let accentText = (try? String(contentsOf: themeFile, encoding: .utf8)) ?? ""
+        let lookText = lookFile.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        let key = accentText + "|" + lookText
+        if key == lookKey { return false }
+        lookKey = key
+        if let color = hexColor(accentText) { accent = color }
+        let parts = lookText.split(separator: "|").map(String.init)
+        if parts.count == 3 {
+            dark = parts[0] == "dark"
+            if let color = hexColor(parts[1]) { surface = color }
+            if let color = hexColor(parts[2]) { textColor = color }
+        }
+        return true
+    }
+
+    var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    var reduceTransparency: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency }
+
+    /// Paints the pill and frame in the app's colours.
+    func restyle() {
+        panel.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        let layer = pill.layer
+        layer?.backgroundColor = surface.withAlphaComponent(reduceTransparency ? 1 : 0.96).cgColor
+        layer?.borderColor = accent.withAlphaComponent(0.5).cgColor
+        layer?.shadowColor = accent.cgColor
+        dot.layer?.backgroundColor = accent.cgColor
+        dot.layer?.shadowColor = accent.cgColor
+        label.textColor = textColor
+        for (button, emphasis) in [(toggle, true), (stop, false), (open, false)] {
+            button.attributedTitle = NSAttributedString(string: button.title, attributes: [
+                .foregroundColor: emphasis ? accent : textColor,
+                .font: NSFont.systemFont(ofSize: 12, weight: emphasis ? .semibold : .medium),
+            ])
+        }
+        fold.contentTintColor = textColor.withAlphaComponent(0.7)
+        for frame in frames { styleFrame(frame) }
+    }
+
+    /// Lays the pill out folded (a small chip) or full, keeping it centred where it was.
+    func layoutPill() {
+        let showFull = !folded || hovering
+        let size = showFull ? Indicator.expandedSize : Indicator.collapsedSize
+        let old = panel.frame
+        let origin = NSPoint(x: old.midX - size.width / 2, y: old.maxY - size.height)
+        if old.size != size { panel.setFrame(NSRect(origin: origin, size: size), display: true) }
+        pill.frame = NSRect(origin: .zero, size: size)
+        pill.layer?.cornerRadius = size.height / 2
+        dot.frame = showFull ? NSRect(x: 15, y: 15, width: 10, height: 10) : NSRect(x: 14, y: 14, width: 12, height: 12)
+        dot.layer?.cornerRadius = dot.frame.width / 2
+        for view in [label, toggle, stop, open, fold] as [NSView] { view.isHidden = !showFull }
+        label.frame = NSRect(x: 34, y: 11, width: 214, height: 18)
+        toggle.frame = NSRect(x: 252, y: 6, width: 62, height: 28)
+        stop.frame = NSRect(x: 316, y: 6, width: 48, height: 28)
+        open.frame = NSRect(x: 366, y: 6, width: 58, height: 28)
+        fold.frame = NSRect(x: 428, y: 8, width: 30, height: 24)
+        fold.image = NSImage(systemSymbolName: folded ? "chevron.down" : "chevron.up", accessibilityDescription: folded ? "Show the full bar" : "Fold to a small chip")
+        pill.setAccessibilityLabel(showFull ? nil : "\(agent) is using \(subject). Hover to show controls.")
+    }
+
+    @objc func toggleFold() {
+        folded.toggle()
+        layoutPill()
+    }
+
+    /// Asks Jackalope to bring this conversation forward.
+    @objc func openInApp() {
+        try? "open".write(to: stateFile.deletingLastPathComponent().appendingPathComponent("open"), atomically: true, encoding: .utf8)
     }
 
     var subject: String {
@@ -908,8 +1054,10 @@ final class Indicator: NSObject {
         let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(reason.replacingOccurrences(of: "|", with: "/"))"
         do { try text.write(to: stateFile, atomically: true, encoding: .utf8) }
         catch { NSApp.terminate(nil) }
-        label.stringValue = status == "active" ? "Jackalope controls \(subject) · Esc to cancel" : "Paused · \(reason)"
-        toggle.title = status == "active" ? "Pause" : "Resume"
+        label.stringValue = status == "active" ? "\(agent) is using \(subject) · Esc stops" : "Paused · \(reason)"
+        let title = status == "active" ? "Pause" : "Resume"
+        if toggle.title != title { toggle.title = title; restyle() }
+        updateDot()
         updateFrames()
     }
 
@@ -917,10 +1065,12 @@ final class Indicator: NSObject {
     /// ignore the mouse and are excluded from screen captures.
     func updateFrames() {
         var areas: [NSRect] = []
+        let room = Indicator.frameRoom
         if status == "active" {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
             if scope == "window", let rect = try? selected?.bounds() {
-                areas = [NSRect(x: rect.minX - 4, y: top - rect.maxY - 4, width: rect.width + 8, height: rect.height + 8)]
+                areas = [NSRect(x: rect.minX - room, y: top - rect.maxY - room,
+                                width: rect.width + room * 2, height: rect.height + room * 2)]
             } else if scope == "desktop" {
                 areas = NSScreen.screens.map { $0.frame }
             } else if let screen = NSScreen.main {
@@ -937,16 +1087,54 @@ final class Indicator: NSObject {
             frame.sharingType = .none
             frame.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             frame.contentView?.wantsLayer = true
-            frame.contentView?.layer?.borderWidth = 4
-            frame.contentView?.layer?.cornerRadius = 8
+            let line = CAShapeLayer()
+            line.fillColor = NSColor.clear.cgColor
+            line.lineWidth = 2
+            line.shadowOffset = .zero
+            line.shadowRadius = 7
+            frame.contentView?.layer?.addSublayer(line)
             frames.append(frame)
+            styleFrame(frame)
         }
         while frames.count > areas.count { frames.removeLast().orderOut(nil) }
         for (frame, area) in zip(frames, areas) {
-            if frame.frame != area { frame.setFrame(area, display: true) }
-            frame.contentView?.layer?.borderColor = accent.cgColor
+            if frame.frame != area {
+                frame.setFrame(area, display: true)
+                styleFrame(frame)
+            }
             frame.orderFrontRegardless()
         }
+    }
+
+    /// Room around a window frame for the outline's soft glow.
+    static let frameRoom: CGFloat = 10
+
+    /// A thin accent line with a soft glow, rounded like the window's corners.
+    func styleFrame(_ frame: NSWindow) {
+        guard let view = frame.contentView, let line = view.layer?.sublayers?.first as? CAShapeLayer else { return }
+        let inset = Indicator.frameRoom - 2
+        let rect = view.bounds.insetBy(dx: inset, dy: inset)
+        let radius: CGFloat = scope == "window" ? 12 : 0
+        line.frame = view.bounds
+        line.path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        line.strokeColor = accent.cgColor
+        line.shadowColor = accent.cgColor
+        line.shadowOpacity = reduceTransparency ? 0 : 0.75
+    }
+
+    /// The live dot pulses gently while the agent is in control.
+    func updateDot() {
+        guard let layer = dot.layer else { return }
+        let pulsing = layer.animation(forKey: "pulse") != nil
+        if status == "active" && !reduceMotion && !pulsing {
+            let pulse = CABasicAnimation(keyPath: "opacity")
+            pulse.fromValue = 1; pulse.toValue = 0.35; pulse.duration = 0.9
+            pulse.autoreverses = true; pulse.repeatCount = .infinity
+            layer.add(pulse, forKey: "pulse")
+        } else if status != "active" && pulsing {
+            layer.removeAnimation(forKey: "pulse")
+        }
+        layer.opacity = status == "active" ? 1 : 0.55
     }
 
     func pause(_ message: String) {
@@ -1032,15 +1220,31 @@ final class Indicator: NSObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
         panel.sharingType = .none
-        panel.isOpaque = true; panel.backgroundColor = .black
-        label.textColor = .white; label.font = .systemFont(ofSize: 12)
-        label.frame = NSRect(x: 16, y: 19, width: 342, height: 18)
+        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
+        pill.wantsLayer = true
+        pill.layer?.borderWidth = 1
+        pill.layer?.shadowOpacity = reduceTransparency ? 0 : 0.35
+        pill.layer?.shadowRadius = 10
+        pill.layer?.shadowOffset = .zero
+        pill.onHover = { [weak self] inside in
+            guard let self = self else { return }
+            self.hovering = inside
+            if self.folded { self.layoutPill() }
+        }
+        dot.wantsLayer = true
+        dot.layer?.shadowOpacity = 0.9; dot.layer?.shadowRadius = 5; dot.layer?.shadowOffset = .zero
+        label.font = .systemFont(ofSize: 12, weight: .medium)
         label.lineBreakMode = .byTruncatingTail
-        toggle.frame = NSRect(x: 368, y: 12, width: 88, height: 32)
-        toggle.bezelStyle = .rounded; toggle.target = self; toggle.action = #selector(change)
-        let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
-        cancelButton.frame = NSRect(x: 462, y: 12, width: 82, height: 32); cancelButton.bezelStyle = .rounded
-        panel.contentView?.addSubview(label); panel.contentView?.addSubview(toggle); panel.contentView?.addSubview(cancelButton)
+        for (button, action) in [(toggle, #selector(change)), (stop, #selector(cancel)), (open, #selector(openInApp)), (fold, #selector(toggleFold))] {
+            button.isBordered = false; button.target = self; button.action = action
+        }
+        stop.setAccessibilityLabel("Stop desktop control")
+        open.setAccessibilityLabel("Open the conversation in Jackalope")
+        fold.imagePosition = .imageOnly
+        panel.contentView = pill
+        for view in [dot, label, toggle, stop, open, fold] as [NSView] { pill.addSubview(view) }
+        restyle()
+        layoutPill()
         var screen = NSScreen.main
         if let bounds = try selected?.bounds() {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
@@ -1048,7 +1252,8 @@ final class Indicator: NSObject {
             screen = NSScreen.screens.first(where: { $0.frame.contains(cocoaPoint) }) ?? NSScreen.main
         }
         guard let frame = screen?.visibleFrame else { throw ControlError("Selected display is unavailable.") }
-        panel.setFrameOrigin(NSPoint(x: frame.midX - 280, y: frame.maxY - 56))
+        panel.setFrameOrigin(NSPoint(x: frame.midX - Indicator.expandedSize.width / 2,
+                                     y: frame.maxY - Indicator.expandedSize.height - 8))
         panel.orderFrontRegardless()
         save()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -1066,12 +1271,7 @@ final class Indicator: NSObject {
                 }
                 if self.status == "active" && !CGEvent.tapIsEnabled(tap: tap) { self.pause("Input monitor interrupted") }
             } catch { self.pause("Window focus or identity changed") }
-            if let color = try? String(contentsOf: self.themeFile, encoding: .utf8), color.count == 7,
-               let rgb = UInt32(color.dropFirst(), radix: 16) {
-                self.accent = NSColor(srgbRed: Double((rgb >> 16) & 255) / 255,
-                    green: Double((rgb >> 8) & 255) / 255, blue: Double(rgb & 255) / 255, alpha: 1)
-                self.toggle.contentTintColor = self.accent
-            }
+            if self.readTheme() { self.restyle() }
             self.save()
         }
         NSApp.run()

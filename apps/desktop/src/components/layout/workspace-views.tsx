@@ -31,6 +31,9 @@ export interface ViewContext {
 }
 
 // Pages load on demand so the first paint ships only the task workspace.
+const LibraryPage = lazy(() =>
+  import('../library/LibraryPage').then((m) => ({ default: m.LibraryPage })),
+);
 const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
 const DevicesPage = lazy(() =>
   import('../remote/DevicesPage').then((m) => ({ default: m.DevicesPage })),
@@ -129,6 +132,7 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
       }}
     />
   ),
+  library: () => <LibraryPage />,
   'remote-hosts': () => <DevicesPage />,
   'project-overview': (ctx) => <ProjectOverview onOpenProject={ctx.openProjectSetup} />,
   changes: (ctx) => <CommitReview key={ctx.activeProjectId} onOpenProject={ctx.openProjectSetup} />,

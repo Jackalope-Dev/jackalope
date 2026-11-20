@@ -112,12 +112,23 @@ body {
   overflow: hidden;
 }
 
+/* Drag overlay and attached-window badge windows draw only their content. */
+.overlay-page,
+.overlay-page body,
+.overlay-page #root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
 :where(button, [role="button"], [role="menuitem"], select, summary) {
   touch-action: manipulation;
 }
-/* Shared segments, menu rows and links size themselves. */
+/* Shared segments, menu rows, choice rows and links size themselves. A fixed minimum on a
+   choice row would let a short scrolling list squeeze it below its two lines of text. */
 :where(button, [role="button"], [role="menuitem"]):where(
-  :not(.ui-segment, .ui-tabs-trigger, .ui-menu-item, .workspace-menu-item, .ui-link)
+  :not(.ui-segment, .ui-tabs-trigger, .ui-menu-item, .workspace-menu-item, .ui-link, .ui-choice)
 ) {
   min-height: var(--control-height, 36px);
   min-width: var(--control-height, 36px);
@@ -128,13 +139,29 @@ body {
 :where(input[type="checkbox"], input[type="radio"]) {
   accent-color: var(--color-accent-ink);
 }
-:where(a, textarea, summary):focus-visible {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 3px;
+/* Containers focused only by code (tabindex="-1"), such as popovers and dialogs, get no ring. */
+:where(
+  a,
+  summary,
+  button,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
-:where(button, input, select, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 4px;
+/* Fields show focus on their own edge, an accent border with a faint inner line, rather
+   than a second ring floating outside the border. Inside the edge, it is never clipped. */
+:where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select
+):focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-border-focus) 45%, transparent);
 }
 button:disabled {
   cursor: not-allowed;
