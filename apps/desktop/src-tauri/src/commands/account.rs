@@ -10,8 +10,8 @@ use tauri_plugin_opener::OpenerExt;
 pub mod beta;
 pub mod feedback;
 pub mod lesson_sync;
-pub mod skill_sync;
 pub mod settings_sync;
+pub mod skill_sync;
 mod waitlist;
 
 fn sha256_hex(value: &str) -> String {
