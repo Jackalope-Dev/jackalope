@@ -1,0 +1,29 @@
+
+Running 4 tests using 2 workers
+
+  ✓  1 [chromium] › tests/home.spec.ts:4:7 › home › shows the hero heading (801ms)
+  ✘  2 [chromium] › tests/login.spec.ts:7:5 › login › rejects a wrong password (3.2s)
+  ✓  3 [chromium] › tests/home.spec.ts:10:7 › home › links to the docs (1.0s)
+  ✓  4 [chromium] › tests/login.spec.ts:15:5 › login › remembers the email (1.4s)
+
+
+  1) [chromium] › tests/login.spec.ts:7:5 › login › rejects a wrong password ──────────────────────
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('alert')
+    Expected string: "Email or password is incorrect"
+    Received string: "Something went wrong"
+
+      10 |     await page.getByRole('button', { name: 'Sign in' }).click();
+    > 11 |     await expect(page.getByRole('alert')).toHaveText('Email or password is incorrect');
+         |                                           ^
+      12 |   });
+
+        at /home/dev/shop/tests/login.spec.ts:11:43
+
+    Error Context: test-results/login-rejects-a-wrong-password-chromium/error-context.md
+
+  1 failed
+    [chromium] › tests/login.spec.ts:7:5 › login › rejects a wrong password ───────────────────────
+  3 passed (6.4s)

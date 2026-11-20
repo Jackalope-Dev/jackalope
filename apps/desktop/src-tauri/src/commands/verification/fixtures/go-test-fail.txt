@@ -1,0 +1,14 @@
+=== RUN   TestParseAmount
+--- PASS: TestParseAmount (0.00s)
+=== RUN   TestTransfer
+    ledger_test.go:41: balance after transfer = 4200, want 4250
+--- FAIL: TestTransfer (0.00s)
+=== RUN   TestReconcile
+--- PASS: TestReconcile (0.03s)
+FAIL
+FAIL	example.com/ledger	0.087s
+=== RUN   TestFormatCurrency
+--- PASS: TestFormatCurrency (0.00s)
+PASS
+ok  	example.com/ledger/report	0.011s
+FAIL
