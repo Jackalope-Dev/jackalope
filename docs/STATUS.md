@@ -78,6 +78,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
+- A new task worktree with a preparation command first clones the checkout's installed
+  `node_modules` folders copy-on-write (APFS `clonefile`, Linux `FICLONE`) when both
+  checkouts' dependency manifests match; the command still runs. Other volumes and
+  Windows install in full, never by byte copy. Native acceptance remains open.
 - The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
