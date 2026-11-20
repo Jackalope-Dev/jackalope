@@ -27,6 +27,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         failure_kind: None,
         provider_error: None,
         session_refused: None,
+        handoff_context: None,
         contract: Default::default(),
         understanding: None,
         monitor_change: None,
@@ -423,6 +424,7 @@ pub(super) fn trial_request(
 ) -> RunRequest {
     RunRequest {
         retry_of: None,
+        handoff_focus: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -686,7 +688,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
 }
 
 #[test]
-fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
+fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
     let root = std::env::temp_dir().join(format!("jackalope-retry-{}", uuid::Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
@@ -753,12 +755,22 @@ fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
     assert_eq!(reused.1, "attempt");
     assert_eq!(reused.2, failed.base_head);
 
-    // Uncommitted agent work is never inherited.
+    assert!(!reused.3, "a clean worktree carries no progress");
+
+    // Uncommitted agent work is never inherited, unless a quota stop interrupted it.
     std::fs::write(worktree.join("half-done.txt"), "partial").unwrap();
     assert!(
         runtime.reusable_workspace(&failed_id).is_none(),
         "a dirty worktree must force a fresh one"
     );
+    runtime.update(&failed_id, |run| {
+        run.quota_failure = Some(super::routing::QuotaFailure {
+            model_only: false,
+            message: "usage limit reached".into(),
+        })
+    });
+    assert!(runtime.reusable_workspace(&failed_id).unwrap().3);
+    runtime.update(&failed_id, |run| run.quota_failure = None);
     std::fs::remove_file(worktree.join("half-done.txt")).unwrap();
     assert!(runtime.reusable_workspace(&failed_id).is_some());
 

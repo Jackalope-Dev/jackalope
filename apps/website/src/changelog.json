@@ -1,5 +1,15 @@
 [
   {
+    "id": "pick-up-quota-stopped-work-where-it-left-off",
+    "date": "2026-11-20",
+    "title": "Pick up quota-stopped work where it left off.",
+    "description": "Retrying a task the provider quota stopped now continues from its changes instead of starting over.",
+    "items": [
+      "Add an optional focus line for the next agent, and see the handoff context it received in Task details.",
+      "A provider refusing a request is reported as a refusal and no longer switches accounts."
+    ]
+  },
+  {
     "id": "hand-an-agent-a-window",
     "date": "2026-11-19",
     "title": "Hand an agent a window.",
