@@ -78,6 +78,13 @@ export const ACP_PRESETS: AcpPreset[] = [
     args: ['acp'],
     url: 'https://commandcode.ai',
   },
+  {
+    id: 'oh-my-pi',
+    name: 'Oh My Pi',
+    binaries: ['omp'],
+    args: ['acp'],
+    url: 'https://omp.sh',
+  },
 ];
 
 const presetBinaries = (preset: AcpPreset, windows: boolean) =>

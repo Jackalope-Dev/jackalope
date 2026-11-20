@@ -154,8 +154,9 @@ release dates.
   the task's agent without a click, follow pull requests opened from the terminal command
   and the phone, and show the state in the phone companion.
 - [ ] Run each known ACP agent preset (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
-  Auggie, Kiro, Hermes Agent, Command Code) through a task with permissions, a question and
-  a continuation, on Windows and macOS, and remove or correct any whose command differs.
+  Auggie, Kiro, Hermes Agent, Command Code, Oh My Pi) through a task with permissions, a
+  question and a continuation, on Windows and macOS, and remove or correct any whose
+  command differs.
   Give custom ACP agents their model list from the session and a product mark.
 - [ ] Tune swarm assignment and subtask limits from installed swarm trials: how often
   agents use peers, peer_adopt and propose_subtask, duplicate implementations avoided,

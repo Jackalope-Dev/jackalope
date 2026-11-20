@@ -298,9 +298,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   server on this computer can be saved the same way after its model list is read.
   An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
   Add agent lists known ACP CLIs by name (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
-  Auggie, Kiro, Hermes Agent and Command Code), marks the ones found on this computer and
-  fills in their path and arguments, which stay editable. None of these has been run
-  through Jackalope in an installed app.
+  Auggie, Kiro, Hermes Agent, Command Code and Oh My Pi), marks the ones found on this
+  computer and fills in their path and arguments, which stay editable. None of these has
+  been run through Jackalope in an installed app.
   First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
@@ -406,7 +406,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
-  Chat supports per-request lesson opt-outs. Automatic review lessons require a later
+  Chat supports per-request lesson opt-outs. Cursor, Windsurf, Cline and GitHub Copilot
+  rule files in the project are offered as paused lessons that tasks receive only after
+  being turned on. Automatic review lessons require a later
   accepted revision and a successful check of the accepted tree; unresolved notes
   remain visible without entering task context.
 - Per-project background learning, on by default: local reflection every 50 reported
