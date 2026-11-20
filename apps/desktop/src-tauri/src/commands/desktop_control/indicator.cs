@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -207,37 +208,58 @@ public sealed class JackalopeWindowIndicator : Form {
         if(Math.Abs(control.Font.Size-size)<0.01f && control.Font.Style==style && control.Font.Unit==GraphicsUnit.Pixel) return;
         var previous=control.Font; control.Font=new Font("Segoe UI",size,style,GraphicsUnit.Pixel); if(!previous.Equals(Control.DefaultFont)) previous.Dispose();
     }
+    // When the agent's own input last arrived, and the person's recent presses: control
+    // pauses only when the person disrupts the agent, the same rule as macOS and X11.
+    DateTime lastAgentInput=DateTime.MinValue;
+    readonly List<DateTime> personInput=new List<DateTime>();
+    static readonly TimeSpan ClashWindow=TimeSpan.FromMilliseconds(600), TakeoverWindow=TimeSpan.FromMilliseconds(1500);
+    const int TakeoverCount=3;
+    // Why a press by the person should pause control, or null when it can pass: a single
+    // stray click or key leaves the agent working; one that lands while the agent is acting,
+    // or several in quick succession, pause it.
+    string Disruption() {
+        var now=DateTime.UtcNow;
+        personInput.RemoveAll(at=>now-at>=TakeoverWindow);
+        personInput.Add(now);
+        string why=null;
+        if(now-lastAgentInput<ClashWindow) why="You stepped in while Jackalope was acting";
+        else if(personInput.Count>=TakeoverCount) why="You're using this window";
+        if(why!=null) personInput.Clear();
+        return why;
+    }
     IntPtr OnKey(int code,IntPtr message,IntPtr data) {
         if(code>=0) {
             var key=(KeyData)Marshal.PtrToStructure(data,typeof(KeyData));
             bool ours=(key.Flags&0x10)!=0 && key.Extra.ToUInt64()==InputTag;
-            if(!ours) {
-                bool down=(int)message==0x100 || (int)message==0x104;
+            bool down=(int)message==0x100 || (int)message==0x104;
+            if(ours) { if(down) lastAgentInput=DateTime.UtcNow; }
+            else {
                 // Escape and keys count only while the granted window is in front (or for a
                 // desktop grant); the person's typing in other apps leaves the agent alone.
                 bool mine=scope=="desktop" || !background;
-                if(key.Key==27 && down && mine) { Cancel(); return new IntPtr(1); }
-                if(down && mine && GetForegroundWindow()!=Handle && state=="active") Pause("You pressed a key");
+                if(key.Key==27 && down && mine && state=="active") { personInput.Clear(); Pause("You pressed Escape"); return new IntPtr(1); }
+                if(down && mine && GetForegroundWindow()!=Handle && state=="active") { var why=Disruption(); if(why!=null) Pause(why); }
             }
         }
         return CallNextHookEx(keyboardHook,code,message,data);
     }
     // WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN, WM_MOUSEWHEEL, WM_MOUSEHWHEEL.
-    // A click or scroll on the granted window (or app); anywhere for a desktop grant.
+    // A click on the granted window (or app); anywhere for a desktop grant.
     bool TargetsGrant(NativePoint point) {
         if(scope=="desktop") return true;
         IntPtr hit=GetAncestor(WindowFromPoint(point),2);
         if(scope=="window") return hit==target;
         return hit!=IntPtr.Zero && ProcessName(hit)==app;
     }
-    static bool Retakes(int message) { return message==0x201 || message==0x204 || message==0x207 || message==0x20B || message==0x20A || message==0x20E; }
+    // Button presses only; the wheel (WM_MOUSEWHEEL, WM_MOUSEHWHEEL) never pauses control.
+    static bool Retakes(int message) { return message==0x201 || message==0x204 || message==0x207 || message==0x20B; }
     IntPtr OnMouse(int code,IntPtr message,IntPtr data) {
         if(code>=0 && state=="active") {
             var input=(MouseData)Marshal.PtrToStructure(data,typeof(MouseData));
             bool ours=(input.Flags&1)!=0 && input.Extra.ToUInt64()==InputTag;
-            if(ours) pointer=input.Point;
-            // Only taking control back pauses: a button press or a wheel turn, not moving.
-            if(!ours && Retakes((int)message) && !(Visible && Bounds.Contains(input.Point.X,input.Point.Y)) && TargetsGrant(input.Point)) Pause((int)message==0x20A || (int)message==0x20E ? "You scrolled" : "You clicked");
+            if(ours) { pointer=input.Point; if(Retakes((int)message)) lastAgentInput=DateTime.UtcNow; }
+            // Only disrupting the agent pauses: see Disruption. Moving and scrolling never do.
+            if(!ours && Retakes((int)message) && !(Visible && Bounds.Contains(input.Point.X,input.Point.Y)) && TargetsGrant(input.Point)) { var why=Disruption(); if(why!=null) Pause(why); }
         }
         return CallNextHookEx(mouseHook,code,message,data);
     }
