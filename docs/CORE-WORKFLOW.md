@@ -181,6 +181,17 @@ skipped and reported as skipped rather than run again. A preparation command tha
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
 
+Before preparing a new isolated worktree, Jackalope clones each `node_modules` folder the
+project checkout has beside a `package.json` into the same place, but only when both
+checkouts' dependency manifests fingerprint the same for the preparation command. Clones
+are copy-on-write (`clonefile` on APFS, `FICLONE` on Btrfs or XFS); a volume or platform
+that cannot clone, including Windows, gets no copy and the command installs in full.
+Existing folders and linked paths are never used. A clone is removed when a link inside it
+points into the project checkout or resolves outside the worktree, or when it holds a
+`pyvenv.cfg` or `CMakeCache.txt`; tool caches (`.cache`, `.vite`) are dropped. Python
+environments and Cargo `target/` are not cloned. The preparation command still runs, so
+it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
+
 Automatic verification is on for a project unless Check results automatically is turned
 off in Project settings, and does nothing until the project has a check command. Every
 launcher and the settings switch read it through `checksAutomatically`. Its saved command
