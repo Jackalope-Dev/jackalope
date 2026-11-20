@@ -187,6 +187,9 @@ struct Access {
     /// Created with the grant, for the run's project.
     sites: Option<SiteGate>,
     site: Option<String>,
+    /// An attached browser window whose address couldn't be read when it was attached:
+    /// the first site seen in it is the one the person attached.
+    unread_site: Option<Window>,
 }
 
 /// A failed desktop call. `Ended` also closes the attempt's desktop session:
@@ -722,7 +725,33 @@ impl Call<'_> {
             format!("You attached \u{201c}{title}\u{201d} to this conversation. The agent may read and control that one window.")
         } else {
             format!("You attached \u{201c}{title}\u{201d} to this conversation for reading. The agent may read and capture it but not click or type.")
-        })
+        })?;
+        match staged.site {
+            attach::AttachSite::Host(host) => self.allow_attached_site(&host),
+            attach::AttachSite::Unread => {
+                self.access.unread_site = self.access.target.clone();
+                Ok(())
+            }
+            attach::AttachSite::None => Ok(()),
+        }
+    }
+
+    /// Attaching a browser window answers the site question for the site open in it, for
+    /// this attempt. Recorded like an answered question; a saved "never" still applies.
+    fn allow_attached_site(&mut self, host: &str) -> Result<(), String> {
+        if !self.sites()?.allow_attached(host) {
+            attach::overlay::trace(format_args!(
+                "attached site {host} stays blocked by a saved decision"
+            ));
+            return Ok(());
+        }
+        let run_id = self.run.id.clone();
+        let prompt = self.sites()?.attached_prompt(&run_id, host);
+        self.push_prompt(&prompt)?;
+        attach::overlay::trace(format_args!("attached site {host} allowed for this task"));
+        self.activity(format!(
+            "You attached this window on {host}, so the agent may use {host} for this task."
+        ))
     }
 
     fn push_prompt(&self, prompt: &PendingUserPrompt) -> Result<(), String> {
@@ -815,6 +844,16 @@ impl Call<'_> {
             return Ok(None);
         };
         self.access.site = Some(host.clone());
+        if let Some(window) = self.access.unread_site.take() {
+            let same = self.access.target.as_ref().is_some_and(|target| {
+                target.handle == window.handle
+                    && target.pid == window.pid
+                    && target.started == window.started
+            });
+            if same {
+                self.allow_attached_site(&host)?;
+            }
+        }
         match self.sites()?.check(&host) {
             Ok(Check::Allowed) => return Ok(None),
             Ok(Check::Ask) => {}
@@ -967,8 +1006,16 @@ impl Call<'_> {
                 value["artifact"] = json!(artifact);
                 value
             }
-            "wait_for" => return self.wait_for(request, epoch),
+            "wait_for" => {
+                if let Some(indicator) = self.access.indicator.as_ref() {
+                    indicator.cursor("look", [0, 0, 0, 0]);
+                }
+                return self.wait_for(request, epoch);
+            }
             _ => {
+                if let Some(indicator) = self.access.indicator.as_ref() {
+                    indicator.cursor("look", [0, 0, 0, 0]);
+                }
                 let mut payload = self.base(epoch, "snapshot");
                 payload["page"] = json!(request.page.unwrap_or(false));
                 payload["monitor"] = json!(request.monitor);
@@ -1093,6 +1140,17 @@ impl Call<'_> {
         if !capabilities.element_actions && action == "invoke" {
             action = "click".into();
             payload["action"] = json!("click");
+        }
+        let element_rect = request
+            .element
+            .as_deref()
+            .and_then(|reference| snapshot.refs.resolve(reference).ok())
+            .and_then(|element| element.bounds);
+        if let (Some((kind, rect)), Some(indicator)) = (
+            cursor_target(request, element_rect),
+            self.access.indicator.as_ref(),
+        ) {
+            indicator.cursor(kind, rect);
         }
         if let Some(key) = &request.key {
             let chord = actions::chord(key)?;
@@ -1315,6 +1373,29 @@ fn summarize(request: &DesktopRequest, target: Option<&str>) -> String {
         "wait_for" => format!("waited for {}", quoted(&request.text)),
         "snapshot" | "screenshot" => format!("took a {}", request.action),
         _ => format!("{verb} {}", at()),
+    }
+}
+
+/// Where the agent's cursor goes for an input action, and how it shows the action: the
+/// element's window-relative rect, or the coordinate point. `None` when there's no target
+/// to point at (a key press with no element).
+pub(crate) fn cursor_target(
+    request: &DesktopRequest,
+    element: Option<[i32; 4]>,
+) -> Option<(&'static str, [i32; 4])> {
+    let kind = match request.action.as_str() {
+        "click" | "double_click" | "right_click" | "invoke" | "select" | "drag" => "click",
+        "type" | "set_value" | "focus" => "type",
+        "scroll" => "scroll",
+        "press" => "type",
+        _ => return None,
+    };
+    if let Some(rect) = element {
+        return Some((kind, rect));
+    }
+    match (request.x, request.y) {
+        (Some(x), Some(y)) => Some((kind, [x, y, 0, 0])),
+        _ => None,
     }
 }
 

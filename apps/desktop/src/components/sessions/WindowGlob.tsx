@@ -13,7 +13,7 @@ import {
   Tooltip,
 } from '@jackalope/ui';
 import { listen } from '@tauri-apps/api/event';
-import { AppWindow, Eye, Link2, MousePointerClick, X } from 'lucide-react';
+import { AppWindow, Eye, Globe, Link2, MousePointerClick, X } from 'lucide-react';
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -34,6 +34,7 @@ import {
   type AttachTarget,
   attachedWindow,
   attachMessage,
+  attachSite,
   attachSupport,
   attachWindows,
   clearAttached,
@@ -634,6 +635,20 @@ function AttachDialog({
   const [control, setControl] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // The site open in the chosen window when it's a browser: attaching allows it.
+  const [site, setSite] = useState<{ handle: string; host: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!chosen) return;
+    let live = true;
+    attachSite(conversation, chosen).then(
+      (host) => live && setSite({ handle: chosen, host }),
+      () => live && setSite({ handle: chosen, host: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [conversation, chosen]);
 
   useEffect(() => {
     if (dropped || !canPick) return;
@@ -655,7 +670,8 @@ function AttachDialog({
     setBusy(true);
     setError('');
     try {
-      await onAttached(await confirmAttach(conversation, chosen, control, agent, provider));
+      const host = site?.handle === chosen ? site.host : null;
+      await onAttached(await confirmAttach(conversation, chosen, control, agent, provider, host));
     } catch (cause) {
       setError(describeError(cause));
       setBusy(false);
@@ -725,6 +741,15 @@ function AttachDialog({
                 onClick={() => setControl(true)}
               />
             </fieldset>
+          )}
+          {target && site?.handle === chosen && site.host && (
+            <p className="window-glob-site">
+              <Globe size={16} aria-hidden="true" />
+              <span>
+                {capitalized(agent)} can use <strong>{site.host}</strong> in this window. Other
+                sites still ask first.
+              </span>
+            </p>
           )}
           <p className="window-glob-note">
             {capitalized(agent)} can use it for the next 30 minutes

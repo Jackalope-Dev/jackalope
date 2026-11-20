@@ -761,10 +761,10 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         let first = AXUIElementCreateApplication(getpid())
         try require(refFor(first) == refFor(first), "Element refs are not stable.")
         try require(keyCodes["F12"] != nil && modifierFlags["Command"] != nil, "Key table is incomplete.")
-        try require(Indicator.retakes(.leftMouseDown) && Indicator.retakes(.keyDown) && Indicator.retakes(.scrollWheel),
-                    "Clicks, key presses and scrolling must pause control.")
-        try require(!Indicator.retakes(.mouseMoved) && !Indicator.retakes(.leftMouseUp) && !Indicator.retakes(.flagsChanged),
-                    "Pointer movement, releases and modifiers alone must not pause control.")
+        try require(Indicator.retakes(.leftMouseDown) && Indicator.retakes(.rightMouseDown) && Indicator.retakes(.keyDown),
+                    "Clicks and key presses must pause control.")
+        try require(!Indicator.retakes(.mouseMoved) && !Indicator.retakes(.scrollWheel) && !Indicator.retakes(.leftMouseUp)
+                    && !Indicator.retakes(.flagsChanged), "Pointer movement, scrolling, releases and modifiers alone must not pause control.")
         return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards, element refs, keys, retaking input"]
     }
     if action == "request_permissions" {
@@ -819,6 +819,16 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
               let window = try? SelectedWindow(identity), !deny.contains(window.pid),
               let rect = try? window.bounds() else { return ["bounds": NSNull()] }
         return ["bounds": boundsJSON(rect)]
+    }
+    // The address of a browser window the person is attaching, so the confirm dialog can
+    // name the site it allows. Only the page address is read, never page content.
+    if action == "site" {
+        guard let identity = request["window"] as? [String: Any],
+              let window = try? SelectedWindow(identity), !deny.contains(window.pid),
+              let rect = try? window.bounds() else { return ["site": NSNull()] }
+        enableWebAccessibility(window.pid)
+        guard let root = try? window.accessible(rect), let page = site(root) else { return ["site": NSNull()] }
+        return ["site": page]
     }
     guard let guardJSON = request["guard"] as? [String: Any] else {
         throw ControlError("An active indicator is required.")
@@ -1012,6 +1022,13 @@ final class Indicator: NSObject {
     let resumeAtStart: Bool
     var lookKey = ""
     var lastFrameStatus = ""
+    /// The agent's cursor, drawn in the window's frame overlay.
+    let cursorLayer = CAShapeLayer()
+    var cursorSeq: UInt64 = 0
+    var cursorAt = Date.distantPast
+    /// Where the cursor last pointed, window-relative from the top left.
+    var cursorPoint: CGPoint?
+    var cursorTrace = ("", Date.distantPast)
     var status = "paused"
     var reason = "Click Resume to begin"
     var epoch: UInt64 = 1
@@ -1290,6 +1307,148 @@ final class Indicator: NSObject {
         glow.shadowOpacity = 0.5
     }
 
+    /// Reads the next agent-cursor event Jackalope wrote (`seq|kind|x|y|width|height`).
+    func readCursor() {
+        guard scope == "window" else { return }
+        let file = stateFile.deletingLastPathComponent().appendingPathComponent("cursor")
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return }
+        let parts = text.split(separator: "|").map(String.init)
+        guard parts.count == 6, let seq = UInt64(parts[0]), seq > cursorSeq,
+              let x = Double(parts[2]), let y = Double(parts[3]), let width = Double(parts[4]), let height = Double(parts[5]) else { return }
+        cursorSeq = seq
+        showCursor(parts[1], CGRect(x: x, y: y, width: width, height: height))
+    }
+
+    /// A small accent pointer, unlike the system cursor, with its tip at the anchor.
+    func setupCursor() {
+        let path = CGMutablePath()
+        path.addLines(between: [CGPoint(x: 1, y: 21), CGPoint(x: 1, y: 4), CGPoint(x: 5.5, y: 8), CGPoint(x: 8.5, y: 1),
+                                CGPoint(x: 11, y: 2), CGPoint(x: 8, y: 8.5), CGPoint(x: 13.5, y: 8.5)])
+        path.closeSubpath()
+        cursorLayer.bounds = CGRect(x: 0, y: 0, width: 16, height: 22)
+        cursorLayer.anchorPoint = CGPoint(x: 1.0 / 16, y: 21.0 / 22)
+        cursorLayer.path = path
+        cursorLayer.lineWidth = 1.5
+        cursorLayer.lineJoin = .round
+        cursorLayer.strokeColor = NSColor.white.cgColor
+        cursorLayer.shadowOffset = .zero
+        cursorLayer.shadowRadius = 5
+        cursorLayer.shadowOpacity = reduceTransparency ? 0 : 0.8
+        cursorLayer.opacity = 0
+    }
+
+    /// Moves the agent's cursor to where an action happens and shows the action. Drawn in the
+    /// frame overlay just above the window, so it is covered wherever the window is.
+    func showCursor(_ kind: String, _ rect: CGRect) {
+        guard let frame = frames.first, let host = frame.contentView?.layer else { return }
+        let room = Indicator.frameRoom
+        let height = frame.frame.height
+        let local = { (point: CGPoint) in CGPoint(x: room + point.x, y: height - room - point.y) }
+        let size = CGSize(width: frame.frame.width - room * 2, height: height - room * 2)
+        let whole = rect.width == 0 && rect.height == 0 && kind == "look"
+        let point = whole ? (cursorPoint ?? CGPoint(x: size.width / 2, y: min(80, size.height / 2)))
+            : rect.width > 0 || rect.height > 0 ? CGPoint(x: rect.midX, y: rect.midY) : rect.origin
+        cursorPoint = point
+        if cursorLayer.path == nil { setupCursor() }
+        if cursorLayer.superlayer !== host { host.addSublayer(cursorLayer) }
+        let target = local(point)
+        let active = status == "active"
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(reduceMotion ? 0 : 0.35)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
+        cursorLayer.position = target
+        cursorLayer.opacity = active ? 1 : 0.45
+        cursorLayer.fillColor = (active ? accent : textColor.withAlphaComponent(0.5)).cgColor
+        cursorLayer.shadowColor = accent.cgColor
+        CATransaction.commit()
+        cursorAt = Date()
+        if kind == "look", rect.width > 0, rect.height > 0 {
+            let origin = local(CGPoint(x: rect.minX, y: rect.maxY))
+            flash(CGRect(x: origin.x, y: origin.y, width: rect.width, height: rect.height), on: host)
+        } else if kind == "click" {
+            ripple(at: target, on: host)
+        } else if kind == "type" {
+            caret(at: CGPoint(x: target.x + 8, y: target.y - 6), on: host)
+        } else if kind == "scroll" {
+            scrollMark(at: CGPoint(x: target.x + 14, y: target.y - 4), on: host)
+        }
+        if cursorTrace.0 != kind || Date().timeIntervalSince(cursorTrace.1) > 1 {
+            cursorTrace = (kind, Date())
+            note("cursor \(kind) at \(Int(point.x)),\(Int(point.y))")
+        }
+    }
+
+    /// Adds a short-lived effect layer and removes it after `life` seconds.
+    func effect(_ layer: CALayer, on host: CALayer, life: Double) {
+        host.insertSublayer(layer, below: cursorLayer)
+        DispatchQueue.main.asyncAfter(deadline: .now() + life) { layer.removeFromSuperlayer() }
+    }
+
+    func ripple(at point: CGPoint, on host: CALayer) {
+        let ring = CAShapeLayer()
+        ring.path = CGPath(ellipseIn: CGRect(x: -10, y: -10, width: 20, height: 20), transform: nil)
+        ring.position = point
+        ring.fillColor = NSColor.clear.cgColor
+        ring.strokeColor = accent.cgColor
+        ring.lineWidth = 2
+        if !reduceMotion {
+            let grow = CABasicAnimation(keyPath: "transform.scale"); grow.fromValue = 0.4; grow.toValue = 2.2
+            let fade = CABasicAnimation(keyPath: "opacity"); fade.fromValue = 1; fade.toValue = 0
+            let group = CAAnimationGroup(); group.animations = [grow, fade]; group.duration = 0.5
+            ring.add(group, forKey: "ripple")
+            ring.opacity = 0
+        }
+        effect(ring, on: host, life: 0.5)
+    }
+
+    func caret(at point: CGPoint, on host: CALayer) {
+        let bar = CALayer()
+        bar.backgroundColor = accent.cgColor
+        bar.bounds = CGRect(x: 0, y: 0, width: 2, height: 16)
+        bar.position = point
+        if !reduceMotion {
+            let blink = CABasicAnimation(keyPath: "opacity"); blink.fromValue = 1; blink.toValue = 0
+            blink.duration = 0.28; blink.autoreverses = true; blink.repeatCount = 3
+            bar.add(blink, forKey: "blink")
+        }
+        effect(bar, on: host, life: 1.7)
+    }
+
+    func scrollMark(at point: CGPoint, on host: CALayer) {
+        let mark = CAShapeLayer()
+        let path = CGMutablePath()
+        path.addLines(between: [CGPoint(x: -4, y: 3), CGPoint(x: 0, y: 7), CGPoint(x: 4, y: 3)])
+        path.addLines(between: [CGPoint(x: -4, y: -3), CGPoint(x: 0, y: -7), CGPoint(x: 4, y: -3)])
+        mark.path = path
+        mark.position = point
+        mark.fillColor = NSColor.clear.cgColor
+        mark.strokeColor = accent.cgColor
+        mark.lineWidth = 2
+        mark.lineCap = .round
+        if !reduceMotion {
+            let fade = CABasicAnimation(keyPath: "opacity"); fade.fromValue = 1; fade.toValue = 0; fade.duration = 0.8
+            mark.add(fade, forKey: "fade")
+            mark.opacity = 0
+        }
+        effect(mark, on: host, life: 0.8)
+    }
+
+    /// A faint box around what the agent just read.
+    func flash(_ rect: CGRect, on host: CALayer) {
+        let box = CAShapeLayer()
+        box.path = CGPath(roundedRect: rect, cornerWidth: 4, cornerHeight: 4, transform: nil)
+        box.fillColor = accent.withAlphaComponent(0.06).cgColor
+        box.strokeColor = accent.withAlphaComponent(0.7).cgColor
+        box.lineWidth = 1
+        if !reduceMotion {
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 1, 1, 0]; fade.keyTimes = [0, 0.15, 0.7, 1]; fade.duration = 1
+            box.add(fade, forKey: "look")
+            box.opacity = 0
+        }
+        effect(box, on: host, life: 1)
+    }
+
     /// The live dot pulses gently while the agent is in control.
     func updateDot() {
         guard let layer = dot.layer else { return }
@@ -1362,11 +1521,11 @@ final class Indicator: NSObject {
         } catch { reason = String(describing: error); save() }
     }
 
-    /// Physical input that means the person is taking control back: a click, a key press or
-    /// a scroll. Moving the mouse alone doesn't pause, and neither do modifier keys on
-    /// their own or button and key releases.
+    /// Physical input that means the person is taking control back: a click or a key press.
+    /// Moving the mouse or scrolling doesn't pause, and neither do modifier keys on their
+    /// own or button and key releases.
     static func retakes(_ type: CGEventType) -> Bool {
-        [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel].contains(type)
+        [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown].contains(type)
     }
 
     /// Whether a screen point (top-left origin) is on this indicator's own pill, whose
@@ -1377,7 +1536,7 @@ final class Indicator: NSObject {
     }
 
     /// Whether the person's input lands on what Jackalope controls: anywhere for a desktop
-    /// grant; keys while the granted window or app is in front; a click or scroll on the
+    /// grant; keys while the granted window or app is in front; a click on the
     /// granted window (or app) where it is visible. Input in other apps leaves the agent's
     /// background work alone.
     func targetsGrant(_ type: CGEventType, _ point: CGPoint) -> Bool {
@@ -1409,7 +1568,7 @@ final class Indicator: NSObject {
         }
         guard Indicator.retakes(type), !onPill(event.location), targetsGrant(type, event.location) else { return }
         resumeTicket += 1
-        pause(type == .keyDown ? "You pressed a key" : type == .scrollWheel ? "You scrolled" : "You clicked")
+        pause(type == .keyDown ? "You pressed a key" : "You clicked")
     }
 
     func run() throws {
@@ -1506,6 +1665,9 @@ final class Indicator: NSObject {
                 if self.status == "active" && !CGEvent.tapIsEnabled(tap: tap) { self.pause("Input monitor interrupted") }
             } catch { self.pause("The window closed, was minimized or changed") }
             if self.readTheme() { self.restyle() }
+            self.readCursor()
+            // The cursor fades after a few quiet seconds and comes back on the next action.
+            if self.cursorLayer.opacity > 0 && Date().timeIntervalSince(self.cursorAt) > 3 { self.cursorLayer.opacity = 0 }
             self.save()
         }
         NSApp.run()

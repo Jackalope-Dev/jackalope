@@ -94,6 +94,7 @@ export const confirmAttach = (
   control: boolean,
   agent: string,
   provider: string,
+  site: string | null,
 ) =>
   invokeNative<AttachedWindow>('desktop_attach_confirm', {
     conversation,
@@ -101,7 +102,12 @@ export const confirmAttach = (
     control,
     agent,
     provider,
+    site,
   });
+
+/** The website open in a browser window, which attaching it allows; null for other apps. */
+export const attachSite = (conversation: string, handle: string) =>
+  invokeNative<string | null>('desktop_attach_site', { conversation, handle });
 
 export const attachedWindow = (conversation: string) =>
   invokeNative<AttachedWindow | null>('desktop_attach_get', { conversation });

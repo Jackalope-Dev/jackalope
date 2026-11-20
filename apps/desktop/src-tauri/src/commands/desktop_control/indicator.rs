@@ -75,6 +75,17 @@ fn forward_trace(file: &std::path::Path) {
     }
 }
 
+/// Numbers each agent-cursor event so the bar acts on every one exactly once.
+static CURSOR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// One agent-cursor event for the bar: `seq|kind|x|y|width|height`, in window-relative
+/// helper units (macOS points, Windows physical pixels). A zero-size rect is a point; a
+/// `look` with no rect means the whole window.
+pub(crate) fn cursor_line(seq: u64, kind: &str, rect: [i32; 4]) -> String {
+    let [x, y, width, height] = rect;
+    format!("{seq}|{kind}|{x}|{y}|{width}|{height}")
+}
+
 /// The app, once the main window has reported its theme.
 pub(crate) fn app() -> Option<tauri::AppHandle> {
     APP.get().cloned()
@@ -352,6 +363,22 @@ impl Indicator {
         }
     }
 
+    /// Shows the agent's cursor where an action happens: a click ripples, typing blinks a
+    /// caret, scrolling shows a small arrow, reading outlines what was read. Drawn by the bar
+    /// in its click-through, capture-excluded frame, so it never reaches the agent's
+    /// screenshots or the person's input.
+    pub fn cursor(&self, kind: &str, rect: [i32; 4]) {
+        let Kind::Process { directory, .. } = &self.kind else {
+            return;
+        };
+        let seq = CURSOR_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+        let file = directory.join("cursor");
+        let temporary = directory.join("cursor.tmp");
+        if std::fs::write(&temporary, cursor_line(seq, kind, rect)).is_ok() {
+            let _ = std::fs::rename(&temporary, &file);
+        }
+    }
+
     /// The indicator process, whose windows agents may never target.
     pub fn pid(&self) -> Option<u32> {
         match &self.kind {
@@ -459,6 +486,18 @@ impl Drop for Indicator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cursor_events_carry_their_order_kind_and_window_relative_rect() {
+        assert_eq!(
+            cursor_line(7, "click", [120, 40, 0, 0]),
+            "7|click|120|40|0|0"
+        );
+        assert_eq!(
+            cursor_line(8, "look", [10, 20, 300, 24]),
+            "8|look|10|20|300|24"
+        );
+    }
+
     #[test]
     fn the_control_bar_look_is_checked_before_it_reaches_the_helper() {
         assert!(valid_look("dark|#1d1b22|#f4f3f7"));

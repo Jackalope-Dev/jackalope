@@ -1058,3 +1058,33 @@ fn a_helper_refusal_for_a_background_window_reads_as_background() {
         );
     }
 }
+
+#[test]
+fn the_agent_cursor_goes_to_the_element_or_the_point_and_shows_the_action() {
+    let mut click = desktop("click", Some("e4"));
+    assert_eq!(
+        cursor_target(&click, Some([10, 20, 80, 24])),
+        Some(("click", [10, 20, 80, 24]))
+    );
+    click.element = None;
+    click.x = Some(300);
+    click.y = Some(150);
+    assert_eq!(
+        cursor_target(&click, None),
+        Some(("click", [300, 150, 0, 0]))
+    );
+    assert_eq!(
+        cursor_target(&desktop("type", Some("e5")), Some([0, 0, 200, 20])).map(|t| t.0),
+        Some("type")
+    );
+    assert_eq!(
+        cursor_target(&desktop("scroll", Some("e6")), Some([0, 0, 1, 1])).map(|t| t.0),
+        Some("scroll")
+    );
+    assert_eq!(
+        cursor_target(&desktop("press", None), None),
+        None,
+        "nothing to point at"
+    );
+    assert_eq!(cursor_target(&desktop("snapshot", None), None), None);
+}
