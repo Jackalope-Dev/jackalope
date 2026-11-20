@@ -373,6 +373,23 @@ function marketingPageText(page: MarketingPage, origin: string) {
   return `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${body}\n\n${details}`;
 }
 
+/**
+ * Markdown mirrors and llms*.txt files stay public for language models but out of
+ * search results: each one is served with noindex and a canonical Link to the
+ * HTML page it mirrors (its directory's page, so /knowledge/x/index.md -> /knowledge/x/).
+ */
+export function mirrorHeaderRules(fileNames: string[], origin = siteOrigin) {
+  return fileNames
+    .filter((name) => name.endsWith('.md') || /(^|\/)llms(-full)?\.txt$/.test(name))
+    .sort()
+    .map((name) => {
+      const page = `/${name}`.replace(/[^/]*$/, '');
+      if (!routes.includes(page)) throw new Error(`${name} mirrors ${page}, which is not a page.`);
+      return `/${name}\n  X-Robots-Tag: noindex\n  Link: <${origin}${page}>; rel="canonical"\n`;
+    })
+    .join('\n');
+}
+
 export function discoveryFiles(
   origin = siteOrigin,
   env: Record<string, string | undefined> = {},

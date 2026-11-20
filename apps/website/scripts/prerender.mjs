@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve, sep } from 'node:path';
 import { createServer, loadEnv } from 'vite';
 import { verifySeo } from './verify-seo.mjs';
 
@@ -10,7 +10,7 @@ const server = await createServer({
 });
 try {
   const { render } = await server.ssrLoadModule('/src/entry-server.tsx');
-  const { pageHtml, routes } = await server.ssrLoadModule('/src/seo.ts');
+  const { pageHtml, routes, mirrorHeaderRules } = await server.ssrLoadModule('/src/seo.ts');
   const { siteOrigin, pages } = await server.ssrLoadModule('/src/content.ts');
   const origin = new URL(loadEnv('production', process.cwd(), 'VITE_').VITE_SITE_URL || siteOrigin)
     .origin;
@@ -56,6 +56,10 @@ try {
       .map((path) => `${path.slice(0, -1)} ${path} 301`)
       .join('\n')}\n`,
   );
+  const published = (await readdir(resolve('dist'), { recursive: true })).map((name) =>
+    name.split(sep).join('/'),
+  );
+  await appendFile(resolve('dist/_headers'), `\n${mirrorHeaderRules(published, origin)}`);
   console.log(`Prerendered ${routes.length} routes and the not-found page.`);
   await verifySeo(resolve('dist'), pages, origin);
 } finally {
