@@ -60,6 +60,37 @@ pub fn desktop_control_theme(
     Ok(())
 }
 
+/// Passes the bar's button presses and pauses to the dev app's terminal as
+/// `indicator:` lines; release builds ignore them.
+fn forward_trace(file: &std::path::Path) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return;
+    };
+    let _ = std::fs::remove_file(file);
+    for line in text.lines().filter(|line| !line.trim().is_empty()).take(50) {
+        eprintln!("indicator: {}", line.chars().take(200).collect::<String>());
+    }
+}
+
+/// Numbers each agent-cursor event so the bar acts on every one exactly once.
+static CURSOR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// One agent-cursor event for the bar: `seq|kind|x|y|width|height`, in window-relative
+/// helper units (macOS points, Windows physical pixels). A zero-size rect is a point; a
+/// `look` with no rect means the whole window.
+pub(crate) fn cursor_line(seq: u64, kind: &str, rect: [i32; 4]) -> String {
+    let [x, y, width, height] = rect;
+    format!("{seq}|{kind}|{x}|{y}|{width}|{height}")
+}
+
+/// The app, once the main window has reported its theme.
+pub(crate) fn app() -> Option<tauri::AppHandle> {
+    APP.get().cloned()
+}
+
 /// Brings the attempt's conversation, or its task, forward in Jackalope.
 fn open_in_app(runtime: &TaskRuntime, id: &str) {
     use tauri::{Emitter, Manager};
@@ -208,13 +239,19 @@ impl Indicator {
     fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
         std::fs::write(directory.join("theme"), accent()).map_err(|e| e.to_string())?;
         std::fs::write(directory.join("look"), look()).map_err(|e| e.to_string())?;
+        std::fs::write(
+            directory.join("logo.png"),
+            include_bytes!("../../../icons/tray-icon-template.png"),
+        )
+        .map_err(|e| e.to_string())?;
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::platform::command(
             json!({"action":"indicator", "window":indicator_window(grant),
             "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
             "file":directory.join("state"),"theme":directory.join("theme"),
-            "look":directory.join("look"),"agent":grant.agent}),
+            "look":directory.join("look"),"logo":directory.join("logo.png"),"agent":grant.agent,
+            "resume":grant.resume}),
         )?;
         command
             .stdin(Stdio::null())
@@ -326,6 +363,22 @@ impl Indicator {
         }
     }
 
+    /// Shows the agent's cursor where an action happens: a click ripples, typing blinks a
+    /// caret, scrolling shows a small arrow, reading outlines what was read. Drawn by the bar
+    /// in its click-through, capture-excluded frame, so it never reaches the agent's
+    /// screenshots or the person's input.
+    pub fn cursor(&self, kind: &str, rect: [i32; 4]) {
+        let Kind::Process { directory, .. } = &self.kind else {
+            return;
+        };
+        let seq = CURSOR_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+        let file = directory.join("cursor");
+        let temporary = directory.join("cursor.tmp");
+        if std::fs::write(&temporary, cursor_line(seq, kind, rect)).is_ok() {
+            let _ = std::fs::rename(&temporary, &file);
+        }
+    }
+
     /// The indicator process, whose windows agents may never target.
     pub fn pid(&self) -> Option<u32> {
         match &self.kind {
@@ -375,6 +428,7 @@ impl Indicator {
         let theme_file = directory.join("theme");
         let look_file = directory.join("look");
         let open_file = directory.join("open");
+        let trace_file = directory.join("trace");
         std::thread::spawn(move || {
             let mut prior_color = String::new();
             let mut prior_look = String::new();
@@ -406,6 +460,7 @@ impl Indicator {
                 if std::fs::remove_file(&open_file).is_ok() {
                     open_in_app(&runtime, &id);
                 }
+                forward_trace(&trace_file);
             }
         });
     }
@@ -431,6 +486,18 @@ impl Drop for Indicator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cursor_events_carry_their_order_kind_and_window_relative_rect() {
+        assert_eq!(
+            cursor_line(7, "click", [120, 40, 0, 0]),
+            "7|click|120|40|0|0"
+        );
+        assert_eq!(
+            cursor_line(8, "look", [10, 20, 300, 24]),
+            "8|look|10|20|300|24"
+        );
+    }
+
     #[test]
     fn the_control_bar_look_is_checked_before_it_reaches_the_helper() {
         assert!(valid_look("dark|#1d1b22|#f4f3f7"));

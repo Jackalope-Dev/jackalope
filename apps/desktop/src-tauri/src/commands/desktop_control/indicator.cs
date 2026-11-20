@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -26,6 +27,8 @@ public sealed class JackalopeWindowIndicator : Form {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr handle);
     [DllImport("user32.dll")] static extern bool GetCursorPos(out NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr handle,uint flags);
     [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
@@ -86,6 +89,8 @@ public sealed class JackalopeWindowIndicator : Form {
     Rect prior;
     NativePoint pointer;
     bool disposed;
+    // Active, but the granted window or app is behind the person's work.
+    bool background;
 
     protected override bool ShowWithoutActivation { get { return true; } }
     protected override void OnHandleCreated(EventArgs args) { base.OnHandleCreated(args); ExcludeFromCapture(Handle); }
@@ -156,6 +161,10 @@ public sealed class JackalopeWindowIndicator : Form {
         gate.Reset(); GetWindowRect(target,out prior); GetCursorPos(out pointer); state="active"; reason=""; epoch++; UpdateLabels();
         if(WriteState() && state=="active") gate.Set(); Pulse();
     }
+    void SetBackground(bool value) {
+        if(background==value) return;
+        background=value; UpdateLabels();
+    }
     void Pause(string why) {
         if(state=="canceled") return;
         gate.Reset();
@@ -165,9 +174,8 @@ public sealed class JackalopeWindowIndicator : Form {
     void Cancel() { gate.Reset(); state="canceled"; epoch++; WriteState(); Close(); }
     void UpdateLabels() {
         bool active=state=="active";
-        string using_=scope=="desktop" ? "your computer" : scope=="app" ? label : "a "+label+" window";
-        heading.Text=active ? "Jackalope is using "+using_ : "Jackalope is Paused";
-        hint.Text=active ? "Esc to cancel   ·   Mouse or keyboard activity pauses control" : "Click Resume to continue   ·   Esc to cancel";
+        heading.Text=!active ? "Paused" : background ? "Jackalope is working in the background" : scope=="desktop" ? "Jackalope is working on your computer" : "Jackalope is working here";
+        hint.Text=!active ? reason+"   ·   Click Resume to continue" : background ? "Stop on this bar ends it" : "Esc to stop   ·   Clicking or typing in it pauses";
         toggle.Text=active ? "Pause" : "Resume";
         toggle.AccessibleName=toggle.Text+" desktop control";
         LayoutBar();
@@ -200,24 +208,58 @@ public sealed class JackalopeWindowIndicator : Form {
         if(Math.Abs(control.Font.Size-size)<0.01f && control.Font.Style==style && control.Font.Unit==GraphicsUnit.Pixel) return;
         var previous=control.Font; control.Font=new Font("Segoe UI",size,style,GraphicsUnit.Pixel); if(!previous.Equals(Control.DefaultFont)) previous.Dispose();
     }
+    // When the agent's own input last arrived, and the person's recent presses: control
+    // pauses only when the person disrupts the agent, the same rule as macOS and X11.
+    DateTime lastAgentInput=DateTime.MinValue;
+    readonly List<DateTime> personInput=new List<DateTime>();
+    static readonly TimeSpan ClashWindow=TimeSpan.FromMilliseconds(600), TakeoverWindow=TimeSpan.FromMilliseconds(1500);
+    const int TakeoverCount=3;
+    // Why a press by the person should pause control, or null when it can pass: a single
+    // stray click or key leaves the agent working; one that lands while the agent is acting,
+    // or several in quick succession, pause it.
+    string Disruption() {
+        var now=DateTime.UtcNow;
+        personInput.RemoveAll(at=>now-at>=TakeoverWindow);
+        personInput.Add(now);
+        string why=null;
+        if(now-lastAgentInput<ClashWindow) why="You stepped in while Jackalope was acting";
+        else if(personInput.Count>=TakeoverCount) why="You're using this window";
+        if(why!=null) personInput.Clear();
+        return why;
+    }
     IntPtr OnKey(int code,IntPtr message,IntPtr data) {
         if(code>=0) {
             var key=(KeyData)Marshal.PtrToStructure(data,typeof(KeyData));
             bool ours=(key.Flags&0x10)!=0 && key.Extra.ToUInt64()==InputTag;
-            if(!ours) {
-                if(key.Key==27 && ((int)message==0x100 || (int)message==0x104)) { Cancel(); return new IntPtr(1); }
-                if(((int)message==0x100 || (int)message==0x104) && GetForegroundWindow()!=Handle && state=="active") Pause("Keyboard activity detected");
+            bool down=(int)message==0x100 || (int)message==0x104;
+            if(ours) { if(down) lastAgentInput=DateTime.UtcNow; }
+            else {
+                // Escape and keys count only while the granted window is in front (or for a
+                // desktop grant); the person's typing in other apps leaves the agent alone.
+                bool mine=scope=="desktop" || !background;
+                if(key.Key==27 && down && mine && state=="active") { personInput.Clear(); Pause("You pressed Escape"); return new IntPtr(1); }
+                if(down && mine && GetForegroundWindow()!=Handle && state=="active") { var why=Disruption(); if(why!=null) Pause(why); }
             }
         }
         return CallNextHookEx(keyboardHook,code,message,data);
     }
+    // WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN, WM_MOUSEWHEEL, WM_MOUSEHWHEEL.
+    // A click on the granted window (or app); anywhere for a desktop grant.
+    bool TargetsGrant(NativePoint point) {
+        if(scope=="desktop") return true;
+        IntPtr hit=GetAncestor(WindowFromPoint(point),2);
+        if(scope=="window") return hit==target;
+        return hit!=IntPtr.Zero && ProcessName(hit)==app;
+    }
+    // Button presses only; the wheel (WM_MOUSEWHEEL, WM_MOUSEHWHEEL) never pauses control.
+    static bool Retakes(int message) { return message==0x201 || message==0x204 || message==0x207 || message==0x20B; }
     IntPtr OnMouse(int code,IntPtr message,IntPtr data) {
         if(code>=0 && state=="active") {
             var input=(MouseData)Marshal.PtrToStructure(data,typeof(MouseData));
             bool ours=(input.Flags&1)!=0 && input.Extra.ToUInt64()==InputTag;
-            if(ours) pointer=input.Point;
-            bool moved=Math.Abs(input.Point.X-pointer.X)>2 || Math.Abs(input.Point.Y-pointer.Y)>2;
-            if(!ours && ((int)message!=0x200 || moved) && !(Visible && Bounds.Contains(input.Point.X,input.Point.Y))) Pause("Mouse activity detected");
+            if(ours) { pointer=input.Point; if(Retakes((int)message)) lastAgentInput=DateTime.UtcNow; }
+            // Only disrupting the agent pauses: see Disruption. Moving and scrolling never do.
+            if(!ours && Retakes((int)message) && !(Visible && Bounds.Contains(input.Point.X,input.Point.Y)) && TargetsGrant(input.Point)) { var why=Disruption(); if(why!=null) Pause(why); }
         }
         return CallNextHookEx(mouseHook,code,message,data);
     }
@@ -227,26 +269,28 @@ public sealed class JackalopeWindowIndicator : Form {
         if(scope=="window") {
             Rect rect; if(!GetWindowRect(target,out rect)) { Cancel(); return; }
             bool visible=IsWindowVisible(target) && !IsIconic(target);
-            if(state=="active" && (!visible || GetForegroundWindow()!=target)) Pause("Window is no longer active");
-            if(state=="active" && (rect.Left!=prior.Left || rect.Top!=prior.Top || rect.Right!=prior.Right || rect.Bottom!=prior.Bottom)) Pause("Window moved or resized");
+            // Another window in front, minimizing, moving or resizing no longer pauses: the
+            // agent keeps working in the background; snapshots go stale on a move.
+            SetBackground(!visible || GetForegroundWindow()!=target);
             prior=rect;
-        } else if(scope=="app" && state=="active" && !ForegroundAllowed()) Pause(label+" is no longer active");
+        } else if(scope=="app") SetBackground(!ForegroundAllowed());
         var areas=new System.Collections.Generic.List<Rectangle>();
         if(scope=="desktop") foreach(var each in Screen.AllScreens) areas.Add(each.Bounds);
         else areas.Add(Screen.FromHandle(AnchorWindow()).Bounds);
         LayoutBar();
-        Color accent=Color.FromArgb(99,102,241);
+        Color accent=Color.FromArgb(139,92,246);
         try { string hex=File.ReadAllText(themeFile).Trim(); if(System.Text.RegularExpressions.Regex.IsMatch(hex,"^#[0-9a-fA-F]{6}$")) accent=ColorTranslator.FromHtml(hex); } catch { }
         while(glows.Count<areas.Count) glows.Add(new Glow());
         while(glows.Count>areas.Count) { glows[glows.Count-1].Dispose(); glows.RemoveAt(glows.Count-1); }
-        for(int i=0;i<areas.Count;i++) { glows[i].Show(); glows[i].Render(areas[i],accent); }
+        // In the background the glow would draw over the person's work, so it waits.
+        for(int i=0;i<areas.Count;i++) { if(background && state=="active") glows[i].Hide(); else { glows[i].Show(); glows[i].Render(areas[i],accent); } }
         SetWindowPos(Handle,new IntPtr(-1),0,0,0,0,0x13);
         WriteState();
     }
     bool WriteState() {
         try {
             string value;
-            using(var process=Process.GetCurrentProcess()) value=state+"|"+epoch+"|"+DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()+"|"+process.Id+"|"+process.StartTime.ToUniversalTime().Ticks+"|"+reason;
+            using(var process=Process.GetCurrentProcess()) value=state+"|"+epoch+"|"+DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()+"|"+process.Id+"|"+process.StartTime.ToUniversalTime().Ticks+"|"+(state=="active" && background ? "background" : reason);
             string temporary=stateFile+".tmp"; File.WriteAllText(temporary,value);
             if(File.Exists(stateFile)) File.Replace(temporary,stateFile,null); else File.Move(temporary,stateFile);
             return true;

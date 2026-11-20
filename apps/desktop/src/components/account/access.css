@@ -237,13 +237,17 @@
   margin-top: 16px;
 }
 .access-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   margin: 24px auto 0;
 }
 .access-learn-links {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
 }
 .access-learn-links > button {
   min-height: var(--control-height, 36px);

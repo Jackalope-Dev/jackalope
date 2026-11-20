@@ -13,6 +13,20 @@
     "note": "Committed skills already travel with the repo, so they stay as they are. Skills that look like they hold a credential stay on the computer."
   },
   {
+    "id": "keep-working-while-jackalope-uses-a-window",
+    "date": "2026-11-19",
+    "title": "Keep working while Jackalope uses a window.",
+    "description": "Desktop control keeps going in the background while you use other apps, and work that isn't about code skips the code setup.",
+    "items": [
+      "Switch to other apps or move the window, and Jackalope keeps reading it and using its buttons and fields. Clicks at a spot on screen and key presses wait until you bring the window back.",
+      "Only clicking or typing in the granted window pauses control. Typing in other apps never does.",
+      "If a turn ends while control is paused, the window's badge shows Resume. Click it and Jackalope carries on without you typing anything.",
+      "Checking a web page, a connection or an attached window runs right in your project folder, with no worktree, setup or checks. Options → Treat as code work switches it back.",
+      "General gives you a place for work that doesn't belong to any project."
+    ],
+    "note": "Background control works on Windows and macOS. On Linux X11, any input still pauses it."
+  },
+  {
     "id": "hand-an-agent-a-window",
     "date": "2026-11-19",
     "title": "Hand an agent a window.",

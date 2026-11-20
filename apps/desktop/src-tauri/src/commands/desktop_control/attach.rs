@@ -56,7 +56,27 @@ pub struct Staged {
     /// The agent's display name and character, for the badge.
     pub agent: String,
     pub provider: String,
+    /// Left behind by an attempt that ended while its grant waited for Resume; the badge
+    /// offers Resume, which wakes the conversation.
+    pub resume_offered: bool,
+    /// The person clicked Resume on the badge, so the next grant starts already resumed.
+    pub resumed: bool,
+    /// The site the attach dialog named for a browser window.
+    pub site: AttachSite,
     at: Instant,
+}
+
+/// The website the person allowed by attaching a browser window. Attaching was their
+/// answer to the site question for it, for that attempt only.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum AttachSite {
+    /// Not a browser, or a window staged without the attach dialog.
+    #[default]
+    None,
+    Host(String),
+    /// A browser whose address could not be read; the first site the grant sees in the
+    /// same window counts as the one the person attached.
+    Unread,
 }
 
 /// A window as the attach UI shows it. The handle identifies it on confirm; identity
@@ -159,6 +179,56 @@ fn set_provider(conversation: &str, provider: &str) {
     }
 }
 
+fn set_site(conversation: &str, site: AttachSite) {
+    if let Ok(mut map) = staged_map().lock() {
+        if let Some(staged) = map.get_mut(conversation) {
+            staged.site = site;
+        }
+    }
+}
+
+/// The host open in a browser window, read from its address only. `None` for other apps
+/// and when the address can't be read.
+fn read_site(window: &Window) -> Option<String> {
+    if !grant::is_browser(&grant::app_key(window)) {
+        return None;
+    }
+    let value = super::native(
+        json!({"action":"site","window":window,"deny":denied()}),
+        &AtomicBool::new(false),
+    )
+    .ok()?;
+    value["site"]["url"].as_str().and_then(grant::site_host)
+}
+
+/// What attaching `window` allows: the host the dialog showed, else the one open now.
+fn attach_site(window: &Window, shown: Option<&str>) -> AttachSite {
+    if !grant::is_browser(&grant::app_key(window)) {
+        return AttachSite::None;
+    }
+    match shown.and_then(grant::site_host) {
+        Some(host) => AttachSite::Host(host),
+        None => read_site(window).map_or(AttachSite::Unread, AttachSite::Host),
+    }
+}
+
+/// The dropped or listed window with this handle, matched against the live window list.
+fn chosen(conversation: &str, handle: &str, take: bool) -> Result<Window, String> {
+    let windows = list()?;
+    let dropped = dropped().lock().ok().and_then(|mut map| {
+        if take {
+            map.remove(conversation)
+        } else {
+            map.get(conversation).cloned()
+        }
+    });
+    match dropped.filter(|window| window.handle == handle) {
+        Some(target) => windows.into_iter().find(|window| same(window, &target)),
+        None => windows.into_iter().find(|window| window.handle == handle),
+    }
+    .ok_or_else(|| "That window closed or changed. Choose it again.".into())
+}
+
 fn insert(conversation: &str, window: Window, control: bool, agent: &str, at: Instant) -> String {
     let id = uuid::Uuid::new_v4().to_string();
     if let Ok(mut map) = staged_map().lock() {
@@ -171,6 +241,9 @@ fn insert(conversation: &str, window: Window, control: bool, agent: &str, at: In
                 control,
                 agent: agent.chars().take(40).collect(),
                 provider: "auto".into(),
+                resume_offered: false,
+                resumed: false,
+                site: AttachSite::None,
                 at,
             },
         );
@@ -179,6 +252,34 @@ fn insert(conversation: &str, window: Window, control: bool, agent: &str, at: In
         }
     }
     id
+}
+
+/// Stages the window of a grant that was still waiting for Resume when its attempt
+/// ended, so its badge can offer Resume. Returns the staged id.
+pub fn offer_resume(conversation: &str, window: Window, control: bool, provider: &str) -> String {
+    let id = stage(conversation, window, control, "Jackalope");
+    set_provider(conversation, provider);
+    if let Ok(mut map) = staged_map().lock() {
+        if let Some(staged) = map.get_mut(conversation) {
+            staged.resume_offered = true;
+        }
+    }
+    id
+}
+
+/// Records the badge's Resume click. Returns the key it waits under, the window title,
+/// and whether this was the first click, so the wake note is sent once per resume.
+pub fn mark_resumed(id: &str) -> Option<(String, String, bool)> {
+    let mut map = staged_map().lock().ok()?;
+    expire(&mut map);
+    let (key, staged) = map.iter_mut().find(|(_, staged)| staged.id == id)?;
+    let first = !staged.resumed;
+    staged.resumed = true;
+    Some((
+        key.clone(),
+        staged.window.title.chars().take(80).collect(),
+        first,
+    ))
 }
 
 /// The key a run's attached window is staged under: its conversation, or its task for
@@ -357,6 +458,7 @@ macro_rules! tauri_commands {
             commands::desktop_control::attach::desktop_attach_support,
             commands::desktop_control::attach::desktop_attach_windows,
             commands::desktop_control::attach::desktop_attach_confirm,
+            commands::desktop_control::attach::desktop_attach_site,
             commands::desktop_control::attach::desktop_attach_get,
             commands::desktop_control::attach::desktop_attach_clear,
             commands::desktop_control::attach::desktop_attach_hand_off,
@@ -371,6 +473,7 @@ macro_rules! tauri_commands {
             commands::desktop_control::attach::badge::desktop_badge_resize,
             commands::desktop_control::attach::badge::desktop_badge_detach,
             commands::desktop_control::attach::badge::desktop_badge_open,
+            commands::desktop_control::attach::badge::desktop_badge_resume,
         ] $($rest)*)
     };
 }
@@ -393,6 +496,21 @@ pub async fn desktop_attach_windows() -> Result<Vec<AttachTarget>, String> {
     Ok(windows.iter().map(summary).collect())
 }
 
+/// The website open in a browser window the attach dialog shows, so the person sees which
+/// site attaching allows. `None` for other apps or an unreadable address.
+#[tauri::command]
+pub async fn desktop_attach_site(
+    conversation: String,
+    handle: String,
+) -> Result<Option<String>, String> {
+    let conversation = conversation_id(&conversation)?.to_owned();
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(read_site(&chosen(&conversation, &handle, false)?))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Stages a window the person chose for the conversation. Called only from the
 /// confirm dialog; the window is matched again against the live window list. The
 /// window's badge opens; it grants nothing either.
@@ -404,23 +522,17 @@ pub async fn desktop_attach_confirm(
     control: bool,
     agent: Option<String>,
     provider: Option<String>,
+    site: Option<String>,
 ) -> Result<AttachedWindow, String> {
     let conversation = conversation_id(&conversation)?.to_owned();
     let agent = agent.unwrap_or_else(|| "the agent".into());
     let provider = provider.unwrap_or_else(|| "auto".into());
     let staged = tauri::async_runtime::spawn_blocking(move || {
-        let windows = list()?;
-        let dropped = dropped()
-            .lock()
-            .ok()
-            .and_then(|mut map| map.remove(&conversation));
-        let window = match dropped.filter(|window| window.handle == handle) {
-            Some(target) => windows.into_iter().find(|window| same(window, &target)),
-            None => windows.into_iter().find(|window| window.handle == handle),
-        }
-        .ok_or("That window closed or changed. Choose it again.")?;
+        let window = chosen(&conversation, &handle, true)?;
+        let site = attach_site(&window, site.as_deref());
         stage(&conversation, window, control, &agent);
         set_provider(&conversation, &provider);
+        set_site(&conversation, site);
         staged(&conversation).ok_or_else(|| "The window could not be attached.".to_string())
     })
     .await
@@ -430,13 +542,18 @@ pub async fn desktop_attach_confirm(
         overlay::flash_attached(&app, staged.window.clone());
     }
     overlay::trace(format_args!(
-        "attached {} \u{2014} {} ({})",
+        "attached {} \u{2014} {} ({}{})",
         grant::app_label(&staged.window),
         staged.window.title.chars().take(60).collect::<String>(),
         if staged.control {
             "can control"
         } else {
             "see only"
+        },
+        match &staged.site {
+            AttachSite::None => String::new(),
+            AttachSite::Host(host) => format!(", site {host}"),
+            AttachSite::Unread => ", site unread".into(),
         }
     ));
     Ok(AttachedWindow::of(&staged))
@@ -649,6 +766,47 @@ mod tests {
     }
 
     #[test]
+    fn a_left_behind_grant_offers_resume_and_counts_only_the_first_click() {
+        let _serial = serial();
+        let window = window("70", 42, "GitHub", "browser");
+        let id = offer_resume("conversation-r", window.clone(), true, "codex");
+        let offered = staged("conversation-r").unwrap();
+        assert!(offered.resume_offered && !offered.resumed && offered.control);
+        assert_eq!(offered.provider, "codex");
+        let (key, title, first) = mark_resumed(&id).unwrap();
+        assert_eq!(
+            (key.as_str(), title.as_str(), first),
+            ("conversation-r", "GitHub", true)
+        );
+        assert!(
+            !mark_resumed(&id).unwrap().2,
+            "a second click sends nothing"
+        );
+        let taken = take_for("conversation-r", &[window], &[]).unwrap();
+        assert!(taken.resumed, "the next grant starts resumed");
+        assert!(mark_resumed(&id).is_none());
+    }
+
+    #[test]
+    fn attaching_a_browser_allows_the_site_the_dialog_showed() {
+        let browser = window("40", 42, "MCP servers", "chrome");
+        assert_eq!(
+            attach_site(&browser, Some("https://AllMCPs.com/servers?q=1")),
+            AttachSite::Host("allmcps.com".into())
+        );
+        let editor = window("41", 42, "notes.txt", "textedit");
+        assert_eq!(
+            attach_site(&editor, Some("https://allmcps.com")),
+            AttachSite::None
+        );
+        assert_eq!(
+            read_site(&editor),
+            None,
+            "only browsers are asked for an address"
+        );
+    }
+
+    #[test]
     fn detaching_by_id_or_key_drops_the_attached_window() {
         let _serial = serial();
         stage(
@@ -681,6 +839,9 @@ mod tests {
             control: false,
             agent: "Codex".into(),
             provider: "codex".into(),
+            resume_offered: false,
+            resumed: false,
+            site: AttachSite::None,
             at: Instant::now(),
         };
         let prompt = answered_prompt("run-1", "Trail", &staged);
