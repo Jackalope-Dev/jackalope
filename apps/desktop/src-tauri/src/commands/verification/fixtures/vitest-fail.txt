@@ -1,0 +1,40 @@
+
+ RUN  v3.2.4 /home/dev/shop
+
+ ✓ src/cart/total.test.ts (14 tests) 9ms
+ ✓ src/cart/discounts.test.ts (22 tests) 15ms
+ ❯ src/catalog/search.test.ts (31 tests | 1 failed) 52ms
+   ✓ search > matches exact titles 2ms
+   × search > ranks fuzzy matches below exact ones 6ms
+     → expected [ 'Blue mug', 'Blue mugs' ] to deeply equal [ 'Blue mugs', 'Blue mug' ]
+ ✓ src/catalog/filters.test.ts (18 tests) 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/catalog/search.test.ts > search > ranks fuzzy matches below exact ones
+AssertionError: expected [ 'Blue mug', 'Blue mugs' ] to deeply equal [ 'Blue mugs', 'Blue mug' ]
+
+- Expected
++ Received
+
+  [
+-   "Blue mugs",
+    "Blue mug",
++   "Blue mugs",
+  ]
+
+ ❯ src/catalog/search.test.ts:41:36
+     39|   it('ranks fuzzy matches below exact ones', () => {
+     40|     const results = search(catalog, 'Blue mugs');
+     41|     expect(results.map(titleOf)).toEqual(['Blue mugs', 'Blue mug']);
+       |                                    ^
+     42|   });
+     43| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 84 passed (85)
+   Start at  10:24:02
+   Duration  1.12s (transform 301ms, setup 0ms, collect 802ms, tests 88ms, environment 0ms, prepare 640ms)

@@ -174,3 +174,33 @@ test('parallel native output calls share the capture limit and release unused re
     process.env = old;
   }
 });
+
+test('build, Go and TypeScript summaries reach the native projection', async () => {
+  const old = { ...process.env };
+  const fetch = globalThis.fetch;
+  try {
+    process.env.JACKALOPE_NATIVE_TOOLS = 'output';
+    process.env.JACKALOPE_NATIVE_TOOLS_RECEIPT = 'unused-fixture-path';
+    process.env.JACKALOPE_BRIDGE_URL = 'http://127.0.0.1:1';
+    process.env.JACKALOPE_BRIDGE_TOKEN = 'test-only';
+    let requests = 0;
+    globalThis.fetch = async () => {
+      requests++;
+      return Response.json(null);
+    };
+    const hooks = await nativeTools();
+    const padding = '   Compiling fixture v1.0.0\n'.repeat(100);
+    for (const summary of [
+      '    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.20s',
+      'ok  \texample.com/ledger\t0.123s',
+      '[10:22:31 AM] Projects in this build:',
+    ]) {
+      const output = { metadata: { exit: 0, truncated: false }, output: `${padding}${summary}\n` };
+      await hooks['tool.execute.after']({ tool: 'bash' }, output);
+    }
+    assert.equal(requests, 3);
+  } finally {
+    globalThis.fetch = fetch;
+    process.env = old;
+  }
+});

@@ -12,8 +12,9 @@ evidence; catalog facts do not prove quality, credit or upstream freshness.
 Experiment settings share a versioned registry. Optional DeepSeek request metering,
 quality-study feasibility planning and isolated warm API helpers support screening;
 representative benefit and installed-platform acceptance remain open.
-OpenCode tasks locally compact recognized passing-test output by default while
-retaining exact recovery files and diagnostics. Other adapters retain their native
+OpenCode tasks locally compact recognized passing test and build output (pytest,
+Node TAP, Jest, Vitest, Playwright, Cargo, Go, TypeScript) by default while
+retaining exact recovery files and diagnostics; failing or flaky runs stay whole. Other adapters retain their native
 shell output. Fresh-profile setup costs and representative task benefits need
 separate acceptance; smaller responses do not establish general cost or speed gains.
 

@@ -1,0 +1,27 @@
+
+Running 3 tests using 2 workers
+
+  ✓  1 [chromium] › tests/home.spec.ts:4:7 › home › shows the hero heading (790ms)
+  ✘  2 [chromium] › tests/search.spec.ts:6:5 › search › suggests products while typing (5.0s)
+  ✓  3 [chromium] › tests/home.spec.ts:10:7 › home › links to the docs (1.0s)
+  ✓  4 [chromium] › tests/search.spec.ts:6:5 › search › suggests products while typing (retry #1) (1.9s)
+
+
+  1) [chromium] › tests/search.spec.ts:6:5 › search › suggests products while typing ──────────────
+
+    Error: Timed out 5000ms waiting for expect(locator).toBeVisible()
+
+    Locator: getByRole('listbox')
+    Expected: visible
+    Received: <element(s) not found>
+
+       8 |     await page.getByRole('searchbox').fill('mug');
+    >  9 |     await expect(page.getByRole('listbox')).toBeVisible();
+         |                                             ^
+      10 |   });
+
+        at /home/dev/shop/tests/search.spec.ts:9:45
+
+  1 flaky
+    [chromium] › tests/search.spec.ts:6:5 › search › suggests products while typing ───────────────
+  2 passed (8.1s)
