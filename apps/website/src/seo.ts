@@ -30,6 +30,12 @@ const SOCIAL_IMAGE_ALT =
 
 export const routes = pages.map((page) => page.path);
 
+/** Retired URLs and the page that absorbed their content; each answers with a 301. */
+export const movedPages: Record<string, string> = {
+  '/blog/git-worktrees-for-ai-coding-agents/': '/git-worktrees-for-ai-agents/',
+  '/blog/claude-code-and-codex-together/': '/guides/run-codex-and-claude-code-in-parallel/',
+};
+
 function personSchema(author: Author, origin: string) {
   return {
     '@type': 'Person',
@@ -354,6 +360,9 @@ function marketingPageText(page: MarketingPage, origin: string) {
           row.map((cell, index) => `${section.table?.columns[index]}: ${cell}`).join('\n'),
         ) || []),
         ...(section.bullets?.map((item) => `- ${item}`) || []),
+        ...(section.code
+          ? [`${section.code.label}\n\`\`\`${section.code.language}\n${section.code.value}\n\`\`\``]
+          : []),
         ...(section.links?.map((link) => `[${link.label}](${link.href})`) || []),
       ].join('\n\n'),
     )
