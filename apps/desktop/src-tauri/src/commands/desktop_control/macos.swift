@@ -765,6 +765,12 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
                     "Clicks and key presses must pause control.")
         try require(!Indicator.retakes(.mouseMoved) && !Indicator.retakes(.scrollWheel) && !Indicator.retakes(.leftMouseUp)
                     && !Indicator.retakes(.flagsChanged), "Pointer movement, scrolling, releases and modifiers alone must not pause control.")
+        try require(Indicator.disruption(sinceAgentInput: 5, recentInput: 1) == nil,
+                    "A single click or key away from the agent's input must not pause control.")
+        try require(Indicator.disruption(sinceAgentInput: 0.2, recentInput: 1) != nil,
+                    "Input that lands while the agent is acting must pause control.")
+        try require(Indicator.disruption(sinceAgentInput: 5, recentInput: Indicator.takeoverCount) != nil,
+                    "Repeated clicks or keys must pause control.")
         return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards, element refs, keys, retaking input"]
     }
     if action == "request_permissions" {
@@ -1037,6 +1043,10 @@ final class Indicator: NSObject {
     var timer: Timer?
     var start = ""
     var resumeTicket: UInt64 = 0
+    /// When the agent last sent its own input; the person's input this soon after is a clash.
+    var lastAgentInput = Date.distantPast
+    /// The person's recent clicks and key presses on what Jackalope controls.
+    var personInput: [Date] = []
 
     init(_ request: [String: Any]) throws {
         guard let identity = request["window"] as? [String: Any], let file = request["file"] as? String,
@@ -1559,16 +1569,40 @@ final class Indicator: NSObject {
     func event(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { resumeTicket += 1; pause("Input monitor interrupted"); return }
         // The agent's own input carries this indicator's tag; everything else is the person.
-        if event.getIntegerValueField(.eventSourceUserData) == tag { return }
-        // Escape stops control while the granted window is in front (or for a desktop
-        // grant). An Escape in another app is the person's own; Stop on the bar always works.
+        if event.getIntegerValueField(.eventSourceUserData) == tag {
+            lastAgentInput = Date()
+            return
+        }
+        // Escape pauses control while the granted window is in front (or for a desktop
+        // grant). An Escape in another app is the person's own; Stop on the bar ends control.
         if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
-            if scope == "desktop" || !background { resumeTicket += 1; cancel() }
+            if scope == "desktop" || !background { resumeTicket += 1; pause("You pressed Escape") }
             return
         }
         guard Indicator.retakes(type), !onPill(event.location), targetsGrant(type, event.location) else { return }
+        let now = Date()
+        personInput = personInput.filter { now.timeIntervalSince($0) < Indicator.takeoverWindow } + [now]
+        guard let reason = Indicator.disruption(
+            sinceAgentInput: now.timeIntervalSince(lastAgentInput), recentInput: personInput.count
+        ) else { return }
         resumeTicket += 1
-        pause(type == .keyDown ? "You pressed a key" : "You clicked")
+        personInput = []
+        pause(reason)
+    }
+
+    /// How long after the agent's own input the person's click or key counts as a clash.
+    static let clashWindow: TimeInterval = 0.6
+    /// The span in which repeated clicks or keys mean the person is taking the window back.
+    static let takeoverWindow: TimeInterval = 1.5
+    static let takeoverCount = 3
+
+    /// Why the person's input should pause control, or nil when it can pass: a single stray
+    /// click or key doesn't interrupt the agent; one that lands while the agent is acting, or
+    /// several in quick succession, does.
+    static func disruption(sinceAgentInput: TimeInterval, recentInput: Int) -> String? {
+        if sinceAgentInput < clashWindow { return "You stepped in while Jackalope was acting" }
+        if recentInput >= takeoverCount { return "You're using this window" }
+        return nil
     }
 
     func run() throws {

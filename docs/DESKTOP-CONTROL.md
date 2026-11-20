@@ -153,14 +153,15 @@ corners, shared logo, display-scaled type and real Pause/Resume and Cancel butto
 keep the status and Escape hint readable. The center of the screen stays clear.
 The overlay has no taskbar entry, does not activate on arrival and uses no animation.
 
-On Windows and macOS a physical click on the granted window (any window of the app for
-an app grant), or a key press while the granted window or app is in front, pauses
-control, and the bar names which. With a desktop grant any click or key press pauses.
-On Windows a scroll on the granted window also pauses; on macOS scrolling does not.
-Moving the mouse, releasing a button or key, modifier keys alone, clicks on the bar's
-own buttons and input in other apps do not. Physical Escape stops control
-while the granted window or app is in front, or anywhere with a desktop grant; an
-Escape in another app is left to that app. Stop on the bar and Revoke in the Screen view
+On macOS control pauses only when the person disrupts the agent: a physical click on
+the granted window (any window of the app for an app grant), or a key press while it
+is in front, that lands within 0.6 seconds of the agent's own input, or three such
+clicks or keys within 1.5 seconds. A single click or key otherwise passes. Physical
+Escape pauses control while the granted window or app is in front. On Windows any such
+click, scroll or key press pauses and Escape stops control. With a desktop grant input
+anywhere counts. On both, moving the mouse, releasing a button or key, modifier keys
+alone, clicks on the bar's own buttons and input in other apps do not pause, and an
+Escape in another app is left to that app. The bar names why it paused. Stop on the bar and Revoke in the Screen view
 always work. On X11 any physical input pauses, Escape cancels from anywhere, and a
 window that loses focus, moves or resizes pauses control. Only the human can Resume
 from the bar. Agent-generated input is tagged so it does not trigger its own pause; an

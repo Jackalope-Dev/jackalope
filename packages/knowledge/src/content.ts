@@ -98,7 +98,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     title: 'Desktop control paused unexpectedly',
     symptom: 'The desktop control bar shows Paused while an agent is using an app.',
     quickFix:
-      'Clicking in the granted window, or typing while it is in front, pauses control. Moving the mouse and using other apps do not, and on Mac neither does scrolling. Click Resume on the bar to continue.',
+      'Control pauses when you step in while Jackalope is acting, keep clicking or typing in its window, or press Escape. On Windows any click or key in that window pauses it. Moving the mouse and using other apps never do. Click Resume on the bar to continue.',
     targetSlug: 'windows-desktop-control',
     targetAnchor: 'physical-interruption',
   },
@@ -1118,9 +1118,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Your own input always comes first. When you take over the granted window yourself, Jackalope stops interacting right away. You can keep working in other apps while it works.',
         ],
         bullets: [
-          'On Windows and macOS, clicking in the granted window, or typing while it is in front, pauses control right away, and the bar says which. Moving the mouse does not, and on Mac scrolling does not either, so you can watch without interrupting. With a desktop grant, any click, scroll or key press pauses it. On Linux X11, any mouse or keyboard input pauses it.',
+          'On Mac, control pauses only when you get in its way: a click or key in its window while Jackalope is acting, a few clicks or keys in a row, or Escape. A single stray click, moving the mouse and scrolling let it keep going. On Windows, any click, scroll or key in its window pauses it. On Linux X11, any mouse or keyboard input pauses it. The bar always says why.',
           'Switching to another app, or moving, resizing or minimizing the granted window, does not pause control on Windows and macOS. Jackalope keeps reading the window, pressing its buttons, typing into its fields and scrolling its lists in the background. Clicks at a spot on screen, key presses and switching windows wait until you bring the window back. Nothing it does pulls a window in front of your work. A minimized window waits until you restore it.',
-          'Pressing the physical Escape key stops access while the granted window is in front, or anywhere with a desktop grant. Escape in another app stays with that app. Stop on the bar and Revoke in the Screen view always work.',
+          'Pressing Escape while the granted window is in front pauses control on Mac and stops it on Windows. Escape in another app stays with that app. Stop on the bar and Revoke in the Screen view always end control.',
           'Only you can click Resume. The agent waits for it instead of asking you in the conversation. After you resume, it takes a fresh snapshot so it does not click on an outdated screen.',
           "On portal desktops, your input does not pause control and Escape does not cancel. Stop sharing from your desktop's indicator, or stop the task, to end access.",
         ],
