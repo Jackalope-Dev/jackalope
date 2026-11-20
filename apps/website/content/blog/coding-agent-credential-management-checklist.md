@@ -1,6 +1,6 @@
 ---
 title: "Coding Agent Credential Management: A Setup Checklist"
-description: "Coding agent credential management starts with verified identities and limited access; use this checklist to check accounts, protect secrets, and revoke keys."
+description: "Coding agent credential management starts with verified identities and limited access: check accounts, protect secrets, and revoke keys safely."
 author: "caden-sumner"
 date: 2026-11-19
 slug: "coding-agent-credential-management-checklist"
