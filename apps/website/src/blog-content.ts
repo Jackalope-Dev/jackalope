@@ -291,13 +291,13 @@ export const practicalPosts: BlogPost[] = [
     slug: 'review-ai-generated-code-checklist',
     cover: { kind: 'review', tone: 'mint', label: 'Look closer' },
     title: 'How to review AI-generated code: a checklist with examples',
-    seoTitle: 'AI code review checklist with examples',
+    seoTitle: 'AI-generated code review checklist, with examples',
     category: 'Practical guides',
     author: 'caden-sumner',
     date: '2026-09-09',
     readingTime: '7 min read',
     description:
-      'Review AI-generated code against requirements, meaningful tests, and the combined patch. Includes examples and a reusable review brief.',
+      'A checklist for reviewing AI-generated code: test the promised behavior, find the input that breaks it, then check the tests and the combined patch.',
     sections: [
       {
         id: 'start-with-outcome',

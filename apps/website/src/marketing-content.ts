@@ -547,9 +547,9 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/agents/claude-code/',
     kind: 'Agent integration',
-    title: 'Run Claude Code in a desktop project workspace | Jackalope',
+    title: 'Claude Code GUI: run tasks in parallel worktrees | Jackalope',
     description:
-      'Run Claude Code tasks with isolated Git worktrees, project MCP connections, in-app questions, account profiles, usage reporting, and review.',
+      'Use your Claude Code CLI and Anthropic account in a desktop workspace: parallel tasks in Git worktrees, MCP tools, in-app questions and one review queue.',
     headline: 'Keep Claude Code connected to the whole task.',
     lede: 'Use your installed Claude Code CLI and Anthropic account while Jackalope keeps the brief, questions, project tools, worktree, result, and review together.',
     image: 'agents',
