@@ -527,10 +527,13 @@ button:disabled {
 .workspace-appearance > div:last-of-type {
   flex-shrink: 0;
 }
+/* The palette handle is centred on the field edge, so it overhangs by half its 20px size. The
+   padding gives it room inside this scroll box; the matching negative margin keeps the layout. */
 .workspace-appearance > .theme-editor {
   overflow-y: auto;
   min-height: 0;
-  padding: 4px;
+  padding: 10px;
+  margin: -6px -10px;
 }
 .workspace-appearance [aria-label="Theme presets"] {
   gap: 4px;
