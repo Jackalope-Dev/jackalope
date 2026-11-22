@@ -13,6 +13,7 @@ import {
   GitCommitHorizontal,
   GitFork,
   History,
+  Images,
   ListTodo,
   type LucideIcon,
   MonitorSmartphone,
@@ -21,10 +22,11 @@ import {
   Route,
   Settings2,
   Share2,
+  Sparkles,
 } from 'lucide-react';
 import { openExternalUrl } from './native/env.ts';
 import type { SettingsCategory } from './settings-categories';
-export type ViewGroup = 'tasks' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
+export type ViewGroup = 'tasks' | 'library' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
 
 /**
  * Every workspace view. Shell renders each page from workspace-views.tsx, records the
@@ -64,6 +66,15 @@ export const WORKSPACE_VIEWS = [
     group: 'tasks',
     primary: true,
     feature: 'tasks',
+  },
+  {
+    id: 'library',
+    label: 'Library',
+    description: 'Screenshots, images and files your work created, by project.',
+    icon: Images,
+    group: 'library',
+    feature: 'tasks',
+    keywords: 'gallery artifacts screenshots captures images attachments files output',
   },
   {
     id: 'bots',
@@ -198,6 +209,15 @@ export const WORKSPACE_VIEWS = [
     icon: Plug,
     group: 'agents',
     feature: 'connections',
+  },
+  {
+    id: 'skills',
+    label: 'Skills',
+    description: 'Agents: skills on this computer, and syncing them between your computers.',
+    icon: Sparkles,
+    group: 'agents',
+    feature: 'agents',
+    keywords: 'skill SKILL.md claude codex agents sync share export import personal project',
   },
   {
     id: 'mcp-marketplace',

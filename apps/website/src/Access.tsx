@@ -3,7 +3,13 @@ import { isAccessToken } from '@jackalope/contracts/links';
 import { Button, CopyButton, Input, LoadingState, MailIcon, Panel, Textarea } from '@jackalope/ui';
 import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
+import {
+  AccessRequestError,
+  accessMessage,
+  accessOrigin,
+  accessRequest,
+  useSignupMode,
+} from './access-api';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import './access.css';
 import './waitlist.css';
@@ -23,6 +29,8 @@ export function AccessPage() {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [sent, setSent] = useState(false);
   const pending = useRef(false);
+  /** Pass links keep working under open signup, but nobody needs one to get an account. */
+  const open = useSignupMode() === 'open';
   const refreshMembership = useCallback(() => {
     void accessRequest<AccessMember>('me')
       .then((value) => {
@@ -183,7 +191,13 @@ export function AccessPage() {
     <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
       <header className="access-heading">
         <h1>{member ? 'Your account' : invite ? 'You’re invited' : 'Sign in'}</h1>
-        {member && <p>Download Jackalope and share your Instant Access Passes.</p>}
+        {member && (
+          <p>
+            {member.openSignup
+              ? 'Download Jackalope and connect your desktop.'
+              : 'Download Jackalope and share your Instant Access Passes.'}
+          </p>
+        )}
       </header>
       {error && (
         <p className="access-alert" role="alert">
@@ -197,10 +211,10 @@ export function AccessPage() {
       <DesktopConnection email={member?.email ?? null} refreshMembership={refreshMembership} />
       {loading ? null : !accessOrigin ? (
         <Panel variant="plain" className="access-card access-entry">
-          <h2>Join the waitlist</h2>
-          <p>Sign-in is not available yet. Join the waitlist to hear when early access opens.</p>
+          <h2>Sign-in isn’t available here</h2>
+          <p>This site isn’t connected to Jackalope accounts. Sign up for product notes instead.</p>
           <a className="button button-primary" href="/#newsletter">
-            Join the waitlist <ArrowRight size={17} />
+            Sign up <ArrowRight size={17} />
           </a>
         </Panel>
       ) : member ? (
@@ -571,16 +585,22 @@ export function AccessPage() {
                   </ul>
                 </div>
               )}
-              <h2>{invite ? 'Claim your pass' : 'Sign in'}</h2>
+              <h2>
+                {invite ? (open ? 'Create your free account' : 'Claim your pass') : 'Sign in'}
+              </h2>
               <p>
                 {invite
-                  ? 'Enter your email. Follow the link we send to claim your pass while a place is available.'
+                  ? open
+                    ? 'Jackalope is free to join. Enter your email and follow the link we send to finish.'
+                    : 'Enter your email. Follow the link we send to claim your pass while a place is available.'
                   : 'Enter the email address you signed up with to receive a sign-in link.'}
               </p>
               {invite && available === false && (
                 <p className="access-alert">
-                  All passes on this link are claimed or reserved right now. You can still sign in
-                  if you already have an account, or <a href="/#newsletter">sign up free</a>.
+                  {open
+                    ? 'This invitation link has no places left, and you don’t need one. Sign in if you already have an account, or '
+                    : 'All passes on this link are claimed or reserved right now. You can still sign in if you already have an account, or '}
+                  <a href="/#newsletter">sign up free</a>.
                 </p>
               )}
               <form onSubmit={signIn}>
@@ -625,6 +645,11 @@ export function AccessPage() {
               <a className="text-link" href="/#newsletter">
                 New here? Sign up free <ArrowRight size={14} />
               </a>
+              {open && (
+                <a className="text-link" href="/download/">
+                  Download Jackalope <ArrowDownToLine size={14} />
+                </a>
+              )}
             </>
           )}
         </Panel>

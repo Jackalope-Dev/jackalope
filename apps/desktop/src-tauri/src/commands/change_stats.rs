@@ -44,7 +44,7 @@ fn stats(workspace: &Path, base: &str) -> Option<ChangeStats> {
 /// Whether the HEAD of a project checkout that an attempt edited in place has moved since
 /// the attempt ended. Its diff from the base would then also hold later commits, so it no
 /// longer describes the attempt.
-fn moved_since(workspace: &Path, base: &str, ended: i64) -> bool {
+pub(super) fn moved_since(workspace: &Path, base: &str, ended: i64) -> bool {
     let read = |args: &[&str]| repo::git(workspace, args, Policy::Inspection).ok();
     let Some(head) = read(&["rev-parse", "HEAD"]) else {
         return true;
@@ -72,7 +72,7 @@ fn moved_since(workspace: &Path, base: &str, ended: i64) -> bool {
 }
 
 /// End time of an attempt that edited its project checkout in place, if it has ended.
-fn ended_in_place(workspace: &str, project: &str, ended: Option<&str>) -> Option<i64> {
+pub(super) fn ended_in_place(workspace: &str, project: &str, ended: Option<&str>) -> Option<i64> {
     let ended = chrono::DateTime::parse_from_rfc3339(ended?)
         .ok()?
         .timestamp();
@@ -104,6 +104,10 @@ pub async fn task_change_stats(
     tauri::async_runtime::spawn_blocking(move || {
         runs.into_iter()
             .filter_map(|run| {
+                // Non-code work reads a checkout it shares with the person; its edits are theirs.
+                if run.non_code {
+                    return None;
+                }
                 let workspace = Path::new(&run.workspace);
                 // Omitted rather than counting later work in the shared checkout as the attempt's.
                 let ended =

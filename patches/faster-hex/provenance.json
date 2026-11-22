@@ -1,0 +1,20 @@
+{
+  "crate": "faster-hex",
+  "version": "0.10.1",
+  "upstreamArchiveSha256": "04839bdf9d8c10f66806fad16b852fc72aab80873aebc3cb69d85b4fa41543ed",
+  "upstreamFix": "https://crates.io/crates/faster-hex/1.0.0",
+  "files": {
+    "patches/faster-hex/Cargo.toml": "2360a159d586b13257e560b7c7b8146f8c4d77b4abd98787d5f08b897b1fc7a1",
+    "patches/faster-hex/Cargo.toml.orig": "a294cba7e22a5dd6801bdbf4e3da9c2bf471fe178a799b6efb0a4bbd33edd392",
+    "patches/faster-hex/LICENSE": "7e4baa202160a035c769bb83bd994222c74f479ec582624e3aedaa8f553481c7",
+    "patches/faster-hex/LICENSE-THIRD-PARTY/Rust Project Developers": "29662666b44dff84977b46e05642cdef910bc3a93a17b5fd86e632bafa59cf21",
+    "patches/faster-hex/LICENSE-THIRD-PARTY/fast-hex": "7c652d12760975f519e979b099e40f9c0868c1139b231e780cea69b2a3fd6656",
+    "patches/faster-hex/README.md": "4f6c1c87659eaf34f83ef0a9bb367fe66a9b60483d7d713d347e9bd4b8292d87",
+    "patches/faster-hex/build.rs": "17d2548e27067b39af279852dfb04e77dd432a22b73ea1a6b0f7cf7574699aaa",
+    "patches/faster-hex/src/decode.rs": "94c4717c64fa5c0bbe96f00a1a293400faf7a2204ead5c04af4279134de93c52",
+    "patches/faster-hex/src/encode.rs": "d73d4545a2fb2db2c9f04633e8781ac1b708b87e813aef2c027945409340c4d4",
+    "patches/faster-hex/src/error.rs": "8f6bcbe6dffda2cc70abc389909a36d41d5e3cfb00241f1f731844d97a0f9795",
+    "patches/faster-hex/src/lib.rs": "6f144ddf7149041105ef44ef089a2a76880b0493009de49a7650eb473a66069e",
+    "patches/faster-hex/src/serde.rs": "f444db204157593ace2ae06424bba9d6c0fd1755e61af66a72d3acda80c3a2c8"
+  }
+}

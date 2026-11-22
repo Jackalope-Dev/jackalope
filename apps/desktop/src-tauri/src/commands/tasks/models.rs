@@ -102,6 +102,11 @@ pub struct TaskRun {
     /// once more as a new conversation, unless it continues a session from outside Jackalope.
     #[serde(skip)]
     pub session_refused: Option<String>,
+    /// The earlier progress Jackalope last gave this attempt's agent in place of a
+    /// conversation it could not continue: a quota handoff, a lost session or a retry that
+    /// picks up preserved work. Kept as sent, including the person's focus line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_context: Option<String>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     /// The agent's own restatement of the task, reported once at the start.
@@ -144,6 +149,10 @@ pub struct TaskRun {
     pub setup_files: Vec<String>,
     #[serde(default)]
     pub auto_verify: bool,
+    /// Work that changes no code, such as operating a web page or checking a connection:
+    /// it read the project folder where it is, with no worktree, preparation or checks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub non_code: bool,
     #[serde(default)]
     pub verification: Option<crate::commands::verification::Verification>,
     #[serde(default)]
@@ -271,6 +280,7 @@ impl TaskRun {
             .chain(&mut self.error)
             .chain(&mut self.verification_error)
             .chain(&mut self.checkpoint_error)
+            .chain(&mut self.handoff_context)
         {
             secrets.text(text);
         }
@@ -322,6 +332,11 @@ pub struct RunRequest {
     pub setup_files: Vec<String>,
     #[serde(default)]
     pub auto_verify: bool,
+    /// Work that changes no code, such as operating a web page, checking a connection or
+    /// research. It works in the project folder as it is (a plain folder stays a plain
+    /// folder): no worktree, branch change, setup files, preparation or automatic checks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub non_code: bool,
     #[serde(default)]
     pub target_branch: Option<String>,
     #[serde(skip)]
@@ -339,6 +354,10 @@ pub struct RunRequest {
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// What the person wants the next agent to focus on when it picks up earlier progress
+    /// (a quota handoff, a lost session or a retry of preserved work). Ignored otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_focus: Option<String>,
     /// A first attempt that resumes a session from outside Jackalope where it ran.
     #[serde(skip)]
     pub continues: Option<ContinuedSession>,
@@ -377,6 +396,7 @@ impl RunRequest {
             prepare_command: None,
             setup_files: Vec::new(),
             auto_verify: false,
+            non_code: false,
             target_branch: None,
             account_binding: None,
             prompt,
@@ -384,6 +404,7 @@ impl RunRequest {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: None,
+            handoff_focus: None,
             continues: None,
             connection_ids: None,
             coordination: None,
@@ -470,6 +491,7 @@ impl TaskRun {
             failure_kind: self.failure_kind,
             provider_error: None,
             session_refused: None,
+            handoff_context: None,
             contract: self.contract.clone(),
             understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
@@ -494,6 +516,7 @@ impl TaskRun {
             prepare_command: self.prepare_command.clone(),
             setup_files: self.setup_files.clone(),
             auto_verify: self.auto_verify.clone(),
+            non_code: self.non_code,
             verification: verification,
             finishing: self.finishing.clone(),
             verification_error: self.verification_error.clone(),

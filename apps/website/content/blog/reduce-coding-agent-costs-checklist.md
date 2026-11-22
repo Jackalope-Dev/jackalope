@@ -37,9 +37,9 @@ This uses an eligible account subscription rather than directly billing each run
 
 It fits interactive work when you already have suitable access and don't need separate API billing for every project. Don't treat included usage as unlimited capacity or as evidence that additional subscriptions will pay for themselves.
 
-**Best for:** Regular interactive work with a clear account owner.
+It's best for regular interactive work with a clear account owner.
 
-Example: Keep routine maintenance on your existing subscription-backed agent. Before buying another seat or subscription, check whether slowdowns come from access constraints or from oversized tasks and repeated corrections.
+For example, keep routine maintenance on your existing subscription-backed agent. Before buying another seat or subscription, check whether slowdowns come from access constraints or from oversized tasks and repeated corrections.
 
 ### API-backed usage
 
@@ -47,9 +47,9 @@ This uses provider API credentials and the provider's usage-based billing arrang
 
 It fits work where you need to attribute consumption to a project or workload. Check whether a configured budget actually blocks requests or merely sends alerts. Don't assume an alert is a spending cap.
 
-**Best for:** Work requiring explicit usage accounting or programmatic access.
+It's best for work that needs explicit usage accounting or programmatic access.
 
-Example: Give a repository-maintenance workflow its own provider project or credential where supported. Review its usage separately from interactive development so unattended activity doesn't disappear into a shared total.
+For example, give a repository-maintenance workflow its own provider project or credential where supported. Review its usage separately from interactive development so unattended activity doesn't disappear into a shared total.
 
 ### A deliberate combination
 
@@ -57,9 +57,9 @@ This keeps subscription-backed and API-backed work, but assigns each a defined p
 
 It fits teams that have distinct interactive and automated workloads. Write down the boundary before adding another billing source.
 
-**Best for:** Separate workloads with different accounting needs.
+It's best for separate workloads with different accounting needs.
 
-Example: Use approved subscription access for interactive coding and an approved API project for automation. Record exceptions rather than silently switching credentials when access is constrained.
+For example, use approved subscription access for interactive coding and an approved API project for automation. Record exceptions rather than silently switching credentials when access is constrained.
 
 ## Choose models by uncertainty and failure cost
 
@@ -69,7 +69,7 @@ Start with a lower-cost option for bounded work where you can cheaply detect mis
 
 Set an escalation rule before the run. For example: if the agent repeats the same failed approach or can't explain a failing test, stop implementation and request a diagnosis. Then decide whether to improve the brief, change the model, or take over.
 
-Don't make every task traverse a ladder of models. Repeatedly reloading context and discarding patches can erase the benefit of a cheaper first attempt. If a task is clearly ambiguous, start with the model you trust to investigate it.
+Don't make every task climb a ladder of models. Repeatedly reloading context and discarding patches can erase the benefit of a cheaper first attempt. If a task is clearly ambiguous, start with the model you trust to investigate it.
 
 ## Give the agent a brief with a stopping point
 

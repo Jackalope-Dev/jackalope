@@ -1,3 +1,4 @@
+pub(in crate::commands) mod combined_check;
 pub(in crate::commands) mod dependencies;
 use super::repo::{self, Identity, Policy::Snapshot, Seed, Untracked};
 use super::tasks::{TaskRun, TaskRuntime};
@@ -1028,6 +1029,11 @@ fn classify_sources(plans: Vec<IntegrationPlan>) -> Result<AppliedSources, Strin
     let mut sources = Vec::new();
     let mut stale = Vec::new();
     for plan in plans {
+        // A project that was moved or deleted can neither run dependent work nor answer Git,
+        // so its plans are left out instead of failing every other project's dispatch.
+        if !Path::new(&plan.project_path).is_dir() {
+            continue;
+        }
         let head = plan
             .integration_head
             .as_deref()
@@ -2091,6 +2097,25 @@ mod tests {
         assert!(reachable_sources(vec![stale, reachable])
             .unwrap_err()
             .contains("no longer contains integration"));
+    }
+
+    #[test]
+    fn a_plan_for_a_deleted_project_does_not_fail_other_projects() {
+        let fixture = Fixture::new();
+        let runs = vec![fixture.run(1, "kept.txt", "kept\n")];
+        let plan = prepare(&fixture.plans, &runs, &[runs[0].id.clone()]).unwrap();
+        let reachable = apply(&fixture.plans, &runs, &plan.id).unwrap();
+        let mut gone = reachable.clone();
+        gone.id = "gone-plan".into();
+        gone.project_path = fixture
+            .project
+            .with_file_name("deleted-project")
+            .to_string_lossy()
+            .into_owned();
+        gone.run_ids = vec!["gone-run".into()];
+        let (sources, paused) = classify_sources(vec![gone, reachable.clone()]).unwrap();
+        assert_eq!(sources, vec![reachable.run_ids]);
+        assert!(paused.is_empty());
     }
 }
 

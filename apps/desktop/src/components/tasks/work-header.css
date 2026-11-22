@@ -19,13 +19,16 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 100%;
+  /* The negative margin lines the mark up with the page edge; the cap adds it back so
+     the heading, which is sized without it, does not clip the name. */
+  max-width: calc(100% + 8px);
   height: var(--control-height, 36px);
   margin-left: -8px;
   padding: 0 8px;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
   font: inherit;
+  text-align: start;
   cursor: pointer;
 }
 .work-header-switch:hover,
@@ -41,10 +44,11 @@
   color: var(--color-text-secondary);
 }
 /* Only very long names truncate; the full name stays in the text, so it is still the
-   accessible name, and in the tooltip. */
+   accessible name, and in the tooltip. A percentage minimum here would be ignored when
+   the button sizes itself and then push the chevron past its edge. */
 .work-header-name {
   flex: 0 1 auto;
-  min-width: min(8ch, 100%);
+  min-width: 0;
   max-width: 40ch;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,46 +84,4 @@
   display: inline-flex;
   margin-left: auto;
   color: var(--color-accent-ink);
-}
-.work-compose-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  height: var(--control-height, 36px);
-  padding: 0 12px 0 14px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-elevated);
-  cursor: text;
-}
-.work-compose-bar:hover {
-  border-color: var(--color-border);
-}
-.work-compose-bar:focus-within {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-}
-.work-compose-bar input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-primary);
-  font: inherit;
-  font-size: var(--text-sm);
-  outline: none;
-  cursor: text;
-}
-.work-compose-bar input::placeholder {
-  color: var(--color-text-secondary);
-}
-.work-compose-agent {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
 }

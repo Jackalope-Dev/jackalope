@@ -33,7 +33,7 @@ const riskLabel: Record<CatchUpRisk, string> = {
   unknown: 'Risk unknown',
 };
 
-function Picture({
+export function Picture({
   picture,
   title,
   onOpen,

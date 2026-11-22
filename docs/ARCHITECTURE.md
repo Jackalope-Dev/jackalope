@@ -43,7 +43,7 @@ Project readiness uses isolated gix metadata reads with Git fallback. Review ren
 uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integration
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
 Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
-and MCP connections and marketplace. Workspace views are registered once in
+MCP connections and marketplace, and Skills. Workspace views are registered once in
 lib/navigation.ts (label, group, icon, telemetry feature, search keywords) with
 their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
 read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
@@ -113,6 +113,8 @@ changes must preserve both sides and old saved records.
 | computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
 | tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), one record of what workspace tools did, and the recovery of changes a lost attempt left on a computer, saved as a patch and never applied |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
+| skills.rs, skills/ | Agent skills on this computer for the Skills page: personal and project skill folders, bounded reading, Git tracking and what keeps a skill local, creation, import and export, saved skill sync state, sync and conflict decisions, and the only writes of synced content, which refuse tracked files |
+| account/skill_sync.rs | Opt-in account sync of chosen skills behind settings sync consent: account binding, the per-account choice, pull, revision-checked push, device holdings and deletion |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
@@ -125,7 +127,7 @@ changes must preserve both sides and old saved records.
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 
 Lock order is **coordinator state → execution guard → runtime state**, and the
-types carry it: coordinator code takes the guard through `Coordinator::transact` or
+types carry it. Coordinator code takes the guard through `Coordinator::transact` or
 `Coordinator::execution`, which need the locked coordinator state, and
 `TaskRuntime::start_locked` takes the `&ExecutionGuard` it runs under. Coordinated
 attempts start through `Coordinator::launch_assignment`, and ledger changes go through
@@ -271,7 +273,7 @@ access/feedback.ts owns authenticated campaign state, shared cooldowns, opt-in e
 eligibility and scoped website replies through the existing inbox/outbox. Anonymous
 telemetry remains separate. See [feedback invitations](FEEDBACK-INVITATIONS.md).
 Shared brand/tokens exports pure theme calculation for browser and Worker rendering.
-Native commands/account.rs owns required early-access account connection; its
+Native commands/account.rs owns the required account connection; its
 credential is protected by account_storage.rs with Windows DPAPI or a macOS Keychain /
 Linux Secret Service reference. platform.rs initializes the Unix GUI login PATH before
 runtime threads start; children inherit the discovery environment. Worker access/devices.ts
@@ -319,4 +321,4 @@ and persistence. Rust tests use disposable repositories/profiles, with opt-in
 provider/browser trials separate. Worker tests use local workerd/D1/R2. Rendered
 checks and signed installed-upgrade trials supplement the suites; see [TODO.md](TODO.md).
 
-Store preview admission is owned by native `commands/execution_access.rs`: account verification supplies a bounded lease, checked before native launch/coordination/scheduled dispatch and PTY creation. The renderer presents connection/recovery state but cannot grant access. Store builds use Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).
+Store preview admission is owned by native `commands/execution_access.rs`. Account verification supplies a bounded lease, checked before native launch/coordination/scheduled dispatch and PTY creation. The renderer presents connection/recovery state but cannot grant access. Store builds use Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).

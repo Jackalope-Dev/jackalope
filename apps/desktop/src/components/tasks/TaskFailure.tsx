@@ -1,5 +1,13 @@
-import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Input,
+} from '@jackalope/ui';
 import { RotateCw } from 'lucide-react';
+import { useState } from 'react';
 import type { FailureKind, PreparationRecord } from '../../lib/run-types';
 
 /** What to do next for failures whose kind has one clear remedy. */
@@ -8,7 +16,11 @@ const NEXT_STEP: Partial<Record<FailureKind, string>> = {
   model_unavailable: 'Choose another model for this agent, then retry.',
   context_too_long:
     'Start a new task with a narrower request; continuing resends the full context.',
+  provider_refused: 'Rephrase the request or choose another agent, then retry.',
 };
+
+/** Matches the backend's handoff focus limit. */
+const FOCUS_MAX = 500;
 
 /** The setup command's own output, which is usually where the real cause is. */
 function SetupOutput({ preparation }: { preparation: PreparationRecord }) {
@@ -31,6 +43,7 @@ export function TaskFailure({
   onInspect,
   onRetry,
   retrying,
+  continuesProgress,
 }: {
   message: string;
   kind?: FailureKind | null;
@@ -38,15 +51,18 @@ export function TaskFailure({
   preparation?: PreparationRecord | null;
   onInspect: () => void;
   /** Absent when this attempt cannot be retried, for example once it is superseded. */
-  onRetry?: () => void;
+  onRetry?: (focus?: string) => void;
   retrying?: boolean;
+  /** A retry picks up the changes a provider quota stop left in the attempt's worktree. */
+  continuesProgress?: boolean;
 }) {
+  const [focus, setFocus] = useState('');
   const firstLine = failureSummary(message);
   const summary = firstLine.length > 200 ? `${firstLine.slice(0, 200)}…` : firstLine;
   const failedSetup = !!preparation && !preparation.success;
   // Jackalope's own messages, such as Gemini's sign-in error, can already say what to do.
   const nextStep =
-    kind && !/\b(sign in|choose another|start a new)\b/i.test(message)
+    kind && !/\b(sign in|choose another|start a new|rephras\w*)\b/i.test(message)
       ? NEXT_STEP[kind]
       : undefined;
   return (
@@ -56,7 +72,11 @@ export function TaskFailure({
       action={
         <>
           {onRetry && (
-            <Button variant="outline" disabled={retrying} onClick={onRetry}>
+            <Button
+              variant="outline"
+              disabled={retrying}
+              onClick={() => onRetry(continuesProgress ? focus : undefined)}
+            >
               <RotateCw size={16} />
               {retrying ? 'Retrying…' : 'Retry'}
             </Button>
@@ -69,11 +89,28 @@ export function TaskFailure({
     >
       <p>{summary || 'The task ended with an error.'}</p>
       {nextStep && <p className="task-muted">{nextStep}</p>}
-      {onRetry && (
+      {onRetry && !continuesProgress && (
         <p className="task-muted">
           A retry starts a fresh attempt at the same task and continues in this workspace when the
           agent left it clean.
         </p>
+      )}
+      {onRetry && continuesProgress && (
+        <FormField
+          label="Focus for the next agent (optional)"
+          description="A retry continues from the changes this attempt left in its workspace."
+        >
+          <Input
+            value={focus}
+            maxLength={FOCUS_MAX}
+            placeholder="For example: finish the parser before the docs"
+            disabled={retrying}
+            onChange={(event) => setFocus(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !retrying) onRetry(focus);
+            }}
+          />
+        </FormField>
       )}
       {failedSetup && <SetupOutput preparation={preparation} />}
       {message.trim() !== summary && (

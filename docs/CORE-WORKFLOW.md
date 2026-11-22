@@ -17,6 +17,16 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
+New work is non-code when it is in General, when a window is attached and the request
+names no code, or when a short request only reads or operates something outside the
+repository (a web page, a connection, email) and mentions no code or changes. Non-code
+work starts one conversation without the planning check, and the agent is told not to
+edit files unless a message asks. Options → Treat as code work overrides an inferred
+guess; General is always non-code. General is a plain folder in Jackalope's data
+directory, offered in the sidebar and the Work project switcher until added, then listed
+like any project. Jackalope never makes it a repository and refuses a data directory
+inside one. Its composer offers no launchpad starters or Plan with me.
+
 Project instructions (Project settings → Basics) reach every task agent natively at launch,
 whatever started the work; a resumed agent session is not given them again, and a prompt
 that already contains them (scheduled and remote tasks add them) does not repeat them.
@@ -168,6 +178,12 @@ A project's optional preparation command authorizes a bounded, cancellable comma
 in each new task workspace before its agent starts. Continuations skip preparation.
 Preparation failure retains workspace/history and its recorded command output.
 
+Non-code work runs in the project folder as it is, on whatever branch is checked out:
+no worktree, branch change, setup files, preparation or automatic checks. It does not
+reserve the checkout, so in-place work is not held up by it, and a continuation stays
+in the folder its conversation started in. Its attempts report no change counts and add
+no changed files to Library.
+
 Preparation and verification commands are bounded by silence rather than by total
 runtime: a command is stopped when it produces no output for its stall budget, so a
 slow command that keeps reporting progress is allowed to finish. Both are still
@@ -180,6 +196,17 @@ against. When a later attempt finds those manifests unchanged, preparation is
 skipped and reported as skipped rather than run again. A preparation command that
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
+
+Before preparing a new isolated worktree, Jackalope clones each `node_modules` folder the
+project checkout has beside a `package.json` into the same place, but only when both
+checkouts' dependency manifests fingerprint the same for the preparation command. Clones
+are copy-on-write (`clonefile` on APFS, `FICLONE` on Btrfs or XFS); a volume or platform
+that cannot clone, including Windows, gets no copy and the command installs in full.
+Existing folders and linked paths are never used. A clone is removed when a link inside it
+points into the project checkout or resolves outside the worktree, or when it holds a
+`pyvenv.cfg` or `CMakeCache.txt`; tool caches (`.cache`, `.vite`) are dropped. Python
+environments and Cargo `target/` are not cloned. The preparation command still runs, so
+it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
 
 Automatic verification is on for a project unless Check results automatically is turned
 off in Project settings, and does nothing until the project has a check command. Every
@@ -207,7 +234,9 @@ account, project settings, recorded context and agreed outcome, resumes no agent
 session, and is refused for an attempt that is already integrated or superseded by a
 later attempt. It continues in the previous attempt's worktree only when that worktree
 still exists, no other attempt owns it, and the agent left no uncommitted changes;
-otherwise a fresh worktree is cut and the earlier one is kept for inspection.
+otherwise a fresh worktree is cut and the earlier one is kept for inspection. The
+exception is an attempt a provider quota stopped: its uncommitted changes carry over
+with quota handoff progress context and the person's optional focus line.
 
 An interrupted attempt keeps its workspace until the person resumes it. Resume lists
 processes still running in the workspace (on macOS and Linux) so anything the attempt

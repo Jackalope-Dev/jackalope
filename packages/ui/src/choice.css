@@ -2,12 +2,15 @@
 @layer components {
   /* A selectable row: bordered, with room for a title and a description line, and a radio
      indicator. Lists of choices stack them with a small gap. */
+  /* No explicit min-height: that would replace the content-based minimum, and rows in a
+     scrolling list would shrink until their title and description overlap the border.
+     Padding and one line of text already reach the control height. */
   .ui-choice {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 10px;
     width: 100%;
-    min-height: var(--control-height, 36px);
     padding: 8px 12px;
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-md);

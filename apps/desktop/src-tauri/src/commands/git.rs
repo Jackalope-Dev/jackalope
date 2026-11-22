@@ -18,6 +18,8 @@ macro_rules! tauri_commands {
         $next!($finish [$($done)*
             commands::git::git_list_worktrees,
             commands::git::git_create_worktree,
+            commands::git::git_list_branches,
+            commands::git::git_switch_branch,
         ] $($rest)*)
     };
 }
@@ -155,6 +157,167 @@ pub async fn git_create_worktree(
     .map_err(|e| e.to_string())?
 }
 
+/// A project checkout's branches for the branch picker, most recently committed first.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchList {
+    /// Empty on a detached HEAD.
+    pub current: String,
+    /// Uncommitted changes to tracked files, which keep the checkout on its branch.
+    pub changed: bool,
+    pub local: Vec<LocalBranch>,
+    /// Remote branches without a local branch of the same name, as `remote/name`.
+    pub remote: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalBranch {
+    pub name: String,
+    /// Another worktree that has this branch checked out; Git will not check it out twice.
+    pub worktree: Option<String>,
+}
+
+/// Enough for any picker; filtering happens on the list Git sorted by recency.
+const MAX_BRANCHES: usize = 500;
+
+#[tauri::command]
+pub async fn git_list_branches(repo_path: String) -> Result<BranchList, String> {
+    tauri::async_runtime::spawn_blocking(move || list_branches(Path::new(&repo_path)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn list_branches(repo: &Path) -> Result<BranchList, String> {
+    let current = repo::git(repo, &["branch", "--show-current"], Policy::Inspection)?;
+    let changed = repo::is_dirty(repo, repo::Untracked::No, Policy::Inspection)?;
+    let refs = repo::git(
+        repo,
+        &[
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--format=%(refname)%00%(worktreepath)",
+            "refs/heads",
+            "refs/remotes",
+        ],
+        Policy::Inspection,
+    )?;
+    let mut local = Vec::new();
+    let mut remote = Vec::new();
+    for line in refs.lines() {
+        let (name, worktree) = line.split_once('\0').unwrap_or((line, ""));
+        if let Some(name) = name.strip_prefix("refs/heads/") {
+            local.push(LocalBranch {
+                name: name.to_string(),
+                worktree: (name != current && !worktree.is_empty()).then(|| worktree.to_string()),
+            });
+        } else if let Some(name) = name.strip_prefix("refs/remotes/") {
+            if !name.ends_with("/HEAD") {
+                remote.push(name.to_string());
+            }
+        }
+    }
+    remote.retain(|name| {
+        let short = name
+            .split_once('/')
+            .map_or(name.as_str(), |(_, short)| short);
+        !local.iter().any(|branch| branch.name == short)
+    });
+    local.truncate(MAX_BRANCHES);
+    remote.truncate(MAX_BRANCHES.saturating_sub(local.len()));
+    Ok(BranchList {
+        current,
+        changed,
+        local,
+        remote,
+    })
+}
+
+/// Switches the project checkout to a local or remote branch, or creates a branch at
+/// the current commit. A new branch keeps uncommitted changes, since no file changes;
+/// another branch needs a clean checkout so changes are never carried over or lost.
+/// It holds the execution guard and refuses while a task works in the checkout.
+#[tauri::command]
+pub async fn git_switch_branch(
+    repo_path: String,
+    branch: String,
+    create: bool,
+    state: tauri::State<'_, super::tasks::TaskRuntime>,
+) -> Result<String, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        switch_branch(
+            Path::new(&repo_path),
+            branch.trim(),
+            create,
+            &runtime.integration_runs()?,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn switch_branch(
+    repo: &Path,
+    branch: &str,
+    create: bool,
+    runs: &[super::tasks::TaskRun],
+) -> Result<String, String> {
+    if branch.is_empty() || branch.starts_with('-') {
+        return Err("Enter a branch name.".into());
+    }
+    let root = repo::git(repo, &["rev-parse", "--show-toplevel"], Policy::Isolated)?;
+    let canonical = |path: &str| dunce::canonicalize(path).ok();
+    let target = canonical(&root);
+    if runs.iter().any(|run| {
+        run.status.is_active()
+            && !run.workspace.is_empty()
+            && (Path::new(&run.workspace) == Path::new(&root)
+                || target.is_some() && canonical(&run.workspace) == target)
+    }) {
+        return Err(
+            "A task is working in the project checkout. Wait for it to finish before switching branches."
+                .into(),
+        );
+    }
+    let root = Path::new(&root);
+    let exists = |reference: &str| {
+        repo::succeeds(
+            root,
+            &["rev-parse", "--verify", "--quiet", reference],
+            Policy::Isolated,
+        )
+    };
+    let clean = || {
+        if repo::is_dirty(root, repo::Untracked::No, Policy::Isolated)? {
+            return Err("The project checkout has uncommitted changes. Commit them, or create a new branch to take them with you, before switching.".to_string());
+        }
+        Ok(())
+    };
+    if create {
+        let name = repo::git(
+            root,
+            &["check-ref-format", "--branch", branch],
+            Policy::Isolated,
+        )
+        .map_err(|_| format!("{branch} is not a valid branch name."))?;
+        if exists(&format!("refs/heads/{name}")) {
+            return Err(format!("A branch named {name} already exists."));
+        }
+        super::delivery::change(root, &["switch", "-c", &name])?;
+    } else if exists(&format!("refs/heads/{branch}")) {
+        clean()?;
+        super::delivery::change(root, &["switch", "--no-guess", branch])?;
+    } else if exists(&format!("refs/remotes/{branch}")) {
+        clean()?;
+        super::delivery::change(root, &["switch", "--track", branch])?;
+    } else {
+        return Err(format!("There is no branch named {branch}."));
+    }
+    repo::git(root, &["branch", "--show-current"], Policy::Isolated)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,5 +425,116 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    fn branch_repo() -> std::path::PathBuf {
+        let repo =
+            std::env::temp_dir().join(format!("jackalope-branches-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&repo).unwrap();
+        run(&repo, &["init", "-q", "-b", "main"]);
+        run(&repo, &["config", "user.email", "test@example.com"]);
+        run(&repo, &["config", "user.name", "Test"]);
+        fs::write(repo.join("README.md"), "hello").unwrap();
+        run(&repo, &["add", "."]);
+        run(&repo, &["commit", "-q", "-m", "initial"]);
+        repo
+    }
+
+    fn current(repo: &Path) -> String {
+        repo::git(repo, &["branch", "--show-current"], Policy::Isolated).unwrap()
+    }
+
+    #[test]
+    fn a_new_branch_takes_changes_along_but_another_branch_needs_a_clean_checkout() {
+        let repo = branch_repo();
+        run(&repo, &["branch", "other"]);
+        fs::write(repo.join("README.md"), "edited").unwrap();
+
+        let refused = switch_branch(&repo, "other", false, &[]).unwrap_err();
+        assert!(refused.contains("uncommitted changes"), "{refused}");
+        assert_eq!(current(&repo), "main");
+
+        assert_eq!(
+            switch_branch(&repo, "feature/new", true, &[]).unwrap(),
+            "feature/new"
+        );
+        assert_eq!(
+            fs::read_to_string(repo.join("README.md")).unwrap(),
+            "edited"
+        );
+        assert!(switch_branch(&repo, "other", true, &[])
+            .unwrap_err()
+            .contains("already exists"));
+        assert!(switch_branch(&repo, "bad..name", true, &[]).is_err());
+        assert!(switch_branch(&repo, "-f", false, &[]).is_err());
+
+        run(&repo, &["commit", "-qam", "edit"]);
+        assert_eq!(switch_branch(&repo, "other", false, &[]).unwrap(), "other");
+        assert_eq!(fs::read_to_string(repo.join("README.md")).unwrap(), "hello");
+        let _ = fs::remove_dir_all(&repo);
+    }
+
+    #[test]
+    fn remote_branches_check_out_as_tracking_branches_and_listing_marks_other_worktrees() {
+        let repo = branch_repo();
+        run(
+            &repo,
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://example.invalid/repo.git",
+            ],
+        );
+        run(&repo, &["update-ref", "refs/remotes/origin/shared", "HEAD"]);
+        run(&repo, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        run(
+            &repo,
+            &["worktree", "add", "-q", "-b", "task", ".worktrees/task"],
+        );
+
+        let list = list_branches(&repo).unwrap();
+        assert_eq!(list.current, "main");
+        assert!(!list.changed);
+        assert_eq!(list.remote, vec!["origin/shared".to_string()]);
+        assert!(list
+            .local
+            .iter()
+            .any(|b| b.name == "main" && b.worktree.is_none()));
+        assert!(list.local.iter().any(
+            |b| b.name == "task" && b.worktree.as_deref().is_some_and(|p| p.ends_with("task"))
+        ));
+
+        assert_eq!(
+            switch_branch(&repo, "origin/shared", false, &[]).unwrap(),
+            "shared"
+        );
+        assert_eq!(
+            repo::git(
+                &repo,
+                &["rev-parse", "--abbrev-ref", "@{upstream}"],
+                Policy::Isolated
+            )
+            .unwrap(),
+            "origin/shared"
+        );
+        assert!(switch_branch(&repo, "missing", false, &[]).is_err());
+        let _ = fs::remove_dir_all(&repo);
+    }
+
+    #[test]
+    fn switching_waits_for_a_task_working_in_the_checkout() {
+        let repo = branch_repo();
+        run(&repo, &["branch", "other"]);
+        let active = super::super::tasks::TaskRun {
+            workspace: repo.to_string_lossy().into_owned(),
+            status: crate::cli_protocol::RunStatus::Running,
+            ..Default::default()
+        };
+        assert!(switch_branch(&repo, "other", false, &[active])
+            .unwrap_err()
+            .contains("A task is working"));
+        assert_eq!(current(&repo), "main");
+        let _ = fs::remove_dir_all(&repo);
     }
 }

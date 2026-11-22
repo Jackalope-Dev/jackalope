@@ -1,5 +1,88 @@
 [
   {
+    "id": "pick-up-quota-stopped-work-where-it-left-off",
+    "date": "2026-11-20",
+    "title": "Pick up quota-stopped work where it left off.",
+    "description": "Retrying a task the provider quota stopped now continues from its changes instead of starting over.",
+    "items": [
+      "Add an optional focus line for the next agent, and see the handoff context it received in Task details.",
+      "A provider refusing a request is reported as a refusal and no longer switches accounts."
+    ]
+  },
+  {
+    "id": "bring-rules-from-other-coding-tools",
+    "date": "2026-11-20",
+    "title": "Bring rules from other coding tools.",
+    "description": "Project context offers your Cursor, Windsurf, Cline and GitHub Copilot rule files as lessons you can turn on.",
+    "items": [
+      "Each rule arrives paused and keeps its file's scope, so path rules match requests that name those folders or file types.",
+      "Oh My Pi is listed among the known ACP agents in Add agent."
+    ]
+  },
+  {
+    "id": "your-skills-on-every-computer",
+    "date": "2026-11-20",
+    "title": "Your skills on every computer.",
+    "description": "Skills you keep outside the repo can now sync between your computers through your account, without ever being committed.",
+    "items": [
+      "The new Skills page in Agents shows your Claude Code, Codex and shared agent skills, personal and per project.",
+      "You choose which skills sync. Skill sync is off until you turn it on, and it needs settings sync.",
+      "If a skill changed on two computers, Jackalope shows both copies and waits for you to pick one. Nothing gets overwritten.",
+      "Synced project skills never go into a file the repo tracks, and new ones are kept out of your commits."
+    ],
+    "note": "Committed skills already travel with the repo, so they stay as they are. Skills that look like they hold a credential stay on the computer."
+  },
+  {
+    "id": "keep-working-while-jackalope-uses-a-window",
+    "date": "2026-11-19",
+    "title": "Keep working while Jackalope uses a window.",
+    "description": "Desktop control keeps going in the background while you use other apps, and work that isn't about code skips the code setup.",
+    "items": [
+      "Switch to other apps or move the window, and Jackalope keeps reading it and using its buttons and fields. Clicks at a spot on screen and key presses wait until you bring the window back.",
+      "Only clicking or typing in the granted window pauses control. Typing in other apps never does.",
+      "If a turn ends while control is paused, the window's badge shows Resume. Click it and Jackalope carries on without you typing anything.",
+      "Checking a web page, a connection or an attached window runs right in your project folder, with no worktree, setup or checks. Options → Treat as code work switches it back.",
+      "General gives you a place for work that doesn't belong to any project."
+    ],
+    "note": "Background control works on Windows and macOS. On Linux X11, any input still pauses it."
+  },
+  {
+    "id": "hand-an-agent-a-window",
+    "date": "2026-11-19",
+    "title": "Hand an agent a window.",
+    "description": "Drag the agent out of a conversation and drop it on any window to let it see that window, or see and control it.",
+    "items": [
+      "Jackalope names the window under your pointer and asks before giving any access.",
+      "See-only lets the agent read and screenshot the window without clicking or typing.",
+      "Prefer the keyboard? Press Enter on the agent to pick from a list of open windows."
+    ],
+    "note": "The drag works on Windows and macOS. Linux X11 uses the window list, and Wayland keeps the system picker."
+  },
+  {
+    "id": "inbox-library-and-a-sidebar-you-can-arrange",
+    "date": "2026-11-19",
+    "title": "Inbox, Library and a sidebar you can arrange.",
+    "description": "Inbox gathers what needs you across projects, and Library collects the screenshots and files your work made.",
+    "items": [
+      "Pin projects and conversations as favorites, pin work to the top of a project, and group work into folders.",
+      "Inbox shows questions, failed checks, reviews, new results and app alerts like a low allowance in one place.",
+      "Library filters by project and kind and remembers your choice.",
+      "Switch or create branches from the branch menu in the status bar.",
+      "A project with no work yet shows starting points and its pages instead of an empty list."
+    ]
+  },
+  {
+    "id": "talk-instead-of-typing",
+    "date": "2026-11-19",
+    "title": "Talk instead of typing.",
+    "description": "Every composer has a mic button that turns speech into text on your computer.",
+    "items": [
+      "Pick a Fast, Balanced or Most accurate Whisper model the first time you use it. It downloads once and resumes if interrupted.",
+      "Recordings stay on your computer and aren't saved.",
+      "Your own local transcription server still works as an option in Settings."
+    ]
+  },
+  {
     "id": "back-and-forward-and-settings-that-stay-in-settings",
     "date": "2026-11-16",
     "title": "Back and Forward, and settings that stay in Settings",

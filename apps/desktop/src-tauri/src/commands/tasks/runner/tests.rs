@@ -64,6 +64,7 @@ impl computers::Transport for StandIn {
 fn request(id: &str, workspace: &Path) -> RunRequest {
     RunRequest {
         retry_of: None,
+        handoff_focus: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -82,6 +83,7 @@ fn request(id: &str, workspace: &Path) -> RunRequest {
         prepare_command: None,
         setup_files: Vec::new(),
         auto_verify: false,
+        non_code: false,
         target_branch: None,
         account_binding: None,
         model: None,

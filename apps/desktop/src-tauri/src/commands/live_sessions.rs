@@ -493,9 +493,14 @@ impl LiveSessions {
             let target = super::tasks::resolve_target_branch(
                 &request.project_path,
                 request.target_branch.as_deref(),
-            )?;
+            );
             request.isolated = true;
-            request.target_branch = Some(target);
+            // Non-code work stays on whatever is checked out, so it needs no target.
+            request.target_branch = if request.non_code {
+                target.ok()
+            } else {
+                Some(target?)
+            };
         }
         request.previous_run_id = None;
         request.prompt = "Live session".into();
@@ -1232,7 +1237,9 @@ fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory
     if session.continues.is_some() {
         prompt.push_str("The person started this conversation outside Jackalope and continues it here. You are working directly in their own checkout, not in a worktree Jackalope made.\n");
     }
-    if !session.request.isolated && session.request.target_branch.is_none() {
+    if session.request.non_code {
+        prompt.push_str("This is not code work: Jackalope prepared no worktree, setup or automatic checks, and you are working in the folder as it is. Use your browser, desktop, connection and other tools as the messages need. Do not edit, create or delete files, install dependencies or run builds unless a message asks for it.\n");
+    } else if !session.request.isolated && session.request.target_branch.is_none() {
         prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");
     }
     for message in messages {

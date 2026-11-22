@@ -1,7 +1,8 @@
 # Current capabilities and limits
 
-Jackalope is prerelease software. This page describes source behavior, not a record
-of completed trials or deployed environments. See [contributor priorities](TODO.md)
+Jackalope is publicly available for Windows, macOS and Linux, with open signup.
+This page describes source behavior, not a record of completed trials or deployed
+environments. See [contributor priorities](TODO.md)
 and [release requirements](RELEASE.md) for outstanding acceptance work.
 
 Provider connections retain per-account models. Private runner settings support
@@ -11,8 +12,9 @@ evidence; catalog facts do not prove quality, credit or upstream freshness.
 Experiment settings share a versioned registry. Optional DeepSeek request metering,
 quality-study feasibility planning and isolated warm API helpers support screening;
 representative benefit and installed-platform acceptance remain open.
-OpenCode tasks locally compact recognized passing-test output by default while
-retaining exact recovery files and diagnostics. Other adapters retain their native
+OpenCode tasks locally compact recognized passing test and build output (pytest,
+Node TAP, Jest, Vitest, Playwright, Cargo, Go, TypeScript) by default while
+retaining exact recovery files and diagnostics; failing or flaky runs stay whole. Other adapters retain their native
 shell output. Fresh-profile setup costs and representative task benefits need
 separate acceptance; smaller responses do not establish general cost or speed gains.
 
@@ -20,9 +22,22 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 - Work is the shared entry point for conversations, tasks and plans. The sidebar
   lists projects as a tree of their work, needs-you first, then running and recent;
-  a project row opens that project's work and its menu opens project pages. The title
-  bar holds command search; the bottom bar shows the focused project, branch, local
-  activity and visual account allowances with freshness and reset times.
+  a project row opens that project's work and its menu opens project pages, including
+  Appearance. Favorites sit above the tree as tiles sized by how many there are; pinned
+  work stays at the top of its project and folders group a project's work, all saved
+  locally. A project with no work shows a launchpad of starting points and project pages.
+  The sidebar and the Work project switcher offer General, a place without a project for
+  work such as operating a web page or checking a connection; once added it lists like
+  any project.
+  Inbox gathers work that needs the person, new results, app alerts (including low
+  allowances), running work and pull requests waiting on others across projects. Library
+  shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
+  attachments and images or PDFs a task's latest workspace changed, filtered by project
+  and kind. The title bar holds command search; the bottom bar shows the focused project,
+  branch, local activity and visual account allowances with freshness and reset times.
+  The branch menu switches the project checkout to a local or remote branch or creates
+  one at the current commit; switching needs a clean checkout and waits for tasks working
+  in it, and a branch held by a task worktree opens that task.
   Settings → Editor & terminal holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
 - Claude Code and Codex conversations people had outside Jackalope (a terminal, another
@@ -31,6 +46,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   left out. Continue in Jackalope starts a conversation that resumes the CLI's session
   directly in the checkout or worktree it ran in. Settings → Privacy turns reading off.
   See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
+- Non-code work (a short request to read or operate a web page or a connection, work on an
+  attached window that names no code, and everything in General) runs in the project folder as it is: no
+  worktree, preparation, automatic checks or planning check, and the agent is told not to
+  edit files unless asked. It does not reserve the checkout. Options → Treat as code work
+  overrides the guess. General is a plain folder in Jackalope's data directory, never a
+  Git repository. See [capture and context](CORE-WORKFLOW.md#capture-and-context).
 - The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
   text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
   Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
@@ -39,8 +60,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
   prompts and commands can apply to all projects or one project; commands require an
-  explicit Run action. Optional dictation inserts editable text through a separately
-  configured loopback transcription service and never sends the task automatically.
+  explicit Run action. Voice to text inserts editable text at the cursor and never sends
+  the task automatically. It transcribes on the computer with a downloaded Whisper model
+  (base, small or large-v3-turbo, pinned and checksum-verified, Metal on macOS); a
+  configured loopback transcription service remains an option. Native microphone and
+  download acceptance remain open.
 - Idle-sleep prevention supports off, active-work and app-open modes using native
   Windows, macOS and Linux APIs, and starts on active work, so an agent run is not cut
   short by the computer idling to sleep. macOS retains native traffic lights and application
@@ -55,6 +79,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
+- A new task worktree with a preparation command first clones the checkout's installed
+  `node_modules` folders copy-on-write (APFS `clonefile`, Linux `FICLONE`) when both
+  checkouts' dependency manifests match; the command still runs. Other volumes and
+  Windows install in full, never by byte copy. Native acceptance remains open.
 - The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
@@ -279,14 +307,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
+  Provider refusals never trigger handoff. Retrying a quota-stopped attempt continues
+  its worktree changes with an optional focus line; the handoff context sent is kept
+  on the attempt.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.
   An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
   Add agent lists known ACP CLIs by name (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
-  Auggie, Kiro, Hermes Agent and Command Code), marks the ones found on this computer and
-  fills in their path and arguments, which stay editable. None of these has been run
-  through Jackalope in an installed app.
+  Auggie, Kiro, Hermes Agent, Command Code and Oh My Pi), marks the ones found on this
+  computer and fills in their path and arguments, which stay editable. None of these has
+  been run through Jackalope in an installed app.
   First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
@@ -330,11 +361,20 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   them, and lets ready planned and swarm results merge too. Such projects push each
   merged branch head to their linked Artifacts repository and, when the policy has a
   `deploy` section, deploy it from a clean checkout with an optional check and rollback;
-  a failed deploy pauses automatic merging. Source worktrees remain
+  a failed deploy pauses automatic merging. Before an automatic merge is applied, the
+  saved check runs on the combined result in a temporary worktree unless a task's own
+  passing check already covers exactly that tree; a failing combination is not merged
+  and waits for the person with the output on each task. Merging from Review & merge by
+  hand does not run it, the running check is not shown, and installed-app acceptance
+  of the combined check remains open. Source worktrees remain
   available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
+- The queue's limit on agents at once on this device is Automatic by default: one per two
+  CPUs and per 4 GiB of memory, whichever allows fewer, from 1 to 16, marked as
+  recommended in the menu. A chosen number (1 to 16) is saved and kept, with a note
+  above the recommendation; swarm placement and plan size use the effective limit.
 - New tasks can assess focused work, investigation or a plan through the project's
   Decisions preference. Substantial requests are split into subtasks that start
   without a review click by default; a project setting or Review before starting
@@ -392,7 +432,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
-  Chat supports per-request lesson opt-outs. Automatic review lessons require a later
+  Chat supports per-request lesson opt-outs. Cursor, Windsurf, Cline and GitHub Copilot
+  rule files in the project are offered as paused lessons that tasks receive only after
+  being turned on. Automatic review lessons require a later
   accepted revision and a successful check of the accepted tree; unresolved notes
   remain visible without entering task context.
 - Per-project background learning, on by default: local reflection every 50 reported
@@ -428,6 +470,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   apps and the user's logged-in browser with a one-window, one-app or full-desktop
   grant; window and app grants can be remembered per project, browser sites are asked
   once each, and actions target accessibility element refs through a resident helper.
+  On Windows and macOS window and app grants keep working while the person uses other
+  apps: reads, captures and element actions continue in the background, input that
+  needs the window in front waits for it, and only the person's clicks, scrolls or keys
+  in the granted window pause control. Paused calls wait for Resume instead of failing.
 - Connected apps link the user's own Composio project. The project key and Composio
   identifiers stay in protected storage; apps connect through Composio's hosted sign-in
   in the user's browser, and one managed on-demand connection delivers them to every
@@ -646,22 +692,34 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Shared appearance, guided onboarding, task notifications, optional settings sync
   and opt-in learned-lesson sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
+- Skill Sync on the Skills page in Agents: it lists personal and project agent skills
+  (folders with a `SKILL.md` in the Claude Code, Codex and shared `.agents` skill
+  folders) and syncs the ones the person chooses through their account. It is off by
+  default, needs settings sync, matches project skills by repository root commits instead
+  of paths, never writes into tracked files and adds new project skills to the
+  repository's local exclude file. Committed, oversized, binary or credential-like
+  skills stay local. Edits on two computers become a conflict the person resolves. Synced
+  skill text is not end-to-end encrypted. Two-desktop acceptance in the installed app is
+  pending. There is no skills directory: **Export a copy** writes a folder to share, and
+  Browse is marked Coming later. See [settings sync](SETTINGS-SYNC.md#skills).
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
 
 ## Services and distribution
 
-The website download page lists Windows, macOS and Linux availability, prioritizes
+The website download page lists Windows, macOS and Linux downloads, prioritizes
 the visitor's likely desktop platform and explains free signup with email
-confirmation. With the service's open-signup switch on, confirming the email
-approves the account and signs the person in; with it off, owner approval and
-friend passes still apply. Acceptance emails lead through explicit email confirmation on that page.
-Unconfigured platforms remain Coming soon; page visits never start a download.
+confirmation. The service's `OPEN_SIGNUP` switch is on in the tracked production
+configuration: confirming the email approves the account and signs the person in.
+With it off (waitlist mode), owner approval and friend passes apply instead.
+Acceptance emails lead through explicit email confirmation on that page. A platform
+without a configured download shows Coming soon; page visits never start a download.
 
-Verified waitlist members can connect the desktop to see their queue position,
-referral progress and share link, with website and tour links before approval.
-Connections persist across restarts and detect approval; offline progress remains
-labeled and cannot authorize execution. Installed and deployed acceptance remain open.
+In waitlist mode, verified waitlist members can connect the desktop to see their
+queue position, referral progress and share link, with website and tour links before
+approval. Connections persist across restarts and detect approval; offline progress
+remains labeled and cannot authorize execution. Installed and deployed acceptance of
+waitlist mode remain open.
 
 New execution requires approved account access in every desktop build. Previously
 verified accounts retain bounded offline access; saved work remains reviewable after
@@ -787,7 +845,13 @@ RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants 
 AT-SPI element actions, portal input and Screenshot-portal captures; physical input
 does not pause control there, and wlroots desktops without RemoteDesktop remain
 unavailable. The portal client compiles only in Linux CI and has no real-portal
-fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+fixture. XWayland alone is insufficient. A person can attach a window to a conversation, or
+to new work before Send, by dragging its agent onto it (Windows and macOS) or picking it
+from a list, choosing see-only or see-and-control; the agent's next window request uses it
+without asking. On Windows and macOS the window wears a badge and edge while it waits, and a
+turn that ends while its grant is paused leaves a Resume button there that continues the
+conversation. The cross-app drag, badge and background control have unit and
+browser-fixture coverage only. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,

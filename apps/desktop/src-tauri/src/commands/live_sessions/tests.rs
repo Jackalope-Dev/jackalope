@@ -774,3 +774,31 @@ fn bot_persona_is_repeated_in_every_batch_and_stays_out_of_the_transcript() {
         )
         .is_err());
 }
+
+#[test]
+fn non_code_conversations_are_saved_as_such_and_told_to_leave_files_alone() {
+    let (_root, service, existing) = fixture();
+    let mut request = service.snapshot(None).unwrap().sessions[0].request.clone();
+    request.non_code = true;
+    let id = Uuid::new_v4().to_string();
+    service
+        .create(
+            id.clone(),
+            String::new(),
+            request,
+            Some(FirstMessage {
+                id: Uuid::new_v4().to_string(),
+                text: "Check that the website's signup page loads".into(),
+                origin: None,
+            }),
+        )
+        .unwrap();
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    let session = saved.sessions.iter().find(|s| s.id == id).unwrap();
+    assert!(session.request.non_code);
+    let messages = session.messages.iter().collect::<Vec<_>>();
+    assert!(batch_prompt(session, &messages).contains("This is not code work"));
+    let code = saved.sessions.iter().find(|s| s.id == existing).unwrap();
+    assert!(!code.request.non_code);
+    assert!(!batch_prompt(code, &[]).contains("not code work"));
+}

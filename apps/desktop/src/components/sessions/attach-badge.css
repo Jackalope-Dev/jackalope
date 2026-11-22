@@ -1,0 +1,244 @@
+.attach-badge {
+  --badge-surface: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 2px;
+  color: var(--color-text-primary);
+  font-size: var(--text-xs);
+  animation: attach-badge-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes attach-badge-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.85);
+  }
+}
+.attach-badge-dock {
+  display: flex;
+  align-items: center;
+  justify-self: center;
+  max-width: 100%;
+}
+/* The agent itself sits on the window's edge, overlapping its pill. */
+.attach-badge-agent {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin-right: -14px;
+  flex: none;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--color-accent) 70%, transparent))
+    drop-shadow(0 3px 6px rgb(0 0 0 / 0.25));
+  animation: attach-badge-land 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.attach-badge-agent[data-bounce] {
+  animation: attach-badge-hop 640ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes attach-badge-land {
+  0% {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.12, 0.86);
+  }
+}
+@keyframes attach-badge-hop {
+  30% {
+    transform: translateY(-12px) scale(0.94, 1.08);
+  }
+  60% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+}
+.attach-badge-bar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 34px;
+  padding: 0 4px 0 18px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: var(--radius-full);
+  background: var(--badge-surface);
+  box-shadow:
+    0 4px 14px rgb(0 0 0 / 0.18),
+    0 0 18px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.attach-badge-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.attach-badge-main:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+}
+.attach-badge-mode {
+  flex: none;
+  color: var(--color-accent-ink);
+}
+.attach-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-badge-text strong {
+  color: var(--color-accent-ink);
+}
+.attach-badge-chevron {
+  flex: none;
+  color: var(--color-text-secondary);
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+.attach-badge[data-open] .attach-badge-chevron {
+  transform: rotate(180deg);
+}
+.attach-badge-icon,
+.attach-badge-send,
+.attach-badge-link {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.attach-badge-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+  height: 26px;
+  margin: 0 2px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.attach-badge-resume:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+.attach-badge-resumed {
+  margin: 0 6px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.attach-badge-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+.attach-badge-icon:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 9%, transparent);
+  color: var(--color-text-primary);
+}
+.attach-badge-ask {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--badge-surface);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.2);
+  animation: attach-badge-in 240ms var(--ease-out);
+}
+.attach-badge-ask textarea {
+  width: 100%;
+  min-height: 48px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.attach-badge-ask textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.attach-badge-ask:focus-within {
+  border-color: var(--color-border-focus);
+}
+.attach-badge-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.attach-badge-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-badge-error {
+  color: var(--color-danger);
+}
+.attach-badge-link {
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent-ink);
+}
+.attach-badge-link:hover {
+  text-decoration: underline;
+}
+.attach-badge-send {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+.attach-badge-send:disabled {
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  cursor: default;
+}
+:is(.attach-badge-main, .attach-badge-icon, .attach-badge-link, .attach-badge-send):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .attach-badge,
+  .attach-badge-agent,
+  .attach-badge-ask {
+    animation: none;
+  }
+  .attach-badge-chevron {
+    transition: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .attach-badge {
+    --badge-surface: var(--color-surface-elevated);
+  }
+  .attach-badge-bar {
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  }
+}

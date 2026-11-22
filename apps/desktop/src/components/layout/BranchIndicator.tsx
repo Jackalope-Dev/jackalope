@@ -1,7 +1,10 @@
-import { Button, CopyButton, Popover } from '@jackalope/ui';
-import { ChevronDown, GitBranch } from 'lucide-react';
+import { describeError } from '@jackalope/contracts/errors';
+import { Button, CopyButton, InlineNotice, Input, Popover, SearchField } from '@jackalope/ui';
+import { Check, ChevronDown, GitBranch, Plus } from 'lucide-react';
+import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
+import { type BranchList, listBranches, switchBranch } from '../../lib/git-branches';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
 import { openWork, selectWork, useWorkspaceWork } from '../../lib/work-selection';
@@ -10,7 +13,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useActiveProject } from '../../stores/projectStore';
+import { type Project, useActiveProject, useProjectStore } from '../../stores/projectStore';
 
 /**
  * The project, remote host and the work in focus: the selected task, plan or
@@ -46,62 +49,276 @@ export function useFocusedWork() {
   return { host, project, run, managed, checkout };
 }
 
-const MAX_SWITCH_TARGETS = 8;
-
 /** Older task branches end in a generated id; its first eight characters still tell them apart. */
 function branchLabel(branch: string) {
   return branch.replace(/(^|\/)([0-9a-f]{8})(?:-[0-9a-f]{1,4}){2,4}[0-9a-f-]*$/i, '$1$2');
 }
 const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
 
+interface BranchRow {
+  key: string;
+  branch: string;
+  /** Beneath the branch: the task using it, or why it cannot be picked. */
+  detail?: string;
+  current?: boolean;
+  /** Undefined when another worktree that Jackalope did not start holds the branch. */
+  pick?: () => void;
+}
+
 /**
- * Checkouts the header can focus instead: the project folder and each task or
- * chat worktree that still exists. Switching changes focus, never `git checkout`.
+ * The project checkout's branches. Picking one switches the checkout with `git switch`;
+ * a branch a task worktree holds opens that task instead. New branch names one to
+ * create at the current commit.
  */
-function useSwitchTargets(checkout: string) {
+function BranchPicker({
+  project,
+  inCheckout,
+  input,
+  creating,
+  setCreating,
+  close,
+}: {
+  project: Project;
+  /** Whether the project checkout, not a task worktree, is in focus. */
+  inCheckout: boolean;
+  input: RefObject<HTMLInputElement | null>;
+  /** The new branch name being entered, or null while filtering; Escape leaves it in the popover. */
+  creating: string | null;
+  setCreating: (name: string | null) => void;
+  close: () => void;
+}) {
   const work = useWorkspaceWork();
-  const project = useActiveProject();
-  if (!project) return [];
-  const existing = project.worktrees ?? [];
-  const seen = new Set([checkout]);
-  const targets: { key: string; branch: string; label: string; open: () => void }[] = [];
-  if (!samePath(checkout, project.path)) {
-    seen.add(project.path);
-    targets.push({
-      key: project.path,
-      branch: project.plainFolder ? 'No Git' : project.gitBranch || 'Branch unknown',
-      label: 'Project checkout',
-      open: () => {
-        selectWork();
-      },
-    });
+  const list = useRef<HTMLUListElement>(null);
+  const [branches, setBranches] = useState<BranchList | null>(null);
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let current = true;
+    listBranches(project.path).then(
+      (next) => current && setBranches(next),
+      (reason) => current && setError(describeError(reason)),
+    );
+    return () => {
+      current = false;
+    };
+  }, [project.path]);
+
+  const focusCheckout = () => {
+    if (!inCheckout) {
+      selectWork();
+      navigateWorkspace('kanban');
+    }
+  };
+  const change = async (branch: string, create: boolean) => {
+    setBusy(true);
+    setError('');
+    try {
+      const now = await switchBranch(project.path, branch, create);
+      const store = useProjectStore.getState();
+      store.updateProject(project.id, { gitBranch: now });
+      void store.loadWorktreesForActiveProject();
+      focusCheckout();
+      close();
+    } catch (reason) {
+      setError(describeError(reason));
+      setBusy(false);
+    }
+  };
+
+  const needle = query.trim().toLowerCase();
+  const rows: BranchRow[] = [];
+  if (branches) {
+    for (const branch of branches.local) {
+      if (needle && !branch.name.toLowerCase().includes(needle)) continue;
+      const holder = branch.worktree;
+      const task = holder
+        ? work.find((item) => {
+            const path = item.run?.workspace?.trim();
+            return (
+              !item.managed && item.run?.projectId === project.id && path && samePath(path, holder)
+            );
+          })
+        : undefined;
+      rows.push({
+        key: `local:${branch.name}`,
+        branch: branch.name,
+        current: branch.name === branches.current,
+        detail: task ? task.title : holder ? `Checked out in ${holder}` : undefined,
+        pick:
+          branch.name === branches.current
+            ? () => {
+                focusCheckout();
+                close();
+              }
+            : task
+              ? () => {
+                  openWork(task);
+                  navigateWorkspace('kanban');
+                  close();
+                }
+              : holder
+                ? undefined
+                : () => change(branch.name, false),
+      });
+    }
+    for (const name of branches.remote) {
+      if (needle && !name.toLowerCase().includes(needle)) continue;
+      rows.push({ key: `remote:${name}`, branch: name, pick: () => change(name, false) });
+    }
+    const exact = rows.findIndex((row) => row.branch.toLowerCase() === needle);
+    if (exact > 0) rows.unshift(...rows.splice(exact, 1));
   }
-  for (const item of work) {
-    const run = item.run;
-    const path = run?.workspace?.trim();
-    if (!run || !path || item.managed || run.projectId !== project.id) continue;
-    if ([...seen].some((known) => samePath(known, path))) continue;
-    // Before the worktree list loads, finished work is the likeliest to have been cleaned up.
-    const present = existing.length
-      ? existing.some((entry) => samePath(entry.path, path))
-      : item.stage !== 'finished';
-    if (!present) continue;
-    seen.add(path);
-    targets.push({
-      key: path,
-      branch: run.branch || 'Branch unknown',
-      label: item.title,
-      open: () => openWork(item),
-    });
-    if (targets.length >= MAX_SWITCH_TARGETS) break;
+  const startCreating = (name: string) => {
+    setError('');
+    setCreating(name);
+    requestAnimationFrame(() => input.current?.focus());
+  };
+  const from = branches?.current || 'the current commit';
+
+  const buttons = () =>
+    [...(list.current?.querySelectorAll('button:not(:disabled)') ?? [])] as HTMLButtonElement[];
+  const onInputKey = (event: KeyboardEvent) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      buttons()[0]?.focus();
+    } else if (event.key === 'Enter' && !busy) {
+      event.preventDefault();
+      const first = rows.find((row) => row.pick);
+      if (first) first.pick?.();
+      else if (query.trim()) startCreating(query.trim());
+    }
+  };
+  const onListKey = (event: KeyboardEvent) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const all = buttons();
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    const next = at + (event.key === 'ArrowDown' ? 1 : -1);
+    if (next < 0) input.current?.focus();
+    else all[Math.min(next, all.length - 1)]?.focus();
+  };
+
+  if (creating !== null) {
+    const name = creating.trim();
+    const create = () => {
+      if (name && !busy) void change(name, true);
+    };
+    return (
+      <section className="branch-switch" aria-labelledby="branch-create-heading">
+        <div className="branch-switch-heading">
+          <h3 id="branch-create-heading">New branch</h3>
+        </div>
+        <Input
+          ref={input}
+          value={creating}
+          onChange={(event) => setCreating(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              create();
+            }
+          }}
+          placeholder="Branch name"
+          aria-label="New branch name"
+          aria-describedby="branch-create-from"
+          disabled={busy}
+        />
+        <p id="branch-create-from" className="branch-details-note">
+          {branches?.changed
+            ? `Starts from ${from} and takes your uncommitted changes with it.`
+            : `Starts from ${from}.`}
+        </p>
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <div className="branch-create-actions">
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setCreating(null)}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={!name} loading={busy} onClick={create}>
+            Create and switch
+          </Button>
+        </div>
+      </section>
+    );
   }
-  return targets;
+
+  return (
+    <section className="branch-switch" aria-labelledby="branch-switch-heading">
+      <div className="branch-switch-heading">
+        <h3 id="branch-switch-heading">Project branches</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || !branches}
+          onClick={() => startCreating('')}
+        >
+          <Plus size={14} aria-hidden="true" />
+          New branch
+        </Button>
+      </div>
+      <SearchField
+        ref={input}
+        value={query}
+        onValueChange={setQuery}
+        onKeyDown={onInputKey}
+        placeholder="Filter branches"
+        aria-label="Filter branches"
+        aria-controls="branch-switch-list"
+        disabled={busy}
+      />
+      {branches?.changed && !error && (
+        <p className="branch-details-note">
+          This checkout has uncommitted changes. Commit them before switching, or create a new
+          branch to take them with you.
+        </p>
+      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {!branches && !error && <p className="branch-details-note">Loading branches…</p>}
+      {branches && rows.length === 0 && (
+        <div className="branch-switch-empty">
+          <p className="branch-details-note">No branches match.</p>
+          {query.trim() && (
+            <Button variant="secondary" size="sm" onClick={() => startCreating(query.trim())}>
+              <Plus size={14} aria-hidden="true" />
+              Create {query.trim()}
+            </Button>
+          )}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <ul id="branch-switch-list" ref={list} onKeyDown={onListKey}>
+          {rows.map((row) => (
+            <li key={row.key}>
+              <button
+                type="button"
+                className="branch-switch-item"
+                aria-current={row.current || undefined}
+                disabled={busy || !row.pick}
+                title={row.branch}
+                onClick={row.pick}
+              >
+                <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
+                <span className="branch-switch-label">{branchLabel(row.branch)}</span>
+                {row.detail && <span className="branch-switch-name">{row.detail}</span>}
+                {row.current && (
+                  <Check size={14} aria-label="Checked out" className="branch-switch-check" />
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 /** The branch in focus, in the status bar; the page header names the scope, so the trigger names the project only in its label. */
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
-  const targets = useSwitchTargets(checkout);
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState<string | null>(null);
+  const search = useRef<HTMLInputElement>(null);
   if (!project || host) return null;
   const branch = run
     ? run.branch ||
@@ -114,7 +331,13 @@ export function BranchIndicator() {
   const copyableBranch = run ? run.branch : !managed ? project.gitBranch : '';
   const location = run ? run.workspace : project.path;
   return (
-    <Popover.Root>
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setCreating(null);
+      }}
+    >
       <Popover.Trigger asChild>
         <button
           type="button"
@@ -134,6 +357,16 @@ export function BranchIndicator() {
           align="start"
           sideOffset={6}
           collisionPadding={12}
+          onEscapeKeyDown={(event) => {
+            if (creating === null) return;
+            event.preventDefault();
+            setCreating(null);
+          }}
+          onOpenAutoFocus={(event) => {
+            if (!search.current) return;
+            event.preventDefault();
+            search.current.focus();
+          }}
         >
           <h2 className="branch-details-title">
             {run ? 'Task workspace' : managed ? 'Plan workspaces' : 'Project checkout'}
@@ -165,31 +398,18 @@ export function BranchIndicator() {
               </div>
             </dl>
           )}
-          {targets.length > 0 && (
-            <section className="branch-switch" aria-labelledby="branch-switch-heading">
-              <h3 id="branch-switch-heading">Switch to</h3>
-              <ul>
-                {targets.map((target) => (
-                  <li key={target.key}>
-                    <Popover.Close asChild>
-                      <button
-                        type="button"
-                        className="branch-switch-item"
-                        title={target.key}
-                        onClick={() => {
-                          target.open();
-                          navigateWorkspace('kanban');
-                        }}
-                      >
-                        <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
-                        <span className="branch-switch-label">{target.label}</span>
-                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
-                      </button>
-                    </Popover.Close>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {!project.plainFolder && (
+            <BranchPicker
+              project={project}
+              inCheckout={!managed && samePath(checkout, project.path)}
+              input={search}
+              creating={creating}
+              setCreating={setCreating}
+              close={() => {
+                setOpen(false);
+                setCreating(null);
+              }}
+            />
           )}
           <div className="branch-actions">
             {!managed && (

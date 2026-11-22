@@ -68,7 +68,7 @@ One background sweep runs every 30 seconds. It closes the cached connection of a
 computer unused for five minutes, and stops a local sandbox that is unheld and idle past
 its **Stop when idle** time: 5, 10 (the default), 30 or 60 minutes, or Never, set in the
 bot's settings or per computer in Settings → Computers. The setting applies at once and
-never recreates the container. Stopping is `docker stop`: the container and its home
+never recreates the container. Stopping is `docker stop`, so the container and its home
 volume stay. It first closes the computer's agent connection and any task browser
 attached to its Chromium, so their next use reconnects and starts the computer again.
 The status then reads **Stopped (idle)** with "Stopped after N minutes idle". A use that
@@ -234,7 +234,7 @@ The command is the local one translated: the program is the CLI on the computer'
 local paths and profile directories are dropped, and the computer is the sandbox, so
 Claude Code runs with `--permission-mode bypassPermissions` and Codex with
 `sandbox_mode="danger-full-access"`. Persistent Claude Code sessions are not used
-remotely. The agent CLI does not need to be installed on this device: for a project with
+remotely. The agent CLI does not need to be installed on this device. For a project with
 a computer, launch checks only the agent's adapter and model settings, and this device's
 account profiles are neither required nor checked. Automatic routing still chooses among
 agents installed here; for a fork that must stay on a computer (see
@@ -283,7 +283,8 @@ added computers places every fork where it ran before the pool existed: on the p
 computer when it has one, otherwise on this device. The choice is offered once there is
 a computer to run on.
 
-Each host has a concurrency limit. This device keeps the queue's limit of one to six;
+Each host has a concurrency limit. This device keeps the queue's limit (Automatic by
+default, or 1 to 16);
 computers together keep the queue's limit on agents on computers (8 by default). The
 project's computer may take up to that shared limit whatever its runner reports. An
 added computer takes the `slots` (1 to 32) its runner reports in `hello` or
@@ -511,7 +512,7 @@ is refused rather than run against this device's copy:
 | Directly delivered connections | Not bridge tools | Withheld | Withheld |
 
 A read-only attempt (a planner, a swarm orchestrator) keeps the workspace tools on this
-device: it changes nothing, so this device's copy is what it reads, and the plan's check
+device. It changes nothing, so this device's copy is what it reads, and the plan's check
 result is recorded where the planning round reads it. `peer_adopt` applies another
 attempt's changes to this device's copy while the agent edits the computer's, which
 would break the single writer of each workspace and be overwritten or conflict when the
@@ -793,7 +794,7 @@ The image is Jackalope's own definition; it uses no Cua code. It installs Debian
 packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, under their
 own licenses, plus Git and Node with the Codex CLI and agent-browser (at the version the
 desktop bundles, checked in `build.rs`) from npm for agents on a computer.
-Claude Code's license does not allow redistributing it, so it is not in the image: the
+Claude Code's license does not allow redistributing it, so it is not in the image. The
 first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
 volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking. The
 first run with a connection that needs `uvx` or `uv` installs uv the same way, from the

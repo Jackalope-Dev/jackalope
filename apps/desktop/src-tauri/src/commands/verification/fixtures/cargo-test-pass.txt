@@ -1,0 +1,40 @@
+   Compiling proc-macro2 v1.0.86
+   Compiling unicode-ident v1.0.12
+   Compiling serde v1.0.204
+   Compiling quote v1.0.36
+   Compiling syn v2.0.72
+   Compiling serde_derive v1.0.204
+    Checking memchr v2.7.4
+   Compiling ledger v0.3.1 (/home/dev/ledger)
+warning: unused import: `std::collections::HashMap`
+ --> src/report.rs:3:5
+  |
+3 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `ledger` (lib test) generated 1 warning (run `cargo fix --lib -p ledger --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.82s
+     Running unittests src/lib.rs (target/debug/deps/ledger-4f1c2a9e8b7d6c5a)
+
+running 9 tests
+test account::tests::opens_with_zero_balance ... ok
+test account::tests::rejects_negative_deposit ... ok
+test account::tests::applies_deposits_in_order ... ok
+test ledger::tests::balances_after_transfer ... ok
+test ledger::tests::rejects_overdraft ... ok
+test ledger::tests::slow_reconciliation ... ignored, needs fixture database
+test report::tests::formats_currency ... ok
+test report::tests::groups_by_month ... ok
+test report::tests::handles_empty_ledger ... ok
+
+test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests ledger
+
+running 2 tests
+test src/account.rs - account::Account::deposit (line 41) ... ok
+test src/lib.rs - (line 7) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s

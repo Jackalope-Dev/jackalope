@@ -60,6 +60,7 @@ const emptyQueue: QueueView = {
   messages: [],
   enabledProjects: [],
   concurrency: 3,
+  automaticConcurrency: true,
   remoteConcurrency: 8,
   bridgeUrl: null,
   bridgeError: null,
@@ -100,6 +101,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     };
   }, [desktop, project.id]);
   const remoteConcurrency = queue.remoteConcurrency ?? 8;
+  const recommended = queue.recommendedConcurrency;
+  const automatic = queue.automaticConcurrency ?? false;
+  const crowded = !automatic && recommended !== undefined && queue.concurrency > recommended;
   const load = async () => {
     if (desktop) setQueue(await queueSnapshot());
     setLoading(false);
@@ -289,24 +293,36 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 <Select
                   id="projectqueue-field-2"
                   aria-label="Concurrent tasks"
+                  aria-describedby={crowded ? 'projectqueue-limit-note' : undefined}
                   className="task-input"
-                  value={String(queue.concurrency)}
+                  value={automatic ? 'automatic' : String(queue.concurrency)}
                   disabled={busy || !desktop}
                   onValueChange={(value) =>
                     void act('queue_dispatch', {
                       projectId: project.id,
                       enabled,
-                      concurrency: Number(value),
+                      concurrency: value === 'automatic' ? value : Number(value),
                     })
                   }
                 >
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <SelectItem value="automatic">
+                    {recommended ? `Automatic (${recommended} on this computer)` : 'Automatic'}
+                  </SelectItem>
+                  {Array.from(
+                    { length: Math.max(queue.maxConcurrency ?? 6, queue.concurrency) },
+                    (_, i) => i + 1,
+                  ).map((n) => (
                     <SelectItem key={n} value={String(n)}>
-                      {n} across projects
+                      {n} across projects{n === recommended ? ' (recommended)' : ''}
                     </SelectItem>
                   ))}
                 </Select>
               </label>
+              {crowded && (
+                <p id="projectqueue-limit-note" className="task-label queue-limit-note">
+                  More than {recommended} at once may slow this computer down.
+                </p>
+              )}
               {onComputer && (
                 <label htmlFor="projectqueue-remote-limit" className="task-label">
                   <span className="inline-flex items-center gap-2">
@@ -322,7 +338,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                       void act('queue_dispatch', {
                         projectId: project.id,
                         enabled,
-                        concurrency: queue.concurrency,
                         remoteConcurrency: Number(value),
                       })
                     }
@@ -352,7 +367,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 void act('queue_dispatch', {
                   projectId: project.id,
                   enabled: !enabled,
-                  concurrency: queue.concurrency,
                 })
               }
             >

@@ -20,10 +20,10 @@ preferences. Legacy account/theme steps without a provisional project resume at
 Project; new Appearance steps resume with their saved draft. No database migration
 is required; the existing persisted-state merge supplies the new optional fields.
 
-Browser pairing can share a verified waitlist membership with the requesting
-desktop. That reports waiting, issues no device credential and grants neither
-execution nor settings access. Pairing expires after ten minutes. After admission,
-the member signs in with their approved email and reconnects if needed.
+In waitlist mode, browser pairing can share a verified waitlist membership with the
+requesting desktop. That reports waiting, issues no device credential and grants
+neither execution nor settings access. Pairing expires after ten minutes. After
+admission, the member signs in with their approved email and reconnects if needed.
 
 ## Preferences and privacy
 
@@ -139,6 +139,131 @@ records. A stale epoch receives `409 lessons_reset`; missing consent receives
 `403 settings_sync_disabled`. Rows are keyed by member ID in D1 and deleted with the
 membership.
 
+## Skills
+
+The **Skills** page in Agents lists the agent skills on this computer and syncs the
+ones the person chooses through their account. A skill is a folder holding a
+`SKILL.md`. Jackalope looks in the personal folders `~/.claude/skills` (or
+`$CLAUDE_CONFIG_DIR/skills`), `$CODEX_HOME/skills` (by default `~/.codex/skills`) and
+`~/.agents/skills`, and in the `.claude/skills` and `.agents/skills` folders of each
+registered project. It skips folder names that start with a dot and the lessons skill
+Jackalope writes for a project. The page can also create a skill from a template,
+import a Markdown file, open or reveal a skill and **Export a copy** to a chosen
+folder. The **Browse and submit skills** section is marked Coming later; there is no
+skills directory.
+
+A synced skill carries its location: personal or project, the agent folder (Claude,
+Codex or the shared `.agents` folder), the skill's folder name and, for a project
+skill, the key derived from the repository's root commits, as for learned lessons. It
+never carries a folder path or remote URL. Each computer writes it to the same agent
+folder: the personal one, or the one in the registered project with the same key. A
+project skill waits on a computer where that project is not registered. Codex skills
+are personal only. A project without a commit cannot sync.
+
+### Consent
+
+Skill sync is off by default and needs settings sync. It starts only after the person
+confirms **Turn on skill sync**, or confirms **Sync skill** for one skill. Turning it on
+writes skills already synced from other computers into their folders here. A local
+skill uploads only after the person chooses to sync it. The choice is saved on the
+desktop for the connected account (a hash of the service and email); connecting a
+different account starts with it off. Without settings sync, the desktop refuses every
+skill sync action except turning it off and deleting synced skills. When the service
+answers `403 settings_sync_disabled`, the desktop turns skill sync and settings sync off.
+
+### What can sync
+
+Only text files inside the skill folder sync. Files and folders whose names start
+with a dot, symbolic links inside the skill, and `node_modules`, `__pycache__` and
+`target` folders are never read. The skill folder itself may be a link. A skill stays on this computer, and its card says why, when it:
+
+- is committed to its repository, fully or partly;
+- has more than 20 files, a file over 96 KB, or more than 24,000 characters in total
+  (counted in UTF-16 units, as the service counts them);
+- would not fit in one request: its files must encode to at most 30,000 bytes of JSON
+  so the request stays under the service's 32 KB limit;
+- holds a file that is not UTF-8 text, a file nested more than two folders deep, or a
+  file name outside letters, digits, `.`, `_` and `-`;
+- has a folder name that is not 1 to 64 lowercase letters, digits, `.`, `_` and `-`;
+- matches a credential pattern: a private key, AWS access key ID, GitHub token,
+  `sk-` key or Slack token, in any file or the description;
+- belongs to a project without a commit.
+
+An untracked skill inside a repository can sync; its card warns that a commit could
+include it.
+
+A synced skill sends its location, the `description` from its `SKILL.md` front matter
+(up to 1,024 characters), each file's relative path and text, and a content hash. The
+service's strict schema refuses any other field, absolute paths, `..`, names that start
+with a dot, paths of more than three parts or 120 characters, a missing `SKILL.md`,
+NUL characters and the same credential patterns. An account holds at most 200 synced
+skills, including removed ones (`413 skills_full`).
+
+### Transfers and conflicts
+
+The native host does all transfers through the existing device credential, rate limits
+and 32 KB request limit. A sync downloads changes since its saved cursor, settles each
+synced skill against this computer's copy, uploads local changes and reports which
+revision this computer holds. It runs when the app starts, every two minutes while skill
+sync is on, on window focus at most once a minute, when the network returns, when
+settings sync or the connected account changes, when the Skills page opens and from
+**Sync now**. Offline or failed syncs keep the saved state and resume. That state lives
+in `task-runs-v1/skills/skill-sync.json`: per account, the epoch, cursor, the last
+exchanged revision and content hash of each synced skill, any account copy not yet
+written, and the devices view.
+
+Every upload names the revision it replaces. The service stores it only when that
+revision is still current; otherwise it answers `conflict` with the current revision.
+Creating a skill that already exists is also a conflict. The desktop writes the account
+copy only when the local copy is missing or unchanged since the last exchange, and
+uploads a local edit only when the account copy has not changed. When both changed, or
+a local skill at the same location differs from the first account copy, the card shows
+**Changed in two places** and nothing is written or uploaded until the person compares
+the copies and picks **Use the account copy** or **Keep this computer's copy**.
+
+Synced content is written only into the skill's folder, and files the account copy no
+longer has are removed. Before writing, Jackalope asks Git whether any file it would
+write or remove is tracked; if one is, it writes nothing and shows the error on the
+card. It never writes through a link. When a sync writes a project skill that was not on
+this computer, Jackalope adds its folder to the repository's `.git/info/exclude`, which
+Git never commits, unless Git already ignores it. New project skills from a template or
+import offer the same **Keep out of commits** choice, on by default, and an untracked
+project skill offers it from its menu.
+
+The page shows which of the account's computers hold each synced skill and whether they
+have the newest revision.
+
+### Stopping and deleting
+
+- **Stop syncing** on one skill removes it from the account at its latest revision.
+  Every computer keeps its current files and stops syncing it. If another computer
+  changed it first, the desktop asks for a sync before trying again.
+- **Turn off on this computer** stops transfers here and keeps the account copies.
+- **Delete synced skills** removes every synced skill and device record from the
+  account and starts a new deletion epoch. Every other desktop's next sync receives
+  `409 skills_reset`, turns skill sync off there and forgets its sync state. Skill files
+  stay on every computer. **Delete synced settings** also deletes synced skills.
+
+Synced skills, like synced settings and learned lessons, are not end-to-end encrypted:
+the service stores their text as JSON in D1, keyed by member ID and deleted with the
+membership. A device's records are deleted with the device.
+
+The service accepts skill sync only from an approved device with settings sync consent,
+except deletion:
+
+- `POST /v1/desktop/skills/pull` with `{epoch, cursor}` returns up to 8 skills changed
+  after the cursor, with the epoch, next cursor and `more`. A first pull sends epoch 0.
+- `POST /v1/desktop/skills/push` with `{epoch, id, baseRevision, deleted, skill}`
+  returns `stored` with the new revision and update time, or `conflict` with the
+  current revision. `baseRevision` is 0 for a new skill; a removal omits `skill`.
+- `POST /v1/desktop/skills/have` with `{epoch, have}` records the revision this device
+  holds of each skill and returns up to 10 of the account's devices and which revision
+  each holds.
+- `DELETE /v1/desktop/skills` deletes every synced skill and advances the epoch.
+
+A stale epoch receives `409 skills_reset`; missing consent receives
+`403 settings_sync_disabled`.
+
 ## Ownership and extension
 
 - `apps/server/src/access/settings.ts` owns the versioned strict schema and
@@ -154,6 +279,14 @@ membership.
   binding, the per-account choice and transfers; `commands/knowledge/learning/sync.rs`
   owns the wire allowlist, merging and exchange state; `src/lib/lesson-sync.ts` and
   `src/stores/lessonSyncStore.ts` own the status view and schedule.
+- Skill sync: `apps/server/src/access/skills.ts` owns the strict schema, limits,
+  revision-checked writes, the devices view and deletion; `commands/skills.rs` owns the
+  page's cards and local skill commands; `commands/skills/detect.rs` owns the skill
+  folders, bounded reading and what blocks a skill; `commands/skills/store.rs` owns the
+  saved sync state, the sync and conflict decisions and every write to disk;
+  `commands/account/skill_sync.rs` owns account binding, the per-account choice and
+  transfers; `src/lib/skill-sync.ts` and `src/stores/skillSyncStore.ts` own the page
+  view and schedule.
 
 Writes use a server revision comparison. A stale writer receives 409. Local and
 remote changes since the saved baseline require an explicit choice; neither
@@ -189,7 +322,17 @@ Migration `0019_lesson_sync.sql` adds the lesson and lesson-history tables and t
 member's lesson sequence and deletion epoch. Apply it before deploying the matching
 Worker; older desktops never call the lesson endpoints.
 
+Migration `0021_skill_sync.sql` adds the synced skill and skill-device tables and the
+member's skill sequence and deletion epoch. Apply it to staging and production before
+deploying the Worker that serves the skill routes. Older desktops never call the skill
+endpoints, and newer desktops report that skill sync is not available when a service
+answers 404.
+
 Server tests cover consent, account isolation, forbidden fields, unknown versions,
 concurrent writes, delete/opt-out behavior and waitlist pairing without admission.
+Skill sync server tests cover consent, account isolation, refused fields and paths,
+revision conflicts, the devices view, deletion epochs and the account limit. Native
+skill tests cover Git classification, blocked skills, credential patterns, merge and
+conflict decisions, refusing tracked writes and the local exclude file.
 Native tests validate the allowlist and old saved accounts. Browser fixtures and
 installed-app acceptance are separate from these tests.

@@ -1,0 +1,518 @@
+/* Inbox is a personal overview rather than a list page: a greeting hero, decision cards
+   on the left and an alerts and activity rail on the right when there is room. */
+.inbox-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.inbox-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding: 22px 24px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background:
+    radial-gradient(120% 160% at 0% 0%, var(--color-accent-subtle), transparent 62%),
+    var(--color-surface-elevated);
+  box-shadow: var(--shadow-surface);
+}
+.inbox-hero[data-caught-up] {
+  background:
+    radial-gradient(
+      120% 160% at 0% 0%,
+      color-mix(in srgb, var(--color-success) 14%, transparent),
+      transparent 62%
+    ),
+    var(--color-surface-elevated);
+}
+.inbox-hero-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.inbox-date {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.inbox-hero h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  line-height: 1.15;
+}
+.inbox-headline {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+.inbox-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Narrow panes keep the greeting compact so the first decision stays in view. */
+@container (max-width: 720px) {
+  .inbox-hero {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+  .inbox-hero h1 {
+    font-size: var(--text-xl);
+  }
+  .inbox-headline {
+    font-size: var(--text-sm);
+  }
+}
+
+.inbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.inbox-project-filter {
+  min-width: 180px;
+}
+
+.inbox-grid {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+@container (min-width: 860px) {
+  .inbox-grid:not([data-single]) {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  }
+}
+.inbox-main,
+.inbox-aside {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.inbox-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.inbox-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.inbox-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.inbox-count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+}
+/* The rail's sections sit on one quiet card each, so they read apart from the decisions. */
+.inbox-panel {
+  padding: 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-sunken);
+}
+.inbox-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.inbox-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.inbox-project > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-project .project-tree-mark {
+  width: 16px;
+  height: 16px;
+}
+
+/* Decision cards: what kind of call it is, the call itself, its evidence and one action. */
+.inbox-decisions,
+.inbox-timeline,
+.inbox-alerts,
+.inbox-work {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.inbox-decisions {
+  gap: 12px;
+}
+.inbox-decision {
+  --tone: var(--color-accent);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-flat);
+  animation: ui-rise-in var(--motion-base) var(--ease-out);
+}
+.inbox-decision[data-tone="warning"] {
+  --tone: var(--color-warning);
+}
+.inbox-decision[data-tone="success"] {
+  --tone: var(--color-success);
+}
+.inbox-decision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.inbox-decision-meta time {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.inbox-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  color: var(--color-text-primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.inbox-kind svg {
+  color: var(--tone);
+}
+.inbox-decision-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+.inbox-decision-body:not(:has(.agent-stack)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.inbox-decision h3 {
+  margin: 0 0 4px;
+  font-size: var(--text-base);
+  font-weight: 650;
+  line-height: 1.3;
+}
+.inbox-decision-call {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+.inbox-decision-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.inbox-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.inbox-suggestion svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-accent-ink);
+}
+.inbox-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.inbox-risk {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+/* New results as a timeline: a dot per result on one rail, newest first. */
+.inbox-timeline {
+  position: relative;
+  gap: 2px;
+  padding-left: 18px;
+}
+.inbox-timeline::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 5px;
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-subtle);
+}
+.inbox-timeline li {
+  --tone: var(--color-text-muted);
+  position: relative;
+}
+.inbox-timeline li[data-tone="success"] {
+  --tone: var(--color-success);
+}
+.inbox-timeline li[data-tone="warning"] {
+  --tone: var(--color-warning);
+}
+.inbox-timeline li::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: -17px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-full);
+  background: var(--tone);
+}
+.inbox-timeline button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.inbox-timeline button:hover {
+  background: var(--color-surface-hover);
+}
+.inbox-timeline-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.inbox-timeline-line strong {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-timeline-line time {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.inbox-timeline-outcome {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.inbox-pictures {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+/* Alerts: the app's own notices and allowances, with the kind shown by icon and colour. */
+.inbox-alerts {
+  gap: 4px;
+}
+.inbox-alert {
+  --tone: var(--color-accent);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+}
+.inbox-alert[data-kind="attention"] {
+  --tone: var(--color-warning);
+}
+.inbox-alert[data-kind="success"] {
+  --tone: var(--color-success);
+}
+.inbox-alert[data-unread] {
+  background: var(--color-surface-elevated);
+}
+.inbox-alert-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  color: var(--tone);
+}
+.inbox-alert-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.inbox-alert-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.inbox-alert-detail {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  white-space: pre-line;
+}
+.inbox-alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Running and waiting-on-others rows: one line each, opening the work. */
+.inbox-work {
+  gap: 2px;
+}
+.inbox-work-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.inbox-work-row:not(:has(.agent-stack)) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.inbox-work-row:hover {
+  background: var(--color-surface-hover);
+}
+.inbox-work-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.inbox-work-title,
+.inbox-work-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-work-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.inbox-work-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.inbox-work-detail .project-tree-mark {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+.inbox-work-arrow {
+  color: var(--color-text-muted);
+}
+
+:is(.inbox-timeline button, .inbox-work-row):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.inbox-calm {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 24px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-xl);
+}
+.inbox-calm-mark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  color: var(--color-success);
+}
+.inbox-calm h2 {
+  margin: 0 0 4px;
+  font-size: var(--text-base);
+  font-weight: 650;
+}
+.inbox-calm p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inbox-decision {
+    animation: none;
+  }
+}

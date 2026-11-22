@@ -69,6 +69,9 @@ pub(crate) struct SiteGate {
     denied: HashSet<String>,
     /// The open question: (prompt ID, host).
     pending: Option<(String, String)>,
+    /// The site open in a window the person attached to the conversation. It and its
+    /// subdomains count as allowed for this attempt unless a saved decision blocks them.
+    attached: Option<String>,
 }
 
 impl SiteGate {
@@ -90,7 +93,43 @@ impl SiteGate {
             allowed: HashSet::new(),
             denied: HashSet::new(),
             pending: None,
+            attached: None,
         }
+    }
+
+    /// Allows the site of an attached window, and its subdomains, for this attempt only.
+    /// Nothing is saved, and a saved "never" still refuses it: then this returns false.
+    pub fn allow_attached(&mut self, host: &str) -> bool {
+        if grant::site_decision(&grant::sites(&self.store, &self.decisions), host) == Some(false) {
+            return false;
+        }
+        self.attached = Some(host.into());
+        true
+    }
+
+    /// The question about an attached window's site, already answered: attaching it was the
+    /// person's answer, so the attempt's questions show it like any other.
+    pub fn attached_prompt(&self, run_id: &str, host: &str) -> PendingUserPrompt {
+        let options = self.options(host).into_iter().map(|(label, _)| label);
+        let mut prompt = PendingUserPrompt::choice(
+            run_id,
+            HEADER,
+            format!("You attached this window on {host}. The agent may read and act on {host} in it for this task."),
+            options.collect(),
+        );
+        prompt.status = "answered".into();
+        prompt.answer = Some(format!("Allow {host} for this task"));
+        prompt.answered_at = Some(chrono::Utc::now().to_rfc3339());
+        prompt
+    }
+
+    fn within_attached(&self, host: &str) -> bool {
+        self.attached.as_deref().is_some_and(|site| {
+            host == site
+                || host
+                    .strip_suffix(site)
+                    .is_some_and(|rest| rest.ends_with('.'))
+        })
     }
 
     fn options(&self, host: &str) -> Vec<(String, (bool, bool))> {
@@ -119,6 +158,10 @@ impl SiteGate {
             Some(false) => {
                 self.denied.insert(host.into());
                 Err(Refused::Blocked)
+            }
+            None if self.within_attached(host) => {
+                self.allowed.insert(host.into());
+                Ok(Check::Allowed)
             }
             None => Ok(Check::Ask),
         }
@@ -305,6 +348,54 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(!decision.allow);
+        let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[test]
+    fn an_attached_site_is_allowed_for_the_attempt_only_and_a_saved_never_wins() {
+        let store = store();
+        grant::decide_site(
+            &store.join("sites.json"),
+            "project-1",
+            "ads.allmcps.com",
+            false,
+        )
+        .unwrap();
+        let mut gate = gate(&store);
+        assert!(gate.allow_attached("allmcps.com"));
+        assert_eq!(gate.check("allmcps.com"), Ok(Check::Allowed));
+        assert_eq!(gate.check("docs.allmcps.com"), Ok(Check::Allowed));
+        assert_eq!(gate.check("notallmcps.com"), Ok(Check::Ask));
+        assert_eq!(gate.check("example.com"), Ok(Check::Ask));
+        assert_eq!(gate.check("ads.allmcps.com"), Err(Refused::Blocked));
+        assert!(gate.pending().is_none(), "nothing was asked");
+
+        let prompt = gate.attached_prompt("run", "allmcps.com");
+        assert_eq!(prompt.status, "answered");
+        assert_eq!(
+            prompt.answer.as_deref(),
+            Some("Allow allmcps.com for this task")
+        );
+        assert!(prompt
+            .question
+            .contains("You attached this window on allmcps.com"));
+
+        let mut fresh = self::gate(&store);
+        assert_eq!(
+            fresh.check("allmcps.com"),
+            Ok(Check::Ask),
+            "nothing was saved"
+        );
+        assert_eq!(
+            grant::sites(&store.join("sites.json"), "project-1").len(),
+            1,
+            "only the earlier never is saved"
+        );
+
+        grant::decide_site(&store.join("sites.json"), "project-1", "blocked.com", false).unwrap();
+        let mut gate = self::gate(&store);
+        assert!(!gate.allow_attached("blocked.com"));
+        assert_eq!(gate.check("blocked.com"), Err(Refused::Blocked));
         let _ = std::fs::remove_dir_all(store);
     }
 }

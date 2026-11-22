@@ -96,7 +96,7 @@ export const SETTINGS_CATEGORIES = [
     group: 'Workspace',
     icon: Monitor,
     keywords:
-      'desktop zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees dictation transcription voice command line cli',
+      'desktop zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees dictation transcription voice speech microphone mic whisper command line cli',
   },
   {
     id: 'Keyboard shortcuts',

@@ -513,6 +513,31 @@ it('words signup and referral emails without a waitlist when signup is open', ()
   for (const content of [open, referral])
     expect(content.text.toLowerCase()).not.toContain('waitlist priority');
   expect(open.text.toLowerCase()).not.toContain('waitlist page');
+  const origin = bindings.ACCESS_WEB_ORIGIN;
+  const welcome = accessEmail(
+    { kind: 'welcome', to: 'reader@example.com', token: 'b'.repeat(64) },
+    origin,
+    [],
+    true,
+  );
+  const ready = accessEmail(
+    { kind: 'passes_ready', to: 'reader@example.com', total: 5 },
+    origin,
+    [],
+    true,
+  );
+  const feedback = accessEmail(
+    { kind: 'feedback_request', to: 'reader@example.com', token: 'c'.repeat(64) },
+    origin,
+    [],
+    true,
+  );
+  for (const content of [welcome, ready, feedback])
+    expect(content.text.toLowerCase()).not.toContain('early access');
+  expect(ready.subject).not.toContain('passes');
+  expect(
+    accessEmail({ kind: 'welcome', to: 'reader@example.com', token: 'b'.repeat(64) }, origin).text,
+  ).toContain('early access is approved');
 });
 
 it('queues branded transactional mail once with encrypted tokens and retries provider failures', async () => {

@@ -10,7 +10,7 @@ faq: [{"q":"Are open source coding agents free to use?","a":"Their code licenses
 
 Choose an open source coding agent by what you need to control: the agent code, the model connection, or the account paying for each run. Those are separate decisions. An open source client can still send your code to a proprietary model and generate a metered bill.
 
-The comparison below covers OpenCode, Codex CLI, and Aider, followed by a practical way to compare costs and keep credentials separate. The goal isn't to find a universal winner. It's to find a setup you can explain, afford, and review.
+The comparison below covers OpenCode, Codex CLI, and Aider, followed by a practical way to compare costs and keep credentials separate. There's no universal winner here. You're looking for a setup you can afford, explain, and review.
 
 ## Compare the control each agent gives you
 
@@ -32,7 +32,7 @@ Open source gives you a way to inspect and modify the client. It doesn't, by its
 
 [OpenCode](https://opencode.ai/docs/) is an open source coding agent with support for multiple model providers. It fits when provider choice is part of your workflow rather than a one-time setup decision. Its [provider documentation](https://opencode.ai/docs/providers/) describes the available connections and authentication requirements.
 
-**Best for:** Testing model choices without changing the agent interface for every experiment.
+It's a good pick for testing model choices without changing the agent interface for every experiment.
 
 For a concrete trial, launch it inside a clean checkout:
 
@@ -55,7 +55,7 @@ Start each trial from the same Git commit. Changing both the agent and the model
 
 [Codex CLI](https://github.com/openai/codex) is OpenAI's open source terminal coding agent. It fits when you want to work with Codex locally and inspect the client implementation. The official repository documents installation and authentication, including account sign-in and API-key alternatives.
 
-**Best for:** Evaluating Codex against your repository's actual build and review requirements.
+It's a good pick for evaluating Codex against your repository's actual build and review requirements.
 
 Launch it from the repository:
 
@@ -72,7 +72,7 @@ Treat authentication as part of the experiment. A supported account sign-in and 
 
 [Aider](https://github.com/Aider-AI/aider) is an open source terminal coding tool that works with your local Git repository. It fits when you want to start with named files and a narrow editing task. Its official repository links installation, model configuration, and usage documentation.
 
-**Best for:** Bounded changes where you already know the implementation and test files.
+It's a good pick for bounded changes where you already know the implementation and test files.
 
 For example, if these files exist in your project:
 
@@ -81,7 +81,7 @@ cd your-project
 aider src/parser.py tests/test_parser.py
 ```
 
-Configure a supported model first, then use the same task brief as the other trials. Providing file paths makes your starting scope explicit; it isn't a security boundary or a guarantee that the task needs no other context.
+Configure a supported model first, then use the same task brief as the other trials. Providing file paths makes your starting scope explicit. It isn't a security boundary, and it doesn't guarantee the task needs no other context.
 
 If the agent needs another file, record why. That helps you distinguish a weak initial brief from a model that struggles with the change.
 
@@ -149,7 +149,7 @@ No output only means those two paths aren't tracked. It doesn't prove the reposi
 
 Git worktrees separate working directories, not credentials or process permissions. A shell command run by an agent still has the access granted to that process.
 
-This is where Jackalope can help: you choose which agent and which work or personal account each project uses, while each task gets its own Git worktree. Routine permission requests go through a risk check, and risky requests still ask you. See the [multi-account and agents guide](https://jackalope.dev/knowledge/multi-account-and-agents/) when setting up that separation.
+This is where Jackalope can help. You choose which agent and which work or personal account each project uses, while each task gets its own Git worktree. Routine permission requests go through a risk check, and risky requests still ask you. See the [multi-account and agents guide](https://jackalope.dev/knowledge/multi-account-and-agents/) when setting up that separation.
 
 ## Run a small trial before switching your workflow
 

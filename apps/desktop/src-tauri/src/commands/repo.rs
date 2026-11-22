@@ -41,9 +41,18 @@ pub(super) fn succeeds(path: &Path, args: &[&str], policy: Policy) -> bool {
 }
 
 fn spawn(mut command: Command) -> Result<Output, String> {
-    command
-        .output()
-        .map_err(|error| format!("Could not run Git: {error}"))
+    command.output().map_err(|error| {
+        // A missing working folder fails the same way as a missing Git, so name the folder.
+        match command.get_current_dir() {
+            Some(dir) if !dir.is_dir() => {
+                format!(
+                    "Could not run Git in {}: the folder no longer exists.",
+                    dir.display()
+                )
+            }
+            _ => format!("Could not run Git: {error}"),
+        }
+    })
 }
 
 fn checked(output: Output) -> Result<String, String> {

@@ -82,6 +82,7 @@ fn request(
 ) -> RunRequest {
     RunRequest {
         retry_of: None,
+        handoff_focus: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -100,6 +101,7 @@ fn request(
         prepare_command: None,
         setup_files: Vec::new(),
         auto_verify: false,
+        non_code: false,
         target_branch: None,
         account_binding: None,
         model: None,
@@ -1012,4 +1014,41 @@ fn the_answers_hook_delivers_a_late_answer_once() {
     assert_eq!(turn(true).answer("answers", &input), json!({}));
     drop(runtime);
     let _ = std::fs::remove_dir_all(folder);
+}
+
+#[test]
+fn non_code_work_starts_in_the_checkout_and_never_prepares_or_checks() {
+    let project = "claude-session-non-code";
+    let fixture = Fixture::new(project, persistent());
+    std::fs::write(
+        fixture.folder.join("mark.cjs"),
+        "require('node:fs').writeFileSync(process.argv[2], 'ran');",
+    )
+    .unwrap();
+    // An untracked file makes the attempt look changed, so checks would otherwise run.
+    std::fs::write(fixture.folder.join("person-notes.txt"), "mine").unwrap();
+    let mut request = fixture.request(project, "claude-non-code", "Check the website", None);
+    request.non_code = true;
+    request.isolated = true;
+    request.workspace_mode = Some(crate::cli_protocol::WorkspaceMode::Worktree);
+    request.prepare_command = Some("node mark.cjs prepared.json".into());
+    request.verify_command = Some("node mark.cjs checked.json".into());
+    request.setup_files = vec!["person-notes.txt".into()];
+    request.auto_verify = true;
+    let run = fixture.finish(request);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
+    assert!(run.non_code);
+    assert_eq!(
+        dunce::canonicalize(&run.workspace).unwrap(),
+        dunce::canonicalize(&fixture.folder).unwrap()
+    );
+    assert!(!fixture.folder.join(".worktrees").exists());
+    assert!(!fixture.folder.join("prepared.json").exists());
+    assert!(!fixture.folder.join("checked.json").exists());
+    assert!(run.verification.is_none());
+    assert!(!run.auto_verify && run.prepare_command.is_none() && run.setup_files.is_empty());
+    assert_eq!(
+        git(&fixture.root, &["branch", "--show-current"]).unwrap(),
+        "master"
+    );
 }

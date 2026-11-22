@@ -184,6 +184,18 @@ public static class JackalopeDesktop {
         return windows;
     }
 
+    // The top-level window under the pointer, for attaching a window by dragging onto it.
+    // The desktop, taskbars and denied processes are never targets.
+    static Dictionary<string, object> WindowAtCursor(HashSet<uint> deny) {
+        Point cursor;
+        if (!GetCursorPos(out cursor)) return null;
+        var hit = GetAncestor(WindowFromPoint(cursor), 2);
+        if (hit == IntPtr.Zero || !IsWindowVisible(hit) || IsIconic(hit) || Title(hit).Length == 0 || deny.Contains(Pid(hit))) return null;
+        string kind = Class(hit);
+        if (kind == "Progman" || kind == "WorkerW" || kind == "Shell_TrayWnd" || kind == "Shell_SecondaryTrayWnd") return null;
+        try { return Info(hit); } catch { return null; }
+    }
+
     static List<object> Monitors() {
         var result = new List<object>();
         var screens = System.Windows.Forms.Screen.AllScreens;
@@ -223,6 +235,21 @@ public static class JackalopeDesktop {
         string action = Text(request, "action") ?? "";
         if (action == "hello") return new Dictionary<string, object> { {"protocol", 1} };
         if (action == "list") return new Dictionary<string, object> { {"windows", ListWindows(Deny(request))}, {"monitors", Monitors()} };
+        if (action == "at") {
+            var hit = WindowAtCursor(Deny(request));
+            object frame = null;
+            if (hit != null) { try { frame = Bounds(new IntPtr(long.Parse((string)hit["handle"]))); } catch { } }
+            return new Dictionary<string, object> { {"window", hit}, {"bounds", frame} };
+        }
+        // Bounds of one window, for the badge on an attached window; geometry only.
+        if (action == "bounds") {
+            try {
+                var identity = Map(request, "window");
+                var handle = Verify(identity);
+                if (Deny(request).Contains(Pid(handle))) return new Dictionary<string, object> { {"bounds", null} };
+                return new Dictionary<string, object> { {"bounds", Bounds(handle)} };
+            } catch { return new Dictionary<string, object> { {"bounds", null} }; }
+        }
         var guard = Map(request, "guard");
         if (guard == null) throw new Exception("Desktop indicator grant is required.");
         GuardFile = Text(guard, "file");
@@ -252,6 +279,9 @@ public static class JackalopeDesktop {
         var context = new Context { Target = target, Bounds = bounds, Screen = screen, Scope = scope, Deny = deny };
         switch (action) {
             case "focus":
+                // UI Automation focus and raising both bring a window in front, so neither
+                // happens while the person works in another app (except for a desktop grant).
+                if (!InFront(context)) throw new Exception(Background);
                 if (Has(request, "element")) { Element(request, "element").SetFocus(); return Sent("accessibility", false, "Element focused."); }
                 if (target == IntPtr.Zero) throw new Exception("Switch to a window first.");
                 if (GetForegroundWindow() != target) { ShowWindow(target, 9); SetForegroundWindow(target); }
@@ -283,6 +313,28 @@ public static class JackalopeDesktop {
     }
 
     class Context { public IntPtr Target; public int[] Bounds; public bool Screen; public string Scope; public HashSet<uint> Deny; }
+
+    const string Background = "The window is in the background. Use element actions by ref, or wait until the person brings it back.";
+
+    // Whether input may go to the window now: it's in front (or its app is, for an app grant),
+    // or the grant covers the whole desktop.
+    static bool InFront(Context context) {
+        if (context.Scope == "desktop" || context.Target == IntPtr.Zero) return true;
+        IntPtr foreground = GetForegroundWindow();
+        if (foreground == context.Target) return true;
+        return context.Scope == "app" && Pid(foreground) == Pid(context.Target);
+    }
+
+    // The element's scroll pattern, or its nearest scrollable ancestor's.
+    static ScrollPattern Scroller(AutomationElement element) {
+        var walker = TreeWalker.ControlViewWalker;
+        for (int depth = 0; element != null && depth < 10; depth++) {
+            var scroll = Pattern(element, ScrollPattern.Pattern) as ScrollPattern;
+            if (scroll != null && scroll.Current.VerticallyScrollable) return scroll;
+            element = walker.GetParent(element);
+        }
+        return null;
+    }
 
     static int PrimaryIndex() {
         var screens = System.Windows.Forms.Screen.AllScreens;
@@ -482,7 +534,7 @@ public static class JackalopeDesktop {
             if (action == "click") {
                 try { return Invoke(element); } catch (InvalidOperationException) { } catch (Exception error) { if (!error.Message.StartsWith("This element has no accessibility action")) throw; }
                 var type = element.Current.ControlType;
-                if (type == ControlType.Edit || type == ControlType.Document) { element.SetFocus(); return Sent("accessibility", true, "Focused the text control through UI Automation; keyboard focus moved."); }
+                if ((type == ControlType.Edit || type == ControlType.Document) && InFront(context)) { element.SetFocus(); return Sent("accessibility", true, "Focused the text control through UI Automation; keyboard focus moved."); }
             }
             point = Center(element, context);
         } else point = new Point { X = (int)Number(request, "x"), Y = (int)Number(request, "y") };
@@ -515,6 +567,7 @@ public static class JackalopeDesktop {
         string text = Text(request, "text") ?? "";
         var value = Pattern(element, ValuePattern.Pattern) as ValuePattern;
         if (value != null && !value.Current.IsReadOnly) { value.SetValue(text); return Sent("accessibility", false, "Replaced the value through UI Automation; no keys were sent."); }
+        if (!InFront(context)) throw new Exception(Background);
         element.SetFocus();
         Foreground(context, true);
         Send(Chord(new string[] { "Control" }, "a"));
@@ -526,8 +579,8 @@ public static class JackalopeDesktop {
         int wheel = (int)Number(request, "wheel");
         if (Has(request, "element")) {
             var element = Element(request, "element");
-            var scroll = Pattern(element, ScrollPattern.Pattern) as ScrollPattern;
-            if (scroll != null && scroll.Current.VerticallyScrollable) {
+            var scroll = Scroller(element);
+            if (scroll != null) {
                 for (int i = 0; i < Math.Abs(wheel); i++) scroll.ScrollVertical(wheel > 0 ? ScrollAmount.SmallDecrement : ScrollAmount.SmallIncrement);
                 return Sent("accessibility", false, "Scrolled through UI Automation; the mouse did not move.");
             }
@@ -559,7 +612,18 @@ public static class JackalopeDesktop {
 
     static Dictionary<string, object> TypeText(IDictionary<string, object> request, Context context) {
         bool focused = false;
-        if (Has(request, "element")) { Element(request, "element").SetFocus(); focused = true; }
+        if (Has(request, "element")) {
+            var element = Element(request, "element");
+            if (!InFront(context)) {
+                // In the background, keys would reach the person's app; add the text through
+                // the control's value instead when it has one, as on macOS.
+                var value = Pattern(element, ValuePattern.Pattern) as ValuePattern;
+                if (value == null || value.Current.IsReadOnly || element.Current.IsPassword) throw new Exception(Background);
+                value.SetValue(value.Current.Value + (Text(request, "text") ?? ""));
+                return Sent("accessibility", false, "Added the text through UI Automation; the window stayed in the background.");
+            }
+            element.SetFocus(); focused = true;
+        }
         focused |= Foreground(context, true);
         CheckFocusedControl();
         TypeKeys(context, Text(request, "text") ?? "");
@@ -589,7 +653,9 @@ public static class JackalopeDesktop {
         bool changed = false;
         IntPtr foreground = GetForegroundWindow();
         if (context.Target != IntPtr.Zero && foreground != context.Target) {
-            if (!allowSwitch || context.Scope == "window") throw new Exception("Selected window is not foreground. Focus it and take a new snapshot.");
+            // Window and app grants never pull a window in front of the person's work.
+            bool sameApp = context.Scope == "app" && Pid(foreground) == Pid(context.Target);
+            if (!allowSwitch || context.Scope == "window" || (context.Scope == "app" && !sameApp)) throw new Exception(Background);
             ShowWindow(context.Target, 9);
             SetForegroundWindow(context.Target);
             System.Threading.Thread.Sleep(60);

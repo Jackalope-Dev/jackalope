@@ -22,6 +22,11 @@ pub(super) fn fields(params: &Value) -> Result<Vec<Field>, ()> {
     }) {
         return Err(());
     }
+    let required = |key: &str| {
+        schema["required"]
+            .as_array()
+            .is_some_and(|keys| keys.iter().any(|k| k == key))
+    };
     let mut fields = Vec::new();
     for (key, property) in properties {
         let multiple = property["type"] == "array";
@@ -32,8 +37,13 @@ pub(super) fn fields(params: &Value) -> Result<Vec<Field>, ()> {
                 return Err(());
             }
             &property["items"]["anyOf"]
-        } else if property["type"] == "string" {
+        } else if property["type"] == "string" && property.get("oneOf").is_some() {
             &property["oneOf"]
+        } else if property["type"] == "string" && property.get("enum").is_some() {
+            &property["enum"]
+        } else if property["type"] == "string" && !required(key) {
+            // An optional free-text answer, such as omp's "Other", is left out.
+            continue;
         } else {
             return Err(());
         };
@@ -45,6 +55,7 @@ pub(super) fn fields(params: &Value) -> Result<Vec<Field>, ()> {
         for (index, option) in choices.iter().enumerate() {
             let value = option["const"]
                 .as_str()
+                .or_else(|| option.as_str())
                 .filter(|value| !value.is_empty() && value.len() <= 1000)
                 .ok_or(())?;
             let title = option["title"].as_str().unwrap_or(value);
@@ -87,6 +98,9 @@ pub(super) fn fields(params: &Value) -> Result<Vec<Field>, ()> {
             choices: options,
             multiple,
         });
+    }
+    if fields.is_empty() {
+        return Err(());
     }
     Ok(fields)
 }
@@ -169,5 +183,29 @@ mod tests {
             "cancel"
         );
         assert!(!asked);
+    }
+
+    #[test]
+    fn omp_forms_skip_optional_free_text_and_accept_plain_enums() {
+        let ask = json!({"mode":"form","message":"Pick","requestedSchema":{"type":"object","required":[],"properties":{"q0":{"type":"string","title":"Which?","oneOf":[{"const":"A","title":"A"},{"const":"B","title":"B"}]},"q0__other":{"type":"string","title":"Other"}}}});
+        assert_eq!(
+            answer(&ask, |_, options, _| Some(options[0].clone())),
+            json!({"action":"accept","content":{"q0":"A"}})
+        );
+        let select = json!({"mode":"form","message":"Approve plan?","requestedSchema":{"type":"object","required":["value"],"properties":{"value":{"type":"string","enum":["Approve","Refine"]}}}});
+        assert_eq!(
+            answer(&select, |_, options, _| Some(options[1].clone())),
+            json!({"action":"accept","content":{"value":"Refine"}})
+        );
+        for properties in [
+            json!({"value":{"type":"string"}}),
+            json!({"note":{"type":"string"}, "value":{"type":"boolean"}}),
+        ] {
+            let required: Vec<_> = properties.as_object().unwrap().keys().cloned().collect();
+            let params = json!({"mode":"form","requestedSchema":{"type":"object","required":required,"properties":properties}});
+            assert!(fields(&params).is_err());
+        }
+        let only_optional_text = json!({"mode":"form","requestedSchema":{"type":"object","properties":{"note":{"type":"string"}}}});
+        assert!(fields(&only_optional_text).is_err());
     }
 }

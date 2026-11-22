@@ -2,6 +2,7 @@ import { guideMarkdown, guidePath, knowledgeFiles, knowledgeGuides } from '@jack
 import { type Author, authorPath, authors, findAuthor } from './authors.ts';
 import benchmarks from './benchmark-summary.json' with { type: 'json' };
 import { blogImageSize, serializeBlogPost } from './blog-types.ts';
+import { GITHUB_URL } from './community.ts';
 import {
   changelogReleases,
   company,
@@ -29,6 +30,12 @@ const SOCIAL_IMAGE_ALT =
   'Jackalope: Run your agents side by side. Codex, Claude Code, Gemini CLI and more, each in its own Git worktree.';
 
 export const routes = pages.map((page) => page.path);
+
+/** Retired URLs and the page that absorbed their content; each answers with a 301. */
+export const movedPages: Record<string, string> = {
+  '/blog/git-worktrees-for-ai-coding-agents/': '/git-worktrees-for-ai-agents/',
+  '/blog/claude-code-and-codex-together/': '/guides/run-codex-and-claude-code-in-parallel/',
+};
 
 function personSchema(author: Author, origin: string) {
   return {
@@ -71,7 +78,16 @@ function lastModified(path: string) {
   return post?.updated ?? post?.date;
 }
 
-export function pageHtml(html: string, path: string, origin = siteOrigin) {
+/**
+ * `env` carries the build's download variables so structured data names only the
+ * platforms the download page offers.
+ */
+export function pageHtml(
+  html: string,
+  path: string,
+  origin = siteOrigin,
+  env: Record<string, string | undefined> = {},
+) {
   const normalized = normalizePath(path);
   const page = pages.find((item) => item.path === normalized);
   const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
@@ -97,17 +113,23 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       '@type': 'Organization',
       '@id': `${origin}/#organization`,
       name: 'Jackalope',
-      url: origin,
+      url: `${origin}/`,
       description: pages[0].description,
-      logo: `${origin}/icon-256.png`,
-      sameAs: ['https://x.com/JackalopeDotDev'],
+      logo: { '@type': 'ImageObject', url: `${origin}/icon-256.png`, width: 256, height: 256 },
+      sameAs: [
+        GITHUB_URL,
+        'https://x.com/JackalopeDotDev',
+        'https://www.reddit.com/r/JackalopeDev/',
+      ],
       parentOrganization: { '@type': 'Organization', name: company.name, url: company.url },
     },
     {
       '@type': 'WebSite',
       '@id': `${origin}/#website`,
       name: 'Jackalope',
-      url: origin,
+      alternateName: new URL(origin).hostname,
+      url: `${origin}/`,
+      inLanguage: 'en',
       publisher: { '@id': `${origin}/#organization` },
     },
     {
@@ -189,8 +211,17 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       '@type': 'SoftwareApplication',
       '@id': `${origin}/#application`,
       name: 'Jackalope',
-      url: origin,
+      url: `${origin}/`,
       applicationCategory: 'DeveloperApplication',
+      // macOS and Linux always have public release builds; Windows is listed once configured.
+      operatingSystem: platformDownloads(env)
+        .filter((platform) => platform.url || platform.id !== 'windows')
+        .map((platform) => platform.name)
+        .join(', '),
+      downloadUrl: `${origin}/download/`,
+      // The account is free and the app is not sold; model access is the user's own.
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      sameAs: [GITHUB_URL],
       description,
       image: `${origin}${SOCIAL_IMAGE}`,
       featureList: [
@@ -354,6 +385,9 @@ function marketingPageText(page: MarketingPage, origin: string) {
           row.map((cell, index) => `${section.table?.columns[index]}: ${cell}`).join('\n'),
         ) || []),
         ...(section.bullets?.map((item) => `- ${item}`) || []),
+        ...(section.code
+          ? [`${section.code.label}\n\`\`\`${section.code.language}\n${section.code.value}\n\`\`\``]
+          : []),
         ...(section.links?.map((link) => `[${link.label}](${link.href})`) || []),
       ].join('\n\n'),
     )
@@ -373,6 +407,23 @@ function marketingPageText(page: MarketingPage, origin: string) {
   return `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${body}\n\n${details}`;
 }
 
+/**
+ * Markdown mirrors and llms*.txt files stay public for language models but out of
+ * search results: each one is served with noindex and a canonical Link to the
+ * HTML page it mirrors (its directory's page, so /knowledge/x/index.md -> /knowledge/x/).
+ */
+export function mirrorHeaderRules(fileNames: string[], origin = siteOrigin) {
+  return fileNames
+    .filter((name) => name.endsWith('.md') || /(^|\/)llms(-full)?\.txt$/.test(name))
+    .sort()
+    .map((name) => {
+      const page = `/${name}`.replace(/[^/]*$/, '');
+      if (!routes.includes(page)) throw new Error(`${name} mirrors ${page}, which is not a page.`);
+      return `/${name}\n  X-Robots-Tag: noindex\n  Link: <${origin}${page}>; rel="canonical"\n`;
+    })
+    .join('\n');
+}
+
 export function discoveryFiles(
   origin = siteOrigin,
   env: Record<string, string | undefined> = {},
@@ -388,7 +439,7 @@ export function discoveryFiles(
           ? `${platform.name} version ${env.VITE_RELEASE_VERSION?.trim()}`
           : platform.name,
     );
-  const availability = `Desktop downloads are available for ${new Intl.ListFormat('en', { type: 'conjunction' }).format(platforms)}. See ${origin}/download/ for current availability. Using the app requires waitlist approval or a claimed Instant Access Pass; model access is separate.`;
+  const availability = `Desktop downloads are available for ${new Intl.ListFormat('en', { type: 'conjunction' }).format(platforms)}. See ${origin}/download/ for current availability. Signup is open: using the app requires a free Jackalope account with a confirmed email. Model access is separate.`;
   const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use Atlas sample project data.\n\n`;
   const publicPages = indexablePages;
   const links = publicPages

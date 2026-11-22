@@ -347,7 +347,7 @@ pub async fn task_pull_request_merge(
 }
 
 /// Runs a Git command that changes the checkout, reporting Git's own message on failure.
-fn change(path: &Path, args: &[&str]) -> Result<String, String> {
+pub(super) fn change(path: &Path, args: &[&str]) -> Result<String, String> {
     let mut command = repo::command(path, args, Policy::Isolated);
     command
         .env("GIT_TERMINAL_PROMPT", "0")

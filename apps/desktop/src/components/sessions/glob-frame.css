@@ -1,0 +1,92 @@
+/* The window sits 14px outside the framed window on every side (attach/overlay.rs
+   FRAME_MARGIN), which leaves room for the outer glow. */
+.glob-frame {
+  position: fixed;
+  inset: 12px;
+  border: 3px solid var(--color-accent);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent),
+    0 0 12px 2px color-mix(in srgb, var(--color-accent) 55%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  pointer-events: none;
+}
+.glob-frame[data-mode="target"] {
+  animation:
+    glob-frame-in 180ms var(--ease-out),
+    glob-frame-pulse 1.4s ease-in-out 180ms infinite;
+}
+/* Just attached: a bright glow that settles and fades, so it stays calm. */
+.glob-frame[data-mode="attached"] {
+  animation: glob-frame-attached 4.2s var(--ease-out) forwards;
+}
+@keyframes glob-frame-in {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+@keyframes glob-frame-pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+@keyframes glob-frame-attached {
+  0% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  8% {
+    opacity: 1;
+    transform: none;
+  }
+  65% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glob-frame[data-mode="target"] {
+    animation: none;
+  }
+  .glob-frame[data-mode="attached"] {
+    animation: glob-frame-attached-still 4.2s steps(1, end) forwards;
+  }
+  @keyframes glob-frame-attached-still {
+    to {
+      opacity: 0;
+    }
+  }
+}
+/* Stays around an attached window: a calm line, dashed when the agent may only see it.
+   The window sits 6px outside it (attach/badge.rs EDGE_MARGIN). */
+.attach-edge {
+  position: fixed;
+  inset: 5px;
+  border: 1.5px dashed color-mix(in srgb, var(--color-accent) 75%, transparent);
+  border-radius: 11px;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  pointer-events: none;
+  animation: attach-edge-in 600ms var(--ease-out) 3.6s backwards;
+}
+.attach-edge[data-control] {
+  border-style: solid;
+}
+@keyframes attach-edge-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attach-edge {
+    animation: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .attach-edge {
+    border-color: var(--color-accent);
+    box-shadow: none;
+  }
+}

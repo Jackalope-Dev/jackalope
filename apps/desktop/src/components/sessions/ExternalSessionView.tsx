@@ -132,8 +132,13 @@ export function ExternalSessionView({ session }: { session: ExternalSession }) {
           <div ref={end} />
         </section>
       )}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: a pointer convenience; the field and buttons stay reachable by keyboard */}
       <form
         className="external-continue"
+        onClick={(event) => {
+          // The whole card reads as the field, so a click on its padding focuses it.
+          if (event.target === event.currentTarget) input.current?.focus();
+        }}
         onSubmit={(event) => {
           event.preventDefault();
           if (text.trim()) void continueHere();

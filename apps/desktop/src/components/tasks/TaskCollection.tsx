@@ -154,9 +154,9 @@ export function TaskCollection({
       <button
         type="button"
         className="work-elsewhere-action"
-        onClick={() => useWorkViewStore.getState().setScope('all')}
+        onClick={() => useWorkViewStore.getState().openInbox()}
       >
-        Show all
+        Open Inbox
       </button>
     </p>
   );
@@ -200,6 +200,7 @@ export function TaskCollection({
       {onArchive && !selecting && (
         <Button
           variant="ghost"
+          size="icon"
           className="work-archive"
           disabled={busy || (!archived && !!item.archiveBlocked)}
           aria-label={`${archived ? 'Restore' : 'Archive'} ${item.title}`}
@@ -315,7 +316,7 @@ export function TaskCollection({
       {archived && onArchivedChange && (
         <div className="work-filter-summary">
           <p>Archived work</p>
-          <Button variant="ghost" disabled={busy} onClick={() => onArchivedChange(false)}>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => onArchivedChange(false)}>
             Show current work
           </Button>
         </div>
@@ -360,7 +361,12 @@ export function TaskCollection({
         <div className="work-filter-summary">
           <p role="status">{notice}</p>
           {undo.length > 0 && (
-            <Button variant="ghost" disabled={busy} onClick={() => void changeArchive(undo, false)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => void changeArchive(undo, false)}
+            >
               Undo
             </Button>
           )}
@@ -373,6 +379,7 @@ export function TaskCollection({
           </p>
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => onViewChange({ ...view, filter: 'all', query: '' })}
           >
             Clear filters

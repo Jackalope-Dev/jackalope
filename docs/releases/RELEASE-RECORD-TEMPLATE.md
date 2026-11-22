@@ -1,4 +1,4 @@
-# Release record: <version> — Windows x64
+# Release record: <version> (Windows x64)
 
 Status: preparing / blocked / trial passed / approved for publication / published.
 This is an unexecuted template. Fill in observations; do not inherit old results.

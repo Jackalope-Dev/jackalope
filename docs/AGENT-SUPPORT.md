@@ -24,7 +24,7 @@ reaching review; an error the CLI retried past keeps the later answer. Beside th
 message, `tasks/failure.rs` records a kind (authentication, quota exhausted, rate
 limited, provider refused, model unavailable, context too long or agent exited).
 Authentication is judged on the message's first line only. Claude Code's rejected
-`rate_limit_event` means a five-hour, weekly or extra-usage window is used up: it is
+`rate_limit_event` means a five-hour, weekly or extra-usage window is used up. It is
 recorded as quota exhausted, naming the window and, when the event carries `resetsAt`,
 when it resets. A 429 or "too many requests" stays rate limited. The kind is descriptive;
 quota handoff still requires a provider quota event.
@@ -163,8 +163,8 @@ two-account acceptance remains required before claiming provider login coverage.
 
 Codex uses `CODEX_HOME`, Claude uses `CLAUDE_CONFIG_DIR`, and Grok uses `GROK_HOME`.
 OpenCode uses `XDG_DATA_HOME` for credentials and session data. Named OpenCode
-profiles additionally redirect XDG config, cache and state directories; the
-default profile preserves the user's existing CLI configuration. Use OpenCode’s `debug paths` command to inspect the selected profile.
+profiles also redirect XDG config, cache and state directories; the
+default profile preserves the user's existing CLI configuration. Use OpenCode's `debug paths` command to inspect the selected profile.
 The temporary-directory path remains controlled by OpenCode and the OS.
 
 A continuation resumes the agent's own session from these directories. When the
@@ -182,7 +182,7 @@ themselves. On this device the attempt then starts once more as a new conversati
 the same earlier request and progress; activity keeps the CLI's own refusal and says so.
 It starts over at most once, and a failure of the new conversation fails the attempt
 with its own error. A continuation of a session from outside Jackalope never starts
-over: a lost session fails it as a lost conversation. Gemini CLI and Antigravity fail
+over. A lost session fails it as a lost conversation. Gemini CLI and Antigravity fail
 when a different session comes back. Continuations on a computer rely on the CLI there.
 
 Gemini account setup uses `GEMINI_CLI_HOME` as the parent of `.gemini` and
@@ -211,12 +211,12 @@ All seven native adapters can use connections configured for
 [on-demand discovery](MCP-DISCOVERY.md) through the HTTP bridge.
 Their own CLI configuration can still supply tools.
 The common coordination bridge is available to agents through task instructions;
-Codex, Claude, OpenCode and Kimi additionally receive direct bridge MCP tools. Do not claim that every
+Codex, Claude, OpenCode and Kimi also receive direct bridge MCP tools. Do not claim that every
 agent has passed real browser, question or third-party OAuth tool trials.
 
 ## Capability boundaries
 
-This table describes Jackalope’s adapter interfaces. Missing integration does not
+This table describes Jackalope's adapter interfaces. Missing integration does not
 imply that the provider lacks the underlying capability.
 
 Jackalope coordinates installed agent harnesses; it does not own every model turn
@@ -283,11 +283,21 @@ Add agent offers known ACP CLIs by name from `lib/acp-presets.ts`, with the comm
 arguments each CLI's own documentation gives: Cursor (`cursor-agent acp`), GitHub Copilot
 CLI (`copilot --acp`, 1.0.93 or newer), Goose (`goose acp`), Qwen Code (`qwen --acp`,
 0.16 or newer), Auggie (`auggie --acp`), Kiro (`kiro-cli acp`), Hermes Agent
-(`hermes acp`) and Command Code (`cmd acp`, `cmdc acp` on Windows). `agent_locate_executables`
+(`hermes acp`), Command Code (`cmd acp`, `cmdc acp` on Windows) and Oh My Pi
+(`omp acp`). `agent_locate_executables`
 looks for those commands on PATH and in the usual install folders without running them, and
-a preset found there fills in its path. A preset is only a starting point for the form: it
+a preset found there fills in its path. A preset is only a starting point for the form. It
 runs as a generic ACP agent, with the same permission, question and session handling, and
 has not been accepted with each CLI.
+
+When the session reports a `model` config option and the agent refuses
+`session/set_model`, as Oh My Pi does, a chosen model is set once more through
+`session/set_config_option`. Agent questions are answered when every required field is a
+choice; optional free-text fields, such as Oh My Pi's "Other" answer, are left out, and
+plain `enum` choices are offered like `oneOf` ones. Oh My Pi asks for permission for
+shell commands and destructive file changes unless its own `tools.approvalMode` is
+explicitly `yolo`; boolean confirmations and free-text prompts are declined, which Oh My
+Pi treats as a refusal.
 
 A loopback OpenAI-compatible server, such as LM Studio or vLLM, is saved as an OpenCode
 account after `GET /v1/models` succeeds. Only `127.0.0.1`, `localhost` and `::1` are accepted.
@@ -327,7 +337,7 @@ Resetting Jackalope removes its private runner along with other app-owned data.
 This changes executable delivery, not task permissions, account binding, process
 ownership or MCP contracts. API tasks retain their owned child processes; the
 default warm helper pool is restricted to managed local-model accounts.
-`JACKALOPE_WARM_API_HELPERS=on` additionally permits protected named API accounts for
+`JACKALOPE_WARM_API_HELPERS=on` also permits protected named API accounts for
 helper-only calls with all tools denied, project configuration disabled and only
 the bound provider enabled. The pool separates executable, account, credentials,
 model, configuration and working directory. It retains at most two servers for
@@ -367,7 +377,7 @@ layout and `.opencode/bin` are discovered alongside PATH executables.
 The ignored `installed_agent_matrix` test runs scenarios per listed agent and model on
 the lifecycle trial's fixtures, each pair in its own disposable repository and history.
 It spends provider usage only when invoked and never runs in `pnpm verify` or CI.
-List every pair explicitly: each model is a pair, the next model listed for that
+List every pair explicitly. Each model is a pair, the next model listed for that
 agent is its switch partner, and an agent without models uses its CLI default.
 
 ```powershell

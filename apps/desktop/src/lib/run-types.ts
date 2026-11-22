@@ -189,6 +189,8 @@ export interface TaskRun {
   modelMismatch?: { requested: string; served: string; fallback: boolean } | null;
   /** What kind of failure `error` describes, when its message says. */
   failureKind?: FailureKind | null;
+  /** Earlier progress Jackalope last gave the agent in place of a conversation it could not continue. */
+  handoffContext?: string | null;
   prompt: string;
   status: RunStatus;
   startedAt: string;
@@ -364,6 +366,11 @@ export interface RunRequest {
   isolated: boolean;
   /** Overrides `isolated` for a new Git task; absent keeps the `isolated` choice. */
   workspaceMode?: 'worktree' | 'branch' | 'current' | 'ask';
+  /**
+   * Work that changes no code: it runs in the project folder as it is, with no worktree,
+   * preparation or automatic checks, whatever the other workspace fields say.
+   */
+  nonCode?: boolean;
   previousRunId?: string;
   retryOf?: string;
   taskId?: string;

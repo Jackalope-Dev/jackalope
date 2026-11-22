@@ -22,11 +22,15 @@ and [task outcomes](TASK-OUTCOMES.md).
 
 Match the work to the request. A question should not wait on workspace preparation or
 automatic checks; reserve full setup and verification for work that changes files.
+Non-code work, such as operating a web page or an attached window, skips the worktree,
+preparation, checks and planning check, and Options → Treat as code work reverses an
+inferred guess.
 
 ## Navigation and copy
 
 The title bar holds Back and Forward (beside the app name) and command search, the sidebar navigates projects and their work, and
-the status bar shows the focused project's branch and activity. Peer workspace views use
+the status bar shows the focused project's branch and activity; its branch menu switches
+and creates branches. Peer workspace views use
 WorkspacePage for gutters and scrolling,
 WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
 section titles, and WorkspaceSubnavigation for peer tabs. Keep page headers in
@@ -179,8 +183,9 @@ and size inputs to what they hold, such as a short code.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
 for menu rows, segments and dense navigation; coarse pointers raise both to 44px. The sidebar
-leads with Inbox (work across projects that needs the person), then projects with only their
-live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
+leads with Inbox (work across projects that needs the person) and Library (files work
+created), then favorite projects and work as tiles, then projects with their pinned work,
+folders, live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
 compact layouts that keep this in view over extra padding. Native
 window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
 small windows. Respect reduced motion, including preference changes while open.

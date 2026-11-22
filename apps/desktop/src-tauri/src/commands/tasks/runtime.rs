@@ -38,8 +38,12 @@ impl crate::services::Service for TaskRuntime {
 impl TaskRuntime {
     /// The workspace of a finished attempt, when a retry can safely continue in it: the
     /// directory is an isolated worktree that still exists, nothing else is using it, and
-    /// the agent left no uncommitted changes for a new attempt to trip over.
-    pub(super) fn reusable_workspace(&self, retried: &str) -> Option<(String, String, String)> {
+    /// the agent left no uncommitted changes for a new attempt to trip over, unless the
+    /// provider quota stopped it. The flag says whether the workspace carries those changes.
+    pub(super) fn reusable_workspace(
+        &self,
+        retried: &str,
+    ) -> Option<(String, String, String, bool)> {
         let runs = self.inner.lock().ok()?;
         let old = runs.runs.get(retried)?;
         if old.status.is_active()
@@ -56,13 +60,16 @@ impl TaskRuntime {
             return None;
         }
         let workspace = old.workspace.clone();
-        let reused = (workspace.clone(), old.branch.clone(), old.base_head.clone());
+        let (branch, base_head) = (old.branch.clone(), old.base_head.clone());
+        let quota_stopped = old.quota_failure.is_some();
         drop(runs);
-        // A dirty worktree holds half-finished agent work; start clean rather than inherit it.
-        git(&workspace, &["status", "--porcelain"])
-            .ok()
-            .filter(|changes| changes.trim().is_empty())
-            .map(|_| reused)
+        // A dirty worktree holds half-finished agent work; start clean rather than inherit
+        // it, unless a quota stop interrupted that work and the retry picks it up.
+        let dirty = !git(&workspace, &["status", "--porcelain"])
+            .ok()?
+            .trim()
+            .is_empty();
+        (!dirty || quota_stopped).then_some((workspace, branch, base_head, dirty))
     }
 
     pub(super) fn fail(&self, id: &str, error: String) {
@@ -213,11 +220,19 @@ impl TaskRuntime {
                 .account_binding
                 .as_ref()
                 .map_or(old.agent.as_str(), |binding| binding.adapter.as_str());
-            request
-                .prompt
-                .push_str(&super::resume::earlier_progress(adapter, old));
-            self.update_checked(id, |run| activity(run, &super::resume::restarted(adapter)))?;
+            let section =
+                super::resume::earlier_progress(adapter, old, req.handoff_focus.as_deref());
+            request.prompt.push_str(&format!("\n{section}\n"));
+            self.update_checked(id, |run| {
+                activity(run, &super::resume::restarted(adapter));
+                run.handoff_context = Some(section);
+            })?;
             resume = None;
+        } else if req.retry_of.is_some() {
+            // A retry that continues preserved work after a quota stop; see `prepare_workspace`.
+            if let Some(section) = self.run_snapshot(id).and_then(|run| run.handoff_context) {
+                request.prompt.push_str(&format!("\n\n{section}"));
+            }
         }
         // A session the CLI itself refuses to resume starts over the same way, once.
         let mut refusable = resume.clone().filter(|_| !continues);
@@ -269,12 +284,13 @@ impl TaskRuntime {
                 .take()
                 .ok_or_else(|| run.error.clone().unwrap_or_else(|| refusal.clone()))?;
             let adapter = self.policy()?.adapter(&request.agent)?;
-            request
-                .prompt
-                .push_str(&super::resume::earlier_progress(&adapter, &old));
+            let section =
+                super::resume::earlier_progress(&adapter, &old, req.handoff_focus.as_deref());
+            request.prompt.push_str(&format!("\n{section}\n"));
             self.relaunch(id, |run| {
                 // The refusal is kept in activity; a failure of the new conversation is its own.
                 run.diagnostics.clear();
+                run.handoff_context = Some(section);
                 for line in super::resume::restarted_after(&adapter, &refusal) {
                     activity(run, &line);
                 }
@@ -402,6 +418,9 @@ impl TaskRuntime {
         if let Some(folder) = plain_folder(&req.project_path)? {
             return self.prepare_plain_folder(id, req, previous, &folder);
         }
+        if req.non_code {
+            return self.prepare_non_code(id, req, previous);
+        }
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
         let mode = if previous.is_some() || req.isolated {
             WorkspaceMode::Worktree
@@ -472,6 +491,8 @@ impl TaskRuntime {
             .retry_of
             .as_deref()
             .and_then(|retried| self.reusable_workspace(retried));
+        let fresh_worktree =
+            previous.is_none() && reusable.is_none() && mode == WorkspaceMode::Worktree;
         let (workspace, branch, base_head) = if let Some(ref old) = previous {
             if old.session_id.is_none() && req.live_session_id.is_none() {
                 return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
@@ -481,12 +502,31 @@ impl TaskRuntime {
                 old.branch.clone(),
                 old.base_head.clone(),
             )
-        } else if let Some((workspace, branch, base_head)) = reusable {
+        } else if let Some((workspace, branch, base_head, progress)) = reusable {
+            let handoff = req
+                .retry_of
+                .as_deref()
+                .and_then(|old| self.run_snapshot(old))
+                .filter(|_| progress)
+                .and_then(|old| Some((old.quota_failure.clone()?, old)))
+                .map(|(failure, old)| {
+                    super::routing::quota_handoff(
+                        &old,
+                        &failure.message,
+                        req.handoff_focus.as_deref(),
+                    )
+                })
+                .transpose()?;
             self.update(id, |run| {
                 activity(
                     run,
-                    "Reusing the previous attempt's workspace; it has no uncommitted changes.",
-                )
+                    if handoff.is_some() {
+                        "Continuing in the previous attempt's workspace with the changes it made before the provider quota stopped it."
+                    } else {
+                        "Reusing the previous attempt's workspace; it has no uncommitted changes."
+                    },
+                );
+                run.handoff_context = handoff;
             });
             (workspace, branch, base_head)
         } else if mode == WorkspaceMode::Worktree {
@@ -574,6 +614,9 @@ impl TaskRuntime {
                 .as_deref()
                 .filter(|command| !command.trim().is_empty())
             {
+                if fresh_worktree {
+                    self.clone_dependencies(id, &root, &workspace, command)?;
+                }
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
                     self.mark_stopped(id);
@@ -587,6 +630,53 @@ impl TaskRuntime {
         Ok(())
     }
 
+    /// Seeds a new worktree with the checkout's installed dependency folders before the setup
+    /// command, which still runs so anything that drifted since the checkout installed is fixed.
+    fn clone_dependencies(
+        &self,
+        id: &str,
+        root: &str,
+        workspace: &str,
+        command: &str,
+    ) -> Result<(), String> {
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new(
+                "dependencies",
+                "Cloning installed dependencies",
+                1,
+            ))
+        });
+        let outcome = self.timed(id, "dependencyClone", || {
+            Ok(crate::commands::dependency_clone::clone_dependencies(
+                root, workspace, command,
+            ))
+        })?;
+        self.update(id, |run| {
+            if !outcome.cloned.is_empty() {
+                activity(
+                    run,
+                    &format!(
+                        "Cloned installed dependencies from the project checkout (copy-on-write): {}.",
+                        outcome.cloned.join(", ")
+                    ),
+                );
+            }
+            for (folder, reason) in &outcome.refused {
+                activity(
+                    run,
+                    &format!("Did not reuse the project checkout's {folder}: {reason}."),
+                );
+            }
+            if outcome.unsupported {
+                activity(
+                    run,
+                    "This volume cannot make copy-on-write copies, so the setup command installs dependencies in full.",
+                );
+            }
+        });
+        Ok(())
+    }
+
     /// Reserves the project checkout for this attempt. Only one attempt works in
     /// a checkout at a time; the check and the reservation happen under one lock
     /// so two in-place starts cannot both pass it.
@@ -594,8 +684,10 @@ impl TaskRuntime {
         let canonical = |path: &str| dunce::canonicalize(path).ok();
         let target = canonical(root);
         let mut inner = self.inner.lock().unwrap();
+        // Non-code work only reads the checkout, so it never holds it.
         if inner.runs.values().any(|other| {
             other.id != id
+                && !other.non_code
                 && !other.workspace.is_empty()
                 && other.status.is_active()
                 && (Path::new(&other.workspace) == Path::new(root)
@@ -701,7 +793,7 @@ impl TaskRuntime {
             run.branch.clear();
             run.base_head.clear();
         })?;
-        if previous.is_none() {
+        if previous.is_none() && !req.non_code {
             let command = req
                 .prepare_command
                 .as_deref()
@@ -719,6 +811,56 @@ impl TaskRuntime {
             }
         }
         Ok(())
+    }
+
+    /// Work that changes no code runs in the project checkout as it is: no worktree,
+    /// branch change, setup files or preparation, and whatever branch is checked out.
+    /// It does not reserve the checkout, so in-place work is not held up by it; a
+    /// continuation stays in the folder its conversation started in.
+    fn prepare_non_code(
+        &self,
+        id: &str,
+        req: &RunRequest,
+        previous: Option<TaskRun>,
+    ) -> Result<(), String> {
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new(
+                "workspace",
+                "Using the project folder",
+                1,
+            ))
+        });
+        let (workspace, branch, base_head) = match &previous {
+            Some(old) => {
+                if old.session_id.is_none() && req.live_session_id.is_none() {
+                    return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
+                }
+                (
+                    old.workspace.clone(),
+                    old.branch.clone(),
+                    old.base_head.clone(),
+                )
+            }
+            None => {
+                let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
+                // A detached checkout has no branch and a repository without commits no head.
+                let branch = git(&root, &["branch", "--show-current"]).unwrap_or_default();
+                let head =
+                    git(&root, &["rev-parse", "--verify", "--quiet", "HEAD"]).unwrap_or_default();
+                (root, branch, head)
+            }
+        };
+        self.update_checked(id, |run| {
+            if previous.is_none() {
+                activity(
+                    run,
+                    "Working in the project folder without a worktree, setup or automatic checks.",
+                );
+            }
+            run.workspace = workspace.clone();
+            run.branch = branch;
+            run.base_head = base_head;
+        })
     }
 
     fn execute_agent(
@@ -1946,6 +2088,7 @@ impl TaskRuntime {
             prepare_command: run.prepare_command.clone(),
             setup_files: run.setup_files.clone(),
             auto_verify: run.auto_verify,
+            non_code: run.non_code,
             target_branch: run.target_branch.clone(),
             account_binding: None,
             prompt: run.prompt.clone(),
@@ -1953,6 +2096,7 @@ impl TaskRuntime {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
+            handoff_focus: None,
             continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
@@ -2204,6 +2348,9 @@ impl TaskRuntime {
                     "This account is disabled in Settings. Choose an enabled account.".into(),
                 );
             }
+            if let Some(old) = previous.as_ref().or(retried.as_ref()) {
+                request.non_code = old.non_code;
+            }
             if let Some(folder) = plain_folder(&request.project_path)? {
                 request.project_path = folder;
                 request.isolated = false;
@@ -2213,10 +2360,14 @@ impl TaskRuntime {
                 request.target_branch =
                     Some(old.target_branch.clone().unwrap_or_else(|| "master".into()));
             } else {
-                request.target_branch = Some(resolve_target_branch(
-                    &request.project_path,
-                    request.target_branch.as_deref(),
-                )?);
+                let target =
+                    resolve_target_branch(&request.project_path, request.target_branch.as_deref());
+                // Non-code work stays on whatever is checked out, so it needs no target.
+                request.target_branch = if request.non_code {
+                    target.ok()
+                } else {
+                    Some(target?)
+                };
             }
             request.account_binding = Some(binding.clone());
             if let Some(old) = &previous {
@@ -2241,6 +2392,12 @@ impl TaskRuntime {
                 if request.connection_ids.is_none() {
                     request.connection_ids = old.connection_ids.clone();
                 }
+            }
+            // Non-code work never prepares the workspace or checks it automatically.
+            if request.non_code {
+                request.prepare_command = None;
+                request.setup_files.clear();
+                request.auto_verify = false;
             }
             let mut context_receipt = if let Some(old) = previous.as_ref().or(retried.as_ref()) {
                 old.context_receipt.clone()
@@ -2309,6 +2466,7 @@ impl TaskRuntime {
                 failure_kind: None,
                 provider_error: None,
                 session_refused: None,
+                handoff_context: None,
                 contract,
                 understanding: None,
                 monitor_change: previous
@@ -2339,6 +2497,7 @@ impl TaskRuntime {
                 prepare_command: request.prepare_command.clone(),
                 setup_files: request.setup_files.clone(),
                 auto_verify: request.auto_verify,
+                non_code: request.non_code,
                 finishing: false,
                 verification_error: None,
                 verification: None,
@@ -2406,7 +2565,7 @@ impl TaskRuntime {
             runtime.stage(&request.id, None);
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
-            crate::commands::desktop_control::close(&request.id);
+            crate::commands::desktop_control::attempt_ended(&request.id);
             crate::commands::computers::release_run(&request.id);
         });
         Ok(id)

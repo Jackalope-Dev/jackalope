@@ -124,7 +124,7 @@ to rewrite the draft into a deeper version of the same task and puts the result 
 input to edit; it never sends. If you typed something meanwhile, the rewrite is printed in
 the feed instead. Clearing the input with Esc and running `/sharpen undo` brings back the
 draft. The call counts toward helper usage like Sharpen in the app.
-What you type in a conversation is its draft, shared with the app's composer: opening the conversation in either place brings it back, and sending clears it. Clickable parts of the header and status line highlight under the pointer.
+What you type in a conversation is its draft, shared with the app's composer. Opening the conversation in either place brings it back, and sending clears it. Clickable parts of the header and status line highlight under the pointer.
 `/retry` relaunches work that failed to start; to try finished or stopped work again,
 send a follow-up. Another conversation that starts needing you is announced in the feed.
 `/learn` inspects conversation history since the previous learn command (or session
@@ -153,7 +153,7 @@ the status line instead.
 `/model <name>` sets one directly. `/usage` (or `/cost`) lists account quota
 windows and resets. `/theme <colour>` takes orange, red, pink, purple, blue,
 teal, green, yellow or any `#rrggbb` and sets the project's accent in every
-terminal and the app: a project with its own app theme changes alone, otherwise
+terminal and the app. A project with its own app theme changes alone; otherwise
 the app-wide accent changes. `/init` asks an agent to write or refresh `AGENTS.md`.
 `/computer` shows the conversation's [bot or task computer](BOT-COMPUTERS.md) and
 `/computer start` or `/computer stop` changes it; computers are created in the app.

@@ -29,6 +29,7 @@ import {
   Heart,
   Leaf,
   type LucideIcon,
+  MessageCircle,
   Music,
   Package,
   Rabbit,
@@ -45,7 +46,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { detectProjectWebsite, fetchProjectFavicon } from '../../lib/project-favicon';
-import { type Project, useProjectStore } from '../../stores/projectStore';
+import { GENERAL_PROJECT_ID, type Project, useProjectStore } from '../../stores/projectStore';
 import './project-mark.css';
 
 /** Saved by key, so renaming a Lucide export never breaks a saved project icon. */
@@ -89,11 +90,14 @@ const WEBSITE_ICON = 'website';
 const initial = (project: Pick<Project, 'name'>) =>
   project.name.trim().charAt(0).toUpperCase() || '?';
 
-/** A project's chosen icon, or its initial when none is set (or a saved key is unknown). */
+/**
+ * A project's chosen icon, or its initial when none is set (or a saved key is unknown).
+ * General, which has no project behind it, shows a neutral conversation mark instead.
+ */
 export function ProjectMark({
   project,
 }: {
-  project: Pick<Project, 'name' | 'icon' | 'iconImage'>;
+  project: Pick<Project, 'name' | 'icon' | 'iconImage'> & { id?: string };
 }) {
   if (project.icon === WEBSITE_ICON && project.iconImage)
     return (
@@ -101,7 +105,11 @@ export function ProjectMark({
         <img src={project.iconImage} alt="" className="project-mark-image" draggable={false} />
       </span>
     );
-  const Icon = project.icon ? PROJECT_ICONS[project.icon] : undefined;
+  const Icon = project.icon
+    ? PROJECT_ICONS[project.icon]
+    : project.id === GENERAL_PROJECT_ID
+      ? MessageCircle
+      : undefined;
   return (
     <span className="project-tree-mark" aria-hidden="true">
       {Icon ? <Icon size={13} strokeWidth={2.25} /> : initial(project)}

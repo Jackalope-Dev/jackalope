@@ -27,6 +27,7 @@ export type MarketingPage = {
     title: string;
     paragraphs: string[];
     bullets?: string[];
+    code?: { label: string; language: string; value: string };
     links?: Array<{ href: string; label: string }>;
     table?: { columns: string[]; rows: string[][] };
   }>;
@@ -116,30 +117,126 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/git-worktrees-for-ai-agents/',
     kind: 'Workflow guide',
-    title: 'Git worktrees for AI coding agents | Jackalope',
+    title: 'Git worktrees for AI coding agents: setup to cleanup',
     description:
-      'Learn how Jackalope uses isolated Git worktrees to run AI coding agents in parallel and guards review, integration, recovery, and cleanup.',
+      'Run AI coding agents in parallel with Git worktrees: commands to create each checkout, separate ports and data, review the combined patch, and clean up.',
     headline: 'Give every coding-agent task its own Git worktree.',
-    lede: 'Worktrees let several coding agents work on one repository without sharing a working directory. Jackalope keeps each worktree connected to its task, history, and review.',
+    lede: 'Worktrees let several coding agents work on one repository without sharing a working directory. This guide walks through the Git commands from setup to cleanup, then shows how Jackalope keeps each worktree connected to its task, history, and review.',
     image: 'review',
     signals: [
       'One task per checkout',
-      'Target-branch checks',
+      'Copyable Git commands',
       'Combined patch review',
       'Recoverable cleanup',
     ],
     sections: [
       {
-        title: 'Why worktrees matter for coding agents.',
+        title: 'What a working tree is.',
         paragraphs: [
-          '[Two agents in one checkout](/parallel-coding-agents/) can overwrite files, change the active branch, or make a clean review difficult. A Git worktree gives each task a separate working directory and branch while sharing the repository’s object database.',
-          'Isolation does not eliminate semantic conflicts. Two locally correct patches can still disagree about an API or shared assumption. That is why Jackalope treats the combined review as a separate decision.',
+          'A working tree is the folder of checked-out files you edit, as opposed to the history Git stores in the .git directory. A normal clone has one: the main working tree. The git worktree add command creates a linked working tree, a second folder attached to the same repository.',
+          'Each working tree has its own checked-out branch, HEAD, and staging area, so editing or switching branches in one leaves the others untouched. They all share one history: a commit made in any of them is immediately visible from the rest, with no push or fetch between folders.',
         ],
       },
       {
-        title: 'Keep the worktree and its task together.',
+        title: 'Why worktrees matter for coding agents.',
         paragraphs: [
-          'Jackalope creates each task worktree from your chosen branch. Return to its history, review its changes, and keep active or interrupted work safe from cleanup. Before merging, Jackalope checks that the source files and target branch still match your review.',
+          "[Two agents in one checkout](/parallel-coding-agents/) can overwrite files, change the active branch, or make a clean review difficult. A Git worktree gives each task a separate working directory and branch while sharing the repository's object database.",
+          'That is useful for a bug fix beside a feature, [two independent improvements](/blog/run-ai-coding-agents-in-parallel/), or a review that should leave your working copy alone. It is less useful when two tasks are both redesigning the same interface. Separate folders cannot settle a disagreement about what that interface should mean, and two locally correct patches can still disagree about an API or shared assumption.',
+          'The commands below use an illustrative search feature. One task adds keyboard navigation; another improves an unrelated help page. They assume the integration branch is main and the sibling directory names are unused, so substitute your own branch and paths.',
+        ],
+      },
+      {
+        title: 'Create one checkout per task from a known baseline.',
+        paragraphs: [
+          'From the original repository, inspect the working copy and existing worktrees before creating anything. Check that the commit printed by rev-parse is the baseline you intend. Uncommitted files in the original checkout are not part of that commit.',
+          'Each add command creates a separate branch from main. The -C option lets you inspect a checkout without changing your terminal directory. Git normally refuses to check out the same branch in two places, so use one task branch per worktree rather than overriding that safeguard.',
+        ],
+        code: {
+          label: 'Run from your original repository; replace main if needed',
+          language: 'sh',
+          value:
+            'git status --short\ngit worktree list\ngit rev-parse main\ngit worktree add -b task/search-keyboard ../search-keyboard main\ngit worktree add -b task/help-copy ../help-copy main\ngit -C ../search-keyboard status --short\ngit -C ../help-copy status --short',
+        },
+        links: [
+          {
+            href: 'https://git-scm.com/docs/git-worktree',
+            label: "Git's worktree reference",
+          },
+        ],
+      },
+      {
+        title: 'Prepare the environment, not just the files.',
+        paragraphs: [
+          'A worktree contains checked-in files, but not installed packages, ignored environment files, or a running database. Before asking an agent to change code, make the unmodified checkout build with the commands the project documents, for example pnpm install --frozen-lockfile. If the baseline already fails, record the first meaningful error so it is not mistaken for a regression later. Keep setup commands in [project instructions agents follow](/blog/agents-md-claude-md-project-instructions/).',
+          'Give local servers distinct ports and check where each checkout connects. A different source directory does not mean a different database, storage bucket, browser profile, or output folder. Avoid linking generated folders between worktrees, since one build can replace files another build is using.',
+        ],
+        table: {
+          columns: ['Resource', 'Keyboard task', 'Help task'],
+          rows: [
+            ['Source checkout', '../search-keyboard', '../help-copy'],
+            ['Development port', 'A reserved unused port', 'A different unused port'],
+            ['Test data', 'Disposable search fixtures', 'Disposable documentation fixtures'],
+            ['Build output', 'Inside this checkout', 'Inside this checkout'],
+            ['Credentials', 'Only the access this task needs', 'No service access if unnecessary'],
+          ],
+        },
+      },
+      {
+        title: 'Give each agent a bounded brief.',
+        paragraphs: [
+          'Open the agent in the exact checkout assigned to it and confirm the current folder in that session. Include the outcome, the files it owns, and the checks you expect. If another task is active, say what it owns and how to report a dependency. File ownership is a coordination agreement, not a filesystem permission boundary.',
+          'Claude Code can also create a worktree through its own --worktree option. Choose whether Git, the agent, or a workspace app manages the checkout, and keep that ownership consistent so you never review the wrong folder.',
+        ],
+        code: {
+          label: 'Reusable task brief',
+          language: 'text',
+          value:
+            'Outcome: make the search results usable with a keyboard.\nWorkspace: the assigned search-keyboard checkout.\nOwn: search UI and its focused interaction tests.\nDo not change: help content or unrelated shared controls.\nAcceptance: arrows move selection; Enter opens a result;\nEscape closes results; an empty list has no active result.\nRead the repository instructions and record baseline failures.\nReport shared-component dependencies before expanding scope.\nReturn: changed files, checks run, and remaining uncertainty.\nLeave commits and integration to the maintainer.',
+        },
+        links: [
+          {
+            href: 'https://code.claude.com/docs/en/worktrees',
+            label: 'Claude Code: worktree sessions',
+          },
+        ],
+      },
+      {
+        title: 'Review each task, then the combination.',
+        paragraphs: [
+          'Start with what the task promised: try the behavior, inspect the changed files, and read the tests. A summary saying checks passed should point to the commands and checkout that produced the result. Use status to find staged and untracked files as well as ordinary edits, and open new files themselves.',
+          'After individual review, integrate through your normal workflow and run the relevant checks on the combined result. Two tasks can pass separately and still disagree about a route, type, or dependency version. Resolve the underlying decision before accepting a mechanically clean merge. The [AI code review checklist](/blog/review-ai-generated-code-checklist/) covers what to look for.',
+        ],
+        code: {
+          label: 'Inspect the keyboard task without changing it',
+          language: 'sh',
+          value:
+            'git -C ../search-keyboard status --short\ngit -C ../search-keyboard diff\ngit -C ../search-keyboard diff --cached\ngit -C ../search-keyboard log --oneline main..HEAD\ngit -C ../search-keyboard diff main...HEAD',
+        },
+      },
+      {
+        title: 'Clean up only after the work has a home.',
+        paragraphs: [
+          'A quiet checkout is not necessarily disposable. Confirm that no agent, editor, or development server is still using it, and that its changes were integrated or kept elsewhere. Check ignored files too: a local database or scratch export can matter even though it never appears in the diff.',
+          'Once you have preserved what you need, git worktree remove is the ordinary removal command. If Git refuses, or a worktree is locked, identify the process using it before retrying; do not add force just to make the error disappear. Removing a worktree and deleting its branch are separate operations. For the next task, create a fresh checkout from the current baseline.',
+        ],
+        code: {
+          label: 'Check before you remove',
+          language: 'sh',
+          value:
+            'git worktree list\ngit -C ../search-keyboard status --short --ignored\ngit worktree remove ../search-keyboard',
+        },
+        links: [
+          {
+            href: '/knowledge/resolving-git-worktree-locks/',
+            label: 'Diagnose worktree locks',
+          },
+        ],
+      },
+      {
+        title: 'How Jackalope manages task worktrees.',
+        paragraphs: [
+          'The hard part of several worktrees is remembering which brief, account, result, and check belongs to each folder. Jackalope creates each task worktree from your chosen branch, keeps it attached to its history and review, and protects active or interrupted work from cleanup. Before merging, it checks that the source files and target branch still match your review.',
+          "Worktrees separate working directories. They do not restrict an agent's access to other local files or sandbox its processes. Your agent permissions still apply; review the code and run project checks before merging.",
         ],
         bullets: [
           'Dependent tasks wait until the changes they need have been merged.',
@@ -147,51 +244,21 @@ export const marketingPages: MarketingPage[] = [
           'If the branch has changed, resolve the difference before merging. Your unrelated edits stay intact.',
           'Archive work you want to keep before removing its worktree.',
         ],
-      },
-      {
-        title: 'Know what a worktree separates.',
-        paragraphs: [
-          'Worktrees separate working directories. They do not restrict an agent’s access to other local files. Your agent permissions still apply; review the code and run project checks before merging.',
-        ],
-      },
-      {
-        title: 'Prepare more than the branch.',
-        paragraphs: [
-          'A worktree contains checked-in files, but it may not contain installed packages, ignored environment files, or a running database. Record the setup commands in [project guidance](/blog/agents-md-claude-md-project-instructions/) and [establish the same build in the new checkout](/blog/git-worktrees-for-ai-coding-agents/) before asking an agent to diagnose application behavior.',
-          'Give local servers distinct ports and check whether tools write to shared caches or external services. Worktrees share Git repository data; they do not create separate operating-system accounts or automatically isolate services.',
-        ],
         links: [
-          {
-            href: 'https://git-scm.com/docs/git-worktree',
-            label: 'Git’s worktree reference',
-          },
-        ],
-      },
-      {
-        title: 'Review cleanup as carefully as creation.',
-        paragraphs: [
-          'After integration, confirm which branch contains the accepted change and inspect remaining uncommitted and untracked work. A branch being merged does not establish that every file in its working directory was included. Keep active or interrupted tasks until their state is understood.',
-          'If a worktree is locked, identify the process using it before attempting cleanup. Stop the process you own, preserve any needed output, and retry. A lock error is a recovery problem, not a reason to discard task history or force removal.',
-        ],
-        links: [
-          {
-            href: '/knowledge/resolving-git-worktree-locks/',
-            label: 'Diagnose worktree locks',
-          },
           {
             href: '/knowledge/git-worktrees/',
-            label: 'Jackalope integration and cleanup rules',
+            label: 'Jackalope worktree integration and cleanup rules',
           },
         ],
       },
     ],
     related: [
       { href: '/parallel-coding-agents/', label: 'Parallel coding agents' },
-      { href: '/guides/review-ai-generated-code/', label: 'A practical review workflow' },
       {
-        href: '/features/project-context-for-coding-agents/',
-        label: 'Project context for every task',
+        href: '/guides/run-codex-and-claude-code-in-parallel/',
+        label: 'Run Codex and Claude Code in parallel',
       },
+      { href: '/guides/review-ai-generated-code/', label: 'A practical review workflow' },
     ],
   },
   {
@@ -209,13 +276,13 @@ export const marketingPages: MarketingPage[] = [
         title: 'Choose by the connection your task needs.',
         paragraphs: [
           'Jackalope runs installed coding-agent CLIs. Start with your required provider, account, model, and tools, then check the adapter below. An agent logo or successful account setup does not establish that Jackalope can execute tasks with it.',
-          'All seven native adapters implement tasks, continuation, and review. Usage reporting varies by CLI and account. Kimi exposes task token totals and membership limits; Antigravity subscription quota requires a CLI with read-only command output. The tool and account differences are important when moving a working CLI setup into a project.',
+          'All seven native adapters implement tasks, continuation, and review. Usage reporting varies by CLI and account. Kimi exposes task token totals and membership limits; Antigravity subscription quota requires a CLI with read-only command output. These tool and account differences matter when you move a working CLI setup into a project.',
         ],
       },
       {
         title: 'Current agent compatibility',
         paragraphs: [
-          'These are implemented capabilities. Jackalope is in early access; validate your installed CLI version, sign-in, and required tool flow on your machine.',
+          'These are implemented capabilities. Validate your installed CLI version, sign-in, and required tool flow on your machine.',
         ],
         table: {
           columns: ['Agent', 'Project tools', 'Account behavior'],
@@ -300,7 +367,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Check a new setup in three steps.',
         paragraphs: [
           'First, confirm the CLI and chosen account work on the host. Next, launch a small task against a project with passing baseline checks. Finally, continue the task with one correction and verify that the account and history remain attached to the original attempt.',
-          'If the task needs a connected service, include a harmless read from that service. Test that exact agent and connection instead of relying on the connection’s saved state. A missing tool, an expired sign-in, and a failing repository build need different fixes.',
+          "If the task needs a connected service, include a harmless read from that service. Test that exact agent and connection instead of relying on the connection's saved state. A missing tool, an expired sign-in, and a failing repository build need different fixes.",
         ],
         links: [
           {
@@ -317,7 +384,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Keep model access and workspace access distinct.',
         paragraphs: [
           'Jackalope does not include a model subscription. Your provider determines available models, permissions, and charges. Task usage shows reported activity from Jackalope attempts; account capacity can include other clients and is not a complete billing statement.',
-          'Choose the account deliberately for each project. Changing a default affects future tasks, while a continuation retains its original account. Profiles organize sign-ins and settings; they do not restrict an agent’s access to local files.',
+          "Choose the account deliberately for each project. Changing a default affects future tasks, while a continuation retains its original account. Profiles organize sign-ins and settings; they do not restrict an agent's access to local files.",
         ],
         links: [
           {
@@ -341,16 +408,16 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Agent integration',
     title: 'Gemini CLI desktop workspace and GUI | Jackalope',
     description:
-      'Use Gemini CLI in Jackalope’s desktop workspace for tasks, Git worktrees, saved conversations, and review. Check setup, permissions, and current limits.',
+      "Use Gemini CLI in Jackalope's desktop workspace for tasks, Git worktrees, saved conversations, and review. Check setup, permissions, and current limits.",
     headline: 'Bring Gemini CLI into your task workspace.',
-    lede: 'Jackalope provides a desktop workflow around your installed Gemini CLI: assign a task, follow streamed activity, continue its saved conversation, and review the changes. The adapter is implemented; installed-app acceptance remains in progress.',
+    lede: 'Jackalope wraps a desktop workflow around your installed Gemini CLI: assign a task, follow streamed activity, continue its saved conversation, and review the changes. The adapter is implemented; installed-app acceptance remains in progress.',
     image: 'agents',
     signals: ['Installed Gemini CLI', 'Worker tasks', 'Session continuation', 'Patch review'],
     sections: [
       {
         title: 'How do I connect Gemini CLI?',
         paragraphs: [
-          'Install Gemini CLI using its official instructions and complete provider sign-in before launching a task. In Jackalope, open Agents → Configuration, check the executable, and select the account for your project. Approved Jackalope access and your own provider access are required.',
+          'Install Gemini CLI using its official instructions and complete provider sign-in before launching a task. In Jackalope, open Agents → Configuration, check the executable, and select the account for your project. A free Jackalope account and your own provider access are required.',
           'Try a small task in a local Git project with passing baseline checks. A missing or expired login must be renewed through account setup; task processes do not open a browser to sign you in.',
         ],
         links: [
@@ -361,7 +428,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Which permissions does a Gemini task use?',
         paragraphs: [
-          'Gemini worker tasks run in headless mode with automatic file-edit approval. That does not grant unrestricted shell access. Shell commands and HTTP clients must already be permitted by Gemini CLI’s own policy; a tool requiring interactive confirmation cannot be approved through this headless session.',
+          "Gemini worker tasks run in headless mode with automatic file-edit approval. That does not grant unrestricted shell access. Shell commands and HTTP clients must already be permitted by Gemini CLI's own policy; a tool requiring interactive confirmation cannot be approved through this headless session.",
           'Project tools use on-demand discovery through an HTTP bridge and need a permitted HTTP client. Direct project MCP injection is not connected for this adapter. If a task cannot run its check through a tool, saved automatic project checks can still run natively after a successful attempt.',
         ],
         links: [
@@ -375,15 +442,15 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Can I continue a task and inspect usage?',
         paragraphs: [
-          'Yes. Jackalope retains the Gemini session identifier for continuation, with the task’s workspace and account. Stop previews and checks before continuing. Inspect the updated patch and new check output after a follow-up.',
-          'Task usage comes from the CLI’s final statistics when usable. Missing reports stay unknown; resumed counters can include earlier turns and are not treated as new-attempt usage. Account quota is unknown. Gemini CLI has no connected model-catalog command, so a configured model is passed to the CLI without inventing a discovered model list.',
+          "Yes. Jackalope retains the Gemini session identifier for continuation, with the task's workspace and account. Stop previews and checks before continuing. Inspect the updated patch and new check output after a follow-up.",
+          "Task usage comes from the CLI's final statistics when usable. Missing reports stay unknown; resumed counters can include earlier turns and are not treated as new-attempt usage. Account quota is unknown. Gemini CLI has no connected model-catalog command, so a configured model is passed to the CLI without inventing a discovered model list.",
         ],
       },
       {
         title: 'Can Gemini choose agents or answer Ask Jackalope?',
         paragraphs: [
           'Gemini CLI currently runs as a worker. It does not supply the tool-free interface used for routing coordination or Ask Jackalope. Use an eligible coordinator or local decision rules, and assign Gemini to the supported work you want it to perform.',
-          'Jackalope is prerelease. CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download, then test a focused change.',
+          'CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download, then test a focused change.',
         ],
         links: [{ label: 'Agent compatibility', href: '/agents/' }],
       },
@@ -408,7 +475,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Connect the Codex CLI you already use.',
         paragraphs: [
-          'Jackalope launches your installed Codex CLI. An OpenAI account in a browser is not enough: the executable and the account selected for the task must be usable on the machine running Jackalope. Start with the official CLI installation and sign-in instructions, then check Codex in Agents → Configuration.',
+          'Jackalope launches your installed Codex CLI. An OpenAI account in a browser is not enough. The executable and the account selected for the task must both work on the machine running Jackalope. Start with the official CLI installation and sign-in instructions, then check Codex in Agents → Configuration.',
           'Choose a local Git project whose normal build already works. Add the build command and [project conventions to its instructions](/blog/agents-md-claude-md-project-instructions/). Your first task should have one observable result, such as fixing a failing parser test, so you can separate setup problems from implementation problems.',
         ],
         links: [
@@ -425,7 +492,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Pin the account before starting client work.',
         paragraphs: [
-          'Named Codex profiles let you organize work and personal sign-ins separately. Choose the project’s Codex account in Project → Settings. Changing the active account affects new tasks; continuing an existing task retains the profile that started it.',
+          "Named Codex profiles let you organize work and personal sign-ins separately. Choose the project's Codex account in Project → Settings. Changing the active account affects new tasks; continuing an existing task retains the profile that started it.",
           'If a task reports an authentication problem, inspect the selected profile instead of assuming the normal terminal login is the one being used. Account labels are names you assign, not verification of the provider identity. Check the identity during sign-in before sending project context.',
         ],
         links: [
@@ -439,7 +506,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Bring the tools the task needs.',
         paragraphs: [
           'Codex supports Jackalope project connections over stdio and HTTP. Select the connection for the project and task, then start with a read operation that confirms the expected service is available. Tools already configured in Codex remain subject to its own configuration and permissions.',
-          'A useful first brief is: “Find the parser case that rejects a valid empty list, add a regression test, and fix it without changing the public API. Run the parser tests and show the changed files.” Add the relevant project guidance; avoid attaching unrelated tools just because they are available.',
+          'A useful first brief is: "Find the parser case that rejects a valid empty list, add a regression test, and fix it without changing the public API. Run the parser tests and show the changed files." Add the relevant project guidance; avoid attaching unrelated tools just because they are available.',
         ],
         links: [
           {
@@ -451,8 +518,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Read capacity and task usage separately.',
         paragraphs: [
-          'Jackalope can show Codex account usage windows when the CLI reports them, alongside usage recorded for Jackalope attempts. Account limits can include activity outside Jackalope; a task’s token total describes that attempt. Neither is a complete invoice or a promise of remaining model access.',
-          'When capacity is unavailable, keep it unknown. Check the account’s reported reset information and whether the task has an explicit agent assignment before expecting automatic routing to use another worker.',
+          "Jackalope can show Codex account usage windows when the CLI reports them, alongside usage recorded for Jackalope attempts. Account limits can include activity outside Jackalope; a task's token total describes that attempt. Neither is a complete invoice or a promise of remaining model access.",
+          "When capacity is unavailable, keep it unknown. Check the account's reported reset information and whether the task has an explicit agent assignment before expecting automatic routing to use another worker.",
         ],
         links: [
           {
@@ -465,7 +532,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Continue, check, and review the change.',
         paragraphs: [
           'Ask for a correction under the same task to retain its account and history. Inspect the patch and the parser test output, then try a nearby edge case. For work alongside Claude Code, give each task a separate scope and make dependent changes wait for integration.',
-          'Jackalope is in early access. These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
+          'These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
         ],
         links: [
           {
@@ -487,9 +554,9 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/agents/claude-code/',
     kind: 'Agent integration',
-    title: 'Run Claude Code in a desktop project workspace | Jackalope',
+    title: 'Claude Code GUI: run tasks in parallel worktrees | Jackalope',
     description:
-      'Run Claude Code tasks with isolated Git worktrees, project MCP connections, in-app questions, account profiles, usage reporting, and review.',
+      'Use your Claude Code CLI and Anthropic account in a desktop workspace: parallel tasks in Git worktrees, MCP tools, in-app questions and one review queue.',
     headline: 'Keep Claude Code connected to the whole task.',
     lede: 'Use your installed Claude Code CLI and Anthropic account while Jackalope keeps the brief, questions, project tools, worktree, result, and review together.',
     image: 'agents',
@@ -498,7 +565,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Start with a working Claude Code sign-in.',
         paragraphs: [
-          'Install Claude Code from Anthropic’s documentation and complete its own sign-in flow. In Jackalope, open Agents → Configuration and check the detected CLI. Choose an existing login or create a named account profile, then select that account for the project.',
+          "Install Claude Code from Anthropic's documentation and complete its own sign-in flow. In Jackalope, open Agents → Configuration and check the detected CLI. Choose an existing login or create a named account profile, then select that account for the project.",
           'Use a project that builds before the agent edits it. Put its setup and test commands in [project guidance](/blog/agents-md-claude-md-project-instructions/). If Claude Code is not found after installation, check the executable path and restart Jackalope so it receives the updated environment.',
         ],
         links: [
@@ -515,8 +582,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Keep questions attached to the requested change.',
         paragraphs: [
-          'Claude Code can surface task questions in Jackalope. This is useful when a change has a product decision inside it: for example, whether an expired invitation should offer a resend action or send someone back to sign-in. Answer in the task so the decision stays with the resulting patch.',
-          'Start with a concrete request: “Improve the expired-invitation screen. Preserve the existing token validation, explain the recovery action, and test an expired token and a valid token. Ask before changing the resend policy.” A second pass should refine that same task instead of losing the original constraint in a new conversation.',
+          'Claude Code can surface task questions in Jackalope. This helps when a change has a product decision inside it, like whether an expired invitation should offer a resend action or send someone back to sign-in. Answer in the task so the decision stays with the resulting patch.',
+          'Start with a concrete request: "Improve the expired-invitation screen. Preserve the existing token validation, explain the recovery action, and test an expired token and a valid token. Ask before changing the resend policy." A second pass should refine that same task instead of losing the original constraint in a new conversation.',
         ],
       },
       {
@@ -553,7 +620,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Use a second agent where the work is independent.',
         paragraphs: [
           'While Claude Code fixes the invitation screen, [another agent can update unrelated documentation](/guides/run-codex-and-claude-code-in-parallel/) in its own worktree. If the documentation depends on a new resend contract, make it wait until that change is accepted. Review both outputs together and exercise the invitation flow before integration.',
-          'Jackalope is in early access. Its Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.',
+          "Jackalope's Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.",
         ],
         links: [
           {
@@ -583,8 +650,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Connect Grok Build, the coding CLI.',
         paragraphs: [
-          'This integration uses the installed Grok Build CLI, rather than a Grok chat in a browser. Follow the official installation and authentication instructions, confirm a small request works in your local project, then choose Grok in Jackalope’s agent configuration.',
-          'Jackalope reads Grok’s account identity and available models through its CLI. Grok validates model access when a task launches. Finding an executable or saving an account profile does not establish a successful sign-in. If the first task fails immediately, inspect its authentication error before changing the task brief or project code.',
+          "This integration uses the installed Grok Build CLI, rather than a Grok chat in a browser. Follow the official installation and authentication instructions, confirm a small request works in your local project, then choose Grok in Jackalope's agent configuration.",
+          "Jackalope reads Grok's account identity and available models through its CLI. Grok validates model access when a task launches. Finding an executable or saving an account profile does not establish a successful sign-in. If the first task fails immediately, inspect its authentication error before changing the task brief or project code.",
         ],
         links: [
           {
@@ -596,8 +663,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Use discovery for supported project tools.',
         paragraphs: [
-          'Grok can discover supported project connections on demand through Jackalope’s HTTP bridge. That differs from directly injecting every selected MCP server into a CLI configuration. Direct project connection delivery is not supported for this adapter.',
-          'For a task that needs an external service, select a connection configured for on-demand discovery and first request a small read. Other tools may come from Grok’s own configuration. Check which path supplies a tool when troubleshooting missing access.',
+          "Grok can discover supported project connections on demand through Jackalope's HTTP bridge. That differs from directly injecting every selected MCP server into a CLI configuration. Direct project connection delivery is not supported for this adapter.",
+          "For a task that needs an external service, select a connection configured for on-demand discovery and first request a small read. Other tools may come from Grok's own configuration. Check which path supplies a tool when troubleshooting missing access.",
         ],
         links: [
           {
@@ -609,7 +676,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Try a bounded investigation before a large change.',
         paragraphs: [
-          'For example: “Find why this command reports success when its output file is missing. Trace the exit-code handling, identify a reproducible case, and propose a focused fix. Preserve the existing command-line flags.” This gives you a concrete artifact to inspect before expanding the work.',
+          'For example: "Find why this command reports success when its output file is missing. Trace the exit-code handling, identify a reproducible case, and propose a focused fix. Preserve the existing command-line flags." That gives you something concrete to inspect before you expand the work.',
           'Jackalope retains the selected project context, worktree, attempts, and result. Review the reproduction, then continue the task with the chosen fix. A related task can update command documentation after the behavior is accepted, without editing the same checkout.',
         ],
       },
@@ -617,7 +684,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Check the account and the reported usage.',
         paragraphs: [
           'Named Grok profiles let projects select different accounts. Continuations retain their original profile. Confirm the selected account when diagnosing a provider error; switching the default for future tasks does not move an existing conversation to another identity.',
-          'Jackalope can display Grok capacity when its billing interface provides it and can record reported task usage. Missing or stale information remains distinct from available capacity. Use the provider’s billing view for charges and allowances beyond recorded Jackalope attempts.',
+          "Jackalope can display Grok capacity when its billing interface provides it and can record reported task usage. Missing or stale information remains distinct from available capacity. Use the provider's billing view for charges and allowances beyond recorded Jackalope attempts.",
         ],
         links: [
           {
@@ -630,7 +697,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Validate the actual command behavior.',
         paragraphs: [
           'For the missing-output example, run the command with a writable destination and with a failing destination. Check the file, exit status, and error message together. A successful agent response alone cannot establish that the command now reports failures correctly.',
-          'Jackalope is in early access. Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
+          'Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
         ],
         links: [
           {
@@ -678,7 +745,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Understand what a named profile changes.',
         paragraphs: [
-          'Jackalope’s default OpenCode profile preserves the existing CLI configuration. Named profiles separate OpenCode’s data, configuration, cache, and state directories. A provider or tool configured under your normal login may therefore need setup in a new named profile.',
+          "Jackalope's default OpenCode profile preserves the existing CLI configuration. Named profiles separate OpenCode's data, configuration, cache, and state directories. A provider or tool configured under your normal login may therefore need setup in a new named profile.",
           'Choose the account for the project and confirm it on a small task. Follow-ups retain the profile that began the attempt, even after a different profile becomes the default. These directories organize configuration; they do not create separate operating-system permissions.',
         ],
         links: [
@@ -691,7 +758,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Choose how project tools reach OpenCode.',
         paragraphs: [
-          'OpenCode supports direct stdio, HTTP, and SSE project connections, as well as on-demand discovery. Jackalope adds direct connections to the task process’s configuration while preserving other inline settings. Tools configured in OpenCode’s own settings remain subject to that profile’s configuration.',
+          "OpenCode supports direct stdio, HTTP, and SSE project connections, as well as on-demand discovery. Jackalope adds direct connections to the task process's configuration while preserving other inline settings. Tools configured in OpenCode's own settings remain subject to that profile's configuration.",
           'If a task can read repository files but cannot reach a connected service, verify the tool in the selected OpenCode profile. Keep a local-only first task available so a provider or tool problem does not get confused with a worktree or build problem.',
         ],
         links: [
@@ -704,7 +771,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Start with a provider-independent result.',
         paragraphs: [
-          'A useful trial is: “Add a regression test for sorting names that differ only by case. Keep the public API unchanged, use the existing test framework, and show the test result and patch.” Evaluate the behavior against the same expected output regardless of the chosen provider.',
+          'A useful trial is: "Add a regression test for sorting names that differ only by case. Keep the public API unchanged, use the existing test framework, and show the test result and patch." Evaluate the behavior against the same expected output regardless of the chosen provider.',
           'Jackalope records OpenCode text, tool activity, session identity, errors, and reported usage. Inspect the actual test output and changed files. An empty response or a provider error should be diagnosed before treating the task as ready for review.',
         ],
       },
@@ -712,7 +779,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Continue the task, then inspect the combination.',
         paragraphs: [
           'Ask for a missed edge case under the same task to preserve its history and account binding. If another agent is changing a caller of the sorting function, review that interaction before integration; two separate worktrees can still disagree about expected behavior.',
-          'Jackalope is in early access. The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
+          'The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
         ],
         links: [
           {
@@ -742,8 +809,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Install and detect the current CLI.',
         paragraphs: [
-          'Follow Kimi’s current installation instructions, then open Agents → Configuration. Jackalope looks for the kimi executable. If it is missing, install it with npm install -g @moonshot-ai/kimi-code and restart Jackalope so it receives the updated PATH. Windows also needs Git for Windows.',
-          'Older Python kimi-cli installations use a different data directory. Follow Kimi’s migration guidance before using managed account profiles; finding a kimi executable alone does not confirm version compatibility or provider access.',
+          "Follow Kimi's current installation instructions, then open Agents → Configuration. Jackalope looks for the kimi executable. If it is missing, install it with npm install -g @moonshot-ai/kimi-code and restart Jackalope so it receives the updated PATH. Windows also needs Git for Windows.",
+          "Older Python kimi-cli installations use a different data directory. Follow Kimi's migration guidance before using managed account profiles; finding a kimi executable alone does not confirm version compatibility or provider access.",
         ],
         links: [
           {
@@ -757,7 +824,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Choose the account and model.',
         paragraphs: [
           'For your existing CLI account, run kimi login. For a separate account, use Add account & sign in in Jackalope, then choose that account in Project → Settings. Named profiles keep Kimi configuration, sign-in data, and sessions in separate directories. They do not restrict access to local files.',
-          'Model choices come from the selected account’s CLI session configuration. Authentication and model discovery do not guarantee that the provider will accept a task or that quota remains. Jackalope checks access when the task starts.',
+          "Model choices come from the selected account's CLI session configuration. Authentication and model discovery do not guarantee that the provider will accept a task or that quota remains. Jackalope checks access when the task starts.",
         ],
         links: [
           {
@@ -769,8 +836,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Run a worker task and answer approvals.',
         paragraphs: [
-          'Assign Kimi Code explicitly to a small task, such as reading project instructions and explaining how to run the tests. Then try a scoped change with an observable check. Kimi streams its response and tool activity into the task, with the CLI’s permission choices, including approval for the session. Structured questions support multiple questions and multiple selections.',
-          'Declining an approval stops the attempt. Unanswered approvals expire after ten minutes; tasks have a thirty-minute limit. Stop ends Jackalope’s owned CLI process tree. Permission scope follows the choices reported by your CLI.',
+          "Assign Kimi Code explicitly to a small task, such as reading project instructions and explaining how to run the tests. Then try a scoped change with an observable check. Kimi streams its response and tool activity into the task, with the CLI's permission choices, including approval for the session. Structured questions support multiple questions and multiple selections.",
+          "Declining an approval stops the attempt. Unanswered approvals expire after ten minutes; tasks have a thirty-minute limit. Stop ends Jackalope's owned CLI process tree. Permission scope follows the choices reported by your CLI.",
           'Kimi supports direct stdio, HTTP, and SSE project connections through ACP, plus on-demand discovery. Direct remote connections require a CLI that advertises the transport. Tools configured inside Kimi remain subject to its own settings and permissions.',
         ],
         links: [
@@ -791,7 +858,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Know the current limits.',
         paragraphs: [
           'Kimi can run tasks, coordinate automatic agent routing, and power Ask Jackalope. Routing and helper requests use a separate agent definition with tools and subagents disabled.',
-          'Task tokens come from the change in Kimi’s session totals, so continuation excludes earlier turns. Context occupancy is shown separately. Cache breakdown, cost, and helper token usage are unavailable. Membership quota is read for the selected managed Kimi account with a current login; custom-provider billing and extra-usage balances are separate. Missing reports stay unknown.',
+          "Task tokens come from the change in Kimi's session totals, so continuation excludes earlier turns. Context occupancy is shown separately. Cache breakdown, cost, and helper token usage are unavailable. Membership quota is read for the selected managed Kimi account with a current login; custom-provider billing and extra-usage balances are separate. Missing reports stay unknown.",
         ],
         links: [
           { href: '/knowledge/task-routing-and-quotas/', label: 'Task usage and account capacity' },
@@ -808,44 +875,26 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/guides/run-codex-and-claude-code-in-parallel/',
     kind: 'Practical guide',
-    title: 'How to run Codex and Claude Code in parallel | Jackalope',
+    title: 'Run Codex and Claude Code in parallel: step by step',
     description:
-      'A practical workflow for running Codex and Claude Code in separate Git worktrees, coordinating dependencies, and reviewing their combined changes.',
+      'Use Claude Code and Codex together: a shared contract, one Git worktree each, a handoff format, cross-review, and checks on the combined result.',
     headline: 'Run Codex and Claude Code together without sharing a checkout.',
-    lede: 'Give each agent a focused outcome, isolate its files in a Git worktree, and make the combined result a deliberate review step.',
+    lede: 'Give each agent a focused outcome, isolate its files in a Git worktree, and make the combined result a deliberate review step. This workflow works with plain terminals; the last section shows where Jackalope helps.',
     image: 'tasks',
-    signals: ['Two focused briefs', 'Two worktrees', 'Visible dependencies', 'One combined review'],
+    signals: ['Shared contract', 'Two worktrees', 'Handoff format', 'One combined review'],
     sections: [
       {
-        title: '1. Split the outcome, not the context.',
+        title: '1. Give two agents a reason to work together.',
         paragraphs: [
-          'Start with one project goal, then separate work only where the tasks can be reviewed independently. Give Codex and Claude Code concrete outcomes, relevant file scopes, and [a shared description of the project constraints](/blog/agents-md-claude-md-project-instructions/).',
-          'Use a dependency when one task truly requires another task’s integrated code. Parallel work should not be an excuse to hide ordering assumptions.',
+          "Using Claude Code and Codex together is most useful when you can describe separate responsibilities. More conversations do not automatically shorten a project: someone still defines the contract between tasks, answers questions, inspects output, and decides what to integrate. Your attention and the project's shared resources are part of the capacity limit.",
+          'If an API shape or product decision is still open, settle it first, then start implementation against the agreed result. For choosing independent work and a concurrency limit in general, see [how to run AI coding agents in parallel](/blog/run-ai-coding-agents-in-parallel/).',
         ],
       },
       {
-        title: '2. Launch each task in its own worktree.',
+        title: '2. Write the shared contract before the prompts.',
         paragraphs: [
-          'Jackalope resolves the target branch and creates [isolated workspaces](/git-worktrees-for-ai-agents/) for the assigned agents. Each attempt receives the project briefing, selected context, and supported tools. You can follow progress, answer questions, and stop an individual task without losing the rest of the plan.',
-        ],
-        bullets: [
-          'Use Codex for one reviewable slice and Claude Code for another.',
-          'Avoid broad overlapping scopes when the same files or contracts are involved.',
-          'Send coordination notes for discoveries that affect related work.',
-          'Rerun or continue a task when its result needs correction.',
-        ],
-      },
-      {
-        title: '3. Review the combination, not only the parts.',
-        paragraphs: [
-          'Passing checks in two worktrees does not prove the patches work together. Inspect each result, [prepare the combined patch](/parallel-coding-agents/), and run the checks that matter against the integrated state before accepting it.',
-          'Jackalope keeps integration explicit and stops when the target or source state has changed. It does not automatically stash, reset, or overwrite unrelated work.',
-        ],
-      },
-      {
-        title: 'Example: add a saved search filter.',
-        paragraphs: [
-          'Agree that a saved filter contains a name and a query before dispatch. Use that decision to distinguish the work that can start now from the work that needs an accepted prerequisite. Agent assignments are examples, not a ranking of model strengths; [using Claude Code and Codex together](/blog/claude-code-and-codex-together/) covers how to split the work.',
+          'Begin with a short brief both sessions receive. State who the feature serves, what observable behavior changes, and what stays out of scope. Define the pieces that would otherwise invite conflicting guesses: names, routes, data shape, labels, and empty states. Keep [project instructions](/blog/agents-md-claude-md-project-instructions/) in the repository so both agents read the same constraints.',
+          'Then divide ownership by complete, reviewable outcomes rather than layers. If the contract changes, tell both agents what changed and which earlier assumption no longer holds. Agent assignments below are examples, not a ranking of model strengths.',
         ],
         table: {
           columns: ['Task', 'Scope and worker', 'Ready when'],
@@ -869,23 +918,82 @@ export const marketingPages: MarketingPage[] = [
         },
       },
       {
-        title: 'Handle a changed assumption explicitly.',
+        title: '3. Start each session in its own worktree.',
         paragraphs: [
-          'If the storage task discovers that names must be unique, pause the dependent selector task and update the contract. Ask the documentation task to revise its explanation. Preserve those corrections in task history so review explains why the behavior changed.',
-          'Before accepting the combined result, create a filter, restart, select it, and remove it. Check the empty list and an existing saved-data fixture. A clean merge and independent unit tests do not cover that complete workflow.',
+          'Create a separate Git worktree for each implementation task from the same commit, make the project build there first, and reserve different ports and disposable data if both agents run the application. The [Git worktree setup and cleanup guide](/git-worktrees-for-ai-agents/) has the commands.',
+          'Claude Code documents worktree sessions, and OpenAI documents managed worktrees for Codex. You can also prepare ordinary worktrees and start each CLI inside its folder. Pick one method per task instead of mixing checkout managers. Sign in to each provider through its supported flow and check you are on the intended work or personal account.',
         ],
         links: [
+          {
+            href: 'https://code.claude.com/docs/en/worktrees',
+            label: 'Claude Code: parallel sessions with worktrees',
+          },
+          {
+            href: 'https://learn.chatgpt.com/docs/environments/git-worktrees',
+            label: 'OpenAI: worktrees and handoff',
+          },
+        ],
+      },
+      {
+        title: '4. Dispatch with ownership and a handoff format.',
+        paragraphs: [
+          'Give both agents the shared contract, then a task-specific brief. Ask them to report baseline failures and dependencies before changing unrelated code, and say whether they may commit, install dependencies, or use connected services. Ask for progress only when it changes a decision: a blocker, a scope conflict, a completed check, or a result ready for review.',
+        ],
+        code: {
+          label: 'Append this handoff request to each task brief',
+          language: 'text',
+          value:
+            'Return a handoff with:\n- Outcome implemented and relevant changed files.\n- Workspace and baseline commit.\n- Commands run, their results, and the revision tested.\n- Manual interactions checked and evidence captured.\n- Contract changes, dependencies, and unresolved questions.\n- Work that is incomplete or could not be verified.\nDo not claim a check passed if it was skipped or blocked.',
+        },
+      },
+      {
+        title: '5. Use cross-review to investigate specific risks.',
+        paragraphs: [
+          'Once one implementation is ready, the other agent can review it. Give it the actual patch, the acceptance criteria, and enough surrounding code, and start with a read-only review so findings and proposed changes stay separate. Ask targeted questions: can an empty list produce an invalid selection, would a test fail if the feature disappeared, do the help instructions work against the real UI?',
+          'A reviewer can be wrong. Check each finding against the current revision before requesting a fix, and do not let the second agent expand the feature. Cross-review generates questions; it does not replace your acceptance decision.',
+        ],
+      },
+      {
+        title: '6. Review and integrate the combination.',
+        paragraphs: [
+          'Passing checks in two worktrees does not prove the patches work together. Inspect each result, [prepare the combined patch](/parallel-coding-agents/), and run the checks that matter against the integrated state. If both tasks changed the same file, treat the conflict as a decision about the intended result.',
+          'If the storage task discovers that names must be unique, pause the dependent selector task and update the contract. Before accepting, create a filter, restart, select it, and remove it, then check the empty list and an existing saved-data fixture. When something fails, route the correction and the reproduction to the task that owns it, and repeat the affected checks.',
+        ],
+        links: [
+          {
+            href: '/guides/review-ai-generated-code/',
+            label: 'Review agent-generated code',
+          },
           {
             href: '/knowledge/git-worktrees/',
             label: 'How dependent tasks wait for integration',
           },
         ],
       },
+      {
+        title: 'Know when one agent is enough.',
+        paragraphs: [
+          'For your first few runs, note time to an accepted result, time spent reviewing, repeated work, and defects found. Use one agent when the work is small or tightly coupled, and several when tasks have clear boundaries you can actually review. If the same shared file keeps blocking progress, change the plan rather than adding sessions.',
+        ],
+      },
+      {
+        title: 'Where Jackalope fits.',
+        paragraphs: [
+          'Jackalope resolves the target branch and creates isolated worktrees for the assigned agents. Each attempt receives the project briefing, selected context, and supported tools. You can follow progress, answer questions, and stop an individual task without losing the rest of the plan.',
+          'Integration stays explicit and stops when the target or source state has changed. Jackalope does not automatically stash, reset, or overwrite unrelated work.',
+        ],
+        bullets: [
+          'Use Codex for one reviewable slice and Claude Code for another.',
+          'Avoid broad overlapping scopes when the same files or contracts are involved.',
+          'Send coordination notes for discoveries that affect related work.',
+          'Rerun or continue a task when its result needs correction.',
+        ],
+      },
     ],
     related: [
       { href: '/agents/codex/', label: 'Codex in Jackalope' },
       { href: '/agents/claude-code/', label: 'Claude Code in Jackalope' },
-      { href: '/git-worktrees-for-ai-agents/', label: 'How agent worktrees work' },
+      { href: '/git-worktrees-for-ai-agents/', label: 'Git worktree setup and cleanup' },
     ],
   },
   {
@@ -940,12 +1048,12 @@ export const marketingPages: MarketingPage[] = [
         title: 'Make the next review decision concrete.',
         paragraphs: [
           'Accept when the requested behavior, compatibility constraints, current patch, and relevant evidence agree. Request a correction when the implementation is incomplete. Record a specific unverified condition when the needed environment is unavailable; do not convert it into a passing check.',
-          'After a follow-up, check the new patch and rerun checks affected by those edits. For parallel results, include callers of shared types and services. The useful question is what evidence would reveal a wrong assumption in this change.',
+          'After a follow-up, check the new patch and rerun checks affected by those edits. For parallel results, include callers of shared types and services. Ask what evidence would reveal a wrong assumption in this change.',
         ],
         links: [
           {
             href: 'https://google.github.io/eng-practices/review/reviewer/looking-for.html',
-            label: 'Google’s code review guidance',
+            label: "Google's code review guidance",
           },
           {
             href: '/features/browser-automation-for-coding-agents/',
@@ -1002,21 +1110,21 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Connect tools to the agents that use them.',
         paragraphs: [
-          'Codex, Claude Code, OpenCode, and Kimi Code support direct project connection delivery. All six task adapters support on-demand discovery for stdio and HTTP connections. CLI-global tools remain subject to each agent’s own configuration. See the agent guide for setup details.',
+          "Codex, Claude Code, OpenCode, and Kimi Code support direct project connection delivery. All seven task adapters support on-demand discovery for stdio and HTTP connections. CLI-global tools remain subject to each agent's own configuration. See the agent guide for setup details.",
         ],
       },
       {
         title: 'Choose where each piece of knowledge belongs.',
         paragraphs: [
           'Put stable conventions in project instructions: the build command, supported data formats, and ownership boundaries. Keep a task-specific requirement in the brief. Record a discovered constraint as a lesson only when its evidence and scope are clear, so a temporary workaround does not become a rule for every future task.',
-          'For example, a checkout’s temporary port conflict belongs to that run. A documented requirement to preserve old preference files belongs in durable project guidance. Review or remove lessons when the code changes; saved context is useful only while its assumptions remain true.',
+          "For example, a checkout's temporary port conflict belongs to that run. A documented requirement to preserve old preference files belongs in durable project guidance. Review or remove lessons when the code changes; saved context is useful only while its assumptions remain true.",
         ],
       },
       {
         title: 'Inspect the context when a result misses the mark.',
         paragraphs: [
           'If an agent used the wrong test command, inspect what the task received before adding more instructions. Check the project default, automatic matches, and any explicit override in Customize task. Updating a project rule helps future tasks; it does not rewrite the context already delivered to an earlier attempt.',
-          'Keep secrets in the relevant private configuration instead of a reusable prompt. Selected tools and an agent’s own CLI settings can add access beyond the text in the brief, so check both when diagnosing an unexpected dependency.',
+          "Keep secrets in the relevant private configuration instead of a reusable prompt. Selected tools and an agent's own CLI settings can add access beyond the text in the brief, so check both when diagnosing an unexpected dependency.",
         ],
         links: [
           {
@@ -1082,7 +1190,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Example: a weekly dependency review.',
         paragraphs: [
           'Save a task that reports outdated dependencies, release notes that affect the project, and recommended checks. Make version changes a separate decision. Select the project account, choose the timezone, set a missed-run policy, and inspect the first occurrence before relying on the schedule.',
-          'If your laptop was asleep, “skip” avoids replaying an old occurrence; a catch-up policy can run one missed occurrence when eligible. Review the resulting history so a missed run is not confused with a successful check that found no work.',
+          'If your laptop was asleep, "skip" avoids replaying an old occurrence; a catch-up policy can run one missed occurrence when eligible. Review the resulting history so a missed run is not confused with a successful check that found no work.',
         ],
         links: [
           {

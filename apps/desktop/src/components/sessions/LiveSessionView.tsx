@@ -61,6 +61,7 @@ import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
 import { SessionTopics } from './SessionTopics';
 import { TranscriptResult } from './TranscriptResult';
+import { WindowGlob } from './WindowGlob';
 import './live-session.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { useAction } from '../../hooks/useAction';
@@ -458,13 +459,20 @@ export function LiveSessionView({
             <ArrowLeft size={18} />
           </Button>
         )}
-        <span className="live-mascot" aria-hidden="true" ref={mascotRef}>
+        <WindowGlob
+          conversation={session.id}
+          provider={provider}
+          agent="Jackalope"
+          disabled={session.closed}
+          mascotRef={mascotRef}
+          onAttached={append}
+        >
           <AgentCharacter
             provider={provider}
             state={questions.length ? 'waiting' : active ? 'working' : 'idle'}
             gaze={mascotGaze}
           />
-        </span>
+        </WindowGlob>
         <div className="live-title" data-tauri-drag-region={detached || undefined}>
           <h1 data-tauri-drag-region={detached || undefined}>{session.title}</h1>
           <span className="live-muted" data-tauri-drag-region={detached || undefined}>
