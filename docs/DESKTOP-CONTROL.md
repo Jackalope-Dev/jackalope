@@ -37,32 +37,90 @@ app request only by a remembered app grant. Unknown scopes written by a newer ap
 ignored. Full-desktop grants cannot be stored.
 
 The selected handle, process ID, process start time and window class (bundle ID on macOS) are checked
-on every operation. Hidden, minimized, closed or replaced windows fail the check.
-Grants live in memory for the current attempt. Stop, completion, release, Escape, the
-bar's Cancel and the Screen view's Revoke end them at once; restart and continuation
-need a new question unless a remembered grant applies. One attempt may reserve desktop
+on every operation. Closed or replaced windows fail the check, and a hidden or minimized
+window fails each action until the person restores it. Grants live in memory for the
+current attempt. Stop, completion, release, Escape, the bar's Cancel and the Screen
+view's Revoke end them at once; restart and continuation need a new question unless a
+remembered grant applies or a paused window was left attached (see
+[Attaching a window](#attaching-a-window-from-a-conversation)). One attempt may reserve desktop
 control at a time, including across Jackalope profiles through a per-user file lease.
 Calls serialize per attempt. The lease remains held until canceled in-flight work has
 returned. Other applications can still interact with the desktop.
+
+### Working in the background
+
+On Windows and macOS a window or app grant keeps working while the person uses other
+apps. Losing focus, moving, resizing and minimizing do not pause it; the indicator
+reports the grant as in the background while the granted window (or, for an app grant,
+the app) is not in front. A move or resize still makes earlier snapshots stale.
+
+In the background, `snapshot`, per-window `screenshot`, `wait_for`, `list_windows` and
+element actions by ref keep working: `invoke`, `select`, `set_value`, `click` with an
+element that has an Accessibility or UI Automation action, `type` with an element (the
+text is appended through the control's value; password and read-only controls are
+refused), and `scroll` with an element (its scroll area moves through Accessibility or
+UI Automation). `focus` with an element works in the background on macOS and waits on
+Windows, where UI Automation focus would raise the window. Coordinate clicks,
+`double_click`, `right_click`, `drag`, `scroll` and `type` without an element, `press`,
+`focus` without an element, `switch_window`, `open_app`, and element actions that fall
+back to pointer or keyboard input need the window in front. Calls that need it wait for
+it like paused calls; any that still find it behind return `{"status":"background"}`
+with an instruction to use element refs or call again.
+
+Nothing brings a window or app in front of the person's work. A window grant never
+changes focus. An app grant switches between its app's windows only while that app is
+already in front. A desktop grant is never in the background, so it may bring a granted
+window forward, and the result reports it. On Windows the helper checks that the window
+is in front before any UI Automation call that would move focus.
 
 ### Attaching a window from a conversation
 
 The person can pick the window instead of waiting for the agent to ask. Dragging the
 agent in a conversation's header out of Jackalope opens a small always-on-top overlay
-whose blob names the window under the pointer (the helpers' read-only `at` action,
-which runs without a grant like `list`); Enter or a click on the agent lists eligible
-windows instead. Jackalope's own windows, untitled windows, the desktop, taskbars, the
-Dock and other system surfaces are never targets. X11 offers only the list; Wayland
-portal desktops keep the portal picker.
+whose blob names the window under the pointer, while an accent outline pulses around
+that window. Enter or a click on the agent lists eligible windows instead. Jackalope's
+own windows, untitled windows, the desktop, taskbars, the Dock and other system surfaces
+are never targets. X11 offers only the list; Wayland portal desktops keep the portal
+picker. The helpers' read-only `at` action (the window under the pointer) and `bounds`
+action (one window's geometry, for the badge and edge) run without a grant, like `list`.
 
 Dropping or choosing asks whether the agent may see the window or see and control it.
 Confirming stages that window for the conversation for 30 minutes. The conversation's
 next window-scope `request_access` takes it once instead of asking, if the handle,
-process and process start time still match; app and desktop requests ignore it. The
-grant then starts through the same path as an answered question, with the visible bar,
-pause and cancel behavior and site checks above, and is recorded as an answered
-"Desktop control" question. A see-only grant allows `snapshot`, `screenshot`,
-`wait_for` and `list_windows` and refuses every other action.
+process and process start time still match; app and desktop requests ignore it. A run
+outside a conversation looks for a window staged under its task id. The grant then
+starts through the same path as an answered question, with the visible bar, pause and
+cancel behavior and site checks above, and is recorded as an answered "Desktop control"
+question. A see-only grant allows `snapshot`, `screenshot`, `wait_for` and
+`list_windows` and refuses every other action.
+
+On Windows and macOS a waiting window wears a badge on its top edge that follows it:
+the agent's character, "Attached" with "can control" or "see only", and × to detach.
+Clicking the badge opens a box for asking Jackalope about the window, which sends the
+question into the conversation. A thin accent edge, solid for control and dashed for
+see only, stays around the window and follows it. In the app the conversation's agent
+shows as away, dimmed with a link mark, beside the window's app name; clicking the name
+shows the window again and × detaches it. The badge and edge close when the person
+detaches, the 30 minutes pass or the agent takes the window, so the grant's own bar and
+frame are then the only indicator. The drag overlay, target outline, badge and edge are
+excluded from screen capture.
+
+The new-work composer can attach a window before a conversation exists. The window
+waits under that project's draft and moves to the conversation or task Send starts, or
+back to the draft if starting fails; the hand-off keeps the original 30 minutes. With a
+window attached, Send skips the planning check and starts one conversation. Comparisons,
+plans and Plan with me do not receive the window; they detach it and say so. Clearing
+the draft or switching to another project's composer also detaches it. A question asked
+on a draft window's badge goes through the open composer, or is added to the draft when
+no composer is open.
+
+If an attempt ends on its own while a conversation's window grant is paused, the window
+stays attached to that conversation for another 30 minutes, and its badge reads
+"Paused" with a Resume button. Resume sends one automatic "Desktop control resumed"
+note into the conversation when its agent is idle, so the agent continues without a
+reply; nothing is sent while the agent is working. The next attempt's grant on that
+window starts resumed, with the same checks as the bar's Resume. Resume grants nothing
+by itself.
 
 ### Browsers and websites
 
@@ -87,25 +145,45 @@ bound than a whole-window snapshot.
 On Windows, an opaque black bar sits flush with the top of the granted window's monitor
 (the primary monitor for desktop grants), centered above a wide glow in the current
 desktop accent color. Desktop grants glow on every monitor; app grants follow the
-app's active window. The bar names what is controlled: a window, the app or your
-computer. The bar and glow are excluded from Jackalope's own monitor captures. Its rounded lower
+app's active window. The bar says whether Jackalope is working here, on your computer
+or in the background, or that control is paused and why. While the granted window or
+app is in the background the glow hides, so it never draws over the person's work. The
+bar and glow are excluded from Jackalope's own monitor captures. Its rounded lower
 corners, shared logo, display-scaled type and real Pause/Resume and Cancel buttons
 keep the status and Escape hint readable. The center of the screen stays clear.
 The overlay has no taskbar entry, does not activate on arrival and uses no animation.
 
-Physical Escape cancels access. Mouse movement and typing pause control. A window
-grant also pauses when that window loses focus, is minimized, moves or resizes; an app
-grant pauses when another app comes forward; a desktop grant pauses only on physical
-input. Only the human
-can Resume from the bar. Agent-generated input is tagged so it does not trigger
-its own pause; an agent's Escape remains scoped to the selected application.
-Every pause/resume invalidates previous snapshots, so resumed work must inspect
-the window again. Paused access also blocks snapshots and captures.
+On macOS, Windows and X11 control pauses only when the person disrupts the agent: a
+physical click on the granted window (any window of the app for an app grant), or a key
+press while it is in front, that lands within 0.6 seconds of the agent's own input, or
+three such clicks or keys within 1.5 seconds. A single click or key otherwise passes.
+Physical Escape pauses control while the granted window or app is in front. With a
+desktop grant input anywhere counts. Moving the mouse, scrolling, releasing a button or
+key, modifier keys alone, clicks on the bar's own buttons and input in other apps do not
+pause, and an Escape in another app is left to that app. The bar names why it paused.
+Stop on the bar and Revoke in the Screen view always work. On X11 Escape pauses from
+anywhere, and a window that loses focus, moves or resizes pauses control. Only the human can Resume
+from the bar. Agent-generated input is tagged so it does not trigger its own pause; an
+agent's Escape remains scoped to the selected application. Every pause/resume
+invalidates previous snapshots, so resumed work must inspect the window again. Paused
+access also blocks snapshots and captures.
 
-macOS and X11 use a native bar with Pause/Resume and Cancel. Grants start paused;
-click Resume to activate the granted window or app and begin. On macOS an accent
-frame surrounds the granted window, or the screens for app and desktop grants,
-while control is active; the bar and frames are excluded from screen capture. macOS uses a listening
+Calls made while control is paused wait for Resume instead of failing at once. Over MCP
+a call waits about 50 seconds, then returns `{"status":"paused"}` with the reason and an
+instruction to call again rather than ask in the conversation; HTTP agents get that
+status at once. After six paused replies in a row, further calls fail with an
+instruction to ask the person to click Resume. Waiting holds no operation lock, so the
+Screen view and Stop stay responsive.
+
+macOS and X11 use a native bar. Grants start paused; click Resume to activate the
+granted window or app and begin. On macOS the bar carries the Jackalope mark, the
+status and Pause/Resume, Stop, Open in Jackalope and fold buttons, takes the app's
+theme colors and folds to a small chip until the pointer leaves it. While the granted
+window or app is in the background the bar stays a chip until hovered. A thin accent
+frame sits just inside the granted window, or the screens for app and desktop grants,
+with an inner accent glow while control is active; paused control turns it neutral. A
+window's frame sits just above that window, so windows in front of it cover the frame
+too. The bar and frames are excluded from screen capture. macOS uses a listening
 Core Graphics event tap; X11 listens to XInput2 raw device events and excludes the
 XTEST virtual devices used for its own input. Other programs using XTEST share
 that exemption; this remains an interaction guard, not an input-security boundary.
@@ -158,11 +236,14 @@ element's current center. Results report `method` (`accessibility`, `pointer` or
 accessibility actions; there refs resolve to the recorded center and `invoke` becomes
 a click. Portal desktops run AT-SPI actions and have no coordinate fallback for refs.
 
+Agents should prefer element-ref actions: they leave the pointer and focus alone and
+keep working while the window is in the background. Pointer input, key presses and
+typing without an element wait for the window to come forward (see
+[Working in the background](#working-in-the-background)).
+
 Input requires `snapshot_id` from the latest snapshot, screenshot or `wait_for`. It
-expires after 60 seconds and is consumed even if input fails. Window grants never
-change focus; app and desktop grants may bring a granted window forward for pointer
-or keyboard input and report it. A moved/resized window or changed current window
-requires inspection again. Keyboard modifiers or mouse buttons held by the user block
+expires after 60 seconds and is consumed even if input fails. A moved/resized window or
+changed current window requires inspection again. Keyboard modifiers or mouse buttons held by the user block
 input. Chords that switch apps or desktops, open system UI or quit apps (Alt+Tab,
 Primary+Tab, Control/Alt/Primary+Escape, Alt+F4, Primary+q, Primary+Space,
 Control+Alt+Delete) and paste (Primary/Control+v) are rejected. Arbitrary scripts,

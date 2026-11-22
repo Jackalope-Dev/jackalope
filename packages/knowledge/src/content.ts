@@ -98,7 +98,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     title: 'Desktop control paused unexpectedly',
     symptom: 'The desktop control bar shows Paused while an agent is using an app.',
     quickFix:
-      'Moving the mouse, touching the keyboard or changing window focus pauses control right away. Click Resume to continue.',
+      'Control pauses when you step in while Jackalope is acting, keep clicking or typing in its window, or press Escape. Moving the mouse, scrolling and using other apps never do. Click Resume on the bar to continue.',
     targetSlug: 'windows-desktop-control',
     targetAnchor: 'physical-interruption',
   },
@@ -1082,7 +1082,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Can I hand an agent a window myself?',
         paragraphs: [
           'Yes. In a conversation, drag the agent at the top left out of Jackalope and drop it on any window. Jackalope names the window under your pointer, then asks whether the agent may see it or see and control it. Nothing is shared until you choose.',
-          "The agent's next request for one window uses the window you picked, without asking again, for up to 30 minutes. See-only lets it read and screenshot the window but not click or type. A chip beside the agent shows the attached window; click its × to detach it.",
+          "The agent's next request for one window uses the window you picked, without asking again, for up to 30 minutes. See-only lets it read and screenshot the window but not click or type.",
+          'While it waits, the window wears a small Jackalope badge on its top edge and a thin outline, dashed for see-only. Click the badge to ask Jackalope about the window, or its × to detach it. In the conversation, the agent dims while its window is attached; click the app name beside it to find the window again.',
+          'You can attach a window from the new-work box too. It goes to the conversation that Send starts. Plans, comparisons and Plan with me start several agents, so they leave the window detached.',
+          'If Jackalope finishes its turn while control of the window is paused, the window stays attached and its badge shows Resume. Click it and Jackalope picks up where it left off, without you typing anything.',
           'Prefer the keyboard? Focus the agent and press Enter to choose from a list of open windows. The drag works on Windows and macOS; Linux on X11 uses the list.',
         ],
       },
@@ -1104,7 +1107,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'visual-indicators',
         question: 'How do I know an agent is using my computer?',
         paragraphs: [
-          'On Windows, a bar at the top of the screen names what the agent controls, such as "Jackalope is using your computer", and a glow in your accent color surrounds the active window. On macOS and Linux X11 a similar bar appears, and macOS adds a frame around the granted window or screens. Each bar has Pause or Resume and Cancel buttons.',
+          'On Windows, a bar at the top of the screen says what Jackalope is doing, such as "Jackalope is working here", and a glow in your accent color surrounds the active window. On macOS and Linux X11 a similar bar appears, and macOS adds a frame around the granted window or screens. Each bar has Pause or Resume and Stop or Cancel buttons.',
+          'When the granted window is behind other windows, the bar says Jackalope is working in the background. The Windows glow hides and the macOS bar folds to a small chip, so neither covers what you are doing.',
           'On macOS and Linux X11, a grant starts paused. Click Resume on the bar to begin.',
           "On Wayland desktops that use the remote desktop portal, there is no Jackalope bar. Approve your desktop's own sharing prompt to begin, and use its sharing indicator to see or stop access. The task's Screen view shows control on every platform.",
         ],
@@ -1113,13 +1117,13 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'physical-interruption',
         question: 'What pauses or cancels control?',
         paragraphs: [
-          'On Windows, macOS and Linux X11, your own input always comes first. Jackalope watches your physical mouse and keyboard and stops interacting right away when you use them.',
+          'Your own input always comes first. When you take over the granted window yourself, Jackalope stops interacting right away. You can keep working in other apps while it works.',
         ],
         bullets: [
-          'Moving the physical mouse or typing puts control in the Paused state right away.',
-          'Pressing the physical Escape key cancels access right away.',
-          'With a window grant, the window losing focus, being minimized, moved or resized pauses control. With an app grant, another app coming forward pauses it. A desktop grant pauses only on your input.',
-          'Only you can click Resume. After you resume, the agent takes a fresh snapshot so it does not click on an outdated screen.',
+          'Control pauses only when you get in its way: a click or key in its window while Jackalope is acting, a few clicks or keys in a row, or Escape. A single stray click, moving the mouse and scrolling let it keep going. The bar always says why.',
+          'Switching to another app, or moving, resizing or minimizing the granted window, does not pause control on Windows and macOS. Jackalope keeps reading the window, pressing its buttons, typing into its fields and scrolling its lists in the background. Clicks at a spot on screen, key presses and switching windows wait until you bring the window back. Nothing it does pulls a window in front of your work. A minimized window waits until you restore it.',
+          'Pressing Escape while the granted window is in front pauses control. Escape in another app stays with that app. Stop on the bar and Revoke in the Screen view always end control.',
+          'Only you can click Resume. The agent waits for it instead of asking you in the conversation. After you resume, it takes a fresh snapshot so it does not click on an outdated screen.',
           "On portal desktops, your input does not pause control and Escape does not cancel. Stop sharing from your desktop's indicator, or stop the task, to end access.",
         ],
       },
@@ -1139,7 +1143,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Open the application and choose its window or app when the agent asks. State the intended action and anything that requires your review.',
           'Follow along in the task’s Screen view, which lists each action, how it was sent and a small capture afterwards.',
-          "Keep the target visible and watch the control status. If you need the computer, pause or cancel from the control bar, or from your desktop's sharing indicator on portal desktops.",
+          "Watch the control status. You can keep working in other apps meanwhile. If you need the granted window, pause or stop from the control bar, or from your desktop's sharing indicator on portal desktops.",
           'After an interruption, review the current window before resuming. The agent needs a fresh snapshot because the UI may have changed.',
           'Read the task result and inspect the application itself. A completed input action is not proof that an external service accepted or saved it.',
         ],

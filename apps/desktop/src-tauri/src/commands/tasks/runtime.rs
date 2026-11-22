@@ -2513,7 +2513,7 @@ impl TaskRuntime {
             runtime.stage(&request.id, None);
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
-            crate::commands::desktop_control::close(&request.id);
+            crate::commands::desktop_control::attempt_ended(&request.id);
             crate::commands::computers::release_run(&request.id);
         });
         Ok(id)

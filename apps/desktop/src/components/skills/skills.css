@@ -1,0 +1,496 @@
+/* Skills: a sync overview with the account's computers, then the skills as tiles. */
+.skills-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The overview: the computers around the account, and what sync is doing. */
+.skill-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 16px 24px 16px 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+.skill-hero-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.skill-hero-body h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.skill-hero-body p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.skill-hero-note {
+  font-size: var(--text-sm);
+}
+.skill-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.skill-hero-actions:empty {
+  display: none;
+}
+
+.skill-orbit {
+  position: relative;
+  flex-shrink: 0;
+  margin: 0;
+}
+.skill-orbit-ring {
+  position: absolute;
+  inset: 14%;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-full);
+  transition: border-color var(--motion-slow) var(--ease-out);
+}
+.skill-orbit[data-enabled] .skill-orbit-ring {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+}
+.skill-orbit-hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  translate: -50% -50%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  transition:
+    background var(--motion-slow) var(--ease-out),
+    color var(--motion-slow) var(--ease-out);
+}
+.skill-orbit[data-enabled] .skill-orbit-hub {
+  border-color: transparent;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+/* A link from the hub's edge to a computer: rotated about the hub's centre, then
+   moved out past the hub along its own direction. */
+.skill-orbit-link {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 0;
+  border-top: 2px dashed var(--color-border);
+  transform-origin: 0 50%;
+  translate: 0 -1px;
+  transform: translateX(22px);
+  transition:
+    border-color var(--motion-slow) var(--ease-out),
+    width var(--motion-slow) var(--ease-out);
+}
+.skill-orbit-link[data-state="current"] {
+  border-top-style: solid;
+  border-color: var(--color-success);
+}
+.skill-orbit-link[data-state="behind"] {
+  border-color: var(--color-warning);
+}
+.skill-orbit-link .ui-flow-pulse {
+  top: -1px;
+}
+.skill-orbit-devices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.skill-orbit-device {
+  position: absolute;
+  translate: -50% -50%;
+  animation: ui-pop-in var(--motion-slow) var(--ease-out);
+}
+.skill-orbit-node {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  transition:
+    border-color var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out);
+}
+.skill-orbit-node:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.skill-orbit-device[data-here] .skill-orbit-node {
+  border-color: transparent;
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+.skill-orbit-device[data-state="current"]:not([data-here]) .skill-orbit-node {
+  border-color: var(--color-success);
+  color: var(--color-text-primary);
+}
+
+/* Tiles: one row height, single-line facts, actions in the footer. */
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  grid-auto-rows: 1fr;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.skill-grid > li {
+  display: grid;
+  min-width: 0;
+}
+.skill-grid > li[data-fresh] {
+  animation: ui-rise-in var(--motion-slow) var(--ease-out);
+}
+.skill-tile {
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 14px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  transition:
+    border-color var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out);
+}
+.skill-tile:hover,
+.skill-tile:focus-within {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+}
+.skill-tile[data-status="conflict"] {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border-subtle));
+}
+.skill-tile-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.skill-tile-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+}
+.skill-tile-title {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+}
+.skill-tile-open {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.skill-tile-open:hover {
+  text-decoration: underline;
+}
+.skill-tile-open:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.skill-tile-description {
+  display: -webkit-box;
+  min-height: calc(2 * 1.45em);
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.skill-tile-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.skill-tile-where {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-tile-detail {
+  min-height: 1.4em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-tile-detail[data-warn] {
+  color: var(--color-warning);
+}
+.skill-tile-actions {
+  display: flex;
+  align-self: end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* The per-skill ring: one arc per computer, filled where it holds the newest copy. */
+.skill-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+}
+.skill-ring:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.skill-ring svg {
+  position: absolute;
+  inset: 0;
+}
+.skill-ring circle {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.skill-ring-track {
+  stroke: var(--color-border-subtle);
+}
+.skill-ring-arc {
+  stroke: var(--color-border);
+  transition:
+    stroke var(--motion-slow) var(--ease-out),
+    stroke-dashoffset var(--motion-slow) var(--ease-out);
+}
+.skill-ring-arc[data-state="current"] {
+  stroke: var(--color-success);
+}
+.skill-ring-arc[data-state="behind"] {
+  stroke: var(--color-warning);
+}
+.skill-ring-count {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.skill-ring[data-synced] .skill-ring-count {
+  color: var(--color-text-primary);
+}
+.skill-ring-tip {
+  display: grid;
+  gap: 2px;
+}
+
+.skill-empty-filter {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+/* The directory that does not exist yet, stated plainly. */
+.skill-browse {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.skill-browse-mark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+}
+.skill-browse h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+}
+.skill-browse p {
+  max-width: 68ch;
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* Detail dialog. */
+.skill-detail {
+  width: min(760px, calc(100vw - 32px));
+}
+.skill-detail-body {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 0 32px 24px;
+  overflow: auto;
+}
+.skill-detail > .app-dialog-footer {
+  margin: 0;
+  padding: 16px 32px 24px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.skill-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+.skill-detail-facts dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.skill-detail-facts dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+}
+.skill-detail-path {
+  grid-column: 1 / -1;
+}
+.skill-detail-path code,
+.skill-new-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+.skill-detail-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.skill-source,
+.skill-diff {
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.skill-source:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.skill-diff {
+  list-style: none;
+}
+.skill-diff li {
+  display: grid;
+  grid-template-columns: 1.5ch minmax(0, 1fr);
+  gap: 8px;
+  padding: 0 6px;
+  border-radius: var(--radius-xs);
+}
+.skill-diff li[data-kind="added"] {
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+.skill-diff li[data-kind="removed"] {
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+.skill-diff-mark {
+  color: var(--color-text-muted);
+}
+
+/* New skill dialog. */
+.skill-new-form {
+  display: grid;
+  gap: 14px;
+}
+.skill-new-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 720px) {
+  .skill-hero {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    padding: 16px;
+    text-align: center;
+  }
+  .skill-hero-actions {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-orbit-ring,
+  .skill-orbit-hub,
+  .skill-orbit-link,
+  .skill-orbit-node,
+  .skill-tile,
+  .skill-ring-arc {
+    transition: none;
+  }
+  .skill-orbit-device,
+  .skill-grid > li[data-fresh] {
+    animation: none;
+  }
+  .skill-orbit-link .ui-flow-pulse {
+    display: none;
+  }
+}
+.skill-source pre {
+  margin: 0;
+  font: inherit;
+  white-space: inherit;
+}
+.skill-search {
+  flex: 1 1 220px;
+  min-width: 180px;
+}

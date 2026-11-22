@@ -94,15 +94,17 @@ export function ArcColorPicker({
             </Popover.Close>
           </div>
           <ThemeEditor value={draft} onChange={setDraft} />
-          <div className="flex justify-between items-center pt-5 mt-5 border-t border-[var(--color-border-subtle)]">
-            <button
-              type="button"
-              onClick={() => setDraft(currentTheme)}
-              className="text-xs text-[var(--color-text-secondary)] flex gap-1.5 items-center"
-            >
-              <RotateCcw className="size-3" />
-              Reset preview
-            </button>
+          <div className="flex justify-between items-center gap-3 pt-5 mt-5 border-t border-[var(--color-border-subtle)]">
+            <Tooltip content="Reset preview">
+              <button
+                type="button"
+                onClick={() => setDraft(currentTheme)}
+                className="quiet-icon"
+                aria-label="Reset preview"
+              >
+                <RotateCcw className="size-4" />
+              </button>
+            </Tooltip>
             <span className="flex gap-2">
               {project?.preferences?.theme && (
                 <Button
