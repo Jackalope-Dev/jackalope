@@ -130,6 +130,12 @@ Sequenzy, whose private API credential stays on the server. Legacy saved-form
 submissions use Sequenzy's confirmation settings and bypass that queue. The popup
 uses the site's shared dialog; it does not inject a hosted provider widget.
 
+Open signup or waitlist mode is the service's `OPEN_SIGNUP` setting, not a website
+build variable. Prerendered pages are the same in both modes; `/waitlist/`, `/access/`
+and the signup confirmation read `GET /v1/access/status` (`useSignupMode` in
+`src/access-api.ts`) and show waitlist or pass copy only in waitlist mode. Signed-in
+member pages use the `openSignup` field of their own responses.
+
 Before enabling signup, verify the sending domain, reply-to and mailing addresses,
 audience, consent settings and email sequences in the provider account. Keep account
 records and subscriber exports private. Live checks require an operator-controlled

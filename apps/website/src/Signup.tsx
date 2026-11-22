@@ -1,5 +1,5 @@
 import { Button, Checkbox, IconButton, Input } from '@jackalope/ui';
-import { accessMessage, accessOrigin, accessRequest } from './access-api';
+import { accessMessage, accessOrigin, accessRequest, useSignupMode } from './access-api';
 import { waitlistReferral } from './referral';
 import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -17,6 +17,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
   const [message, setMessage] = useState('');
   const request = useRef<AbortController | null>(null);
   const challenge = useRef<TurnstileHandle | null>(null);
+  const mode = useSignupMode();
   useEffect(() => () => request.current?.abort(), []);
   const action = popup ? signupActions.popup : signupActions.inline;
   async function subscribe(event: FormEvent<HTMLFormElement>) {
@@ -103,7 +104,14 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               <p>{message}</p>
             </div>
           </div>
-          {accessOrigin && (
+          {/* Before the email is confirmed there is no account to open, so open signup
+              offers the download; a waitlist signup can look up its place. */}
+          {mode === 'open' && (
+            <a className="button button-secondary" href="/download/">
+              Download Jackalope <ArrowRight size={16} />
+            </a>
+          )}
+          {accessOrigin && mode === 'waitlist' && (
             <a className="button button-secondary" href="/waitlist/">
               Open my account <ArrowRight size={16} />
             </a>

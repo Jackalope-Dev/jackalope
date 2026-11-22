@@ -3,7 +3,13 @@ import { isAccessToken } from '@jackalope/contracts/links';
 import { Button, Input, MailIcon, Panel, RefreshIcon } from '@jackalope/ui';
 import { ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
+import {
+  AccessRequestError,
+  accessMessage,
+  accessOrigin,
+  accessRequest,
+  useSignupMode,
+} from './access-api';
 import { BrandMark } from './BrandMark';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import { WaitlistQuestions } from './WaitlistPreferences';
@@ -28,8 +34,9 @@ const shareMessage = (approved: boolean) =>
 export function WaitlistPage() {
   const [place, setPlace] = useState<Place | null>(null);
   const [token, setToken] = useState('');
-  /** With open signup there is no line to look up, so the page points to sign-in instead. */
-  const [openSignup, setOpenSignup] = useState(false);
+  /** With open signup there is no line to look up, so the page leads to signup and download. */
+  const mode = useSignupMode();
+  const open = mode === 'open';
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -76,10 +83,6 @@ export function WaitlistPage() {
     readLink();
     window.addEventListener('hashchange', readLink);
     const controller = new AbortController();
-    if (accessOrigin)
-      void accessRequest<{ openSignup?: boolean }>('status', undefined, controller.signal)
-        .then((status) => setOpenSignup(status.openSignup === true))
-        .catch(() => undefined);
     if (accessOrigin)
       void accessRequest<Place>('waitlist/me', undefined, controller.signal)
         .then(setPlace)
@@ -167,7 +170,13 @@ export function WaitlistPage() {
             ? 'Your next chapter is open.'
             : 'A little closer to Jackalope.'}
         </h1>
-        <p>Your place. Your people. Your next hop.</p>
+        {mode !== 'loading' && (
+          <p>
+            {open
+              ? 'Free to join. Confirm your email, then download the app.'
+              : 'Your place. Your people. Your next hop.'}
+          </p>
+        )}
       </header>
       {error && (
         <p className="access-alert" role="alert">
@@ -180,8 +189,8 @@ export function WaitlistPage() {
       {place?.status !== 'approved' && (
         <DesktopConnection email={place?.email ?? null} waiting refreshMembership={refreshPlace} />
       )}
-      {loading ? (
-        <p role="status">Finding your place…</p>
+      {loading || mode === 'loading' ? (
+        <p role="status">Loading your account…</p>
       ) : token ? (
         <Panel variant="plain" className="access-card access-entry">
           <h2>Confirm your email.</h2>
@@ -350,32 +359,40 @@ export function WaitlistPage() {
             </aside>
           )}
         </>
-      ) : openSignup ? (
-        <Panel variant="plain" className="access-card access-entry">
-          <h2>There's no waitlist anymore.</h2>
-          <p>
-            Anyone can create a free Jackalope account. Sign in with your email, or sign up free.
-          </p>
-          <div className="access-entry-actions">
-            <a className="button button-primary" href="/access/">
-              Sign in
-              <ArrowRight size={18} />
-            </a>
-            <a className="button button-secondary" href="/#newsletter">
-              Sign up free
-            </a>
-          </div>
-        </Panel>
       ) : (
         <Panel variant="plain" className="access-card access-entry">
-          <h2>{sent ? 'Check your inbox.' : 'Find your place.'}</h2>
+          <h2>
+            {sent
+              ? 'Check your inbox.'
+              : open
+                ? 'Jackalope is open to everyone.'
+                : 'Find your place.'}
+          </h2>
           <p>
             {sent
-              ? 'If this address is on the list, a private link is on its way. Check spam too. You can request another after a minute.'
-              : 'Already joined? We’ll send you a private link to your position and referrals.'}
+              ? open
+                ? 'If this address has signed up, a fresh link is on its way. Check spam too. You can request another after a minute.'
+                : 'If this address is on the list, a private link is on its way. Check spam too. You can request another after a minute.'
+              : open
+                ? 'There’s no waitlist. Create a free account, confirm your email, and download the app.'
+                : 'Already joined? We’ll send you a private link to your position and referrals.'}
           </p>
+          {open && !sent && (
+            <div className="access-entry-actions">
+              <a className="button button-primary" href="/#newsletter">
+                Sign up free
+                <ArrowRight size={18} />
+              </a>
+              <a className="button button-secondary" href="/download/">
+                Download Jackalope
+              </a>
+            </div>
+          )}
           {accessOrigin ? (
             <form onSubmit={signIn}>
+              {open && !sent && (
+                <p>Already signed up? We’ll email you a fresh confirmation link.</p>
+              )}
               <label htmlFor="waitlist-email">Email address</label>
               <Input
                 id="waitlist-email"
@@ -391,14 +408,14 @@ export function WaitlistPage() {
                 <input id="waitlist-website" name="website" tabIndex={-1} autoComplete="off" />
               </div>
               <Button
-                variant="primary"
-                className="button button-primary"
+                variant={open ? 'secondary' : 'primary'}
+                className={`button ${open ? 'button-secondary' : 'button-primary'}`}
                 type="submit"
                 disabled={busy}
                 loading={busy}
                 loadingLabel="Sending…"
               >
-                {sent ? 'Send a fresh link' : 'Email my private link'}
+                {sent ? 'Send a fresh link' : open ? 'Email my link' : 'Email my private link'}
                 <MailIcon size={20} />
               </Button>
             </form>
@@ -406,8 +423,12 @@ export function WaitlistPage() {
             <p>Sign-in isn’t available on this site.</p>
           )}
           <p>
-            New here? <a href="/#newsletter">Sign up free</a>. Already have an account?{' '}
-            <a href="/access/">Sign in</a>.
+            {!open && (
+              <>
+                New here? <a href="/#newsletter">Sign up free</a>.{' '}
+              </>
+            )}
+            Already have an account? <a href="/access/">Sign in</a>.
           </p>
         </Panel>
       )}
