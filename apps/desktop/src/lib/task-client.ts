@@ -7,7 +7,9 @@ export const stopTask = (id: string) => invokeNative<void>('task_stop', { id });
 export const markReviewed = (id: string) => invokeNative<void>('task_mark_reviewed', { id });
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });
 /** Start a fresh attempt at a task whose last attempt did not finish. */
-export const retryTask = (id: string) => invokeNative<string>('task_retry', { id });
+/** `focus` leads the progress context when the retry picks up a quota-stopped attempt's work. */
+export const retryTask = (id: string, focus?: string) =>
+  invokeNative<string>('task_retry', { id, focus: focus?.trim() || null });
 /** Marks an interrupted attempt stopped once the person confirmed nothing from it still runs. */
 export const releaseInterrupted = (id: string) =>
   invokeNative<TaskRun>('task_release_interrupted', { id });

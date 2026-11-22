@@ -189,6 +189,8 @@ export interface TaskRun {
   modelMismatch?: { requested: string; served: string; fallback: boolean } | null;
   /** What kind of failure `error` describes, when its message says. */
   failureKind?: FailureKind | null;
+  /** Earlier progress Jackalope last gave the agent in place of a conversation it could not continue. */
+  handoffContext?: string | null;
   prompt: string;
   status: RunStatus;
   startedAt: string;

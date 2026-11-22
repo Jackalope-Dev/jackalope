@@ -38,8 +38,12 @@ impl crate::services::Service for TaskRuntime {
 impl TaskRuntime {
     /// The workspace of a finished attempt, when a retry can safely continue in it: the
     /// directory is an isolated worktree that still exists, nothing else is using it, and
-    /// the agent left no uncommitted changes for a new attempt to trip over.
-    pub(super) fn reusable_workspace(&self, retried: &str) -> Option<(String, String, String)> {
+    /// the agent left no uncommitted changes for a new attempt to trip over, unless the
+    /// provider quota stopped it. The flag says whether the workspace carries those changes.
+    pub(super) fn reusable_workspace(
+        &self,
+        retried: &str,
+    ) -> Option<(String, String, String, bool)> {
         let runs = self.inner.lock().ok()?;
         let old = runs.runs.get(retried)?;
         if old.status.is_active()
@@ -56,13 +60,16 @@ impl TaskRuntime {
             return None;
         }
         let workspace = old.workspace.clone();
-        let reused = (workspace.clone(), old.branch.clone(), old.base_head.clone());
+        let (branch, base_head) = (old.branch.clone(), old.base_head.clone());
+        let quota_stopped = old.quota_failure.is_some();
         drop(runs);
-        // A dirty worktree holds half-finished agent work; start clean rather than inherit it.
-        git(&workspace, &["status", "--porcelain"])
-            .ok()
-            .filter(|changes| changes.trim().is_empty())
-            .map(|_| reused)
+        // A dirty worktree holds half-finished agent work; start clean rather than inherit
+        // it, unless a quota stop interrupted that work and the retry picks it up.
+        let dirty = !git(&workspace, &["status", "--porcelain"])
+            .ok()?
+            .trim()
+            .is_empty();
+        (!dirty || quota_stopped).then_some((workspace, branch, base_head, dirty))
     }
 
     pub(super) fn fail(&self, id: &str, error: String) {
@@ -213,11 +220,19 @@ impl TaskRuntime {
                 .account_binding
                 .as_ref()
                 .map_or(old.agent.as_str(), |binding| binding.adapter.as_str());
-            request
-                .prompt
-                .push_str(&super::resume::earlier_progress(adapter, old));
-            self.update_checked(id, |run| activity(run, &super::resume::restarted(adapter)))?;
+            let section =
+                super::resume::earlier_progress(adapter, old, req.handoff_focus.as_deref());
+            request.prompt.push_str(&format!("\n{section}\n"));
+            self.update_checked(id, |run| {
+                activity(run, &super::resume::restarted(adapter));
+                run.handoff_context = Some(section);
+            })?;
             resume = None;
+        } else if req.retry_of.is_some() {
+            // A retry that continues preserved work after a quota stop; see `prepare_workspace`.
+            if let Some(section) = self.run_snapshot(id).and_then(|run| run.handoff_context) {
+                request.prompt.push_str(&format!("\n\n{section}"));
+            }
         }
         // A session the CLI itself refuses to resume starts over the same way, once.
         let mut refusable = resume.clone().filter(|_| !continues);
@@ -269,12 +284,13 @@ impl TaskRuntime {
                 .take()
                 .ok_or_else(|| run.error.clone().unwrap_or_else(|| refusal.clone()))?;
             let adapter = self.policy()?.adapter(&request.agent)?;
-            request
-                .prompt
-                .push_str(&super::resume::earlier_progress(&adapter, &old));
+            let section =
+                super::resume::earlier_progress(&adapter, &old, req.handoff_focus.as_deref());
+            request.prompt.push_str(&format!("\n{section}\n"));
             self.relaunch(id, |run| {
                 // The refusal is kept in activity; a failure of the new conversation is its own.
                 run.diagnostics.clear();
+                run.handoff_context = Some(section);
                 for line in super::resume::restarted_after(&adapter, &refusal) {
                     activity(run, &line);
                 }
@@ -486,12 +502,31 @@ impl TaskRuntime {
                 old.branch.clone(),
                 old.base_head.clone(),
             )
-        } else if let Some((workspace, branch, base_head)) = reusable {
+        } else if let Some((workspace, branch, base_head, progress)) = reusable {
+            let handoff = req
+                .retry_of
+                .as_deref()
+                .and_then(|old| self.run_snapshot(old))
+                .filter(|_| progress)
+                .and_then(|old| Some((old.quota_failure.clone()?, old)))
+                .map(|(failure, old)| {
+                    super::routing::quota_handoff(
+                        &old,
+                        &failure.message,
+                        req.handoff_focus.as_deref(),
+                    )
+                })
+                .transpose()?;
             self.update(id, |run| {
                 activity(
                     run,
-                    "Reusing the previous attempt's workspace; it has no uncommitted changes.",
-                )
+                    if handoff.is_some() {
+                        "Continuing in the previous attempt's workspace with the changes it made before the provider quota stopped it."
+                    } else {
+                        "Reusing the previous attempt's workspace; it has no uncommitted changes."
+                    },
+                );
+                run.handoff_context = handoff;
             });
             (workspace, branch, base_head)
         } else if mode == WorkspaceMode::Worktree {
@@ -2061,6 +2096,7 @@ impl TaskRuntime {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
+            handoff_focus: None,
             continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
@@ -2430,6 +2466,7 @@ impl TaskRuntime {
                 failure_kind: None,
                 provider_error: None,
                 session_refused: None,
+                handoff_context: None,
                 contract,
                 understanding: None,
                 monitor_change: previous

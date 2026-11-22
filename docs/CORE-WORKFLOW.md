@@ -234,7 +234,9 @@ account, project settings, recorded context and agreed outcome, resumes no agent
 session, and is refused for an attempt that is already integrated or superseded by a
 later attempt. It continues in the previous attempt's worktree only when that worktree
 still exists, no other attempt owns it, and the agent left no uncommitted changes;
-otherwise a fresh worktree is cut and the earlier one is kept for inspection.
+otherwise a fresh worktree is cut and the earlier one is kept for inspection. The
+exception is an attempt a provider quota stopped: its uncommitted changes carry over
+with quota handoff progress context and the person's optional focus line.
 
 An interrupted attempt keeps its workspace until the person resumes it. Resume lists
 processes still running in the workspace (on macOS and Linux) so anything the attempt

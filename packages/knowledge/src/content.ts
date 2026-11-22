@@ -861,6 +861,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'With automatic quota handoff enabled, a recognized provider quota error can trigger another eligible worker. Ordinary test failures and assistant prose do not trigger handoff.',
           'Jackalope stops the owned worker, retains the same attempt and worktree, and supplies progress context to the replacement. It excludes the exhausted account or quota pool and allows at most three handoffs.',
           'If no eligible alternative remains, routing fails, or the handoff limit is reached, work stops with an actionable error and preserves progress. Handoff is not a guarantee of uninterrupted completion.',
+          'Retry continues that attempt from its changes in the same worktree. You can add a short focus for the next agent; Task details shows the handoff context it received. New work goes back to your preferred account once its quota resets.',
+          'A provider declining the request under its content policy is a refusal, not a quota error, so it does not switch accounts.',
         ],
       },
       {

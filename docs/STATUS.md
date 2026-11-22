@@ -307,6 +307,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
+  Provider refusals never trigger handoff. Retrying a quota-stopped attempt continues
+  its worktree changes with an optional focus line; the handoff context sent is kept
+  on the attempt.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.

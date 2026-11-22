@@ -1164,6 +1164,7 @@ setInterval(()=>{},1000);
         std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
         let mut request = RunRequest {
             retry_of: None,
+            handoff_focus: None,
             continues: None,
             live_session_id: None,
             effort: None,
