@@ -144,6 +144,8 @@ export interface KnowledgeGuide {
   category: GuideCategory;
   title: string;
   shortTitle: string;
+  /** The website's search title when the short title does not name what people search for. */
+  seoTitle?: string;
   description: string;
   readingTime: string;
   sections: KnowledgeGuideSection[];
@@ -1303,10 +1305,11 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'resolving-git-worktree-locks',
     category: 'troubleshooting',
-    title: 'Resolve a Git lock without losing work',
+    title: 'Remove a stale Git lock file (index.lock) without losing work',
     shortTitle: 'Resolve Git locks',
+    seoTitle: 'Remove a stale Git index.lock file safely | Jackalope',
     description:
-      'How to safely diagnose, remove and prevent stale Git index locks and orphaned worktrees left behind by an unexpected shutdown.',
+      'Fix "Unable to create .git/index.lock: File exists": find the stale lock file, confirm no Git process still owns it, then remove only that file.',
     readingTime: '2 min read',
     sections: [
       {
@@ -1322,7 +1325,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I diagnose a Git lock safely?',
         paragraphs: [
           'Inspect the affected checkout with git status and git worktree list. Confirm that no task, editor, or Git process is still using it before changing lock files. A linked worktree’s .git may be a file, not a directory.',
-          'Use git rev-parse --git-path index.lock from that checkout to locate its index lock. Remove only a lock you have confirmed is stale. Worktree locks can be intentional; do not bulk-delete locks or force-remove a checkout to clear an error.',
+          'Use git rev-parse --git-path index.lock from that checkout to locate its index lock. Remove only a lock you have confirmed is stale, by deleting the one file at the path that command prints. Worktree locks can be intentional; do not bulk-delete locks or force-remove a checkout to clear an error.',
         ],
         codeBox: {
           title: 'Locate the affected lock',

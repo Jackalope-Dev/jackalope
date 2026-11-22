@@ -282,7 +282,7 @@ export const pages: SitePage[] = [
   })),
   ...knowledgeGuides.map((guide) => ({
     path: guidePath(guide.slug),
-    title: `${guide.shortTitle} | Jackalope`,
+    title: guide.seoTitle ?? `${guide.shortTitle} | Jackalope`,
     description: guide.description,
   })),
 ];
