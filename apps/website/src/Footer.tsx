@@ -46,7 +46,6 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
     title: 'Connect',
     links: [
       ['Your account', '/access/'],
-      ['Your access & passes', '/access/'],
       ['Questions', '/#questions'],
       ['Join our Discord', DISCORD_URL, <DiscordIcon key="discord" />],
       ['GitHub', GITHUB_URL, <GitHubIcon key="github" />],

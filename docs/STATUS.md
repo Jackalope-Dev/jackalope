@@ -311,9 +311,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   server on this computer can be saved the same way after its model list is read.
   An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
   Add agent lists known ACP CLIs by name (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
-  Auggie, Kiro, Hermes Agent and Command Code), marks the ones found on this computer and
-  fills in their path and arguments, which stay editable. None of these has been run
-  through Jackalope in an installed app.
+  Auggie, Kiro, Hermes Agent, Command Code and Oh My Pi), marks the ones found on this
+  computer and fills in their path and arguments, which stay editable. None of these has
+  been run through Jackalope in an installed app.
   First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
@@ -357,7 +357,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   them, and lets ready planned and swarm results merge too. Such projects push each
   merged branch head to their linked Artifacts repository and, when the policy has a
   `deploy` section, deploy it from a clean checkout with an optional check and rollback;
-  a failed deploy pauses automatic merging. Source worktrees remain
+  a failed deploy pauses automatic merging. Before an automatic merge is applied, the
+  saved check runs on the combined result in a temporary worktree unless a task's own
+  passing check already covers exactly that tree; a failing combination is not merged
+  and waits for the person with the output on each task. Merging from Review & merge by
+  hand does not run it, the running check is not shown, and installed-app acceptance
+  of the combined check remains open. Source worktrees remain
   available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
@@ -423,7 +428,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
-  Chat supports per-request lesson opt-outs. Automatic review lessons require a later
+  Chat supports per-request lesson opt-outs. Cursor, Windsurf, Cline and GitHub Copilot
+  rule files in the project are offered as paused lessons that tasks receive only after
+  being turned on. Automatic review lessons require a later
   accepted revision and a successful check of the accepted tree; unresolved notes
   remain visible without entering task context.
 - Per-project background learning, on by default: local reflection every 50 reported

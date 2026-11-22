@@ -299,6 +299,22 @@ It does not push or remove source worktrees. A persisted merge receipt recovers 
 completed application after interruption. Neither mode establishes semantic correctness
 from checks alone; installed acceptance and measured reduction in duplicate work remain open.
 
+Each task's check ran on its own snapshot, so an automatic merge first needs the saved
+check to pass on the tree it would create. When a task's passing check already covers
+exactly that tree (one task whose target has not moved, or a reconciliation or combined
+review attempt), that result counts and nothing runs. Otherwise Jackalope checks the
+prepared merge commit out into a temporary worktree, copies the project's setup files,
+runs its setup command and then the saved check there with the usual check slots and
+time limits, and removes the worktree. Nothing is merged while it runs; other automatic
+merges for the project wait, and agents keep working. A pass is kept for that tree and
+command, and the merge is prepared again and applied; a target or source that changed
+in the meantime gets a new check. A failure merges nothing and leaves the target and
+source worktrees as they were: each source task records a failed **Combined check**
+with the output, standalone tasks show a failed reconciliation with **Retry
+reconciliation** (which runs the check again), and a planned or swarm result is held
+like a policy hold. Merging by hand in **Review & merge** does not run the combined
+check, and the running check is not shown in the interface.
+
 A project can limit automatic merging with `.jackalope/autonomy.json`, read from the
 target-branch commit the integration starts from, never from a worktree, so a change
 cannot loosen the policy it is judged by:

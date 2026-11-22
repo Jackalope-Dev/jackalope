@@ -1,5 +1,8 @@
 use super::*;
-use crate::commands::{integration, tasks::TaskRun};
+use crate::commands::{
+    integration::{self, combined_check::Gate},
+    tasks::TaskRun,
+};
 use serde::Serialize;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -19,6 +22,225 @@ mod tests {
     use super::super::agreement_tests::Repo;
     use super::*;
     use crate::commands::tasks::RunStatus;
+
+    /// A project that merges verified work automatically, with one finished task
+    /// per file. Each task adds its file and carries a passing check of `command`
+    /// bound to its own snapshot.
+    fn merging(command: &str, files: &[&str]) -> (Repo, Coordinator, Vec<TaskRun>) {
+        let repo = Repo::new();
+        repo.git(&["config", "user.name", "Fixture"]);
+        repo.git(&["config", "user.email", "fixture@example.invalid"]);
+        let ignored: String = (0..files.len())
+            .map(|index| format!("/task-{index}/\n"))
+            .collect();
+        std::fs::write(
+            repo.root.join(".git/info/exclude"),
+            format!("/history/\n/queue/\n/snapshots/\n{ignored}"),
+        )
+        .unwrap();
+        let directory = repo.root.join("snapshots");
+        std::fs::create_dir(&directory).unwrap();
+        let history = repo.root.join("history");
+        std::fs::create_dir(&history).unwrap();
+        let mut runs = vec![];
+        for (index, file) in files.iter().enumerate() {
+            let mut run = repo.run(&format!("task-{index}"));
+            run.target_branch = Some("main".into());
+            std::fs::write(PathBuf::from(&run.workspace).join(file), "work\n").unwrap();
+            let tree = integration::workspace_tree(&run, &directory).unwrap();
+            run.verify_command = Some(command.into());
+            run.verification = Some(serde_json::from_value(serde_json::json!({"command":command,"checkedAt":"now","tree":tree,"result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());
+            std::fs::write(
+                history.join(format!("{}.json", run.id)),
+                serde_json::to_vec(&run).unwrap(),
+            )
+            .unwrap();
+            runs.push(run);
+        }
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
+        {
+            let mut inner = service.state();
+            inner.ledger.assist_policies.push(AssistPolicy {
+                project_id: "p".into(),
+                project_name: "Fixture".into(),
+                project_path: repo.root.to_string_lossy().into(),
+                agent: "auto".into(),
+                verify_command: command.into(),
+                resolve: false,
+                merge: true,
+            });
+            inner.enabled.insert("p".into());
+        }
+        (repo, service, runs)
+    }
+
+    /// One automatic-merge pass, then waits for a combined check it started.
+    fn pass(repo: &Repo, service: &Coordinator, runs: &[TaskRun]) -> bool {
+        let acted = {
+            let mut inner = service.state();
+            let guard = service.execution(&inner).map_err(String::from).unwrap();
+            service
+                .assist_locked(&mut inner, &guard, runs, &[], "http://fixture")
+                .unwrap()
+        };
+        integration::combined_check::wait(&repo.root.to_string_lossy());
+        acted
+    }
+
+    fn jobs(service: &Coordinator) -> Vec<ReconciliationJob> {
+        service.state().ledger.reconciliations.clone()
+    }
+
+    /// The combined checks recorded on each attempt, as status and notes.
+    fn combined_checks(service: &Coordinator) -> Vec<Vec<(String, String)>> {
+        service
+            .runtime
+            .integration_runs()
+            .unwrap()
+            .iter()
+            .map(|run| {
+                run.validation_steps
+                    .iter()
+                    .filter(|step| step.step == "Combined check")
+                    .map(|step| (step.status.clone(), step.notes.clone().unwrap_or_default()))
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn checkouts(repo: &Repo) -> usize {
+        std::fs::read_dir(repo.root.join("history/integrations/combined-checks/work"))
+            .map_or(0, |entries| entries.count())
+    }
+
+    #[test]
+    fn work_that_passes_alone_but_fails_combined_is_not_merged() {
+        let command = if cfg!(windows) {
+            "if exist a.txt if exist b.txt (echo a and b disagree & exit 1)"
+        } else {
+            "if [ -e a.txt ] && [ -e b.txt ]; then echo a and b disagree; exit 1; fi"
+        };
+        let (repo, service, runs) = merging(command, &["a.txt", "b.txt"]);
+        let head = repo.git(&["rev-parse", "main"]);
+        // The first pass starts the check and saves nothing.
+        assert!(!pass(&repo, &service, &runs));
+        assert!(jobs(&service).is_empty());
+        assert!(pass(&repo, &service, &runs));
+        let job = jobs(&service).remove(0);
+        assert_eq!(job.status, "failed");
+        let error = job.error.unwrap();
+        assert!(error.contains("saved check failed"), "{error}");
+        assert_eq!(repo.git(&["rev-parse", "main"]), head);
+        assert!(!repo.root.join("a.txt").exists() && !repo.root.join("b.txt").exists());
+        assert!(repo.git(&["status", "--porcelain"]).is_empty());
+        let directory = repo.root.join("snapshots");
+        for run in &runs {
+            assert_eq!(
+                integration::workspace_tree(run, &directory).ok(),
+                run.verification.as_ref().unwrap().tree,
+                "the source workspace is untouched"
+            );
+        }
+        let saved = service.runtime.integration_runs().unwrap();
+        assert_eq!(saved.len(), 2);
+        assert!(saved.iter().all(|run| {
+            run.verification.as_ref().unwrap().result.success
+                && run
+                    .activity
+                    .iter()
+                    .any(|line| line.contains("saved check failed"))
+                && run
+                    .diagnostics
+                    .iter()
+                    .any(|text| text.contains("a and b disagree"))
+        }));
+        for checks in combined_checks(&service) {
+            assert_eq!(checks.len(), 1);
+            assert_eq!(checks[0].0, "failed");
+            assert!(checks[0].1.contains("a and b disagree"), "{}", checks[0].1);
+        }
+        assert_eq!(checkouts(&repo), 0);
+        assert!(!repo.git(&["worktree", "list"]).contains("combined-checks"));
+        // It waits for a person: nothing runs or merges again on its own.
+        assert!(!pass(&repo, &service, &runs));
+        assert_eq!(combined_checks(&service)[0].len(), 1);
+        assert_eq!(repo.git(&["rev-parse", "main"]), head);
+    }
+
+    #[test]
+    fn work_that_passes_combined_is_merged_after_the_check() {
+        let command = if cfg!(windows) {
+            "type a.txt b.txt"
+        } else {
+            "cat a.txt b.txt"
+        };
+        let (repo, service, runs) = merging(command, &["a.txt", "b.txt"]);
+        assert!(!pass(&repo, &service, &runs));
+        assert!(!repo.root.join("a.txt").exists());
+        assert!(pass(&repo, &service, &runs));
+        assert_eq!(jobs(&service)[0].status, "merged");
+        assert!(repo.root.join("a.txt").exists() && repo.root.join("b.txt").exists());
+        for checks in combined_checks(&service) {
+            assert_eq!(checks.len(), 1);
+            assert_eq!(checks[0].0, "passed");
+        }
+        assert_eq!(checkouts(&repo), 0);
+    }
+
+    #[test]
+    fn a_project_without_a_saved_check_merges_without_a_combined_check() {
+        let (repo, service, runs) = merging("", &["a.txt", "b.txt"]);
+        assert!(pass(&repo, &service, &runs));
+        assert_eq!(jobs(&service)[0].status, "merged");
+        assert!(repo.root.join("a.txt").exists() && repo.root.join("b.txt").exists());
+        assert!(combined_checks(&service).iter().all(Vec::is_empty));
+        assert!(!repo
+            .root
+            .join("history/integrations/combined-checks")
+            .exists());
+    }
+
+    #[test]
+    fn a_combined_tree_equal_to_the_checked_snapshot_reuses_that_result() {
+        // The command would fail if it ran. The task's own passing check covers the
+        // combined tree because the target has not moved since the task started.
+        let (repo, service, runs) = merging("exit 1", &["a.txt"]);
+        assert!(pass(&repo, &service, &runs));
+        assert_eq!(jobs(&service)[0].status, "merged");
+        assert!(repo.root.join("a.txt").exists());
+        assert!(combined_checks(&service).iter().all(Vec::is_empty));
+        assert!(!repo
+            .root
+            .join("history/integrations/combined-checks")
+            .exists());
+    }
+
+    #[test]
+    fn a_target_that_moved_after_the_task_check_gets_a_combined_check() {
+        let (repo, service, runs) = merging("exit 1", &["a.txt"]);
+        std::fs::write(repo.root.join("later.txt"), "moved\n").unwrap();
+        repo.git(&["add", "later.txt"]);
+        repo.git(&["commit", "-m", "Target moved"]);
+        let head = repo.git(&["rev-parse", "main"]);
+        assert!(!pass(&repo, &service, &runs));
+        assert!(pass(&repo, &service, &runs));
+        assert_eq!(jobs(&service)[0].status, "failed");
+        assert_eq!(repo.git(&["rev-parse", "main"]), head);
+        assert!(!repo.root.join("a.txt").exists());
+        // An explicit retry prepares the merge again and runs the check again.
+        {
+            let mut inner = service.state();
+            service
+                .commit(&mut inner, |ledger| {
+                    ledger.reconciliations[0].status = "superseded".into();
+                    Ok::<_, String>(())
+                })
+                .unwrap();
+        }
+        assert!(!pass(&repo, &service, &runs));
+        assert_eq!(combined_checks(&service)[0].len(), 2);
+    }
 
     /// Commits `policy` to the target branch, verifies one task that writes
     /// `file`, and runs automatic merging once.
@@ -331,6 +553,10 @@ impl Coordinator {
             {
                 continue;
             }
+            // Its result decides the merge that started it; nothing else merges meanwhile.
+            if integration::combined_check::running(&policy.project_path) {
+                continue;
+            }
             if let Some(job) = inner
                 .ledger
                 .reconciliations
@@ -488,6 +714,31 @@ impl Coordinator {
                 .filter(|result| result.as_ref().is_ok_and(|p| p.status == "ready"))
             {
                 job.plan_id = Some(plan.id.clone());
+                // A result the autonomy policy keeps in review is not merged, so not checked.
+                let unheld = plan.integration_head.as_deref().is_some_and(|head| {
+                    super::autonomy::hold_reason(
+                        std::path::Path::new(&plan.project_path),
+                        &plan.master_head,
+                        head,
+                    )
+                    .is_none()
+                });
+                if policy.merge && unheld {
+                    match self.combined_check(runs, plan, &policy) {
+                        Gate::Clear => {}
+                        // Nothing is saved: the merge is prepared again once the check ends.
+                        Gate::Waiting => continue,
+                        Gate::Failed(reason) => {
+                            job.status = "failed".into();
+                            job.error = Some(reason);
+                            self.commit(inner, |ledger| {
+                                ledger.reconciliations.push(job);
+                                Ok::<_, String>(())
+                            })?;
+                            return Ok(true);
+                        }
+                    }
+                }
                 job.status = if policy.merge { "applying" } else { "review" }.into();
                 self.commit(inner, |ledger| {
                     ledger.reconciliations.push(job.clone());
@@ -697,6 +948,13 @@ impl Coordinator {
             None
         };
         let merge = policy.merge && held.is_none();
+        if merge && plan.status == "ready" {
+            match self.combined_check(runs, &plan, policy) {
+                Gate::Clear => {}
+                Gate::Waiting => return Ok(()),
+                Gate::Failed(reason) => return Err(reason),
+            }
+        }
         let mediator = job.run_id.as_ref().filter(|_| job.plan_id.is_none());
         // Save the revised decision versions together with the merge receipt for restart.
         let revisions: Vec<_> = job
@@ -755,6 +1013,17 @@ impl Coordinator {
             self.mark_merged(inner, &job.id)?;
         }
         Ok(())
+    }
+
+    /// Whether the saved check passed on the tree this merge would create.
+    fn combined_check(
+        &self,
+        runs: &[TaskRun],
+        plan: &integration::IntegrationPlan,
+        policy: &AssistPolicy,
+    ) -> Gate {
+        integration::combined_check::gate(&self.runtime, runs, plan, &policy.verify_command)
+            .unwrap_or_else(Gate::Failed)
     }
 
     fn mark_merged(&self, inner: &mut Inner, job_id: &str) -> Result<(), String> {

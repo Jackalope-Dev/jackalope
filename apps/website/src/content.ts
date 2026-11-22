@@ -194,6 +194,18 @@ const duplicateSlug = posts.find(
 );
 if (duplicateSlug) throw new Error(`Two blog posts use the slug ${duplicateSlug.slug}.`);
 
+/**
+ * Search titles and descriptions for guides whose bundled-help wording does not
+ * name what people search for. The guide text itself stays in packages/knowledge.
+ */
+const guideSearch: Record<string, { title: string; description: string }> = {
+  'resolving-git-worktree-locks': {
+    title: 'Remove a stale Git index.lock file safely | Jackalope',
+    description:
+      'Fix "Unable to create .git/index.lock: File exists": find the stale lock file, confirm no Git process still owns it, then remove only that file.',
+  },
+};
+
 export const pages: SitePage[] = [
   {
     path: '/',
@@ -203,9 +215,9 @@ export const pages: SitePage[] = [
   },
   {
     path: '/download/',
-    title: 'Download the Jackalope app for Windows, macOS & Linux',
+    title: 'Jackalope download for Windows, macOS and Linux',
     description:
-      'Download Jackalope, the desktop app from Jackalope Digital for running Codex, Claude Code and Gemini CLI in parallel Git worktrees. Free signup.',
+      'Download Jackalope for Windows, macOS or Linux. Create a free account with your email, confirm it, and sign in to run coding agents side by side.',
   },
   {
     path: '/benchmarks/',
@@ -282,8 +294,8 @@ export const pages: SitePage[] = [
   })),
   ...knowledgeGuides.map((guide) => ({
     path: guidePath(guide.slug),
-    title: `${guide.shortTitle} | Jackalope`,
-    description: guide.description,
+    title: guideSearch[guide.slug]?.title ?? `${guide.shortTitle} | Jackalope`,
+    description: guideSearch[guide.slug]?.description ?? guide.description,
   })),
 ];
 
