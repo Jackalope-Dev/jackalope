@@ -264,9 +264,9 @@ export const growthPages: MarketingPage[] = [
   {
     path: '/features/browser-automation-for-coding-agents/',
     kind: 'Product guide',
-    title: 'Browser automation for coding agents | Jackalope',
+    title: 'Browser automation for coding agents: screenshots & a11y',
     description:
-      'Keep browser sessions, screenshots, and accessibility findings attached to coding-agent tasks in Jackalope.',
+      'Let Claude Code, Codex and other agents drive a browser: fill forms, capture screenshots at each size, and keep accessibility findings with the task.',
     headline: 'Give browser work a place in the task.',
     lede: 'A UI change needs more than a confident summary. Jackalope gives agent tasks owned browser sessions and recorded evidence you can return to during review.',
     image: 'review',

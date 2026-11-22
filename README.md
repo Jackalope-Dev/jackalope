@@ -10,8 +10,9 @@
 [![Sponsor Jackalope on GitHub](https://img.shields.io/badge/GitHub-Sponsor_Jackalope-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Jackalope-Dev)
 [![Support Jackalope on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Jackalope-FF6433?logo=kofi&logoColor=white)](https://ko-fi.com/jackalope_digital)
 
-A desktop workspace for coding agents. Bring your installed agents and existing
-sign-ins, run tasks in parallel Git worktrees, and review changes before merging.
+Run Codex, Claude Code, Gemini CLI and other coding agents side by side, each in its
+own Git worktree, and review every change in one desktop app before it merges.
+Jackalope uses the agents you already have installed and their existing sign-ins.
 
 [Website](https://jackalope.dev/) · [App tour](https://jackalope.dev/tour/) ·
 [User guides](https://jackalope.dev/knowledge/) · [Documentation](docs/README.md) ·
@@ -29,10 +30,15 @@ validated on each platform.
 
 ## What you can do
 
-- Work with Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity, with
+- Work with Codex, Claude Code, Gemini CLI, Grok Build, OpenCode, Kimi Code and
+  Antigravity, or add another ACP agent, with
   [provider-specific capabilities and limits](docs/AGENT-SUPPORT.md).
 - Organize projects, tasks and saved ideas, then run parallel queues in isolated worktrees.
+- Send one prompt to up to four agents and compare their results side by side.
+- Plan larger work with an agent first, then run the approved plan as one task, subtasks
+  or a swarm.
 - Respond to agent questions, inspect results, run checks and review patches before integration.
+- Start and rejoin conversations from the [`jackalope` terminal command](docs/CLI.md).
 - Connect MCP tools and task-owned browser sessions, and schedule recurring local work.
 - Keep project guidance, codebase context, reported usage and recoverable task history together.
 - Choose accounts and models, with capacity-aware routing and bounded quota handoff.

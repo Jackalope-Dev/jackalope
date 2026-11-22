@@ -99,7 +99,10 @@ depends on a `faster-hex` release with optional `heapless`.
 The [whisper-rs-sys patch](../patches/whisper-rs-sys/README.md) limits the library
 search folders its build script declares. The published script declared every CMake
 folder, and on Windows Cargo puts those on `PATH` for tests and `cargo run`, which
-overflowed what `cmd.exe` reads. It has the same provenance and source-override check.
+overflowed what `cmd.exe` reads. On Windows it also builds whisper.cpp with the
+static C and C++ runtimes, so the app does not need the Visual C++ Redistributable;
+that relies on Tauri's static VC runtime. It has the same provenance and
+source-override check.
 
 Run the affected renderer, watcher, readiness and browser tests when upgrading
 these dependencies, then `pnpm verify`. Check the production CSP, keyboard access,

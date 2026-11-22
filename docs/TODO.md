@@ -138,6 +138,15 @@ release dates.
 - [ ] Use Learning activity to calibrate background learning's cadence, probation,
   archive, miss and curator thresholds against real use, and measure whether learned
   lessons reduce repeated corrections before claiming it.
+- [ ] Accept skill sync on two installed desktops on Windows and macOS: a personal and a
+  project skill synced from one and written on the other, the project skill added to the
+  local exclude file, an edit on each side shown as a conflict and resolved both ways, a
+  tracked target refused, Stop syncing, Delete synced skills turning sync off on the other
+  desktop, and settings sync turned off mid-sync.
+- [ ] Design a skills directory for browsing and submitting shared skills, replacing the
+  Coming later section on the Skills page. Today sharing means exporting a folder.
+- [ ] Decide whether synced free text (learned lessons and skills) should be end-to-end
+  encrypted, and how a new computer would get the key.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
 - [ ] Improve provider reporting, model inventory, capacity and monetary budgets.
   Keep reported, estimated, stale and unavailable data distinct.

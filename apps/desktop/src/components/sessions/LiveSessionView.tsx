@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
-import { agentNames } from '../../lib/agent-catalog';
 import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
@@ -243,8 +242,6 @@ export function LiveSessionView({
   const botColor = BOT_COLORS.find((item) => item.id === bot?.appearance?.color)?.value;
   const character = (agent: string) => botLook ?? agent;
   const provider = character(active?.agent ?? latest?.agent ?? session.request.agent);
-  const agentName =
-    bot?.name ?? agentNames([active?.agent ?? latest?.agent ?? session.request.agent]);
   const screenRun = active ?? latest;
   const pauseLabel = integrated
     ? 'Integrated'
@@ -465,7 +462,7 @@ export function LiveSessionView({
         <WindowGlob
           conversation={session.id}
           provider={provider}
-          agent={agentName}
+          agent="Jackalope"
           disabled={session.closed}
           mascotRef={mascotRef}
           onAttached={append}

@@ -185,7 +185,11 @@ Cloudflare configuration and replace its Worker name and domain for your deploym
 do not deploy a fork with the upstream identifiers.
 
 Serve each generated directory's `index.html`, normalize trailing slashes and return
-`404.html` with HTTP 404 for unknown routes. Avoid a catch-all 200 SPA rewrite.
+`404.html` with HTTP 404 for unknown routes. The build writes `dist/_redirects` (a 301
+from each page without its trailing slash, plus the retired URLs in `movedPages` in
+`src/seo.ts`) and appends rules to `dist/_headers` that serve every Markdown mirror and
+`llms*.txt` file with `X-Robots-Tag: noindex` and a canonical `Link` to its HTML page.
+Hosts that ignore those files need equivalent rules. Avoid a catch-all 200 SPA rewrite.
 Subdirectory hosting is not configured. Serve MP4 as `video/mp4`, WebM as
 `video/webm` and VTT as `text/vtt`; preserve byte-range requests for video seeking.
 Use immutable caching for hashed assets and revalidate HTML and named public media.

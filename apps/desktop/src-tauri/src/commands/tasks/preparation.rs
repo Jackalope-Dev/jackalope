@@ -177,7 +177,7 @@ pub fn fingerprint(workspace: &Path, command: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-fn dependency_inputs(workspace: &Path) -> Option<Vec<String>> {
+pub(in crate::commands) fn dependency_inputs(workspace: &Path) -> Option<Vec<String>> {
     let mut paths = Vec::new();
     let walk = ignore::WalkBuilder::new(workspace)
         .hidden(false)

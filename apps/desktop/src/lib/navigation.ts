@@ -22,6 +22,7 @@ import {
   Route,
   Settings2,
   Share2,
+  Sparkles,
 } from 'lucide-react';
 import { openExternalUrl } from './native/env.ts';
 import type { SettingsCategory } from './settings-categories';
@@ -208,6 +209,15 @@ export const WORKSPACE_VIEWS = [
     icon: Plug,
     group: 'agents',
     feature: 'connections',
+  },
+  {
+    id: 'skills',
+    label: 'Skills',
+    description: 'Agents: skills on this computer, and syncing them between your computers.',
+    icon: Sparkles,
+    group: 'agents',
+    feature: 'agents',
+    keywords: 'skill SKILL.md claude codex agents sync share export import personal project',
   },
   {
     id: 'mcp-marketplace',
