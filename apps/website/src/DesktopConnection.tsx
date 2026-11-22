@@ -199,7 +199,7 @@ export function DesktopConnection({
         <div>
           <p>
             {waiting
-              ? 'Sign in below using your waitlist email.'
+              ? 'Sign in below with the email you signed up with.'
               : 'Sign in below with your account email.'}{' '}
             If the email opens another tab, return here to confirm the connection.
           </p>

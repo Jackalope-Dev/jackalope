@@ -295,10 +295,29 @@ export const practicalPosts: BlogPost[] = [
     category: 'Practical guides',
     author: 'caden-sumner',
     date: '2026-09-09',
+    updated: '2026-11-22',
     readingTime: '7 min read',
     description:
       'A checklist for reviewing AI-generated code: test the promised behavior, find the input that breaks it, then check the tests and the combined patch.',
     sections: [
+      {
+        id: 'reusable-checklist',
+        title: 'The checklist for the acceptance decision',
+        paragraphs: [
+          'These eight checks decide whether to accept a change an agent wrote; the sections after them work through each with examples. Read the checklist against the actual change, and mark a point as not applicable when there is a clear reason. A copy-only update and an authentication change deserve different depth. The checklist should make review decisions visible, not encourage a ritual where every box is marked without evidence.',
+          'When asking another agent to review, provide the checklist and request only actionable findings with a reproduction or code-based explanation. Keep that review read-only until you decide which findings are valid. Several agents agreeing with each other is not independent proof of correctness.',
+        ],
+        bullets: [
+          'Outcome: the requested user behavior is present, including the important failure or empty state.',
+          'Scope: every material change has a reason connected to the task.',
+          'Correctness: boundary values, asynchronous changes, and error paths are handled where relevant.',
+          'Compatibility: existing callers and saved data remain supported, or migration is explicit.',
+          "Access: permissions and sensitive data handling still follow the application's rules.",
+          'Tests: assertions would fail for a plausible broken implementation.',
+          'Evidence: commands and manual checks refer to the current changed state.',
+          'Integration: the combined result has been checked, with remaining uncertainty stated.',
+        ],
+      },
       {
         id: 'start-with-outcome',
         title: 'Review the promised behavior before the summary',
@@ -378,24 +397,6 @@ export const practicalPosts: BlogPost[] = [
             ['Does the final combination work?', 'Checks on the integrated revision'],
           ],
         },
-      },
-      {
-        id: 'reusable-checklist',
-        title: 'Use a short checklist for the acceptance decision',
-        paragraphs: [
-          'Read the checklist against the actual change, and mark a point as not applicable when there is a clear reason. A copy-only update and an authentication change deserve different depth. The checklist should make review decisions visible, not encourage a ritual where every box is marked without evidence.',
-          'When asking another agent to review, provide the checklist and request only actionable findings with a reproduction or code-based explanation. Keep that review read-only until you decide which findings are valid. Several agents agreeing with each other is not independent proof of correctness.',
-        ],
-        bullets: [
-          'Outcome: the requested user behavior is present, including the important failure or empty state.',
-          'Scope: every material change has a reason connected to the task.',
-          'Correctness: boundary values, asynchronous changes, and error paths are handled where relevant.',
-          'Compatibility: existing callers and saved data remain supported, or migration is explicit.',
-          "Access: permissions and sensitive data handling still follow the application's rules.",
-          'Tests: assertions would fail for a plausible broken implementation.',
-          'Evidence: commands and manual checks refer to the current changed state.',
-          'Integration: the combined result has been checked, with remaining uncertainty stated.',
-        ],
       },
       {
         id: 'close-the-loop',
