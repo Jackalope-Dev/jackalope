@@ -1,7 +1,7 @@
 # Waitlist referrals and Instant Access Passes
 
 This guide covers waitlist mode, which the service runs when `OPEN_SIGNUP` is off
-(the tracked staging and local setting). Production runs open signup, where
+(the tracked local setting). Production and staging run open signup, where
 confirming the email approves the account; see [account access](EARLY-ACCESS.md).
 
 Waitlist sharing is unlimited. After verifying an email, a person can open
