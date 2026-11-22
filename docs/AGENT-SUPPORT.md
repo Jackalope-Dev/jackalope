@@ -283,11 +283,21 @@ Add agent offers known ACP CLIs by name from `lib/acp-presets.ts`, with the comm
 arguments each CLI's own documentation gives: Cursor (`cursor-agent acp`), GitHub Copilot
 CLI (`copilot --acp`, 1.0.93 or newer), Goose (`goose acp`), Qwen Code (`qwen --acp`,
 0.16 or newer), Auggie (`auggie --acp`), Kiro (`kiro-cli acp`), Hermes Agent
-(`hermes acp`) and Command Code (`cmd acp`, `cmdc acp` on Windows). `agent_locate_executables`
+(`hermes acp`), Command Code (`cmd acp`, `cmdc acp` on Windows) and Oh My Pi
+(`omp acp`). `agent_locate_executables`
 looks for those commands on PATH and in the usual install folders without running them, and
 a preset found there fills in its path. A preset is only a starting point for the form. It
 runs as a generic ACP agent, with the same permission, question and session handling, and
 has not been accepted with each CLI.
+
+When the session reports a `model` config option and the agent refuses
+`session/set_model`, as Oh My Pi does, a chosen model is set once more through
+`session/set_config_option`. Agent questions are answered when every required field is a
+choice; optional free-text fields, such as Oh My Pi's "Other" answer, are left out, and
+plain `enum` choices are offered like `oneOf` ones. Oh My Pi asks for permission for
+shell commands and destructive file changes unless its own `tools.approvalMode` is
+explicitly `yolo`; boolean confirmations and free-text prompts are declined, which Oh My
+Pi treats as a refusal.
 
 A loopback OpenAI-compatible server, such as LM Studio or vLLM, is saved as an OpenCode
 account after `GET /v1/models` succeeds. Only `127.0.0.1`, `localhost` and `::1` are accepted.
