@@ -491,6 +491,8 @@ impl TaskRuntime {
             .retry_of
             .as_deref()
             .and_then(|retried| self.reusable_workspace(retried));
+        let fresh_worktree =
+            previous.is_none() && reusable.is_none() && mode == WorkspaceMode::Worktree;
         let (workspace, branch, base_head) = if let Some(ref old) = previous {
             if old.session_id.is_none() && req.live_session_id.is_none() {
                 return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
@@ -612,6 +614,9 @@ impl TaskRuntime {
                 .as_deref()
                 .filter(|command| !command.trim().is_empty())
             {
+                if fresh_worktree {
+                    self.clone_dependencies(id, &root, &workspace, command)?;
+                }
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
                     self.mark_stopped(id);
@@ -622,6 +627,53 @@ impl TaskRuntime {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Seeds a new worktree with the checkout's installed dependency folders before the setup
+    /// command, which still runs so anything that drifted since the checkout installed is fixed.
+    fn clone_dependencies(
+        &self,
+        id: &str,
+        root: &str,
+        workspace: &str,
+        command: &str,
+    ) -> Result<(), String> {
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new(
+                "dependencies",
+                "Cloning installed dependencies",
+                1,
+            ))
+        });
+        let outcome = self.timed(id, "dependencyClone", || {
+            Ok(crate::commands::dependency_clone::clone_dependencies(
+                root, workspace, command,
+            ))
+        })?;
+        self.update(id, |run| {
+            if !outcome.cloned.is_empty() {
+                activity(
+                    run,
+                    &format!(
+                        "Cloned installed dependencies from the project checkout (copy-on-write): {}.",
+                        outcome.cloned.join(", ")
+                    ),
+                );
+            }
+            for (folder, reason) in &outcome.refused {
+                activity(
+                    run,
+                    &format!("Did not reuse the project checkout's {folder}: {reason}."),
+                );
+            }
+            if outcome.unsupported {
+                activity(
+                    run,
+                    "This volume cannot make copy-on-write copies, so the setup command installs dependencies in full.",
+                );
+            }
+        });
         Ok(())
     }
 
