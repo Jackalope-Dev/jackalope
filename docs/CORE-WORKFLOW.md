@@ -17,6 +17,16 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
+New work is non-code when it is in General, when a window is attached and the request
+names no code, or when a short request only reads or operates something outside the
+repository (a web page, a connection, email) and mentions no code or changes. Non-code
+work starts one conversation without the planning check, and the agent is told not to
+edit files unless a message asks. Options → Treat as code work overrides an inferred
+guess; General is always non-code. General is a plain folder in Jackalope's data
+directory, offered in the sidebar and the Work project switcher until added, then listed
+like any project. Jackalope never makes it a repository and refuses a data directory
+inside one. Its composer offers no launchpad starters or Plan with me.
+
 Project instructions (Project settings → Basics) reach every task agent natively at launch,
 whatever started the work; a resumed agent session is not given them again, and a prompt
 that already contains them (scheduled and remote tasks add them) does not repeat them.
@@ -167,6 +177,12 @@ never sends.
 A project's optional preparation command authorizes a bounded, cancellable command
 in each new task workspace before its agent starts. Continuations skip preparation.
 Preparation failure retains workspace/history and its recorded command output.
+
+Non-code work runs in the project folder as it is, on whatever branch is checked out:
+no worktree, branch change, setup files, preparation or automatic checks. It does not
+reserve the checkout, so in-place work is not held up by it, and a continuation stays
+in the folder its conversation started in. Its attempts report no change counts and add
+no changed files to Library.
 
 Preparation and verification commands are bounded by silence rather than by total
 runtime: a command is stopped when it produces no output for its stall budget, so a

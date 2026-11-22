@@ -27,6 +27,7 @@ export type MarketingPage = {
     title: string;
     paragraphs: string[];
     bullets?: string[];
+    code?: { label: string; language: string; value: string };
     links?: Array<{ href: string; label: string }>;
     table?: { columns: string[]; rows: string[][] };
   }>;
@@ -116,15 +117,15 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/git-worktrees-for-ai-agents/',
     kind: 'Workflow guide',
-    title: 'Git worktrees for AI coding agents | Jackalope',
+    title: 'Git worktrees for AI coding agents: setup to cleanup',
     description:
-      'Learn how Jackalope uses isolated Git worktrees to run AI coding agents in parallel and guards review, integration, recovery, and cleanup.',
+      'Run AI coding agents in parallel with Git worktrees: commands to create each checkout, separate ports and data, review the combined patch, and clean up.',
     headline: 'Give every coding-agent task its own Git worktree.',
-    lede: 'Worktrees let several coding agents work on one repository without sharing a working directory. Jackalope keeps each worktree connected to its task, history, and review.',
+    lede: 'Worktrees let several coding agents work on one repository without sharing a working directory. This guide walks through the Git commands from setup to cleanup, then shows how Jackalope keeps each worktree connected to its task, history, and review.',
     image: 'review',
     signals: [
       'One task per checkout',
-      'Target-branch checks',
+      'Copyable Git commands',
       'Combined patch review',
       'Recoverable cleanup',
     ],
@@ -133,33 +134,22 @@ export const marketingPages: MarketingPage[] = [
         title: 'Why worktrees matter for coding agents.',
         paragraphs: [
           "[Two agents in one checkout](/parallel-coding-agents/) can overwrite files, change the active branch, or make a clean review difficult. A Git worktree gives each task a separate working directory and branch while sharing the repository's object database.",
-          'Isolation does not eliminate semantic conflicts. Two locally correct patches can still disagree about an API or shared assumption. That is why Jackalope treats the combined review as a separate decision.',
+          'That is useful for a bug fix beside a feature, [two independent improvements](/blog/run-ai-coding-agents-in-parallel/), or a review that should leave your working copy alone. It is less useful when two tasks are both redesigning the same interface. Separate folders cannot settle a disagreement about what that interface should mean, and two locally correct patches can still disagree about an API or shared assumption.',
+          'The commands below use an illustrative search feature. One task adds keyboard navigation; another improves an unrelated help page. They assume the integration branch is main and the sibling directory names are unused, so substitute your own branch and paths.',
         ],
       },
       {
-        title: 'Keep the worktree and its task together.',
+        title: 'Create one checkout per task from a known baseline.',
         paragraphs: [
-          'Jackalope creates each task worktree from your chosen branch. Return to its history, review its changes, and keep active or interrupted work safe from cleanup. Before merging, Jackalope checks that the source files and target branch still match your review.',
+          'From the original repository, inspect the working copy and existing worktrees before creating anything. Check that the commit printed by rev-parse is the baseline you intend. Uncommitted files in the original checkout are not part of that commit.',
+          'Each add command creates a separate branch from main. The -C option lets you inspect a checkout without changing your terminal directory. Git normally refuses to check out the same branch in two places, so use one task branch per worktree rather than overriding that safeguard.',
         ],
-        bullets: [
-          'Dependent tasks wait until the changes they need have been merged.',
-          'Review the combined patch before updating your target branch.',
-          'If the branch has changed, resolve the difference before merging. Your unrelated edits stay intact.',
-          'Archive work you want to keep before removing its worktree.',
-        ],
-      },
-      {
-        title: 'Know what a worktree separates.',
-        paragraphs: [
-          "Worktrees separate working directories. They do not restrict an agent's access to other local files. Your agent permissions still apply; review the code and run project checks before merging.",
-        ],
-      },
-      {
-        title: 'Prepare more than the branch.',
-        paragraphs: [
-          'A worktree contains checked-in files, but it may not contain installed packages, ignored environment files, or a running database. Record the setup commands in [project guidance](/blog/agents-md-claude-md-project-instructions/) and [establish the same build in the new checkout](/blog/git-worktrees-for-ai-coding-agents/) before asking an agent to diagnose application behavior.',
-          'Give local servers distinct ports and check whether tools write to shared caches or external services. Worktrees share Git repository data; they do not create separate operating-system accounts or automatically isolate services.',
-        ],
+        code: {
+          label: 'Run from your original repository; replace main if needed',
+          language: 'sh',
+          value:
+            'git status --short\ngit worktree list\ngit rev-parse main\ngit worktree add -b task/search-keyboard ../search-keyboard main\ngit worktree add -b task/help-copy ../help-copy main\ngit -C ../search-keyboard status --short\ngit -C ../help-copy status --short',
+        },
         links: [
           {
             href: 'https://git-scm.com/docs/git-worktree',
@@ -168,30 +158,100 @@ export const marketingPages: MarketingPage[] = [
         ],
       },
       {
-        title: 'Review cleanup as carefully as creation.',
+        title: 'Prepare the environment, not just the files.',
         paragraphs: [
-          'After integration, confirm which branch contains the accepted change and inspect remaining uncommitted and untracked work. A branch being merged does not establish that every file in its working directory was included. Keep active or interrupted tasks until their state is understood.',
-          'If a worktree is locked, identify the process using it before attempting cleanup. Stop the process you own, preserve any needed output, and retry. A lock error is a recovery problem, not a reason to discard task history or force removal.',
+          'A worktree contains checked-in files, but not installed packages, ignored environment files, or a running database. Before asking an agent to change code, make the unmodified checkout build with the commands the project documents, for example pnpm install --frozen-lockfile. If the baseline already fails, record the first meaningful error so it is not mistaken for a regression later. Keep setup commands in [project instructions agents follow](/blog/agents-md-claude-md-project-instructions/).',
+          'Give local servers distinct ports and check where each checkout connects. A different source directory does not mean a different database, storage bucket, browser profile, or output folder. Avoid linking generated folders between worktrees, since one build can replace files another build is using.',
         ],
+        table: {
+          columns: ['Resource', 'Keyboard task', 'Help task'],
+          rows: [
+            ['Source checkout', '../search-keyboard', '../help-copy'],
+            ['Development port', 'A reserved unused port', 'A different unused port'],
+            ['Test data', 'Disposable search fixtures', 'Disposable documentation fixtures'],
+            ['Build output', 'Inside this checkout', 'Inside this checkout'],
+            ['Credentials', 'Only the access this task needs', 'No service access if unnecessary'],
+          ],
+        },
+      },
+      {
+        title: 'Give each agent a bounded brief.',
+        paragraphs: [
+          'Open the agent in the exact checkout assigned to it and confirm the current folder in that session. Include the outcome, the files it owns, and the checks you expect. If another task is active, say what it owns and how to report a dependency. File ownership is a coordination agreement, not a filesystem permission boundary.',
+          'Claude Code can also create a worktree through its own --worktree option. Choose whether Git, the agent, or a workspace app manages the checkout, and keep that ownership consistent so you never review the wrong folder.',
+        ],
+        code: {
+          label: 'Reusable task brief',
+          language: 'text',
+          value:
+            'Outcome: make the search results usable with a keyboard.\nWorkspace: the assigned search-keyboard checkout.\nOwn: search UI and its focused interaction tests.\nDo not change: help content or unrelated shared controls.\nAcceptance: arrows move selection; Enter opens a result;\nEscape closes results; an empty list has no active result.\nRead the repository instructions and record baseline failures.\nReport shared-component dependencies before expanding scope.\nReturn: changed files, checks run, and remaining uncertainty.\nLeave commits and integration to the maintainer.',
+        },
+        links: [
+          {
+            href: 'https://code.claude.com/docs/en/worktrees',
+            label: 'Claude Code: worktree sessions',
+          },
+        ],
+      },
+      {
+        title: 'Review each task, then the combination.',
+        paragraphs: [
+          'Start with what the task promised: try the behavior, inspect the changed files, and read the tests. A summary saying checks passed should point to the commands and checkout that produced the result. Use status to find staged and untracked files as well as ordinary edits, and open new files themselves.',
+          'After individual review, integrate through your normal workflow and run the relevant checks on the combined result. Two tasks can pass separately and still disagree about a route, type, or dependency version. Resolve the underlying decision before accepting a mechanically clean merge. The [AI code review checklist](/blog/review-ai-generated-code-checklist/) covers what to look for.',
+        ],
+        code: {
+          label: 'Inspect the keyboard task without changing it',
+          language: 'sh',
+          value:
+            'git -C ../search-keyboard status --short\ngit -C ../search-keyboard diff\ngit -C ../search-keyboard diff --cached\ngit -C ../search-keyboard log --oneline main..HEAD\ngit -C ../search-keyboard diff main...HEAD',
+        },
+      },
+      {
+        title: 'Clean up only after the work has a home.',
+        paragraphs: [
+          'A quiet checkout is not necessarily disposable. Confirm that no agent, editor, or development server is still using it, and that its changes were integrated or kept elsewhere. Check ignored files too: a local database or scratch export can matter even though it never appears in the diff.',
+          'Once you have preserved what you need, git worktree remove is the ordinary removal command. If Git refuses, or a worktree is locked, identify the process using it before retrying; do not add force just to make the error disappear. Removing a worktree and deleting its branch are separate operations. For the next task, create a fresh checkout from the current baseline.',
+        ],
+        code: {
+          label: 'Check before you remove',
+          language: 'sh',
+          value:
+            'git worktree list\ngit -C ../search-keyboard status --short --ignored\ngit worktree remove ../search-keyboard',
+        },
         links: [
           {
             href: '/knowledge/resolving-git-worktree-locks/',
             label: 'Diagnose worktree locks',
           },
+        ],
+      },
+      {
+        title: 'How Jackalope manages task worktrees.',
+        paragraphs: [
+          'The hard part of several worktrees is remembering which brief, account, result, and check belongs to each folder. Jackalope creates each task worktree from your chosen branch, keeps it attached to its history and review, and protects active or interrupted work from cleanup. Before merging, it checks that the source files and target branch still match your review.',
+          "Worktrees separate working directories. They do not restrict an agent's access to other local files or sandbox its processes. Your agent permissions still apply; review the code and run project checks before merging.",
+        ],
+        bullets: [
+          'Dependent tasks wait until the changes they need have been merged.',
+          'Review the combined patch before updating your target branch.',
+          'If the branch has changed, resolve the difference before merging. Your unrelated edits stay intact.',
+          'Archive work you want to keep before removing its worktree.',
+        ],
+        links: [
           {
             href: '/knowledge/git-worktrees/',
-            label: 'Jackalope integration and cleanup rules',
+            label: 'Jackalope worktree integration and cleanup rules',
           },
         ],
       },
     ],
     related: [
       { href: '/parallel-coding-agents/', label: 'Parallel coding agents' },
-      { href: '/guides/review-ai-generated-code/', label: 'A practical review workflow' },
       {
-        href: '/features/project-context-for-coding-agents/',
-        label: 'Project context for every task',
+        href: '/guides/run-codex-and-claude-code-in-parallel/',
+        label: 'Run Codex and Claude Code in parallel',
       },
+      { href: '/guides/review-ai-generated-code/', label: 'A practical review workflow' },
     ],
   },
   {
@@ -487,9 +547,9 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/agents/claude-code/',
     kind: 'Agent integration',
-    title: 'Run Claude Code in a desktop project workspace | Jackalope',
+    title: 'Claude Code GUI: run tasks in parallel worktrees | Jackalope',
     description:
-      'Run Claude Code tasks with isolated Git worktrees, project MCP connections, in-app questions, account profiles, usage reporting, and review.',
+      'Use your Claude Code CLI and Anthropic account in a desktop workspace: parallel tasks in Git worktrees, MCP tools, in-app questions and one review queue.',
     headline: 'Keep Claude Code connected to the whole task.',
     lede: 'Use your installed Claude Code CLI and Anthropic account while Jackalope keeps the brief, questions, project tools, worktree, result, and review together.',
     image: 'agents',
@@ -808,44 +868,26 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/guides/run-codex-and-claude-code-in-parallel/',
     kind: 'Practical guide',
-    title: 'How to run Codex and Claude Code in parallel | Jackalope',
+    title: 'Run Codex and Claude Code in parallel: step by step',
     description:
-      'A practical workflow for running Codex and Claude Code in separate Git worktrees, coordinating dependencies, and reviewing their combined changes.',
+      'Use Claude Code and Codex together: a shared contract, one Git worktree each, a handoff format, cross-review, and checks on the combined result.',
     headline: 'Run Codex and Claude Code together without sharing a checkout.',
-    lede: 'Give each agent a focused outcome, isolate its files in a Git worktree, and make the combined result a deliberate review step.',
+    lede: 'Give each agent a focused outcome, isolate its files in a Git worktree, and make the combined result a deliberate review step. This workflow works with plain terminals; the last section shows where Jackalope helps.',
     image: 'tasks',
-    signals: ['Two focused briefs', 'Two worktrees', 'Visible dependencies', 'One combined review'],
+    signals: ['Shared contract', 'Two worktrees', 'Handoff format', 'One combined review'],
     sections: [
       {
-        title: '1. Split the outcome, not the context.',
+        title: '1. Give two agents a reason to work together.',
         paragraphs: [
-          'Start with one project goal, then separate work only where the tasks can be reviewed independently. Give Codex and Claude Code concrete outcomes, relevant file scopes, and [a shared description of the project constraints](/blog/agents-md-claude-md-project-instructions/).',
-          "Use a dependency when one task really needs another task's integrated code. Parallel work should not be an excuse to hide ordering assumptions.",
+          "Using Claude Code and Codex together is most useful when you can describe separate responsibilities. More conversations do not automatically shorten a project: someone still defines the contract between tasks, answers questions, inspects output, and decides what to integrate. Your attention and the project's shared resources are part of the capacity limit.",
+          'If an API shape or product decision is still open, settle it first, then start implementation against the agreed result. For choosing independent work and a concurrency limit in general, see [how to run AI coding agents in parallel](/blog/run-ai-coding-agents-in-parallel/).',
         ],
       },
       {
-        title: '2. Launch each task in its own worktree.',
+        title: '2. Write the shared contract before the prompts.',
         paragraphs: [
-          'Jackalope resolves the target branch and creates [isolated workspaces](/git-worktrees-for-ai-agents/) for the assigned agents. Each attempt receives the project briefing, selected context, and supported tools. You can follow progress, answer questions, and stop an individual task without losing the rest of the plan.',
-        ],
-        bullets: [
-          'Use Codex for one reviewable slice and Claude Code for another.',
-          'Avoid broad overlapping scopes when the same files or contracts are involved.',
-          'Send coordination notes for discoveries that affect related work.',
-          'Rerun or continue a task when its result needs correction.',
-        ],
-      },
-      {
-        title: '3. Review the combination, not only the parts.',
-        paragraphs: [
-          'Passing checks in two worktrees does not prove the patches work together. Inspect each result, [prepare the combined patch](/parallel-coding-agents/), and run the checks that matter against the integrated state before accepting it.',
-          'Jackalope keeps integration explicit and stops when the target or source state has changed. It does not automatically stash, reset, or overwrite unrelated work.',
-        ],
-      },
-      {
-        title: 'Example: add a saved search filter.',
-        paragraphs: [
-          'Agree that a saved filter contains a name and a query before dispatch. Use that decision to distinguish the work that can start now from the work that needs an accepted prerequisite. Agent assignments are examples, not a ranking of model strengths; [using Claude Code and Codex together](/blog/claude-code-and-codex-together/) covers how to split the work.',
+          'Begin with a short brief both sessions receive. State who the feature serves, what observable behavior changes, and what stays out of scope. Define the pieces that would otherwise invite conflicting guesses: names, routes, data shape, labels, and empty states. Keep [project instructions](/blog/agents-md-claude-md-project-instructions/) in the repository so both agents read the same constraints.',
+          'Then divide ownership by complete, reviewable outcomes rather than layers. If the contract changes, tell both agents what changed and which earlier assumption no longer holds. Agent assignments below are examples, not a ranking of model strengths.',
         ],
         table: {
           columns: ['Task', 'Scope and worker', 'Ready when'],
@@ -869,23 +911,82 @@ export const marketingPages: MarketingPage[] = [
         },
       },
       {
-        title: 'Handle a changed assumption explicitly.',
+        title: '3. Start each session in its own worktree.',
         paragraphs: [
-          'If the storage task discovers that names must be unique, pause the dependent selector task and update the contract. Ask the documentation task to revise its explanation. Preserve those corrections in task history so review explains why the behavior changed.',
-          'Before accepting the combined result, create a filter, restart, select it, and remove it. Check the empty list and an existing saved-data fixture. A clean merge and independent unit tests do not cover that complete workflow.',
+          'Create a separate Git worktree for each implementation task from the same commit, make the project build there first, and reserve different ports and disposable data if both agents run the application. The [Git worktree setup and cleanup guide](/git-worktrees-for-ai-agents/) has the commands.',
+          'Claude Code documents worktree sessions, and OpenAI documents managed worktrees for Codex. You can also prepare ordinary worktrees and start each CLI inside its folder. Pick one method per task instead of mixing checkout managers. Sign in to each provider through its supported flow and check you are on the intended work or personal account.',
         ],
         links: [
+          {
+            href: 'https://code.claude.com/docs/en/worktrees',
+            label: 'Claude Code: parallel sessions with worktrees',
+          },
+          {
+            href: 'https://learn.chatgpt.com/docs/environments/git-worktrees',
+            label: 'OpenAI: worktrees and handoff',
+          },
+        ],
+      },
+      {
+        title: '4. Dispatch with ownership and a handoff format.',
+        paragraphs: [
+          'Give both agents the shared contract, then a task-specific brief. Ask them to report baseline failures and dependencies before changing unrelated code, and say whether they may commit, install dependencies, or use connected services. Ask for progress only when it changes a decision: a blocker, a scope conflict, a completed check, or a result ready for review.',
+        ],
+        code: {
+          label: 'Append this handoff request to each task brief',
+          language: 'text',
+          value:
+            'Return a handoff with:\n- Outcome implemented and relevant changed files.\n- Workspace and baseline commit.\n- Commands run, their results, and the revision tested.\n- Manual interactions checked and evidence captured.\n- Contract changes, dependencies, and unresolved questions.\n- Work that is incomplete or could not be verified.\nDo not claim a check passed if it was skipped or blocked.',
+        },
+      },
+      {
+        title: '5. Use cross-review to investigate specific risks.',
+        paragraphs: [
+          'Once one implementation is ready, the other agent can review it. Give it the actual patch, the acceptance criteria, and enough surrounding code, and start with a read-only review so findings and proposed changes stay separate. Ask targeted questions: can an empty list produce an invalid selection, would a test fail if the feature disappeared, do the help instructions work against the real UI?',
+          'A reviewer can be wrong. Check each finding against the current revision before requesting a fix, and do not let the second agent expand the feature. Cross-review generates questions; it does not replace your acceptance decision.',
+        ],
+      },
+      {
+        title: '6. Review and integrate the combination.',
+        paragraphs: [
+          'Passing checks in two worktrees does not prove the patches work together. Inspect each result, [prepare the combined patch](/parallel-coding-agents/), and run the checks that matter against the integrated state. If both tasks changed the same file, treat the conflict as a decision about the intended result.',
+          'If the storage task discovers that names must be unique, pause the dependent selector task and update the contract. Before accepting, create a filter, restart, select it, and remove it, then check the empty list and an existing saved-data fixture. When something fails, route the correction and the reproduction to the task that owns it, and repeat the affected checks.',
+        ],
+        links: [
+          {
+            href: '/guides/review-ai-generated-code/',
+            label: 'Review agent-generated code',
+          },
           {
             href: '/knowledge/git-worktrees/',
             label: 'How dependent tasks wait for integration',
           },
         ],
       },
+      {
+        title: 'Know when one agent is enough.',
+        paragraphs: [
+          'For your first few runs, note time to an accepted result, time spent reviewing, repeated work, and defects found. Use one agent when the work is small or tightly coupled, and several when tasks have clear boundaries you can actually review. If the same shared file keeps blocking progress, change the plan rather than adding sessions.',
+        ],
+      },
+      {
+        title: 'Where Jackalope fits.',
+        paragraphs: [
+          'Jackalope resolves the target branch and creates isolated worktrees for the assigned agents. Each attempt receives the project briefing, selected context, and supported tools. You can follow progress, answer questions, and stop an individual task without losing the rest of the plan.',
+          'Integration stays explicit and stops when the target or source state has changed. Jackalope does not automatically stash, reset, or overwrite unrelated work.',
+        ],
+        bullets: [
+          'Use Codex for one reviewable slice and Claude Code for another.',
+          'Avoid broad overlapping scopes when the same files or contracts are involved.',
+          'Send coordination notes for discoveries that affect related work.',
+          'Rerun or continue a task when its result needs correction.',
+        ],
+      },
     ],
     related: [
       { href: '/agents/codex/', label: 'Codex in Jackalope' },
       { href: '/agents/claude-code/', label: 'Claude Code in Jackalope' },
-      { href: '/git-worktrees-for-ai-agents/', label: 'How agent worktrees work' },
+      { href: '/git-worktrees-for-ai-agents/', label: 'Git worktree setup and cleanup' },
     ],
   },
   {

@@ -483,7 +483,10 @@ struct Target {
             return false
         }
         if window.isForeground(rect) { return false }
-        try require(scope != "window", "The selected window lost focus. Wait for the human to Resume.")
+        // Window and app grants never pull a window in front of the person's work; only a
+        // desktop grant may switch windows.
+        try require(scope == "desktop" || (scope == "app" && NSWorkspace.shared.frontmostApplication?.processIdentifier == window.pid),
+                    backgroundRefusal)
         try window.focus()
         let deadline = Date().addingTimeInterval(1)
         while !window.isForeground(rect) && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
@@ -582,6 +585,21 @@ func invoke(_ element: AXUIElement) throws -> [String: Any] {
     throw ControlError("This element has no accessibility action. Use click instead.")
 }
 
+/// The vertical scroll bar of the element's nearest scroll area, if Accessibility lets its
+/// value change.
+func scrollBar(_ element: AXUIElement) throws -> AXUIElement {
+    var current: AXUIElement? = element
+    for _ in 0..<12 {
+        guard let candidate = current else { break }
+        if (attribute(candidate, kAXRoleAttribute) as? String) == kAXScrollAreaRole as String,
+           let bar = elementAttribute(candidate, kAXVerticalScrollBarAttribute), settable(bar, kAXValueAttribute) {
+            return bar
+        }
+        current = elementAttribute(candidate, kAXParentAttribute)
+    }
+    throw ControlError(backgroundRefusal)
+}
+
 func input(_ action: String, _ request: [String: Any], _ target: Target) throws -> [String: Any] {
     switch action {
     case "invoke":
@@ -635,6 +653,15 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
         return sent("keyboard", true, "The control has no writable value, so Jackalope focused it, selected all and typed.")
     case "scroll":
         guard let count = request["wheel"] as? Int32, count != 0, abs(count) <= 10 else { throw ControlError("Invalid scroll input.") }
+        // In the background, move the nearest scroll bar through Accessibility instead of
+        // sending a wheel event that would reach whatever is under the pointer.
+        if let window = target.window, request["element"] is String, target.scope != "desktop", !window.isForeground(target.rect) {
+            let bar = try scrollBar(try referenced(request, "element"))
+            let current = (attribute(bar, kAXValueAttribute) as? NSNumber)?.doubleValue ?? 0
+            let next = min(1, max(0, current - Double(count) * 0.05))
+            try require(AXUIElementSetAttributeValue(bar, kAXValueAttribute as CFString, NSNumber(value: next)) == .success, backgroundRefusal)
+            return sent("accessibility", false, "Scrolled through Accessibility; the window stayed in the background.")
+        }
         let changed = try target.ensureForeground()
         let point = try target.point(request, "element", "x", "y")
         guard let event = CGEvent(scrollWheelEvent2Source: target.source, units: .line, wheelCount: 1, wheel1: count, wheel2: 0, wheel3: 0) else { throw ControlError("Invalid scroll input.") }
@@ -661,7 +688,19 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
               !text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw ControlError("Invalid literal text.") }
         var changed = false
         if request["element"] is String {
-            _ = AXUIElementSetAttributeValue(try referenced(request, "element"), kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            let element = try referenced(request, "element")
+            // In the background, keys would reach the person's app; add the text through
+            // the control's value instead when it has one.
+            if let window = target.window, !window.isForeground(target.rect), target.scope != "desktop" {
+                try require(!secure(element), "Password controls are protected. Enter secrets yourself.")
+                try require(settable(element, kAXValueAttribute), backgroundRefusal)
+                _ = window
+                let current = attribute(element, kAXValueAttribute) as? String ?? ""
+                try require(AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, (current + text) as CFString) == .success,
+                            "The app refused the new value.")
+                return sent("accessibility", false, "Added the text through Accessibility; the window stayed in the background.")
+            }
+            _ = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
             changed = true
         }
         changed = try target.ensureForeground() || changed
@@ -722,7 +761,17 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         let first = AXUIElementCreateApplication(getpid())
         try require(refFor(first) == refFor(first), "Element refs are not stable.")
         try require(keyCodes["F12"] != nil && modifierFlags["Command"] != nil, "Key table is incomplete.")
-        return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards, element refs, keys"]
+        try require(Indicator.retakes(.leftMouseDown) && Indicator.retakes(.rightMouseDown) && Indicator.retakes(.keyDown),
+                    "Clicks and key presses must pause control.")
+        try require(!Indicator.retakes(.mouseMoved) && !Indicator.retakes(.scrollWheel) && !Indicator.retakes(.leftMouseUp)
+                    && !Indicator.retakes(.flagsChanged), "Pointer movement, scrolling, releases and modifiers alone must not pause control.")
+        try require(Indicator.disruption(sinceAgentInput: 5, recentInput: 1) == nil,
+                    "A single click or key away from the agent's input must not pause control.")
+        try require(Indicator.disruption(sinceAgentInput: 0.2, recentInput: 1) != nil,
+                    "Input that lands while the agent is acting must pause control.")
+        try require(Indicator.disruption(sinceAgentInput: 5, recentInput: Indicator.takeoverCount) != nil,
+                    "Repeated clicks or keys must pause control.")
+        return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards, element refs, keys, retaking input"]
     }
     if action == "request_permissions" {
         _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
@@ -777,6 +826,16 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
               let rect = try? window.bounds() else { return ["bounds": NSNull()] }
         return ["bounds": boundsJSON(rect)]
     }
+    // The address of a browser window the person is attaching, so the confirm dialog can
+    // name the site it allows. Only the page address is read, never page content.
+    if action == "site" {
+        guard let identity = request["window"] as? [String: Any],
+              let window = try? SelectedWindow(identity), !deny.contains(window.pid),
+              let rect = try? window.bounds() else { return ["site": NSNull()] }
+        enableWebAccessibility(window.pid)
+        guard let root = try? window.accessible(rect), let page = site(root) else { return ["site": NSNull()] }
+        return ["site": page]
+    }
     guard let guardJSON = request["guard"] as? [String: Any] else {
         throw ControlError("An active indicator is required.")
     }
@@ -810,7 +869,8 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         display = monitor.0
         rect = monitor.1
     }
-    if scope == "window", let window = window { _ = try window.foreground(rect) }
+    // Reads and element actions work while the window sits behind the person's work; only
+    // raw pointer and keyboard input need it in front (Target.ensureForeground).
     if let expected = request["bounds"] as? [String: Double] {
         try require(sameBounds(rect, try rectFromJSON(expected)), "Window bounds changed. Take a new snapshot.")
     }
@@ -846,7 +906,6 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         try guardState.check()
         if let window = window {
             try require(sameBounds(rect, try window.bounds()), "Window moved or resized during capture. Take a new snapshot.")
-            if scope == "window" { _ = try window.foreground(rect) }
         }
         try writePNG(scaled(image, request["thumb"] as? Int ?? 0), path)
         var result: [String: Any] = ["bounds": boundsJSON(rect)]
@@ -855,6 +914,10 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     case "focus":
         if request["element"] is String { break }
         guard let window = window else { throw ControlError("Switch to a window first.") }
+        // Raising a window would pull it in front of the person's work; only a desktop grant
+        // may, or an app grant whose app is already in front.
+        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        try require(scope == "desktop" || window.isForeground(rect) || (scope == "app" && front == window.pid), backgroundRefusal)
         try window.focus()
         return ["status": "focused", "bounds": boundsJSON(rect)]
     default:
@@ -910,6 +973,14 @@ func hexColor(_ text: String) -> NSColor? {
                    blue: Double(rgb & 255) / 255, alpha: 1)
 }
 
+/// Whether a window is minimized: listed by Accessibility but off screen.
+func minimized(_ window: SelectedWindow) -> Bool {
+    !visibleWindows().contains { ($0[kCGWindowNumber as String] as? UInt32) == window.id }
+}
+
+/// How the helper refuses input that a background window can't take without focus.
+let backgroundRefusal = "The window is in the background. Use element actions by ref, or wait until the person brings it back."
+
 final class Indicator: NSObject {
     let selected: SelectedWindow?
     let scope: String
@@ -923,17 +994,24 @@ final class Indicator: NSObject {
     let lookFile: URL?
     let tag = Int64.random(in: 1...Int64.max)
     let parent = getppid()
-    static let expandedSize = NSSize(width: 470, height: 40)
+    static let height: CGFloat = 40
+    static let maxWidth: CGFloat = 520
     static let collapsedSize = NSSize(width: 40, height: 40)
-    let panel = NSPanel(contentRect: NSRect(origin: .zero, size: Indicator.expandedSize),
+    let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 40),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     let pill = HoverView()
+    /// The Jackalope mark, as in the app's title bar.
+    let logo = NSImageView()
+    let logoFile: URL?
     let dot = NSView()
     let label = NSTextField(labelWithString: "")
-    let toggle = NSButton(title: "Resume", target: nil, action: nil)
-    let stop = NSButton(title: "Stop", target: nil, action: nil)
-    let open = NSButton(title: "Open", target: nil, action: nil)
+    let detail = NSTextField(labelWithString: "")
+    let toggle = NSButton(title: "", target: nil, action: nil)
+    let stop = NSButton(title: "", target: nil, action: nil)
+    let open = NSButton(title: "", target: nil, action: nil)
     let fold = NSButton(title: "", target: nil, action: nil)
+    /// After folding, hovering doesn't unfold until the pointer has left the pill once.
+    var holdFold = false
     /// Folded to a small chip by the person; hovering shows the full pill again. The chip and
     /// the frame always stay visible while control is active.
     var folded = false
@@ -944,7 +1022,19 @@ final class Indicator: NSObject {
     var dark = true
     var surface = hexColor("#1d1b22")!
     var textColor = hexColor("#f4f3f7")!
+    /// Active, but the granted window or app is behind the person's work.
+    var background = false
+    /// The person already clicked Resume on the attached window's badge.
+    let resumeAtStart: Bool
     var lookKey = ""
+    var lastFrameStatus = ""
+    /// The agent's cursor, drawn in the window's frame overlay.
+    let cursorLayer = CAShapeLayer()
+    var cursorSeq: UInt64 = 0
+    var cursorAt = Date.distantPast
+    /// Where the cursor last pointed, window-relative from the top left.
+    var cursorPoint: CGPoint?
+    var cursorTrace = ("", Date.distantPast)
     var status = "paused"
     var reason = "Click Resume to begin"
     var epoch: UInt64 = 1
@@ -953,6 +1043,10 @@ final class Indicator: NSObject {
     var timer: Timer?
     var start = ""
     var resumeTicket: UInt64 = 0
+    /// When the agent last sent its own input; the person's input this soon after is a clash.
+    var lastAgentInput = Date.distantPast
+    /// The person's recent clicks and key presses on what Jackalope controls.
+    var personInput: [Date] = []
 
     init(_ request: [String: Any]) throws {
         guard let identity = request["window"] as? [String: Any], let file = request["file"] as? String,
@@ -964,6 +1058,8 @@ final class Indicator: NSObject {
         if scope == "desktop" { selected = nil } else { selected = try SelectedWindow(identity) }
         stateFile = URL(fileURLWithPath: file); themeFile = URL(fileURLWithPath: theme)
         lookFile = (request["look"] as? String).map { URL(fileURLWithPath: $0) }
+        logoFile = (request["logo"] as? String).map { URL(fileURLWithPath: $0) }
+        resumeAtStart = request["resume"] as? Bool == true
         super.init()
         readTheme()
     }
@@ -999,45 +1095,94 @@ final class Indicator: NSObject {
         dot.layer?.backgroundColor = accent.cgColor
         dot.layer?.shadowColor = accent.cgColor
         label.textColor = textColor
-        for (button, emphasis) in [(toggle, true), (stop, false), (open, false)] {
-            button.attributedTitle = NSAttributedString(string: button.title, attributes: [
-                .foregroundColor: emphasis ? accent : textColor,
-                .font: NSFont.systemFont(ofSize: 12, weight: emphasis ? .semibold : .medium),
-            ])
-        }
-        fold.contentTintColor = textColor.withAlphaComponent(0.7)
+        logo.contentTintColor = textColor
+        dot.layer?.borderColor = surface.cgColor
+        detail.textColor = textColor.withAlphaComponent(0.62)
+        toggle.contentTintColor = accent
+        for button in [stop, open, fold] { button.contentTintColor = textColor.withAlphaComponent(0.78) }
         for frame in frames { styleFrame(frame) }
     }
 
-    /// Lays the pill out folded (a small chip) or full, keeping it centred where it was.
+    /// Lays the pill out folded (a small chip) or sized to its content, keeping it centred
+    /// where it was. Text never runs under the buttons; only a long pause reason shortens.
     func layoutPill() {
-        let showFull = !folded || hovering
-        let size = showFull ? Indicator.expandedSize : Indicator.collapsedSize
+        // In the background the bar keeps to a small chip, out of the person's way.
+        let showFull = (!folded && !(background && status == "active")) || (hovering && !holdFold)
+        let height = Indicator.height
+        let pad: CGFloat = 12, gap: CGFloat = 8, button: CGFloat = 28, buttonGap: CGFloat = 2
+        let buttons = [toggle, stop, open, fold]
+        let controls = CGFloat(buttons.count) * button + CGFloat(buttons.count - 1) * buttonGap
+        let titleSize = label.fittingSize
+        let mark: CGFloat = 16
+        let fixed = pad + mark + gap + titleSize.width + 6 + gap * 1.5 + controls + 6
+        let detailWidth = max(0, min(detail.fittingSize.width, Indicator.maxWidth - fixed))
+        let size = showFull ? NSSize(width: ceil(fixed + detailWidth), height: height) : Indicator.collapsedSize
         let old = panel.frame
         let origin = NSPoint(x: old.midX - size.width / 2, y: old.maxY - size.height)
         if old.size != size { panel.setFrame(NSRect(origin: origin, size: size), display: true) }
         pill.frame = NSRect(origin: .zero, size: size)
-        pill.layer?.cornerRadius = size.height / 2
-        dot.frame = showFull ? NSRect(x: 15, y: 15, width: 10, height: 10) : NSRect(x: 14, y: 14, width: 12, height: 12)
-        dot.layer?.cornerRadius = dot.frame.width / 2
-        for view in [label, toggle, stop, open, fold] as [NSView] { view.isHidden = !showFull }
-        label.frame = NSRect(x: 34, y: 11, width: 214, height: 18)
-        toggle.frame = NSRect(x: 252, y: 6, width: 62, height: 28)
-        stop.frame = NSRect(x: 316, y: 6, width: 48, height: 28)
-        open.frame = NSRect(x: 366, y: 6, width: 58, height: 28)
-        fold.frame = NSRect(x: 428, y: 8, width: 30, height: 24)
+        pill.layer?.cornerRadius = height / 2
+        let markX = showFull ? pad : (size.width - mark) / 2
+        logo.frame = NSRect(x: markX, y: (height - mark) / 2, width: mark, height: mark)
+        // The live dot sits on the mark's lower corner.
+        let dotSize: CGFloat = 7
+        dot.frame = NSRect(x: markX + mark - dotSize + 2, y: (height - mark) / 2 - 2, width: dotSize, height: dotSize)
+        dot.layer?.cornerRadius = dotSize / 2
+        for view in [label, detail] + buttons as [NSView] { view.isHidden = !showFull }
+        guard showFull else {
+            pill.setAccessibilityLabel("Jackalope is working. Hover to show controls.")
+            return
+        }
+        pill.setAccessibilityLabel(nil)
+        var x = pad + mark + gap
+        label.frame = NSRect(x: x, y: (height - titleSize.height) / 2, width: titleSize.width, height: titleSize.height)
+        x += titleSize.width + 6
+        let detailHeight = detail.fittingSize.height
+        detail.frame = NSRect(x: x, y: (height - detailHeight) / 2, width: detailWidth, height: detailHeight)
+        x = size.width - 6 - controls
+        for item in buttons {
+            item.frame = NSRect(x: x, y: (height - button) / 2, width: button, height: button)
+            x += button + buttonGap
+        }
+        let active = status == "active"
+        toggle.image = NSImage(systemSymbolName: active ? "pause.fill" : "play.fill", accessibilityDescription: active ? "Pause" : "Resume")
+        toggle.toolTip = active ? "Pause" : "Resume"
+        stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: "Stop")
+        stop.toolTip = "Stop (Esc)"
+        open.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: "Open in Jackalope")
+        open.toolTip = "Open in Jackalope"
         fold.image = NSImage(systemSymbolName: folded ? "chevron.down" : "chevron.up", accessibilityDescription: folded ? "Show the full bar" : "Fold to a small chip")
-        pill.setAccessibilityLabel(showFull ? nil : "\(agent) is using \(subject). Hover to show controls.")
+        fold.toolTip = folded ? "Show the full bar" : "Fold to a small chip"
     }
 
     @objc func toggleFold() {
         folded.toggle()
+        // The pointer is on the pill right now; let the fold show until it leaves.
+        holdFold = folded
+        note("fold \(folded ? "folded" : "unfolded")")
         layoutPill()
+    }
+
+    /// A line for the app's debug trace (`indicator:` in the dev log).
+    func note(_ line: String) {
+        let file = stateFile.deletingLastPathComponent().appendingPathComponent("trace")
+        let entry = line.replacingOccurrences(of: "\n", with: " ") + "\n"
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile(); handle.write(entry.data(using: .utf8)!); try? handle.close()
+        } else {
+            try? entry.write(to: file, atomically: true, encoding: .utf8)
+        }
     }
 
     /// Asks Jackalope to bring this conversation forward.
     @objc func openInApp() {
+        note("open pressed")
         try? "open".write(to: stateFile.deletingLastPathComponent().appendingPathComponent("open"), atomically: true, encoding: .utf8)
+    }
+
+    /// "working here", or where the agent works for app and desktop grants.
+    var working: String {
+        scope == "desktop" ? "working on your computer" : scope == "app" ? "working in \(name)" : "working here"
     }
 
     var subject: String {
@@ -1051,13 +1196,20 @@ final class Indicator: NSObject {
     }
 
     func save() {
-        let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(reason.replacingOccurrences(of: "|", with: "/"))"
+        // Active in the background is still active; the reason tells the app.
+        let shown = status == "active" && background ? "background" : reason
+        let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(shown.replacingOccurrences(of: "|", with: "/"))"
         do { try text.write(to: stateFile, atomically: true, encoding: .utf8) }
         catch { NSApp.terminate(nil) }
-        label.stringValue = status == "active" ? "\(agent) is using \(subject) · Esc stops" : "Paused · \(reason)"
-        let title = status == "active" ? "Pause" : "Resume"
-        if toggle.title != title { toggle.title = title; restyle() }
+        let title = status != "active" ? "Paused" : background ? "Jackalope is working in the background" : "Jackalope is \(working)"
+        let secondary = status != "active" ? reason : background ? "Stop on the bar ends it" : "Esc to stop"
+        if label.stringValue != title || detail.stringValue != secondary || toggle.toolTip != (status == "active" ? "Pause" : "Resume") {
+            label.stringValue = title
+            detail.stringValue = secondary
+            layoutPill()
+        }
         updateDot()
+        if lastFrameStatus != status { lastFrameStatus = status; for frame in frames { styleFrame(frame) } }
         updateFrames()
     }
 
@@ -1066,9 +1218,9 @@ final class Indicator: NSObject {
     func updateFrames() {
         var areas: [NSRect] = []
         let room = Indicator.frameRoom
-        if status == "active" {
+        if status == "active" || status == "paused" {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
-            if scope == "window", let rect = try? selected?.bounds() {
+            if scope == "window", let rect = try? selected?.bounds(), !(selected.map { minimized($0) } ?? false) {
                 areas = [NSRect(x: rect.minX - room, y: top - rect.maxY - room,
                                 width: rect.width + room * 2, height: rect.height + room * 2)]
             } else if scope == "desktop" {
@@ -1093,6 +1245,16 @@ final class Indicator: NSObject {
             line.shadowOffset = .zero
             line.shadowRadius = 7
             frame.contentView?.layer?.addSublayer(line)
+            // A soft glow along the inside edges while the agent is in control: a wide
+            // shadowed stroke, masked to the window so only its inward half shows.
+            let glow = CAShapeLayer()
+            glow.fillColor = NSColor.clear.cgColor
+            glow.lineWidth = 2
+            glow.shadowOffset = .zero
+            glow.shadowRadius = 16
+            let mask = CAShapeLayer()
+            glow.mask = mask
+            frame.contentView?.layer?.insertSublayer(glow, below: line)
             frames.append(frame)
             styleFrame(frame)
         }
@@ -1102,7 +1264,14 @@ final class Indicator: NSObject {
                 frame.setFrame(area, display: true)
                 styleFrame(frame)
             }
-            frame.orderFrontRegardless()
+            // A window frame sits just above its window, so other apps in front cover it
+            // too; it never draws over the person's foreground work.
+            if scope == "window", let selected = selected {
+                frame.level = .normal
+                frame.order(.above, relativeTo: Int(selected.id))
+            } else {
+                frame.orderFrontRegardless()
+            }
         }
     }
 
@@ -1112,14 +1281,182 @@ final class Indicator: NSObject {
     /// A thin accent line with a soft glow, rounded like the window's corners.
     func styleFrame(_ frame: NSWindow) {
         guard let view = frame.contentView, let line = view.layer?.sublayers?.first as? CAShapeLayer else { return }
-        let inset = Indicator.frameRoom - 2
+        // The line sits just inside the window's edge, so a window that fills the screen
+        // still shows it on all four sides.
+        let inset = Indicator.frameRoom + 1
         let rect = view.bounds.insetBy(dx: inset, dy: inset)
         let radius: CGFloat = scope == "window" ? 12 : 0
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        let active = status == "active"
+        // Paused reads as paused: a neutral, quieter line and no inner glow.
+        let tone = active ? accent : textColor.withAlphaComponent(0.45)
         line.frame = view.bounds
-        line.path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-        line.strokeColor = accent.cgColor
-        line.shadowColor = accent.cgColor
-        line.shadowOpacity = reduceTransparency ? 0 : 0.75
+        line.path = path
+        line.strokeColor = tone.cgColor
+        line.shadowColor = tone.cgColor
+        line.shadowOpacity = reduceTransparency || !active ? 0 : 0.75
+        guard let glow = view.layer?.sublayers?.first(where: { $0 !== line }) as? CAShapeLayer,
+              let mask = glow.mask as? CAShapeLayer else { return }
+        glow.frame = view.bounds
+        glow.path = path
+        glow.strokeColor = accent.withAlphaComponent(0.6).cgColor
+        glow.shadowColor = accent.cgColor
+        mask.frame = view.bounds
+        mask.path = path
+        let showGlow = active && !reduceTransparency
+        glow.isHidden = !showGlow
+        let breathing = glow.animation(forKey: "breathe") != nil
+        if showGlow && !reduceMotion && !breathing {
+            let breathe = CABasicAnimation(keyPath: "shadowOpacity")
+            breathe.fromValue = 0.55; breathe.toValue = 0.3; breathe.duration = 2.4
+            breathe.autoreverses = true; breathe.repeatCount = .infinity
+            glow.add(breathe, forKey: "breathe")
+        } else if (!showGlow || reduceMotion) && breathing {
+            glow.removeAnimation(forKey: "breathe")
+        }
+        glow.shadowOpacity = 0.5
+    }
+
+    /// Reads the next agent-cursor event Jackalope wrote (`seq|kind|x|y|width|height`).
+    func readCursor() {
+        guard scope == "window" else { return }
+        let file = stateFile.deletingLastPathComponent().appendingPathComponent("cursor")
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return }
+        let parts = text.split(separator: "|").map(String.init)
+        guard parts.count == 6, let seq = UInt64(parts[0]), seq > cursorSeq,
+              let x = Double(parts[2]), let y = Double(parts[3]), let width = Double(parts[4]), let height = Double(parts[5]) else { return }
+        cursorSeq = seq
+        showCursor(parts[1], CGRect(x: x, y: y, width: width, height: height))
+    }
+
+    /// A small accent pointer, unlike the system cursor, with its tip at the anchor.
+    func setupCursor() {
+        let path = CGMutablePath()
+        path.addLines(between: [CGPoint(x: 1, y: 21), CGPoint(x: 1, y: 4), CGPoint(x: 5.5, y: 8), CGPoint(x: 8.5, y: 1),
+                                CGPoint(x: 11, y: 2), CGPoint(x: 8, y: 8.5), CGPoint(x: 13.5, y: 8.5)])
+        path.closeSubpath()
+        cursorLayer.bounds = CGRect(x: 0, y: 0, width: 16, height: 22)
+        cursorLayer.anchorPoint = CGPoint(x: 1.0 / 16, y: 21.0 / 22)
+        cursorLayer.path = path
+        cursorLayer.lineWidth = 1.5
+        cursorLayer.lineJoin = .round
+        cursorLayer.strokeColor = NSColor.white.cgColor
+        cursorLayer.shadowOffset = .zero
+        cursorLayer.shadowRadius = 5
+        cursorLayer.shadowOpacity = reduceTransparency ? 0 : 0.8
+        cursorLayer.opacity = 0
+    }
+
+    /// Moves the agent's cursor to where an action happens and shows the action. Drawn in the
+    /// frame overlay just above the window, so it is covered wherever the window is.
+    func showCursor(_ kind: String, _ rect: CGRect) {
+        guard let frame = frames.first, let host = frame.contentView?.layer else { return }
+        let room = Indicator.frameRoom
+        let height = frame.frame.height
+        let local = { (point: CGPoint) in CGPoint(x: room + point.x, y: height - room - point.y) }
+        let size = CGSize(width: frame.frame.width - room * 2, height: height - room * 2)
+        let whole = rect.width == 0 && rect.height == 0 && kind == "look"
+        let point = whole ? (cursorPoint ?? CGPoint(x: size.width / 2, y: min(80, size.height / 2)))
+            : rect.width > 0 || rect.height > 0 ? CGPoint(x: rect.midX, y: rect.midY) : rect.origin
+        cursorPoint = point
+        if cursorLayer.path == nil { setupCursor() }
+        if cursorLayer.superlayer !== host { host.addSublayer(cursorLayer) }
+        let target = local(point)
+        let active = status == "active"
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(reduceMotion ? 0 : 0.35)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
+        cursorLayer.position = target
+        cursorLayer.opacity = active ? 1 : 0.45
+        cursorLayer.fillColor = (active ? accent : textColor.withAlphaComponent(0.5)).cgColor
+        cursorLayer.shadowColor = accent.cgColor
+        CATransaction.commit()
+        cursorAt = Date()
+        if kind == "look", rect.width > 0, rect.height > 0 {
+            let origin = local(CGPoint(x: rect.minX, y: rect.maxY))
+            flash(CGRect(x: origin.x, y: origin.y, width: rect.width, height: rect.height), on: host)
+        } else if kind == "click" {
+            ripple(at: target, on: host)
+        } else if kind == "type" {
+            caret(at: CGPoint(x: target.x + 8, y: target.y - 6), on: host)
+        } else if kind == "scroll" {
+            scrollMark(at: CGPoint(x: target.x + 14, y: target.y - 4), on: host)
+        }
+        if cursorTrace.0 != kind || Date().timeIntervalSince(cursorTrace.1) > 1 {
+            cursorTrace = (kind, Date())
+            note("cursor \(kind) at \(Int(point.x)),\(Int(point.y))")
+        }
+    }
+
+    /// Adds a short-lived effect layer and removes it after `life` seconds.
+    func effect(_ layer: CALayer, on host: CALayer, life: Double) {
+        host.insertSublayer(layer, below: cursorLayer)
+        DispatchQueue.main.asyncAfter(deadline: .now() + life) { layer.removeFromSuperlayer() }
+    }
+
+    func ripple(at point: CGPoint, on host: CALayer) {
+        let ring = CAShapeLayer()
+        ring.path = CGPath(ellipseIn: CGRect(x: -10, y: -10, width: 20, height: 20), transform: nil)
+        ring.position = point
+        ring.fillColor = NSColor.clear.cgColor
+        ring.strokeColor = accent.cgColor
+        ring.lineWidth = 2
+        if !reduceMotion {
+            let grow = CABasicAnimation(keyPath: "transform.scale"); grow.fromValue = 0.4; grow.toValue = 2.2
+            let fade = CABasicAnimation(keyPath: "opacity"); fade.fromValue = 1; fade.toValue = 0
+            let group = CAAnimationGroup(); group.animations = [grow, fade]; group.duration = 0.5
+            ring.add(group, forKey: "ripple")
+            ring.opacity = 0
+        }
+        effect(ring, on: host, life: 0.5)
+    }
+
+    func caret(at point: CGPoint, on host: CALayer) {
+        let bar = CALayer()
+        bar.backgroundColor = accent.cgColor
+        bar.bounds = CGRect(x: 0, y: 0, width: 2, height: 16)
+        bar.position = point
+        if !reduceMotion {
+            let blink = CABasicAnimation(keyPath: "opacity"); blink.fromValue = 1; blink.toValue = 0
+            blink.duration = 0.28; blink.autoreverses = true; blink.repeatCount = 3
+            bar.add(blink, forKey: "blink")
+        }
+        effect(bar, on: host, life: 1.7)
+    }
+
+    func scrollMark(at point: CGPoint, on host: CALayer) {
+        let mark = CAShapeLayer()
+        let path = CGMutablePath()
+        path.addLines(between: [CGPoint(x: -4, y: 3), CGPoint(x: 0, y: 7), CGPoint(x: 4, y: 3)])
+        path.addLines(between: [CGPoint(x: -4, y: -3), CGPoint(x: 0, y: -7), CGPoint(x: 4, y: -3)])
+        mark.path = path
+        mark.position = point
+        mark.fillColor = NSColor.clear.cgColor
+        mark.strokeColor = accent.cgColor
+        mark.lineWidth = 2
+        mark.lineCap = .round
+        if !reduceMotion {
+            let fade = CABasicAnimation(keyPath: "opacity"); fade.fromValue = 1; fade.toValue = 0; fade.duration = 0.8
+            mark.add(fade, forKey: "fade")
+            mark.opacity = 0
+        }
+        effect(mark, on: host, life: 0.8)
+    }
+
+    /// A faint box around what the agent just read.
+    func flash(_ rect: CGRect, on host: CALayer) {
+        let box = CAShapeLayer()
+        box.path = CGPath(roundedRect: rect, cornerWidth: 4, cornerHeight: 4, transform: nil)
+        box.fillColor = accent.withAlphaComponent(0.06).cgColor
+        box.strokeColor = accent.withAlphaComponent(0.7).cgColor
+        box.lineWidth = 1
+        if !reduceMotion {
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 1, 1, 0]; fade.keyTimes = [0, 0.15, 0.7, 1]; fade.duration = 1
+            box.add(fade, forKey: "look")
+            box.opacity = 0
+        }
+        effect(box, on: host, life: 1)
     }
 
     /// The live dot pulses gently while the agent is in control.
@@ -1138,7 +1475,12 @@ final class Indicator: NSObject {
     }
 
     func pause(_ message: String) {
-        if status == "active" { status = "paused"; reason = message; epoch += 1; save() }
+        if status == "active" { note("paused: \(message)"); status = "paused"; reason = message; epoch += 1; save() }
+    }
+
+    @objc func stopPressed() {
+        note("stop pressed")
+        cancel()
     }
 
     @objc func cancel() {
@@ -1164,7 +1506,8 @@ final class Indicator: NSObject {
     }
 
     @objc func change() {
-        if status == "active" { pause("Paused by the user"); return }
+        note(status == "active" ? "pause pressed" : "resume pressed")
+        if status == "active" { pause("Paused by you"); return }
         do {
             try checkPermissions()
             guard let tap = tap else { throw ControlError("Input monitor unavailable") }
@@ -1188,12 +1531,78 @@ final class Indicator: NSObject {
         } catch { reason = String(describing: error); save() }
     }
 
+    /// Physical input that means the person is taking control back: a click or a key press.
+    /// Moving the mouse or scrolling doesn't pause, and neither do modifier keys on their
+    /// own or button and key releases.
+    static func retakes(_ type: CGEventType) -> Bool {
+        [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown].contains(type)
+    }
+
+    /// Whether a screen point (top-left origin) is on this indicator's own pill, whose
+    /// buttons act on a click instead of counting it as taking control back.
+    func onPill(_ point: CGPoint) -> Bool {
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        return panel.isVisible && panel.frame.contains(NSPoint(x: point.x, y: top - point.y))
+    }
+
+    /// Whether the person's input lands on what Jackalope controls: anywhere for a desktop
+    /// grant; keys while the granted window or app is in front; a click on the
+    /// granted window (or app) where it is visible. Input in other apps leaves the agent's
+    /// background work alone.
+    func targetsGrant(_ type: CGEventType, _ point: CGPoint) -> Bool {
+        if scope == "desktop" { return true }
+        if type == .keyDown { return !background }
+        let hit = visibleWindows().first { value in
+            guard (value[kCGWindowLayer as String] as? Int) == 0,
+                  (value[kCGWindowOwnerPID as String] as? Int32) != getpid(),
+                  (value[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let bounds = value[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return rect.contains(point)
+        }
+        guard let hit = hit else { return false }
+        if scope == "window" { return (hit[kCGWindowNumber as String] as? UInt32) == selected?.id }
+        guard let pid = hit[kCGWindowOwnerPID as String] as? Int32 else { return false }
+        return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier?.lowercased() == app
+    }
+
     func event(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { resumeTicket += 1; pause("Input monitor interrupted"); return }
-        if event.getIntegerValueField(.eventSourceUserData) == tag { return }
+        // The agent's own input carries this indicator's tag; everything else is the person.
+        if event.getIntegerValueField(.eventSourceUserData) == tag {
+            lastAgentInput = Date()
+            return
+        }
+        // Escape pauses control while the granted window is in front (or for a desktop
+        // grant). An Escape in another app is the person's own; Stop on the bar ends control.
+        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
+            if scope == "desktop" || !background { resumeTicket += 1; pause("You pressed Escape") }
+            return
+        }
+        guard Indicator.retakes(type), !onPill(event.location), targetsGrant(type, event.location) else { return }
+        let now = Date()
+        personInput = personInput.filter { now.timeIntervalSince($0) < Indicator.takeoverWindow } + [now]
+        guard let reason = Indicator.disruption(
+            sinceAgentInput: now.timeIntervalSince(lastAgentInput), recentInput: personInput.count
+        ) else { return }
         resumeTicket += 1
-        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 { cancel(); return }
-        pause("Physical input detected")
+        personInput = []
+        pause(reason)
+    }
+
+    /// How long after the agent's own input the person's click or key counts as a clash.
+    static let clashWindow: TimeInterval = 0.6
+    /// The span in which repeated clicks or keys mean the person is taking the window back.
+    static let takeoverWindow: TimeInterval = 1.5
+    static let takeoverCount = 3
+
+    /// Why the person's input should pause control, or nil when it can pass: a single stray
+    /// click or key doesn't interrupt the agent; one that lands while the agent is acting, or
+    /// several in quick succession, does.
+    static func disruption(sinceAgentInput: TimeInterval, recentInput: Int) -> String? {
+        if sinceAgentInput < clashWindow { return "You stepped in while Jackalope was acting" }
+        if recentInput >= takeoverCount { return "You're using this window" }
+        return nil
     }
 
     func run() throws {
@@ -1229,20 +1638,30 @@ final class Indicator: NSObject {
         pill.onHover = { [weak self] inside in
             guard let self = self else { return }
             self.hovering = inside
+            if !inside { self.holdFold = false }
             if self.folded { self.layoutPill() }
         }
         dot.wantsLayer = true
-        dot.layer?.shadowOpacity = 0.9; dot.layer?.shadowRadius = 5; dot.layer?.shadowOffset = .zero
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.lineBreakMode = .byTruncatingTail
-        for (button, action) in [(toggle, #selector(change)), (stop, #selector(cancel)), (open, #selector(openInApp)), (fold, #selector(toggleFold))] {
+        dot.layer?.borderWidth = 1.5
+        dot.layer?.shadowOpacity = 0.9; dot.layer?.shadowRadius = 4; dot.layer?.shadowOffset = .zero
+        if let file = logoFile, let image = NSImage(contentsOf: file) {
+            image.isTemplate = true
+            logo.image = image
+        }
+        logo.imageScaling = .scaleProportionallyUpOrDown
+        logo.setAccessibilityElement(false)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        detail.font = .systemFont(ofSize: 12)
+        detail.lineBreakMode = .byTruncatingTail
+        for (button, action) in [(toggle, #selector(change)), (stop, #selector(stopPressed)), (open, #selector(openInApp)), (fold, #selector(toggleFold))] {
             button.isBordered = false; button.target = self; button.action = action
+            button.imagePosition = .imageOnly; button.imageScaling = .scaleProportionallyDown
+            button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         }
         stop.setAccessibilityLabel("Stop desktop control")
         open.setAccessibilityLabel("Open the conversation in Jackalope")
-        fold.imagePosition = .imageOnly
         panel.contentView = pill
-        for view in [dot, label, toggle, stop, open, fold] as [NSView] { pill.addSubview(view) }
+        for view in [logo, dot, label, detail, toggle, stop, open, fold] as [NSView] { pill.addSubview(view) }
         restyle()
         layoutPill()
         var screen = NSScreen.main
@@ -1252,26 +1671,37 @@ final class Indicator: NSObject {
             screen = NSScreen.screens.first(where: { $0.frame.contains(cocoaPoint) }) ?? NSScreen.main
         }
         guard let frame = screen?.visibleFrame else { throw ControlError("Selected display is unavailable.") }
-        panel.setFrameOrigin(NSPoint(x: frame.midX - Indicator.expandedSize.width / 2,
-                                     y: frame.maxY - Indicator.expandedSize.height - 8))
+        panel.setFrameOrigin(NSPoint(x: frame.midX - panel.frame.width / 2,
+                                     y: frame.maxY - Indicator.height - 8))
         panel.orderFrontRegardless()
         save()
+        // The person already clicked Resume on the attached window's badge: start the same
+        // way the bar's Resume would, with the same checks.
+        if resumeAtStart { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.change() } }
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if getppid() != self.parent || !self.panel.isVisible { self.cancel(); return }
             do {
-                if self.scope == "window", let selected = self.selected {
+                if self.scope == "window", let selected = self.selected,
+                   minimized(selected), NSRunningApplication(processIdentifier: selected.pid) != nil {
+                    // Minimized: nothing to read or press until it's restored, but it isn't
+                    // a reason to stop; actions report it.
+                    self.background = true
+                } else if self.scope == "window", let selected = self.selected {
                     let rect = try selected.bounds()
-                    if self.status == "active" {
-                        _ = try selected.foreground(rect)
-                        if let previous = self.previousBounds, !sameBounds(rect, previous) { self.pause("Window moved or resized") }
-                    }
-                } else if self.scope == "app" && self.status == "active" && !self.frontmostAllowed() {
-                    self.pause("\(self.name) is no longer active")
+                    // Another app in front, a move or a resize no longer pauses: the agent
+                    // keeps working in the background and its snapshots go stale on a move.
+                    self.background = !selected.isForeground(rect)
+                    self.previousBounds = rect
+                } else if self.scope == "app" {
+                    self.background = !self.frontmostAllowed()
                 }
                 if self.status == "active" && !CGEvent.tapIsEnabled(tap: tap) { self.pause("Input monitor interrupted") }
-            } catch { self.pause("Window focus or identity changed") }
+            } catch { self.pause("The window closed, was minimized or changed") }
             if self.readTheme() { self.restyle() }
+            self.readCursor()
+            // The cursor fades after a few quiet seconds and comes back on the next action.
+            if self.cursorLayer.opacity > 0 && Date().timeIntervalSince(self.cursorAt) > 3 { self.cursorLayer.opacity = 0 }
             self.save()
         }
         NSApp.run()

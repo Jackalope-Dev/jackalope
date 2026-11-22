@@ -531,7 +531,7 @@ ${incoming}`
                   compact
                   conversation={attachKey}
                   provider={chosen[0]?.id ?? project.preferences?.preferredRunner ?? 'auto'}
-                  agent={chosen.length === 1 ? chosen[0].name : 'your agent'}
+                  agent="Jackalope"
                   disabled={busy}
                   mascotRef={attachMarkRef}
                   refresh={attachRefresh}
