@@ -118,7 +118,9 @@ test('the home page identifies the brand, its profiles and the free desktop app'
   assert.equal(entry('WebSite').alternateName, 'site.example.test');
   assert.equal(entry('WebSite').url, `${origin}/`);
   assert.equal(entry('Organization').logo.url, `${origin}/icon-256.png`);
-  assert.ok(entry('Organization').sameAs.includes('https://github.com/Jackalope-Dev/jackalope'));
+  assert.ok(
+    new Set(entry('Organization').sameAs).has('https://github.com/Jackalope-Dev/jackalope'),
+  );
   const application = entry('SoftwareApplication');
   assert.equal(application.operatingSystem, 'Windows, macOS, Linux');
   assert.equal(application.applicationCategory, 'DeveloperApplication');
