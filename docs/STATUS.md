@@ -353,7 +353,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   them, and lets ready planned and swarm results merge too. Such projects push each
   merged branch head to their linked Artifacts repository and, when the policy has a
   `deploy` section, deploy it from a clean checkout with an optional check and rollback;
-  a failed deploy pauses automatic merging. Source worktrees remain
+  a failed deploy pauses automatic merging. Before an automatic merge is applied, the
+  saved check runs on the combined result in a temporary worktree unless a task's own
+  passing check already covers exactly that tree; a failing combination is not merged
+  and waits for the person with the output on each task. Merging from Review & merge by
+  hand does not run it, the running check is not shown, and installed-app acceptance
+  of the combined check remains open. Source worktrees remain
   available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
