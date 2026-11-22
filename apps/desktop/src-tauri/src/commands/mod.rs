@@ -81,6 +81,7 @@ pub mod readiness;
 pub mod resources;
 pub mod schedules;
 mod site_gate;
+pub mod skills;
 
 pub mod agent_screen;
 pub mod browser;

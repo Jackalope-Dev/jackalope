@@ -30,6 +30,12 @@ const SOCIAL_IMAGE_ALT =
 
 export const routes = pages.map((page) => page.path);
 
+/** Retired URLs and the page that absorbed their content; each answers with a 301. */
+export const movedPages: Record<string, string> = {
+  '/blog/git-worktrees-for-ai-coding-agents/': '/git-worktrees-for-ai-agents/',
+  '/blog/claude-code-and-codex-together/': '/guides/run-codex-and-claude-code-in-parallel/',
+};
+
 function personSchema(author: Author, origin: string) {
   return {
     '@type': 'Person',
@@ -354,6 +360,9 @@ function marketingPageText(page: MarketingPage, origin: string) {
           row.map((cell, index) => `${section.table?.columns[index]}: ${cell}`).join('\n'),
         ) || []),
         ...(section.bullets?.map((item) => `- ${item}`) || []),
+        ...(section.code
+          ? [`${section.code.label}\n\`\`\`${section.code.language}\n${section.code.value}\n\`\`\``]
+          : []),
         ...(section.links?.map((link) => `[${link.label}](${link.href})`) || []),
       ].join('\n\n'),
     )
@@ -371,6 +380,23 @@ function marketingPageText(page: MarketingPage, origin: string) {
       ].join('\n\n')
     : '';
   return `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${body}\n\n${details}`;
+}
+
+/**
+ * Markdown mirrors and llms*.txt files stay public for language models but out of
+ * search results: each one is served with noindex and a canonical Link to the
+ * HTML page it mirrors (its directory's page, so /knowledge/x/index.md -> /knowledge/x/).
+ */
+export function mirrorHeaderRules(fileNames: string[], origin = siteOrigin) {
+  return fileNames
+    .filter((name) => name.endsWith('.md') || /(^|\/)llms(-full)?\.txt$/.test(name))
+    .sort()
+    .map((name) => {
+      const page = `/${name}`.replace(/[^/]*$/, '');
+      if (!routes.includes(page)) throw new Error(`${name} mirrors ${page}, which is not a page.`);
+      return `/${name}\n  X-Robots-Tag: noindex\n  Link: <${origin}${page}>; rel="canonical"\n`;
+    })
+    .join('\n');
 }
 
 export function discoveryFiles(

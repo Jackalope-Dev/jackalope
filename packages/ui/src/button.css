@@ -39,6 +39,8 @@
     font-size: var(--text-sm, 0.875rem);
     font-weight: 500;
     line-height: 1.5;
+    /* Bodies have a fixed height, so a wrapped label would crowd the edges. */
+    white-space: nowrap;
     cursor: pointer;
     transition:
       background-color 150ms,

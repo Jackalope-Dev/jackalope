@@ -195,6 +195,17 @@ fn main() {
         println!("cargo:rustc-link-lib=advapi32");
     }
 
+    // Jackalope patch: build whisper.cpp against the static C and C++ runtimes. Tauri
+    // links the VC runtime statically and the UCRT dynamically, so with /MD the C++ code
+    // alone made the app import MSVCP140.dll and need the Visual C++ Redistributable.
+    // /MT objects pull in libcpmt, which links against that same hybrid CRT.
+    if target.contains("msvc") {
+        config
+            .static_crt(true)
+            .define("CMAKE_POLICY_DEFAULT_CMP0091", "NEW")
+            .define("CMAKE_MSVC_RUNTIME_LIBRARY", "MultiThreaded");
+    }
+
     if cfg!(feature = "coreml") {
         config.define("WHISPER_COREML", "ON");
         config.define("WHISPER_COREML_ALLOW_FALLBACK", "1");

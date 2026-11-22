@@ -286,6 +286,21 @@
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
 }
+.window-glob-site {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.window-glob-site svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+}
+.window-glob-site strong {
+  overflow-wrap: anywhere;
+}
 .window-glob-note {
   margin: 0;
   color: var(--color-text-secondary);

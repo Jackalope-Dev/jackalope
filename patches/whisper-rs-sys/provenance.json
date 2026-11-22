@@ -6,8 +6,8 @@
   "files": {
     "patches/whisper-rs-sys/Cargo.toml": "662014946424b030a3887685a5e47994f9db9ed964433feb46de68920c41589e",
     "patches/whisper-rs-sys/Cargo.toml.orig": "c3c5deb2c8ad7d4c8560780442ca99d8b79c8eba8288b3b17201ab4fcdffe500",
-    "patches/whisper-rs-sys/README.md": "77aae68deb21d5461d4ae0150afad1cc6c2dcd42372703c51a134c50138e23dc",
-    "patches/whisper-rs-sys/build.rs": "b6e41bc4fc37b9115f3afe4217ed6470795b05c43a4bf877f9b1e68a78f3a181",
+    "patches/whisper-rs-sys/README.md": "bb0d82db0f4b29bc2eeacaafd07d53a6f1700934da5a7e4f79ad018e8e88646c",
+    "patches/whisper-rs-sys/build.rs": "c1f802b848f5c9f4ea23236788484b768fc83f234b85906a6568296d37f99ea6",
     "patches/whisper-rs-sys/src/bindings.rs": "7be784d3f55dff7ffc92e5f86b8c7a5065bc2618522fab3ae12bdeaaeb5612b1",
     "patches/whisper-rs-sys/src/lib.rs": "1f0c51a1d8af588a150ad38fd44b70b6214058747b52b0dd1c8317ea9ce19d32",
     "patches/whisper-rs-sys/whisper.cpp/CMakeLists.txt": "7a529b424a6d3af433bc838315e804d2312b309aeb0197d271a8d8995f1cca52",

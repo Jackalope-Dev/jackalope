@@ -92,7 +92,7 @@ export const recentPosts: BlogPost[] = [
       },
       {
         label: 'Git worktrees for AI coding agents',
-        href: '/blog/git-worktrees-for-ai-coding-agents/',
+        href: '/git-worktrees-for-ai-agents/',
       },
     ],
   },
@@ -224,11 +224,11 @@ export const recentPosts: BlogPost[] = [
     related: [
       {
         label: 'Use Claude Code and Codex together',
-        href: '/blog/claude-code-and-codex-together/',
+        href: '/guides/run-codex-and-claude-code-in-parallel/',
       },
       {
         label: 'Git worktrees for coding agents',
-        href: '/blog/git-worktrees-for-ai-coding-agents/',
+        href: '/git-worktrees-for-ai-agents/',
       },
       { label: 'Compare Jackalope and terminal tabs', href: '/compare/terminal-tabs/' },
     ],
@@ -327,7 +327,7 @@ export const recentPosts: BlogPost[] = [
     related: [
       {
         label: 'Using Claude Code and Codex together',
-        href: '/blog/claude-code-and-codex-together/',
+        href: '/guides/run-codex-and-claude-code-in-parallel/',
       },
       { label: 'Reviewing AI-generated code', href: '/blog/review-ai-generated-code-checklist/' },
     ],

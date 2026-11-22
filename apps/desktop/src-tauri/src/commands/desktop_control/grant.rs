@@ -84,6 +84,9 @@ pub struct Grant {
     pub read_only: bool,
     /// The agent's display name, for the control bar.
     pub agent: String,
+    /// The person already clicked Resume (on an attached window's badge), so control
+    /// starts without asking again.
+    pub resume: bool,
 }
 
 impl Grant {
@@ -97,6 +100,7 @@ impl Grant {
                 remembered: None,
                 read_only: false,
                 agent: String::new(),
+                resume: false,
             },
             Choice::App {
                 key,
@@ -111,6 +115,7 @@ impl Grant {
                 remembered: None,
                 read_only: false,
                 agent: String::new(),
+                resume: false,
             },
             Choice::Desktop => Self {
                 scope: Scope::Desktop,
@@ -120,6 +125,7 @@ impl Grant {
                 remembered: None,
                 read_only: false,
                 agent: String::new(),
+                resume: false,
             },
         }
     }
@@ -165,7 +171,7 @@ pub fn question(scope: Scope, project: &str, reason: Option<&str>, portal: bool)
     let control = if portal {
         "Your desktop then asks you to approve remote control, and its sharing indicator shows while control is active. Stopping the share there, Stop or Revoke ends access at once; on this desktop your own mouse and keyboard input does not pause the agent."
     } else {
-        "A frame and bar show while control is active. Escape, Stop or Revoke ends access at once; moving the mouse or typing pauses it until you click Resume."
+        "A frame and bar show while control is active. Stop or Revoke ends access at once; pressing Escape or stepping in while it works pauses it until you click Resume."
     };
     format!("Allow desktop control in {project}?{reason} {what} {control} Input can change files or send data, so do not choose anything showing secrets.")
 }

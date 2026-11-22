@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { comparisonPages } from '../src/comparison-content.ts';
 import { posts } from '../src/content.ts';
-import { discoveryFiles, pageHtml } from '../src/seo.ts';
+import { discoveryFiles, mirrorHeaderRules, movedPages, pageHtml, routes } from '../src/seo.ts';
 
 const origin = 'https://site.example.test';
 const metadata = (path) => {
@@ -77,5 +77,31 @@ test('an editorial refresh preserves publication dates and exposes the actual mo
     const item = files['feed.xml'].split(`<link>${origin}${path}</link>`)[1].split('</item>')[0];
     const published = new Date(item.match(/<pubDate>([^<]+)<\/pubDate>/)[1]);
     assert.equal(published.toISOString().slice(0, 10), post.date, path);
+  }
+});
+
+test('Markdown mirrors and llms files are noindex with a canonical link to their page', () => {
+  const names = Object.keys(discoveryFiles(origin));
+  const rules = mirrorHeaderRules([...names, 'assets/app.js', 'robots.txt'], origin);
+  for (const name of names.filter((name) => name.endsWith('.md') || name.includes('llms'))) {
+    const page = `/${name}`.replace(/[^/]*$/, '');
+    assert.ok(
+      rules.includes(
+        `/${name}\n  X-Robots-Tag: noindex\n  Link: <${origin}${page}>; rel="canonical"\n`,
+      ),
+      name,
+    );
+    assert.ok(
+      !discoveryFiles(origin)['sitemap.xml'].includes(name),
+      `${name} is not in the sitemap`,
+    );
+  }
+  assert.ok(!rules.includes('robots.txt') && !rules.includes('app.js'));
+});
+
+test('moved pages point at a live page and are no longer routes', () => {
+  for (const [from, to] of Object.entries(movedPages)) {
+    assert.ok(!routes.includes(from), from);
+    assert.ok(routes.includes(to), to);
   }
 });
