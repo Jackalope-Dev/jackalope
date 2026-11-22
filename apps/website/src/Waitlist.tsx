@@ -10,6 +10,7 @@ import {
   accessRequest,
   useSignupMode,
 } from './access-api';
+import { reportConversion } from './analytics';
 import { BrandMark } from './BrandMark';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import { WaitlistQuestions } from './WaitlistPreferences';
@@ -118,6 +119,7 @@ export function WaitlistPage() {
   async function verify() {
     await act(async () => {
       await accessRequest('waitlist/accept', { token });
+      reportConversion('signup_confirmed');
       setToken('');
       // With open signup, confirming also signs the person in, so send them straight to
       // their download rather than a waitlist page with nothing to wait for.

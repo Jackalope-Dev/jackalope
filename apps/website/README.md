@@ -136,6 +136,14 @@ and the signup confirmation read `GET /v1/access/status` (`useSignupMode` in
 `src/access-api.ts`) and show waitlist or pass copy only in waitlist mode. Signed-in
 member pages use the `openSignup` field of their own responses.
 
+Production builds for the canonical origin (`https://jackalope.dev`) add LopeBase's
+cookieless page counter to every page's head (`vite.config.ts`); the dev server and
+builds with another `VITE_SITE_URL` do not. `reportConversion` in `src/analytics.ts`
+reports `signup`, `signup_confirmed` and `download` once per page load, without
+personal data. The site sends no Content-Security-Policy; if one is added, allow
+`https://app.lopebase.com` for scripts and connections and the inline queue stub.
+Keep the privacy page's description of the counter accurate when it changes.
+
 Before enabling signup, verify the sending domain, reply-to and mailing addresses,
 audience, consent settings and email sequences in the provider account. Keep account
 records and subscriber exports private. Live checks require an operator-controlled

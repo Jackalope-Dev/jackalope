@@ -1,5 +1,6 @@
 import { Button, Checkbox, IconButton, Input } from '@jackalope/ui';
 import { accessMessage, accessOrigin, accessRequest, useSignupMode } from './access-api';
+import { reportConversion } from './analytics';
 import { waitlistReferral } from './referral';
 import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -71,6 +72,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
         return;
       }
       setState('success');
+      reportConversion('signup');
       setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
