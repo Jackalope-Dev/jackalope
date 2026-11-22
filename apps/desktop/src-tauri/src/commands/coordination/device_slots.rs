@@ -22,8 +22,16 @@ pub(super) fn slots_for(cpus: usize, memory: Option<u64>) -> usize {
     slots.max(1)
 }
 
-/// [`slots_for`] this device, measured once.
+/// [`slots_for`] this device, measured once. Tests get a fixed three so queue
+/// behavior does not depend on the machine that runs them.
 pub(super) fn recommended() -> usize {
+    if cfg!(test) {
+        return 3;
+    }
+    measured()
+}
+
+fn measured() -> usize {
     static SLOTS: OnceLock<usize> = OnceLock::new();
     *SLOTS.get_or_init(|| {
         slots_for(
@@ -94,7 +102,7 @@ mod tests {
 
     #[test]
     fn this_device_has_a_recommendation_in_range() {
-        assert!((1..=MAX_CONCURRENCY).contains(&recommended()));
+        assert!((1..=MAX_CONCURRENCY).contains(&measured()));
         assert!(memory().is_some_and(|bytes| bytes >= GIB));
     }
 
