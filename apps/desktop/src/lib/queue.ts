@@ -89,7 +89,13 @@ export interface QueueView {
   items: QueueItem[];
   messages: QueueMessage[];
   enabledProjects: string[];
+  /** Agents that may run at once on this device. */
   concurrency: number;
+  /** Whether `concurrency` follows `recommendedConcurrency`. */
+  automaticConcurrency?: boolean;
+  /** What this device's CPUs and memory can run at once. */
+  recommendedConcurrency?: number;
+  maxConcurrency?: number;
   /** Agents that may run at once on project computers, apart from `concurrency`. */
   remoteConcurrency?: number;
   bridgeUrl: string | null;
