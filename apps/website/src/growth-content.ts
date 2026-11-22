@@ -159,7 +159,7 @@ export const growthPages: MarketingPage[] = [
             label: 'A worked parallel plan',
           },
           {
-            href: '/guides/review-ai-generated-code/',
+            href: '/blog/review-ai-generated-code-checklist/',
             label: 'What to inspect in the result',
           },
         ],
@@ -257,7 +257,7 @@ export const growthPages: MarketingPage[] = [
     ],
     related: [
       { href: '/compare/', label: 'Compare coding-agent workspaces' },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
       { href: '/git-worktrees-for-ai-agents/', label: 'Understand Git worktrees' },
     ],
   },
@@ -327,7 +327,10 @@ export const growthPages: MarketingPage[] = [
       },
     ],
     related: [
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated changes' },
+      {
+        href: '/blog/review-ai-generated-code-checklist/',
+        label: 'Review agent-generated changes',
+      },
       { href: '/tour/', label: 'Watch the interface tour' },
       { href: '/features/project-context-for-coding-agents/', label: 'Project context and tools' },
     ],

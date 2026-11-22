@@ -189,7 +189,7 @@ export function App({ path = '/' }: { path?: string }) {
                     ['Parallel coding agents', '/parallel-coding-agents/'],
                     ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],
                     ['Supported agents', '/agents/'],
-                    ['Review AI-generated code', '/guides/review-ai-generated-code/'],
+                    ['Review AI-generated code', '/blog/review-ai-generated-code-checklist/'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
                     ['Roadmap', '/roadmap/'],

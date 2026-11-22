@@ -413,7 +413,7 @@ export const recentPosts: BlogPost[] = [
       },
     ],
     related: [
-      { label: 'Code review with evidence', href: '/guides/review-ai-generated-code/' },
+      { label: 'Code review with evidence', href: '/blog/review-ai-generated-code-checklist/' },
       { label: 'See what is taking shape', href: '/changelog/' },
     ],
   },
