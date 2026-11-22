@@ -1081,6 +1081,7 @@ process.stdin.on('end', () => {
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let request = RunRequest {
         retry_of: None,
+        handoff_focus: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -1210,6 +1211,7 @@ process.stdin.on('end', () => {
     runtime
         .start(RunRequest {
             retry_of: None,
+            handoff_focus: None,
             continues: None,
             live_session_id: None,
             effort: None,
