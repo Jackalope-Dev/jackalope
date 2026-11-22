@@ -24,6 +24,7 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
       ['Knowledgebase', '/knowledge/'],
       ['Run agents together', '/guides/run-codex-and-claude-code-in-parallel/'],
       ['Review AI-generated code', '/blog/review-ai-generated-code-checklist/'],
+      ['AGENTS.md vs CLAUDE.md', '/blog/agents-md-claude-md-project-instructions/'],
       ['Field notes', '/blog/'],
       ['Changelog', '/changelog/'],
       ['Roadmap', '/roadmap/'],

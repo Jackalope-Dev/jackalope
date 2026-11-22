@@ -1044,7 +1044,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Choose where each piece of knowledge belongs.',
         paragraphs: [
-          'Put stable conventions in project instructions: the build command, supported data formats, and ownership boundaries. Keep a task-specific requirement in the brief. Record a discovered constraint as a lesson only when its evidence and scope are clear, so a temporary workaround does not become a rule for every future task.',
+          'Put stable conventions in project instructions, such as [an AGENTS.md or CLAUDE.md file](/blog/agents-md-claude-md-project-instructions/): the build command, supported data formats, and ownership boundaries. Keep a task-specific requirement in the brief. Record a discovered constraint as a lesson only when its evidence and scope are clear, so a temporary workaround does not become a rule for every future task.',
           "For example, a checkout's temporary port conflict belongs to that run. A documented requirement to preserve old preference files belongs in durable project guidance. Review or remove lessons when the code changes; saved context is useful only while its assumptions remain true.",
         ],
       },

@@ -160,28 +160,22 @@ export const practicalPosts: BlogPost[] = [
     slug: 'agents-md-claude-md-project-instructions',
     cover: { kind: 'context', tone: 'honey', label: 'Write it down once.' },
     title: 'AGENTS.md and CLAUDE.md: writing project instructions agents follow',
-    seoTitle: 'AGENTS.md vs CLAUDE.md: a practical guide',
+    seoTitle: 'AGENTS.md vs CLAUDE.md: which file Claude Code reads',
     category: 'Practical guides',
     author: 'caden-sumner',
     date: '2026-09-27',
+    updated: '2026-11-22',
     readingTime: '7 min read',
     description:
-      'Write an AGENTS.md or CLAUDE.md coding agents follow: what to include, sharing one file across Codex, Claude Code and Gemini CLI, and testing it.',
+      'Claude Code reads CLAUDE.md; Codex and OpenCode read AGENTS.md. Share one file between them with an @AGENTS.md import, and write instructions agents follow.',
     sections: [
       {
-        id: 'why-instruction-files',
-        title: 'Stop repeating the same correction',
-        paragraphs: [
-          'Every coding agent starts a session knowing nothing about your repository. It guesses the package manager, runs the wrong test command, and formats files the way it saw most often in training. You correct it, the session ends, and the next one makes the same guess.',
-          'A project instruction file fixes that at the source. It is a Markdown file in the repository that the agent reads before it starts work. Written well, it replaces the first ten minutes of every conversation. Written badly, it becomes a long list of rules the agent skims, half follows or applies in the wrong place.',
-        ],
-      },
-      {
         id: 'which-file',
-        title: 'Know which file each agent reads',
+        title: 'AGENTS.md vs CLAUDE.md: which file each agent reads',
         paragraphs: [
-          "AGENTS.md is an open format supported by many tools, including Codex and OpenCode. Claude Code reads CLAUDE.md. Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool's documentation for the version you run, because loading rules change.",
-          'You rarely need three copies. Keep the shared guidance in AGENTS.md and make the other files thin pointers. Claude Code supports importing another file with an @ reference, so a one-line CLAUDE.md can pull in AGENTS.md and add only what is specific to Claude. Copies drift; one source with small agent-specific additions does not.',
+          'AGENTS.md and CLAUDE.md do the same job: each is a Markdown file of project instructions that a coding agent loads when a session starts. The difference is which tool looks for which name. AGENTS.md is an open format read by Codex, OpenCode and many other tools. Claude Code reads CLAUDE.md and does not load AGENTS.md on its own.',
+          'If you use Claude Code beside another agent, you rarely need two copies. Keep the shared guidance in AGENTS.md and add a CLAUDE.md whose first line is @AGENTS.md. Claude Code imports the shared file from that line, so both tools follow the same instructions, and anything specific to Claude goes below it. If Claude Code is the only agent you use, a plain CLAUDE.md is enough.',
+          "Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool's documentation for the version you run, because loading rules change. Copies drift; one source with small agent-specific additions does not.",
         ],
         table: {
           caption: 'Default instruction files by agent',
@@ -205,6 +199,14 @@ export const practicalPosts: BlogPost[] = [
             label: 'Claude Code: memory and CLAUDE.md',
             href: 'https://code.claude.com/docs/en/memory',
           },
+        ],
+      },
+      {
+        id: 'why-instruction-files',
+        title: 'Stop repeating the same correction',
+        paragraphs: [
+          'Every coding agent starts a session knowing nothing about your repository. It guesses the package manager, runs the wrong test command, and formats files the way it saw most often in training. You correct it, the session ends, and the next one makes the same guess.',
+          'A project instruction file fixes that at the source. The agent reads it before it starts work. Written well, it replaces the first ten minutes of every conversation. Written badly, it becomes a long list of rules the agent skims, half follows or applies in the wrong place.',
         ],
       },
       {

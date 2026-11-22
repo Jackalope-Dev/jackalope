@@ -234,12 +234,13 @@ export const pages: SitePage[] = [
     path: '/blog/',
     title: 'Coding-agent workflows & field notes | Jackalope',
     description:
-      'Notes from the Jackalope studio on building a calmer workspace and working thoughtfully with coding agents.',
+      'Practical guides and field notes on AI coding agents: running them in parallel, reviewing their code, AGENTS.md and CLAUDE.md, MCP tools, costs and credentials.',
   },
   {
     path: '/changelog/',
-    title: 'Changelog | Jackalope',
-    description: 'Follow new Jackalope features, meaningful improvements, and major milestones.',
+    title: 'Changelog: new features and releases | Jackalope',
+    description:
+      "What's new in Jackalope, the desktop workspace for AI coding agents: dated notes on new features, improvements and releases for Windows, macOS and Linux.",
   },
   {
     path: '/knowledge/',
