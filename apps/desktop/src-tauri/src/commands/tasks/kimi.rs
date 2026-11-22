@@ -54,6 +54,7 @@ pub(super) fn drive_with_servers(
     let mut wait_for_commands = false;
     let mut commands_session = None;
     let mut usage_session = None;
+    let mut model_option = false;
     let mut usage_text = String::new();
     let mut usage_baseline: Option<(u64, u64)> = None;
     let mut terminal_result = None;
@@ -208,6 +209,15 @@ pub(super) fn drive_with_servers(
             if expected == 5 {
                 return terminal_result.unwrap();
             }
+            // Agents without the unstable `session/set_model`, such as omp, take the
+            // model through the stable `model` config option the session reported.
+            if expected == 2 && std::mem::take(&mut model_option) {
+                send(
+                    input,
+                    &json!({"jsonrpc":"2.0","id":2,"method":"session/set_config_option","params":{"sessionId":session.as_deref().unwrap(),"configId":"model","value":model.unwrap()}}),
+                )?;
+                continue;
+            }
             observe(
                 &json!({"sessionUpdate":"jackalope_error","type":"error","error":event["error"]}),
             );
@@ -279,6 +289,11 @@ pub(super) fn drive_with_servers(
                     }
                 }
                 if let Some(model) = model {
+                    model_option = result["configOptions"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .any(|option| option["id"] == "model");
                     send(
                         input,
                         &json!({"jsonrpc":"2.0","id":2,"method":"session/set_model","params":{"sessionId":session_id,"modelId":model}}),
@@ -764,6 +779,47 @@ mod tests {
         assert_eq!(run.result, "New answer 🐇");
         assert_eq!(run.session_id.as_deref(), Some("saved"));
         assert!(!run.usage.reported);
+    }
+
+    #[test]
+    fn acp_model_falls_back_to_the_model_config_option_once() {
+        let options = json!({"sessionId":"new","configOptions":[{"id":"model","type":"select","currentValue":"a","options":[]}]});
+        let mut sent = Vec::new();
+        drive(transcript(&[
+            json!({"id":0,"result":{"protocolVersion":1}}),
+            json!({"id":1,"result":options}),
+            json!({"id":2,"error":{"code":-32603,"message":"Unknown ACP ext method: session/set_model"}}),
+            json!({"id":2,"result":{}}),
+            json!({"id":3,"result":{"stopReason":"end_turn"}}),
+        ]), &mut sent, "C:/workspace", None, Some("provider/b"), "Task", |_| {}, |_| panic!("Unexpected permission")).unwrap();
+        let requests: Vec<Value> = String::from_utf8(sent)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(requests[2]["method"], "session/set_model");
+        assert_eq!(requests[3]["method"], "session/set_config_option");
+        assert_eq!(
+            requests[3]["params"],
+            json!({"sessionId":"new","configId":"model","value":"provider/b"})
+        );
+        assert_eq!(requests[4]["method"], "session/prompt");
+        let refused = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":options}),
+                json!({"id":2,"error":{}}),
+                json!({"id":2,"error":{}}),
+            ]),
+            &mut Vec::new(),
+            "C:/workspace",
+            None,
+            Some("missing"),
+            "Task",
+            |_| {},
+            |_| panic!("Unexpected permission"),
+        );
+        assert!(refused.is_err());
     }
 
     #[test]

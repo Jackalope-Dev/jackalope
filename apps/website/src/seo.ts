@@ -2,6 +2,7 @@ import { guideMarkdown, guidePath, knowledgeFiles, knowledgeGuides } from '@jack
 import { type Author, authorPath, authors, findAuthor } from './authors.ts';
 import benchmarks from './benchmark-summary.json' with { type: 'json' };
 import { blogImageSize, serializeBlogPost } from './blog-types.ts';
+import { GITHUB_URL } from './community.ts';
 import {
   changelogReleases,
   company,
@@ -77,7 +78,16 @@ function lastModified(path: string) {
   return post?.updated ?? post?.date;
 }
 
-export function pageHtml(html: string, path: string, origin = siteOrigin) {
+/**
+ * `env` carries the build's download variables so structured data names only the
+ * platforms the download page offers.
+ */
+export function pageHtml(
+  html: string,
+  path: string,
+  origin = siteOrigin,
+  env: Record<string, string | undefined> = {},
+) {
   const normalized = normalizePath(path);
   const page = pages.find((item) => item.path === normalized);
   const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
@@ -103,17 +113,23 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       '@type': 'Organization',
       '@id': `${origin}/#organization`,
       name: 'Jackalope',
-      url: origin,
+      url: `${origin}/`,
       description: pages[0].description,
-      logo: `${origin}/icon-256.png`,
-      sameAs: ['https://x.com/JackalopeDotDev'],
+      logo: { '@type': 'ImageObject', url: `${origin}/icon-256.png`, width: 256, height: 256 },
+      sameAs: [
+        GITHUB_URL,
+        'https://x.com/JackalopeDotDev',
+        'https://www.reddit.com/r/JackalopeDev/',
+      ],
       parentOrganization: { '@type': 'Organization', name: company.name, url: company.url },
     },
     {
       '@type': 'WebSite',
       '@id': `${origin}/#website`,
       name: 'Jackalope',
-      url: origin,
+      alternateName: new URL(origin).hostname,
+      url: `${origin}/`,
+      inLanguage: 'en',
       publisher: { '@id': `${origin}/#organization` },
     },
     {
@@ -195,8 +211,17 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       '@type': 'SoftwareApplication',
       '@id': `${origin}/#application`,
       name: 'Jackalope',
-      url: origin,
+      url: `${origin}/`,
       applicationCategory: 'DeveloperApplication',
+      // macOS and Linux always have public release builds; Windows is listed once configured.
+      operatingSystem: platformDownloads(env)
+        .filter((platform) => platform.url || platform.id !== 'windows')
+        .map((platform) => platform.name)
+        .join(', '),
+      downloadUrl: `${origin}/download/`,
+      // The account is free and the app is not sold; model access is the user's own.
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      sameAs: [GITHUB_URL],
       description,
       image: `${origin}${SOCIAL_IMAGE}`,
       featureList: [

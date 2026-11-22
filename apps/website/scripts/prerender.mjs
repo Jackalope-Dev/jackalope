@@ -13,8 +13,8 @@ try {
   const { pageHtml, routes, mirrorHeaderRules, movedPages } =
     await server.ssrLoadModule('/src/seo.ts');
   const { siteOrigin, pages } = await server.ssrLoadModule('/src/content.ts');
-  const origin = new URL(loadEnv('production', process.cwd(), 'VITE_').VITE_SITE_URL || siteOrigin)
-    .origin;
+  const env = loadEnv('production', process.cwd(), 'VITE_');
+  const origin = new URL(env.VITE_SITE_URL || siteOrigin).origin;
   const { applyThemeTokens } = await server.ssrLoadModule('@jackalope/brand/theme');
   const { DEFAULT_WEBSITE_THEME } = await server.ssrLoadModule('/src/theme.ts');
   const tokens = new Map();
@@ -41,7 +41,7 @@ try {
     }
   }
   for (const path of [...routes, '/404/']) {
-    const html = pageHtml(template, path, origin)
+    const html = pageHtml(template, path, origin, env)
       .replace('</head>', `<style>:root{${themeStyle}}</style></head>`)
       .replace('<div id="root"></div>', `<div id="root">${render(path)}</div>`);
     const target = resolve('dist', path === '/404/' ? '404.html' : `${path.slice(1)}index.html`);

@@ -10,6 +10,16 @@
     ]
   },
   {
+    "id": "bring-rules-from-other-coding-tools",
+    "date": "2026-11-20",
+    "title": "Bring rules from other coding tools.",
+    "description": "Project context offers your Cursor, Windsurf, Cline and GitHub Copilot rule files as lessons you can turn on.",
+    "items": [
+      "Each rule arrives paused and keeps its file's scope, so path rules match requests that name those folders or file types.",
+      "Oh My Pi is listed among the known ACP agents in Add agent."
+    ]
+  },
+  {
     "id": "your-skills-on-every-computer",
     "date": "2026-11-20",
     "title": "Your skills on every computer.",

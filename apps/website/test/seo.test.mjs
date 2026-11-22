@@ -105,3 +105,32 @@ test('moved pages point at a live page and are no longer routes', () => {
     assert.ok(routes.includes(to), to);
   }
 });
+
+test('the home page identifies the brand, its profiles and the free desktop app', () => {
+  const html = pageHtml('<html><head></head><body></body></html>', '/', origin, {
+    VITE_WINDOWS_STORE_URL: 'https://apps.microsoft.com/detail/9NM89QFJQ244',
+  });
+  const graph = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1])[
+    '@graph'
+  ];
+  const entry = (type) => graph.find((item) => item['@type'] === type);
+  assert.equal(entry('WebSite').name, 'Jackalope');
+  assert.equal(entry('WebSite').alternateName, 'site.example.test');
+  assert.equal(entry('WebSite').url, `${origin}/`);
+  assert.equal(entry('Organization').logo.url, `${origin}/icon-256.png`);
+  assert.ok(
+    new Set(entry('Organization').sameAs).has('https://github.com/Jackalope-Dev/jackalope'),
+  );
+  const application = entry('SoftwareApplication');
+  assert.equal(application.operatingSystem, 'Windows, macOS, Linux');
+  assert.equal(application.applicationCategory, 'DeveloperApplication');
+  assert.deepEqual(application.offers, { '@type': 'Offer', price: '0', priceCurrency: 'USD' });
+  assert.ok(!('aggregateRating' in application) && !('review' in application));
+  assert.equal(
+    metadata('/').mainEntity['@id'],
+    application['@id'],
+    'the home page is about the application',
+  );
+  assert.match(html, /<link rel="canonical" href="https:\/\/site\.example\.test\/" \/>/);
+  assert.match(html, /<meta property="og:site_name" content="Jackalope" \/>/);
+});
