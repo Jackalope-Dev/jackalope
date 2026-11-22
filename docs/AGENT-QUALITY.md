@@ -91,9 +91,14 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   Account capacity reads share in-flight refreshes and use at most four concurrent
   reads, preserving candidate order and final policy/quota reservation checks.
 - `computer_verify` omits recognized passing-test lines only from long successful
-  responses, preserving diagnostics and stderr. It recognizes complete pytest and
-  Node TAP summaries before omitting supported progress or passing-test records.
-  Parsed pytest, Cargo and Node TAP counts describe reported output, not independent
+  responses, preserving diagnostics and stderr. It needs a complete pytest, Node TAP,
+  Jest, Vitest, Playwright, Cargo test or build, Go test or TypeScript build summary
+  before omitting that runner's progress and passing rows, Cargo compile progress, Go
+  run/pass rows that no test log follows, or up-to-date TypeScript projects. Warnings,
+  skips, test logs and summaries remain. Any reported failure, error, flaky retry,
+  interrupted test or TypeScript diagnostic leaves the whole output unchanged.
+  Jest results and Cargo compile progress are written to stderr, so this response
+  keeps them. Parsed counts describe reported output, not independent
   correctness. Failed, timed-out and truncated captures remain intact within the
   capture limit, including output reporting failed tests despite a zero process exit.
   Unknown formats retain their original output. `--after-verification-output=legacy`
@@ -111,8 +116,9 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   executing their commands. Keep captures private. These replays measure tool-output
   delivery, not model tokens, task speed or quality.
 - OpenCode task launches attach a local output hook, including API-key connections
-  using that runner. It only projects complete, successful, untruncated pytest or
-  Node TAP shell output between 2 KB and 50 KB. Diagnostics, skips and summary counts
+  using that runner. It only projects complete, successful, untruncated shell output
+  from the same recognized runners between 2 KB and 50 KB; the shell combines
+  stdout and stderr. Diagnostics, skips and summary counts
   remain visible; the exact original is saved before replacement, with a recovery
   path in the tool response. Commands, arguments, permissions and metadata are unchanged.
   The authenticated local projection endpoint has a one-second deadline; missing
