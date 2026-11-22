@@ -131,6 +131,13 @@ export const marketingPages: MarketingPage[] = [
     ],
     sections: [
       {
+        title: 'What a working tree is.',
+        paragraphs: [
+          'A working tree is the folder of checked-out files you edit, as opposed to the history Git stores in the .git directory. A normal clone has one: the main working tree. The git worktree add command creates a linked working tree, a second folder attached to the same repository.',
+          'Each working tree has its own checked-out branch, HEAD, and staging area, so editing or switching branches in one leaves the others untouched. They all share one history: a commit made in any of them is immediately visible from the rest, with no push or fetch between folders.',
+        ],
+      },
+      {
         title: 'Why worktrees matter for coding agents.',
         paragraphs: [
           "[Two agents in one checkout](/parallel-coding-agents/) can overwrite files, change the active branch, or make a clean review difficult. A Git worktree gives each task a separate working directory and branch while sharing the repository's object database.",
