@@ -1,3 +1,4 @@
+pub(in crate::commands) mod combined_check;
 pub(in crate::commands) mod dependencies;
 use super::repo::{self, Identity, Policy::Snapshot, Seed, Untracked};
 use super::tasks::{TaskRun, TaskRuntime};
