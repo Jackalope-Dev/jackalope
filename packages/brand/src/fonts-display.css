@@ -1,0 +1,5 @@
+/*
+ * Bricolage Grotesque with its width axis (75% to 100%), for display type that changes
+ * width. Loaded only by pages that need it; fonts.css keeps the smaller weight-only file.
+ */
+@import "@fontsource-variable/bricolage-grotesque/wdth.css";

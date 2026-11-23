@@ -50,28 +50,38 @@ async function _verifyPage(page) {
   ]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => scrollTo(0, 0));
-    const logo = page.locator('.lp-hero .lp-ascii-frame');
+    const grain = page.locator('.lp-hero .lp-grain');
     assert(
-      await logo.evaluate(
+      await grain.evaluate(
         (element) =>
           element.getAttribute('aria-hidden') === 'true' &&
           getComputedStyle(element).pointerEvents === 'none',
       ),
-      `Decorative background does not intercept controls at ${width}`,
+      `Decorative grain does not intercept controls at ${width}`,
     );
-    const session = page.locator('.lp-screen');
-    await session.evaluate((el) => el.scrollIntoView({ behavior: 'instant', block: 'center' }));
-    const visual = await session.boundingBox();
     assert(
-      visual.x >= 0 && visual.x + visual.width <= width,
-      `Complete session illustration at ${width}`,
+      await page.evaluate(() => {
+        const hero = document.querySelector('.lp-hero');
+        return (
+          !('motion' in document.querySelector('.lp').dataset) && hero.offsetHeight <= innerHeight
+        );
+      }),
+      `Reduced motion keeps the hero one screen tall at ${width}`,
     );
-    await page.waitForFunction(
-      () => document.querySelector('.lp-screen').dataset.stage === '3',
-      undefined,
-      { timeout: 2000 },
-    );
-    for (const id of ['how-it-works', 'inside', 'features', 'questions', 'download']) {
+    for (const title of await page.locator('.lp-card-title a').all()) {
+      await title.evaluate((el) => el.scrollIntoView({ behavior: 'instant', block: 'center' }));
+      assert(
+        await title.evaluate((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const text = range.getBoundingClientRect();
+          const card = el.closest('.lp-card').getBoundingClientRect();
+          return text.left >= card.left && text.right <= card.right;
+        }),
+        `Card title fits its card at ${width}`,
+      );
+    }
+    for (const id of ['intro', 'inside', 'features', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -119,36 +129,46 @@ async function _verifyPage(page) {
     () => document.querySelectorAll('.td-tab')[1]?.getAttribute('aria-current') === 'true',
   );
   assert(
-    await page
-      .locator('.lp-hero .lp-line-text')
-      .first()
-      .evaluate((el) => getComputedStyle(el).animationName === 'none'),
+    await page.locator('.lp-cue').evaluate((el) => getComputedStyle(el).animationName === 'none'),
     'Reduced hero motion',
   );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.reload();
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-  const scrubTo = (share) =>
-    page.locator('#how-it-works').evaluate((el, at) => {
-      const top = el.getBoundingClientRect().top + scrollY;
-      scrollTo({ top: top + (el.offsetHeight - innerHeight) * at, behavior: 'instant' });
+  await page.waitForFunction(() => 'motion' in document.querySelector('.lp').dataset);
+  const scrubHero = (share) =>
+    page.locator('.lp-hero').evaluate((el, at) => {
+      scrollTo({ top: (el.offsetHeight - innerHeight) * at, behavior: 'instant' });
     }, share);
-  const stage = () => page.locator('.lp-screen').getAttribute('data-stage');
-  await scrubTo(0);
-  await page.waitForFunction(() => document.querySelector('.lp-screen').dataset.stage === '0');
-  await scrubTo(0.5);
-  await page.waitForFunction(() => document.querySelector('.lp-screen').dataset.stage === '2');
-  await scrubTo(1);
-  await page.waitForFunction(() => document.querySelector('.lp-screen').dataset.stage === '3');
-  assert((await stage()) === '3', 'Scrolling plays the work through to review');
+  const maskOpacity = () =>
+    page.locator('.lp-mask').evaluate((el) => Number(getComputedStyle(el).opacity));
+  await scrubHero(0);
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('.lp-mask')).opacity === '1',
+  );
+  await scrubHero(1);
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('.lp-mask')).opacity === '0',
+  );
+  assert((await maskOpacity()) === 0, 'Scrolling zooms through the name onto the field');
+  await page.locator('#inside').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.lp-word')].every((word) => word.classList.contains('is-lit')),
+  );
+  await page.locator('#features').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.lp-card')].every((card) =>
+      card.classList.contains('is-active'),
+    ),
+  );
   assert(errors.length === 0, errors.join('\n'));
   return {
     viewports: 5,
     keyboard: true,
     appearance: true,
     reducedMotion: true,
-    scrollSession: true,
+    scrollStory: true,
     terminalDemo: true,
     errors,
   };
