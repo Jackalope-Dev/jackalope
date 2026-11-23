@@ -349,7 +349,7 @@ export function LandingPage({
 
       <section
         className="lp-statement"
-        id="intro"
+        id="how-it-works"
         data-lanes="0.36 0.2 0.9"
         data-lanes-narrow="0 0.8 0.2"
       >

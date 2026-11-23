@@ -72,7 +72,7 @@ async function _verifyPage(page) {
         `Pane text fits at ${width}`,
       );
     }
-    for (const id of ['intro', 'inside', 'features', 'questions', 'download']) {
+    for (const id of ['how-it-works', 'inside', 'features', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
