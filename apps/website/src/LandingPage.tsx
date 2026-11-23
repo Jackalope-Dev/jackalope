@@ -181,7 +181,8 @@ function startChoreography(main: HTMLElement, animate: boolean): () => void {
     if (beadBox.bottom > 0 && beadBox.top < viewportHeight) {
       for (const [index, bead] of beads.entries()) {
         const x = laneX(index, beads.length, field.forkEnd, time, field);
-        const left = viewportWidth / 2 + x * viewportHeight - beadBox.left - bead.offsetWidth / 2;
+        const center = beadBox.left + bead.offsetLeft + bead.offsetWidth / 2;
+        const left = viewportWidth / 2 + x * viewportHeight - center;
         bead.style.transform = `translate3d(${left.toFixed(1)}px, 0, 0)`;
       }
     }

@@ -8,9 +8,9 @@ async function _verifyPage(page) {
   await page.evaluate(() => document.fonts.ready);
   assert(
     await page.evaluate(
-      () => document.documentElement.style.getPropertyValue('--accent-h') === '245',
+      () => document.documentElement.style.getPropertyValue('--accent-h') === '258',
     ),
-    'Default Indigo theme',
+    'Default Jackalope Violet theme',
   );
   assert(
     (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
@@ -104,13 +104,24 @@ async function _verifyPage(page) {
   const headerWaitlistButton = page
     .locator('.landing-header')
     .getByRole('button', { name: 'Sign up', exact: true });
-  await headerWaitlistButton.click();
-  await page.getByRole('dialog', { name: 'Sign up for Jackalope' }).waitFor();
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(
-    (button) => document.activeElement === button,
-    await headerWaitlistButton.elementHandle(),
-  );
+  // Builds with configured downloads link to the download page instead of offering signup.
+  if (await headerWaitlistButton.count()) {
+    await headerWaitlistButton.click();
+    await page.getByRole('dialog', { name: 'Sign up for Jackalope' }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(
+      (button) => document.activeElement === button,
+      await headerWaitlistButton.elementHandle(),
+    );
+  } else {
+    assert(
+      (await page
+        .locator('.landing-header')
+        .getByRole('link', { name: 'Get Jackalope' })
+        .getAttribute('href')) === '/download/',
+      'Header download link',
+    );
+  }
   const terminal = page.getByRole('textbox', { name: 'Message the demo agent' });
   await terminal.fill('!git status');
   await terminal.press('Enter');

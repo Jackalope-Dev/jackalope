@@ -155,7 +155,7 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 3px;
 }
-/* The agents' marks: a row without scripts, and one on each lane once the script places them. */
+/* The agents' marks: a centered row, which the script slides onto the lanes. */
 .lp-beads {
   position: absolute;
   inset: auto 0 72px;
@@ -181,10 +181,8 @@
   width: 24px;
   height: 24px;
 }
+/* The script moves each mark from its place in the row with a transform, so nothing shifts. */
 .lp[data-js] .lp-bead {
-  position: absolute;
-  top: 0;
-  left: 0;
   will-change: transform;
 }
 

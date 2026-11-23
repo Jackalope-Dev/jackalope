@@ -25,7 +25,7 @@ const escapeHtml = (value: string) =>
       character,
   );
 /** The share image; bump the version when the image changes so link previews refetch it. */
-const SOCIAL_IMAGE = '/social-preview.png?v=2';
+const SOCIAL_IMAGE = '/social-preview.png?v=3';
 const SOCIAL_IMAGE_ALT =
   'Jackalope: Run your agents side by side. Codex, Claude Code, Gemini CLI and more, each in its own Git worktree.';
 
