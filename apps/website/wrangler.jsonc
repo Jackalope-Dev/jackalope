@@ -14,5 +14,9 @@
     // hashed build assets and media skip it.
     "run_worker_first": ["/*", "!/assets/*", "!/media/*"]
   },
+  // Per-IP limit for the /api/mcp and /api/a2a content endpoints.
+  "ratelimits": [
+    { "name": "API_LIMITER", "namespace_id": "7301", "simple": { "limit": 60, "period": 60 } }
+  ],
   "routes": [{ "pattern": "jackalope.dev/*", "zone_name": "jackalope.dev" }]
 }

@@ -210,9 +210,15 @@ skipping `/assets/*` and `/media/*`). A page request whose `Accept` header prefe
 `text/markdown` gets the page as Markdown: the guide's `index.md` mirror when one
 exists, otherwise the prerendered `<main>` converted at request time. HTML pages gain
 `Vary: Accept` and discovery `Link` headers, and `/.well-known/api-catalog` is served
-as `application/linkset+json`. `src/agent-discovery.ts` generates the agent skills
-index and SKILL.md files, the API catalog, `openapi.json` and the ARD
-`ai-catalog.json`; keep them limited to what the site really serves. `src/webmcp.ts`
+as `application/linkset+json`. The Worker also serves a read-only website content
+MCP server at `/api/mcp` (stateless Streamable HTTP, `worker/mcp.ts`) and an A2A
+agent at `/api/a2a` (JSON-RPC 1.0 and 0.3, keyword routing, `worker/a2a.ts`). Both run
+the tools in `worker/tools.ts`, which read only `llms.txt`, `knowledge/llms.txt`,
+`changelog.json` and page assets, with bounded arguments, a 64 KiB body cap and the
+`API_LIMITER` per-IP rate limit. `src/agent-discovery.ts` generates the agent skills
+index and SKILL.md files, the MCP server card, the A2A agent card, the API catalog,
+`openapi.json`, the ARD `ai-catalog.json` and `poppy.json`; keep them limited to what
+the site really serves. `src/webmcp.ts`
 registers read-only WebMCP tools in browsers that support them. Static hosts without
 the Worker serve the discovery files but not Markdown negotiation.
 Subdirectory hosting is not configured. Serve MP4 as `video/mp4`, WebM as

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import worker, { pageMarkdown, prefersMarkdown } from '../worker/index.ts';
+import worker, { prefersMarkdown } from '../worker/index.ts';
+import { pageMarkdown } from '../worker/markdown.ts';
 
 const page = `<!doctype html><html><head><title>Features &amp; more | Jackalope</title>
 <meta name="description" content="What it does." />
