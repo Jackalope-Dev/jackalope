@@ -35,10 +35,7 @@ export function landingPanes(platforms: string): LandingPane[] {
         'Give three tasks to three agents and they work at the same time. Questions come to you while the rest keeps moving.',
       href: '/parallel-coding-agents/',
       tags: roster.map((agent) => agent.name),
-      facts: [
-        { value: String(roster.length), label: 'coding agents in one workspace' },
-        { value: String(providers.length), label: 'model providers, connected directly' },
-      ],
+      facts: [{ value: '1', label: 'workspace for all your coding agents' }],
     },
     {
       name: 'Isolated',

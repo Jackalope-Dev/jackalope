@@ -273,7 +273,7 @@ function ProviderMark({ id }: { id: string }) {
 }
 
 const statement = [
-  `Jackalope runs ${roster.length} coding agents side by side.`,
+  'Jackalope runs coding agents side by side.',
   'Each task gets its own Git worktree.',
   'Nothing merges until you approve it.',
 ];
