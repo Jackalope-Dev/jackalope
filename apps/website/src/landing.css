@@ -402,7 +402,7 @@
 /* The rest of the product, as a joined grid. */
 .lp-more {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(256px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
   gap: 1px;
   margin: 0 0 8svh;
   padding: 0;
