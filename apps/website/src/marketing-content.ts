@@ -111,7 +111,7 @@ export const marketingPages: MarketingPage[] = [
         href: '/guides/run-codex-and-claude-code-in-parallel/',
         label: 'Run Codex and Claude Code together',
       },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
     ],
   },
   {
@@ -258,7 +258,10 @@ export const marketingPages: MarketingPage[] = [
         href: '/guides/run-codex-and-claude-code-in-parallel/',
         label: 'Run Codex and Claude Code in parallel',
       },
-      { href: '/guides/review-ai-generated-code/', label: 'A practical review workflow' },
+      {
+        href: '/blog/review-ai-generated-code-checklist/',
+        label: 'A practical AI code review checklist',
+      },
     ],
   },
   {
@@ -624,7 +627,7 @@ export const marketingPages: MarketingPage[] = [
         ],
         links: [
           {
-            href: '/guides/review-ai-generated-code/',
+            href: '/blog/review-ai-generated-code-checklist/',
             label: 'Review behavior and evidence together',
           },
         ],
@@ -633,7 +636,7 @@ export const marketingPages: MarketingPage[] = [
     related: [
       { href: '/agents/codex/', label: 'Codex integration' },
       { href: '/parallel-coding-agents/', label: 'Parallel coding agents' },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
     ],
   },
   {
@@ -701,8 +704,8 @@ export const marketingPages: MarketingPage[] = [
         ],
         links: [
           {
-            href: '/guides/review-ai-generated-code/',
-            label: 'A practical review workflow',
+            href: '/blog/review-ai-generated-code-checklist/',
+            label: 'A practical AI code review checklist',
           },
         ],
       },
@@ -710,7 +713,7 @@ export const marketingPages: MarketingPage[] = [
     related: [
       { href: '/agents/', label: 'Compare supported coding agents' },
       { href: '/parallel-coding-agents/', label: 'Coordinate parallel agent tasks' },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
     ],
   },
   {
@@ -783,7 +786,7 @@ export const marketingPages: MarketingPage[] = [
         ],
         links: [
           {
-            href: '/guides/review-ai-generated-code/',
+            href: '/blog/review-ai-generated-code-checklist/',
             label: 'Check an agent result before accepting it',
           },
         ],
@@ -869,7 +872,7 @@ export const marketingPages: MarketingPage[] = [
     related: [
       { href: '/agents/', label: 'Compare supported agents' },
       { href: '/parallel-coding-agents/', label: 'Run workers in parallel' },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
     ],
   },
   {
@@ -961,7 +964,7 @@ export const marketingPages: MarketingPage[] = [
         ],
         links: [
           {
-            href: '/guides/review-ai-generated-code/',
+            href: '/blog/review-ai-generated-code-checklist/',
             label: 'Review agent-generated code',
           },
           {
@@ -994,81 +997,6 @@ export const marketingPages: MarketingPage[] = [
       { href: '/agents/codex/', label: 'Codex in Jackalope' },
       { href: '/agents/claude-code/', label: 'Claude Code in Jackalope' },
       { href: '/git-worktrees-for-ai-agents/', label: 'Git worktree setup and cleanup' },
-    ],
-  },
-  {
-    path: '/guides/review-ai-generated-code/',
-    kind: 'Practical guide',
-    title: 'How to review AI-generated code | Jackalope',
-    description:
-      'Review AI-generated code with the original brief, exact patch snapshot, checks, evidence, follow-ups, and combined integration state in view.',
-    headline: 'Review the outcome, the evidence, and the exact code together.',
-    lede: 'Agent output can sound complete while the code is stale, incomplete, or incompatible with another patch. Jackalope organizes review around the task and the snapshot that produced its evidence.',
-    image: 'review',
-    signals: [
-      'Original intent',
-      'Checks for the current code',
-      'Visible patch',
-      'Explicit decision',
-    ],
-    sections: [
-      {
-        title: 'Begin with the promised outcome.',
-        paragraphs: [
-          'Read the original task before the summary. Check whether the result satisfies the requested behavior and constraints, rather than accepting a confident completion message as proof.',
-          'Jackalope keeps attempts, questions, corrections, and the final result under one task so the reasoning behind a change does not disappear into terminal history.',
-        ],
-      },
-      {
-        title: 'Match evidence to the code it describes.',
-        paragraphs: [
-          'Recorded checks and previews belong to a particular content snapshot. If files change afterward, the earlier evidence becomes stale and the behavior needs to be checked again. Missing evidence stays missing rather than being presented as a pass.',
-        ],
-        bullets: [
-          'Inspect changed files and the patch, not only the agent summary.',
-          'Review the commands and outputs that matter for the project.',
-          'Try the changed behavior when automated checks cannot establish it.',
-          'Ask for a focused correction instead of silently editing around a misunderstood result.',
-        ],
-      },
-      {
-        title: 'Check how the changes work together.',
-        paragraphs: [
-          'Independent patches can conflict semantically even when Git can combine them. Jackalope prepares a combined review from the selected task results and rechecks the source and target state before an explicit integration action.',
-        ],
-      },
-      {
-        title: 'Example: a settings value that disappears after restart.',
-        paragraphs: [
-          'Suppose the task was to save a notification preference. A screenshot of the new toggle proves that a control rendered. A passing component test may show that clicking it changes local state. Neither establishes that the preference was stored, read on restart, or migrated from an older profile.',
-          'Trace the control through its persistence call, inspect the saved-data handling, and exercise a restart. If the agent changed only the visible toggle, ask for the missing persistence path and a check that would have caught the original bug.',
-        ],
-      },
-      {
-        title: 'Make the next review decision concrete.',
-        paragraphs: [
-          'Accept when the requested behavior, compatibility constraints, current patch, and relevant evidence agree. Request a correction when the implementation is incomplete. Record a specific unverified condition when the needed environment is unavailable; do not convert it into a passing check.',
-          'After a follow-up, check the new patch and rerun checks affected by those edits. For parallel results, include callers of shared types and services. Ask what evidence would reveal a wrong assumption in this change.',
-        ],
-        links: [
-          {
-            href: 'https://google.github.io/eng-practices/review/reviewer/looking-for.html',
-            label: "Google's code review guidance",
-          },
-          {
-            href: '/features/browser-automation-for-coding-agents/',
-            label: 'Capture useful browser evidence',
-          },
-        ],
-      },
-    ],
-    related: [
-      { href: '/parallel-coding-agents/', label: 'Parallel work in one review queue' },
-      { href: '/git-worktrees-for-ai-agents/', label: 'Worktree isolation and integration' },
-      {
-        href: '/features/project-context-for-coding-agents/',
-        label: 'Keep the original context attached',
-      },
     ],
   },
   {
@@ -1116,7 +1044,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Choose where each piece of knowledge belongs.',
         paragraphs: [
-          'Put stable conventions in project instructions: the build command, supported data formats, and ownership boundaries. Keep a task-specific requirement in the brief. Record a discovered constraint as a lesson only when its evidence and scope are clear, so a temporary workaround does not become a rule for every future task.',
+          'Put stable conventions in project instructions, such as [an AGENTS.md or CLAUDE.md file](/blog/agents-md-claude-md-project-instructions/): the build command, supported data formats, and ownership boundaries. Keep a task-specific requirement in the brief. Record a discovered constraint as a lesson only when its evidence and scope are clear, so a temporary workaround does not become a rule for every future task.',
           "For example, a checkout's temporary port conflict belongs to that run. A documented requirement to preserve old preference files belongs in durable project guidance. Review or remove lessons when the code changes; saved context is useful only while its assumptions remain true.",
         ],
       },
@@ -1212,7 +1140,7 @@ export const marketingPages: MarketingPage[] = [
         href: '/features/project-context-for-coding-agents/',
         label: 'Project context and reusable workflows',
       },
-      { href: '/guides/review-ai-generated-code/', label: 'Review every generated change' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review every generated change' },
       { href: '/parallel-coding-agents/', label: 'Coordinate several tasks' },
     ],
   },

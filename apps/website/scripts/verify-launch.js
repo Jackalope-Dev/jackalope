@@ -27,7 +27,7 @@ async function _verifyLaunch(page) {
     '/agents/grok/',
     '/agents/opencode/',
     '/guides/run-codex-and-claude-code-in-parallel/',
-    '/guides/review-ai-generated-code/',
+    '/blog/review-ai-generated-code-checklist/',
     '/features/project-context-for-coding-agents/',
     '/features/recurring-coding-agent-tasks/',
     '/blog/room-for-the-work/',

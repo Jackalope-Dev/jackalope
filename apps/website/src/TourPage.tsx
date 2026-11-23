@@ -48,8 +48,8 @@ const workflow = [
       'Read the patch alongside the task and its checks. Ask for another iteration, inspect related changes together, and decide what belongs in your project.',
     takeaway: 'Review the evidence before choosing what to integrate.',
     walkthrough: 'Open a completed task, inspect its changes, and expand the code patch.',
-    href: '/guides/review-ai-generated-code/',
-    link: 'Explore the review workflow',
+    href: '/blog/review-ai-generated-code-checklist/',
+    link: 'Read the AI code review checklist',
   },
 ];
 

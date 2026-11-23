@@ -160,28 +160,22 @@ export const practicalPosts: BlogPost[] = [
     slug: 'agents-md-claude-md-project-instructions',
     cover: { kind: 'context', tone: 'honey', label: 'Write it down once.' },
     title: 'AGENTS.md and CLAUDE.md: writing project instructions agents follow',
-    seoTitle: 'AGENTS.md vs CLAUDE.md: a practical guide',
+    seoTitle: 'AGENTS.md vs CLAUDE.md: which file Claude Code reads',
     category: 'Practical guides',
     author: 'caden-sumner',
     date: '2026-09-27',
+    updated: '2026-11-22',
     readingTime: '7 min read',
     description:
-      'Write an AGENTS.md or CLAUDE.md coding agents follow: what to include, sharing one file across Codex, Claude Code and Gemini CLI, and testing it.',
+      'Claude Code reads CLAUDE.md; Codex and OpenCode read AGENTS.md. Share one file between them with an @AGENTS.md import, and write instructions agents follow.',
     sections: [
       {
-        id: 'why-instruction-files',
-        title: 'Stop repeating the same correction',
-        paragraphs: [
-          'Every coding agent starts a session knowing nothing about your repository. It guesses the package manager, runs the wrong test command, and formats files the way it saw most often in training. You correct it, the session ends, and the next one makes the same guess.',
-          'A project instruction file fixes that at the source. It is a Markdown file in the repository that the agent reads before it starts work. Written well, it replaces the first ten minutes of every conversation. Written badly, it becomes a long list of rules the agent skims, half follows or applies in the wrong place.',
-        ],
-      },
-      {
         id: 'which-file',
-        title: 'Know which file each agent reads',
+        title: 'AGENTS.md vs CLAUDE.md: which file each agent reads',
         paragraphs: [
-          "AGENTS.md is an open format supported by many tools, including Codex and OpenCode. Claude Code reads CLAUDE.md. Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool's documentation for the version you run, because loading rules change.",
-          'You rarely need three copies. Keep the shared guidance in AGENTS.md and make the other files thin pointers. Claude Code supports importing another file with an @ reference, so a one-line CLAUDE.md can pull in AGENTS.md and add only what is specific to Claude. Copies drift; one source with small agent-specific additions does not.',
+          'AGENTS.md and CLAUDE.md do the same job: each is a Markdown file of project instructions that a coding agent loads when a session starts. The difference is which tool looks for which name. AGENTS.md is an open format read by Codex, OpenCode and many other tools. Claude Code reads CLAUDE.md and does not load AGENTS.md on its own.',
+          'If you use Claude Code beside another agent, you rarely need two copies. Keep the shared guidance in AGENTS.md and add a CLAUDE.md whose first line is @AGENTS.md. Claude Code imports the shared file from that line, so both tools follow the same instructions, and anything specific to Claude goes below it. If Claude Code is the only agent you use, a plain CLAUDE.md is enough.',
+          "Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool's documentation for the version you run, because loading rules change. Copies drift; one source with small agent-specific additions does not.",
         ],
         table: {
           caption: 'Default instruction files by agent',
@@ -205,6 +199,14 @@ export const practicalPosts: BlogPost[] = [
             label: 'Claude Code: memory and CLAUDE.md',
             href: 'https://code.claude.com/docs/en/memory',
           },
+        ],
+      },
+      {
+        id: 'why-instruction-files',
+        title: 'Stop repeating the same correction',
+        paragraphs: [
+          'Every coding agent starts a session knowing nothing about your repository. It guesses the package manager, runs the wrong test command, and formats files the way it saw most often in training. You correct it, the session ends, and the next one makes the same guess.',
+          'A project instruction file fixes that at the source. The agent reads it before it starts work. Written well, it replaces the first ten minutes of every conversation. Written badly, it becomes a long list of rules the agent skims, half follows or applies in the wrong place.',
         ],
       },
       {
@@ -296,7 +298,7 @@ export const practicalPosts: BlogPost[] = [
     author: 'caden-sumner',
     date: '2026-09-09',
     updated: '2026-11-22',
-    readingTime: '7 min read',
+    readingTime: '8 min read',
     description:
       'A checklist for reviewing AI-generated code: test the promised behavior, find the input that breaks it, then check the tests and the combined patch.',
     sections: [
@@ -379,6 +381,27 @@ export const practicalPosts: BlogPost[] = [
         },
       },
       {
+        id: 'match-evidence',
+        title: 'Match each piece of evidence to the code it describes',
+        paragraphs: [
+          'A check result or a screenshot belongs to the files as they were when it ran. If the agent edits anything afterward, that evidence describes older code and the behavior needs checking again. Missing evidence stays missing: a check that could not run is an open question, not a pass.',
+          'Suppose the task was to save a notification preference. A screenshot of the new toggle proves that a control rendered. A passing component test may show that clicking it changes local state. Neither establishes that the preference was stored, read back after a restart, or migrated from an older profile.',
+          'Trace the control through its save call, inspect how saved data is loaded, and exercise a restart. If the agent changed only the visible toggle, ask for the missing persistence path and a check that would have caught the original bug.',
+        ],
+        bullets: [
+          'Read the changed files and the patch, not only the agent summary.',
+          'Read the commands that ran and their output, and confirm they ran on the current files.',
+          'Try the changed behavior yourself when automated checks cannot establish it.',
+          'Ask for a focused correction instead of quietly editing around a misunderstood result.',
+        ],
+        links: [
+          {
+            label: 'Capture browser evidence for a change',
+            href: '/features/browser-automation-for-coding-agents/',
+          },
+        ],
+      },
+      {
         id: 'check-integration',
         title: 'Inspect the seams between independently correct changes',
         paragraphs: [
@@ -404,12 +427,17 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'A good review comment connects a situation to a consequence and then to the expected behavior. For example: "If results refresh while the second row is selected, the selected index may exceed the new list length. Reconcile the selection when the list changes, and cover shortening the list while the menu is open." That is more helpful than asking the author to make the code more robust.',
           'After a fix, inspect the new patch and rerun the affected checks. Revisit any earlier finding made stale by the correction. Do not accidentally accept an old screenshot or test run as evidence for new code, and do not resolve a finding solely because the author says it is fixed.',
+          'End each review with one of three decisions. Accept when the requested behavior, compatibility constraints, current patch, and relevant evidence agree. Request a correction when the implementation is incomplete. When the environment a check needs is unavailable, record that specific unverified condition instead of treating it as passed.',
           'Jackalope keeps task results, changes, and recorded evidence together before integration. Whatever interface you use today, the final review should answer three questions: what changed, what establishes that it works, and what still needs a decision.',
         ],
       },
     ],
     related: [
-      { label: "Jackalope's review workflow", href: '/guides/review-ai-generated-code/' },
+      {
+        label: 'Review and merge agent changes in Jackalope',
+        href: '/knowledge/review-and-merge/',
+      },
+      { label: 'Parallel work in one review queue', href: '/parallel-coding-agents/' },
       { label: 'From a brief to a considered review', href: '/blog/from-brief-to-review/' },
       {
         label: 'Coordinate Claude Code and Codex',

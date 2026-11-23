@@ -35,6 +35,7 @@ export const routes = pages.map((page) => page.path);
 export const movedPages: Record<string, string> = {
   '/blog/git-worktrees-for-ai-coding-agents/': '/git-worktrees-for-ai-agents/',
   '/blog/claude-code-and-codex-together/': '/guides/run-codex-and-claude-code-in-parallel/',
+  '/guides/review-ai-generated-code/': '/blog/review-ai-generated-code-checklist/',
 };
 
 function personSchema(author: Author, origin: string) {

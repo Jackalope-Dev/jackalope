@@ -121,10 +121,10 @@ async function request(
 }
 it('normalizes waitlist emails, keeps approval private and makes approval idempotent', async () => {
   expect(
-    (await request('waitlist', { email: ' PERSON@example.com ', newsletter: true })).status,
+    (await request('waitlist', { email: ' PERSON@jackalope.dev ', newsletter: true })).status,
   ).toBe(202);
   const person = required(await env.DB.prepare('SELECT * FROM access_members').first<Member>());
-  expect(person.email).toBe('person@example.com');
+  expect(person.email).toBe('person@jackalope.dev');
   expect(person.status).toBe('waiting');
   expect((await request('me')).status).toBe(401);
   await Promise.all([approve(bindings, person.id), approve(bindings, person.id)]);
@@ -140,7 +140,7 @@ it('normalizes waitlist emails, keeps approval private and makes approval idempo
 it('saves optional multi-select insights once without granting access or allowing email-based overwrite', async () => {
   const campaign = { source: 'dev', medium: 'article', campaign: 'launch', landing: '/compare/' };
   const signup = await (
-    await request('waitlist', { email: 'insights@example.com', campaign })
+    await request('waitlist', { email: 'insights@jackalope.dev', campaign })
   ).json<{ surveyToken: string }>();
   const preferences = {
     platforms: ['macos', 'linux', 'linux'],
@@ -157,7 +157,7 @@ it('saves optional multi-select insights once without granting access or allowin
   expect(JSON.parse(required(saved).preferences).platforms).toEqual(['macos', 'linux']);
   expect(JSON.parse(required(saved).campaign)).toEqual(campaign);
   expect(saved?.survey_hash).toBeNull();
-  const duplicate = await (await request('waitlist', { email: 'insights@example.com' })).json<{
+  const duplicate = await (await request('waitlist', { email: 'insights@jackalope.dev' })).json<{
     surveyToken: string;
   }>();
   expect(
@@ -189,7 +189,7 @@ it('saves optional multi-select insights once without granting access or allowin
 });
 it('expires survey capabilities and never creates a member for the honeypot', async () => {
   const preferences = { platforms: ['windows'], agents: [], priorities: [] };
-  const signup = await (await request('waitlist', { email: 'expired@example.com' })).json<{
+  const signup = await (await request('waitlist', { email: 'expired@jackalope.dev' })).json<{
     surveyToken: string;
   }>();
   await env.DB.prepare('UPDATE access_members SET survey_expires_at=0').run();
@@ -214,6 +214,26 @@ it('expires survey capabilities and never creates a member for the honeypot', as
       })
     ).status,
   ).toBe(400);
+});
+it('accepts throwaway and reserved signup domains without storing or emailing them', async () => {
+  for (const email of [
+    'bird51161b@0tm.sablereels.com',
+    'probe@euploading.com',
+    'qa-probe@example.com',
+    'probe@example.net',
+    'someone@mailinator.com',
+    'person@site.test',
+  ]) {
+    const response = await request('waitlist', { email });
+    expect(response.status).toBe(202);
+    expect((await response.json<{ surveyToken: string }>()).surveyToken).toHaveLength(64);
+  }
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_members').first()).toEqual({
+    n: 0,
+  });
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
+  expect((await request('waitlist', { email: 'person@jackalope.dev' })).status).toBe(202);
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 1 });
 });
 it('confirms a new signup once under contention, without issuing access or requiring newsletter consent', async () => {
   await Promise.all(
