@@ -11,8 +11,15 @@ declare global {
   }
 }
 
-/** Public site key; signup shows no challenge while it is unset. */
-const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() || '';
+/** jackalope.dev's managed widget; site keys are public. */
+const productionSiteKey = '0x4AAAAAAGN_ZlrzTmqeOCHJ';
+/**
+ * Public site key. A set VITE_TURNSTILE_SITE_KEY wins, and an empty one turns the
+ * challenge off; unset, production builds use jackalope.dev's widget.
+ */
+const turnstileSiteKey = (
+  import.meta.env.VITE_TURNSTILE_SITE_KEY ?? (import.meta.env.PROD ? productionSiteKey : '')
+).trim();
 const script = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 let loading: Promise<void> | null = null;
 
