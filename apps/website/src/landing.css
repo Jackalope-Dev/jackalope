@@ -1,28 +1,19 @@
 /*
- * Landing page: one moving field behind the whole page, a name the camera zooms through,
- * a statement that lights up and stacking color cards. Page colors come from brand tokens
- * so both appearances carry through; scroll-driven styles hang off [data-motion], which
- * the script sets only when motion is allowed, so the page reads without it.
+ * Landing page: one line forks into a lane per agent, the lanes run down the page behind
+ * the content and merge again at the sign-up. Page colors come from brand tokens so both
+ * appearances carry through. The script sets [data-js] when it runs, [data-motion] only
+ * when motion is allowed and [data-pinned] while the panes scroll sideways, so the page
+ * reads without any of them.
  */
 .lp {
   --lp-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --lp-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
-  --lp-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Arial Black", sans-serif;
   --lp-line: var(--color-border-subtle);
   --lp-ink-terminal: color-mix(in srgb, black 92%, var(--color-accent));
-  --lp-gutter: clamp(16px, 2.4vw, 32px);
+  --lp-gutter: var(--site-gutter);
   --lp-radius: var(--radius-3xl, 24px);
-  /* The hero layer: white blended with `screen` in the light appearance. */
-  --lp-mask: #fbfaff;
-  --lp-letters: #000;
-  --lp-blend: screen;
+  --lp-glass: color-mix(in srgb, var(--color-surface-elevated) 90%, transparent);
   overflow-x: clip;
-}
-/* Near-black blended with `multiply` in the dark one. Not pure black, so a trace of the field shows. */
-.lp[data-scheme="dark"] {
-  --lp-mask: #0d0b13;
-  --lp-letters: #fff;
-  --lp-blend: multiply;
 }
 .lp-width {
   width: min(1200px, calc(100% - var(--site-gutter) * 2));
@@ -60,113 +51,61 @@
   color: var(--color-text-secondary);
   text-wrap: pretty;
 }
-/* Heavy display type. `--stretch` drives the font's width axis. */
-.lp-display {
-  font-family: var(--lp-display);
-  font-weight: 800;
-  font-stretch: var(--stretch, 100%);
-  line-height: 0.86;
-  letter-spacing: -0.03em;
-  text-transform: uppercase;
-}
 
-/* Background */
+/* The lanes. The canvas paints the page background itself and fades in once it can draw. */
 .lp-backdrop {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(135deg, #4f22e0, #c4b0ff 45%, #ff6a3d);
 }
 .lp-backdrop canvas {
   display: block;
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: opacity 800ms linear;
+  transition: opacity 300ms linear;
 }
-.lp[data-fluid] .lp-backdrop canvas {
+.lp[data-lanes-ready] .lp-backdrop canvas {
   opacity: 1;
 }
-/* Without the shader nothing fades the gradient under the text, so a scrim does. */
-.lp:not([data-fluid]) > section:not(.lp-hero) {
-  background: color-mix(in srgb, var(--color-bg) 90%, transparent);
-}
 
-/* Hero. Without motion it is one screen tall and scrolls away like any section. */
+/* Hero: the copy on the left, the fork on the right. */
 .lp-hero {
   position: relative;
-  height: 100svh;
-}
-.lp-mask,
-.lp-meta {
-  position: sticky;
-  top: 0;
-  height: 100svh;
-}
-.lp-mask {
   display: grid;
-  place-items: center;
-  overflow: clip;
-  background: var(--lp-mask);
-  mix-blend-mode: var(--lp-blend);
+  align-content: center;
+  min-height: 100svh;
+  padding: calc(var(--header-height) + 24px) var(--lp-gutter) 168px;
 }
-.lp-name {
-  /* "JACKALOPE" is 5.45em wide; size it to fill the viewport width. */
-  margin: 0;
-  font-size: min(calc(92vw / 5.45), 38svh);
-  color: var(--lp-letters);
-  text-align: center;
-  white-space: nowrap;
-  will-change: transform;
-}
-.lp-meta {
+.lp-hero-copy {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: end;
+  justify-items: start;
   gap: 24px;
-  margin-top: -100svh;
-  padding: var(--lp-gutter);
-  padding-bottom: 32px;
-  overflow: clip;
-}
-.lp-intro {
-  position: relative;
-  display: grid;
-  gap: 12px;
-  max-width: 520px;
+  width: min(1400px, 100%);
+  margin-inline: auto;
 }
 .lp-hero h1 {
-  font-size: clamp(28px, 2.8vw, 44px);
+  max-width: 52vw;
+  font-size: clamp(48px, 6.2vw, 112px);
   font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
-  text-wrap: balance;
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+.lp-hero h1 span {
+  display: block;
 }
 .lp .lp-lede {
-  font-size: 16px;
-  line-height: 24px;
+  max-width: 520px;
+  font-size: 20px;
+  line-height: 28px;
   color: var(--color-text-secondary);
   text-wrap: pretty;
 }
-.lp-cue {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-full, 999px);
-  color: var(--color-text-primary);
-}
-.lp-cue:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 3px;
-}
 .lp-actions {
-  position: relative;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 12px;
+  margin-top: 8px;
 }
 .lp-actions > * {
   white-space: nowrap;
@@ -199,6 +138,7 @@
 .lp-source {
   padding: 0 24px;
   border: 1px solid var(--color-border);
+  background: var(--color-bg);
   font-size: 16px;
   color: var(--color-text-primary);
 }
@@ -215,41 +155,63 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 3px;
 }
-/* Film grain over the hero layer. One small noise tile, shifted in steps. */
-.lp-grain {
+/* The agents' marks: a row without scripts, and one on each lane once the script places them. */
+.lp-beads {
   position: absolute;
-  inset: -50%;
-  opacity: 0.07;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  pointer-events: none;
+  inset: auto 0 72px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.lp[data-scheme="dark"] .lp-grain {
-  opacity: 0.11;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.4 -.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+.lp-bead {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-surface);
 }
-/* With motion the hero is taller: the extra scroll distance drives the zoom through the name. */
-.lp[data-motion] .lp-hero {
-  height: 250svh;
+.lp-bead > svg {
+  width: 24px;
+  height: 24px;
+}
+.lp[data-js] .lp-bead {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
 }
 
-/* Statement */
+/* Statement: three sentences, each lit as it comes up the screen. */
 .lp-statement {
   display: grid;
   align-content: center;
   gap: 32px;
-  min-height: 120svh;
-  padding-inline: var(--lp-gutter);
+  min-height: 100svh;
+  padding: 96px var(--lp-gutter);
 }
-.lp-statement:focus {
-  outline: none;
+.lp-statement > * {
+  width: min(1400px, 100%);
+  margin-inline: auto;
 }
-.lp .lp-sentence {
-  max-width: 19ch;
-  font-size: clamp(34px, 5.6vw, 96px);
-  font-weight: 700;
-  line-height: 1.02;
+.lp .lp-sentences {
+  font-size: clamp(34px, 4.6vw, 80px);
+  line-height: 1.08;
   letter-spacing: -0.045em;
   text-wrap: initial;
+}
+.lp-line {
+  display: block;
+  max-width: 62vw;
+}
+.lp-line + .lp-line {
+  margin-top: 0.3em;
 }
 .lp-proof {
   font-size: clamp(16px, 1.4vw, 22px);
@@ -262,54 +224,67 @@
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
-/* Unlit words are dimmed with a color that keeps large-text contrast, not with opacity. */
-.lp[data-motion] .lp-word {
+/* Unlit sentences are dimmed with a color that keeps large-text contrast, not with opacity. */
+.lp[data-motion] .lp-line {
   color: var(--color-text-muted);
-  transition: color 350ms linear;
+  transition: color 500ms linear;
 }
-.lp[data-motion] .lp-word.is-lit {
+.lp[data-motion] .lp-line.is-lit {
   color: var(--color-text-primary);
 }
 
-/*
- * Cards pin under the header and stack; each new one slides over the last. They are
- * tinted glass: the field behind takes the card's colors and shows through its edges.
- */
-.lp-work {
-  padding: 12svh var(--lp-gutter) 0;
+/* Panes: a wrapping grid by default, and one row that scrolls sideways when pinned. */
+.lp-panes {
+  padding-block: 32px;
 }
-.lp-card {
-  position: sticky;
-  top: calc(var(--header-height) + 8px);
+.lp-track {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 24px;
-  min-height: calc(100svh - var(--header-height) - 48px);
-  margin-bottom: 8svh;
-  padding: clamp(20px, 3vw, 48px);
-  border-radius: var(--lp-radius);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(28px) saturate(1.5);
-  color: var(--ink);
-  container-type: inline-size;
-  transform-origin: 50% 0;
-  transform: scale(calc(1 - var(--covered, 0) * 0.06));
-  filter: brightness(calc(1 - var(--covered, 0) * 0.45));
-  box-shadow:
-    0 -32px 80px -32px rgb(0 0 0 / 0.45),
-    0 0 144px -16px color-mix(in srgb, var(--surface) 55%, transparent);
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0 var(--lp-gutter);
+  list-style: none;
 }
-.lp-card-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+.lp-pane {
+  --lane: var(--color-accent);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 24px;
+  min-height: 440px;
+  padding: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--lp-radius);
+  background: var(--lp-glass);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--shadow-surface);
+  container-type: inline-size;
+  transition: border-color 300ms var(--lp-ease);
+}
+.lp-pane:hover {
+  border-color: var(--lane);
+}
+.lp-pane-top {
+  display: grid;
   gap: 16px;
 }
-.lp-card-kind {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 28px;
+/* The pane's lane color marks it, as a node on the line the pane belongs to. */
+.lp-pane-kind {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--color-text-secondary);
+}
+.lp-pane-kind::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--lane);
+  border-radius: var(--radius-full, 999px);
 }
 .lp-tags {
   display: flex;
@@ -318,95 +293,108 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 20px;
+  color: var(--color-text-secondary);
 }
 .lp-tags li {
-  padding: 4px 12px;
-  border: 1px solid currentColor;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full, 999px);
 }
-/*
- * The name fills the card width at full stretch. Letters average under 0.7em wide
- * there ("REMEMBERED" is the widest at 0.69), so dividing by (letters x 0.72) always fits.
- */
-.lp .lp-card-title {
-  align-self: center;
-  font-size: min(calc(100cqi / (var(--letters) * 0.72)), 240px);
-  line-height: 0.86;
-  letter-spacing: -0.03em;
-  white-space: nowrap;
+.lp .lp-pane-title {
+  align-self: end;
+  /* Sized from the pane, so the longest name fits the narrowest pane. */
+  font-size: clamp(36px, 15cqi, 72px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.05em;
 }
-/* The whole card is the link target, while the link text stays the name. */
-.lp-card-title a::after {
+/* The whole pane is the link target, while the link text stays the name. */
+.lp-pane-title a::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: var(--lp-radius);
 }
-.lp-card-title a:focus-visible {
+.lp-pane-title a:focus-visible {
   outline: none;
 }
-.lp-card-title a:focus-visible::after {
-  outline: 3px solid var(--ink);
-  outline-offset: -8px;
+.lp-pane-title a:focus-visible::after {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -6px;
 }
-.lp-card-details {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-}
-.lp-card-summary {
-  max-width: 34ch;
-  font-size: clamp(17px, 1.7vw, 26px);
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+.lp-pane-summary {
+  /* Three lines, so every pane's title sits at the same height. */
+  min-height: 84px;
+  font-size: 18px;
+  line-height: 28px;
+  color: var(--color-text-secondary);
   text-wrap: pretty;
 }
 .lp-facts {
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px clamp(20px, 3cqi, 48px);
+  gap: 32px;
   margin: 0;
-  padding: 0;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--color-border);
   list-style: none;
 }
 .lp-facts li {
+  /* A number and two lines of label, so one-line labels keep the same height. */
+  min-height: 84px;
   display: grid;
-  align-content: end;
-  max-width: 208px;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.25;
+  align-content: start;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-text-secondary);
 }
 .lp-facts strong {
-  font-family: var(--lp-display);
-  font-size: clamp(30px, 4cqi, 64px);
-  font-weight: 800;
-  font-stretch: 75%;
+  font-size: 40px;
+  font-weight: 700;
   line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--color-text-primary);
 }
-/* With motion, each name starts condensed and widens as its card arrives. Left-aligned, so nothing shifts. */
-.lp[data-motion] .lp-card-title {
-  --stretch: 75%;
-  transition: font-stretch 900ms var(--lp-ease);
+.lp[data-pinned] .lp-panes {
+  padding-block: 0;
 }
-.lp[data-motion] .lp-card.is-active .lp-card-title {
-  --stretch: 100%;
+.lp[data-pinned] .lp-panes-sticky {
+  position: sticky;
+  top: 0;
+  display: grid;
+  align-items: center;
+  height: 100svh;
+  padding-top: var(--header-height);
+  overflow: clip;
+}
+.lp[data-pinned] .lp-track {
+  display: flex;
+  width: max-content;
+  padding-inline: max(var(--lp-gutter), calc((100vw - 1400px) / 2));
+  will-change: transform;
+}
+.lp[data-pinned] .lp-pane {
+  width: clamp(380px, 34vw, 520px);
+  height: min(600px, calc(100svh - var(--header-height) - 64px));
+  min-height: 0;
 }
 
 /* The rest of the product, as a joined grid. */
+.lp-more-section {
+  padding: 32px var(--lp-gutter) 0;
+}
 .lp-more {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
   gap: 1px;
-  margin: 0 0 8svh;
+  width: min(1400px, 100%);
+  margin: 0 auto;
   padding: 0;
   overflow: clip;
+  border: 1px solid var(--color-border);
   border-radius: var(--lp-radius);
   background: var(--color-border);
   list-style: none;
@@ -417,7 +405,7 @@
   align-content: start;
   gap: 4px;
   padding: 24px;
-  background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  background: var(--color-surface-elevated);
   font-size: 14px;
   line-height: 20px;
   color: var(--color-text-secondary);
@@ -541,7 +529,7 @@
   padding: 8px 32px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--lp-radius);
-  background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  background: var(--color-surface-elevated);
 }
 .lp-faq-list details + details {
   border-top: 1px solid var(--color-border);
@@ -561,16 +549,14 @@
   text-wrap: pretty;
 }
 
-/* Final call */
+/* Final call. The lanes close into one line that ends at the marker above the heading. */
 .lp-final {
   display: grid;
   justify-items: center;
-  gap: 32px;
-  padding-block: 96px 128px;
+  padding-block: 60svh 128px;
 }
-.lp-final-mark {
-  width: 280px;
-  height: 200px;
+.lp-merge {
+  height: 48px;
 }
 .lp-final-body {
   display: grid;
@@ -618,70 +604,30 @@
   border-color: var(--color-accent);
 }
 
-/* The cue and the grain only move for people who have not asked for less motion. */
-@media (prefers-reduced-motion: no-preference) {
-  .lp-cue {
-    animation: lp-breathe 2.4s ease-in-out infinite;
-  }
-  .lp-grain {
-    animation: lp-static 0.9s steps(1) infinite;
-  }
-}
-@keyframes lp-breathe {
-  0%,
-  100% {
-    transform: translateY(-5px);
-  }
-  50% {
-    transform: translateY(5px);
-  }
-}
-@keyframes lp-static {
-  0% {
-    transform: translate(0, 0);
-  }
-  12% {
-    transform: translate(-7%, 4%);
-  }
-  25% {
-    transform: translate(5%, -9%);
-  }
-  37% {
-    transform: translate(-11%, -3%);
-  }
-  50% {
-    transform: translate(8%, 7%);
-  }
-  62% {
-    transform: translate(-4%, 11%);
-  }
-  75% {
-    transform: translate(10%, -6%);
-  }
-  87% {
-    transform: translate(-9%, 8%);
-  }
-}
-
 @media (max-width: 1000px) {
   .lp h2 {
     font-size: 44px;
   }
-  .lp-meta {
-    grid-template-columns: 1fr;
+  /* The hero stacks: copy at the top, and the fork opens beneath the buttons. */
+  .lp-hero {
+    align-content: start;
+    padding-bottom: 144px;
+  }
+  .lp-hero-copy {
     justify-items: center;
-    gap: 20px;
     text-align: center;
   }
-  .lp-intro {
-    justify-items: center;
+  .lp-hero h1 {
+    max-width: none;
   }
   .lp-actions {
-    order: 1;
     justify-content: center;
   }
-  .lp-cue {
-    order: 2;
+  .lp-beads {
+    bottom: 48px;
+  }
+  .lp-line {
+    max-width: none;
   }
   .lp-faq-grid {
     grid-template-columns: 1fr;
@@ -692,23 +638,12 @@
   .lp h2 {
     font-size: 36px;
   }
-  /* The name breaks into two lines and moves up to leave the lower half for the heading. */
-  .lp-mask {
-    align-items: start;
-    padding-top: calc(var(--header-height) + 4svh);
+  .lp-hero h1 {
+    font-size: clamp(40px, 12vw, 64px);
   }
-  /* "ALOPE" is 3.1em wide. */
-  .lp-name {
-    font-size: min(calc(92vw / 3.1), 14svh);
-  }
-  .lp-meta {
-    align-content: end;
-  }
-  .lp-cue {
-    display: none;
-  }
-  .lp-name > span {
-    display: block;
+  .lp .lp-lede {
+    font-size: 17px;
+    line-height: 26px;
   }
   .lp-download,
   .lp-source {
@@ -716,8 +651,24 @@
     padding: 0 24px;
     font-size: 16px;
   }
+  .lp-bead {
+    width: 40px;
+    height: 40px;
+  }
+  .lp-bead > svg {
+    width: 20px;
+    height: 20px;
+  }
+  .lp-beads {
+    gap: 6px;
+    height: 40px;
+  }
   .lp .lp-detail {
     font-size: 18px;
+  }
+  .lp-pane {
+    min-height: 0;
+    padding: 24px;
   }
   .lp-cli {
     padding-block: 96px 64px;

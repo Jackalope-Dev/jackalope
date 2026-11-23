@@ -1,66 +1,51 @@
-import { AsciiMark } from '@jackalope/brand/ascii-mark';
 import { PROVIDER_MARKS } from '@jackalope/brand/provider-marks';
 import { Disclosure, DisclosureSummary, GitHubIcon } from '@jackalope/ui';
-import { ArrowDownToLine, ArrowRight, ChevronDown } from 'lucide-react';
-import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef } from 'react';
+import { ArrowDownToLine, ArrowRight } from 'lucide-react';
+import { type CSSProperties, type ReactNode, useEffect, useRef } from 'react';
 import { GITHUB_URL } from './community';
-import {
-  heroPalette,
-  landingCards,
-  moreFeatures,
-  type Palette,
-  providers,
-  roster,
-} from './landing-content';
-import { createFluid, type Fluid } from './landing-fluid';
-import {
-  approach,
-  clamp,
-  heroState,
-  hexToRgb,
-  progressThrough,
-  READING_WASH,
-  type Rgb,
-  scrollEnergy,
-} from './landing-motion';
+import { landingPanes, moreFeatures, providers, roster } from './landing-content';
+import { createLanes, type Lanes } from './landing-lanes';
+import { clamp, hexToRgb, type LaneField, laneX, type Rgb, scrollEnergy } from './landing-motion';
 import { TerminalDemo } from './TerminalDemo';
-import '@jackalope/brand/fonts-display.css';
 import './landing.css';
 
 const REDUCED = '(prefers-reduced-motion: reduce)';
+/** At this width and below the hero stacks and the panes stop scrolling sideways; matches the CSS. */
+const NARROW = 1000;
+/** The merged line, in the brand violet. */
+const TRUNK = '#8b5cf6';
+/** One lane per agent, in that agent's color. */
+const laneColors = roster.map((agent) => PROVIDER_MARKS[agent.id]?.color ?? TRUNK);
 
-type Colors = [Rgb, Rgb, Rgb];
-
-/** A section that sets the look of the background field while it is on screen. */
-interface Scene {
-  element: HTMLElement;
-  colors: Colors;
-  /** A fixed wash for sections that paint their own surface; text on the field uses the reading wash. */
-  wash?: number;
+/** Where the lanes sit while a section is on screen, as fractions of the viewport width. */
+interface Look {
+  center: number;
+  spread: number;
+  /** How strongly the lanes show, 0 to 1. Sections with text over the lanes keep it low. */
+  intensity: number;
 }
 
-/** Seconds of flow already "elapsed" at load, chosen because the field looks good there. */
-const TIME_OFFSET = 12;
-/** On devices that cannot animate the field, redraw it at most this often (ms) while scrolling. */
-const STILL_REDRAW_INTERVAL = 250;
-/** Field turbulence at rest, and how much scrolling adds to it. */
-const BASE_WARP = 3.4;
-const SCROLL_WARP = 1.6;
-/** How many times faster the field flows at full scroll energy. */
-const SCROLL_SPEED_UP = 5;
-/** The page colors the field fades toward under text. */
-const WASH_COLOR: Record<'dark' | 'light', Rgb> = {
-  dark: [0.03, 0.025, 0.045],
-  light: [0.985, 0.98, 1],
-};
+/** Sections that set no look: lanes across the page, faint enough to read over. */
+const REST: Look = { center: 0, spread: 0.92, intensity: 0.22 };
 
-const toColors = (palette: Palette) => palette.map(hexToRgb) as Colors;
+function parseLook(value: string | undefined): Look | undefined {
+  const [center, spread, intensity] = (value ?? '').split(' ').map(Number);
+  if (center === undefined || spread === undefined || intensity === undefined) return undefined;
+  return { center, spread, intensity };
+}
+
+/** Seconds the lanes take to grow down the first screen once they can be drawn. */
+const REVEAL_SECONDS = 1.6;
+/** How many times faster work moves along the lanes at full scroll energy. */
+const SCROLL_SPEED_UP = 6;
+/** Page height (viewport heights) the merged line runs on before its end ring; the shader's 0.12. */
+const TAIL = 0.12;
 
 /**
- * Wires the scroll choreography to the page: one animation frame loop reads the scroll
- * position and writes styles, with the math in ./landing-motion. Nothing here is needed
- * to read the page. Without scripts, or with reduced motion, the hero is an ordinary
- * full-height section and every word is visible.
+ * Wires the lanes to the page: one animation frame loop reads the scroll position, places
+ * the agent marks on their lanes, moves the panes sideways and draws the canvas, with the
+ * math in ./landing-motion. Nothing here is needed to read the page. Without scripts the
+ * marks sit in a row and the panes wrap; with reduced motion the lanes hold still.
  *
  * @returns a function that stops the loop and restores the static page
  */
@@ -71,198 +56,186 @@ function startChoreography(main: HTMLElement, animate: boolean): () => void {
     if (!element) throw new Error(`Missing landing element: ${selector}`);
     return element;
   };
-  const hero = find('[data-hero]');
-  const heroMask = find('[data-hero-mask]');
-  const heroName = find('[data-hero-name]');
-  const heroMeta = find('[data-hero-meta]');
-  const zoomTarget = find('[data-zoom-target]');
-  const statement = find('[data-statement]');
-  const canvas = find<HTMLCanvasElement>('[data-fluid]');
-  const words = [...statement.querySelectorAll<HTMLElement>('[data-word]')];
-  const cards = [...main.querySelectorAll<HTMLElement>('[data-card]')];
-  const heroColors = toColors(heroPalette);
-  const scenes: Scene[] = [...main.querySelectorAll<HTMLElement>('[data-palette]')].map(
-    (element) => ({
-      element,
-      colors: toColors((element.dataset.palette ?? '').split(',') as Palette),
-      wash: element.dataset.wash ? Number(element.dataset.wash) : undefined,
-    }),
-  );
+  const actions = find('[data-hero-actions]');
+  const beadRow = find('[data-beads]');
+  const beads = [...beadRow.querySelectorAll<HTMLElement>('[data-bead]')];
+  const lines = [...main.querySelectorAll<HTMLElement>('[data-line]')];
+  const panes = find('[data-panes]');
+  const track = find('[data-track]');
+  const merge = find('[data-merge]');
+  const canvas = find<HTMLCanvasElement>('[data-lanes-canvas]');
+  const scenes = [...main.querySelectorAll<HTMLElement>('[data-lanes]')].map((element) => {
+    const wide = parseLook(element.dataset.lanes) ?? REST;
+    return { element, wide, narrow: parseLook(element.dataset.lanesNarrow) ?? wide };
+  });
+  const colors = laneColors.map(hexToRgb);
+  const trunk = hexToRgb(TRUNK);
 
-  let fluid: Fluid | null = null;
-  let scheme: 'dark' | 'light' = 'light';
-  let colors = heroColors;
-  let wash = 0;
-  let washColor = WASH_COLOR.light;
-  let pointer: [number, number] = [0, 0];
-  let pointerTarget: [number, number] = [0, 0];
-  let lastStillDraw = 0;
+  let lanes: Lanes | null = null;
+  let scheme = '';
+  let background: Rgb = [1, 1, 1];
+  let look: Look | undefined;
+  let pinned = false;
+  let revealStart = 0;
   let lastFrame = 0;
   let lastScrollY = window.scrollY;
+  let lastDrawn = '';
   let energy = 0;
-  let flowTime = TIME_OFFSET;
+  let time = 0;
   let frameId = 0;
   let idleId = 0;
   let stopped = false;
 
-  /** The theme sets `color-scheme` on the root; the hero's blend mode and the wash follow it. */
+  /** The theme sets `color-scheme` on the root; the canvas takes the page's own background. */
   function readScheme() {
     const next = document.documentElement.style.colorScheme === 'dark' ? 'dark' : 'light';
-    if (next === scheme && main.dataset.scheme) return;
+    if (next === scheme) return;
     scheme = next;
-    main.dataset.scheme = next;
-    lastStillDraw = 0;
+    const channels = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g);
+    if (channels && channels.length >= 3) {
+      background = channels.slice(0, 3).map((channel) => Number(channel) / 255) as Rgb;
+    }
   }
 
-  /** Zoom toward the stem of one letter, so the camera ends up inside the letter. */
-  function aimZoom() {
-    const name = heroName.getBoundingClientRect();
-    const target = zoomTarget.getBoundingClientRect();
-    const scale = name.width / heroName.offsetWidth || 1;
-    const x = (target.left + target.width * 0.22 - name.left) / scale;
-    const y = (target.top + target.height * 0.45 - name.top) / scale;
-    heroName.style.transformOrigin = `${x}px ${y}px`;
-  }
-
-  /** The last section with a palette whose body is in the middle of the screen, if any. */
-  function activeScene(viewportHeight: number): Scene | undefined {
-    let active: Scene | undefined;
+  /** The look of the last section with one whose body is in the middle of the screen. */
+  function targetLook(viewportHeight: number, narrow: boolean): Look {
+    let active = REST;
     for (const scene of scenes) {
       const rect = scene.element.getBoundingClientRect();
-      if (rect.top < viewportHeight * 0.55 && rect.bottom > viewportHeight * 0.2) active = scene;
+      if (rect.top < viewportHeight * 0.55 && rect.bottom > viewportHeight * 0.2) {
+        active = narrow ? scene.narrow : scene.wide;
+      }
     }
     return active;
   }
 
-  /** Moves the hero and returns the wash it wants: none inside the name, the reading wash after. */
-  function updateHero(viewportHeight: number): number {
-    const rect = hero.getBoundingClientRect();
-    const reading = READING_WASH[scheme];
-    if (!animate) return rect.bottom > viewportHeight / 2 ? 0 : reading;
-    const state = heroState(progressThrough(-rect.top, 0, rect.height - viewportHeight), reading);
-    heroName.style.transform = `scale(${state.scale})`;
-    heroMask.style.opacity = String(state.maskOpacity);
-    heroMeta.style.opacity = String(state.metaOpacity);
-    heroMeta.style.visibility = state.metaOpacity < 0.01 ? 'hidden' : 'visible';
-    return state.wash;
-  }
-
-  function updateStatement(viewportHeight: number) {
-    const rect = statement.getBoundingClientRect();
-    const lit = progressThrough(
-      viewportHeight * 0.8 - rect.top,
-      0,
-      rect.height + viewportHeight * 0.25,
-    );
-    for (const [i, word] of words.entries()) {
-      word.classList.toggle('is-lit', i / words.length < lit);
+  /** On wide screens the panes pin and scroll sideways; the section's height is that travel. */
+  function updatePanes(viewportWidth: number, viewportHeight: number) {
+    const shouldPin = animate && viewportWidth > NARROW;
+    if (shouldPin !== pinned) {
+      pinned = shouldPin;
+      if (pinned) main.dataset.pinned = '';
+      else {
+        delete main.dataset.pinned;
+        panes.style.height = '';
+        track.style.transform = '';
+      }
     }
+    if (!pinned) return;
+    const travel = Math.max(0, track.offsetWidth - viewportWidth);
+    const height = `${Math.round(viewportHeight + travel)}px`;
+    if (panes.style.height !== height) panes.style.height = height;
+    const rect = panes.getBoundingClientRect();
+    const progress = clamp(-rect.top / Math.max(1, rect.height - viewportHeight));
+    track.style.transform = `translate3d(${(-progress * travel).toFixed(1)}px, 0, 0)`;
   }
 
-  /** Each card shrinks and darkens as the next one slides over it. */
-  function updateCards(viewportHeight: number) {
-    for (const [i, card] of cards.entries()) {
-      const rect = card.getBoundingClientRect();
-      card.classList.toggle('is-active', rect.top < viewportHeight * 0.6);
-      const next = cards[i + 1]?.getBoundingClientRect();
-      const covered = next ? clamp(1 - (next.top - rect.top) / rect.height) : 0;
-      card.style.setProperty('--covered', covered.toFixed(3));
+  /** Each sentence of the statement lights up as it comes up the screen, and stays lit. */
+  function updateLines(viewportHeight: number) {
+    for (const line of lines) {
+      line.classList.toggle('is-lit', line.getBoundingClientRect().top < viewportHeight * 0.62);
     }
-  }
-
-  /** Scrolling stirs the field: it flows faster and folds harder, then settles. */
-  function updateFlow(now: number, viewportHeight: number) {
-    const elapsed = lastFrame ? Math.min(now - lastFrame, 100) / 1000 : 0;
-    lastFrame = now;
-    energy = scrollEnergy(energy, (window.scrollY - lastScrollY) / viewportHeight);
-    lastScrollY = window.scrollY;
-    flowTime += elapsed * (1 + energy * SCROLL_SPEED_UP);
-  }
-
-  function drawFluid(now: number, heroWash: number, viewportHeight: number) {
-    if (!fluid) return;
-    const flowing = animate && fluid.canAnimate;
-    if (!flowing && now - lastStillDraw < STILL_REDRAW_INTERVAL) return;
-    lastStillDraw = now;
-
-    const scene = activeScene(viewportHeight);
-    const targetColors = scene?.colors ?? heroColors;
-    const targetWash = scene ? (scene.wash ?? READING_WASH[scheme]) : heroWash;
-    // A still frame jumps straight to the section's look; a flowing one eases toward it.
-    if (flowing) {
-      colors = colors.map((color, i) => approach(color, targetColors[i] ?? color, 0.05)) as Colors;
-      wash += (targetWash - wash) * 0.08;
-      washColor = approach(washColor, WASH_COLOR[scheme], 0.12);
-      pointer = [
-        pointer[0] + (pointerTarget[0] - pointer[0]) * 0.06,
-        pointer[1] + (pointerTarget[1] - pointer[1]) * 0.06,
-      ];
-    } else {
-      colors = targetColors;
-      wash = targetWash;
-      washColor = WASH_COLOR[scheme];
-    }
-
-    fluid.draw({
-      time: flowing ? flowTime : TIME_OFFSET,
-      pointer: flowing ? pointer : [0, 0],
-      warp: flowing ? BASE_WARP + energy * SCROLL_WARP : BASE_WARP,
-      wash,
-      washColor,
-      colors,
-    });
   }
 
   function frame(now: number) {
     if (stopped) return;
+    const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const narrow = viewportWidth <= NARROW;
+    const scrollY = window.scrollY;
+    const pageY = (clientY: number) => (clientY + scrollY) / viewportHeight;
     readScheme();
-    const heroWash = updateHero(viewportHeight);
+    updatePanes(viewportWidth, viewportHeight);
     if (animate) {
-      updateStatement(viewportHeight);
-      updateCards(viewportHeight);
-      updateFlow(now, viewportHeight);
+      updateLines(viewportHeight);
+      const elapsed = lastFrame ? Math.min(now - lastFrame, 100) / 1000 : 0;
+      energy = scrollEnergy(energy, (scrollY - lastScrollY) / viewportHeight);
+      time += elapsed * (1 + energy * SCROLL_SPEED_UP);
     }
-    drawFluid(now, heroWash, viewportHeight);
+    lastFrame = now;
+    lastScrollY = scrollY;
+
+    // A still page jumps straight to the section's look; a moving one eases toward it.
+    const target = targetLook(viewportHeight, narrow);
+    const from = animate && look ? look : target;
+    look = {
+      center: from.center + (target.center - from.center) * 0.07,
+      spread: from.spread + (target.spread - from.spread) * 0.07,
+      intensity: from.intensity + (target.intensity - from.intensity) * 0.07,
+    };
+
+    const aspect = viewportWidth / viewportHeight;
+    const beadBox = beadRow.getBoundingClientRect();
+    const mergeEnd = pageY(merge.getBoundingClientRect().top) - TAIL;
+    const field: LaneField = {
+      center: look.center * aspect,
+      spread: look.spread * aspect,
+      // The line starts under the header, or under the buttons where the hero stacks.
+      rootY: narrow ? pageY(actions.getBoundingClientRect().bottom + 28) : 116 / viewportHeight,
+      forkEnd: pageY(beadBox.top + beadBox.height / 2),
+      mergeStart: mergeEnd - 0.55,
+      mergeEnd,
+    };
+
+    // Each agent's mark rides its own lane where the fork finishes.
+    if (beadBox.bottom > 0 && beadBox.top < viewportHeight) {
+      for (const [index, bead] of beads.entries()) {
+        const x = laneX(index, beads.length, field.forkEnd, time, field);
+        const left = viewportWidth / 2 + x * viewportHeight - beadBox.left - bead.offsetWidth / 2;
+        bead.style.transform = `translate3d(${left.toFixed(1)}px, 0, 0)`;
+      }
+    }
+
+    if (lanes) {
+      const flowing = animate && lanes.canAnimate;
+      const grown = animate ? clamp((now - revealStart) / (REVEAL_SECONDS * 1000)) : 1;
+      const reveal = grown < 1 ? field.rootY + (1 - (1 - grown) ** 3) * 1.4 : 1e6;
+      // A device that cannot animate redraws only when what is on screen has changed.
+      const drawn = flowing
+        ? ''
+        : JSON.stringify([scrollY, viewportWidth, viewportHeight, scheme, field, look, reveal]);
+      if (flowing || drawn !== lastDrawn) {
+        lastDrawn = drawn;
+        lanes.draw({
+          ...field,
+          scroll: scrollY / viewportHeight,
+          time,
+          reveal,
+          intensity: look.intensity,
+          glow: scheme === 'dark' ? 1 : 0,
+          background,
+          trunk,
+        });
+      }
+    }
     if (!document.hidden) frameId = requestAnimationFrame(frame);
   }
 
-  const onPointerMove = (event: PointerEvent) => {
-    pointerTarget = [
-      (event.clientX - window.innerWidth / 2) / window.innerHeight,
-      -(event.clientY - window.innerHeight / 2) / window.innerHeight,
-    ];
-  };
   const onResize = () => {
-    fluid?.resize();
-    lastStillDraw = 0;
-    aimZoom();
+    lanes?.resize();
+    lastDrawn = '';
   };
   const onVisibility = () => {
     if (document.hidden) return;
     cancelAnimationFrame(frameId);
     frameId = requestAnimationFrame(frame);
   };
-  // The CSS gradient is already on screen. Swap in the shader once the page is settled.
+  // The page is already readable. Start the canvas once the page is settled.
   const createWhenIdle = () => {
     const create = () => {
       if (stopped) return;
-      fluid = createFluid(canvas);
-      if (fluid) main.dataset.fluid = '';
+      lanes = createLanes(canvas, colors);
+      revealStart = performance.now();
+      if (lanes) main.dataset.lanesReady = '';
     };
     if ('requestIdleCallback' in window) idleId = requestIdleCallback(create, { timeout: 2000 });
     else idleId = setTimeout(create, 200) as unknown as number;
   };
 
+  main.dataset.js = '';
   if (animate) main.dataset.motion = '';
-  readScheme();
-  window.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('resize', onResize);
   document.addEventListener('visibilitychange', onVisibility);
-  document.fonts.ready.then(() => {
-    if (!stopped) aimZoom();
-  });
-  aimZoom();
   frameId = requestAnimationFrame(frame);
   if (document.readyState === 'complete') createWhenIdle();
   else window.addEventListener('load', createWhenIdle, { once: true });
@@ -272,17 +245,12 @@ function startChoreography(main: HTMLElement, animate: boolean): () => void {
     cancelAnimationFrame(frameId);
     if ('cancelIdleCallback' in window) cancelIdleCallback(idleId);
     clearTimeout(idleId);
-    window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('resize', onResize);
     window.removeEventListener('load', createWhenIdle);
     document.removeEventListener('visibilitychange', onVisibility);
-    delete main.dataset.motion;
-    for (const element of [heroName, heroMask, heroMeta]) element.removeAttribute('style');
-    for (const word of words) word.classList.remove('is-lit');
-    for (const card of cards) {
-      card.classList.remove('is-active');
-      card.style.removeProperty('--covered');
-    }
+    for (const name of ['js', 'motion', 'pinned']) delete main.dataset[name];
+    for (const element of [panes, track, ...beads]) element.removeAttribute('style');
+    for (const line of lines) line.classList.remove('is-lit');
   };
 }
 
@@ -303,6 +271,12 @@ function ProviderMark({ id }: { id: string }) {
     </svg>
   );
 }
+
+const statement = [
+  `Jackalope runs ${roster.length} coding agents side by side.`,
+  'Each task gets its own Git worktree.',
+  'Nothing merges until you approve it.',
+];
 
 export function LandingPage({
   signup,
@@ -331,40 +305,28 @@ export function LandingPage({
     };
   }, []);
 
-  const statement = `Jackalope runs ${roster.length} coding agents side by side. Each task gets its own Git worktree. Nothing merges until you approve it.`;
-  const cards = landingCards(platforms);
-
   return (
     <main id="main" className="lp" ref={landing}>
-      {/* The background: a CSS gradient paints first, and the canvas fades in over it. */}
+      {/* The lanes: one fixed canvas behind the whole page, drawn in page coordinates. */}
       <div className="lp-backdrop" aria-hidden="true">
-        <canvas data-fluid="" />
+        <canvas data-lanes-canvas="" />
       </div>
 
-      <section className="lp-hero" data-hero="" aria-labelledby="hero-title">
-        {/* A solid layer blended with the page: the letters become windows onto the canvas. */}
-        <div className="lp-mask" data-hero-mask="" aria-hidden="true">
-          <p className="lp-display lp-name" data-hero-name="">
-            <span>Jack</span>
-            <span>
-              a<span data-zoom-target="">l</span>ope
-            </span>
+      <section
+        className="lp-hero"
+        data-lanes="0.24 0.4 1"
+        data-lanes-narrow="0 0.78 1"
+        aria-labelledby="hero-title"
+      >
+        <div className="lp-hero-copy">
+          <h1 id="hero-title">
+            Run your agents <span>side by side.</span>
+          </h1>
+          <p className="lp-lede">
+            Jackalope is a desktop workspace for Codex, Claude Code, Gemini CLI and more. Every task
+            runs in its own Git worktree, and nothing lands until you approve it.
           </p>
-        </div>
-        <div className="lp-meta" data-hero-meta="">
-          <div className="lp-grain" aria-hidden="true" />
-          <div className="lp-intro">
-            <h1 id="hero-title">Run your agents side by side.</h1>
-            <p className="lp-lede">
-              Jackalope is a desktop workspace for Codex, Claude Code, Gemini CLI and more. Every
-              task runs in its own Git worktree, and nothing lands until you approve it.
-            </p>
-          </div>
-          <a className="lp-cue" href="#intro">
-            <span className="lp-sr">Scroll to content</span>
-            <ChevronDown size={28} aria-hidden="true" />
-          </a>
-          <div className="lp-actions">
+          <div className="lp-actions" data-hero-actions="">
             <a className="lp-download" href="/download/">
               <ArrowDownToLine size={20} aria-hidden="true" />
               Download Jackalope
@@ -375,73 +337,83 @@ export function LandingPage({
             </a>
           </div>
         </div>
+        <ul className="lp-beads" data-beads="" aria-label="Agents it runs">
+          {roster.map((agent) => (
+            <li className="lp-bead" key={agent.id} data-bead="" title={agent.name}>
+              <ProviderMark id={agent.id} />
+              <span className="lp-sr">{agent.name}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <section className="lp-statement" id="intro" tabIndex={-1}>
-        {/* Each word lights up as the section scrolls past. Screen readers get the plain sentence. */}
-        <h2 className="lp-sentence" data-statement="">
-          <span className="lp-sr">{statement}</span>
-          <span aria-hidden="true">
-            {statement.split(' ').map((word, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: words repeat and never reorder.
-              <Fragment key={index}>
-                <span className="lp-word" data-word="">
-                  {word}
-                </span>{' '}
-              </Fragment>
-            ))}
-          </span>
+      <section
+        className="lp-statement"
+        id="intro"
+        data-lanes="0.36 0.2 0.9"
+        data-lanes-narrow="0 0.8 0.2"
+      >
+        <h2 className="lp-sentences">
+          {statement.map((sentence) => (
+            <span className="lp-line" data-line="" key={sentence}>
+              {sentence}{' '}
+            </span>
+          ))}
         </h2>
         <p className="lp-proof">
           Open source under Apache 2.0. <a href={GITHUB_URL}>Read the code on GitHub</a>.
         </p>
       </section>
 
-      <section className="lp-work" id="inside" aria-labelledby="work-title">
-        <h2 id="work-title" className="lp-sr">
-          What Jackalope does
-        </h2>
-        {cards.map((card) => (
-          <article
-            className="lp-card"
-            key={card.name}
-            data-card=""
-            data-palette={card.palette.join(',')}
-            data-wash="0.1"
-            style={
-              {
-                '--surface': card.surface,
-                '--ink': card.ink,
-                '--letters': card.name.length,
-              } as CSSProperties
-            }
-          >
-            <div className="lp-card-top">
-              <p className="lp-card-kind">{card.kind}</p>
-              <ul className="lp-tags">
-                {card.tags.map((tag) => (
-                  <li key={tag}>{tag}</li>
-                ))}
-              </ul>
-            </div>
-            <h3 className="lp-display lp-card-title">
-              <a href={card.href}>{card.name}</a>
-            </h3>
-            <div className="lp-card-details">
-              <p className="lp-card-summary">{card.summary}</p>
-              <ul className="lp-facts">
-                {card.facts.map((fact) => (
-                  <li key={fact.label}>
-                    <strong>{fact.value}</strong>
-                    <span>{fact.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </article>
-        ))}
+      <section
+        className="lp-panes"
+        id="inside"
+        data-panes=""
+        data-lanes="0 0.92 0.6"
+        aria-labelledby="panes-title"
+      >
+        <div className="lp-panes-sticky">
+          <h2 id="panes-title" className="lp-sr">
+            What Jackalope does
+          </h2>
+          <ol className="lp-track" data-track="">
+            {landingPanes(platforms).map((pane, index) => (
+              <li
+                className="lp-pane"
+                key={pane.name}
+                style={{ '--lane': laneColors[index % laneColors.length] } as CSSProperties}
+              >
+                <div className="lp-pane-top">
+                  <p className="lp-pane-kind">{pane.kind}</p>
+                  <ul className="lp-tags">
+                    {pane.tags.map((tag) => (
+                      <li key={tag}>{tag}</li>
+                    ))}
+                  </ul>
+                </div>
+                <h3 className="lp-pane-title">
+                  <a href={pane.href}>{pane.name}</a>
+                </h3>
+                <p className="lp-pane-summary">{pane.summary}</p>
+                <ul className="lp-facts">
+                  {pane.facts.map((fact) => (
+                    <li key={fact.label}>
+                      <strong>{fact.value}</strong>
+                      <span>{fact.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
 
-        <ul className="lp-more" id="features">
+      <section className="lp-more-section" id="features" aria-labelledby="more-title">
+        <h2 id="more-title" className="lp-sr">
+          More in the app
+        </h2>
+        <ul className="lp-more">
           {moreFeatures.map((feature) => (
             <li key={feature.title}>
               <a href={feature.href}>
@@ -454,11 +426,7 @@ export function LandingPage({
         </ul>
       </section>
 
-      <section
-        className="lp-cli"
-        aria-labelledby="cli-title"
-        data-palette="#6366f1,#22d3ee,#1e1b4b"
-      >
+      <section className="lp-cli" aria-labelledby="cli-title">
         <div className="lp-width">
           <h2 id="cli-title" className="lp-center">
             Or never leave the terminal.
@@ -518,10 +486,15 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="lp-final" id="download" aria-labelledby="final-title">
-        <div className="lp-final-mark">
-          <AsciiMark echoes={4} />
-        </div>
+      <section
+        className="lp-final"
+        id="download"
+        data-lanes="0 0.5 0.9"
+        data-lanes-narrow="0 0.78 0.9"
+        aria-labelledby="final-title"
+      >
+        {/* The lanes merge into one line that ends here, above the heading. */}
+        <div className="lp-merge" data-merge="" aria-hidden="true" />
         <div className="lp-width lp-final-body">
           <h2 id="final-title" className="lp-center">
             Start your first parallel task.

@@ -1,44 +1,54 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { heroPalette, landingCards } from '../src/landing-content.ts';
-import {
-  contrastRatio,
-  heroState,
-  hexToRgb,
-  READING_WASH,
-  scrollEnergy,
-} from '../src/landing-motion.ts';
+import { landingPanes, roster } from '../src/landing-content.ts';
+import { hexToRgb, laneOpen, laneX, scrollEnergy } from '../src/landing-motion.ts';
 
-const cards = landingCards('Windows, macOS and Linux');
+const field = {
+  center: 0.3,
+  spread: 0.6,
+  rootY: 0.1,
+  forkEnd: 0.9,
+  mergeStart: 9,
+  mergeEnd: 9.5,
+};
+const lanes = roster.length;
+const positions = (y, time = 0) =>
+  Array.from({ length: lanes }, (_, index) => laneX(index, lanes, y, time, field));
 
-test('each card keeps 4.5:1 between its text and its surface', () => {
-  for (const card of cards) {
-    const ratio = contrastRatio(card.ink, card.surface);
-    assert.ok(ratio >= 4.5, `${card.name}: ${ratio.toFixed(2)}:1`);
+test('the lanes start as one line at the root', () => {
+  assert.equal(laneOpen(field, field.rootY), 0);
+  assert.deepEqual(positions(field.rootY, 7), Array(lanes).fill(field.center));
+});
+
+test('the lanes run parallel, in order and inside the bundle, once the fork ends', () => {
+  assert.equal(laneOpen(field, field.forkEnd), 1);
+  for (const time of [0, 3, 11]) {
+    const xs = positions(4, time);
+    const gap = field.spread / (lanes - 1);
+    for (let index = 1; index < lanes; index++) assert.ok(xs[index] - xs[index - 1] > gap * 0.75);
+    assert.ok(xs[0] > field.center - field.spread / 2 - 0.02);
+    assert.ok(xs.at(-1) < field.center + field.spread / 2 + 0.02);
   }
 });
 
-test('every palette is three colors the shader can read', () => {
-  for (const palette of [heroPalette, ...cards.map((card) => card.palette)]) {
-    assert.equal(palette.length, 3);
-    for (const color of palette) assert.equal(hexToRgb(color).length, 3);
-  }
+test('the lanes are one line again after the merge', () => {
+  assert.equal(laneOpen(field, field.mergeEnd), 0);
+  assert.deepEqual(positions(field.mergeEnd + 0.1, 5), Array(lanes).fill(field.center));
 });
 
 test('platform tags list each platform once', () => {
-  assert.deepEqual(cards.at(-1).tags, ['Windows', 'macOS', 'Linux', 'Apache 2.0']);
-  assert.deepEqual(landingCards('macOS and Linux').at(-1).tags, ['macOS', 'Linux', 'Apache 2.0']);
+  assert.deepEqual(landingPanes('Windows, macOS and Linux').at(-1).tags, [
+    'Windows',
+    'macOS',
+    'Linux',
+    'Apache 2.0',
+  ]);
+  assert.deepEqual(landingPanes('macOS and Linux').at(-1).tags, ['macOS', 'Linux', 'Apache 2.0']);
 });
 
-test('the hero starts as a clear name and ends inside it on the washed field', () => {
-  const start = heroState(0, READING_WASH.dark);
-  assert.deepEqual(start, { scale: 1, maskOpacity: 1, metaOpacity: 1, wash: 0 });
-  const end = heroState(1, READING_WASH.dark);
-  assert.equal(end.maskOpacity, 0);
-  assert.equal(end.metaOpacity, 0);
-  assert.equal(end.wash, READING_WASH.dark);
-  assert.ok(end.scale > 50);
-  assert.deepEqual(heroState(4, READING_WASH.light), heroState(1, READING_WASH.light));
+test('colors convert to the 0..1 components the shader reads', () => {
+  assert.deepEqual(hexToRgb('#ff0000'), [1, 0, 0]);
+  assert.throws(() => hexToRgb('red'));
 });
 
 test('scroll energy rises with scrolling and settles when it stops', () => {

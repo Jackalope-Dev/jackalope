@@ -1,4 +1,8 @@
-/** Pure math for the landing page's scroll choreography. No DOM access, so it can be unit tested. */
+/**
+ * Pure math for the landing page's lanes: one line that forks into a lane per agent, runs
+ * down the page and merges again. No DOM access, so it can be unit tested. The fragment
+ * shader in ./landing-lanes repeats `laneOpen` and `laneX`; change them together.
+ */
 
 export function clamp(value: number, min = 0, max = 1): number {
   return Math.min(max, Math.max(min, value));
@@ -10,45 +14,51 @@ function smoothstep(from: number, to: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-export interface HeroState {
-  /** Scale of the name. Grows fast near the end so the camera passes through a letter. */
-  scale: number;
-  /** Opacity of the layer the name is cut from. */
-  maskOpacity: number;
-  /** Opacity of the heading, actions and scroll cue. */
-  metaOpacity: number;
-  /** How far the field is washed toward the page color: 0 inside the letters. */
-  wash: number;
-}
-
-const MAX_ZOOM = 90;
-
 /**
- * How far the field fades toward the page color under body text, where that text has to
- * stay readable: toward black in the dark appearance, toward white in the light one.
+ * Where the lanes are. Horizontal values are in viewport heights from the screen's
+ * center; vertical values are in viewport heights from the top of the page.
  */
-export const READING_WASH = { dark: 0.74, light: 0.9 };
-
-/** Where the hero is for a scroll progress of 0 (top of page) to 1 (hero finished). */
-export function heroState(progress: number, readingWash: number): HeroState {
-  const p = clamp(progress);
-  return {
-    scale: 1 + p ** 3 * MAX_ZOOM,
-    maskOpacity: 1 - smoothstep(0.5, 0.86, p),
-    metaOpacity: 1 - smoothstep(0.04, 0.3, p),
-    wash: readingWash * smoothstep(0.55, 1, p),
-  };
+export interface LaneField {
+  /** Middle of the bundle. */
+  center: number;
+  /** Width of the bundle where the lanes run parallel. */
+  spread: number;
+  /** The single line starts here and begins to fork. */
+  rootY: number;
+  /** The lanes are fully parallel from here. */
+  forkEnd: number;
+  /** The lanes begin to close here and are one line again at `mergeEnd`. */
+  mergeStart: number;
+  mergeEnd: number;
 }
 
-/** How far a position has moved through a range, as 0 to 1. */
-export function progressThrough(position: number, start: number, end: number): number {
-  return clamp((position - start) / (end - start));
+/** How far each lane sways, as a share of the gap between two lanes, so neighbors never cross. */
+export const LANE_SWAY = 0.1;
+
+/** How far apart the lanes are at page height `y`: 0 is one line, 1 is fully parallel. */
+export function laneOpen(field: LaneField, y: number): number {
+  return (
+    smoothstep(field.rootY, field.forkEnd, y) *
+    (1 - smoothstep(field.mergeStart, field.mergeEnd, y))
+  );
+}
+
+/** Horizontal position of lane `index` of `count` at page height `y`. */
+export function laneX(
+  index: number,
+  count: number,
+  y: number,
+  time: number,
+  field: LaneField,
+): number {
+  const gaps = Math.max(1, count - 1);
+  const sway = (LANE_SWAY / gaps) * Math.sin(y * 2.3 + index * 1.7 + time * 0.4);
+  return field.center + (index / gaps - 0.5 + sway) * field.spread * laneOpen(field, y);
 }
 
 /**
- * How stirred up the field is, from how fast the page is scrolling. Rises quickly with
- * scroll speed and decays on its own, so the background surges while you scroll and
- * settles when you stop.
+ * How stirred up the lanes are, from how fast the page is scrolling. Rises quickly with
+ * scroll speed and decays on its own, so work on the lanes speeds up while you scroll.
  *
  * @param energy current energy, 0 (calm) to 1 (fully stirred)
  * @param scrolled distance scrolled this frame, as a fraction of the viewport height
@@ -66,21 +76,4 @@ export function hexToRgb(hex: string): Rgb {
   return [match[1], match[2], match[3]].map(
     (channel) => Number.parseInt(channel ?? '0', 16) / 255,
   ) as Rgb;
-}
-
-/** Moves `current` a fraction of the way toward `target`. Called once per frame. */
-export function approach(current: Rgb, target: Rgb, rate: number): Rgb {
-  return current.map((value, i) => value + ((target[i] ?? value) - value) * rate) as Rgb;
-}
-
-/** WCAG contrast ratio between two "#rrggbb" colors. */
-export function contrastRatio(a: string, b: string): number {
-  const luminance = (hex: string) => {
-    const [r, g, bl] = hexToRgb(hex).map((c) =>
-      c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
-    ) as Rgb;
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
-  };
-  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
-  return (light + 0.05) / (dark + 0.05);
 }

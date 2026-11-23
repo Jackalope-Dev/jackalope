@@ -50,35 +50,26 @@ async function _verifyPage(page) {
   ]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => scrollTo(0, 0));
-    const grain = page.locator('.lp-hero .lp-grain');
     assert(
-      await grain.evaluate(
-        (element) =>
-          element.getAttribute('aria-hidden') === 'true' &&
-          getComputedStyle(element).pointerEvents === 'none',
-      ),
-      `Decorative grain does not intercept controls at ${width}`,
+      await page
+        .locator('.lp-backdrop')
+        .evaluate((element) => element.getAttribute('aria-hidden') === 'true'),
+      `Decorative lanes are hidden from assistive technology at ${width}`,
     );
     assert(
       await page.evaluate(() => {
-        const hero = document.querySelector('.lp-hero');
-        return (
-          !('motion' in document.querySelector('.lp').dataset) && hero.offsetHeight <= innerHeight
-        );
+        const data = document.querySelector('.lp').dataset;
+        return !('motion' in data) && !('pinned' in data);
       }),
-      `Reduced motion keeps the hero one screen tall at ${width}`,
+      `Reduced motion leaves the panes in the page flow at ${width}`,
     );
-    for (const title of await page.locator('.lp-card-title a').all()) {
-      await title.evaluate((el) => el.scrollIntoView({ behavior: 'instant', block: 'center' }));
+    for (const pane of await page.locator('.lp-pane').all()) {
+      await pane.evaluate((el) => el.scrollIntoView({ behavior: 'instant', block: 'center' }));
+      const box = await pane.boundingBox();
+      assert(box.x >= 0 && box.x + box.width <= width, `Complete pane at ${width}`);
       assert(
-        await title.evaluate((el) => {
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          const text = range.getBoundingClientRect();
-          const card = el.closest('.lp-card').getBoundingClientRect();
-          return text.left >= card.left && text.right <= card.right;
-        }),
-        `Card title fits its card at ${width}`,
+        await pane.evaluate((el) => el.scrollWidth <= el.clientWidth),
+        `Pane text fits at ${width}`,
       );
     }
     for (const id of ['intro', 'inside', 'features', 'questions', 'download']) {
@@ -129,38 +120,41 @@ async function _verifyPage(page) {
     () => document.querySelectorAll('.td-tab')[1]?.getAttribute('aria-current') === 'true',
   );
   assert(
-    await page.locator('.lp-cue').evaluate((el) => getComputedStyle(el).animationName === 'none'),
-    'Reduced hero motion',
+    await page
+      .locator('.lp-line')
+      .first()
+      .evaluate((el) => getComputedStyle(el).transitionDuration === '0s'),
+    'Reduced statement motion',
   );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.reload();
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-  await page.waitForFunction(() => 'motion' in document.querySelector('.lp').dataset);
-  const scrubHero = (share) =>
-    page.locator('.lp-hero').evaluate((el, at) => {
-      scrollTo({ top: (el.offsetHeight - innerHeight) * at, behavior: 'instant' });
+  await page.waitForFunction(() => 'pinned' in document.querySelector('.lp').dataset);
+  const scrubPanes = (share) =>
+    page.locator('#inside').evaluate((el, at) => {
+      const top = el.getBoundingClientRect().top + scrollY;
+      scrollTo({ top: top + (el.offsetHeight - innerHeight) * at, behavior: 'instant' });
     }, share);
-  const maskOpacity = () =>
-    page.locator('.lp-mask').evaluate((el) => Number(getComputedStyle(el).opacity));
-  await scrubHero(0);
+  await scrubPanes(0);
   await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('.lp-mask')).opacity === '1',
+    () => document.querySelector('.lp-pane').getBoundingClientRect().left > 0,
   );
-  await scrubHero(1);
+  await scrubPanes(1);
   await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('.lp-mask')).opacity === '0',
+    () =>
+      [...document.querySelectorAll('.lp-pane')].at(-1).getBoundingClientRect().right <= innerWidth,
   );
-  assert((await maskOpacity()) === 0, 'Scrolling zooms through the name onto the field');
-  await page.locator('#inside').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll('.lp-word')].every((word) => word.classList.contains('is-lit')),
+  assert(
+    await page
+      .locator('.lp-pane')
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().left < 0),
+    'Scrolling moves the panes sideways to the last one',
   );
   await page.locator('#features').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
   await page.waitForFunction(() =>
-    [...document.querySelectorAll('.lp-card')].every((card) =>
-      card.classList.contains('is-active'),
-    ),
+    [...document.querySelectorAll('.lp-line')].every((line) => line.classList.contains('is-lit')),
   );
   assert(errors.length === 0, errors.join('\n'));
   return {
