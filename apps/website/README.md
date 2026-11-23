@@ -204,6 +204,17 @@ from each page without its trailing slash, plus the retired URLs in `movedPages`
 `src/seo.ts`) and appends rules to `dist/_headers` that serve every Markdown mirror and
 `llms*.txt` file with `X-Robots-Tag: noindex` and a canonical `Link` to its HTML page.
 Hosts that ignore those files need equivalent rules. Avoid a catch-all 200 SPA rewrite.
+
+On Cloudflare, `worker/index.ts` runs in front of the assets (`run_worker_first`,
+skipping `/assets/*` and `/media/*`). A page request whose `Accept` header prefers
+`text/markdown` gets the page as Markdown: the guide's `index.md` mirror when one
+exists, otherwise the prerendered `<main>` converted at request time. HTML pages gain
+`Vary: Accept` and discovery `Link` headers, and `/.well-known/api-catalog` is served
+as `application/linkset+json`. `src/agent-discovery.ts` generates the agent skills
+index and SKILL.md files, the API catalog, `openapi.json` and the ARD
+`ai-catalog.json`; keep them limited to what the site really serves. `src/webmcp.ts`
+registers read-only WebMCP tools in browsers that support them. Static hosts without
+the Worker serve the discovery files but not Markdown negotiation.
 Subdirectory hosting is not configured. Serve MP4 as `video/mp4`, WebM as
 `video/webm` and VTT as `text/vtt`; preserve byte-range requests for video seeking.
 Use immutable caching for hashed assets and revalidate HTML and named public media.

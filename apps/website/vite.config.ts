@@ -6,6 +6,7 @@ import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character
 import { Resvg } from '@resvg/resvg-js';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
+import { agentDiscoveryFiles } from './src/agent-discovery.ts';
 import type { ReleaseMap } from './src/changelog.ts';
 import { normalizePath, siteOrigin, updatesWith } from './src/content.ts';
 import { platformDownloads } from './src/platform-downloads.ts';
@@ -67,6 +68,7 @@ export default defineConfig(({ mode, command }) => {
   // the site shows, with the same release state, instead of a copy that drifts.
   const files = {
     ...discoveryFiles(site.origin, env, releases),
+    ...agentDiscoveryFiles(site.origin),
     'changelog.json': JSON.stringify(updatesWith(releases)),
   };
   const icons = {

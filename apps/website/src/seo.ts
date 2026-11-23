@@ -412,9 +412,11 @@ function marketingPageText(page: MarketingPage, origin: string) {
  * Markdown mirrors and llms*.txt files stay public for language models but out of
  * search results: each one is served with noindex and a canonical Link to the
  * HTML page it mirrors (its directory's page, so /knowledge/x/index.md -> /knowledge/x/).
+ * Agent discovery files under .well-known/ (agent-discovery.ts) mirror no page.
  */
 export function mirrorHeaderRules(fileNames: string[], origin = siteOrigin) {
   return fileNames
+    .filter((name) => !name.startsWith('.well-known/'))
     .filter((name) => name.endsWith('.md') || /(^|\/)llms(-full)?\.txt$/.test(name))
     .sort()
     .map((name) => {

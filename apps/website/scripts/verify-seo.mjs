@@ -22,6 +22,7 @@ export async function verifySeo(directory, pages, origin) {
   const headers = await read('_headers');
   for (const name of await readdir(directory, { recursive: true })) {
     const path = `/${name.split(sep).join('/')}`;
+    if (path.startsWith('/.well-known/')) continue;
     if (!path.endsWith('.md') && !/\/llms(-full)?\.txt$/.test(path)) continue;
     const page = path.replace(/[^/]*$/, '');
     assert.ok(

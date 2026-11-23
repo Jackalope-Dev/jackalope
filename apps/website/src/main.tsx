@@ -6,6 +6,7 @@ import { App } from './App';
 import { normalizePath } from './content';
 import { readWebsiteTheme } from './theme';
 import { signupCampaign } from './WaitlistPreferences';
+import { registerWebMcpTools } from './webmcp';
 import '@jackalope/brand/fonts.css';
 import './styles.css';
 import './launch.css';
@@ -16,6 +17,7 @@ import './site.css';
 
 applyThemeTokens(readWebsiteTheme());
 signupCampaign();
+registerWebMcpTools();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing website root');
