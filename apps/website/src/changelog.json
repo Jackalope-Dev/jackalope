@@ -1,5 +1,15 @@
 [
   {
+    "id": "your-projects-found-for-you",
+    "date": "2026-11-24",
+    "title": "Your projects, found for you.",
+    "description": "Setup lists the repositories you already work in, from your agent history, code folders and editor, so you can add them in one step.",
+    "items": [
+      "Find projects on this computer in command search adds more later.",
+      "Only Git details are read, and folders like Documents and Desktop are never opened."
+    ]
+  },
+  {
     "id": "kimi-requests-get-the-full-risk-check",
     "date": "2026-11-24",
     "title": "Kimi requests get the full risk check.",

@@ -27,6 +27,8 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept repository discovery on a fresh macOS install with sessions under protected
+  folders (no permission prompts), and on Windows and Linux.
 - [ ] Accept worktree lifecycle in an installed app on macOS, Windows and Linux:
   `.worktreeinclude` copies, worktree commands and their failure output, stopping a marked
   terminal on merge and archive, and an automatic cleanup pass keeping and removing the

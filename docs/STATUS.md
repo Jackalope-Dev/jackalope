@@ -55,6 +55,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   background with progress, cancel and idempotent updates. Imported conversations open
   read-only in an Imported group under their project and continue by resuming the CLI
   session. Checked with fixtures and a read-only local trial; installed acceptance is open.
+  First-run setup and command search (Find projects on this computer) list repositories
+  found from Claude Code and Codex session folders, common code folders and recent VS Code,
+  Cursor and Windsurf folders, reading only Git metadata. Desktop, Documents, Downloads,
+  ~/Library, iCloud and volumes are never opened, here or when listing and importing
+  sessions; chosen repositories are added with detected commands.
   See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
 - Non-code work (a short request to read or operate a web page or a connection, work on an
   attached window that names no code, and everything in General) runs in the project folder as it is: no
