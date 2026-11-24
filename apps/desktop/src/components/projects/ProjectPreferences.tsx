@@ -645,7 +645,11 @@ export function ProjectPreferences({
               projectId={project.id}
               projectPath={project.path}
             />
-            <AppStoreConnectSettings key={`asc-${project.id}`} projectId={project.id} />
+            <AppStoreConnectSettings
+              key={`asc-${project.id}`}
+              projectId={project.id}
+              developmentTeam={project.preferences?.developmentTeam}
+            />
             <ProjectComputerSettings
               key={`computer-${project.id}`}
               project={{ id: project.id, name: project.name }}

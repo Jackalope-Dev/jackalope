@@ -32,7 +32,7 @@ interface Draft {
 
 const EMPTY: Draft = { issuerId: '', keyId: '', developmentTeam: '', bundleId: '', scheme: '' };
 
-const fromConnection = (connection: AppStoreConnection | null): Draft =>
+const fromConnection = (connection: AppStoreConnection | null, developmentTeam = ''): Draft =>
   connection
     ? {
         issuerId: connection.issuerId,
@@ -41,7 +41,7 @@ const fromConnection = (connection: AppStoreConnection | null): Draft =>
         bundleId: connection.bundleId ?? '',
         scheme: connection.scheme ?? '',
       }
-    : EMPTY;
+    : { ...EMPTY, developmentTeam };
 
 const when = (value: string) =>
   new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -50,7 +50,14 @@ const when = (value: string) =>
  * The App Store Connect API key Jackalope uses to sign and upload a task's iOS app to
  * TestFlight. The key is kept in protected storage and never given to agents.
  */
-export function AppStoreConnectSettings({ projectId }: { projectId: string }) {
+export function AppStoreConnectSettings({
+  projectId,
+  developmentTeam,
+}: {
+  projectId: string;
+  /** The project's Development team, offered as the Team ID of a new connection. */
+  developmentTeam?: string;
+}) {
   const [connection, setConnection] = useState<AppStoreConnection | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [key, setKey] = useState<SecretFileValue | null>(null);
@@ -142,7 +149,7 @@ export function AppStoreConnectSettings({ projectId }: { projectId: string }) {
   };
 
   const startEditing = () => {
-    setDraft(fromConnection(connection));
+    setDraft(fromConnection(connection, developmentTeam?.trim() ?? ''));
     setKey(null);
     setSummary('');
     setError('');
