@@ -2250,6 +2250,26 @@ fn resume_at_reset_is_saved_with_the_attempt_and_taken_once() {
         .is_none());
     runtime.limit_resume_failed(&run.id, resets, "No account".into());
     assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+
+    // A later attempt, such as a manual retry or a switch, drops the schedule.
+    runtime.schedule_limit_resume(&run.id, true).unwrap();
+    drop(runtime);
+    let mut newer = sample("codex");
+    newer.id = "newer-attempt".into();
+    newer.status = RunStatus::Failed;
+    newer.started_at = (Utc::now() + chrono::Duration::minutes(5)).to_rfc3339();
+    std::fs::write(
+        history.join(format!("{}.json", newer.id)),
+        serde_json::to_vec(&newer).unwrap(),
+    )
+    .unwrap();
+    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+    assert!(runtime
+        .run_snapshot(&run.id)
+        .unwrap()
+        .resume_at_reset
+        .is_none());
 }
 
 #[test]

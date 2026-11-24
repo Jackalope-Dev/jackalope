@@ -103,6 +103,9 @@ pub(super) fn explain(run: &mut TaskRun, exit_code: Option<i32>) {
     }
     let message = run.error.as_deref().unwrap_or_default();
     run.failure_kind = classify(message, run.quota_failure.as_ref())
+        // Unreported stderr is the agent's own log, where "rate limit" or "402" can come
+        // from the project's tools; only a reported error marks the account limited.
+        .filter(|kind| !(unexplained && kind.is_limit()))
         .or(unexplained.then_some(FailureKind::AgentExited));
     if run.failure_kind.is_some_and(FailureKind::is_limit) {
         // A limit known only from the agent's final message still gets a typed record, so
@@ -574,6 +577,17 @@ mod tests {
         explain(&mut run, Some(1));
         assert_eq!(run.failure_kind, Some(FailureKind::Billing));
         assert_eq!(run.quota_failure.unwrap().resets_at, None);
+
+        // Limit wording in the agent's own stderr does not mark the account limited.
+        for line in [
+            "npm warn GitHub API rate limit exceeded for 203.0.113.7",
+            "fetch failed: 402 Payment Required",
+        ] {
+            let mut run = failed(&["Running checks", line]);
+            explain(&mut run, Some(1));
+            assert_eq!(run.failure_kind, Some(FailureKind::AgentExited), "{line}");
+            assert!(run.quota_failure.is_none(), "{line}");
+        }
 
         let mut run = failed(&["Starting", "Error: 401 Unauthorized"]);
         explain(&mut run, Some(1));

@@ -426,6 +426,15 @@ where
     format!("{name} — resets {when}")
 }
 
+/// Whether a later or still active attempt at the same task has taken over from `run`.
+fn replaced<'a>(mut runs: impl Iterator<Item = &'a TaskRun>, run: &TaskRun) -> bool {
+    runs.any(|other| {
+        other.id != run.id
+            && other.task_id == run.task_id
+            && (other.started_at > run.started_at || other.status.is_active())
+    })
+}
+
 impl TaskRuntime {
     /// Schedules, or with `schedule` false cancels, a retry of attempt `id` once the
     /// usage limit that stopped it resets. Only the latest attempt of an ordinary task can
@@ -457,10 +466,7 @@ impl TaskRuntime {
                 .as_ref()
                 .and_then(|failure| failure.resets_at)
                 .ok_or("The provider did not report when this limit resets.")?;
-            if inner.runs.values().any(|other| {
-                other.task_id == run.task_id
-                    && (other.started_at > run.started_at || other.status.is_active())
-            }) {
+            if replaced(inner.runs.values(), run) {
                 return Err("A newer attempt has replaced this one.".into());
             }
             updated.resume_at_reset = Some(ResumeAtReset { at, error: None });
@@ -473,7 +479,9 @@ impl TaskRuntime {
     }
 
     /// Attempts whose scheduled retry is due at `now`. Each is unscheduled before it is
-    /// returned, so a retry is started at most once even if starting it fails.
+    /// returned, so a retry is started at most once even if starting it fails. A schedule
+    /// on an attempt that another attempt has since replaced, such as a manual retry or a
+    /// switch to another account, is dropped instead of starting the task a second time.
     pub(in crate::commands) fn take_due_limit_resumes(&self, now: i64) -> Vec<(String, i64)> {
         let Ok(mut inner) = self.inner.lock() else {
             return vec![];
@@ -497,12 +505,51 @@ impl TaskRuntime {
             let Some(resume) = updated.resume_at_reset.take() else {
                 continue;
             };
+            let current =
+                updated.status == RunStatus::Failed && !replaced(inner.runs.values(), run);
             if self.save(&updated).is_ok() {
                 inner.runs.insert(id.clone(), updated);
-                taken.push((id, resume.at));
+                if current {
+                    taken.push((id, resume.at));
+                }
             }
         }
         taken
+    }
+
+    /// Refuses a switch to an account turned off in Settings, for this project or the whole
+    /// app. The start itself checks the agent and the account a project assigns.
+    pub(in crate::commands) fn ensure_switch_allowed(
+        &self,
+        request: &super::RunRequest,
+    ) -> Result<(), String> {
+        if matches!(request.agent.as_str(), "auto" | "default") {
+            return Ok(());
+        }
+        let policy = self.policy()?;
+        let adapter = policy.adapter(&request.agent)?;
+        let assigned = policy
+            .projects
+            .get(&request.project_id)
+            .and_then(|project| {
+                project
+                    .agent_accounts
+                    .get(&adapter)
+                    .or_else(|| project.agent_accounts.get(&request.agent))
+            });
+        let binding = crate::commands::agent_profiles::bind_account(
+            &self.profiles_root(),
+            &adapter,
+            request
+                .agent_profile_id
+                .as_deref()
+                .or(assigned.map(String::as_str)),
+        )?;
+        if policy.account_allowed(&request.project_id, &request.agent, &binding) {
+            Ok(())
+        } else {
+            Err("That account is turned off for this project in Settings.".into())
+        }
     }
 
     /// Keeps a scheduled retry that could not start, with the reason, on attempt `id`.

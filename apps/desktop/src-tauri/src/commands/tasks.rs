@@ -590,6 +590,7 @@ pub async fn task_retry(
         if let Some(switch) = switch_to {
             let old = runtime.run_snapshot(&id).ok_or("Attempt not found")?;
             switch.apply(&old, &mut request)?;
+            runtime.ensure_switch_allowed(&request)?;
         }
         coordinator.start_manual(request)
     })
