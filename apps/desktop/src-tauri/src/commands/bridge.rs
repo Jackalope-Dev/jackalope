@@ -88,6 +88,7 @@ enum Group {
     Browser,
     Desktop,
     Device,
+    Simulator,
     Coordination,
 }
 
@@ -97,6 +98,7 @@ impl Group {
             Group::Browser => "browser",
             Group::Desktop => "desktop",
             Group::Device => "device",
+            Group::Simulator => "simulator",
             Group::Coordination => "coordination",
         }
     }
@@ -108,7 +110,9 @@ enum Offer {
     Always,
     /// Where desktop control works on this platform.
     Platform,
-    /// On macOS, where Xcode's devicectl reaches the person's iPhones and iPads.
+    /// macOS with a resolved Xcode, refused elsewhere: devicectl reaches the
+    /// person's iPhones and iPads, and the Simulator tools are listed for
+    /// workspaces with an Apple project.
     Xcode,
     /// Saved bots' conversations; refused to everyone else.
     Bots,
@@ -274,7 +278,7 @@ impl Tool {
     fn supported(&self) -> bool {
         match self.offer {
             Offer::Platform => super::desktop_control::platform::supported(),
-            Offer::Xcode => cfg!(target_os = "macos"),
+            Offer::Xcode => super::simulator::supported(),
             _ => true,
         }
     }
@@ -314,6 +318,7 @@ impl Tool {
             Offer::Reconciliation if !run.dependency_snapshot.reconciles => Err(
                 ToolError::refused("Only reconciliation attempts resolve conflict blocks."),
             ),
+            Offer::Xcode => super::simulator::available().map_err(ToolError::refused),
             _ => Ok(()),
         }
     }
@@ -694,6 +699,7 @@ fn listed(service: &Coordinator, run: &TaskRun) -> Vec<&'static Tool> {
             Offer::Connections => !trimmed || service.runtime.mcp_broker.has_attempt(&run.id),
             Offer::SavedCheck => !trimmed || check,
             Offer::Reconciliation => run.dependency_snapshot.reconciles,
+            Offer::Xcode => super::simulator::offered(run),
         })
         .filter(|tool| {
             surface != Surface::Deferred
@@ -712,7 +718,7 @@ fn requested(names: &[String]) -> Result<BTreeSet<String>, &'static str> {
         || names.len() > optional().count()
     {
         return Err(
-            "Select optional tool names or browser, desktop, device and coordination groups.",
+            "Select optional tool names or browser, desktop, device, simulator and coordination groups.",
         );
     }
     Ok(optional()
@@ -726,7 +732,8 @@ fn requested(names: &[String]) -> Result<BTreeSet<String>, &'static str> {
         .collect())
 }
 
-/// Codex approves each call of the tools that act on a browser, desktop or device.
+/// Codex approves each call of the tools that act on a browser, desktop,
+/// device or simulator.
 pub(crate) fn codex_tool_policy() -> Value {
     Value::Object(
         tools()
@@ -734,7 +741,7 @@ pub(crate) fn codex_tool_policy() -> Value {
             .filter(|tool| {
                 matches!(
                     tool.group,
-                    Some(Group::Browser | Group::Desktop | Group::Device)
+                    Some(Group::Browser | Group::Desktop | Group::Device | Group::Simulator)
                 )
             })
             .map(|tool| (tool.name.into(), json!({"approval_mode":"approve"})))

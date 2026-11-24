@@ -1,6 +1,6 @@
 import { isActive } from '@jackalope/contracts/runs';
 import { Badge, Button, InlineNotice } from '@jackalope/ui';
-import { AppWindow, ExternalLink, Globe, Lock, Monitor, Server } from 'lucide-react';
+import { AppWindow, ExternalLink, Globe, Lock, Monitor, Server, Smartphone } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   desktopLabel,
@@ -31,6 +31,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
   const active = isActive(run);
   const [screen, setScreen] = useState<Screen | null>(null);
   const [frame, setFrame] = useState<{ src: string; url: string | null } | null>(null);
+  const [simulatorFrame, setSimulatorFrame] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [revoking, setRevoking] = useState<'' | 'browser' | 'desktop'>('');
   const [remembering, setRemembering] = useState(false);
@@ -53,6 +54,8 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
           setFrame({ src: `data:image/png;base64,${next.browser.frame}`, url: next.browser.url });
         else if (next.browser.status === 'stopped' || next.browser.status === 'unavailable')
           setFrame(null);
+        if (next.simulator?.frame)
+          setSimulatorFrame(`data:image/png;base64,${next.simulator.frame}`);
       } catch (cause) {
         if (alive) setError(describeError(cause));
       } finally {
@@ -99,6 +102,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
   const browser = screen?.browser;
   const desktop = screen?.desktop ?? null;
   const computer = screen?.computer ?? null;
+  const simulator = screen?.simulator ?? null;
   const desktopState = desktopLabel(desktop);
   const pageUrl = frame?.url ?? browser?.url ?? null;
   const openable = openableUrl(pageUrl);
@@ -170,6 +174,35 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
           )}
         </div>
       </div>
+
+      {simulator && (
+        <div className="agent-screen-section">
+          <div className="agent-screen-heading">
+            <Smartphone size={16} aria-hidden="true" />
+            <h3>Simulator</h3>
+            <Badge variant={simulator.status === 'live' && active ? 'accent' : 'default'}>
+              {!active ? 'Attempt ended' : simulator.status === 'live' ? 'Live' : 'Not running'}
+            </Badge>
+          </div>
+          <figure className="agent-screen-frame" data-empty={!simulatorFrame || undefined}>
+            <div className="agent-screen-address">
+              <span title={simulator.udid}>
+                {[simulator.device ?? 'iOS Simulator', simulator.app].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+            {simulatorFrame ? (
+              <img
+                src={simulatorFrame}
+                alt={`Simulator screen${simulator.app ? ` showing ${simulator.app}` : ''}`}
+              />
+            ) : (
+              <p className="agent-screen-empty">
+                {simulator.error ?? 'The simulator screen appears here while it is running.'}
+              </p>
+            )}
+          </figure>
+        </div>
+      )}
 
       {computer && (
         <div className="agent-screen-section">

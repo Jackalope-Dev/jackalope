@@ -24,9 +24,9 @@ use std::{
 pub(in crate::commands) enum ToolEvent {
     /// The task browser opened a page.
     Visited(String),
-    /// A browser capture, saved in the workspace where the tool ran.
+    /// A browser or simulator capture, saved in the workspace where the tool ran.
     Screenshot(ScreenshotArtifact),
-    /// A browser interaction. `label` keeps each bridge route's wording.
+    /// A browser or simulator interaction. `label` keeps each bridge route's wording.
     Interaction {
         label: &'static str,
         summary: String,
@@ -58,8 +58,13 @@ pub(in crate::commands) fn record(
         ToolEvent::Screenshot(artifact) => match host {
             None => runtime.update(run_id, |run| {
                 run.screenshots.push(artifact.clone());
+                let source = if artifact.url.starts_with("simulator://") {
+                    "simulator"
+                } else {
+                    "browser"
+                };
                 run.activity
-                    .push(format!("Captured browser screenshot: {}", artifact.name));
+                    .push(format!("Captured {source} screenshot: {}", artifact.name));
             }),
             Some(computer) => {
                 runtime.update(run_id, |run| {

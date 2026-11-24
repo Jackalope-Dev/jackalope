@@ -446,6 +446,15 @@ impl ConcurrencyChoice {
 }
 
 impl Coordinator {
+    /// Gives the attempt `run_id` the bridge token `token`, for tests outside
+    /// this module that call bridge tools.
+    #[cfg(test)]
+    pub(crate) fn grant_for_test(&self, token: &str, run_id: &str) {
+        self.state()
+            .grants
+            .insert(token.into(), (run_id.into(), run_id.into()));
+    }
+
     /// Turns dispatch on or off for a project and applies any new limits.
     /// Without a concurrency choice, the saved one stays.
     fn dispatch(
