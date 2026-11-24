@@ -278,6 +278,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   are recorded. Project settings, the bot editor and `/browser` open, clear and delete
   profiles.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
+  Delivery, pull request following, issue import and workflow starters also work with
+  GitLab (gitlab.com and self-managed, through the person's glab sign-in, as merge requests
+  and pipelines; a fork's merge request targets the parent project unless kept in the fork)
+  and Bitbucket Cloud (through an API token in protected storage). Merges are pinned to the
+  reviewed commit on GitLab and checked against it on Bitbucket. GitHub is unchanged. Not
+  yet accepted against live GitLab or Bitbucket repositories.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.
   Create pull request drafts an editable title and description from the branch's diff alone

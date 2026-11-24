@@ -1,5 +1,16 @@
 [
   {
+    "id": "work-with-gitlab-and-bitbucket",
+    "date": "2026-11-24",
+    "title": "Work with GitLab and Bitbucket.",
+    "description": "Open, follow and merge GitLab merge requests and Bitbucket Cloud pull requests, and import their issues.",
+    "items": [
+      "GitLab uses your own glab sign-in, on gitlab.com or your own server; merge requests from a fork open on the parent project.",
+      "Bitbucket uses an Atlassian API token kept in your system's credential store.",
+      "Failed pipeline logs and review threads go into the fix draft for the task's agent, like they do for GitHub."
+    ]
+  },
+  {
     "id": "your-projects-found-for-you",
     "date": "2026-11-24",
     "title": "Your projects, found for you.",
