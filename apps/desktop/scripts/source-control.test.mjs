@@ -135,6 +135,9 @@ test('starters follow the host and hide what it cannot serve', () => {
   );
   assert.match(recipePrompt('ci', '188', undefined, 'bitbucket'), /Pipeline build number: 188/);
   assert.match(recipePrompt('ci', '12', undefined, undefined), /Workflow run number: 12/);
+  assert.match(recipePrompt('review', '4', undefined, 'gitlab'), /thread resolution, MR merge/);
+  assert.match(recipePrompt('review', '4', undefined, 'bitbucket'), /thread resolution, PR merge/);
+  assert.doesNotMatch(recipePrompt('review', '4', undefined, 'gitlab'), /pull request|\bPR\b/);
   const prompt = issuePrompt({
     id: '!3',
     title: 'Saved carts',

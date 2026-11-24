@@ -449,25 +449,109 @@ pub(crate) fn find_for_branch(
     repository: &Repository,
     branch: &str,
 ) -> Result<Option<ChangeRequest>, String> {
-    let base = project(repository);
+    // A fork's merge requests live in the project they target.
+    let destination = target(cwd, repository, None, false)?;
+    let into = destination.repository(repository);
+    let base = project(&into);
     for state in ["opened", "all"] {
         let found = get(
             cwd,
-            repository,
+            &into,
             &format!(
-                "{base}/merge_requests?source_branch={}&state={state}&order_by=updated_at&per_page=1",
+                "{base}/merge_requests?source_branch={}&state={state}&order_by=updated_at&per_page=20",
                 encode(branch)
             ),
         )?;
-        if let Some(number) = found
-            .as_array()
-            .and_then(|list| list.first())
-            .and_then(|mr| mr["iid"].as_u64())
-        {
-            return view(cwd, repository, number).map(Some);
+        let number = found.as_array().and_then(|list| {
+            list.iter()
+                .find(|mr| mr["source_project_id"].as_u64() == Some(destination.source_id))
+                .and_then(|mr| mr["iid"].as_u64())
+        });
+        if let Some(number) = number {
+            return view(cwd, &into, number).map(Some);
         }
     }
     Ok(None)
+}
+
+/// Where a merge request from a project lands: the project it was forked from,
+/// as glab and GitLab's own page choose, unless `in_fork`; otherwise the project itself.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Target {
+    pub source_id: u64,
+    pub project_id: u64,
+    /// `group/name` of the target project.
+    pub path: String,
+    pub branch: String,
+    pub forked: bool,
+}
+
+impl Target {
+    pub(crate) fn repository(&self, source: &Repository) -> Repository {
+        Repository {
+            host: source.host.clone(),
+            path: self.path.clone(),
+        }
+    }
+}
+
+/// Chooses the target from GitLab's record of the source project. GitLab names the
+/// parent only when the person can read it; otherwise the fork itself is the target.
+pub(crate) fn choose_target(
+    project: &Value,
+    requested: Option<&str>,
+    in_fork: bool,
+) -> Result<Target, String> {
+    let source_id = project["id"]
+        .as_u64()
+        .ok_or("GitLab returned a project without an ID.")?;
+    let parent = &project["forked_from_project"];
+    let upstream = (!in_fork)
+        .then(|| {
+            Some((
+                parent["id"].as_u64()?,
+                parent["path_with_namespace"].as_str()?.to_string(),
+                parent["default_branch"].as_str().unwrap_or("").to_string(),
+            ))
+        })
+        .flatten();
+    let (project_id, path, default, forked) = match upstream {
+        Some((id, path, default)) => (id, path, default, true),
+        None => (
+            source_id,
+            text(project, "path_with_namespace"),
+            text(project, "default_branch"),
+            false,
+        ),
+    };
+    let branch = requested
+        .filter(|branch| !branch.is_empty())
+        .map(String::from)
+        .or_else(|| (!default.is_empty()).then_some(default))
+        .ok_or("GitLab reported no default branch. Set the task's target branch and retry.")?;
+    if path.is_empty() {
+        return Err("GitLab returned a project without its path.".into());
+    }
+    Ok(Target {
+        source_id,
+        project_id,
+        path,
+        branch,
+        forked,
+    })
+}
+
+pub(crate) fn target(
+    cwd: &Path,
+    repository: &Repository,
+    requested: Option<&str>,
+    in_fork: bool,
+) -> Result<Target, String> {
+    choose_target(
+        &get(cwd, repository, &project(repository))?,
+        requested,
+        in_fork,
+    )
 }
 
 /// GitLab marks a draft by its title.
@@ -480,41 +564,35 @@ pub(crate) fn draft_title(title: &str, draft: bool) -> String {
     }
 }
 
-/// Opens a merge request from `branch`, which must already be pushed. Returns its address.
+/// Opens a merge request from `branch`, which must already be pushed, into the
+/// [`target`] project. Returns its address.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn create(
     cwd: &Path,
     repository: &Repository,
     branch: &str,
-    target: Option<&str>,
+    requested: Option<&str>,
+    in_fork: bool,
     title: &str,
     body: &str,
     draft: bool,
 ) -> Result<String, String> {
-    let base = project(repository);
-    let target = match target.filter(|target| !target.is_empty()) {
-        Some(target) => target.to_string(),
-        None => {
-            let project = get(cwd, repository, &base)?;
-            project["default_branch"]
-                .as_str()
-                .filter(|branch| !branch.is_empty())
-                .ok_or(
-                    "GitLab reported no default branch. Set the task's target branch and retry.",
-                )?
-                .to_string()
-        }
-    };
+    let target = target(cwd, repository, requested, in_fork)?;
+    let mut payload = json!({
+        "source_branch": branch,
+        "target_branch": target.branch,
+        "title": draft_title(title, draft),
+        "description": body,
+    });
+    if target.forked {
+        payload["target_project_id"] = json!(target.project_id);
+    }
     let created = api(
         cwd,
         repository,
         "POST",
-        &format!("{base}/merge_requests"),
-        Some(json!({
-            "source_branch": branch,
-            "target_branch": target,
-            "title": draft_title(title, draft),
-            "description": body,
-        })),
+        &format!("{}/merge_requests", project(repository)),
+        Some(payload),
     )
     .map_err(|error| format!("The merge request was not opened. {error}"))?;
     created["web_url"]
@@ -1008,6 +1086,49 @@ mod tests {
             error.contains("glab auth login --hostname gitlab.com"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn forks_target_the_project_they_came_from() {
+        let fork = json!({
+            "id": 77,
+            "path_with_namespace": "ana/web",
+            "default_branch": "ana-main",
+            "forked_from_project": {"id": 12, "path_with_namespace": "acme/platform/web", "default_branch": "main"}
+        });
+        let upstream = choose_target(&fork, None, false).unwrap();
+        assert_eq!(
+            upstream,
+            Target {
+                source_id: 77,
+                project_id: 12,
+                path: "acme/platform/web".into(),
+                branch: "main".into(),
+                forked: true
+            }
+        );
+        assert_eq!(
+            choose_target(&fork, Some("release"), false).unwrap().branch,
+            "release"
+        );
+        let own = choose_target(&fork, None, true).unwrap();
+        assert_eq!(
+            (
+                own.project_id,
+                own.path.as_str(),
+                own.branch.as_str(),
+                own.forked
+            ),
+            (77, "ana/web", "ana-main", false)
+        );
+        // A parent the person cannot read is not named, so the fork is the target.
+        let hidden = json!({"id": 77, "path_with_namespace": "ana/web", "default_branch": "main"});
+        assert!(!choose_target(&hidden, None, false).unwrap().forked);
+        let bare = json!({"id": 77, "path_with_namespace": "ana/web", "default_branch": ""});
+        assert!(choose_target(&bare, None, false)
+            .unwrap_err()
+            .contains("target branch"));
+        assert!(choose_target(&bare, Some("main"), false).is_ok());
     }
 
     #[test]

@@ -1,11 +1,11 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
-import { type HostKind, hostTerms } from '../../lib/source-control';
+import { type ChangeRequestTarget, type HostKind, hostTerms } from '../../lib/source-control';
 import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 
 /**
@@ -31,6 +31,22 @@ export function CreatePullRequest({
   const { noun, via } = hostTerms(provider);
   const [draft, setDraft] = useState(true);
   const [uncommitted, setUncommitted] = useState<string[] | null>(null);
+  // Where GitLab or Bitbucket will open it; GitHub's CLI chooses as it always has.
+  const [target, setTarget] = useState<ChangeRequestTarget | null>(null);
+  const [targetError, setTargetError] = useState('');
+  const [inFork, setInFork] = useState(false);
+  const hosted = !!provider && provider !== 'github';
+  const reading = useRef(0);
+  const readTarget = (fork: boolean) => {
+    const read = ++reading.current;
+    setTargetError('');
+    void invokeNative<ChangeRequestTarget | null>('task_pull_request_target', {
+      id: run.id,
+      inFork: fork,
+    })
+      .then((next) => read === reading.current && setTarget(next))
+      .catch((cause) => read === reading.current && setTargetError(describeError(cause)));
+  };
   const checkout = { repoPath: run.projectPath, worktreePath: run.workspace };
   const message = useDraftedMessage(() =>
     invokeNative<{ title: string; body: string }>('git_generate_pull_request', {
@@ -46,6 +62,9 @@ export function CreatePullRequest({
     setDraft(true);
     message.write(false);
     setUncommitted(null);
+    setTarget(null);
+    setInFork(false);
+    if (hosted) readTarget(false);
     void workingChanges(checkout)
       .then((changes) => setUncommitted(changes.files.map((file) => file.path)))
       .catch(() => setUncommitted([]));
@@ -68,6 +87,7 @@ export function CreatePullRequest({
           title: title.trim(),
           body: message.body,
           draft,
+          ...(hosted ? { inFork } : {}),
         }),
       );
     } catch (cause) {
@@ -95,6 +115,26 @@ export function CreatePullRequest({
     >
       {({ busy }) => (
         <div className="workspace-stack">
+          {hosted && (target || targetError) && (
+            <p className="task-muted">
+              {target
+                ? `Into ${target.repository}${target.branch ? ` → ${target.branch}` : ''}${target.forked ? ` from your fork ${target.fork}` : ''}.`
+                : `Could not read where it will open: ${targetError}`}
+            </p>
+          )}
+          {provider === 'gitlab' && (target?.forked || inFork) && (
+            <label className="flex items-center gap-3 min-h-11">
+              <Checkbox
+                checked={inFork}
+                disabled={busy}
+                onChange={(event) => {
+                  setInFork(event.target.checked);
+                  readTarget(event.target.checked);
+                }}
+              />
+              Open it in the fork instead
+            </label>
+          )}
           <DraftedMessageFields message={message} busy={busy} />
           <label className="flex items-center gap-3 min-h-11">
             <Checkbox

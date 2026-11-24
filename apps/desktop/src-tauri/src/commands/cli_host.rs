@@ -708,9 +708,15 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             }
             super::commit_review::git_push_changes(run.project_path.clone(), run.workspace.clone())
                 .await?;
-            let url =
-                super::delivery::task_pull_request_create(run.id, title, body, draft, app.state())
-                    .await?;
+            let url = super::delivery::task_pull_request_create(
+                run.id,
+                title,
+                body,
+                draft,
+                None,
+                app.state(),
+            )
+            .await?;
             Ok(Response::PullRequest { url })
         }
         Request::BrowserProfile {

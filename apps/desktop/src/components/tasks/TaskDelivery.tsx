@@ -53,8 +53,8 @@ const prepareGoals = (noun: string, Noun: string) => [
   { goal: 'a deployment', label: 'Deployment', icon: Rocket },
 ];
 
-export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string) {
-  return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a PR, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
+export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string, short = 'PR') {
+  return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a ${short}, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
 }
 
 export function TaskDelivery({
@@ -111,7 +111,7 @@ export function TaskDelivery({
   const prepare = async (goal: string) => {
     setError('');
     try {
-      await onHandoff(deliveryHandoff(run, integrated, goal));
+      await onHandoff(deliveryHandoff(run, integrated, goal, terms.short));
     } catch (cause) {
       setError(describeError(cause));
     }
@@ -226,7 +226,7 @@ export function TaskDelivery({
                 className="workspace-menu-item"
                 onSelect={() =>
                   void navigator.clipboard
-                    .writeText(deliveryHandoff(run, integrated, 'a delivery handoff'))
+                    .writeText(deliveryHandoff(run, integrated, 'a delivery handoff', terms.short))
                     .catch((cause) => setError(describeError(cause)))
                 }
               >

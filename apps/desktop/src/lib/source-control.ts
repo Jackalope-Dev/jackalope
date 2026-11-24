@@ -35,6 +35,15 @@ export interface ProjectHost {
   access: HostAccess;
 }
 
+/** `task_pull_request_target`: where a GitLab or Bitbucket change request will open. */
+export interface ChangeRequestTarget {
+  host: string;
+  repository: string;
+  branch: string | null;
+  forked: boolean;
+  fork: string | null;
+}
+
 export interface ConfiguredHost {
   host: string;
   kind: HostKind;

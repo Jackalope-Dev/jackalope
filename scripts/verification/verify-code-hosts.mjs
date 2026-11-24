@@ -40,6 +40,9 @@ window.__TAURI_INTERNALS__ = { metadata: { currentWindow: { label: 'main' }, cur
     case 'gitlab_cli_status': return f.gitlab[args.host] ?? { state: 'ready', message: 'Signed in to ' + args.host + ' as ana.' };
     case 'bitbucket_connection_save': return { email: args.email, name: 'Ana Author', scopes: [] };
     case 'source_control_host_save': return [{ host: 'git.corp.example', kind: 'gitlab' }, { host: args.host, kind: args.kind }];
+    case 'task_pull_request_target': return args.inFork ? { host: 'gitlab.com', repository: 'ana/web', branch: 'main', forked: false, fork: null } : { host: 'gitlab.com', repository: 'acme/platform/web', branch: 'main', forked: true, fork: 'ana/web' };
+    case 'git_working_changes': return { files: [] };
+    case 'git_generate_pull_request': return { title: 'Keep carts between visits', body: 'Saved carts.' };
     case 'plugin:event|listen': return 0;
     default: return null;
   }
@@ -127,7 +130,15 @@ try {
 
   // Opening a new one says merge request and names the GitLab CLI.
   await show('fresh');
-  await page.getByRole('button', { name: 'Create merge request' }).waitFor();
+  await page.getByRole('button', { name: 'Create merge request' }).click();
+  dialog = page.getByRole('alertdialog').or(page.getByRole('dialog'));
+  await dialog.getByText('Into acme/platform/web → main from your fork ana/web.').waitFor();
+  await dialog.getByRole('checkbox', { name: 'Open it in the fork instead' }).check();
+  await dialog.getByText('Into ana/web → main.').waitFor();
+  await dialog.screenshot({ path: `${output}/gitlab-create-fork.png` });
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal((await calls('task_pull_request_create')).length, 0);
 
   // Bitbucket keeps "pull request", offers its merge strategies and says the token is missing.
   await show('api');
