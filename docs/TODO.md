@@ -25,6 +25,8 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept Codex app-server sessions in an installed app on each platform: approvals,
+  Send now, Stop, and resume after a restart.
 - [ ] Accept composer side questions (Claude fork-session, `codex exec fork`) and per-send
   effort with real providers in an installed app; move the Codex side question to the
   app-server's thread fork.

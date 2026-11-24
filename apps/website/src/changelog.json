@@ -1,5 +1,16 @@
 [
   {
+    "id": "faster-interruptible-codex-conversations",
+    "date": "2026-11-24",
+    "title": "Faster, interruptible Codex conversations.",
+    "description": "Codex now keeps one session per conversation instead of starting fresh every turn.",
+    "items": [
+      "Codex asks before leaving its sandbox, and your project's approval settings decide, as they do for Claude Code.",
+      "Send now adds a message to a running Codex turn, and Stop ends the turn cleanly.",
+      "Older Codex versions fall back to the previous way of running, and the activity line says why."
+    ]
+  },
+  {
     "id": "composer-shortcuts",
     "date": "2026-11-24",
     "title": "Composer shortcuts.",

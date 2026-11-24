@@ -323,6 +323,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   starts once as a new conversation in the same workspace with the earlier progress (Codex
   and Grok before launch, Claude Code, Kimi, ACP agents and OpenCode's server after they
   refuse it). Continuations of sessions from outside Jackalope fail instead.
+  Local Codex conversations run in one warm `codex app-server` session (falling back to
+  `codex exec` with the reason shown). Requests to leave its sandbox follow the project's
+  permission settings, Stop interrupts the turn, and Send now adds a message to a running
+  Codex turn. A real smoke run passed; installed acceptance on each platform is open.
 - Project-scoped agent lists, task defaults and account choices; app-wide limits
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
