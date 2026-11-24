@@ -12,6 +12,7 @@
 use super::super::*;
 use crate::commands::{permission_risk, permission_rules};
 use serde_json::json;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const ALLOW_ONCE: &str = "Allow once";
 const ALWAYS_PREFIX: &str = "Always allow ";
@@ -195,7 +196,8 @@ pub(super) fn reply(method: &str, params: &Value, allowed: bool) -> Value {
 }
 
 /// Decides one approval request of attempt `run_id` and returns Codex's answer. Blocks
-/// while the person is asked, until they answer or the attempt stops.
+/// while the person is asked, until they answer, the attempt stops or Codex sets
+/// `settled` because it no longer waits for an answer; then there is none to send.
 pub(super) fn answer(
     runtime: &TaskRuntime,
     run_id: &str,
@@ -203,9 +205,10 @@ pub(super) fn answer(
     method: &str,
     params: &Value,
     files: &[String],
-) -> Value {
+    settled: &AtomicBool,
+) -> Option<Value> {
     let Some(subject) = subject(method, params, files) else {
-        return reply(method, params, false);
+        return Some(reply(method, params, false));
     };
     if read_only {
         runtime.update(run_id, |run| {
@@ -217,7 +220,7 @@ pub(super) fn answer(
                 ),
             )
         });
-        return reply(method, params, false);
+        return Some(reply(method, params, false));
     }
     if method == "mcpServer/elicitation/request" && !confirmation_only(params) {
         runtime.update(run_id, |run| {
@@ -229,10 +232,10 @@ pub(super) fn answer(
                 ),
             )
         });
-        return reply(method, params, false);
+        return Some(reply(method, params, false));
     }
     let Some(run) = runtime.run_snapshot(run_id) else {
-        return reply(method, params, false);
+        return Some(reply(method, params, false));
     };
     let rules = permission_rules::path(&runtime.preferences_directory());
     let command = (subject.tool == "Bash")
@@ -247,7 +250,7 @@ pub(super) fn answer(
         runtime.update(run_id, |run| {
             activity(run, &format!("Allowed by a saved rule: {}", subject.label))
         });
-        return reply(method, params, true);
+        return Some(reply(method, params, true));
     }
     let escalation = if subject.assessable {
         match permission_risk::decide(runtime, run_id, &subject.label, |scope| {
@@ -258,7 +261,7 @@ pub(super) fn answer(
                 .find(|verdict| *verdict != permission_risk::Verdict::Routine)
                 .unwrap_or(permission_risk::Verdict::Routine)
         }) {
-            permission_risk::Decision::Approve => return reply(method, params, true),
+            permission_risk::Decision::Approve => return Some(reply(method, params, true)),
             permission_risk::Decision::Ask(reason) => reason,
         }
     } else {
@@ -274,7 +277,7 @@ pub(super) fn answer(
                 ),
             )
         });
-        return reply(method, params, false);
+        return Some(reply(method, params, false));
     }
     let always = standing
         .as_ref()
@@ -289,7 +292,11 @@ pub(super) fn answer(
             .map(|reason| format!("\nJackalope is asking because {reason}."))
             .unwrap_or_default()
     );
-    let answer = super::super::kimi::wait_for_answer(runtime, run_id, question, options, "choice");
+    let answer = match ask(runtime, run_id, question, options, settled) {
+        Asked::Answered(answer) => Some(answer),
+        Asked::Settled => return None,
+        Asked::Unanswered => None,
+    };
     let allowed = match (answer.as_deref(), &always, &standing) {
         (Some(ALLOW_ONCE), _, _) => true,
         (Some(answer), Some(always), Some((rule, _))) if answer == always => {
@@ -312,5 +319,82 @@ pub(super) fn answer(
             ),
         )
     });
-    reply(method, params, allowed)
+    Some(reply(method, params, allowed))
 }
+
+enum Asked {
+    Answered(String),
+    /// Codex settled the request before the person answered.
+    Settled,
+    /// The attempt stopped or the person did not answer in time.
+    Unanswered,
+}
+
+/// How long a permission question waits for the person.
+const ASK_LIMIT: Duration = Duration::from_secs(1800);
+
+/// Asks the person on attempt `run_id` and waits for the answer. A question Codex settles
+/// first is closed, so it no longer waits on the person.
+fn ask(
+    runtime: &TaskRuntime,
+    run_id: &str,
+    question: String,
+    options: Vec<String>,
+    settled: &AtomicBool,
+) -> Asked {
+    let prompt = crate::commands::harness::PendingUserPrompt {
+        id: uuid::Uuid::new_v4().to_string(),
+        run_id: run_id.into(),
+        question,
+        input_type: "choice".into(),
+        options,
+        default_value: None,
+        status: "pending".into(),
+        answer: None,
+        created_at: Utc::now().to_rfc3339(),
+        answered_at: None,
+        presentation: Default::default(),
+        autonomy: Default::default(),
+    };
+    runtime.record_prompt(&prompt);
+    let started = std::time::Instant::now();
+    loop {
+        if settled.load(Ordering::SeqCst) {
+            runtime.update(run_id, |run| {
+                if let Some(open) = run
+                    .prompts
+                    .iter_mut()
+                    .find(|saved| saved.id == prompt.id && saved.status != "answered")
+                {
+                    open.status = "answered".into();
+                    open.answer = Some(SETTLED.into());
+                    open.answered_at = Some(Utc::now().to_rfc3339());
+                }
+                activity(
+                    run,
+                    "Codex settled a permission request before it was answered.",
+                );
+            });
+            return Asked::Settled;
+        }
+        let answer = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .get(run_id)
+            .and_then(|run| run.prompts.iter().find(|saved| saved.id == prompt.id))
+            .and_then(|saved| saved.answer.clone());
+        if let Some(answer) = answer {
+            return Asked::Answered(answer);
+        }
+        // Checked after the settlement, which arrives just before a turn that ends.
+        if started.elapsed() >= ASK_LIMIT || !runtime.process_alive(run_id) {
+            return Asked::Unanswered;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// The answer a closed question shows when Codex settled it first.
+pub(super) const SETTLED: &str = "Codex no longer needed an answer.";

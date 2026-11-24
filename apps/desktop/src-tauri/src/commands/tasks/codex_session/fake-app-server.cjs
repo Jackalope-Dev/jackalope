@@ -125,13 +125,47 @@ if (args[0] === 'exec') {
         reason: 'Needs access to the repository.',
       });
     }
+    if (text.includes('SETTLE')) {
+      // Codex settles the request itself; any later answer is only logged.
+      const id = next++;
+      waiting.set(id, (reply) => log('late.jsonl', { reply }));
+      send({
+        id,
+        method: 'item/commandExecution/requestApproval',
+        params: {
+          threadId: thread,
+          turnId: turn,
+          itemId: 'exec-3',
+          kind: 'command',
+          command: "/bin/zsh -lc 'git push origin master'",
+          startedAtMs: 0,
+        },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      send({ method: 'serverRequest/resolved', params: { threadId: thread, requestId: id } });
+    }
     if (text.includes('RISKY')) {
+      const push = {
+        type: 'commandExecution',
+        id: 'exec-2',
+        command: "/bin/zsh -lc 'git push --force origin master'",
+        cwd: process.cwd(),
+        status: 'inProgress',
+        commandActions: [],
+        aggregatedOutput: null,
+        exitCode: null,
+      };
+      send({ method: 'item/started', params: { item: push, threadId: thread, turnId: turn } });
       await approve(thread, turn, 'item/commandExecution/requestApproval', {
         kind: 'command',
         itemId: 'exec-2',
-        command: "/bin/zsh -lc 'git push --force origin master'",
+        command: push.command,
         cwd: process.cwd(),
-        reason: null,
+        reason: 'Publishing needs the network.',
+      });
+      send({
+        method: 'item/completed',
+        params: { item: { ...push, status: 'declined' }, threadId: thread, turnId: turn },
       });
       const change = {
         type: 'fileChange',
@@ -205,6 +239,10 @@ if (args[0] === 'exec') {
     const params = message.params ?? {};
     switch (message.method) {
       case 'initialize':
+        if (fs.existsSync(path.join(dir, 'slow-initialize'))) {
+          setTimeout(() => reply({ userAgent: 'fake/0.156.1' }), 3000);
+          return undefined;
+        }
         return reply({
           userAgent: 'fake/0.156.1',
           codexHome: dir,

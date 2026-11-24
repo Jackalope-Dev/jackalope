@@ -40,6 +40,11 @@ pub(super) enum Effect {
     MessageStart,
     /// Usage of a turn that ended without completing, which exec never reported.
     Usage(TurnUsage),
+    /// The context the latest model call used and, when Codex states it, the window.
+    Context {
+        used: u64,
+        window: Option<u64>,
+    },
     Ended(TurnEnd),
 }
 
@@ -51,6 +56,8 @@ pub(super) struct Mapper {
     turn: String,
     usage: Option<TurnUsage>,
     pub(super) files: FileChanges,
+    /// Why Codex asked to run each command it requested approval for, by item ID.
+    reasons: HashMap<String, String>,
 }
 
 impl Mapper {
@@ -59,6 +66,15 @@ impl Mapper {
             turn: turn.to_string(),
             usage: None,
             files: Default::default(),
+            reasons: HashMap::new(),
+        }
+    }
+
+    /// Notes the reason an approval request for item `item` gave, for a declined command.
+    pub(super) fn asked(&mut self, item: &str, reason: &str) {
+        if !reason.trim().is_empty() && self.reasons.len() < 200 {
+            self.reasons
+                .insert(item.to_string(), reason.trim().to_string());
         }
     }
 
@@ -69,6 +85,13 @@ impl Mapper {
     pub(super) fn map(&mut self, method: &str, params: &Value) -> Vec<Effect> {
         match method {
             "item/started" if self.current(params) => self.started(&params["item"]),
+            "item/completed"
+                if self.current(params)
+                    && params["item"]["type"] == "commandExecution"
+                    && params["item"]["status"] == "declined" =>
+            {
+                vec![Effect::Activity(self.declined(&params["item"]))]
+            }
             "item/completed" if self.current(params) => completed(&params["item"])
                 .map(|item| {
                     vec![Effect::Event(
@@ -93,7 +116,18 @@ impl Mapper {
                         .cached
                         .saturating_add(last["cachedInputTokens"].as_u64().unwrap_or(0));
                 }
-                vec![]
+                last["inputTokens"]
+                    .as_u64()
+                    .filter(|used| *used > 0)
+                    .map(|used| {
+                        vec![Effect::Context {
+                            used,
+                            window: params["tokenUsage"]["modelContextWindow"]
+                                .as_u64()
+                                .filter(|window| *window > 0),
+                        }]
+                    })
+                    .unwrap_or_default()
             }
             "turn/completed" if params["turn"]["id"].as_str() == Some(self.turn.as_str()) => {
                 self.ended(&params["turn"])
@@ -162,6 +196,27 @@ impl Mapper {
                 .unwrap_or_default(),
             _ => vec![],
         }
+    }
+
+    /// The activity line of a command that did not run because its approval was declined,
+    /// with Codex's reason: what it reported for the item, or why it asked.
+    fn declined(&self, item: &Value) -> String {
+        let reason = item["aggregatedOutput"]
+            .as_str()
+            .map(str::trim)
+            .filter(|output| !output.is_empty())
+            .map(|output| format!(": {output}"))
+            .or_else(|| {
+                item["id"]
+                    .as_str()
+                    .and_then(|id| self.reasons.get(id))
+                    .map(|reason| format!(". Codex asked because: {reason}"))
+            })
+            .unwrap_or_default();
+        format!(
+            "{}\nDeclined{reason}",
+            item["command"].as_str().unwrap_or("A command")
+        )
     }
 
     fn ended(&mut self, turn: &Value) -> Vec<Effect> {

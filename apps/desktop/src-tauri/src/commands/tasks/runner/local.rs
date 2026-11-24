@@ -107,7 +107,11 @@ impl AttemptRunner for LocalRunner {
         let launched = std::time::Instant::now();
         let opencode = &mut self.opencode;
         let server = opencode.is_some();
+        let resumed = self.resumed_session.as_deref();
         let Some(spawned) = runtime.register_process(id, Some(workspace), || {
+            if adapter == "codex" {
+                runtime.codex_sessions.check_free(resumed, workspace)?;
+            }
             if let Some(connection) = opencode {
                 connection.release_port();
             }
@@ -334,6 +338,10 @@ impl AttemptRunner for LocalRunner {
                 }
                 codex_session::Outcome::Stopped => return Ok(None),
                 codex_session::Outcome::Unavailable(reason) => {
+                    // An attempt stopped meanwhile starts nothing, so it does not say exec ran.
+                    if self.start(runtime, launch)? == Step::Stopped {
+                        return Ok(None);
+                    }
                     runtime.update_checked(id, |run| {
                         run.efficiency.codex_transport = Some("exec".into());
                         activity(
@@ -344,9 +352,6 @@ impl AttemptRunner for LocalRunner {
                             ),
                         );
                     })?;
-                    if self.start(runtime, launch)? == Step::Stopped {
-                        return Ok(None);
-                    }
                 }
             }
         }

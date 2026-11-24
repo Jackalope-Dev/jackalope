@@ -755,7 +755,10 @@ Approval requests (`item/commandExecution/requestApproval`,
 `mcpServer/elicitation/request`) go through the project's saved permission rules, its
 auto-approval setting and then a question on the attempt. A command is assessed as the
 script inside Codex's shell wrapper; a file change by the paths its item reported. Plan
-sessions deny every request, and forms Jackalope cannot fill are declined.
+sessions deny every request, and forms Jackalope cannot fill are declined. A question
+Codex settles itself (`serverRequest/resolved`) closes without an answer, and a declined
+command shows as declined, with Codex's reason when it gave one. Each model call's input
+tokens and Codex's `modelContextWindow` are recorded as the run's `context`.
 
 Processes are parked like Claude Code's: keyed by thread ID and a fingerprint of the
 command, environment, plan mode and which of model, effort and tier the turn sets (Codex
@@ -763,7 +766,9 @@ keeps those for later turns of a loaded thread). A stop sends `turn/interrupt` a
 process tree if the turn has not settled within five seconds; a cleanly interrupted
 process stays warm. Quitting kills it at once. While a turn runs, `TaskRun.steerable` is
 set and a live conversation's **Send now** adds the message with `turn/steer`; when the
-turn cannot take it the message is sent after stopping the turn, as before.
+turn cannot take it the message is sent after stopping the turn, as before. Rolling back or
+forking a thread reserves it and its workspace under the runtime lock, so no turn can
+start there until the change finishes.
 
 A turn that cannot start in the app-server (a process that exits, an `initialize`,
 `thread/start` or `turn/start` error, or an `unknown variant` for a method an older Codex

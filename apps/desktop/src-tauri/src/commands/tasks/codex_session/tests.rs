@@ -62,6 +62,12 @@ fn map(recording: &str) -> Mapped {
                 }
                 Effect::Activity(text) => activity(&mut mapped.run, text),
                 Effect::Delta(text) => mapped.deltas.push_str(text),
+                Effect::Context { used, window } => {
+                    mapped.run.context = Some(ContextUsage {
+                        used: *used,
+                        window: *window,
+                    })
+                }
                 _ => {}
             }
             mapped.effects.push(effect);
@@ -110,6 +116,14 @@ fn a_recorded_turn_maps_onto_the_codex_transcript() {
         Some(&Effect::Ended(TurnEnd::Completed))
     );
     assert_eq!(mapped.requests.len(), 1);
+    // The context meter reads the latest call and the window Codex states.
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 18703,
+            window: Some(258400)
+        })
+    );
     assert_eq!(
         mapped.requests[0]["method"],
         "item/commandExecution/requestApproval"
@@ -623,6 +637,13 @@ fn follow_ups_reuse_the_warm_app_server_and_resume_saved_threads_by_id() {
         ),
         (10, 4, 2)
     );
+    assert_eq!(
+        first.context,
+        Some(ContextUsage {
+            used: 10,
+            window: Some(1000)
+        })
+    );
     let start = &fixture.requests("thread/start")[0]["params"];
     assert_eq!(start["approvalPolicy"], "on-request");
     assert_eq!(start["sandbox"], "workspace-write");
@@ -737,6 +758,12 @@ fn approval_requests_follow_the_project_permission_settings() {
         "{:?}",
         risky.activity
     );
+    assert!(risky.activity.iter().any(|line| line
+        == "/bin/zsh -lc 'git push --force origin master'\nDeclined. Codex asked because: Publishing needs the network."));
+    assert!(!risky
+        .activity
+        .iter()
+        .any(|line| line.contains("Exit: null")));
 
     // The recorded escalation is answered the same way.
     fixture
@@ -786,9 +813,10 @@ fn approval_requests_follow_the_project_permission_settings() {
             true,
             "item/commandExecution/requestApproval",
             &params,
-            &[]
+            &[],
+            &std::sync::atomic::AtomicBool::new(false),
         ),
-        json!({"decision": "decline"})
+        Some(json!({"decision": "decline"}))
     );
 }
 
@@ -958,6 +986,75 @@ fn a_thread_codex_no_longer_has_starts_over_once_and_failed_turns_fail() {
 }
 
 #[test]
+fn declined_commands_say_so_with_codex_reason() {
+    let mut mapper = Mapper::new("turn-1");
+    let item = |output: Value| {
+        json!({"threadId": "t", "turnId": "turn-1", "item": {"type": "commandExecution", "id": "exec-1",
+            "command": "/bin/zsh -lc 'git push'", "status": "declined", "exitCode": null, "aggregatedOutput": output}})
+    };
+    assert_eq!(
+        mapper.map("item/completed", &item(Value::Null)),
+        vec![Effect::Activity("/bin/zsh -lc 'git push'\nDeclined".into())]
+    );
+    mapper.asked("exec-1", "Publishing needs the network.");
+    assert_eq!(
+        mapper.map("item/completed", &item(Value::Null)),
+        vec![Effect::Activity(
+            "/bin/zsh -lc 'git push'\nDeclined. Codex asked because: Publishing needs the network."
+                .into()
+        )]
+    );
+    assert_eq!(
+        mapper.map("item/completed", &item(json!("rejected by user"))),
+        vec![Effect::Activity(
+            "/bin/zsh -lc 'git push'\nDeclined: rejected by user".into()
+        )]
+    );
+}
+
+#[test]
+fn a_request_codex_settles_itself_closes_its_question() {
+    let fixture = Fixture::new("codex-session-settle", false);
+    let run = fixture.finish(fixture.request("codex-settle", "SETTLE", None));
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
+    let run = fixture.wait("codex-settle", |run| {
+        run.prompts.len() == 1 && run.prompts[0].status == "answered"
+    });
+    assert_eq!(run.prompts[0].answer.as_deref(), Some(approval::SETTLED));
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line == "Codex settled a permission request before it was answered."));
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(fixture.lines("late.jsonl").is_empty());
+}
+
+#[test]
+fn an_attempt_stopped_while_the_app_server_starts_runs_nothing_else() {
+    let fixture = Fixture::new("codex-session-setup-stop", true);
+    std::fs::write(fixture.folder.join("slow-initialize"), "").unwrap();
+    fixture
+        .runtime
+        .start(fixture.request("codex-setup-stop", "First", None))
+        .unwrap();
+    fixture.wait("codex-setup-stop", |_| {
+        !fixture.lines("processes.jsonl").is_empty()
+    });
+    fixture.runtime.stop("codex-setup-stop").unwrap();
+    let run = fixture.wait("codex-setup-stop", |run| {
+        !run.status.is_active() && !run.finishing
+    });
+    assert_eq!(run.status, RunStatus::Stopped);
+    assert!(
+        !run.activity.iter().any(|line| line.contains("codex exec")),
+        "{:?}",
+        run.activity
+    );
+    assert!(fixture.lines("exec.jsonl").is_empty());
+    assert_eq!(run.efficiency.codex_transport.as_deref(), Some("started"));
+}
+
+#[test]
 fn codex_threads_roll_back_and_fork_by_turn() {
     let fixture = Fixture::new("codex-session-history", true);
     let mut previous = None;
@@ -1014,6 +1111,29 @@ fn codex_threads_roll_back_and_fork_by_turn() {
         .fork_codex_thread("codex-history-3", 2)
         .unwrap_err()
         .contains("nothing to fork"));
+
+    // A rollback or fork in progress holds the conversation: a turn waits for it.
+    let workspace = fixture
+        .runtime
+        .run_snapshot("codex-history-3")
+        .unwrap()
+        .workspace;
+    let held = fixture
+        .runtime
+        .codex_sessions
+        .reserve(&thread, &workspace)
+        .unwrap();
+    assert!(fixture
+        .runtime
+        .codex_sessions
+        .reserve(&thread, &workspace)
+        .is_err());
+    // A new conversation in the same checkout waits too.
+    let blocked = fixture.finish(fixture.request("codex-history-held", "Held", None));
+    assert_eq!(blocked.status, RunStatus::Failed);
+    assert_eq!(blocked.error.as_deref(), Some(RESERVED));
+    assert_eq!(fixture.requests("turn/start").len(), 3);
+    drop(held);
 
     // A running turn of the conversation blocks both.
     fixture

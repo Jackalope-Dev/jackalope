@@ -286,9 +286,69 @@ struct Live {
 pub(super) struct Sessions {
     pool: super::warm_session::Pool<Session>,
     live: Mutex<HashMap<String, Live>>,
+    /// Threads and workspaces whose history a rollback or fork is changing.
+    reserved: Mutex<std::collections::HashSet<String>>,
 }
 
+/// A rollback or fork's hold on a thread and its workspace, released when dropped.
+pub(super) struct Reservation<'a> {
+    sessions: &'a Sessions,
+    keys: Vec<String>,
+}
+
+impl Drop for Reservation<'_> {
+    fn drop(&mut self) {
+        let mut reserved = self.sessions.reserved.lock().unwrap();
+        for key in &self.keys {
+            reserved.remove(key);
+        }
+    }
+}
+
+fn reservation_keys(thread: Option<&str>, workspace: &str) -> Vec<String> {
+    let mut keys: Vec<String> = thread
+        .map(|thread| format!("thread:{thread}"))
+        .into_iter()
+        .collect();
+    if !workspace.is_empty() {
+        keys.push(format!("workspace:{workspace}"));
+    }
+    keys
+}
+
+/// Why a turn cannot start while its conversation's history changes.
+const RESERVED: &str =
+    "Jackalope is rolling back or forking this conversation. Try again when it finishes.";
+
 impl Sessions {
+    /// Holds `thread` and `workspace` for a history change. Callers hold the runtime lock
+    /// while they check that no turn runs there and reserve, and turns check under the same
+    /// lock before they start ([`Sessions::check_free`]), so neither can slip in between.
+    pub(super) fn reserve(&self, thread: &str, workspace: &str) -> Result<Reservation<'_>, String> {
+        let keys = reservation_keys(Some(thread), workspace);
+        let mut reserved = self.reserved.lock().unwrap();
+        if keys.iter().any(|key| reserved.contains(key)) {
+            return Err("Another change to this conversation is in progress.".into());
+        }
+        reserved.extend(keys.iter().cloned());
+        Ok(Reservation {
+            sessions: self,
+            keys,
+        })
+    }
+
+    /// Fails while a rollback or fork holds the thread a turn continues or its workspace.
+    pub(super) fn check_free(&self, thread: Option<&str>, workspace: &str) -> Result<(), String> {
+        let reserved = self.reserved.lock().unwrap();
+        if reservation_keys(thread, workspace)
+            .iter()
+            .any(|key| reserved.contains(key))
+        {
+            return Err(RESERVED.into());
+        }
+        Ok(())
+    }
+
     pub(super) fn clear(&self) {
         self.pool.clear();
     }
@@ -387,27 +447,31 @@ impl TaskRuntime {
             .as_ref()
             .map(|binding| binding.directory.clone());
         let started = Instant::now();
-        let claimed = self.register_process(id, Some(workspace), || match warm {
-            Some(session) => Ok((Some(session.process.clone()), Ok((session, "reused", 1)))),
-            None => {
-                let transport = if previous_session.is_some() {
-                    "resumed"
-                } else {
-                    "started"
-                };
-                match Session::spawn(
-                    &mut cmd,
-                    &request.agent,
-                    key,
-                    workspace,
-                    bridge_token.clone(),
-                    account,
-                ) {
-                    Ok((session, attempts)) => Ok((
-                        Some(session.process.clone()),
-                        Ok((session, transport, attempts)),
-                    )),
-                    Err(error) => Ok((None, Err(error))),
+        let claimed = self.register_process(id, Some(workspace), || {
+            self.codex_sessions
+                .check_free(previous_session, workspace)?;
+            match warm {
+                Some(session) => Ok((Some(session.process.clone()), Ok((session, "reused", 1)))),
+                None => {
+                    let transport = if previous_session.is_some() {
+                        "resumed"
+                    } else {
+                        "started"
+                    };
+                    match Session::spawn(
+                        &mut cmd,
+                        &request.agent,
+                        key,
+                        workspace,
+                        bridge_token.clone(),
+                        account,
+                    ) {
+                        Ok((session, attempts)) => Ok((
+                            Some(session.process.clone()),
+                            Ok((session, transport, attempts)),
+                        )),
+                        Err(error) => Ok((None, Err(error))),
+                    }
                 }
             }
         })?;
@@ -521,6 +585,7 @@ impl TaskRuntime {
             watch,
             ended: None,
             closed: false,
+            requests: HashMap::new(),
         };
         let quota_stopped = self.drive_codex_turn(id, &session, settings, &mut state);
         self.codex_sessions.live.lock().unwrap().remove(id);
@@ -653,6 +718,14 @@ impl TaskRuntime {
             }
             match session.inbound.recv_timeout(Duration::from_millis(100)) {
                 Ok(Inbound::Notification { method, params }) => {
+                    // Codex settles a request itself when its turn moves on without it.
+                    if method == "serverRequest/resolved" {
+                        if let Some(settled) =
+                            state.requests.remove(&params["requestId"].to_string())
+                        {
+                            settled.store(true, std::sync::atomic::Ordering::SeqCst);
+                        }
+                    }
                     self.apply_codex(id, state, &method, &params)
                 }
                 Ok(Inbound::Request {
@@ -665,6 +738,15 @@ impl TaskRuntime {
                     let run_id = id.to_string();
                     let files = state.mapper.files.clone();
                     let read_only = settings.read_only;
+                    if let (Some(item), Some(reason)) =
+                        (params["itemId"].as_str(), params["reason"].as_str())
+                    {
+                        state.mapper.asked(item, reason);
+                    }
+                    let settled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    if state.requests.len() < 64 {
+                        state.requests.insert(request.to_string(), settled.clone());
+                    }
                     std::thread::spawn(move || {
                         let paths = files
                             .lock()
@@ -676,10 +758,11 @@ impl TaskRuntime {
                             connection.reject(&request, "Jackalope does not handle this request.");
                             return;
                         }
-                        let reply = approval::answer(
-                            &runtime, &run_id, read_only, &method, &params, &paths,
-                        );
-                        connection.respond(&request, reply);
+                        if let Some(reply) = approval::answer(
+                            &runtime, &run_id, read_only, &method, &params, &paths, &settled,
+                        ) {
+                            connection.respond(&request, reply);
+                        }
                     });
                 }
                 Ok(Inbound::Oversized) => {
@@ -753,6 +836,10 @@ impl TaskRuntime {
                         ..Usage::default()
                     }
                 }),
+                Effect::Context { used, window } => self.update(id, |run| {
+                    let window = window.or(run.context.as_ref().and_then(|context| context.window));
+                    run.context = Some(ContextUsage { used, window });
+                }),
                 Effect::Ended(end) => state.ended = Some(end),
             }
         }
@@ -803,4 +890,6 @@ struct TurnState {
     watch: super::resume::Watch,
     ended: Option<TurnEnd>,
     closed: bool,
+    /// Approval requests still being decided, by request ID, set once Codex settles them.
+    requests: HashMap<String, Arc<std::sync::atomic::AtomicBool>>,
 }

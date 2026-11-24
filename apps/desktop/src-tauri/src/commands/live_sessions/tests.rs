@@ -646,6 +646,33 @@ fn limits_pause_new_batches_and_do_not_infer_missing_cost() {
 }
 
 #[test]
+fn a_message_for_a_turn_that_cannot_take_it_is_left_to_stop_and_send() {
+    let (root, mut service, id) = fixture();
+    // A saved run never reads back as steerable, so a reloaded running turn takes nothing.
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: RunStatus::Running,
+        steerable: true,
+        ..Default::default()
+    };
+    attach_run(&root, &mut service, &id, run);
+    let message = Uuid::new_v4().to_string();
+    assert!(service
+        .steer(&id, message.clone(), "Also this".into(), None)
+        .unwrap()
+        .is_none());
+    let snapshot = service.snapshot(Some(&id)).unwrap();
+    assert!(!snapshot.sessions[0]
+        .messages
+        .iter()
+        .any(|m| m.id == message));
+    assert!(service
+        .steer(&id, "not-a-uuid".into(), "x".into(), None)
+        .is_err());
+}
+
+#[test]
 fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
     let (root, mut service, id) = fixture();
     let run = TaskRun {

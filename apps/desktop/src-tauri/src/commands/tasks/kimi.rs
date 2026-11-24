@@ -653,7 +653,7 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         .unwrap_or_else(|| json!({"outcome":"cancelled"}))
 }
 
-pub(super) fn wait_for_answer(
+fn wait_for_answer(
     runtime: &TaskRuntime,
     run_id: &str,
     question: String,

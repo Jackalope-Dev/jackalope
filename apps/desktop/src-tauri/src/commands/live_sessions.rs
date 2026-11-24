@@ -668,42 +668,50 @@ impl LiveSessions {
         if text.is_empty() || text.chars().count() > 12_000 {
             return Err("Use a message between 1 and 12,000 characters.".into());
         }
-        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
-        let session = {
-            let inner = self.inner.lock().map_err(|e| e.to_string())?;
-            inner
-                .ledger
-                .sessions
-                .iter()
-                .find(|session| session.id == id)
-                .cloned()
-                .ok_or("Conversation not found")?
-        };
-        if let Some(existing) = session.messages.iter().find(|m| m.id == message_id) {
-            return if existing.text == text {
-                Ok(Some(session.draft.clone()))
-            } else {
-                Err("This message was already saved with different text.".into())
+        // Codex can take seconds to accept the message, so the conversation is checked and
+        // updated under the gate but not held while it waits; the message ID is claimed
+        // instead, so a repeated send cannot steer it twice.
+        let (run_id, _claim) = {
+            let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+            let session = {
+                let inner = self.inner.lock().map_err(|e| e.to_string())?;
+                inner
+                    .ledger
+                    .sessions
+                    .iter()
+                    .find(|session| session.id == id)
+                    .cloned()
+                    .ok_or("Conversation not found")?
             };
-        }
-        if session.closed || session.messages.len() >= 1000 {
-            return Ok(None);
-        }
-        let Some(run_id) = session
-            .batches
-            .last()
-            .filter(|batch| !batch.settled)
-            .map(|batch| batch.run_id.clone())
-        else {
-            return Ok(None);
+            if let Some(existing) = session.messages.iter().find(|m| m.id == message_id) {
+                return if existing.text == text {
+                    Ok(Some(session.draft.clone()))
+                } else {
+                    Err("This message was already saved with different text.".into())
+                };
+            }
+            if session.closed || session.messages.len() >= 1000 {
+                return Ok(None);
+            }
+            let Some(run_id) = session
+                .batches
+                .last()
+                .filter(|batch| !batch.settled)
+                .map(|batch| batch.run_id.clone())
+            else {
+                return Ok(None);
+            };
+            if !self
+                .runtime
+                .run_snapshot(&run_id)
+                .is_some_and(|run| run.steerable && run.status.is_running())
+            {
+                return Ok(None);
+            }
+            let claim =
+                SteerClaim::take(&message_id).ok_or("This message is already being sent.")?;
+            (run_id, claim)
         };
-        if !self
-            .runtime
-            .run_snapshot(&run_id)
-            .is_some_and(|run| run.steerable && run.status.is_running())
-        {
-            return Ok(None);
-        }
         let prompt = format!("The person added this message while you were working. Fold it into the current batch; later messages override earlier ones.\n\nUser message {message_id}:\n{text}\n");
         if let Err(reason) = self.runtime.steer(&run_id, &prompt) {
             self.runtime.update(&run_id, |run| {
@@ -714,6 +722,9 @@ impl LiveSessions {
             });
             return Ok(None);
         }
+        // The agent has the message, so it joins the batch it went to even if that batch
+        // settled meanwhile.
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;
             let now = Utc::now().to_rfc3339();
@@ -1883,6 +1894,31 @@ pub async fn live_session_action(
     .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
     Ok(())
+}
+
+/// A message ID being steered into a running turn, released when dropped.
+struct SteerClaim(String);
+
+impl SteerClaim {
+    fn claimed() -> &'static Mutex<std::collections::HashSet<String>> {
+        static CLAIMED: std::sync::OnceLock<Mutex<std::collections::HashSet<String>>> =
+            std::sync::OnceLock::new();
+        CLAIMED.get_or_init(Default::default)
+    }
+
+    fn take(message_id: &str) -> Option<Self> {
+        Self::claimed()
+            .lock()
+            .unwrap()
+            .insert(message_id.to_string())
+            .then(|| Self(message_id.to_string()))
+    }
+}
+
+impl Drop for SteerClaim {
+    fn drop(&mut self) {
+        Self::claimed().lock().unwrap().remove(&self.0);
+    }
 }
 
 #[cfg(test)]

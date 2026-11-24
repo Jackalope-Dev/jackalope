@@ -177,14 +177,19 @@ impl TaskRuntime {
             .session_id
             .clone()
             .ok_or("This attempt has no Codex conversation to change.")?;
-        let busy = self.inner.lock().unwrap().runs.values().any(|other| {
-            other.status.is_active()
-                && (other.session_id.as_deref() == Some(thread.as_str())
-                    || (!run.workspace.is_empty() && other.workspace == run.workspace))
-        });
-        if busy {
-            return Err("Stop the running turn before changing this conversation.".into());
-        }
+        // Checked and reserved under the runtime lock, where turns check before starting.
+        let _reservation = {
+            let inner = self.inner.lock().unwrap();
+            let busy = inner.runs.values().any(|other| {
+                other.status.is_active()
+                    && (other.session_id.as_deref() == Some(thread.as_str())
+                        || (!run.workspace.is_empty() && other.workspace == run.workspace))
+            });
+            if busy {
+                return Err("Stop the running turn before changing this conversation.".into());
+            }
+            self.codex_sessions.reserve(&thread, &run.workspace)?
+        };
         if let Some(session) = self.codex_sessions.pool.take_any(&thread, &run.workspace) {
             let result = change(&session.connection, &thread);
             if session.process.alive() {
