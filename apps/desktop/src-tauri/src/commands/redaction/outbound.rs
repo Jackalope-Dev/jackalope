@@ -235,10 +235,14 @@ fn key(text: &str, start: usize, header_end: usize) -> (usize, String) {
     if rest.starts_with("\\n") || rest.starts_with("\\r\\n") {
         return (escaped_key(text, header_end), KEY_MARK.into());
     }
-    if rest.starts_with([' ', '\t']) {
+    // Spaces or tabs after the header and before its line break are trailing
+    // whitespace, not a key flattened onto one line.
+    let line_break = rest.trim_start_matches([' ', '\t']);
+    let multiline = line_break.starts_with('\n') || line_break.starts_with("\r\n");
+    if !multiline && rest.starts_with([' ', '\t']) {
         return (flattened_key(text, header_end), KEY_MARK.into());
     }
-    if !rest.starts_with('\n') && !rest.starts_with("\r\n") {
+    if !multiline {
         return (header_end, KEY_MARK.into());
     }
     let header = &text[text[..start].rfind('\n').map_or(0, |at| at + 1)..start];
@@ -273,7 +277,7 @@ fn key(text: &str, start: usize, header_end: usize) -> (usize, String) {
         kept.push((own, ending));
         end = at + line.len() - ending.len();
     }
-    let header_ending = if lines[0].1 == "\r" { "\r" } else { "" };
+    let header_ending = if lines[0].1.ends_with('\r') { "\r" } else { "" };
     let mut out = String::from(KEY_MARK);
     if kept.is_empty() {
         return (header_end, out);
@@ -818,6 +822,26 @@ mod tests {
         assert_eq!(
             masked(&format!("{begin} then the key, then {end} below.")),
             format!("[redacted private key] then the key, then {end} below.")
+        );
+        for spacing in [" \n", "\t\n", " \r\n", "\r\n"] {
+            let crlf = spacing.ends_with("\r\n");
+            let text = format!("{begin}{spacing}{one}\n{two}\n{end}\nafter");
+            let text = if crlf {
+                text.replace("\r\n", "\n").replace('\n', "\r\n")
+            } else {
+                text
+            };
+            let expected = if crlf {
+                "[redacted private key]\r\nafter"
+            } else {
+                "[redacted private key]\nafter"
+            };
+            assert_eq!(masked(&text), expected, "{spacing:?}");
+        }
+        let diff = format!("@@ -0,0 +1,3 @@\n+{begin} \r\n+{one}\r\n+{end}\r\n");
+        assert_eq!(
+            masked(&diff),
+            "@@ -0,0 +1,3 @@\n+[redacted private key]\r\n+\r\n+\r\n"
         );
         let encrypted = format!(
             "{begin}\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,{}\n\n{one}\n{end}\nafter",
