@@ -1,0 +1,58 @@
+{
+  "info": {
+    "arguments": [
+      "devicectl",
+      "device",
+      "info",
+      "apps",
+      "--device",
+      "174A0893-56DA-48F5-BBFA-30B525C89AE0",
+      "--json-output",
+      "/tmp/out.json"
+    ],
+    "commandType": "devicectl.device.info.apps",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 5,
+    "outcome": "success",
+    "version": "651.32"
+  },
+  "result": {
+    "apps": [
+      {
+        "appClip": false,
+        "builtByDeveloper": true,
+        "bundleIdentifier": "digital.jackalope.Driver.xctrunner",
+        "bundleVersion": "1",
+        "containerAccessible": true,
+        "defaultApp": false,
+        "hidden": false,
+        "internalApp": false,
+        "name": "Driver-Runner",
+        "removable": true,
+        "url": "file:///Users/me/Library/Developer/CoreSimulator/Devices/174A0893-56DA-48F5-BBFA-30B525C89AE0/data/Containers/Bundle/Application/29D97215-86B2-4294-9B73-A56D971E8C6C/Driver-Runner.app/",
+        "version": "1.0"
+      },
+      {
+        "appClip": false,
+        "builtByDeveloper": true,
+        "bundleIdentifier": "dev.jackalope.companion",
+        "bundleVersion": "0.1.0",
+        "containerAccessible": true,
+        "defaultApp": false,
+        "hidden": false,
+        "internalApp": false,
+        "name": "Jackalope",
+        "removable": true,
+        "url": "file:///Users/me/Library/Developer/CoreSimulator/Devices/174A0893-56DA-48F5-BBFA-30B525C89AE0/data/Containers/Bundle/Application/3478D93C-F6F1-4E37-88D3-71AF48421357/Jackalope.app/",
+        "version": "0.1.0"
+      }
+    ],
+    "defaultAppsIncluded": false,
+    "deviceIdentifier": "174A0893-56DA-48F5-BBFA-30B525C89AE0",
+    "hiddenAppsIncluded": false,
+    "internalAppsIncluded": false,
+    "removableAppsIncluded": true
+  }
+}

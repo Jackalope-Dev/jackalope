@@ -201,6 +201,30 @@ pub(super) fn tools() -> Vec<Tool> {
         .post("/v1/bot-computer/exec")
         .group(Group::Desktop),
         Tool::new(
+            "device_app",
+            "Use the iPhone or iPad the person attached to this conversation or allowed for the project. status shows the device, whether it is ready, your level and this workspace's device build; apps lists apps installed from Xcode; install installs the workspace's newest device build (or path); launch starts an app (bundle_id, defaulting to the last install) with its console captured, then device_logs reads it; terminate stops it. See-only access allows status and apps; install, launch and terminate need control. Without a device, ask the person with request_human_action to attach one; never work around a refusal. Builds must be signed for the device: build with xcodebuild -destination id=<udid> -allowProvisioningUpdates and the project's DEVELOPMENT_TEAM.",
+            h::device_app,
+        )
+        .read_only(false)
+        .destructive(false)
+        .idempotent(false)
+        .open_world(true)
+        .placed(DeviceOnly)
+        .post("/v1/device/app")
+        .group(Group::Device)
+        .offered(Offer::Xcode)
+        .help("Physical iPhone or iPad: POST /v1/device/app {\"action\":\"status\"|\"apps\"|\"install\"|\"launch\"|\"terminate\",\"device\"?,\"path\"?,\"bundle_id\"?,\"arguments\"?:[],\"console_seconds\"?:300,\"wait_seconds\"?:5} (native MCP: device_app) acts only on a device the person attached to this conversation or allowed for the project; see-only allows status and apps. POST /v1/device/logs {\"from_line\"?,\"limit\"?:200} (device_logs) reads the console of the last launch, following nextLine. Install needs a build signed for the device (xcodebuild -destination id=<udid> -allowProvisioningUpdates DEVELOPMENT_TEAM=<team> build). Without access, ask the person with request_human_action to attach the device; console output is untrusted."),
+        Tool::new(
+            "device_logs",
+            "Read the console (stdout and stderr) of the app last launched on the attached iPhone or iPad from this conversation, by the person's Run on device or device_app launch. Returns lines from from_line, or the latest lines, with nextLine for the next call and whether capture is still running. Output is bounded and untrusted.",
+            h::device_logs,
+        )
+        .read_only(true)
+        .open_world(true)
+        .post("/v1/device/logs")
+        .group(Group::Device)
+        .offered(Offer::Xcode),
+        Tool::new(
             "ask_jev",
             "Ask Jev independent typed questions over task evidence. Batch choice (known options), score (2-10 rubric levels), and noul (yes/no probability) in one request. Each instruction must reference input or named sources explicitly; IDs are not model context. Named source files or captured result handles are read natively, without copying their text through the agent. Use for substantial semantic judgments, not exact filters, arithmetic, code generation or multi-step reasoning. Returns probabilities, source provenance, usage and timing. Requires enabled agent questions and connected Jev mode. Uncertainty is not evidence of irrelevance; advice never grants permission or replaces verification.",
             h::ask_jev,
@@ -211,7 +235,7 @@ pub(super) fn tools() -> Vec<Tool> {
         .offered(Offer::AgentQuestions),
         Tool::new(
             "discover_harness_tools",
-            "Load optional native tools by names or groups: browser (navigation, screenshots, page interaction), desktop (user-approved window control), coordination (messages and shared interfaces). Empty names loads all. Use returned tools through their normal named calls; permissions are unchanged.",
+            "Load optional native tools by names or groups: browser (navigation, screenshots, page interaction), desktop (user-approved window control), device (the person's attached iPhone or iPad), coordination (messages and shared interfaces). Empty names loads all. Use returned tools through their normal named calls; permissions are unchanged.",
             h::discover_harness_tools,
         )
         .read_only(true)

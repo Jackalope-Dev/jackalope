@@ -177,6 +177,20 @@ pub(super) async fn desktop_control(
         .map_err(ToolError::refused)
 }
 
+pub(super) async fn device_app(
+    call: Call,
+    input: crate::commands::devices::AppInput,
+) -> Result<Value, ToolError> {
+    crate::commands::devices::app_tool(call.runtime().clone(), call.caller.run, input).await
+}
+
+pub(super) async fn device_logs(
+    call: Call,
+    input: crate::commands::devices::LogsInput,
+) -> Result<Value, ToolError> {
+    crate::commands::devices::logs_tool(call.runtime().clone(), call.caller.run, input).await
+}
+
 pub(super) async fn computer_request(
     call: Call,
     input: crate::commands::computers::ComputerRequestInput,

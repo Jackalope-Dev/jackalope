@@ -67,6 +67,10 @@ pub struct ProjectRecord {
     /// `desktop` and/or `narrow`. Empty means desktop only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_viewports: Vec<String>,
+    /// The Apple team ID that device builds sign with (`DEVELOPMENT_TEAM`). Absent
+    /// leaves signing to the Xcode project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub development_team: Option<String>,
     /// User-facing features whose pages review screenshots prefer when work
     /// changes their source files. Unreadable entries are dropped on load.
     #[serde(

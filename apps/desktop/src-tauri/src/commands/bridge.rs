@@ -87,6 +87,7 @@ pub(crate) struct Route {
 enum Group {
     Browser,
     Desktop,
+    Device,
     Coordination,
 }
 
@@ -95,6 +96,7 @@ impl Group {
         match self {
             Group::Browser => "browser",
             Group::Desktop => "desktop",
+            Group::Device => "device",
             Group::Coordination => "coordination",
         }
     }
@@ -106,6 +108,8 @@ enum Offer {
     Always,
     /// Where desktop control works on this platform.
     Platform,
+    /// On macOS, where Xcode's devicectl reaches the person's iPhones and iPads.
+    Xcode,
     /// Saved bots' conversations; refused to everyone else.
     Bots,
     /// Projects that allow agent questions to Jev.
@@ -268,7 +272,11 @@ impl Tool {
 
     /// Whether the tool exists on this platform at all.
     fn supported(&self) -> bool {
-        self.offer != Offer::Platform || super::desktop_control::platform::supported()
+        match self.offer {
+            Offer::Platform => super::desktop_control::platform::supported(),
+            Offer::Xcode => cfg!(target_os = "macos"),
+            _ => true,
+        }
     }
 
     /// The MCP definition.
@@ -676,7 +684,7 @@ fn listed(service: &Coordinator, run: &TaskRun) -> Vec<&'static Tool> {
         .iter()
         .filter(|tool| tool.supported() && !access.tool_unavailable(tool.name))
         .filter(|tool| match tool.offer {
-            Offer::Always | Offer::Platform => true,
+            Offer::Always | Offer::Platform | Offer::Xcode => true,
             Offer::Bots => is_bot(run),
             Offer::AgentQuestions => {
                 super::decisions::agent_questions::available(&service.runtime, &run.project_id)
@@ -703,7 +711,9 @@ fn requested(names: &[String]) -> Result<BTreeSet<String>, &'static str> {
         .any(|name| !optional().any(|(tool, group)| name == tool.name || name == group.name()))
         || names.len() > optional().count()
     {
-        return Err("Select optional tool names or browser, desktop and coordination groups.");
+        return Err(
+            "Select optional tool names or browser, desktop, device and coordination groups.",
+        );
     }
     Ok(optional()
         .filter(|(tool, group)| {
@@ -716,12 +726,17 @@ fn requested(names: &[String]) -> Result<BTreeSet<String>, &'static str> {
         .collect())
 }
 
-/// Codex approves each call of the tools that act on a browser or desktop.
+/// Codex approves each call of the tools that act on a browser, desktop or device.
 pub(crate) fn codex_tool_policy() -> Value {
     Value::Object(
         tools()
             .iter()
-            .filter(|tool| matches!(tool.group, Some(Group::Browser | Group::Desktop)))
+            .filter(|tool| {
+                matches!(
+                    tool.group,
+                    Some(Group::Browser | Group::Desktop | Group::Device)
+                )
+            })
             .map(|tool| (tool.name.into(), json!({"approval_mode":"approve"})))
             .collect(),
     )

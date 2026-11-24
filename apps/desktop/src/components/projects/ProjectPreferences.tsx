@@ -19,6 +19,7 @@ import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
 import { syncsLessons } from '../../lib/lesson-sync';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { type PlanSettings, planCommands } from '../../lib/plan-mode';
+import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { checksAutomatically } from '../../lib/project-automation';
 import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
@@ -33,6 +34,7 @@ import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { BrowserProfileSettings } from './BrowserProfileSettings';
 import { CloudResourcesCard } from './CloudResourcesCard';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
+import { DeviceProjectSettings } from './DeviceProjectSettings';
 import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectAutomationPreset } from './ProjectAutomationPreset';
 import { ProjectGitSettings } from './ProjectGitSettings';
@@ -414,6 +416,32 @@ export function ProjectPreferences({
                 </>
               )}
             </SettingGroup>
+            {isMacPlatform() && (
+              <SettingGroup title="iPhone and iPad">
+                <SettingRow
+                  title="Development team"
+                  description="Your Apple team ID, such as ABCDE12345. Run on device builds with it and lets Xcode register the device and create a development profile. Leave empty to use the team set in the Xcode project."
+                  controlId="project-development-team"
+                  descriptionId="project-development-team-description"
+                >
+                  <Input
+                    id="project-development-team"
+                    aria-describedby="project-development-team-description"
+                    className="project-setting-input"
+                    value={project.preferences?.developmentTeam ?? ''}
+                    maxLength={10}
+                    placeholder="ABCDE12345"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    onChange={(event) =>
+                      updateProjectPreferences(project.id, {
+                        developmentTeam: event.target.value.toUpperCase(),
+                      })
+                    }
+                  />
+                </SettingRow>
+              </SettingGroup>
+            )}
             <ProjectTerminalCommands project={project} />
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="automation" className="project-settings-panel">
@@ -604,6 +632,9 @@ export function ProjectPreferences({
               owner={{ kind: 'project', id: project.id, name: project.name }}
             />
             <DesktopProjectSettings key={`desktop-${project.id}`} projectId={project.id} />
+            {isMacPlatform() && (
+              <DeviceProjectSettings key={`devices-${project.id}`} projectId={project.id} />
+            )}
             <CloudResourcesCard
               key={`cloud-${project.path}`}
               projectId={project.id}

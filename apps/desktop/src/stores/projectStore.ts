@@ -38,6 +38,8 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  /** Apple team ID that device builds sign with (`DEVELOPMENT_TEAM`). */
+  developmentTeam?: string;
   /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
   terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
@@ -369,6 +371,7 @@ interface ProjectRecord {
   prepareCommand?: string;
   setupFiles?: string[];
   previewCommand?: string;
+  developmentTeam?: string;
   reviewCaptures?: boolean;
   reviewPages?: string[];
   reviewViewports?: string[];
@@ -416,6 +419,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
     previewCommand: preferences?.previewCommand?.trim() || undefined,
+    developmentTeam: preferences?.developmentTeam?.trim() || undefined,
     reviewCaptures: preferences?.reviewCaptures,
     reviewPages: reviewPagesForRegistry(preferences?.reviewPages),
     reviewViewports: preferences?.reviewViewports?.length ? preferences.reviewViewports : undefined,

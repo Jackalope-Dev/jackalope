@@ -75,6 +75,7 @@ macro_rules! with_commands {
             commands::desktop_control,
             commands::desktop_control::attach,
             commands::desktop_integration,
+            commands::devices,
             commands::dictation,
             commands::execution_access,
             commands::external_sessions,

@@ -95,6 +95,7 @@ pub mod composio;
 pub mod computers;
 pub mod delivery;
 pub mod desktop_control;
+pub mod devices;
 pub mod github_workflows;
 pub mod issues;
 pub mod remote;
