@@ -550,9 +550,9 @@ impl Coordinator {
             return false;
         }
         let limit = self.state().concurrency;
-        self.runtime.integration_runs().is_ok_and(|runs| {
-            runs.iter().filter(|run| run.status.is_active()).count() < limit
-        })
+        self.runtime
+            .integration_runs()
+            .is_ok_and(|runs| runs.iter().filter(|run| run.status.is_active()).count() < limit)
     }
 
     /// Whether a session or planner attempt that has not started would exceed

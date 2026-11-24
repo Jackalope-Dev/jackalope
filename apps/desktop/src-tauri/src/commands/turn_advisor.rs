@@ -29,8 +29,8 @@ use super::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashSet,
-    path::Path,
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
     sync::{atomic::AtomicBool, Mutex},
     time::{Duration, Instant},
 };
@@ -220,7 +220,12 @@ pub fn parse_notes(text: &str, max: usize) -> Result<Vec<AdvisorNote>, String> {
         .notes
         .iter()
         .filter_map(|item| {
-            let severity = match item["severity"].as_str()?.trim().to_ascii_lowercase().as_str() {
+            let severity = match item["severity"]
+                .as_str()?
+                .trim()
+                .to_ascii_lowercase()
+                .as_str()
+            {
                 "aside" => Severity::Aside,
                 "concern" => Severity::Concern,
                 "blocker" => Severity::Blocker,
@@ -311,11 +316,7 @@ fn previous<'a>(history: &'a [TaskRun], run: &TaskRun) -> Option<&'a TaskRun> {
 
 /// Marks notes that repeat what the previous review sent the agent, when
 /// `run` is the follow-up turn that review started.
-pub fn mark_repeats(
-    notes: &mut [AdvisorNote],
-    run: &TaskRun,
-    previous: Option<&AdvisorReview>,
-) {
+pub fn mark_repeats(notes: &mut [AdvisorNote], run: &TaskRun, previous: Option<&AdvisorReview>) {
     let Some(previous) = previous.filter(|_| advisor_turn(run)) else {
         return;
     };
@@ -343,11 +344,7 @@ pub fn reviewable(run: &TaskRun) -> bool {
 }
 
 /// Why the advisor stays out of a reviewable turn, recorded on it.
-pub fn guard(
-    run: &TaskRun,
-    history: &[TaskRun],
-    settings: &AdvisorSettings,
-) -> Result<(), String> {
+pub fn guard(run: &TaskRun, history: &[TaskRun], settings: &AdvisorSettings) -> Result<(), String> {
     let reviews = history
         .iter()
         .filter(|item| item.id != run.id)
@@ -360,7 +357,9 @@ pub fn guard(
         ));
     }
     if run.quota_failure.is_some() {
-        return Err("The agent's account reached its usage limit, so the advisor did not run.".into());
+        return Err(
+            "The agent's account reached its usage limit, so the advisor did not run.".into(),
+        );
     }
     Ok(())
 }
@@ -405,7 +404,9 @@ pub fn delivery(notes: &[AdvisorNote], chain: usize, latest: bool, stopping: boo
         };
     }
     if stopping {
-        return Delivery::Person("The task was stopped, so the notes are shown to you only.".into());
+        return Delivery::Person(
+            "The task was stopped, so the notes are shown to you only.".into(),
+        );
     }
     if chain >= MAX_CHAIN {
         return Delivery::Person(format!(
@@ -465,7 +466,10 @@ fn checks(run: &TaskRun) -> String {
         }
     }
     if let Some(error) = &run.verification_error {
-        lines.push(format!("- The project check could not run: {}", clip(error, 300)));
+        lines.push(format!(
+            "- The project check could not run: {}",
+            clip(error, 300)
+        ));
     }
     for step in run.validation_steps.iter().rev().take(12) {
         lines.push(format!(
@@ -508,7 +512,14 @@ fn changes(run: &TaskRun) -> String {
     let mut text = stat;
     if !untracked.is_empty() {
         text.push_str("\nNew files: ");
-        text.push_str(&untracked.iter().take(50).cloned().collect::<Vec<_>>().join(", "));
+        text.push_str(
+            &untracked
+                .iter()
+                .take(50)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
     }
     let shown: String = patch.chars().take(DIFF_CHARS).collect();
     text.push_str("\n\n");
@@ -573,11 +584,17 @@ struct Watch {
     active: HashSet<String>,
 }
 
-static WATCH: Mutex<Option<Watch>> = Mutex::new(None);
+/// One watch per task history, so separate runtimes never share what they saw.
+static WATCH: Mutex<Option<HashMap<PathBuf, Watch>>> = Mutex::new(None);
 
-fn with_watch<T>(change: impl FnOnce(&mut Watch) -> T) -> T {
-    let mut watch = WATCH.lock().unwrap_or_else(|error| error.into_inner());
-    change(watch.get_or_insert_with(Watch::default))
+fn with_watch<T>(runtime: &TaskRuntime, change: impl FnOnce(&mut Watch) -> T) -> T {
+    let mut watches = WATCH.lock().unwrap_or_else(|error| error.into_inner());
+    change(
+        watches
+            .get_or_insert_with(HashMap::new)
+            .entry(runtime.integration_directory())
+            .or_default(),
+    )
 }
 
 /// Starts a review for each attempt that finished since the last tick. Only
@@ -586,7 +603,7 @@ fn with_watch<T>(change: impl FnOnce(&mut Watch) -> T) -> T {
 /// lock while it reads the planning settings.
 pub fn tick(coordinator: &Coordinator) {
     let activity = coordinator.runtime.run_activity();
-    let (first, finished) = with_watch(|watch| {
+    let (first, finished) = with_watch(&coordinator.runtime, |watch| {
         let first = !watch.started;
         watch.started = true;
         let mut finished = Vec::new();
@@ -628,14 +645,16 @@ fn recover(runtime: &TaskRuntime) {
     let Ok(runs) = runtime.integration_runs() else {
         return;
     };
-    for run in runs
-        .iter()
-        .filter(|run| run.advisor.as_ref().is_some_and(|review| review.status == "reviewing"))
-    {
+    for run in runs.iter().filter(|run| {
+        run.advisor
+            .as_ref()
+            .is_some_and(|review| review.status == "reviewing")
+    }) {
         let _ = runtime.update_checked(&run.id, |saved| {
             if let Some(review) = saved.advisor.as_mut() {
                 review.status = "failed".into();
-                review.reason = Some("Jackalope restarted while the advisor was reading this turn.".into());
+                review.reason =
+                    Some("Jackalope restarted while the advisor was reading this turn.".into());
                 review.finished_at = Some(Utc::now().to_rfc3339());
             }
         });
@@ -690,7 +709,9 @@ fn review(coordinator: &Coordinator, run: TaskRun, settings: AdvisorSettings) {
         &asking,
         &agent_decider::available_agents(coordinator, &run.project_id),
     ) else {
-        return save(AdvisorReview::skipped("No installed agent is available to advise."));
+        return save(AdvisorReview::skipped(
+            "No installed agent is available to advise.",
+        ));
     };
     let binding = match bind(runtime, &run.project_id, &agent) {
         Ok(binding) => binding,
@@ -701,7 +722,9 @@ fn review(coordinator: &Coordinator, run: TaskRun, settings: AdvisorSettings) {
         return save(AdvisorReview::skipped(reason));
     }
     let Some(_slot) = agent_decider::acquire(Instant::now() + SLOT_WAIT) else {
-        return save(AdvisorReview::skipped("Every advising agent was busy for a minute."));
+        return save(AdvisorReview::skipped(
+            "Every advising agent was busy for a minute.",
+        ));
     };
     let mut review = AdvisorReview {
         status: "reviewing".into(),
@@ -749,7 +772,13 @@ fn review(coordinator: &Coordinator, run: TaskRun, settings: AdvisorSettings) {
             let text = follow_up_text(&agent, &notes);
             let queued = matches!(decision, Delivery::FollowUp)
                 && coordinator
-                    .enqueue_followup(Uuid::new_v4().to_string(), &run.id, text.clone(), None, false)
+                    .enqueue_followup(
+                        Uuid::new_v4().to_string(),
+                        &run.id,
+                        text.clone(),
+                        None,
+                        false,
+                    )
                     .is_ok();
             if queued {
                 review.delivery = Some("followUp".into());
@@ -757,7 +786,8 @@ fn review(coordinator: &Coordinator, run: TaskRun, settings: AdvisorSettings) {
                 match coordinator.tell_task(&run, text) {
                     Ok(()) => review.delivery = Some("message".into()),
                     Err(error) => {
-                        review.reason = Some(format!("The notes could not reach the agent: {error}"))
+                        review.reason =
+                            Some(format!("The notes could not reach the agent: {error}"))
                     }
                 }
             }
