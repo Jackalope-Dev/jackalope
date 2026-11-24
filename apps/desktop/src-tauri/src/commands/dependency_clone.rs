@@ -205,21 +205,30 @@ pub(super) fn is_unsupported(error: &io::Error) -> bool {
 }
 
 /// Makes `destination`, which must not exist, a copy-on-write clone of the directory
-/// `source`, keeping links as links. On failure nothing is left at `destination`.
+/// `source`, keeping links as links. On failure nothing it made is left at `destination`.
 pub(super) fn clone_tree(source: &Path, destination: &Path) -> io::Result<()> {
     let result = imp::clone_tree(source, destination);
-    if result.is_err() && std::fs::symlink_metadata(destination).is_ok() {
+    if result.as_ref().is_err_and(|error| !existed(error))
+        && std::fs::symlink_metadata(destination).is_ok()
+    {
         let _ = std::fs::remove_dir_all(destination);
     }
     result
 }
 
+/// The clone refused a destination that was already there, which is not the clone's to remove.
+fn existed(error: &io::Error) -> bool {
+    error.kind() == io::ErrorKind::AlreadyExists
+}
+
 /// Makes `destination`, which must not exist, a copy-on-write clone of the regular file
 /// `source`. [`is_unsupported`] tells a volume that cannot clone from a real failure; on any
-/// failure nothing is left at `destination`.
+/// failure nothing it made is left at `destination`.
 pub(super) fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
     let result = imp::clone_file(source, destination);
-    if result.is_err() && std::fs::symlink_metadata(destination).is_ok_and(|m| m.is_file()) {
+    if result.as_ref().is_err_and(|error| !existed(error))
+        && std::fs::symlink_metadata(destination).is_ok_and(|m| m.is_file())
+    {
         let _ = std::fs::remove_file(destination);
     }
     result
@@ -274,6 +283,18 @@ mod imp {
         fs::DirBuilder::new()
             .mode(mode & 0o7777)
             .create(destination)?;
+        // Past this point `destination` is the clone's own, so a clash inside it must not read
+        // as a destination that already existed.
+        fill(source, destination).map_err(|error| {
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                io::Error::other(error)
+            } else {
+                error
+            }
+        })
+    }
+
+    fn fill(source: &Path, destination: &Path) -> io::Result<()> {
         for entry in fs::read_dir(source)? {
             let entry = entry?;
             let kind = entry.file_type()?;
@@ -409,6 +430,28 @@ mod tests {
             workspace.to_str().unwrap(),
             "pnpm install --frozen-lockfile",
         )
+    }
+
+    #[test]
+    fn a_clone_onto_an_existing_path_fails_without_removing_it() {
+        let root = scratch();
+        std::fs::write(root.join("source"), "new").unwrap();
+        std::fs::write(root.join("existing"), "keep").unwrap();
+        assert!(clone_file(&root.join("source"), &root.join("existing")).is_err());
+        assert_eq!(
+            std::fs::read_to_string(root.join("existing")).unwrap(),
+            "keep"
+        );
+        std::fs::create_dir_all(root.join("from")).unwrap();
+        std::fs::write(root.join("from/file"), "new").unwrap();
+        std::fs::create_dir_all(root.join("to")).unwrap();
+        std::fs::write(root.join("to/file"), "keep").unwrap();
+        assert!(clone_tree(&root.join("from"), &root.join("to")).is_err());
+        assert_eq!(
+            std::fs::read_to_string(root.join("to/file")).unwrap(),
+            "keep"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
