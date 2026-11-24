@@ -21,6 +21,7 @@ pub(super) mod preparation;
 mod project_setup;
 mod prompt;
 mod resume;
+pub(crate) mod rewind;
 mod routing;
 pub(in crate::commands) mod runner;
 mod runners;
@@ -282,6 +283,9 @@ macro_rules! tauri_commands {
             commands::tasks::effort::task_effort_levels,
             commands::tasks::side_chat::task_side_question,
             commands::tasks::side_chat::task_side_question_cancel,
+            commands::tasks::rewind::task_rewind_preview,
+            commands::tasks::rewind::task_rewind,
+            commands::tasks::rewind::task_rewind_undo,
         ] $($rest)*)
     };
 }

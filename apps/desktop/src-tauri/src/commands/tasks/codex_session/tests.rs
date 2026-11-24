@@ -1149,6 +1149,60 @@ fn codex_threads_roll_back_and_fork_by_turn() {
         .contains("Stop the running turn"));
 }
 
+#[test]
+fn a_rewind_forks_the_thread_after_the_kept_turn_and_the_next_turn_continues_the_fork() {
+    use crate::commands::tasks::rewind::RewindResume;
+    let fixture = Fixture::new("codex-session-rewind", true);
+    let isolated = |id: &str, prompt: &str, previous: Option<&str>| {
+        let mut request = fixture.request(id, prompt, previous);
+        request.isolated = true;
+        request.target_branch = Some("master".into());
+        request
+    };
+    let mut previous = None;
+    let mut turns = Vec::new();
+    for id in ["codex-rewind-1", "codex-rewind-2", "codex-rewind-3"] {
+        let run = fixture.finish(isolated(id, id, previous));
+        assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
+        // The turn's own ID marks where the thread stood when it ended.
+        let mark = run.rewind.mark.clone().unwrap();
+        assert_eq!(Some(&mark.session), run.session_id.as_ref());
+        assert!(run.rewind.checkpoint.is_some());
+        previous = Some(id);
+        turns.push((run, mark));
+    }
+    let thread = turns[0].0.session_id.clone().unwrap();
+    let prepared = fixture
+        .runtime
+        .prepare_rewind("codex-rewind-2", "codex-rewind-3")
+        .unwrap();
+    let guard = crate::commands::integration::execution_guard().unwrap();
+    let outcome = fixture.runtime.apply_rewind(&guard, prepared).unwrap();
+    drop(guard);
+    let RewindResume::Codex { thread: forked } = outcome.rewind.resume.clone() else {
+        panic!("{:?}", outcome.rewind.resume)
+    };
+    assert_ne!(forked, thread);
+    let fork = &fixture.requests("thread/fork")[0]["params"];
+    assert_eq!(fork["threadId"], thread.as_str());
+    assert_eq!(fork["lastTurnId"], turns[0].1.entry.as_str());
+    // The original thread keeps every turn, so the rewind can still be undone.
+    let threads: Value =
+        serde_json::from_slice(&std::fs::read(fixture.folder.join("threads.json")).unwrap())
+            .unwrap();
+    assert_eq!(threads[&thread].as_array().unwrap().len(), 3);
+    assert_eq!(threads[&forked].as_array().unwrap().len(), 1);
+
+    let four = fixture.finish(isolated("codex-rewind-4", "Fourth", Some("codex-rewind-3")));
+    assert_eq!(four.status, RunStatus::Review, "{:?}", four.error);
+    assert_eq!(four.session_id.as_deref(), Some(forked.as_str()));
+    let started = fixture.requests("turn/start");
+    assert_eq!(
+        started.last().unwrap()["params"]["threadId"],
+        forked.as_str()
+    );
+}
+
 /// Two tiny turns through the installed, signed-in `codex` (not the fake): a file is
 /// created in the workspace, then a write outside it is asked about and denied, in the
 /// same warm app-server. Uses the person's Codex sign-in and quota, so it runs only on

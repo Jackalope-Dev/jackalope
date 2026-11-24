@@ -1,0 +1,62 @@
+/* An unavailable rewind stays focusable so its reason can be read. */
+.edit-from-here[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+}
+.rewind-details {
+  display: grid;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.rewind-details p {
+  margin: 0;
+}
+.rewind-notice code {
+  overflow-wrap: anywhere;
+  font-size: var(--text-xs);
+}
+.rewind-error {
+  color: var(--color-danger);
+}
+/* Undone turns stay readable at full contrast but step back: grey text and bubbles. */
+.rewound-turns {
+  margin-bottom: 22px;
+  border-block: 1px dashed var(--color-border-subtle);
+}
+.rewound-turns > .ui-disclosure-summary {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.rewound-turns-body {
+  color: var(--color-text-secondary);
+}
+.rewound-turns-body .live-sent > p {
+  background: var(--color-surface-sunken);
+}
+/* In a task, a turn's actions sit under its request and appear with hover or focus. */
+.task-turn-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 28px;
+}
+.task-turn-action {
+  min-height: 28px;
+  padding-inline: 8px;
+  font-size: var(--text-xs);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.task-exchange:is(:hover, :focus-within) .task-turn-action {
+  opacity: 1;
+}
+@media (hover: none) {
+  .task-turn-action {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-turn-action {
+    transition: none;
+  }
+}

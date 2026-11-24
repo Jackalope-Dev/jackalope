@@ -5,6 +5,7 @@ mod topics;
 pub use topics::*;
 mod learning;
 pub use learning::*;
+mod rewind;
 
 use super::{
     coordination::Coordinator,
@@ -1372,7 +1373,9 @@ impl LiveSessions {
                     .account_binding
                     .as_ref()
                     .and_then(|b| b.profile_id.clone());
-                if previous.session_id.is_none() {
+                // A rewind decides the conversation the batch continues, and the batches it
+                // undid never reach the agent again.
+                if previous.session_id.is_none() && previous.rewind.pending().is_none() {
                     let context: Vec<_> = latest
                         .messages
                         .iter()
@@ -1380,6 +1383,10 @@ impl LiveSessions {
                             !message.canceled
                                 && message.run_id.is_some()
                                 && message.run_id.as_deref() != Some(&batch.run_id)
+                                && !runs.iter().any(|run| {
+                                    Some(&run.id) == message.run_id.as_ref()
+                                        && run.rewind.rewound.is_some()
+                                })
                         })
                         .rev()
                         .take(12)

@@ -6,8 +6,8 @@
 //! conversation Codex keeps; it does not revert the workspace's files. Codex can roll back
 //! only threads with paginated history (every thread Codex 0.156 creates); a thread saved
 //! with legacy history fails with that reason.
-// Runtime capabilities for rewinding a conversation and side chats; the app does not call
-// them yet.
+// Rolling back in place and forking by count are runtime capabilities the app does not call
+// yet; rewinds fork after a turn so the original thread stays available to undo them.
 #![cfg_attr(not(test), allow(dead_code))]
 
 use super::*;
@@ -87,7 +87,7 @@ impl TaskRuntime {
         run_id: &str,
         turns: usize,
     ) -> Result<CodexThread, String> {
-        self.with_codex_thread(run_id, |connection, thread| {
+        self.with_codex_thread(run_id, true, |connection, thread| {
             if turns > 0 {
                 let newest = newest_turns(connection, thread, turns)
                     .map_err(|error| failed("read the conversation's turns", error))?;
@@ -126,7 +126,7 @@ impl TaskRuntime {
             .run_snapshot(run_id)
             .map(|run| run.workspace)
             .unwrap_or_default();
-        self.with_codex_thread(run_id, |connection, thread| {
+        self.with_codex_thread(run_id, false, |connection, thread| {
             let mut params = json!({"threadId": thread, "excludeTurns": true, "cwd": workspace});
             if drop_turns > 0 {
                 let newest = newest_turns(connection, thread, drop_turns + 1)
@@ -155,10 +155,50 @@ impl TaskRuntime {
         })
     }
 
+    /// Copies the Codex conversation attempt `run_id` ran into a new thread that ends with
+    /// turn `last_turn`, leaving the original as it is. A rewind uses it so the original
+    /// stays available to undo the rewind.
+    pub(in crate::commands) fn fork_codex_thread_after(
+        &self,
+        run_id: &str,
+        last_turn: &str,
+    ) -> Result<CodexThread, String> {
+        let workspace = self
+            .run_snapshot(run_id)
+            .map(|run| run.workspace)
+            .unwrap_or_default();
+        self.with_codex_thread(run_id, false, |connection, thread| {
+            let turns = all_turns(connection, thread)
+                .map_err(|error| failed("read the conversation's turns", error))?;
+            if !turns.iter().any(|turn| turn == last_turn) {
+                return Err("Codex no longer has that turn in this conversation.".into());
+            }
+            let forked = connection
+                .call(
+                    "thread/fork",
+                    json!({"threadId": thread, "excludeTurns": true, "cwd": workspace, "lastTurnId": last_turn}),
+                    THREAD_LIMIT,
+                )
+                .map_err(|error| failed("fork the conversation", error))?;
+            let id = forked["thread"]["id"]
+                .as_str()
+                .ok_or("Codex forked the conversation without naming the new thread.")?
+                .to_string();
+            Ok(CodexThread {
+                turns: all_turns(connection, &id)
+                    .map_err(|error| failed("read the forked conversation's turns", error))?,
+                thread_id: id,
+            })
+        })
+    }
+
     /// Runs `change` on the thread of attempt `run_id`, loaded in an app-server.
+    /// A fork leaves its new thread loaded in the process that made it, so that process
+    /// shuts down afterwards (`keep_warm` false) and the next turn can open the thread.
     fn with_codex_thread<T>(
         &self,
         run_id: &str,
+        keep_warm: bool,
         change: impl FnOnce(&Connection, &str) -> Result<T, String>,
     ) -> Result<T, String> {
         let run = self.run_snapshot(run_id).ok_or("Attempt not found")?;
@@ -192,7 +232,9 @@ impl TaskRuntime {
         };
         if let Some(session) = self.codex_sessions.pool.take_any(&thread, &run.workspace) {
             let result = change(&session.connection, &thread);
-            if session.process.alive() {
+            if !keep_warm {
+                session.shut_down();
+            } else if session.process.alive() {
                 self.codex_sessions.pool.park(session);
             }
             return result;
@@ -220,8 +262,11 @@ impl TaskRuntime {
             .call("thread/resume", params, THREAD_LIMIT)
             .map_err(|error| failed("open the conversation", error))?;
         if resumed["thread"]["historyMode"] == "legacy" {
+            session.shut_down();
             return Err("This conversation was saved with Codex's legacy history, which Codex cannot roll back or fork by turn.".into());
         }
-        change(&session.connection, &thread)
+        let result = change(&session.connection, &thread);
+        session.shut_down();
+        result
     }
 }

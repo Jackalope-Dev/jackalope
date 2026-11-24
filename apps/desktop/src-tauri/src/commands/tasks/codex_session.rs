@@ -50,6 +50,8 @@ const STEER_LIMIT: Duration = Duration::from_secs(15);
 pub(super) const INTERRUPT_GRACE: Duration = Duration::from_secs(5);
 /// How long the app-server's output may stay open after the process exits.
 const EXIT_GRACE: Duration = Duration::from_secs(2);
+/// How long an app-server asked to shut down may take before its tree is ended.
+const CLOSE_GRACE: Duration = Duration::from_secs(5);
 /// Thread settings `codex exec` takes as configuration overrides, which a turn sets
 /// through the protocol instead.
 const PER_TURN: [&str; 4] = [
@@ -236,6 +238,18 @@ impl Session {
             INITIALIZE_LIMIT,
         )?;
         self.connection.notify("initialized", json!({}))
+    }
+
+    /// Ends the app-server by closing its input, so Codex releases the threads it holds.
+    /// Killing it instead leaves them refusing other app-servers for minutes ("already has an
+    /// active writer"), as Codex 0.156.1 does. A server still running after the grace is
+    /// ended with its tree when the session drops.
+    fn shut_down(self) {
+        self.connection.close();
+        let deadline = Instant::now() + CLOSE_GRACE;
+        while self.process.alive() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(25));
+        }
     }
 
     fn release_alias(&self) {
@@ -578,7 +592,13 @@ impl TaskRuntime {
                 turn: turn.clone(),
             },
         );
-        self.update(id, |run| run.steerable = true);
+        self.update(id, |run| {
+            run.steerable = true;
+            run.rewind.mark = Some(super::rewind::ConversationMark {
+                session: thread.clone(),
+                entry: turn.clone(),
+            });
+        });
         let mut state = TurnState {
             mapper: Mapper::new(&turn),
             partials: Partials::new(started),

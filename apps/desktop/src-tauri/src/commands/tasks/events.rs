@@ -160,6 +160,18 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
     if let Some(id) = event["thread_id"].as_str().or(event["session_id"].as_str()) {
         run.session_id = Some(id.into());
     }
+    // The last message Claude Code wrote to the session, which a rewind resumes up to.
+    if protocol == Some(Protocol::ClaudeStream) && matches!(kind, "assistant" | "user") {
+        if let (Some(session), Some(entry)) = (
+            run.session_id.clone(),
+            event["uuid"].as_str().filter(|uuid| uuid.len() <= 100),
+        ) {
+            run.rewind.mark = Some(super::rewind::ConversationMark {
+                session,
+                entry: entry.into(),
+            });
+        }
+    }
     if let Some(model) = event["model"]
         .as_str()
         .or(event["message"]["model"].as_str())

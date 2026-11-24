@@ -98,6 +98,9 @@ pub struct TaskRun {
     pub checkpoint: Option<crate::commands::checkpoint::Checkpoint>,
     #[serde(default)]
     pub checkpoint_error: Option<String>,
+    /// Turn checkpoint, conversation mark and rewinds, for "Edit from here".
+    #[serde(default, skip_serializing_if = "super::rewind::RewindState::is_empty")]
+    pub rewind: super::rewind::RewindState,
     #[serde(default)]
     pub routing: Option<super::routing::RoutingHistory>,
     #[serde(default)]
@@ -531,6 +534,7 @@ impl TaskRun {
             dependency_snapshot: self.dependency_snapshot.clone(),
             checkpoint: self.checkpoint.clone(),
             checkpoint_error: self.checkpoint_error.clone(),
+            rewind: self.rewind.clone(),
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
             failure_kind: self.failure_kind,

@@ -768,7 +768,10 @@ process stays warm. Quitting kills it at once. While a turn runs, `TaskRun.steer
 set and a live conversation's **Send now** adds the message with `turn/steer`; when the
 turn cannot take it the message is sent after stopping the turn, as before. Rolling back or
 forking a thread reserves it and its workspace under the runtime lock, so no turn can
-start there until the change finishes.
+start there until the change finishes. A fork shuts its app-server down by closing its
+input, because Codex 0.156.1 keeps a thread it loaded locked against other app-servers
+("already has an active writer") for minutes after the process is killed; the rewind's
+next turn then opens the forked thread in a new process.
 
 A turn that cannot start in the app-server (a process that exits, an `initialize`,
 `thread/start` or `turn/start` error, or an `unknown variant` for a method an older Codex

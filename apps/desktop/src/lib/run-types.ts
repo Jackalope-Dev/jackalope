@@ -2,6 +2,7 @@ import type { PendingUserPrompt, RunStatus } from '@jackalope/contracts/runs';
 import type { DecisionReceipt } from './decisions.ts';
 import type { ContextReceipt, ContextSelection } from './knowledge-types.ts';
 import type { ReviewCaptures } from './review-captures.ts';
+import type { RewindState } from './rewind.ts';
 import type { DesktopPermission } from './system-info.ts';
 import type { TaskEffort } from './task-effort.ts';
 import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
@@ -64,6 +65,10 @@ export interface ActivityTime {
 export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
+  /** Work that changes no code, run in the project folder as it is. */
+  nonCode?: boolean;
+  /** The session from outside Jackalope this work continues. */
+  continues?: { adapter: string; sessionId: string } | null;
   effort?: TaskEffort | null;
   codexSpeed?: 'standard' | 'fast' | null;
   /** The running turn takes new messages without stopping (a Codex app-server turn). */
@@ -112,6 +117,8 @@ export interface TaskRun {
   };
   checkpoint?: { head: string; message: string } | null;
   checkpointError?: string | null;
+  /** Turn checkpoint, conversation mark and rewinds; absent on attempts saved before them. */
+  rewind?: RewindState;
   /** The provider limit that stopped the attempt; `resetsAt` is Unix seconds when reported. */
   quotaFailure?: { modelOnly: boolean; message: string; resetsAt?: number | null } | null;
   /** A retry the person scheduled for when that limit resets. */

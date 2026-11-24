@@ -61,6 +61,7 @@ import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentScreen } from './AgentScreen';
 import { DecisionTrail } from './DecisionTrail';
 import { DesktopPermissionNotice } from './DesktopPermissionNotice';
+import { EditFromHereButton, RewindUndoNotice } from './EditFromHere';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ResumeInterrupted, resumePrompt, StopInterrupted } from './ResumeInterrupted';
@@ -400,6 +401,13 @@ export function TaskDetail({
       setActing(false);
     }
   };
+  /** After a rewind: the turn's prompt goes back into the follow-up, below any draft. */
+  const rewound = async ({ prompt }: { prompt: string }) => {
+    addToReply(prompt, true);
+    await refresh();
+    const next = latestAttempt(useExecutionStore.getState().runs, run.taskId);
+    if (next) useExecutionStore.getState().select(next.id);
+  };
   /** Answers a question the attempt ended on by continuing the task with it. */
   const continueWithAnswer = (question: string, answer: string) =>
     continueWith(`You asked: ${question}\nMy answer: ${answer}`);
@@ -691,6 +699,12 @@ export function TaskDetail({
           {notice}
         </p>
       )}
+      {!run.liveSessionId && (
+        <RewindUndoNotice runs={runs} taskId={run.taskId} onChanged={refresh} />
+      )}
+      {run.rewind?.rewound && (
+        <InlineNotice>A rewind undid this turn. It stays here for reference.</InlineNotice>
+      )}
       {!isLatest && latest && (
         <div className="task-notice">
           <span>You’re viewing an earlier attempt.</span>
@@ -792,11 +806,23 @@ export function TaskDetail({
             {attempts
               .filter((attempt) => Date.parse(attempt.startedAt) < Date.parse(run.startedAt))
               .map((attempt, index) => (
-                <Disclosure key={attempt.id} className="my-3">
+                <Disclosure
+                  key={attempt.id}
+                  className={`my-3 task-exchange${attempt.rewind?.rewound ? ' rewound-turns-body' : ''}`}
+                >
                   <DisclosureSummary>
                     Earlier exchange {index + 1} · {statusLabel[attempt.status]}
+                    {attempt.rewind?.rewound ? ' · Rewound' : ''}
                   </DisclosureSummary>
                   <p className="task-request whitespace-pre-wrap">{attempt.prompt}</p>
+                  <div className="task-turn-actions">
+                    <EditFromHereButton
+                      runs={runs}
+                      run={attempt}
+                      className="task-turn-action"
+                      onRewound={rewound}
+                    />
+                  </div>
                   <Suspense fallback={<p>{attempt.result}</p>}>
                     <TaskMarkdown
                       content={attempt.result || 'No result recorded.'}
@@ -807,9 +833,19 @@ export function TaskDetail({
                   <TurnAdvisorNotes review={attempt.advisor} />
                 </Disclosure>
               ))}
-            {attempts.length > 1 && (
-              <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
-            )}
+            <div className="task-exchange">
+              {attempts.length > 1 && (
+                <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
+              )}
+              <div className="task-turn-actions">
+                <EditFromHereButton
+                  runs={runs}
+                  run={run}
+                  className="task-turn-action"
+                  onRewound={rewound}
+                />
+              </div>
+            </div>
             {!!run.screenshots?.length && (
               <figure className="result-preview">
                 <ScreenshotPreview

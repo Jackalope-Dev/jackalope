@@ -216,6 +216,7 @@ impl TaskRuntime {
             self.prepare_workspace(id, req, previous.clone())
         })?;
         self.provide_context(id, req);
+        self.capture_turn_checkpoint(id);
         self.update(id, |run| run.progress = None);
         if req.agent == "auto" && !early.is_finished() && self.is_running(id) {
             self.stage(id, Some("routing"));
@@ -235,7 +236,13 @@ impl TaskRuntime {
         }
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
-        let mut resume = previous;
+        // A rewind kept on the previous attempt decides which conversation this turn
+        // continues. Like a session from outside Jackalope, that conversation is the point,
+        // so if it is gone the turn fails instead of starting over with the undone turns.
+        let rewound = previous
+            .as_ref()
+            .is_some_and(|old| old.rewind.pending().is_some());
+        let mut resume = previous.and_then(|old| self.rewound_resume(id, old));
         // A session from outside Jackalope is the point of its continuation, so a lost one
         // is never replaced by a new conversation.
         let continues = self
@@ -247,6 +254,9 @@ impl TaskRuntime {
         if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
             if continues {
                 return Err(super::resume::gone(old));
+            }
+            if rewound {
+                return Err(super::resume::rewind_gone(old));
             }
             let adapter = old
                 .account_binding
@@ -267,7 +277,7 @@ impl TaskRuntime {
             }
         }
         // A session the CLI itself refuses to resume starts over the same way, once.
-        let mut refusable = resume.clone().filter(|_| !continues);
+        let mut refusable = resume.clone().filter(|_| !continues && !rewound);
         let mut routed = true;
         loop {
             if !self.is_running(id) {
@@ -341,6 +351,7 @@ impl TaskRuntime {
         self.update_checked(id, |run| {
             change(run);
             run.session_id = None;
+            run.rewind.mark = None;
             run.result.clear();
             run.error = None;
             run.quota_failure = None;
@@ -1102,6 +1113,12 @@ impl TaskRuntime {
                 // A persistent session adds --resume only when no warm process continues it.
                 if !persistent {
                     cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
+                }
+                // After a rewind: the session up to that message, saved as a new session so
+                // the original stays as it was. The changed launch also keeps a warm process
+                // that remembers the undone turns from being reused.
+                if let Some(at) = &old.rewind.resume_at {
+                    cmd.args(["--resume-session-at", at, "--fork-session"]);
                 }
             }
         } else if adapter == "kimi" {
@@ -2611,6 +2628,7 @@ impl TaskRuntime {
                     .unwrap_or_else(|| request.dependency_snapshot.clone()),
                 checkpoint: None,
                 checkpoint_error: None,
+                rewind: Default::default(),
                 routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
                 quota_failure: None,
                 failure_kind: None,

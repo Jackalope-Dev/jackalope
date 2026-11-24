@@ -113,7 +113,8 @@ type Waiter = mpsc::Sender<Result<Value, RpcError>>;
 
 /// The writing half of a session and the requests waiting for their response.
 pub(super) struct Connection {
-    stdin: Mutex<ChildStdin>,
+    /// `None` once closed, which asks the app-server to shut down.
+    stdin: Mutex<Option<ChildStdin>>,
     next: AtomicU64,
     waiting: Arc<Mutex<Option<HashMap<u64, Waiter>>>>,
 }
@@ -157,7 +158,7 @@ impl Connection {
         });
         (
             Arc::new(Self {
-                stdin: Mutex::new(stdin),
+                stdin: Mutex::new(Some(stdin)),
                 next: AtomicU64::new(1),
                 waiting,
             }),
@@ -169,12 +170,20 @@ impl Connection {
         let mut line = value.to_string();
         line.push('\n');
         let mut stdin = self.stdin.lock().unwrap();
+        let stdin = stdin
+            .as_mut()
+            .ok_or_else(|| RpcError::local("Codex's app-server was shut down."))?;
         stdin
             .write_all(line.as_bytes())
             .and_then(|()| stdin.flush())
             .map_err(|error| {
                 RpcError::local(format!("Codex could not receive the request: {error}"))
             })
+    }
+
+    /// Closes the app-server's input, which asks it to shut down.
+    pub(super) fn close(&self) {
+        self.stdin.lock().unwrap().take();
     }
 
     /// Sends `method` and waits up to `limit` for its result.

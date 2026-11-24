@@ -165,6 +165,45 @@ impl Coordinator {
         })
     }
 
+    /// Applies a prepared rewind under the coordinator state and execution guard, so no
+    /// queued follow-up or other launch can start in between. A queued follow-up would
+    /// otherwise run on the rewound work before the person edits the prompt.
+    pub(in crate::commands) fn rewind(
+        &self,
+        prepared: crate::commands::tasks::rewind::PreparedRewind,
+    ) -> Result<crate::commands::tasks::rewind::RewindOutcome, String> {
+        self.ensure_storage_loaded()?;
+        self.transact(|inner, guard| {
+            Self::no_queued_followups(inner, prepared.task_id())?;
+            self.runtime.apply_rewind(guard, prepared)
+        })
+    }
+
+    pub(in crate::commands) fn undo_rewind(&self, run_id: &str) -> Result<(), String> {
+        self.ensure_storage_loaded()?;
+        let task_id = self
+            .runtime
+            .run_snapshot(run_id)
+            .ok_or("Attempt not found")?
+            .task_id;
+        self.transact(|inner, guard| {
+            Self::no_queued_followups(inner, &task_id)?;
+            self.runtime.undo_rewind(guard, run_id)
+        })
+    }
+
+    fn no_queued_followups(inner: &Inner, task_id: &str) -> Result<(), String> {
+        if inner
+            .ledger
+            .followups
+            .iter()
+            .any(|item| item.task_id == task_id && !item.dispatched)
+        {
+            return Err("Send or cancel this task's queued follow-ups first.".into());
+        }
+        Ok(())
+    }
+
     fn stop_for_followup(&self, inner: &mut Inner, id: &str, run_id: &str) -> Result<(), String> {
         if let Err(error) = self.runtime.stop(run_id) {
             self.pause_followup(

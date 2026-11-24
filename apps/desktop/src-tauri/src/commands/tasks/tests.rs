@@ -23,6 +23,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         stages: vec![],
         checkpoint: None,
         checkpoint_error: None,
+        rewind: Default::default(),
         routing: None,
         quota_failure: None,
         failure_kind: None,

@@ -443,6 +443,46 @@ on its own. A failed read keeps the last state and says so. Fix requests are edi
 follow-ups in the task's own composer; pushing an update and merging on GitHub each need
 their own confirmation, and no state change sends, pushes or merges by itself.
 
+### Edit from here
+
+Each turn of a conversation or task offers **Edit from here** with its other actions (on hover or
+keyboard focus) when both halves of a rewind are real: Jackalope saved the files the turn
+started from, and the agent can return its own conversation to the end of the turn before.
+That means Claude Code and Codex work in a worktree Jackalope made, on this device. Other
+agents, in-place and non-code work, work on a computer and attempts saved before turn
+checkpoints existed show nothing or a disabled action with the reason; files are never
+restored under an agent that still remembers the later turns (`tasks/rewind.rs`).
+
+- Before a turn's agent starts, its worktree files (tracked and untracked, not ignored) are
+  saved as a commit under `refs/jackalope/checkpoints/<task>/<attempt>`. No branch contains
+  it, so merges, pull requests and ordinary pushes never carry it. The task branch's
+  automatic commits are a separate, project-configurable feature and are unchanged.
+- Each Claude Code turn records its session and last message ID, each Codex app-server turn
+  its thread and turn ID. Rewinding to turn K resumes Claude Code with `--resume <session>
+  --resume-session-at <message> --fork-session` on the next turn, and forks the Codex
+  thread after turn K-1 (`thread/fork` with `lastTurnId`) before confirming. Both leave the
+  original conversation intact. Rewinding to the first turn starts a new conversation. If
+  the CLI no longer has that conversation, the next turn fails instead of starting over
+  with the undone turns as context.
+- The confirmation states how many turns are undone and which files return. Rewinding is
+  refused while any turn of the task runs, while messages or follow-ups are queued, and
+  while a preview, check or task terminal uses the worktree. It runs under the coordinator
+  state, execution guard and runtime lock in that order and holds the workspace lease.
+- The current files and staged index are saved first under
+  `refs/jackalope/rewinds/<task>/<id>`, then the worktree files are set to the checkpoint.
+  The branch never moves, so restored files show as changes against it, and ignored files
+  are left alone.
+- Undone turns stay in saved history marked rewound, collapsed and greyed in the
+  transcript. The edited turn's messages (including attachment lines) are added to the
+  composer below any draft. **Undo rewind** restores the saved files (saving the replaced
+  ones the same way) and lets the next turn continue the original conversation, until the
+  next turn starts.
+
+`cargo test --no-default-features --lib rewind` covers planning, gating, restore, the safety
+snapshot, Undo and restart with fixture agents; `real_claude_rewind` and `real_codex_rewind`
+are ignored trials against the installed CLIs. `node scripts/verification/verify-rewind.mjs`
+is a browser fixture of the conversation view.
+
 Paused Chat sessions use the same integration controls for their latest batch after
 queued messages are run or canceled. Applied receipts block reopening or sending into
 the old workspace. Optional review positions show changes since an explicitly marked
