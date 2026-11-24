@@ -118,6 +118,46 @@ pub struct Timing {
     pub max_ms: u64,
 }
 
+/// One kind of agent activity in an attempt (see `tool_activity::activity_kind`).
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ActivityTime {
+    pub calls: u64,
+    /// This kind's share of the agent's working time. A moment with several calls running
+    /// goes to one kind, so the kinds add up to the time measured.
+    pub wall_ms: u64,
+    pub longest_ms: u64,
+}
+
+/// One tool's calls in an attempt. Overlapping calls each count in full.
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ToolTime {
+    pub kind: String,
+    pub total_ms: u64,
+    pub longest_ms: u64,
+}
+
+/// Which kind gets a moment when calls of several kinds are running, first wins.
+const PRECEDENCE: [&str; 11] = [
+    "ask", "check", "app", "command", "helper", "web", "edit", "read", "search", "tool", "plan",
+];
+
+#[derive(Clone, Debug)]
+struct OpenTool {
+    since: std::time::Instant,
+    kind: &'static str,
+    name: String,
+}
+
+/// Running state for [`Efficiency::activity`]; never saved, so an attempt picked up after
+/// a restart measures from its next event.
+#[derive(Clone, Default, Debug)]
+struct Clock {
+    last: Option<std::time::Instant>,
+    open: std::collections::HashMap<String, OpenTool>,
+}
+
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Efficiency {
@@ -158,8 +198,32 @@ pub struct Efficiency {
     /// arguments. Tool arguments are otherwise never stored; these feed the repository map
     /// of a later task in the same project, so it can rank the area that was worked in.
     pub touched_paths: std::collections::BTreeSet<String>,
+    /// The agent's working time by kind, from tool start and finish events as they
+    /// arrive. `think` is time with no tool running: the model reading results, planning
+    /// and writing. Empty for attempts recorded before this was measured.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub activity: std::collections::BTreeMap<String, ActivityTime>,
+    /// Measured durations by tool name, bounded like `tool_calls`.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub tool_time: std::collections::BTreeMap<String, ToolTime>,
     #[serde(skip)]
     seen_tools: std::collections::HashSet<String>,
+    #[serde(skip)]
+    clock: Clock,
+}
+
+/// A tool name as a bounded map key: shortened, and `other` once the map holds 100 names.
+fn tool_key<V>(map: &std::collections::BTreeMap<String, V>, name: &str) -> String {
+    let name: String = name.chars().take(100).collect();
+    if map.len() >= 100 && !map.contains_key(&name) {
+        "other".into()
+    } else {
+        name
+    }
+}
+
+fn millis(elapsed: std::time::Duration) -> u64 {
+    elapsed.as_millis().min(u64::MAX as u128) as u64
 }
 
 /// Argument names the supported CLIs use for a file the agent reads or edits.
@@ -201,7 +265,7 @@ impl Efficiency {
         timing.total_ms = timing.total_ms.saturating_add(milliseconds);
         timing.max_ms = timing.max_ms.max(milliseconds);
     }
-    fn tool(&mut self, id: &str, name: &str) {
+    fn tool(&mut self, id: &str, name: &str, kind: &str) {
         if self.seen_tools.contains(id) {
             return;
         }
@@ -210,13 +274,67 @@ impl Efficiency {
             return;
         }
         self.seen_tools.insert(id.into());
-        let name: String = name.chars().take(100).collect();
-        let name = if self.tool_calls.len() >= 100 && !self.tool_calls.contains_key(&name) {
-            "other".into()
-        } else {
-            name
+        *self
+            .tool_calls
+            .entry(tool_key(&self.tool_calls, name))
+            .or_default() += 1;
+        self.activity.entry(kind.into()).or_default().calls += 1;
+    }
+
+    /// Starts measuring the agent's working time, when its execution stage opens.
+    pub fn start_clock(&mut self, now: std::time::Instant) {
+        self.clock.last.get_or_insert(now);
+    }
+
+    /// Gives the time since the last event to the kind running through it.
+    fn advance(&mut self, now: std::time::Instant) {
+        let Some(last) = self.clock.last.filter(|last| *last < now) else {
+            self.clock.last.get_or_insert(now);
+            return;
         };
-        *self.tool_calls.entry(name).or_default() += 1;
+        self.clock.last = Some(now);
+        let kind = self
+            .clock
+            .open
+            .values()
+            .map(|tool| tool.kind)
+            .min_by_key(|kind| PRECEDENCE.iter().position(|known| known == kind))
+            .unwrap_or("think");
+        let slice = millis(now - last);
+        let time = self.activity.entry(kind.into()).or_default();
+        time.wall_ms = time.wall_ms.saturating_add(slice);
+    }
+
+    fn began(&mut self, id: &str, name: &str, kind: &'static str, now: std::time::Instant) {
+        self.advance(now);
+        if self.clock.open.len() < 64 && id.len() <= 300 && !self.clock.open.contains_key(id) {
+            let name = name.into();
+            self.clock.open.insert(
+                id.into(),
+                OpenTool {
+                    since: now,
+                    kind,
+                    name,
+                },
+            );
+        }
+    }
+
+    fn ended(&mut self, id: &str, now: std::time::Instant) {
+        self.advance(now);
+        let Some(tool) = self.clock.open.remove(id) else {
+            return;
+        };
+        let elapsed = millis(now.saturating_duration_since(tool.since));
+        let time = self.activity.entry(tool.kind.into()).or_default();
+        time.longest_ms = time.longest_ms.max(elapsed);
+        let key = tool_key(&self.tool_time, &tool.name);
+        let time = self.tool_time.entry(key).or_insert_with(|| ToolTime {
+            kind: tool.kind.into(),
+            ..ToolTime::default()
+        });
+        time.total_ms = time.total_ms.saturating_add(elapsed);
+        time.longest_ms = time.longest_ms.max(elapsed);
     }
 
     fn touched(&mut self, input: &serde_json::Value, workspace: &str) {
@@ -234,13 +352,31 @@ impl Efficiency {
     }
 
     pub fn observe(&mut self, event: &serde_json::Value, adapter: &str, workspace: &str) {
+        self.observe_at(event, adapter, workspace, std::time::Instant::now());
+    }
+
+    fn observe_at(
+        &mut self,
+        event: &serde_json::Value,
+        adapter: &str,
+        workspace: &str,
+        now: std::time::Instant,
+    ) {
+        use super::tool_activity::activity_kind;
         let protocol = crate::commands::agents::find(adapter).map(|agent| agent.protocol);
+        self.advance(now);
         if protocol == Some(Protocol::Opencode) && event["type"] == "tool_use" {
             let part = &event["part"];
             let id = part["callID"].as_str().or_else(|| part["id"].as_str());
             if let (Some(id), Some(name)) = (id, part["tool"].as_str()) {
-                self.tool(id, name);
-                self.touched(&part["state"]["input"], workspace);
+                let input = &part["state"]["input"];
+                let kind = activity_kind(name, input);
+                self.tool(id, name, kind);
+                self.touched(input, workspace);
+                match part["state"]["status"].as_str() {
+                    Some("pending" | "running") => self.began(id, name, kind, now),
+                    _ => self.ended(id, now),
+                }
             }
         }
         if protocol == Some(Protocol::Antigravity) && event["event"] == "step_update" {
@@ -249,12 +385,25 @@ impl Efficiency {
                 if let (Some(index), Some(name)) =
                     (step["step_index"].as_u64(), step["tool_name"].as_str())
                 {
-                    self.tool(&format!("antigravity-{index}"), name);
-                    self.touched(&step["tool_info"]["parameters"], workspace);
+                    let id = format!("antigravity-{index}");
+                    let input = &step["tool_info"]["parameters"];
+                    let kind = activity_kind(name, input);
+                    self.tool(&id, name, kind);
+                    self.touched(input, workspace);
+                    if step["state"] == "ACTIVE" {
+                        self.began(&id, name, kind, now);
+                    } else {
+                        self.ended(&id, now);
+                    }
                 }
             }
         }
-        if protocol == Some(Protocol::Codex) && event["type"] == "item.completed" {
+        if protocol == Some(Protocol::Codex)
+            && matches!(
+                event["type"].as_str(),
+                Some("item.started" | "item.completed")
+            )
+        {
             let item = &event["item"];
             if let (Some(id), Some(kind)) = (item["id"].as_str(), item["type"].as_str()) {
                 if [
@@ -266,10 +415,6 @@ impl Efficiency {
                 ]
                 .contains(&kind)
                 {
-                    self.touched(item, workspace);
-                    for change in item["changes"].as_array().into_iter().flatten() {
-                        self.touched(change, workspace);
-                    }
                     let name = if kind == "mcp_tool_call" {
                         format!(
                             "{}:{}",
@@ -279,25 +424,55 @@ impl Efficiency {
                     } else {
                         kind.into()
                     };
-                    self.tool(id, &name);
-                }
-            }
-        }
-        if protocol == Some(Protocol::ClaudeStream) && event["type"] == "assistant" {
-            for block in event["message"]["content"].as_array().into_iter().flatten() {
-                if block["type"] == "tool_use" {
-                    if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
-                        self.tool(id, name);
-                        self.touched(&block["input"], workspace);
+                    let activity = activity_kind(&name, item);
+                    if event["type"] == "item.started" {
+                        self.began(id, &name, activity, now);
+                    } else {
+                        self.touched(item, workspace);
+                        for change in item["changes"].as_array().into_iter().flatten() {
+                            self.touched(change, workspace);
+                        }
+                        self.tool(id, &name, activity);
+                        self.ended(id, now);
                     }
                 }
             }
         }
-        if protocol == Some(Protocol::Gemini) && event["type"] == "tool_use" {
-            let name = event["tool_name"].as_str();
-            if let (Some(id), Some(name)) = (event["tool_id"].as_str(), name) {
-                self.tool(id, name);
-                self.touched(&event["parameters"], workspace);
+        // A helper agent's own calls run inside its `Task` call, which already holds the time.
+        let main_agent = event["parent_tool_use_id"].is_null();
+        if protocol == Some(Protocol::ClaudeStream) && event["type"] == "assistant" {
+            for block in event["message"]["content"].as_array().into_iter().flatten() {
+                if block["type"] == "tool_use" {
+                    if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
+                        let kind = activity_kind(name, &block["input"]);
+                        self.tool(id, name, kind);
+                        self.touched(&block["input"], workspace);
+                        if main_agent {
+                            self.began(id, name, kind, now);
+                        }
+                    }
+                }
+            }
+        }
+        if protocol == Some(Protocol::ClaudeStream) && event["type"] == "user" && main_agent {
+            for block in event["message"]["content"].as_array().into_iter().flatten() {
+                if let Some(id) = block["tool_use_id"].as_str() {
+                    self.ended(id, now);
+                }
+            }
+        }
+        if protocol == Some(Protocol::Gemini) {
+            if let Some(id) = event["tool_id"].as_str() {
+                if event["type"] == "tool_use" {
+                    if let Some(name) = event["tool_name"].as_str() {
+                        let kind = activity_kind(name, &event["parameters"]);
+                        self.tool(id, name, kind);
+                        self.touched(&event["parameters"], workspace);
+                        self.began(id, name, kind, now);
+                    }
+                } else if event["type"] == "tool_result" {
+                    self.ended(id, now);
+                }
             }
         }
     }
@@ -481,5 +656,70 @@ mod tests {
         assert!(!saved.contains("never store"));
         assert!(!saved.contains("passwd"));
         assert!(!saved.contains("id_rsa"));
+    }
+
+    #[test]
+    fn activity_splits_working_time_by_kind_with_overlaps_going_to_one_kind() {
+        use serde_json::json;
+        use std::time::Duration;
+        let start = std::time::Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let mut efficiency = Efficiency::for_launch();
+        efficiency.start_clock(start);
+        let tool = |id: &str, name: &str, input: serde_json::Value| json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":id,"name":name,"input":input}]}});
+        let done = |id: &str| json!({"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":id}]}});
+        let steps = [
+            (1, tool("a", "Read", json!({"file_path":"src/a.rs"}))),
+            (3, done("a")),
+            (
+                4,
+                tool("b", "Bash", json!({"command":"cd app && pnpm test:unit"})),
+            ),
+            (4, tool("c", "Read", json!({"file_path":"src/b.rs"}))),
+            (5, done("c")),
+            // A helper agent's own calls stay inside its parent call.
+            (
+                6,
+                json!({"type":"assistant","parent_tool_use_id":"b","message":{"content":[{"type":"tool_use","id":"d","name":"Grep","input":{}}]}}),
+            ),
+            (10, done("b")),
+            (12, json!({"type":"result"})),
+        ];
+        for (seconds, event) in steps {
+            efficiency.observe_at(&event, "claude", "/work", at(seconds));
+        }
+        let wall = |kind: &str| efficiency.activity.get(kind).map(|time| time.wall_ms);
+        assert_eq!(wall("think"), Some(4000));
+        assert_eq!(wall("read"), Some(2000));
+        assert_eq!(wall("check"), Some(6000));
+        assert_eq!(wall("search"), Some(0));
+        assert_eq!(efficiency.activity["read"].calls, 2);
+        assert_eq!(efficiency.activity["check"].longest_ms, 6000);
+        assert_eq!(efficiency.activity["search"].calls, 1);
+        assert_eq!(efficiency.tool_time["Read"].total_ms, 3000);
+        assert_eq!(efficiency.tool_time["Read"].longest_ms, 2000);
+        assert_eq!(efficiency.tool_time["Bash"].kind, "check");
+        let saved = serde_json::to_value(&efficiency).unwrap();
+        assert_eq!(saved["activity"]["check"]["wallMs"], 6000);
+        assert!(serde_json::to_value(Efficiency::for_launch()).unwrap()["activity"].is_null());
+    }
+
+    #[test]
+    fn codex_items_are_timed_from_start_to_completion() {
+        use serde_json::json;
+        use std::time::Duration;
+        let start = std::time::Instant::now();
+        let mut efficiency = Efficiency::for_launch();
+        let item = |kind: &str| json!({"type":kind,"item":{"id":"item_1","type":"mcp_tool_call","server":"jackalope","tool":"browser_navigate"}});
+        efficiency.observe_at(&item("item.started"), "codex", "/work", start);
+        efficiency.observe_at(
+            &item("item.completed"),
+            "codex",
+            "/work",
+            start + Duration::from_secs(13),
+        );
+        assert_eq!(efficiency.activity["app"].wall_ms, 13_000);
+        assert_eq!(efficiency.activity["app"].calls, 1);
+        assert_eq!(efficiency.tool_calls["jackalope:browser_navigate"], 1);
     }
 }

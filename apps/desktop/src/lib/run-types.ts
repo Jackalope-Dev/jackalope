@@ -40,6 +40,26 @@ export interface RunUsage {
   reported: boolean;
   estimatedCostUsd: number | null;
 }
+/** What a tool call spent the agent's time on; `think` is time with no tool running. */
+export type ActivityKind =
+  | 'think'
+  | 'plan'
+  | 'read'
+  | 'search'
+  | 'edit'
+  | 'command'
+  | 'check'
+  | 'app'
+  | 'ask'
+  | 'helper'
+  | 'web'
+  | 'tool';
+/** One kind's calls and its share of working time, in which overlapping calls count once. */
+export interface ActivityTime {
+  calls: number;
+  wallMs: number;
+  longestMs: number;
+}
 export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
@@ -55,6 +75,10 @@ export interface TaskRun {
     repositoryMapCacheHits?: number;
     toolCalls?: Record<string, number>;
     toolObservationsTruncated?: boolean;
+    /** Working time by kind of activity; absent before it was measured. */
+    activity?: Partial<Record<ActivityKind, ActivityTime>>;
+    /** Measured durations by tool name; overlapping calls each count in full. */
+    toolTime?: Record<string, { kind: ActivityKind; totalMs: number; longestMs: number }>;
     launchPromptBytes: number;
     launches: number;
     jevQuestionCalls?: number | null;

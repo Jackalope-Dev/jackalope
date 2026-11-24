@@ -19,6 +19,9 @@ impl TaskRuntime {
                     .ok()
                     .map(|start| (now - start.with_timezone(&Utc)).num_milliseconds().max(0));
             }
+            if next == Some("execution") {
+                run.efficiency.start_clock(std::time::Instant::now());
+            }
             if let Some(stage) = next {
                 if run.stages.len() < 128 {
                     run.stages.push(ExecutionStage {
