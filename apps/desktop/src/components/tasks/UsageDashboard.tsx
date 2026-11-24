@@ -40,6 +40,7 @@ import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { CapacityPanel } from './CapacityPanel';
 import { DecisionUsage, useTaskDecisionUsage } from './DecisionUsage';
 import { JevConnectionUsage } from './JevConnectionUsage';
+import { UsageActivity } from './UsageActivity';
 import { tokenLabel, UsageInsights } from './UsageInsights';
 import { WorkflowPerformance } from './WorkflowPerformance';
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
@@ -456,6 +457,9 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             </InlineNotice>
           )}
         </section>
+        {!loading && !historyError && (
+          <UsageActivity runs={filtered.filter((entry) => entry.purpose === 'Worker')} />
+        )}
         {showAssessments && (
           <DecisionUsage
             {...decisionUsage}

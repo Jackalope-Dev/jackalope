@@ -165,6 +165,8 @@ impl Stream {
                 }
             }
             Some("result") => {
+                run.efficiency
+                    .observe(&event, "antigravity", &run.workspace);
                 if self.completed {
                     run.error.get_or_insert(
                         "Antigravity returned more than one result for this attempt.".into(),

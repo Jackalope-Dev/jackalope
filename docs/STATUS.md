@@ -623,6 +623,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Grok and OpenCode; an attempt that ends without the agent's final total (stopped,
   failed or interrupted) keeps the sum of the calls it observed, without a cost, and
   says so in its activity.
+- Finished tasks have a Report tab: total time, the agent's session, checks, setup,
+  waiting on the person, tokens, cost and changes, with the agent's working time split
+  by activity (thinking and writing, reading, tests and builds, trying the app, other
+  work) and per-tool calls and durations. Usage & quota compares the same split across
+  agents. Activity is timed for Codex, Claude Code, Grok, OpenCode, Gemini CLI and
+  Antigravity attempts started from this version; ACP agents and earlier attempts show
+  stages and tool counts only.
 - Failed attempts keep the agent's own message with a typed kind (authentication,
   quota, rate limit, provider refusal, unavailable model, context length or exit),
   and a next step for sign-in, model and context-length failures. Requested and served models are compared;
