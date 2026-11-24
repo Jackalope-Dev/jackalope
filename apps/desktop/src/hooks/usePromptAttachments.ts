@@ -1,6 +1,6 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { type ClipboardEvent, type RefObject, useEffect, useRef, useState } from 'react';
-import { attachesPaste, pastedTextLabel, restorePaste } from '../lib/large-paste';
+import { attachesPaste, insertPasted, pastedTextLabel, restorePaste } from '../lib/large-paste';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
 import { attachmentReference } from '../lib/prompt-attachments';
@@ -89,6 +89,8 @@ export function usePromptAttachments({
     const text = event.clipboardData.getData('text/plain');
     if (!edit || !attachesPaste(text, room?.())) return;
     event.preventDefault();
+    const field = event.currentTarget as HTMLTextAreaElement | HTMLInputElement;
+    const at = { start: field.selectionStart, end: field.selectionEnd, value: field.value };
     setBusy(true);
     setError('');
     void invokeNative<string>('prompt_attachment_save', {
@@ -101,7 +103,11 @@ export function usePromptAttachments({
         attach.current([reference]);
         setPasted((current) => [...current, { reference, text, label: pastedTextLabel(text) }]);
       })
-      .catch((cause) => setError(describeError(cause)))
+      .catch((cause) => {
+        // Saving failed, so the text goes into the draft as a normal paste would.
+        setError(`${describeError(cause)} The pasted text was added to the draft instead.`);
+        edit((current) => insertPasted(current, text, at));
+      })
       .finally(() => setBusy(false));
   };
   const onPaste = (event: ClipboardEvent) => {

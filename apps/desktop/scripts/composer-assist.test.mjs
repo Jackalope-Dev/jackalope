@@ -2,13 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   composerCommands,
+  composingKey,
   insertMention,
   matchCommands,
   mentionQuery,
   parseCommand,
   slashQuery,
 } from '../src/lib/composer-commands.ts';
-import { attachesPaste, pastedTextLabel, restorePaste } from '../src/lib/large-paste.ts';
+import { proseMention, strongFileMatch } from '../src/lib/file-search.ts';
+import {
+  attachesPaste,
+  insertPasted,
+  pastedTextLabel,
+  restorePaste,
+} from '../src/lib/large-paste.ts';
 import { caretAtEdge, historyEntries, stepHistory } from '../src/lib/prompt-history.ts';
 import { compactTokens, contextShare, isReasoningEffort } from '../src/lib/reasoning-effort.ts';
 
@@ -127,4 +134,31 @@ test('context is shown only when reported, as a share of a reported window', () 
   assert.equal(compactTokens(1_000_000), '1M');
   assert.equal(isReasoningEffort('xhigh'), true);
   assert.equal(isReasoningEffort('none'), false);
+});
+
+test('Enter accepts a mention only for a close match, and prose stays quiet', () => {
+  assert.equal(strongFileMatch('src/search.tsx', 'sea'), true);
+  assert.equal(strongFileMatch('src/search.tsx', 'src/se'), true);
+  assert.equal(strongFileMatch('apps/desktop/src/App.tsx', 'desktop/src'), true);
+  assert.equal(strongFileMatch('src/search.tsx', 'S'), false);
+  // A subsequence that only scatters across the path is weak.
+  assert.equal(strongFileMatch('src/components/sessions/SessionStart.tsx', 'sam'), false);
+  assert.equal(strongFileMatch('src/search.tsx', 'arch'), false);
+  assert.equal(proseMention('sam'), true);
+  assert.equal(proseMention('José'), true);
+  assert.equal(proseMention('src/se'), false);
+  assert.equal(proseMention('app.ts'), false);
+});
+
+test('an IME composition key never sends', () => {
+  assert.equal(composingKey({ isComposing: true, keyCode: 13 }), true);
+  assert.equal(composingKey({ isComposing: false, keyCode: 229 }), true);
+  assert.equal(composingKey({ isComposing: false, keyCode: 13 }), false);
+});
+
+test('pasted text that could not be saved lands where it was pasted', () => {
+  const at = { start: 4, end: 9, value: 'Fix [sel] now' };
+  assert.equal(insertPasted('Fix [sel] now', 'LOG', at), 'Fix LOG now');
+  assert.equal(insertPasted('Fix it later', 'LOG', at), 'Fix it later\n\nLOG');
+  assert.equal(insertPasted('', 'LOG', { start: null, end: null, value: 'x' }), 'LOG');
 });

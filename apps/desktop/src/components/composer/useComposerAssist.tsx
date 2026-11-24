@@ -13,13 +13,14 @@ import {
   type ComposerCommand,
   type ComposerCommandContext,
   composerCommands,
+  composingKey,
   insertMention,
   matchCommands,
   mentionQuery,
   parseCommand,
   slashQuery,
 } from '../../lib/composer-commands';
-import { searchFiles } from '../../lib/file-search';
+import { proseMention, searchFiles, strongFileMatch } from '../../lib/file-search';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { appendAttachments, attachmentReference } from '../../lib/prompt-attachments';
 import {
@@ -64,6 +65,8 @@ export function useComposerAssist({
   const [caret, setCaret] = useState(0);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<string | null>(null);
+  /** The menu the person moved through with the arrow keys, whose Enter then chooses. */
+  const [navigated, setNavigated] = useState<string | null>(null);
   const browse = useRef<HistoryBrowse | null>(null);
   const pendingCaret = useRef<number | null>(null);
   const remoteHost = useHostContextStore((state) => state.host);
@@ -83,6 +86,11 @@ export function useComposerAssist({
       ? null
       : mentionQuery(text, caret);
   const files = useProjectFiles(projectPath, !!mention);
+  const found = mention?.query ? searchFiles(files, mention.query, 8) : [];
+  const strong = (path?: string) => !!path && !!mention && strongFileMatch(path, mention.query);
+  // "@sam" in a sentence is prose until a file name really starts with it.
+  const quiet =
+    !!mention?.query && proseMention(mention.query) && !found.some((path) => strong(path));
   const options: ComposerMenuOption[] =
     slash !== null
       ? matchCommands(list, slash).map((command) => ({
@@ -93,8 +101,8 @@ export function useComposerAssist({
             command.id === 'provider' ? `Skill · ${command.description}` : command.description,
           command,
         }))
-      : mention?.query
-        ? searchFiles(files, mention.query, 8).map((path) => ({
+      : !quiet
+        ? found.map((path) => ({
             id: `file-${path}`,
             label: path,
             file: path,
@@ -102,7 +110,11 @@ export function useComposerAssist({
         : [];
   const key = slash !== null ? `/${slash}` : mention ? `@${mention.start}:${mention.query}` : null;
   const hint =
-    mention && !options.length ? (mention.query ? 'No matching files' : 'Type a file name') : '';
+    mention && !quiet && !options.length
+      ? mention.query
+        ? 'No matching files'
+        : 'Type a file name'
+      : '';
   const open = !!key && key !== dismissed && (options.length > 0 || !!hint);
   // Escape closes the menu until the draft leaves that command or mention.
   useEffect(() => {
@@ -151,19 +163,12 @@ export function useComposerAssist({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    // WebKit sends the Enter that commits an IME composition after `compositionend`, as
-    // key code 229 with `isComposing` already false.
-    if (
-      event.nativeEvent.isComposing ||
-      event.nativeEvent.keyCode === 229 ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey
-    )
+    if (composingKey(event.nativeEvent) || event.altKey || event.ctrlKey || event.metaKey)
       return false;
     if (open) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
+        setNavigated(key);
         if (options.length)
           setActive(
             (highlighted + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length,
@@ -173,6 +178,10 @@ export function useComposerAssist({
       if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
         const option = options[highlighted];
         if (!option) return false;
+        // Enter after "@word" at the end of a message sends it unless the person picked
+        // a file with the arrows or the highlighted file plainly matches; Tab always picks.
+        if (event.key === 'Enter' && option.file && navigated !== key && !strong(option.file))
+          return false;
         event.preventDefault();
         choose(option);
         return true;

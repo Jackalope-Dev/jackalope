@@ -197,6 +197,18 @@ try {
     .waitFor();
   await input.press('Enter');
   assert.equal(await input.inputValue(), 'See @src/search.tsx\n\nAttached file: src/search.tsx');
+  // A prose-like mention with only a scattered match stays quiet; Tab picks a weak match.
+  await input.fill('');
+  await input.pressSequentially('Thanks @gde');
+  assert.equal(await input.getAttribute('aria-expanded'), 'false');
+  await input.fill('');
+  await input.pressSequentially('@gd.m');
+  await page
+    .getByRole('listbox', { name: 'Files' })
+    .getByRole('option', { name: /docs\/guide\.md/ })
+    .waitFor();
+  await input.press('Tab');
+  assert.equal(await input.inputValue(), '@docs/guide.md\n\nAttached file: docs/guide.md');
   await input.fill('');
   await input.evaluate((field) => {
     const data = new DataTransfer();

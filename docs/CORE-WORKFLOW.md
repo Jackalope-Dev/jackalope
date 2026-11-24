@@ -35,17 +35,22 @@ The new-work, conversation and task follow-up composers share these keyboard aid
   print-mode turns it runs.
 - `@` after whitespace searches the project's Git-listed files (`project_files_list`,
   which honours `.gitignore`) and inserts `@path` plus the same `Attached file:` line a
-  picked file adds. Mentions are unavailable through a remote host or outside Git.
+  picked file adds. Tab picks the highlighted file; Enter picks it only after moving
+  through the list or when a file or folder name starts with what was typed, and
+  otherwise sends. A word-like `@name` with no such match shows no list. Mentions are
+  unavailable through a remote host or outside Git.
 - ArrowUp on the first line (or in an empty field) recalls earlier prompts of that
   conversation, task or project's new work, newest first; ArrowDown goes forward and
   past the newest returns the draft, with any edits kept while browsing.
 - Pasting text of 32 KiB or more, or more than the draft can still hold, saves it as a
   `.txt` file under `.jackalope/attachments` and adds its attachment line, with a chip
-  whose Undo puts the text back where the line was.
+  whose Undo puts the text back where the line was. If saving fails, the error shows and
+  the text goes into the draft instead.
 
 A side question (`/btw`) runs a read-only fork of the attempt's saved agent session
 (`tasks/side_chat.rs`): Claude Code with `--resume --fork-session
---no-session-persistence` in plan mode without edit tools, Codex with `codex exec fork
+--no-session-persistence` in plan mode with only Read, Grep and Glob (Bash, edits,
+subagents and skills refused by name), Codex with `codex exec fork
 --ephemeral` in its read-only sandbox, both without MCP servers, in the attempt's folder
 and account. It takes no coordinator lock or execution guard and claims no workspace, so
 it neither waits for nor interrupts running work, and its answer never enters the

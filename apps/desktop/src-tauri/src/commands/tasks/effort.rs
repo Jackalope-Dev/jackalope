@@ -136,7 +136,8 @@ fn nearest(asked: &'static str, have: &[&'static str]) -> Option<&'static str> {
 }
 
 /// The levels the composer offers for `model` through `adapter`, least thinking first:
-/// the levels Decisions records for that model when it lists any, otherwise the measured
+/// the levels Decisions records for that model that the measured table also accepts (all
+/// measured levels when none overlap), otherwise the measured ones, otherwise the recorded
 /// ones, otherwise low to high. Empty when the agent or model takes no effort level.
 pub(in crate::commands) fn choosable(
     adapter: &str,
@@ -148,19 +149,36 @@ pub(in crate::commands) fn choosable(
         "codex" => CODEX_FLAG,
         _ => return Vec::new(),
     };
-    let offered: Vec<&'static str> = if !recorded.is_empty() {
-        CHOOSABLE
-            .into_iter()
-            .filter(|level| recorded.iter().any(|r| r == level))
-            .collect()
-    } else {
-        match model.and_then(|model| accepted(adapter, model)) {
-            Some(have) => CHOOSABLE
+    let measured: Option<Vec<&'static str>> =
+        model
+            .and_then(|model| accepted(adapter, model))
+            .map(|have| {
+                CHOOSABLE
+                    .into_iter()
+                    .filter(|level| have.contains(level))
+                    .collect()
+            });
+    let recorded: Vec<&'static str> = CHOOSABLE
+        .into_iter()
+        .filter(|level| recorded.iter().any(|r| r == level))
+        .collect();
+    // A recorded level the measured model lacks would be clamped at launch, so only
+    // levels the run actually sends are offered.
+    let offered = match (measured, recorded.is_empty()) {
+        (Some(measured), false) => {
+            let both: Vec<_> = recorded
                 .into_iter()
-                .filter(|level| have.contains(level))
-                .collect(),
-            None => UNMEASURED.to_vec(),
+                .filter(|level| measured.contains(level))
+                .collect();
+            if both.is_empty() {
+                measured
+            } else {
+                both
+            }
         }
+        (Some(measured), true) => measured,
+        (None, false) => recorded,
+        (None, true) => UNMEASURED.to_vec(),
     };
     offered
         .into_iter()
@@ -379,10 +397,17 @@ mod tests {
     #[test]
     fn the_composer_offers_recorded_then_measured_levels_the_flag_takes() {
         let recorded = vec!["max".to_string(), "low".to_string()];
+        // Measured Claude models stop at xhigh, so a recorded max is never offered.
         assert_eq!(
             choosable("claude", Some("claude-opus-5-5"), &recorded),
-            ["low", "max"]
+            ["low"]
         );
+        assert_eq!(
+            choosable("claude", Some("claude-opus-5-5"), &["max".to_string()]),
+            ["low", "medium", "high", "xhigh"]
+        );
+        // An unmeasured model takes what Decisions records, up to the flag's levels.
+        assert_eq!(choosable("claude", Some("opus"), &recorded), ["low", "max"]);
         assert_eq!(choosable("codex", Some("gpt-6.1-sol"), &recorded), ["low"]);
         assert_eq!(
             choosable("claude", Some("claude-opus-5-5"), &[]),
@@ -394,6 +419,29 @@ mod tests {
         );
         assert!(choosable("claude", Some("claude-haiku-4-5"), &[]).is_empty());
         assert!(choosable("gemini", None, &recorded).is_empty());
+    }
+
+    #[test]
+    fn every_offered_level_is_the_level_the_run_sends() {
+        let recorded: Vec<String> = CHOOSABLE.iter().map(|level| level.to_string()).collect();
+        for (adapter, model) in [
+            ("claude", "claude-opus-5-5"),
+            ("claude", "claude-fable-5"),
+            ("claude", "opus"),
+            ("codex", "gpt-6.1-sol"),
+            ("codex", "gpt-5.4"),
+            ("codex", "gpt-6.1-terra"),
+        ] {
+            for offered in [&recorded[..], &[]] {
+                for level in choosable(adapter, Some(model), offered) {
+                    assert_eq!(
+                        requested(adapter, Some(model), level).as_deref(),
+                        Some(level),
+                        "{adapter} {model}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

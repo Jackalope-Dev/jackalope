@@ -11,6 +11,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+/// The only tools a Claude Code side question has: reading and searching the workspace.
+const READ_ONLY_TOOLS: &str = "Read,Grep,Glob";
+/// Claude Code tools that change files, run commands or start other agents.
+const MUTATING_TOOLS: &str =
+    "Bash,BashOutput,KillShell,Edit,MultiEdit,Write,NotebookEdit,Task,Agent,Skill,SlashCommand";
 const LIMIT: Duration = Duration::from_secs(180);
 const QUESTION_LIMIT: usize = 4000;
 
@@ -42,8 +47,13 @@ pub(in crate::commands) fn fork_arguments(
             "--no-session-persistence",
             "--permission-mode",
             "plan",
+            // Plan mode alone leaves refusing a write to the model; only reading tools
+            // exist in the fork, and every tool that changes files or runs commands is
+            // also refused by name.
+            "--tools",
+            READ_ONLY_TOOLS,
             "--disallowedTools",
-            "Edit,Write,MultiEdit,NotebookEdit",
+            MUTATING_TOOLS,
             "--strict-mcp-config",
             "--mcp-config",
             r#"{"mcpServers":{}}"#,
@@ -268,6 +278,31 @@ mod tests {
         let resume = claude.iter().position(|arg| arg == "--resume").unwrap();
         assert_eq!(claude[resume + 1], "s-1");
         assert_eq!(&claude[claude.len() - 2..], ["--model", "claude-opus-5-5"]);
+        let value = |flag: &str| {
+            let at = claude.iter().position(|arg| arg == flag).unwrap();
+            claude[at + 1]
+                .split(',')
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(value("--tools"), ["Read", "Grep", "Glob"]);
+        let refused = value("--disallowedTools");
+        for tool in [
+            "Bash",
+            "BashOutput",
+            "KillShell",
+            "Edit",
+            "MultiEdit",
+            "Write",
+            "NotebookEdit",
+            "Task",
+            "Agent",
+            "Skill",
+            "SlashCommand",
+        ] {
+            assert!(refused.iter().any(|name| name == tool), "{tool}");
+        }
+        assert!(value("--tools").iter().all(|tool| !refused.contains(tool)));
 
         let codex = fork_arguments("codex", "t-1", None).unwrap();
         let fork = codex.iter().position(|arg| arg == "fork").unwrap();

@@ -6,7 +6,7 @@ import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { useProviderSkills } from '../../hooks/useProviderSkills';
 import { agentAdapter, getAgentMetadata } from '../../lib/agent-catalog';
 import { emitAppEvent } from '../../lib/app-events';
-import type { ComposerCommand } from '../../lib/composer-commands';
+import { type ComposerCommand, composingKey } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { isReasoningEffort, type ReasoningEffort } from '../../lib/reasoning-effort';
@@ -215,7 +215,7 @@ export function TaskFollowUpPanel({
               if (
                 (event.ctrlKey || event.metaKey) &&
                 event.key === 'Enter' &&
-                !event.nativeEvent.isComposing
+                !composingKey(event.nativeEvent)
               ) {
                 event.preventDefault();
                 send();

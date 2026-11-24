@@ -102,3 +102,11 @@ export function insertMention(text: string, start: number, caret: number, path: 
   const spaced = after.startsWith(' ') || after.startsWith('\n') ? after : ` ${after}`;
   return { text: `${text.slice(0, start)}${token}${spaced}`, caret: start + token.length + 1 };
 }
+
+/**
+ * Whether a key belongs to an IME composition. WebKit sends the Enter that commits a
+ * composition after `compositionend`, as key code 229 with `isComposing` already false.
+ */
+export function composingKey(event: { isComposing: boolean; keyCode: number }) {
+  return event.isComposing || event.keyCode === 229;
+}

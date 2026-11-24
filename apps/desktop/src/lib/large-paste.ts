@@ -29,3 +29,17 @@ export function restorePaste(draft: string, reference: string, pasted: string) {
   lines.splice(index, 1, pasted);
   return lines.join('\n');
 }
+
+/**
+ * Pasted text placed as the browser would have: over the selection it was pasted on,
+ * when the draft has not changed since, otherwise at the end.
+ */
+export function insertPasted(
+  draft: string,
+  pasted: string,
+  at: { start: number | null; end: number | null; value: string },
+) {
+  if (draft === at.value && at.start !== null && at.end !== null)
+    return `${draft.slice(0, at.start)}${pasted}${draft.slice(at.end)}`;
+  return draft.trim() ? `${draft.replace(/\s+$/, '')}\n\n${pasted}` : pasted;
+}

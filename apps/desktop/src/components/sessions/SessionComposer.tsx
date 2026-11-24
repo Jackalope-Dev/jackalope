@@ -5,7 +5,7 @@ import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { useProviderSkills } from '../../hooks/useProviderSkills';
 import { agentAdapter } from '../../lib/agent-catalog';
 import { emitAppEvent } from '../../lib/app-events';
-import type { ComposerCommand } from '../../lib/composer-commands';
+import { type ComposerCommand, composingKey } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { appendAttachments } from '../../lib/prompt-attachments';
@@ -301,7 +301,7 @@ export function SessionComposer({
         onPaste={attachments.onPaste}
         onKeyDown={(event) => {
           if (assist.onKeyDown(event)) return;
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+          if (event.key === 'Enter' && !event.shiftKey && !composingKey(event.nativeEvent)) {
             event.preventDefault();
             void send();
           }

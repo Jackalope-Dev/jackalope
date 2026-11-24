@@ -350,9 +350,10 @@ See [parallel workflows](PARALLEL-WORKFLOWS.md) for recovery and review behavior
 The composers' effort picker sends a provider level for one send (`reasoningEffort` on
 the request, saved on each conversation message and queued follow-up), separate from
 the prompt-only task approach. It wins over the approach's level, and a conversation
-batch never mixes levels. `task_effort_levels` offers the levels Decisions records for
-that adapter and model, otherwise the measured levels in `tasks/effort.rs`, otherwise
-low to high, limited to what the CLI flag takes (Claude Code `--effort` up to `max`,
+batch never mixes levels. `task_effort_levels` offers only levels the run sends
+unchanged: the levels Decisions records for that adapter and model that the measured
+table in `tasks/effort.rs` also accepts (the measured levels when none overlap),
+otherwise the measured levels, otherwise the recorded ones, otherwise low to high, limited to what the CLI flag takes (Claude Code `--effort` up to `max`,
 Codex `model_reasoning_effort` up to `xhigh`). Agents without an effort flag get no
 picker. Automatic offers low to high and the routed model clamps the level, as it does
 for any level a model lacks.

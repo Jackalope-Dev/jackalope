@@ -8,7 +8,7 @@ import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { useProviderSkills } from '../../hooks/useProviderSkills';
 import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { startComparison } from '../../lib/compare-launch';
-import type { ComposerCommand } from '../../lib/composer-commands';
+import { type ComposerCommand, composingKey } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
@@ -577,7 +577,7 @@ ${incoming}`
             onPaste={attachments.onPaste}
             onKeyDown={(event) => {
               if (assist.onKeyDown(event)) return;
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              if (event.key === 'Enter' && !event.shiftKey && !composingKey(event.nativeEvent)) {
                 event.preventDefault();
                 void send();
               }
