@@ -15,6 +15,8 @@ use std::time::{Duration, Instant};
 
 use super::process_control;
 
+pub mod project;
+
 /// How long a resolution is reused before the disk is checked again, so a
 /// newly installed or selected Xcode is noticed without a restart.
 const CACHE_FOR: Duration = Duration::from_secs(60);
@@ -125,6 +127,72 @@ pub fn apply(command: &mut Command) -> &mut Command {
         }
     }
     command
+}
+
+/// Whether processes Jackalope runs in `workspace` get [`environment`]. Only
+/// Xcode projects do, so other projects keep the system's selection for the
+/// `/usr/bin` tools Xcode also provides (Git, compilers, make).
+pub fn applies_to(workspace: &Path) -> bool {
+    cfg!(target_os = "macos") && project::find(workspace).is_some()
+}
+
+/// [`environment`] for a process in `workspace`, when [`applies_to`] it.
+pub fn environment_for(workspace: &Path) -> Option<(&'static str, OsString)> {
+    if !applies_to(workspace) {
+        return None;
+    }
+    environment()
+}
+
+/// [`apply`] for a process in `workspace`, when [`applies_to`] it.
+pub fn apply_for<'a>(command: &'a mut Command, workspace: &Path) -> &'a mut Command {
+    if applies_to(workspace) {
+        apply(command);
+    }
+    command
+}
+
+/// Why an Xcode project in `root` cannot be built here, quoting what
+/// `xcode-select` reports. `None` when it is not an Xcode project or a full
+/// Xcode is available.
+pub fn readiness_issue(root: &Path) -> Option<String> {
+    project::find(root)?;
+    if !cfg!(target_os = "macos") {
+        return Some("This is an Xcode project. Xcode projects build only on a Mac.".into());
+    }
+    if toolchain().is_some() {
+        return None;
+    }
+    let selected = match selected_dir() {
+        Some(path) => format!("xcode-select points at {}", path.display()),
+        None => "xcode-select reports no developer directory".into(),
+    };
+    Some(format!(
+        "This is an Xcode project, but no full Xcode is installed: {selected}, which has no xcodebuild or Simulator. Install Xcode in Applications; Jackalope finds it there without changing xcode-select."
+    ))
+}
+
+/// Which Xcode tasks use, when it is not the system selection.
+pub fn readiness_note(root: &Path) -> Option<String> {
+    project::find(root)?;
+    let found = toolchain().filter(Toolchain::needs_environment)?;
+    let app = found
+        .developer_dir
+        .parent()
+        .and_then(Path::parent)
+        .unwrap_or(&found.developer_dir);
+    let version = found
+        .version
+        .as_deref()
+        .map(|version| format!(" {version}"))
+        .unwrap_or_default();
+    let selected = selected_dir()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "nothing".into());
+    Some(format!(
+        "Tasks use Xcode{version} at {} because xcode-select points at {selected}.",
+        app.display()
+    ))
 }
 
 /// `xcrun <tool>` against the resolved toolchain, hidden from the console and

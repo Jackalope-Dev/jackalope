@@ -82,6 +82,10 @@ pub struct ProjectRecord {
         deserialize_with = "super::previews::features::lenient"
     )]
     pub feature_map: Vec<super::previews::features::Feature>,
+    /// The device type and runtime of the project's task Simulators. Absent
+    /// uses the newest iOS runtime's standard iPhone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator: Option<super::simulators::SimulatorBase>,
 }
 
 #[derive(Default, Serialize, Deserialize)]

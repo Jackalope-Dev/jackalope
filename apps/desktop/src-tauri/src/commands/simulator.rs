@@ -49,29 +49,12 @@ fn attempts() -> std::sync::MutexGuard<'static, HashMap<String, Attempt>> {
         .unwrap_or_else(|poison| poison.into_inner())
 }
 
-/// The simulator `run`'s tools act on.
-///
-/// This is the seam with task simulators: integration replaces the body with
-/// `simulators::ensure(&run.id, workspace, project)`, which gives each task
-/// its own booted device. Until then it uses `JACKALOPE_SIMULATOR_UDID` from
-/// Jackalope's environment, booting it when needed, else the first booted
-/// simulator.
-fn device_for(_runtime: &TaskRuntime, _run: &TaskRun) -> Result<String, String> {
-    if let Some(udid) = std::env::var("JACKALOPE_SIMULATOR_UDID")
-        .ok()
-        .filter(|udid| !udid.trim().is_empty())
-    {
-        simctl::run(&simctl::bootstatus(udid.trim()), simctl::BOOT_TIMEOUT)?;
-        return Ok(udid.trim().to_string());
-    }
-    simctl::devices()?
-        .into_iter()
-        .find(|device| device.booted)
-        .map(|device| device.udid)
-        .ok_or_else(|| {
-            "No simulator is running. Boot one with xcrun simctl boot <udid>, then call again."
-                .into()
-        })
+/// The task's own Simulator, created and booted within the simulator pool.
+/// Follow-ups in the same workspace get the same device, so app state
+/// persists between turns.
+fn device_for(runtime: &TaskRuntime, run: &TaskRun) -> Result<(String, String), String> {
+    let device = super::simulators::ensure(runtime, &run.id, || !runtime.is_running(&run.id))?;
+    Ok((device.udid, device.name))
 }
 
 /// The attempt's device, resolved once.
@@ -82,11 +65,8 @@ fn device(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String> {
     if !runtime.is_running(&run.id) {
         return Err("This attempt has ended.".into());
     }
-    let udid = device_for(runtime, run)?;
-    let name = simctl::devices()
-        .ok()
-        .and_then(|devices| devices.into_iter().find(|device| device.udid == udid))
-        .map(|device| device.name);
+    let (udid, name) = device_for(runtime, run)?;
+    let name = Some(name);
     attempts().entry(run.id.clone()).or_insert_with(|| Attempt {
         udid: udid.clone(),
         name,

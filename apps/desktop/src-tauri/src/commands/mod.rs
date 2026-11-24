@@ -102,6 +102,7 @@ pub mod issues;
 pub mod remote;
 pub mod review_progress;
 pub mod simulator;
+pub mod simulators;
 pub mod workflow_feedback;
 pub mod xcode;
 

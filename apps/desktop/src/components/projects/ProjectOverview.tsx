@@ -322,6 +322,8 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                     ) : (
                       'Not inspected yet.'
                     )
+                  ) : readiness.toolchainIssue ? (
+                    <span className="project-ready-warning">{readiness.toolchainIssue}</span>
                   ) : readiness.dependenciesMissing ? (
                     <span className="project-ready-warning">
                       Dependencies may need installing (no node_modules folder).

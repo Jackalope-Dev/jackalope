@@ -136,7 +136,9 @@ outcomes and prior checks without claiming those checks still describe current f
 
 Workspace readiness performs bounded, read-only local Git, manifest and environment
 name inspection. It suggests installation, check and development commands; it never
-executes detected scripts. Choosing a suggestion saves the existing explicit project
+executes detected scripts. For an Xcode project it may run `xcodebuild -list` through
+the resolved Xcode, with a timeout, to choose a scheme, and it reports a missing Xcode
+(see [iOS development](IOS-DEVELOPMENT.md#xcode-toolchain-and-project-detection)). Choosing a suggestion saves the existing explicit project
 preparation/check preference. Missing configuration reports names, never values, and
 presence does not prove a value is valid.
 

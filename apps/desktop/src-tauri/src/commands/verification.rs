@@ -175,7 +175,53 @@ fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     cmd.env_remove("JACKALOPE_BRIDGE_TOKEN")
         .env_remove("JACKALOPE_BRIDGE_URL");
     cmd.envs(super::source_packages::environment(Path::new(workspace)));
+    super::xcode::apply_for(&mut cmd, Path::new(workspace));
     Ok(cmd)
+}
+
+/// The task's Simulator for a command in an iOS project, or one that names
+/// `$JACKALOPE_SIMULATOR_UDID`: created for setup, booted for a check. A
+/// device that cannot be had is reported and the command runs without it, so
+/// its own output shows what failed.
+fn task_simulator(
+    runtime: &TaskRuntime,
+    id: &str,
+    workspace: &str,
+    command: &str,
+    booted: bool,
+    canceled: impl Fn() -> bool,
+) -> Option<super::simulators::Device> {
+    if !super::simulators::needed_by_command(workspace, command) {
+        return None;
+    }
+    let device = super::simulators::assign(runtime, id).and_then(|device| {
+        if booted {
+            super::simulators::boot(&device, canceled)
+        } else {
+            Ok(device)
+        }
+    });
+    match device {
+        Ok(device) => Some(device),
+        Err(error) => {
+            runtime.update(id, |run| {
+                activity(run, &format!("No Simulator for this command: {error}"))
+            });
+            None
+        }
+    }
+}
+
+fn with_simulator(
+    mut command: Command,
+    device: Option<&super::simulators::Device>,
+) -> (Command, Option<super::simulators::InUse>) {
+    let Some(device) = device else {
+        return (command, None);
+    };
+    command.envs(device.environment());
+    super::xcode::apply(&mut command);
+    (command, Some(super::simulators::InUse::new(device)))
 }
 
 /// Runs an explicitly requested command in a disposable workspace the caller has reserved,
@@ -188,12 +234,28 @@ pub(in crate::commands) fn run_disposable(
     limits: &TimeLimits,
 ) -> Result<process_control::CommandResult, String> {
     let _slot = leases::check_slot(|| false)?;
-    process_control::run_supervised(
-        shell(command, workspace)?,
-        limits.limits(setup),
-        || false,
-        |_, _| {},
-    )
+    let mut process = shell(command, workspace)?;
+    // A check in a disposable workspace gets a Simulator of its own that is
+    // deleted with it; setup there only gets one when it names the device.
+    let wants = if setup {
+        command.contains("JACKALOPE_SIMULATOR_")
+    } else {
+        super::simulators::needed_by_command(workspace, command)
+    };
+    let simulator = wants.then(|| super::simulators::Disposable::new(workspace, !setup));
+    if let Some(Ok(disposable)) = &simulator {
+        process.envs(disposable.device.environment());
+        super::xcode::apply(&mut process);
+    }
+    let mut result =
+        process_control::run_supervised(process, limits.limits(setup), || false, |_, _| {})?;
+    if let Some(Err(error)) = simulator {
+        result.stderr = format!(
+            "Jackalope could not provide a Simulator: {error}\n{}",
+            result.stderr
+        );
+    }
+    Ok(result)
 }
 
 /// Runs `work` in `workspace` holding its verification lease. Under the
@@ -274,6 +336,9 @@ fn run_preparation(
         leases::check_slot(|| !runtime.is_running(id))
     })?;
     let limits = run_limits(runtime, id);
+    let simulator = task_simulator(runtime, id, workspace, command, false, || {
+        !runtime.is_running(id)
+    });
     let mut attempt = 1;
     let record = loop {
         runtime.update_checked(id, |run| {
@@ -292,8 +357,9 @@ fn run_preparation(
             );
         })?;
         let result = runtime.timed(id, "preparation", || {
+            let (process, _in_use) = with_simulator(shell(command, workspace)?, simulator.as_ref());
             process_control::run_supervised(
-                shell(command, workspace)?,
+                process,
                 limits.limits(true),
                 || !runtime.is_running(id),
                 observer(runtime, id),
@@ -359,6 +425,9 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         let _slot = runtime.timed(&run.id, "verificationWait", || {
             leases::check_slot(|| active && !runtime.is_running(&run.id))
         })?;
+        let simulator = task_simulator(runtime, &run.id, &run.workspace, command, true, || {
+            active && !runtime.is_running(&run.id)
+        });
         let directory = runtime.integration_directory();
         let before = super::integration::workspace_tree(run, &directory)?;
         runtime.stage(&run.id, Some("verification"));
@@ -371,8 +440,10 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
             ))
         });
         let result = runtime.timed(&run.id, "verification", || {
+            let (process, _in_use) =
+                with_simulator(shell(command, &run.workspace)?, simulator.as_ref());
             process_control::run_supervised(
-                shell(command, &run.workspace)?,
+                process,
                 run.time_limits.unwrap_or_default().limits(false),
                 || agent_active && !runtime.is_running(&run.id),
                 observer(runtime, &run.id),

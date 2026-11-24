@@ -76,6 +76,7 @@ export function WorkspaceReadiness({
             <p>
               Branch: {result.branch || 'Detached HEAD'} · {result.head.slice(0, 8)}
             </p>
+            {result.toolchainIssue && <InlineNotice>{result.toolchainIssue}</InlineNotice>}
             {result.dependenciesMissing && (
               <InlineNotice>
                 This workspace has no node_modules folder. Dependencies may need preparing before

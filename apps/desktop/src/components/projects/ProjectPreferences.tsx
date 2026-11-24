@@ -40,6 +40,7 @@ import { ProjectAutomationPreset } from './ProjectAutomationPreset';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { ProjectSecretsSettings } from './ProjectSecretsSettings';
+import { ProjectSimulatorSettings } from './ProjectSimulatorSettings';
 import { ProjectTerminalCommands } from './ProjectTerminalCommands';
 import { ProjectTimeLimitsSettings } from './ProjectTimeLimits';
 import { RemoveProjectAction } from './RemoveProjectAction';
@@ -418,6 +419,7 @@ export function ProjectPreferences({
                 </>
               )}
             </SettingGroup>
+            <ProjectSimulatorSettings project={project} />
             {isMacPlatform() && (
               <SettingGroup title="iPhone and iPad">
                 <SettingRow

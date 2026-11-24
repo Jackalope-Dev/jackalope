@@ -1,4 +1,5 @@
 use super::{git, read};
+use crate::commands::xcode::project::XcodeProject;
 use serde::Serialize;
 use std::path::Path;
 
@@ -9,6 +10,79 @@ pub struct ProjectDefaults {
     pub prepare_command: Option<String>,
     pub verify_command: Option<String>,
     pub preview_command: Option<String>,
+    /// The Xcode project or Swift package, when there is one.
+    pub xcode: Option<XcodeProject>,
+}
+
+/// Tools of Apple projects whose documented commands commonly quote a
+/// `-destination` or scheme, so quotes, commas and `$` are allowed in them.
+const APPLE_TOOLS: [&str; 7] = [
+    "xcodebuild",
+    "swift",
+    "xcodegen",
+    "tuist",
+    "pod",
+    "fastlane",
+    "bundle",
+];
+
+/// Classifies an Apple project command as preparation (`true`) or a check,
+/// with the same ranks as [`command_kind`].
+fn apple_kind(tool: &str, args: &[&str]) -> Option<(bool, usize)> {
+    let action = args.first().copied();
+    match (tool, action) {
+        ("bundle", Some("exec")) => {
+            let (tool, args) = args[1..].split_first()?;
+            apple_kind(tool, args)
+        }
+        ("xcodegen", None | Some("generate")) => Some((true, 0)),
+        ("pod", Some("install")) => Some((true, 0)),
+        ("tuist", Some("install" | "generate")) => Some((true, 0)),
+        ("tuist", Some("test")) => Some((false, 3)),
+        ("swift", Some("test")) => Some((false, 3)),
+        ("swift", Some("build")) => Some((false, 4)),
+        ("swift", Some("package")) if args.get(1) == Some(&"resolve") => Some((true, 0)),
+        ("fastlane", Some("ios" | "mac")) => apple_kind("fastlane", &args[1..]),
+        ("fastlane", Some("test" | "tests" | "scan" | "unit_tests")) => Some((false, 3)),
+        ("xcodebuild", _) => {
+            if args.contains(&"-resolvePackageDependencies") {
+                Some((true, 0))
+            } else if args.contains(&"test") {
+                Some((false, 3))
+            } else if args.contains(&"build") {
+                Some((false, 4))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// A documented Apple command adjusted for a task: an `xcodebuild` Simulator
+/// destination becomes the task's own Simulator, and `tuist generate` does not
+/// open Xcode.
+fn for_task(command: &str) -> String {
+    let mut command = command.to_string();
+    if command.starts_with("xcodebuild ") || command.contains(" xcodebuild ") {
+        if let Some(start) = command.find("-destination ") {
+            let value = start + "-destination ".len();
+            let rest = &command[value..];
+            let end = match rest.chars().next() {
+                Some(quote @ ('\'' | '"')) => rest[1..].find(quote).map(|end| end + 2),
+                _ => Some(rest.find(' ').unwrap_or(rest.len())),
+            };
+            if let Some(end) = end {
+                if rest[..end].to_ascii_lowercase().contains("simulator") {
+                    command.replace_range(value..value + end, "\"id=$JACKALOPE_SIMULATOR_UDID\"");
+                }
+            }
+        }
+    }
+    if command.contains("tuist generate") && !command.contains("--no-open") {
+        command = command.replacen("tuist generate", "tuist generate --no-open", 1);
+    }
+    command
 }
 
 fn target_branch(root: &Path) -> Option<String> {
@@ -88,20 +162,26 @@ fn commands(content: &str) -> Vec<String> {
 }
 
 fn command_kind(command: &str, manifest: Option<&serde_json::Value>) -> Option<(bool, usize)> {
+    let words: Vec<_> = command.split_whitespace().collect();
+    let (tool, args) = words.split_first()?;
+    let apple = APPLE_TOOLS.contains(tool);
     if command.len() > 240
-        || !command
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b" -_./:=@".contains(&b))
+        || !command.bytes().all(|b| {
+            b.is_ascii_alphanumeric()
+                || b" -_./:=@".contains(&b)
+                || (apple && b",'\"$".contains(&b))
+        })
     {
         return None;
     }
-    let words: Vec<_> = command.split_whitespace().collect();
-    let (tool, args) = words.split_first()?;
     if args
         .iter()
         .any(|arg| ["--watch", "-w", "--help", "-h", "--global", "-g"].contains(arg))
     {
         return None;
+    }
+    if apple {
+        return apple_kind(tool, args);
     }
     if *tool == "pytest" {
         return Some((false, 3));
@@ -170,6 +250,7 @@ pub fn detect(root: &Path) -> ProjectDefaults {
         .ok()
         .flatten()
         .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    defaults.xcode = crate::commands::xcode::project::detect(root);
     if let Some(manifest) = &manifest {
         let manager = manager(root, manifest);
         defaults.prepare_command = Some(match manager {
@@ -224,6 +305,9 @@ pub fn detect(root: &Path) -> ProjectDefaults {
             }
             .into(),
         );
+    } else if let Some(project) = &defaults.xcode {
+        defaults.prepare_command = Some(project.prepare_command());
+        defaults.verify_command = Some(project.verify_command());
     }
     let mut preparation_rank = usize::MAX;
     let mut verification_rank = usize::MAX;
@@ -249,6 +333,7 @@ pub fn detect(root: &Path) -> ProjectDefaults {
             };
             if rank < *current_rank {
                 *current_rank = rank;
+                let command = for_task(&command);
                 if preparation {
                     defaults.prepare_command = Some(command);
                 } else {
@@ -349,6 +434,61 @@ mod tests {
         assert_eq!(
             detect(&root).verify_command.as_deref(),
             Some("python -m pytest")
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn xcode_projects_get_simulator_checks_and_documented_apple_commands() {
+        let root = fixture();
+        write(
+            &root,
+            "project.yml",
+            "name: Notes\ntargets:\n  Notes:\n    platform: iOS\n",
+        );
+        let detected = detect(&root);
+        assert_eq!(
+            detected.prepare_command.as_deref(),
+            Some("xcodegen generate")
+        );
+        assert_eq!(
+            detected.verify_command.as_deref(),
+            Some("xcodebuild test -project Notes.xcodeproj -scheme Notes -destination \"id=$JACKALOPE_SIMULATOR_UDID\" -quiet")
+        );
+        assert!(detected.xcode.as_ref().is_some_and(|project| project.ios));
+        write(
+            &root,
+            "README.md",
+            "```sh\nbundle exec pod install\nxcodebuild test -scheme Notes -destination 'platform=iOS Simulator,name=iPhone 17'\n```\nThen `fastlane deploy`.\n",
+        );
+        let detected = detect(&root);
+        assert_eq!(
+            detected.prepare_command.as_deref(),
+            Some("bundle exec pod install")
+        );
+        assert_eq!(
+            detected.verify_command.as_deref(),
+            Some("xcodebuild test -scheme Notes -destination \"id=$JACKALOPE_SIMULATOR_UDID\"")
+        );
+        for (command, kind) in [
+            ("xcodegen", Some((true, 0))),
+            ("tuist generate", Some((true, 0))),
+            ("swift package resolve", Some((true, 0))),
+            ("xcodebuild -resolvePackageDependencies", Some((true, 0))),
+            ("swift test --parallel", Some((false, 3))),
+            ("swift build", Some((false, 4))),
+            ("fastlane ios tests", Some((false, 3))),
+            ("fastlane release", None),
+            ("xcodebuild -list", None),
+            ("xcodebuild test | xcpretty", None),
+            ("pod install; rm -rf Pods", None),
+        ] {
+            assert_eq!(command_kind(command, None), kind, "{command}");
+        }
+        assert_eq!(for_task("tuist generate"), "tuist generate --no-open");
+        assert_eq!(
+            for_task("xcodebuild build -destination generic/platform=iOS"),
+            "xcodebuild build -destination generic/platform=iOS"
         );
         std::fs::remove_dir_all(root).unwrap();
     }

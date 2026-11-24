@@ -7,6 +7,7 @@ import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
+import type { SimulatorBase } from '../lib/simulators.ts';
 import type { TerminalCommand } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
@@ -90,6 +91,8 @@ export interface ProjectPreferences {
   reviewViewports?: ('desktop' | 'narrow')[];
   /** User-facing features whose pages review screenshots prefer when their sources change. */
   featureMap?: FeatureMapEntry[];
+  /** The device type and runtime of task Simulators. Undefined uses the newest standard iPhone. */
+  simulator?: SimulatorBase;
 }
 
 /**
@@ -389,6 +392,7 @@ interface ProjectRecord {
   reviewPages?: string[];
   reviewViewports?: string[];
   featureMap?: FeatureMapEntry[];
+  simulator?: SimulatorBase;
 }
 
 /**
@@ -438,6 +442,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     reviewPages: reviewPagesForRegistry(preferences?.reviewPages),
     reviewViewports: preferences?.reviewViewports?.length ? preferences.reviewViewports : undefined,
     featureMap: featureMapForRegistry(preferences?.featureMap),
+    simulator: preferences?.simulator,
   }));
 }
 
