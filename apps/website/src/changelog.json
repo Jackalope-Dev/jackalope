@@ -34,6 +34,18 @@
     "note": "Rules apply to Claude Code on this device and to permission requests from OpenCode and ACP agents. Codex, Claude Code with persistent sessions turned off, and agents running on a computer are not checked yet."
   },
   {
+    "id": "a-second-opinion-on-every-turn",
+    "date": "2026-11-24",
+    "title": "A second opinion on every turn.",
+    "description": "Turn on the Turn advisor in Project settings and another agent reads each finished task turn, then leaves a few graded notes.",
+    "items": [
+      "Jackalope prefers an advisor from a different model family. It reads the request, reply, changes and checks, and never runs tools.",
+      "Concerns and blockers go back to the working agent as a follow-up it can push back on. Asides are only shown to you.",
+      "Notes appear under each reply in the task's Result tab, marked as sent to the agent or kept for you."
+    ],
+    "note": "The advisor uses its own agent account's quota. It skips turns when that quota is low, when every execution slot is busy, or once a task reaches its review limit."
+  },
+  {
     "id": "agents-work-in-windows-behind-yours",
     "date": "2026-11-24",
     "title": "Agents work in windows behind yours.",

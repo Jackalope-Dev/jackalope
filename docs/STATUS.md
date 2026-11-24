@@ -221,6 +221,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   counts, with Run again in a disposable worktree (its latest output per command is kept
   across reloads) and Send to the author into the follow-up draft. Agent review and a
   plan's combined review also default to a reviewer from another model family.
+- The opt-in Turn advisor in Project settings has an installed agent, preferably from
+  another model family, read each finished task attempt without tools and leave up to
+  five graded notes. Asides stay with the person; concerns and blockers return to the
+  working agent as a follow-up it may push back on, at most two in a row. Per-task review
+  limits, low quota and busy execution slots skip the review with a recorded reason. The
+  task's Result tab shows the notes under each reply. Advisor runs with installed agents
+  remain to be accepted on Windows and macOS.
 - Compared attempts can start a read-only judge, defaulting to a different agent family,
   that scores them against criteria taken from the request, recommends a base and lists
   parts worth porting. Keep and combine drafts a follow-up on the kept attempt and holds

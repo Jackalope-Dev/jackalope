@@ -388,7 +388,8 @@ plan, and returns one JSON object:
 An answer stands only when `decision` is `answer`, `confidence` is at least 0.7 and the
 answer fits the question (one of the options when only options are allowed; a JSON array
 of options for several). Otherwise, or when the attempt fails, takes more than 3 minutes
-or waits more than 3 minutes for one of the three shared decider slots, the question goes
+or waits more than 3 minutes for one of the three decider slots (shared with the
+[turn advisor](CORE-WORKFLOW.md#turn-advisor)), the question goes
 to the person with the decider's reason. Elapsed time never answers anything.
 
 While the decider works the question is saved as `deciding`: it raises no notification,

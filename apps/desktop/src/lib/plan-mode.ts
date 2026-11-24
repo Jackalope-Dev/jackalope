@@ -1,6 +1,7 @@
 import type { PendingUserPrompt } from '@jackalope/contracts/runs';
 import { invokeNative } from './native/transport.ts';
 import type { RunRequest } from './run-types';
+import type { AdvisorSettings } from './turn-advisor.ts';
 
 export type PlanShape = 'single' | 'subtasks' | 'swarm';
 export type PlanStatus = 'planning' | 'draft' | 'approved' | 'running' | 'done';
@@ -105,6 +106,8 @@ export interface PlanSettings {
   orchestrators?: number;
   /** What agents may decide for you in this project's plans. */
   decide?: DecideSettings;
+  /** Whether another agent reads each finished task turn and leaves notes. */
+  advisor?: AdvisorSettings;
 }
 
 /** The project's Autonomy settings; a committed autonomy policy can only make them stricter. */

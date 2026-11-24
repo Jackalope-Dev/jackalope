@@ -260,6 +260,7 @@ impl Coordinator {
         self.auto_start_managed()?;
         // Swarm rounds take the plan store and coordinator locks one at a time.
         crate::commands::planning::rounds::tick(self);
+        crate::commands::turn_advisor::tick(self);
         self.runtime.access.ensure()?;
         self.transact(|inner, guard| {
             self.refresh_pool_locked(inner);
@@ -542,6 +543,18 @@ impl Coordinator {
         })
     }
 
+    /// Whether the coordinator is running and fewer attempts are active than
+    /// its execution limit, so optional helper work may run now.
+    pub(in crate::commands) fn has_free_slot(&self) -> bool {
+        if !self.alive.load(Ordering::Relaxed) {
+            return false;
+        }
+        let limit = self.state().concurrency;
+        self.runtime
+            .integration_runs()
+            .is_ok_and(|runs| runs.iter().filter(|run| run.status.is_active()).count() < limit)
+    }
+
     /// Whether a session or planner attempt that has not started would exceed
     /// the execution limit.
     fn awaits_capacity(&self, inner: &Inner, request: &RunRequest) -> Result<bool, String> {
@@ -705,7 +718,13 @@ impl Coordinator {
 
     pub fn shutdown(&self) {
         self.alive.store(false, Ordering::Relaxed);
+        crate::commands::turn_advisor::cancel_all();
         self.state().enabled.clear();
+    }
+
+    /// Whether the coordinator has not been shut down or reset.
+    pub(in crate::commands) fn running(&self) -> bool {
+        self.alive.load(Ordering::Relaxed)
     }
 
     /// The grant a bridge token was issued for: its task and attempt.
