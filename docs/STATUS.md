@@ -322,6 +322,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Provider refusals never trigger handoff. Retrying a quota-stopped attempt continues
   its worktree changes with an optional focus line; the handoff context sent is kept
   on the attempt.
+  Usage, rate and billing limits are typed with the reset time the provider reports.
+  Stopped tasks and conversations show a usage-limit banner with a reset countdown and
+  can resume at the reset; tasks can also switch to another allowed account or agent.
+  Not yet accepted against live provider limits in an installed app.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.

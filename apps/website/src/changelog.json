@@ -1,5 +1,16 @@
 [
   {
+    "id": "pick-up-where-a-usage-limit-stopped-you",
+    "date": "2026-11-24",
+    "title": "Pick up where a usage limit stopped you.",
+    "description": "When an agent hits a usage limit, Jackalope shows when it resets and can resume the work then.",
+    "items": [
+      "The banner counts down to the reset time the provider reports and shows its own message.",
+      "Resume at reset survives a restart, and tasks can switch to another account or agent instead.",
+      "Notifications and the Inbox say which limit stopped the work and when it resets."
+    ]
+  },
+  {
     "id": "bring-your-claude-code-and-codex-history",
     "date": "2026-11-24",
     "title": "Bring your Claude Code and Codex history.",

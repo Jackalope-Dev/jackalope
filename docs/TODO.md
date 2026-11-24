@@ -149,6 +149,9 @@ release dates.
 
 ## Context, usage and integrations
 
+- [ ] Accept usage-limit resume and account or agent switching against real Claude, Codex
+  and Gemini limits in an installed app, and decide whether conversations may switch
+  agent or account after a limit.
 - [ ] Use Learning activity to calibrate background learning's cadence, probation,
   archive, miss and curator thresholds against real use, and measure whether learned
   lessons reduce repeated corrections before claiming it.
