@@ -29,6 +29,13 @@ test('Windows looks for the command that is not the command prompt', () => {
   assert.equal(presetPath(commandCode, { cmdc: 'C:/npm/cmdc.cmd' }, true), 'C:/npm/cmdc.cmd');
 });
 
+test('Oh My Pi is offered as omp acp', () => {
+  const omp = ACP_PRESETS.find((preset) => preset.id === 'oh-my-pi');
+  assert.deepEqual([omp.binaries, omp.args], [['omp'], ['acp']]);
+  for (const windows of [false, true]) assert.ok(presetCommandNames(windows).includes('omp'));
+  assert.equal(presetPath(omp, { omp: '/usr/local/bin/omp' }, false), '/usr/local/bin/omp');
+});
+
 test('installed presets lead the list', () => {
   const ordered = orderedPresets({ goose: '/usr/local/bin/goose' }, false);
   assert.equal(ordered[0].id, 'goose');

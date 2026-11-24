@@ -23,6 +23,8 @@ export interface KnowledgeEntry {
       | 'adjustment'
       | 'review'
       | 'repository'
+      /** A rule file written for another tool, offered paused. */
+      | 'rules'
       | 'verification'
       | 'correction'
       | 'clarification'

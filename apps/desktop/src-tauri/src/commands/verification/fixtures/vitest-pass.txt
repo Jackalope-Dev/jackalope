@@ -1,0 +1,19 @@
+
+ RUN  v3.2.4 /home/dev/shop
+
+ ✓ src/cart/total.test.ts (14 tests) 9ms
+ ✓ src/cart/discounts.test.ts (22 tests) 15ms
+ ✓ src/catalog/search.test.ts (31 tests) 48ms
+ ✓ src/catalog/filters.test.ts (18 tests) 12ms
+ ✓ src/checkout/address.test.ts (9 tests) 6ms
+ ✓ src/checkout/payment.test.ts (12 tests) 21ms
+stderr | src/checkout/payment.test.ts > payment > retries a declined card
+warning: card processor returned a soft decline; retrying once
+
+ ↓ src/legacy/importer.test.ts (4 tests | 4 skipped)
+ ✓ src/ui/price-tag.test.tsx (7 tests) 33ms
+
+ Test Files  7 passed | 1 skipped (8)
+      Tests  113 passed | 4 skipped (117)
+   Start at  10:22:31
+   Duration  1.84s (transform 412ms, setup 0ms, collect 1.20s, tests 144ms, environment 610ms, prepare 1.05s)

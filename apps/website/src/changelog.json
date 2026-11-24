@@ -1,15 +1,36 @@
 [
   {
-    "id": "lessons-that-steer-agents-as-they-work",
+    "id": "pick-up-quota-stopped-work-where-it-left-off",
     "date": "2026-11-20",
-    "title": "Lessons that steer agents as they work.",
-    "description": "Turn a project lesson into a tool rule that warns about or blocks matching shell commands and file changes while an agent works.",
+    "title": "Pick up quota-stopped work where it left off.",
+    "description": "Retrying a task the provider quota stopped now continues from its changes instead of starting over.",
     "items": [
-      "Match a command or the text being written with a pattern, a file path, or both.",
-      "Warnings let the call run and show the agent your message; blocks refuse it and tell the agent why.",
-      "Every match is recorded in the task's activity."
+      "Add an optional focus line for the next agent, and see the handoff context it received in Task details.",
+      "A provider refusing a request is reported as a refusal and no longer switches accounts."
+    ]
+  },
+  {
+    "id": "bring-rules-from-other-coding-tools",
+    "date": "2026-11-20",
+    "title": "Bring rules from other coding tools.",
+    "description": "Project context offers your Cursor, Windsurf, Cline and GitHub Copilot rule files as lessons you can turn on.",
+    "items": [
+      "Each rule arrives paused and keeps its file's scope, so path rules match requests that name those folders or file types.",
+      "Oh My Pi is listed among the known ACP agents in Add agent."
+    ]
+  },
+  {
+    "id": "your-skills-on-every-computer",
+    "date": "2026-11-20",
+    "title": "Your skills on every computer.",
+    "description": "Skills you keep outside the repo can now sync between your computers through your account, without ever being committed.",
+    "items": [
+      "The new Skills page in Agents shows your Claude Code, Codex and shared agent skills, personal and per project.",
+      "You choose which skills sync. Skill sync is off until you turn it on, and it needs settings sync.",
+      "If a skill changed on two computers, Jackalope shows both copies and waits for you to pick one. Nothing gets overwritten.",
+      "Synced project skills never go into a file the repo tracks, and new ones are kept out of your commits."
     ],
-    "note": "Rules apply to Claude Code and to permission requests from OpenCode and ACP agents. Codex calls are not checked yet."
+    "note": "Committed skills already travel with the repo, so they stay as they are. Skills that look like they hold a credential stay on the computer."
   },
   {
     "id": "keep-working-while-jackalope-uses-a-window",

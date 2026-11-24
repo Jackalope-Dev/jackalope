@@ -76,9 +76,9 @@ export const roadmapStages = [
       },
       {
         title: 'Tools that travel with the work.',
-        summary: 'In-app help, MCP connections, browser sessions, and recurring tasks.',
+        summary: 'In-app help, MCP connections, skills, browser sessions, and recurring tasks.',
         detail:
-          'Ask Jackalope connects your default agent to official help and reviewed changes to appearance, preferences, and tasks. External agents can use the same tools through an opt-in local MCP connection. Automatic project lessons learn from explicit preferences, resolved review feedback with matching checks, and repository patterns, with editable sources in Project context. Background learning works with every agent: it saves your stated preferences, corrections and passing checks while work runs, keeps new lessons on probation until tasks use them, archives unused ones, folds duplicates, and records why each lesson changed. Optional per-project extensions can ask your default agent to reflect too, write active lessons into AGENTS.md and a Claude Code skill, and sync learned lessons through your account. Usage & quota brings account limits, reported tokens, task breakdowns, and export together on one page. The MCP marketplace starts with curated publisher tools, guided setup and connection checks; service sign-in remains account-specific. Codebase maps, task-owned browsers, hourly recurring tasks, and capacity-aware routing keep work connected. Local change-only monitors check committed content without model calls by default. With a connected key, optional Jev assistance can select relevant context, assess result coverage, prioritize review, filter unrelated changes and match Automatic assignments. Repository and model evidence, routing goals and separate assessment usage are implemented; savings and quality need live calibration.',
+          'Ask Jackalope connects your default agent to official help and reviewed changes to appearance, preferences, and tasks. External agents can use the same tools through an opt-in local MCP connection. Automatic project lessons learn from explicit preferences, resolved review feedback with matching checks, and repository patterns, with editable sources in Project context. Background learning works with every agent: it saves your stated preferences, corrections and passing checks while work runs, keeps new lessons on probation until tasks use them, archives unused ones, folds duplicates, and records why each lesson changed. Optional per-project extensions can ask your default agent to reflect too, write active lessons into AGENTS.md and a Claude Code skill, and sync learned lessons through your account. The Skills page shows the personal and project skills your agents use, and Skill Sync keeps the ones you choose the same on each of your computers without committing them; when a skill changed on two computers, you pick which copy to keep. Testing across two installed computers is in progress. Usage & quota brings account limits, reported tokens, task breakdowns, and export together on one page. The MCP marketplace starts with curated publisher tools, guided setup and connection checks; service sign-in remains account-specific. Codebase maps, task-owned browsers, hourly recurring tasks, and capacity-aware routing keep work connected. Local change-only monitors check committed content without model calls by default. With a connected key, optional Jev assistance can select relevant context, assess result coverage, prioritize review, filter unrelated changes and match Automatic assignments. Repository and model evidence, routing goals and separate assessment usage are implemented; savings and quality need live calibration.',
       },
     ],
   },
@@ -196,6 +196,12 @@ export const roadmapStages = [
         summary: 'Shared workflows, team spaces, and hosting choices.',
         detail:
           'We intend to explore team collaboration, managed or self-hosted remote services, and hosted Artifacts repositories that let many agents fork, review and check work in parallel, after validating individual remote workflows. Shared remote workspaces are future work. We have not announced pricing or a release date for these plans.',
+      },
+      {
+        title: 'A place to find skills.',
+        summary: 'Browse and share agent skills.',
+        detail:
+          "Today you share a skill by exporting its folder from the Skills page. We're considering a directory where you can browse skills other people have shared and submit your own. This is exploratory, and we haven't announced a release date.",
       },
     ],
   },

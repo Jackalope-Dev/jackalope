@@ -39,7 +39,7 @@ export function FeedbackPage() {
       history.replaceState(null, '', location.pathname);
       if (!isAccessToken(value)) {
         setError(
-          'Open the private link in your feedback invitation. You can also send feedback from the app’s Updates & support settings.',
+          'Open the private link in your feedback invitation. You can also send feedback from the app’s Help & community settings.',
         );
         return;
       }
@@ -228,7 +228,7 @@ export function FeedbackPage() {
 }
 function feedbackError(error: unknown) {
   if (error instanceof AccessRequestError && error.status === 410)
-    return 'This private link has expired. You can still send feedback from the app’s Updates & support settings.';
+    return 'This private link has expired. You can still send feedback from the app’s Help & community settings.';
   if (error instanceof AccessRequestError && error.status === 429)
     return 'Please wait a minute before trying again. Your draft is still here.';
   return 'We couldn’t complete that request. Your draft is still here; please retry.';

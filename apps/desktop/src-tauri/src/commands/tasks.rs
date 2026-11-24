@@ -566,17 +566,21 @@ pub async fn task_respond_prompt(
 }
 
 /// Start a fresh attempt at a task whose last attempt did not finish, reusing that
-/// attempt's prepared workspace when it is safe to.
+/// attempt's prepared workspace when it is safe to. `focus` leads the progress context
+/// when the retry picks up preserved work.
 #[tauri::command]
 pub async fn task_retry(
     id: String,
+    focus: Option<String>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
 ) -> Result<String, String> {
     let runtime = state.inner().clone();
     let coordinator = coordinator.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        coordinator.start_manual(runtime.retry_request(&id)?)
+        let mut request = runtime.retry_request(&id)?;
+        request.handoff_focus = focus.filter(|focus| !focus.trim().is_empty());
+        coordinator.start_manual(request)
     })
     .await
     .map_err(|e| e.to_string())?

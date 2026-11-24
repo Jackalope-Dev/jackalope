@@ -11,6 +11,7 @@ import { featureMedia } from './feature-media';
 import { InlineLinks } from './InlineLinks';
 import type { MarketingPage as MarketingPageContent } from './marketing-content';
 import { WaitlistButton } from './Signup';
+import './blog.css';
 import './comparisons.css';
 
 export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark: boolean }) {
@@ -178,8 +179,8 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
                   <p>
                     Explore <a href="/agents/">supported agents</a>, learn about{' '}
                     <a href="/git-worktrees-for-ai-agents/">Git worktrees</a>, or read the{' '}
-                    <a href="/guides/review-ai-generated-code/">code review guide</a>. When you’re
-                    ready, sign up free and download the app.
+                    <a href="/blog/review-ai-generated-code-checklist/">AI code review checklist</a>
+                    . When you’re ready, sign up free and download the app.
                   </p>
                   <div className="acquisition-actions">
                     <WaitlistButton />
@@ -246,6 +247,15 @@ function SectionContent({ section }: { section: MarketingPageContent['sections']
             </tbody>
           </table>
         </section>
+      )}
+      {section.code && (
+        <figure className="blog-code">
+          <figcaption>{section.code.label}</figcaption>
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Overflowing code must be keyboard-scrollable. */}
+          <pre tabIndex={0}>
+            <code>{section.code.value}</code>
+          </pre>
+        </figure>
       )}
       {section.bullets && (
         <ul>

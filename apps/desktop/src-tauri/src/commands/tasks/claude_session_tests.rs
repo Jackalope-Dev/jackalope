@@ -85,6 +85,7 @@ fn request(
 ) -> RunRequest {
     RunRequest {
         retry_of: None,
+        handoff_focus: None,
         continues: None,
         live_session_id: None,
         effort: None,

@@ -66,11 +66,12 @@ impl Coordinator {
                 followup.paused = true;
             }
         }
+        let concurrency = device_slots::effective(ledger.concurrency, device_slots::recommended());
         let service = Self {
             inner: Arc::new(Mutex::new(Inner {
                 ledger,
                 enabled: HashSet::new(),
-                concurrency: 3,
+                concurrency,
                 remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
                 remote_projects: HashSet::new(),
                 pool: Default::default(),

@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 const configured = import.meta.env.VITE_ACCESS_API?.trim() || '';
 export const accessOrigin = configured ? new URL(configured).origin : '';
 if (configured && (accessOrigin !== configured || !/^https:\/\//.test(configured))) {
@@ -49,4 +51,35 @@ export function accessMessage(error: unknown) {
     if (error.status === 400) return 'Check the email addresses and try again.';
   }
   return 'Couldn’t connect. Please try again.';
+}
+
+export type SignupMode = 'loading' | 'open' | 'waitlist';
+let openSignup: Promise<boolean> | undefined;
+
+/**
+ * Whether the service runs open signup (confirming the email approves the account)
+ * or waitlist mode. This is a service setting, not a website build variable, so
+ * pages ask at runtime and render mode-neutral copy while `loading`. A site without
+ * the service, or one whose status request fails, is treated as waitlist mode.
+ */
+export function useSignupMode(): SignupMode {
+  const [mode, setMode] = useState<SignupMode>(accessOrigin ? 'loading' : 'waitlist');
+  useEffect(() => {
+    if (!accessOrigin) return;
+    let current = true;
+    openSignup ??= accessRequest<{ openSignup?: boolean }>('status').then(
+      (status) => status.openSignup === true,
+      () => {
+        openSignup = undefined;
+        return false;
+      },
+    );
+    void openSignup.then((open) => {
+      if (current) setMode(open ? 'open' : 'waitlist');
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+  return mode;
 }
