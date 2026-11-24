@@ -732,20 +732,36 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
 }
 
 /// Starts the resident Windows helper, which compiles its C# source, so a change that
-/// breaks the helper fails here rather than on someone's computer.
+/// breaks the helper fails here, with the compiler's message, rather than on someone's
+/// computer.
 #[cfg(windows)]
 #[test]
 fn the_windows_helper_compiles_and_lists_windows() {
-    let mut helper = helper::Helper::new(platform::launcher().unwrap());
-    let listed = helper
-        .call(
-            &json!({"action":"list","deny":[std::process::id()]}),
-            Duration::from_secs(60),
-            &AtomicBool::new(false),
-        )
-        .map_err(String::from)
+    use std::io::Write;
+    use std::process::Stdio;
+    let launch = (platform::launcher().unwrap())().unwrap();
+    let mut command = launch.command;
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .unwrap();
-    assert!(listed["windows"].is_array());
+    {
+        let mut stdin = child.stdin.take().unwrap();
+        for line in &launch.preamble {
+            writeln!(stdin, "{line}").unwrap();
+        }
+        let request = json!({"id":1,"action":"list","deny":[std::process::id()]});
+        writeln!(stdin, "{request}").unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("\"windows\""),
+        "helper output: {stdout}\nerrors: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 /// Opens a disposable form, starts a real indicator and drives the resident

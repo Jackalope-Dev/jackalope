@@ -118,6 +118,8 @@ enum Offer {
     Connections,
     /// A trimmed surface lists it only when the attempt has a saved check.
     SavedCheck,
+    /// Attempts that reconcile other tasks' work; refused to everyone else.
+    Reconciliation,
 }
 
 /// MCP tool annotations.
@@ -301,6 +303,9 @@ impl Tool {
             Offer::ContextRead if !context_read() => {
                 Err(ToolError::refused("Source context reads are not enabled."))
             }
+            Offer::Reconciliation if !run.dependency_snapshot.reconciles => Err(
+                ToolError::refused("Only reconciliation attempts resolve conflict blocks."),
+            ),
             _ => Ok(()),
         }
     }
@@ -680,6 +685,7 @@ fn listed(service: &Coordinator, run: &TaskRun) -> Vec<&'static Tool> {
             Offer::Deferred => surface == Surface::Deferred,
             Offer::Connections => !trimmed || service.runtime.mcp_broker.has_attempt(&run.id),
             Offer::SavedCheck => !trimmed || check,
+            Offer::Reconciliation => run.dependency_snapshot.reconciles,
         })
         .filter(|tool| {
             surface != Surface::Deferred

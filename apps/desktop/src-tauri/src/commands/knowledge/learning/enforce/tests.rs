@@ -45,6 +45,7 @@ fn written(store: &KnowledgeStore, path: &str, content: &str) -> KnowledgeEntry 
             process: Default::default(),
             stale: None,
             enforced: None,
+            tool_rule: None,
             id: uuid::Uuid::new_v4().to_string(),
             project_id: "p".into(),
             project_path: path.into(),
@@ -207,6 +208,7 @@ fn an_accepted_check_retires_a_learned_lesson_and_marks_a_written_one() {
         .save(KnowledgeEntry {
             content: "Route tables live in exactly one module.".into(),
             enforced: None,
+            tool_rule: None,
             ..marked.clone()
         })
         .unwrap();

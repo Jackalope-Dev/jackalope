@@ -61,6 +61,9 @@ saved tool permission rules remain in force. A repeated request containing the s
 denied permission name and pattern stops the attempt without asking again, including
 requests from owned child sessions. Eight denied requests also stop the attempt.
 This guard compares provider-reported scopes, not semantic equivalence between commands.
+A request a project [tool rule](PROJECT-KNOWLEDGE.md#tool-rules) blocks is rejected
+with the rule's message, which OpenCode returns to the model, and counts toward the
+eight denials.
 Unanswered and unrecognized responses stop the attempt after rejecting the action.
 Structured questions retain their choices and descriptions. Stop terminates the
 owned server/process tree. Continuation requires the original idle session and

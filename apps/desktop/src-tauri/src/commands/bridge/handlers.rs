@@ -8,6 +8,7 @@ use crate::commands::{
         BrowserNavigateRequest, BrowserScreenshotRequest, BrowserSnapshotRequest,
         BrowserTabsRequest, ComputerVerifyInput, HumanActionInput, RecordValidationInput,
     },
+    integration,
     mcp_broker::{self, ExecuteInput, SearchInput},
     tasks::{
         runner::record::{record, ToolEvent},
@@ -67,6 +68,60 @@ pub(super) async fn read_context(
             .count() as u64;
     });
     Ok(value)
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ConflictsInput {
+    #[schemars(
+        description = "A workspace-relative file to read; omit to list every conflicted file."
+    )]
+    #[serde(default)]
+    path: Option<String>,
+}
+
+pub(super) async fn conflicts(call: Call, input: ConflictsInput) -> Result<Value, ToolError> {
+    let workspace = call.run().workspace.clone();
+    let listing = tauri::async_runtime::spawn_blocking(move || {
+        integration::conflicts::list(std::path::Path::new(&workspace), input.path.as_deref())
+    })
+    .await
+    .map_err(joined)?
+    .map_err(ToolError::invalid)?;
+    json(listing)
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ResolveConflictsInput {
+    #[schemars(description = "The workspace-relative file.")]
+    path: String,
+    #[schemars(description = "The file's hash from conflicts.")]
+    hash: String,
+    #[schemars(description = "One resolution for every block of the file.")]
+    resolutions: Vec<integration::conflicts::Resolution>,
+}
+
+pub(super) async fn resolve_conflicts(
+    call: Call,
+    input: ResolveConflictsInput,
+) -> Result<Value, ToolError> {
+    if !call.runtime().is_running(&call.run().id) {
+        return Err(ToolError::refused("This attempt has ended."));
+    }
+    let workspace = call.run().workspace.clone();
+    let resolved = tauri::async_runtime::spawn_blocking(move || {
+        integration::conflicts::resolve_file(
+            std::path::Path::new(&workspace),
+            &input.path,
+            &input.hash,
+            &input.resolutions,
+        )
+    })
+    .await
+    .map_err(joined)?
+    .map_err(ToolError::invalid)?;
+    json(resolved)
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]

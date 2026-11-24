@@ -355,6 +355,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   automatic checkpoint commits and have no merge step; a new branch stays for review
   or a pull request. Parallel subtasks, comparisons, schedules and coordinated work
   keep isolated worktrees.
+  A ready review can be split into up to 12 ordered commits the default agent proposes
+  and the person approves; Jackalope applies the split only when the rebuilt commits reach
+  exactly the reviewed tree. Installed-app acceptance of the split remains open.
   Agents can report
   all requirement assessments in one call; review shows their justifications and
   evidence separately from human acceptance.
@@ -362,7 +365,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   checks gate dependent work and integration. Running agents can read and adopt other
   tasks' live unintegrated files, are told when their work stops merging with another
   task's, and can split off subtasks with the user's consent; planned tasks show
-  whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
+  whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation,
+  which resolves diff3 conflict blocks one block at a time through hash-guarded bridge tools,
   and verified local merging; a committed `.jackalope/autonomy.json` limits which paths
   and change sizes merge automatically, can accept outcomes agents proved by running
   them, and lets ready planned and swarm results merge too. Such projects push each
@@ -462,7 +466,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   lesson, especially one agents keep missing, into an architecture, type, lint or test
   check proven against a past instance; accepting it marks the lesson enforced and
   retires learned lessons, and a check that later disappears restores or flags the
-  lesson. On by default per project: agent
+  lesson. A person can give a lesson a **tool rule** (a regular expression over a shell
+  command or written text and/or a path glob) that warns or blocks: Claude Code
+  persistent sessions check shell commands, writes and edits through `PreToolUse`, and
+  OpenCode and ACP permission requests are refused on a block; every match is recorded
+  in the attempt's activity. Codex calls, Claude Code without persistent sessions and
+  agents on a computer are not checked. On by default per project: agent
   reflection with the default agent after work ends (bounded to 4 an hour and 20 a
   day, on that account's quota, through the same gate). Off by default: mirroring
   active lessons into a marked `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
@@ -569,6 +578,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   save times. Their values and managed keys given to an agent are redacted from the
   attempt's saved and displayed record; the agent itself can still use or send them.
   See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
+- Feedback reports, companion responses, Jev requests and exported plans mask known
+  secret values and common credential shapes before they leave the app; local
+  history and agent input are unchanged. See [SECURITY.md](../SECURITY.md).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People

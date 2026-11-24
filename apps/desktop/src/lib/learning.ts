@@ -148,6 +148,8 @@ const ACTION_LABELS: Record<string, string> = {
   enforced: 'Made a check',
   unenforced: 'No longer enforced',
   unreported: 'Check not reported',
+  ruled: 'Made a tool rule',
+  unruled: 'Tool rule removed',
 };
 
 export function ledgerActionLabel(action: string): string {
