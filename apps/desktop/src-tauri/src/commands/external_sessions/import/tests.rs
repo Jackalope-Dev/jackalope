@@ -84,6 +84,16 @@ fn shape(entries: &[TranscriptEntry]) -> Vec<(&'static str, String, Vec<String>,
         .collect()
 }
 
+/// A working directory as Claude Code and Codex record it: absolute in the platform's own form.
+/// `/work/repo` has no drive on Windows, so it is relative there and no session holds it.
+fn recorded_cwd() -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(r"C:\work\repo")
+    } else {
+        PathBuf::from("/work/repo")
+    }
+}
+
 fn strings(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| value.to_string()).collect()
 }
@@ -94,7 +104,7 @@ fn claude_fixture_reads_messages_tools_and_attachments_past_damaged_lines() {
     let file = fixture.session(
         &format!("claude/projects/-repo/{CLAUDE_SESSION}.jsonl"),
         CLAUDE_FIXTURE,
-        Path::new("/work/repo"),
+        &recorded_cwd(),
     );
     let transcript = Source::Claude
         .read_transcript(&file, Transcript::keeping(ENTRIES), SOURCE_BYTES)
@@ -150,10 +160,19 @@ fn claude_fixture_reads_messages_tools_and_attachments_past_damaged_lines() {
     );
     let summary = Source::Claude.summarize(&file).unwrap();
     assert_eq!(summary.session_id, CLAUDE_SESSION);
-    assert_eq!(summary.cwd, "/work/repo");
+    assert_eq!(summary.cwd, recorded_cwd().to_str().unwrap());
     assert_eq!(
         summary.title.as_deref(),
         Some("Fix the off-by-one in the parser")
+    );
+    let relative = fixture.session(
+        &format!("claude/projects/-relative/{CLAUDE_SESSION}.jsonl"),
+        CLAUDE_FIXTURE,
+        Path::new("work/repo"),
+    );
+    assert!(
+        Source::Claude.summarize(&relative).is_none(),
+        "a relative folder cannot be placed in a project"
     );
 }
 
@@ -163,7 +182,7 @@ fn codex_fixture_reads_messages_tools_and_attachments_past_damaged_lines() {
     let file = fixture.session(
         &format!("codex/sessions/2026/11/10/rollout-2026-11-10T15-57-20-{CODEX_THREAD}.jsonl"),
         CODEX_FIXTURE,
-        Path::new("/work/repo"),
+        &recorded_cwd(),
     );
     let transcript = Source::Codex
         .read_transcript(&file, Transcript::keeping(ENTRIES), SOURCE_BYTES)
@@ -217,9 +236,19 @@ fn codex_fixture_reads_messages_tools_and_attachments_past_damaged_lines() {
     assert!(transcript.partial_tail);
     let summary = Source::Codex.summarize(&file).unwrap();
     assert_eq!(summary.session_id, CODEX_THREAD);
+    assert_eq!(summary.cwd, recorded_cwd().to_str().unwrap());
     assert_eq!(
         summary.title.as_deref(),
         Some("Add pagination defaults to the list endpoint")
+    );
+    let relative = fixture.session(
+        &format!("codex/relative/rollout-2026-11-10T15-57-20-{CODEX_THREAD}.jsonl"),
+        CODEX_FIXTURE,
+        Path::new("work/repo"),
+    );
+    assert!(
+        Source::Codex.summarize(&relative).is_none(),
+        "a relative folder cannot be placed in a project"
     );
 }
 
