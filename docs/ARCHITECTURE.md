@@ -118,6 +118,7 @@ changes must preserve both sides and old saved records.
 | account/skill_sync.rs | Opt-in account sync of chosen skills behind settings sync consent: account binding, the per-account choice, pull, revision-checked push, device holdings and deletion |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
+| xcode.rs, xcode/, simulators.rs, simulators/ | The resolved Xcode toolchain, Xcode project detection, and each iOS workspace's own Simulator with its ledger, boot pool and cleanup; see [iOS development](IOS-DEVELOPMENT.md) |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
 | cloudflare.rs, cloudflare/ | The protected Cloudflare connection and Connect Cloudflare sign-in, the product scopes it may request, and the v4 account API client shared by Artifacts, cloud resources and Swarm setup |
 | cloudflare_artifacts.rs, cloudflare_resources.rs | Artifacts repository creation, host-scoped token pushes and review snapshots; per-project cloud resources and their manifest |

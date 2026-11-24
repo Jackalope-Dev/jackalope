@@ -127,6 +127,7 @@ fn hard_block(
     let path = canonical(&wt.path)?;
     super::previews::ensure_idle(&wt.path)?;
     super::verification::ensure_idle(&wt.path)?;
+    super::simulators::ensure_idle(&wt.path)?;
     if repo.starts_with(&path) {
         return Err("Current project folder — kept.".into());
     }
@@ -660,7 +661,9 @@ pub(super) fn remove(
     } else {
         vec!["worktree", "remove", "--", worktree_path]
     };
+    let simulator = super::simulators::workspace_identity(worktree_path);
     repo::git_exact(Path::new(repo_path), &args, Inspection).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
+    super::simulators::release(simulator);
     if delete_branch && !wt.branch.is_empty() {
         delete_merged_branch(
             repo_path,
@@ -946,11 +949,13 @@ fn archive(
         ));
     }
     // Nothing else can be recovered from disk now — take the worktree down.
+    let simulator = super::simulators::workspace_identity(worktree_path);
     repo::git_exact(
         repo,
         &["worktree", "remove", "--force", "--", worktree_path],
         Inspection,
     )?;
+    super::simulators::release(simulator);
     if branch.starts_with("jackalope/") {
         let _ = repo::git_exact(repo, &["branch", "-D", &branch], Inspection);
     }
@@ -1036,7 +1041,11 @@ fn remove_orphan(repo_path: &str, folder_path: &str, runs: &[TaskRun]) -> Result
     if let Some(reason) = folder.blocked_reason {
         return Err(reason);
     }
-    std::fs::remove_dir_all(&target).map_err(|e| format!("Cannot remove {}: {e}. Close terminals, development servers or file viewers using this folder, then retry.", target.display()))
+    super::simulators::ensure_idle(folder_path)?;
+    let simulator = super::simulators::workspace_identity(folder_path);
+    std::fs::remove_dir_all(&target).map_err(|e| format!("Cannot remove {}: {e}. Close terminals, development servers or file viewers using this folder, then retry.", target.display()))?;
+    super::simulators::release(simulator);
+    Ok(())
 }
 
 /// Drop Git's registration for worktrees whose folder is already gone.

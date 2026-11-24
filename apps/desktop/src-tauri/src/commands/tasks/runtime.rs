@@ -1335,6 +1335,38 @@ impl TaskRuntime {
             }
             cmd.envs(secrets);
         }
+        // An iOS project's agent gets the resolved Xcode and its workspace's
+        // own Simulator, which boots while the agent starts.
+        let mut simulator = None;
+        if remote.is_none() {
+            crate::commands::xcode::apply_for(&mut cmd, Path::new(&workspace));
+            if crate::commands::simulators::needed_by_agent(&workspace) {
+                match crate::commands::simulators::assign(self, id) {
+                    Ok(device) => {
+                        cmd.envs(device.environment());
+                        self.update_checked(id, |run| {
+                            activity(
+                                run,
+                                &format!(
+                                    "Simulator for this task: {} ({}).",
+                                    device.name, device.udid
+                                ),
+                            )
+                        })?;
+                        let runtime = self.clone();
+                        let owner = id.to_string();
+                        crate::commands::simulators::boot_in_background(
+                            device.clone(),
+                            move || !runtime.is_running(&owner),
+                        );
+                        simulator = Some(device);
+                    }
+                    Err(error) => self.update_checked(id, |run| {
+                        activity(run, &format!("No Simulator for this task: {error}"))
+                    })?,
+                }
+            }
+        }
         // A resumed session already has its context.
         if req.previous_run_id.is_none() && req.continues.is_none() {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
@@ -1389,6 +1421,9 @@ impl TaskRuntime {
             .map(|run| super::efficiency::launch_context(run, host_parallelism))
             .unwrap_or_default();
         input.push_str(&launch_context);
+        if let Some(device) = &simulator {
+            input.push_str(&device.guidance());
+        }
         let native_mcp = req.coordination.is_some() && spec.bridge() == Bridge::Mcp;
         if native_mcp
             && crate::commands::experiments::is(

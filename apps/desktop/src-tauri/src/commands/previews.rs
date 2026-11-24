@@ -326,6 +326,11 @@ fn preview_process(expanded: &str, workspace: &str, port: u16) -> Command {
         .env("PORT", port.to_string())
         .env_remove("JACKALOPE_BRIDGE_TOKEN")
         .env_remove("JACKALOPE_BRIDGE_URL");
+    super::xcode::apply_for(&mut cmd, std::path::Path::new(workspace));
+    if let Some(device) = super::simulators::assigned(workspace) {
+        cmd.envs(device.environment());
+        super::xcode::apply(&mut cmd);
+    }
     cmd
 }
 

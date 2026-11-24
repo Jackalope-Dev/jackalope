@@ -2154,3 +2154,82 @@ fn reported_input_includes_cache_once_for_every_adapter() {
     );
     assert_eq!(fresh(&antigravity.usage), 10);
 }
+
+/// A saved check that names the task Simulator runs against a booted device
+/// of its own, kept for the workspace's next check and deleted with it. Run on
+/// a Mac with Xcode:
+/// `cargo test --lib check_commands_reach_the_task_simulator -- --ignored --nocapture`
+#[test]
+#[ignore = "boots a real iOS Simulator"]
+fn check_commands_reach_the_task_simulator() {
+    let root = std::env::temp_dir().join(format!("jackalope-sim-check-{}", uuid::Uuid::new_v4()));
+    let workspace = root.join("repo");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let path = workspace.to_str().unwrap();
+    git(path, &["init", "-b", "master"]).unwrap();
+    git(
+        path,
+        &[
+            "-c",
+            "user.name=Trial",
+            "-c",
+            "user.email=trial@example.test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+    )
+    .unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("profile")).unwrap();
+    crate::commands::simulators::initialize(root.join("simulators"), runtime.clone());
+    let mut run = sample("codex");
+    run.id = format!("test{}", uuid::Uuid::new_v4().simple());
+    run.project_path = path.into();
+    run.workspace = path.into();
+    run.base_head = git(path, &["rev-parse", "HEAD"]).unwrap();
+    run.verify_command =
+        Some("xcrun simctl getenv \"$JACKALOPE_SIMULATOR_UDID\" HOME && echo \"$JACKALOPE_SIMULATOR_NAME\"".into());
+    run.auto_verify = true;
+    runtime.save(&run).unwrap();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run.clone());
+    let _cleanup = crate::commands::simulators::ReleaseOnDrop(
+        crate::commands::simulators::workspace_identity(path),
+    );
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    let checked = runtime.run_snapshot(&run.id).unwrap().verification.unwrap();
+    println!(
+        "check output:\n{}{}",
+        checked.result.stdout, checked.result.stderr
+    );
+    assert!(checked.result.success);
+    let device = crate::commands::simulators::assigned(path).unwrap();
+    assert_eq!(device.state, "Booted");
+    assert!(checked.result.stdout.contains(&device.udid));
+    assert!(checked.result.stdout.contains("Jackalope test"));
+
+    std::fs::write(workspace.join("changed.txt"), "again").unwrap();
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    let again = runtime.run_snapshot(&run.id).unwrap().verification.unwrap();
+    assert!(again.result.stdout.contains(&device.udid));
+
+    crate::commands::simulators::release(crate::commands::simulators::workspace_identity(path));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    while crate::commands::simulators::simctl::devices()
+        .unwrap()
+        .iter()
+        .any(|listed| listed.udid == device.udid)
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "device was not deleted"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}

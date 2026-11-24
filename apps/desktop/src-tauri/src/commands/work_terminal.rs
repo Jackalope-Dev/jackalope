@@ -301,6 +301,18 @@ fn spawn_terminal(
         command.env_remove(name);
     }
     command.env_remove("JACKALOPE_BRIDGE_URL");
+    let simulator = super::simulators::assigned(&workspace.to_string_lossy());
+    let toolchain = if simulator.is_some() {
+        super::xcode::environment()
+    } else {
+        super::xcode::environment_for(&workspace)
+    };
+    if let (Some((name, value)), None) = (toolchain, command.get_env("DEVELOPER_DIR")) {
+        command.env(name, value);
+    }
+    for (name, value) in simulator.iter().flat_map(|device| device.environment()) {
+        command.env(name, value);
+    }
     let mut child = pair
         .slave
         .spawn_command(command)

@@ -110,6 +110,7 @@ macro_rules! with_commands {
             commands::reset,
             commands::review_progress,
             commands::schedules,
+            commands::simulators,
             commands::skills,
             commands::system,
             commands::task_strategy,
@@ -303,6 +304,7 @@ pub fn run(launch: Launch) {
             let resetting = reset_on_startup(&directory)?;
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
+            commands::simulators::initialize(directory.join("simulators"), runtime.clone());
             runtime.observe_changes(app.handle().clone());
             commands::computers::pool::restore_health(&runtime.computers_root());
             runtime.launch_lost_host_recovery();

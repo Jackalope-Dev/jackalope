@@ -38,6 +38,7 @@ import { ProjectAutomationPreset } from './ProjectAutomationPreset';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { ProjectSecretsSettings } from './ProjectSecretsSettings';
+import { ProjectSimulatorSettings } from './ProjectSimulatorSettings';
 import { ProjectTerminalCommands } from './ProjectTerminalCommands';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
@@ -414,6 +415,7 @@ export function ProjectPreferences({
                 </>
               )}
             </SettingGroup>
+            <ProjectSimulatorSettings project={project} />
             <ProjectTerminalCommands project={project} />
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="automation" className="project-settings-panel">
