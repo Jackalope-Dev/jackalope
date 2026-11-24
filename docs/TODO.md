@@ -38,7 +38,8 @@ release dates.
   wake, spend), bridge tools, on-demand connections, stdio connections running on the
   computer (npx and uvx servers, the uv install, Claude Code's approval hook and Codex's
   `mcp_servers` overrides), `execute_tool` approvals and project
-  secrets through the relay, Jackalope context (cloud resources manifest and pasted
+  secrets through the relay, Keep API keys on this device with Claude Code and Codex
+  streaming from Anthropic and OpenAI, Jackalope context (cloud resources manifest and pasted
   images) reaching the agent there, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.

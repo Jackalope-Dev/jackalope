@@ -470,6 +470,7 @@ pub(crate) mod tests {
             status: 200,
             content_type: "application/json".into(),
             body: vec![b'x'; crate::commands::computers::relay::ANSWER_LIMIT + 1],
+            piece: None,
         };
         session.answer(&large).unwrap();
         let small = crate::commands::computers::relay::Answer {

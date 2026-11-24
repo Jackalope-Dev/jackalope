@@ -438,10 +438,18 @@ impl Session {
     /// Output after the cursors and new bridge requests. `reclaim` also returns
     /// requests handed over earlier and still unanswered, after a read whose
     /// answer may have been lost.
-    pub fn read(&mut self, out: &mut u64, err: &mut u64, reclaim: bool) -> Result<Page, String> {
+    /// Waits at most `wait_ms` for something new ([`READ_WAIT_MS`] usually;
+    /// shorter while a provider answer streams, so its pieces go out sooner).
+    pub fn read(
+        &mut self,
+        out: &mut u64,
+        err: &mut u64,
+        reclaim: bool,
+        wait_ms: u64,
+    ) -> Result<Page, String> {
         let result = self.call(
-            json!({"action":"run_read","out":*out,"err":*err,"wait_ms":READ_WAIT_MS,"reclaim":reclaim}),
-            Duration::from_millis(READ_WAIT_MS) + Duration::from_secs(30),
+            json!({"action":"run_read","out":*out,"err":*err,"wait_ms":wait_ms,"reclaim":reclaim}),
+            Duration::from_millis(wait_ms) + Duration::from_secs(30),
         )?;
         let decode = |key: &str| {
             base64::engine::general_purpose::STANDARD
@@ -461,13 +469,23 @@ impl Session {
 
     /// Sends one bridge answer to the waiting agent. One above the relay's
     /// answer limit is uploaded as an artifact first, when the runner has them.
-    pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<(), String> {
+    /// A piece of a streamed provider answer carries its offset, whether it is
+    /// the last, and the provider's headers with the first. Returns whether
+    /// the agent was still waiting for it.
+    pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<bool, String> {
         let mut request = json!({
             "action": "run_answer",
             "call": answer.call,
             "status": answer.status,
             "contentType": answer.content_type,
         });
+        if let Some(piece) = &answer.piece {
+            request["piece"] = json!({
+                "offset": piece.offset,
+                "last": piece.last,
+                "headers": piece.headers,
+            });
+        }
         if answer.body.len() > super::relay::ANSWER_LIMIT
             && self.capabilities.has(super::runner::ARTIFACTS)
         {
@@ -476,8 +494,8 @@ impl Session {
         } else {
             request["body"] = json!(base64::engine::general_purpose::STANDARD.encode(&answer.body));
         }
-        self.call(request, CALL_TIMEOUT)?;
-        Ok(())
+        let result = self.call(request, CALL_TIMEOUT)?;
+        Ok(result["delivered"] != false)
     }
 
     pub fn stop(&mut self) -> Result<(), String> {

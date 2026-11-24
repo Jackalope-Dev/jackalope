@@ -449,6 +449,29 @@ API key (`CODEX_API_KEY` and `OPENAI_API_KEY`). They are stored in protected sto
 (`computers/secrets/agent-credentials.bin`), shown only as saved or not, and passed to
 the run's environment only. A missing sign-in fails the attempt with where to add it.
 
+With **Keep API keys on this device** on (Settings → Computers, beta, off by default), an
+agent whose sign-in for computers is an Anthropic or OpenAI API key never receives the
+key. The run gets a random per-attempt token in its place (`ANTHROPIC_API_KEY`, or
+`CODEX_API_KEY` and `OPENAI_API_KEY`) and a base URL on its runner's relay
+(`ANTHROPIC_BASE_URL`, or Codex's `openai_base_url` and `OPENAI_BASE_URL`), set after
+project secrets so none of them can point the agent elsewhere. The relay queues each
+request under `/provider/<provider>/` like a bridge call, without the bridge secret.
+This device (`computers/provider_proxy.rs`) checks the token in constant time and accepts
+only `GET /v1/models`, Anthropic's `POST /v1/messages` and `/v1/messages/count_tokens`,
+and OpenAI's `POST /v1/responses`, `/v1/responses/compact` and `/v1/chat/completions`,
+up to 16 MB. Routes must be plain: percent escapes, backslashes, dot or empty segments
+and fragments are refused, and the parsed URL must keep the provider's host and exactly
+the checked route and query. Only listed request headers are forwarded, the saved key is
+the only credential the provider receives, and the answer streams back in `run_answer`
+pieces of up to 256 KB at byte offsets, the first carrying the listed response headers;
+the runner writes each piece once, in order, and streams it to the agent as it arrives.
+An error answer is read whole and sent without the key or token. The token stops
+working when the attempt ends (at most seven hours), a stream stops when the agent hangs
+up or the run ends, the key and token are redacted from the attempt's record, and the
+attempt's activity counts the requests. A Claude Code sign-in token still goes to the
+computer, as the activity says, and a computer whose runner lacks `provider-proxy`
+fails the attempt instead of receiving the key.
+
 [Project secrets](AGENT-ACCOUNTS.md#project-secrets) whose **Available to** includes agents on computers
 are added to the run's environment as well. They replace a variable of the same name
 from the translated command and are kept even when the value looks like a local path,
@@ -472,6 +495,7 @@ listed, so a computer on an older image keeps the protocol 3 behaviour exactly:
 | `policy-callbacks` | Asks this device before opening a website, and sends the approval hook's questions to `POST /v1/policy` |
 | `artifacts` | Stores and serves content-addressed, resumable transfers, and receives bridge answers above 512 KB from one (see [how workspaces travel](#how-workspaces-travel)) |
 | `git-sync` | Keeps a repository per project and takes workspaces as Git bundles, returning results the same way; used only together with `artifacts` |
+| `provider-proxy` | Relays model provider requests under `/provider/` and streams their answers, for **Keep API keys on this device** |
 
 The bridge reaches the agent through a relay (`computers/relay.rs` and the run's
 supervisor in `agent.py`). The supervisor serves the bridge on a free `127.0.0.1` port
@@ -731,7 +755,8 @@ capacity pool, host health and the placer (with `coordination/hosts.rs` refreshi
 working out each fork's needs and retrying lost hosts), `computers/policy.rs` the
 answers to the runner's policy callbacks and events, `computers/sync.rs` the Git bundles
 of `git-sync`, `computers/artifacts.rs` the artifact transfers,
-`computers/credentials.rs` the agent sign-ins for computers, and
+`computers/credentials.rs` the agent sign-ins for computers,
+`computers/provider_proxy.rs` the provider requests of runs that keep their API key here, and
 `tasks/runner/remote.rs` the attempt side of an agent on a computer, one of the two
 runners behind `tasks/runner.rs` (see [the runner](#the-runner)).
 `desktop_control/computer.rs` runs desktop actions on a computer and
@@ -764,7 +789,8 @@ result lists connections that could not start and the tools the runner serves),
 `run_read` (output after byte offsets and up
 to eight waiting bridge requests, each handed over once unless `reclaim` asks again,
 waiting up to five seconds, with the exit once both streams are read), `run_answer`
-(one bridge answer, inline or as a named artifact), `run_status` (whether the run exists,
+(one bridge answer, inline or as a named artifact, or one piece of a streamed provider
+answer at a byte offset, reporting `delivered: false` once the agent stopped waiting), `run_status` (whether the run exists,
 was uploaded, synced from a bundle and started, and its exit), `run_stop`,
 `workspace_diff` and `workspace_get` (the binary patch from
 the base, including anything the agent committed) and `run_remove` (for a synced run
@@ -861,6 +887,13 @@ runner repository, deltas against the commits it holds, the snapshot staying out
 person's repository, context edits left out, conflicts and bad bundles leaving the
 workspace unchanged, the workspaces that go as files, artifact paths, a session that
 syncs and brings back saved output, and older runners keeping the tar and patch;
+`computers::provider_proxy` covers the token replacing the key in the run, the saved key
+replacing every credential the computer sends, wrong, expired and revoked tokens, the
+route allowlist against encoded, double-encoded, backslash, dot-segment, query and
+fragment tricks, the size limit, error answers without the key, Claude Code sign-in
+tokens staying on the current path, and streaming from a stand-in provider in order as
+events arrive and stopping when told; `computers::relay` also covers joining stream
+pieces, abandoned streams leaving nothing behind and unsent pieces staying in order;
 `computers::artifacts` covers chunked uploads, resuming, skipping stored artifacts,
 resumed downloads, hash mismatches and large bridge answers; `mcp_broker` covers
 lifting the result limit;
@@ -894,7 +927,10 @@ and its reuse, stall and stored output, source reads, declarations in each langu
 repository search ranked like this device's with plain text matches after them, policy
 callbacks that allow only an
 explicit allow (including no answer), site questions skipped for the computer's own pages,
-and screenshots saved in the workspace and returned even when ignored; artifact resume,
+and screenshots saved in the workspace and returned even when ignored; provider requests
+streamed through the relay (chunked request bodies, headers kept or dropped, pieces sent
+again or out of order, a stream the agent left being forgotten, size and browser
+refusals); artifact resume,
 deduplication and hash checks, the git-sync round trip (checkout, history, context and
 setup files kept out of the result, artifacts, deltas, cleanup), refused snapshots and
 large answers delivered from an artifact. The

@@ -16,7 +16,7 @@
 //! device's copy stays identical to what they read.
 
 use super::*;
-use crate::commands::computers::{pool, relay, runner};
+use crate::commands::computers::{pool, provider_proxy, relay, runner};
 
 /// How long a run waits for its computer to start; a first image build is slow.
 const START_WAIT: Duration = Duration::from_secs(20 * 60);
@@ -26,6 +26,8 @@ const START_WAIT: Duration = Duration::from_secs(20 * 60);
 const LOST_WINDOW: Duration = Duration::from_secs(30 * 60);
 /// Failed reads, about two seconds apart, between reconnection attempts.
 const RECONNECT_EVERY: u32 = 5;
+/// How long a read waits while a provider answer streams.
+const STREAMING_READ_WAIT_MS: u64 = 100;
 
 /// How a remote run's reading ended.
 struct Followed {
@@ -44,6 +46,9 @@ pub(in crate::commands::tasks) struct RemoteRunner {
     session: Option<runs::Session>,
     /// The agent reaches this device's bridge through the relay.
     relayed: bool,
+    /// The agent reaches its model provider through this device, which keeps
+    /// the API key; revoked when the runner is dropped.
+    proxy: Option<provider_proxy::Held>,
     /// The runner receives large bridge answers whole, as artifacts.
     large_answers: bool,
     argv: Vec<String>,
@@ -76,6 +81,7 @@ impl RemoteRunner {
             },
             session: None,
             relayed: false,
+            proxy: None,
             large_answers: false,
             argv: Vec::new(),
             env: Vec::new(),
@@ -200,7 +206,7 @@ impl AttemptRunner for RemoteRunner {
                 format!("\nAn answer from on-demand tools can reach this computer only up to about {} KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024)
             });
         }
-        let (argv, mut env) = runs::translate(
+        let (mut argv, mut env) = runs::translate(
             adapter,
             &launch.cmd,
             &root,
@@ -226,10 +232,23 @@ impl AttemptRunner for RemoteRunner {
             });
         }
         runs::add_secrets(&mut env, secrets);
-        let protected = crate::commands::redaction::injected(
+        self.proxy = keep_key_here(
+            runtime,
+            id,
+            adapter,
+            &computer,
+            &session.capabilities,
+            status.is_some(),
+            &mut argv,
+            &mut env,
+        )?;
+        let mut protected = crate::commands::redaction::injected(
             env.iter().map(|(name, value)| (name, value)),
             &names,
         );
+        if let Some(grant) = &self.proxy {
+            protected.extend(grant.protected());
+        }
         if !protected.is_empty() {
             runtime.update_checked(id, |run| run.protect(protected))?;
         }
@@ -307,13 +326,15 @@ impl AttemptRunner for RemoteRunner {
             parts.insert("local".into(), local);
         }
         let relayed = self.relayed;
+        // The runner's relay also carries provider requests when the key stays here.
+        let relay = relayed || self.proxy.is_some();
         let (argv, env) = (
             std::mem::take(&mut self.argv),
             std::mem::take(&mut self.env),
         );
         let started = self
             .session()
-            .start(&argv, &env, &launch.input, relayed, &parts)?;
+            .start(&argv, &env, &launch.input, relay, &parts)?;
         self.immediate = started.exit;
         let computer = &self.computer;
         if relayed {
@@ -375,15 +396,22 @@ impl AttemptRunner for RemoteRunner {
     ) -> Result<Option<Outcome>, String> {
         let id = launch.id;
         let bridge = launch.req.coordination.as_ref().filter(|_| self.relayed);
-        let mut relay = bridge.map(|b| {
-            relay::Relay::new(&b.endpoint, &b.token, self.access.clone()).with_answer_limit(
-                if self.large_answers {
-                    relay::LARGE_ANSWER_LIMIT
-                } else {
-                    relay::ANSWER_LIMIT
-                },
-            )
-        });
+        let grant = self.proxy.as_ref().map(provider_proxy::Held::shared);
+        let mut relay = match bridge {
+            Some(b) => Some(
+                relay::Relay::new(&b.endpoint, &b.token, self.access.clone()).with_answer_limit(
+                    if self.large_answers {
+                        relay::LARGE_ANSWER_LIMIT
+                    } else {
+                        relay::ANSWER_LIMIT
+                    },
+                ),
+            ),
+            None => grant
+                .as_ref()
+                .map(|_| relay::Relay::provider_only(self.access.clone())),
+        }
+        .map(|relay| relay.with_provider_proxy(grant));
         let launched = self.launched.unwrap_or_else(std::time::Instant::now);
         let followed = match self.immediate.take() {
             Some(exit) => Followed {
@@ -393,8 +421,17 @@ impl AttemptRunner for RemoteRunner {
             },
             None => self.follow_run(runtime, id, launch.adapter, launched, &mut relay),
         };
-        self.lost = followed.lost;
+        // The run has ended or lost contact: its provider streams stop and its
+        // token is no longer honoured.
+        drop(relay);
         let computer = &self.computer;
+        if let Some(grant) = self.proxy.take() {
+            grant.revoke();
+            if let Some(line) = grant.summary(&computer.name) {
+                runtime.update(id, |run| activity(run, &line));
+            }
+        }
+        self.lost = followed.lost;
         let exit = followed.exit.as_ref();
         let code = exit
             .and_then(|exit| exit["code"].as_i64())
@@ -493,13 +530,32 @@ impl RemoteRunner {
                 computers::usage::note(&root, &computer.id);
                 last_note = std::time::Instant::now();
             }
+            let mut wait = runs::READ_WAIT_MS;
             if let Some(relay) = relay.as_mut() {
+                // After one answer fails, the rest wait for the next round, so
+                // a stream's pieces arrive in order.
+                let mut failed = lost_since.is_some();
                 for answer in relay.answers() {
-                    let sent = lost_since.is_none() && session.answer(&answer).is_ok();
-                    relay.delivered(answer, sent);
+                    let delivered = if failed {
+                        None
+                    } else {
+                        session.answer(&answer).ok()
+                    };
+                    match delivered {
+                        // The agent stopped waiting for a streamed answer.
+                        Some(false) if answer.piece.is_some() => relay.abandon(&answer.call),
+                        Some(_) => relay.delivered(answer, true),
+                        None => {
+                            failed = true;
+                            relay.delivered(answer, false);
+                        }
+                    }
+                }
+                if relay.streaming() {
+                    wait = STREAMING_READ_WAIT_MS;
                 }
             }
-            match session.read(&mut out, &mut err, reclaim) {
+            match session.read(&mut out, &mut err, reclaim, wait) {
                 Ok(page) => {
                     failures = 0;
                     reclaim = false;
@@ -982,6 +1038,49 @@ fn placement_activity(
         ));
     }
     text
+}
+
+/// With **Keep API keys on this device** on, gives the run a token and a base
+/// URL on its runner's relay in place of the saved API key. A Claude Code
+/// sign-in token still goes to the computer, as the activity says. A computer
+/// whose runner cannot carry provider requests fails the attempt rather than
+/// receive the key.
+#[allow(clippy::too_many_arguments)]
+fn keep_key_here(
+    runtime: &TaskRuntime,
+    id: &str,
+    adapter: &str,
+    computer: &Computer,
+    capabilities: &runner::RunnerCapabilities,
+    answers_status: bool,
+    argv: &mut Vec<String>,
+    env: &mut runs::Environment,
+) -> Result<Option<provider_proxy::Held>, String> {
+    let root = runtime.computers_root();
+    if !computers::usage::preferences(&root).keep_api_keys_on_device {
+        return Ok(None);
+    }
+    let grant = match provider_proxy::grant(&root, adapter) {
+        Ok(grant) => grant,
+        Err(reason) => {
+            runtime.update(id, |run| activity(run, &reason));
+            return Ok(None);
+        }
+    };
+    if !answers_status || !capabilities.has(runner::PROVIDER_PROXY) {
+        return Err(format!(
+            "Keep API keys on this device is on, but {} cannot carry provider requests yet, so the agent did not start. Update its image, or turn the setting off in Settings → Computers.",
+            computer.name
+        ));
+    }
+    grant.apply(adapter, argv, env);
+    let line = format!(
+        "The agent on {} reaches {} through this device, which keeps the API key.",
+        computer.name,
+        grant.provider().label()
+    );
+    runtime.update(id, |run| activity(run, &line));
+    Ok(Some(provider_proxy::Held::new(grant)))
 }
 
 fn megabytes(bytes: u64) -> String {

@@ -1,5 +1,15 @@
 [
   {
+    "id": "keep-api-keys-off-agent-computers",
+    "date": "2026-11-24",
+    "title": "Keep API keys off agent computers.",
+    "description": "Agents on a computer can now reach Anthropic and OpenAI through Jackalope, so your saved API key never leaves this device.",
+    "items": [
+      "Turn on Keep API keys on this device in Settings → Computers. Each attempt gets its own token, which stops working when the attempt ends.",
+      "Responses still stream to the agent as they arrive. Claude Code sign-in tokens go to the computer as before."
+    ]
+  },
+  {
     "id": "pick-up-quota-stopped-work-where-it-left-off",
     "date": "2026-11-20",
     "title": "Pick up quota-stopped work where it left off.",

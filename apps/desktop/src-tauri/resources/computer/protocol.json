@@ -52,6 +52,7 @@
     "credentialHeaders": ["authorization", "x-api-key"],
     "headers": [
       "content-type",
+      "content-encoding",
       "accept",
       "user-agent",
       "anthropic-version",

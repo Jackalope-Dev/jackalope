@@ -518,7 +518,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   (Rust, TypeScript, JavaScript, Python and Go) the way this device ranks its symbol
   map, then plain text matches.
   Control tools reach this device through a relay that keeps the bridge credential here;
-  desktop control acts on that computer. An image on protocol 3 or older keeps the
+  desktop control acts on that computer. With **Keep API keys on this device** (Settings
+  → Computers, off by default) an Anthropic or OpenAI API key stays here too: the agent
+  gets a per-attempt token and reaches only the provider's model routes through that
+  relay, which adds the key and streams the answer back; a Claude Code sign-in token still
+  goes to the computer. An image on protocol 3 or older keeps the
   earlier tools: browser tools only on a local sandbox with networking and
   workspace-reading tools only for read-only attempts. `peer_adopt` and
   `browser_open_profile` are unavailable. Selected on-demand HTTP connections, and every on-demand connection of a
@@ -862,8 +866,9 @@ stop are covered by unit tests only. Agents on a computer are covered by unit te
 agent's POSIX run, relay and runner tests and the opt-in Docker trial with a stand-in agent;
 attempts on this device and on a computer share one runner path, which a unit test drives
 with a real local agent process and a stand-in computer runner;
-real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
-agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
+real Claude Code or Codex runs there (including through Keep API keys on this device,
+which is covered by unit and runner tests with a stand-in provider only), bridge, desktop
+and browser tools used by a real agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
 recovery against a real computer, Git-synced workspaces and artifacts against a built
 image from Windows and macOS hosts, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37

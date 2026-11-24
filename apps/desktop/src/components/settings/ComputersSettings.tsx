@@ -86,6 +86,13 @@ export function ComputersSettings() {
     return () => window.clearInterval(timer);
   }, [live]);
 
+  const changePreferences = (change: Partial<ComputerPreferences>) => {
+    if (!preferences) return;
+    void setComputerPreferences({ ...preferences, ...change }).then(setPreferences, (cause) =>
+      setError(describeError(cause)),
+    );
+  };
+
   const replace = (next: ComputerStatus) =>
     setComputers((current) => current.map((item) => (item.id === next.id ? next : item)));
 
@@ -160,11 +167,7 @@ export function ComputersSettings() {
             label="Keep computers running when Jackalope quits"
             checked={preferences?.keepRunningOnQuit ?? false}
             disabled={!preferences}
-            onCheckedChange={(keepRunningOnQuit) =>
-              void setComputerPreferences({ keepRunningOnQuit }).then(setPreferences, (cause) =>
-                setError(describeError(cause)),
-              )
-            }
+            onCheckedChange={(keepRunningOnQuit) => changePreferences({ keepRunningOnQuit })}
           />
         </SettingRow>
       </SettingGroup>
@@ -234,7 +237,13 @@ export function ComputersSettings() {
 
       <Agent37Settings />
 
-      <AgentSignIns />
+      <AgentSignIns
+        keepApiKeysOnDevice={preferences?.keepApiKeysOnDevice ?? false}
+        disabled={!preferences}
+        onKeepApiKeysOnDeviceChange={(keepApiKeysOnDevice) =>
+          changePreferences({ keepApiKeysOnDevice })
+        }
+      />
 
       <SettingGroup
         title="Computers"
