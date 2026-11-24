@@ -116,8 +116,8 @@ Project review lessons require resolved feedback and matching successful checks.
 Background learning keeps learned lessons on probation, archives unused ones, folds
 near-duplicates and records their history; its thresholds and any effect on
 corrections need real-use calibration. Opt-in account sync of learned lessons,
-optional agent reflection and export to `AGENTS.md` and a Claude Code skill are
-implemented and need installed acceptance.
+optional agent reflection, export to `AGENTS.md` and a Claude Code skill, and
+person-made tool rules on lessons are implemented and need installed acceptance.
 Chronological history comparisons and bounded offline prompt optimization have
 separate validation and held-out gates. Representative first-pass acceptance and
 actual correction counts still need measurement before making outcome claims.

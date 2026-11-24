@@ -280,6 +280,57 @@ gone, a lesson Jackalope wrote loses the mark and, if it was retired for it, is
 supplied to tasks again. Any other lesson is only flagged **Check missing**, offering
 **Make it a check** again; the flag clears when the file or script returns.
 
+### Tool rules
+
+A lesson can also steer agents while they act. Choose **Add tool rule** on a lesson
+in Project → Context, or turn on **Check agents' tool calls against this lesson** in
+its editor. A rule names the calls it covers (shell commands, file writes, file
+edits), a regular expression searched in the command or the text written, and/or a
+glob over the workspace-relative path (without a `/` it matches the file name in any
+folder), a message, and what happens on a match:
+
+- **Warn** lets the call run and shows the agent the message.
+- **Block** refuses the call with the message as the reason.
+
+Only the person makes rules; reflection, the curator and sync never add, change or
+remove one. Adding or changing a rule makes a learned lesson yours, as an edit does,
+and while it has a rule it is never archived or rewritten automatically, even if a
+synced copy says otherwise. Its history records the rule. A rule applies while its
+lesson is available: pausing, archiving or removing the lesson stops it. Edits match
+the text they write, not the text they replace. Paths are matched after `.` and `..`
+are resolved, so `src/../migrations/a.sql` matches `migrations/*.sql`.
+
+Patterns use the Rust `regex` syntax, which matches in time linear in the input: no
+backreferences or lookaround. A pattern is limited to 500 characters and a 1 MB
+compiled size, a path to 240 characters and a message to 800; invalid rules are
+refused when saved. Each call is matched against at most its first 256 KB.
+
+Where rules apply:
+
+- **Claude Code** with a persistent session (the default) registers a `PreToolUse`
+  callback for Bash, PowerShell, Write, Edit, MultiEdit and NotebookEdit. A block
+  answers `permissionDecision: "deny"` with the reason; a warning returns
+  `additionalContext` without a decision, so the usual permission flow still applies.
+  Rules saved during a conversation apply to its next tool call.
+- **OpenCode** and **ACP agents** (Kimi Code and custom ACP agents) are checked when
+  they ask permission. A block rejects the request; OpenCode returns the message to
+  the model, while ACP has no reason field, so the agent sees a plain rejection and the
+  attempt stops with the rule's reason. Warnings are recorded only. OpenCode does not
+  ask before shell commands or edits by default, so its rules only see requests its
+  permission settings ask about. OpenCode asks the same `edit` permission for writes,
+  edits and patches, so a rule for either file writes or file edits applies to all
+  three. Kimi's requests carry only a title and a diff, so the arguments Kimi streamed
+  for that call earlier are matched instead.
+- Not checked: Codex and the other adapters, Claude Code with persistent sessions
+  turned off, and any agent running on a [computer](BOT-COMPUTERS.md#agents-on-a-computer).
+
+Rules fail open. If the project's lessons cannot be read, no rule applies; a rule
+saved earlier that no longer compiles is skipped and logged; and if the Claude Code
+check does not answer within its 10-second hook timeout, the call goes ahead.
+
+Every match adds a line such as `Tool rule "Use pnpm" denied Bash: npm install` to the
+attempt's activity.
+
 ### Thresholds and activity
 
 Every tunable lives in `Thresholds` (`THRESHOLDS`) in
@@ -416,8 +467,10 @@ own the curator, agent reflection, export, the stale-lesson check, lesson enforc
 and the sync data model. Learned lessons keep their status and use counts under the
 entry's `automatic.lifecycle`, including miss counts; the stale-lesson note is the
 entry's local `stale` field and the enforcing check is its local `enforced` field;
-a task's link to the lesson it enforces lives on its context receipt. Entries and tasks
-saved before these existed load unchanged. Learned
+a task's link to the lesson it enforces lives on its context receipt.
+`commands/knowledge/tool_rules.rs` owns tool rules, kept in the entry's local `toolRule`
+field, and their matching; `automatic/rules.rs` reads other tools' rule files. Entries
+and tasks saved before these existed load unchanged. Learned
 ids derive from the project ID and the lesson, not the folder; project IDs belong to
 one installation, so sync matches projects by repository instead. History is
 append-only JSON Lines in `task-runs-v1/knowledge/ledger/`, one file per project; past

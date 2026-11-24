@@ -343,3 +343,32 @@ fn the_project_key_comes_from_root_commits_not_the_path() {
     assert!(projects.is_empty());
     assert_eq!(unavailable, 1);
 }
+
+#[test]
+fn a_synced_copy_never_hands_a_ruled_lesson_back_to_jackalope() {
+    let (store, project) = fixture();
+    let mut entry = learn(&store, &project, "Always use pnpm instead of npm here.");
+    entry.tool_rule = Some(
+        serde_json::from_value(serde_json::json!({
+            "tools":["shell"],"pattern":"npm","message":"Use pnpm."
+        }))
+        .unwrap(),
+    );
+    let entry = store.save(entry).unwrap();
+    let mut remote = outgoing_lesson(&entry, &project.key).unwrap();
+    remote.revision = entry.revision + 1;
+    remote.updated_at = millis(&entry.updated_at) + 10;
+    remote.lesson.as_mut().unwrap().managed = true;
+    remote.lesson.as_mut().unwrap().title = "Newer title".into();
+    store
+        .sync_apply(
+            std::slice::from_ref(&project),
+            std::slice::from_ref(&remote),
+            &[],
+        )
+        .unwrap();
+    let local = store.list("p", &project.path).unwrap().remove(0);
+    assert_eq!(local.title, "Newer title");
+    assert!(!local.automatic.as_ref().unwrap().managed);
+    assert!(local.tool_rule.is_some());
+}

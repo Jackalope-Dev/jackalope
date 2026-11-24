@@ -58,6 +58,7 @@ pub(super) fn drive_with_servers(
     let mut usage_text = String::new();
     let mut usage_baseline: Option<(u64, u64)> = None;
     let mut terminal_result = None;
+    let mut calls = std::collections::HashMap::new();
     loop {
         let mut bytes = Vec::new();
         let size = match (&mut output).take(1_000_001).read_until(b'\n', &mut bytes) {
@@ -129,7 +130,12 @@ pub(super) fn drive_with_servers(
                     && expected == 3
                     && event["params"]["sessionId"].as_str() == session.as_deref()
                 {
-                    let outcome = permission(&event["params"]);
+                    let mut params = event["params"].clone();
+                    params[KNOWN_CALL] = known_call(&calls, &params["toolCall"]);
+                    let mut outcome = permission(&params);
+                    let reason = outcome
+                        .as_object_mut()
+                        .and_then(|outcome| outcome.remove(REASON));
                     let denied = outcome["outcome"] != "selected"
                         || event["params"]["options"]
                             .as_array()
@@ -145,6 +151,9 @@ pub(super) fn drive_with_servers(
                         input,
                         &json!({"jsonrpc":"2.0","id":id,"result":{"outcome":outcome}}),
                     )?;
+                    if let Some(reason) = reason.as_ref().and_then(Value::as_str) {
+                        return Err(format!("{reason}\nThe agent ends its turn when a request is declined. Change the task or the rule before continuing."));
+                    }
                     if denied {
                         return Err("Kimi permission was declined or unanswered. Review the task before continuing.".into());
                     }
@@ -174,6 +183,7 @@ pub(super) fn drive_with_servers(
                 && event["params"]["sessionId"].as_str() == session.as_deref()
             {
                 let update = &event["params"]["update"];
+                remember_call(&mut calls, update);
                 if expected == 3
                     || ([4, 5].contains(&expected) && update["sessionUpdate"] == "usage_update")
                 {
@@ -464,6 +474,69 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
     }
 }
 
+/// Where [`permission`] puts a tool rule's denial reason in its outcome.
+const REASON: &str = "jackalopeRuleReason";
+
+/// Where `drive_with_servers` gives [`permission`] the requested tool call
+/// merged with what earlier updates reported about it. Never sent to the agent.
+const KNOWN_CALL: &str = "jackalopeKnownCall";
+
+/// Calls remembered at once; a turn's permission request follows its own call.
+const KNOWN_CALLS: usize = 16;
+
+/// Keeps what `tool_call` updates report about each call, because a permission
+/// request carries only some fields (Kimi sends only the title and a diff or
+/// description). Kimi reports no `rawInput`; it streams the call's JSON
+/// arguments as the text content, so those are kept instead.
+fn remember_call(calls: &mut std::collections::HashMap<String, Value>, update: &Value) {
+    if !matches!(
+        update["sessionUpdate"].as_str(),
+        Some("tool_call" | "tool_call_update")
+    ) {
+        return;
+    }
+    let Some(id) = update["toolCallId"].as_str() else {
+        return;
+    };
+    if calls.len() >= KNOWN_CALLS && !calls.contains_key(id) {
+        calls.clear();
+    }
+    let known = calls.entry(id.to_string()).or_insert_with(|| json!({}));
+    for key in ["kind", "title", "rawInput", "locations"] {
+        if !update[key].is_null() {
+            known[key] = update[key].clone();
+        }
+    }
+    if let Some([item]) = update["content"].as_array().map(Vec::as_slice) {
+        if let Some(arguments) = item["content"]["text"]
+            .as_str()
+            .and_then(|text| serde_json::from_str::<Value>(text).ok())
+            .filter(Value::is_object)
+        {
+            known["arguments"] = arguments;
+        }
+    }
+}
+
+/// The requested call over what was known about it; reported arguments stand
+/// in for a missing `rawInput`.
+fn known_call(calls: &std::collections::HashMap<String, Value>, tool_call: &Value) -> Value {
+    let mut call = tool_call["toolCallId"]
+        .as_str()
+        .and_then(|id| calls.get(id))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    for (key, value) in tool_call.as_object().into_iter().flatten() {
+        if !value.is_null() {
+            call[key] = value.clone();
+        }
+    }
+    if call["rawInput"].is_null() && call["arguments"].is_object() {
+        call["rawInput"] = call["arguments"].take();
+    }
+    call
+}
+
 pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) -> Value {
     if params["mode"] == "form" {
         return questions::answer(params, |question, options, multiple| {
@@ -502,6 +575,38 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         return json!({"outcome":"cancelled"});
     }
     let tool_call = &params["toolCall"];
+    let label = format!(
+        "{}: {}",
+        tool_call["title"].as_str().unwrap_or("Tool"),
+        crate::commands::permission_risk::label("", &tool_call["rawInput"])
+            .trim_start_matches(": ")
+    );
+    // ACP has no field for a reason, so the agent sees a rejection; the reason
+    // rides along under `REASON` for the attempt's error and is removed before sending.
+    if let Some(reason) = crate::commands::knowledge::tool_rules::check_request(
+        runtime,
+        run_id,
+        &label,
+        |workspace| {
+            crate::commands::knowledge::tool_rules::ToolCall::acp(
+                params.get(KNOWN_CALL).unwrap_or(tool_call),
+                workspace,
+            )
+        },
+    ) {
+        let mut outcome = params["options"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|option| option["kind"] == "reject_once")
+            .and_then(|option| option["optionId"].as_str())
+            .map_or_else(
+                || json!({"outcome":"cancelled"}),
+                |reject| json!({"outcome":"selected","optionId":reject}),
+            );
+        outcome[REASON] = json!(reason);
+        return outcome;
+    }
     let allow_once = params["options"]
         .as_array()
         .into_iter()
@@ -510,12 +615,6 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         .and_then(|option| option["optionId"].as_str());
     let mut escalation = None;
     if let Some(allow_once) = allow_once {
-        let label = format!(
-            "{}: {}",
-            tool_call["title"].as_str().unwrap_or("Tool"),
-            crate::commands::permission_risk::label("", &tool_call["rawInput"])
-                .trim_start_matches(": ")
-        );
         match crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
             crate::commands::permission_risk::assess_acp(tool_call, scope)
         }) {
@@ -945,6 +1044,90 @@ mod tests {
                 if allowed { "yes" } else { "no" }
             );
         }
+    }
+
+    /// Kimi's shapes (kimi_cli/acp/session.py): `tool_call` updates carry the
+    /// title and the streamed JSON arguments as text; the permission request
+    /// carries only the id, the title and a diff or a description.
+    #[test]
+    fn kimi_permission_requests_are_checked_with_the_arguments_streamed_before_them() {
+        use crate::commands::knowledge::tool_rules::{ToolCall, ToolKind};
+        let update = |value: Value| json!({"method":"session/update","params":{"sessionId":"new","update":value}});
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        let ask = |id: &str, call: Value| json!({"id":id,"method":"session/request_permission","params":{"sessionId":"new","toolCall":call,"options":[{"optionId":"approve","name":"Approve once","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}});
+        let mut seen = Vec::new();
+        drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/1","title":"Shell","status":"in_progress","content":text("{\"command\": \"npm")})),
+                update(json!({"sessionUpdate":"tool_call_update","toolCallId":"turn/1","title":"Shell: npm install left-pad","status":"in_progress","content":text("{\"command\": \"npm install left-pad\"}")})),
+                ask("p1", json!({"toolCallId":"turn/1","title":"Shell: npm install left-pad","content":text("Requesting approval to perform: Run command `npm install left-pad`")})),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/2","title":"StrReplaceFile: src/a.ts","status":"in_progress","content":text("{\"path\": \"/work/src/a.ts\", \"edit\": [{\"old\": \"a\", \"new\": \"console.log(a)\"}, {\"old\": \"b\", \"new\": \"c\"}]}")})),
+                ask("p2", json!({"toolCallId":"turn/2","title":"StrReplaceFile: src/a.ts","content":[{"type":"diff","path":"/work/src/a.ts","oldText":"a\nb","newText":"console.log(a)\nc"}]})),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/3","title":"WriteFile: notes/../src/b.ts","status":"in_progress","content":text("{\"path\": \"/work/notes/../src/b.ts\", \"content\": \"export {}\"}")})),
+                ask("p3", json!({"toolCallId":"turn/3","title":"WriteFile: src/b.ts","content":[{"type":"diff","path":"/work/src/b.ts","oldText":"","newText":"export {}"}]})),
+                // A request with no earlier update still reads its diff.
+                ask("p4", json!({"toolCallId":"turn/4","title":"StrReplaceFile: src/c.ts","content":[{"type":"diff","path":"/work/src/c.ts","oldText":"x","newText":"y"}]})),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut Vec::new(),
+            "/work",
+            None,
+            None,
+            "Task",
+            |_| {},
+            |params| {
+                seen.push(ToolCall::acp(&params[KNOWN_CALL], "/work").unwrap());
+                json!({"outcome":"selected","optionId":"approve"})
+            },
+        )
+        .unwrap();
+        let call = |kind, text: &str, paths: &[&str]| ToolCall {
+            kinds: vec![kind],
+            text: text.into(),
+            paths: paths.iter().map(|path| path.to_string()).collect(),
+        };
+        assert_eq!(
+            seen,
+            [
+                call(ToolKind::Shell, "npm install left-pad", &[]),
+                call(ToolKind::Edit, "console.log(a)\nc", &["src/a.ts"]),
+                call(ToolKind::Write, "export {}", &["src/b.ts"]),
+                call(ToolKind::Edit, "y", &["src/c.ts"]),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_tool_rule_denial_is_sent_as_a_rejection_and_stops_with_its_reason() {
+        let mut sent = Vec::new();
+        let error = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                json!({"id":"permission-8","method":"session/request_permission","params":{"sessionId":"new","options":[{"optionId":"yes","kind":"allow_once"},{"optionId":"no","kind":"reject_once"}]}}),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut sent,
+            "C:/workspace",
+            None,
+            None,
+            "Task",
+            |_| {},
+            |_| json!({"outcome":"selected","optionId":"no",REASON:"Project rule \"Use pnpm\": No npm."}),
+        )
+        .unwrap_err();
+        assert!(
+            error.starts_with("Project rule \"Use pnpm\": No npm."),
+            "{error}"
+        );
+        let sent = String::from_utf8(sent).unwrap();
+        let reply: Value = serde_json::from_str(sent.lines().last().unwrap()).unwrap();
+        assert_eq!(
+            reply["result"]["outcome"],
+            json!({"outcome":"selected","optionId":"no"})
+        );
     }
 
     #[test]

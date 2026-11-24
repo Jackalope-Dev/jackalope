@@ -15,6 +15,7 @@ fn entry(id: usize, kind: KnowledgeKind, phrase: &str) -> KnowledgeEntry {
         enabled: true,
         stale: None,
         enforced: None,
+        tool_rule: None,
         source_run_id: None,
         source_head: None,
         revision: 0,

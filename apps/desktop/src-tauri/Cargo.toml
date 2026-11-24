@@ -54,6 +54,10 @@ regex = "1"
 aho-corasick = "1"
 reqwest = { version = "0.13", default-features = false }
 ignore = "0.4"
+# Project tool rules. The regex crate matches in linear time, so a saved
+# pattern cannot stall an agent's tool call.
+regex = "1"
+globset = "0.4"
 tree-sitter = "0.27"
 tree-sitter-typescript = "0.23"
 tree-sitter-javascript = "0.25"
