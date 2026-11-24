@@ -25,6 +25,9 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept importing Claude Code and Codex history in an installed app on each platform:
+  the onboarding offer, a real import, updating a conversation that grew, and continuing an
+  imported conversation through its CLI.
 - [ ] Extend agents on a computer: automatic routing that does not require the CLI here.
 - [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
   local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and

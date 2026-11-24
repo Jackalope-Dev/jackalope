@@ -1,5 +1,15 @@
 [
   {
+    "id": "bring-your-claude-code-and-codex-history",
+    "date": "2026-11-24",
+    "title": "Bring your Claude Code and Codex history.",
+    "description": "Import past conversations into Jackalope, grouped by project, and continue them where they ran.",
+    "items": [
+      "Choose conversations by project and date; the import runs in the background and can be canceled.",
+      "Importing again updates conversations that grew since last time."
+    ]
+  },
+  {
     "id": "keep-api-keys-off-agent-computers",
     "date": "2026-11-24",
     "title": "Keep API keys off agent computers.",

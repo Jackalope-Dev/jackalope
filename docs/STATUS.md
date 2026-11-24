@@ -45,6 +45,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   those CLIs' session files for the accounts Jackalope uses; Jackalope's own attempts are
   left out. Continue in Jackalope starts a conversation that resumes the CLI's session
   directly in the checkout or worktree it ran in. Settings → Privacy turns reading off.
+  Import Claude and Codex history (command search, Settings → Data & reset, and offered
+  once after setup) copies those conversations into Jackalope by project, in the
+  background with progress, cancel and idempotent updates. Imported conversations open
+  read-only in an Imported group under their project and continue by resuming the CLI
+  session. Checked with fixtures and a read-only local trial; installed acceptance is open.
   See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
 - Non-code work (a short request to read or operate a web page or a connection, work on an
   attached window that names no code, and everything in General) runs in the project folder as it is: no
