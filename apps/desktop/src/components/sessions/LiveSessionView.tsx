@@ -19,6 +19,7 @@ import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useStat
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
+import { copyText } from '../../lib/clipboard';
 import {
   type LiveSession,
   type MessageOrigin,
@@ -30,6 +31,7 @@ import {
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import type { TaskRun } from '../../lib/run-types';
 import { sessionMarkdown } from '../../lib/session-export';
+import { replyOmitted } from '../../lib/session-replies';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
 import { usageLimitOf } from '../../lib/usage-limit';
@@ -119,15 +121,18 @@ export function LiveSessionView({
     const rows: TranscriptRow[] = session.messages.map((message) => {
       const run = message.runId ? runById.get(message.runId) : undefined;
       const batch = message.runId ? batchById.get(message.runId) : undefined;
-      const reply = batch?.messageIds.at(-1) === message.id ? (run?.result ?? '') : '';
-      items += reply ? 2 : 1;
+      const last = batch?.messageIds.at(-1) === message.id;
+      const omitted = last && replyOmitted(run);
+      const reply = last && !omitted ? (run?.result ?? '') : '';
+      const length = omitted ? (run?.resultChars ?? 0) : reply.length;
+      items += reply || omitted ? 2 : 1;
       return {
         key: message.id,
-        text: [message.text, reply],
+        text: [message.text, omitted ? null : reply],
         estimate:
           70 +
           Math.ceil(message.text.length / 70) * 22 +
-          (reply ? 90 + Math.ceil(reply.length / 90) * 22 : 0),
+          (length ? 90 + Math.ceil(length / 90) * 22 : 0),
       };
     });
     return { rows, items };
@@ -212,6 +217,35 @@ export function LiveSessionView({
   const transcript = useRef<TranscriptHandle>(null);
   // Replies already formatted render formatted again when they scroll back into view.
   const formatted = useRef(new Set<string>());
+  // Older replies the snapshot left out load together as their rows render.
+  const [replyError, setReplyError] = useState('');
+  const requested = useRef(new Set<string>());
+  const requestReply = (runId: string) => {
+    const batch = requested.current;
+    batch.add(runId);
+    if (batch.size > 1) return;
+    queueMicrotask(() => {
+      const ids = [...batch];
+      batch.clear();
+      useLiveSessionStore
+        .getState()
+        .loadReplies(session.id, ids)
+        .then(
+          () => setReplyError(''),
+          (cause) => setReplyError(describeError(cause)),
+        );
+    });
+  };
+  const searchUnloaded = async (query: string) =>
+    new Map(
+      Object.entries(await useLiveSessionStore.getState().searchReplies(session.id, query)).flatMap(
+        ([runId, count]) => {
+          const batch = batchById.get(runId);
+          const message = batch?.messageIds.at(-1);
+          return message ? [[message, count] as const] : [];
+        },
+      ),
+    );
   const mascotRef = useRef<HTMLSpanElement>(null);
   const mascotGaze = useAgentGaze(mascotRef);
   const refresh = () => useLiveSessionStore.getState().refresh(session.id);
@@ -323,13 +357,20 @@ export function LiveSessionView({
                           label: 'Copy conversation as Markdown',
                           onSelect: () =>
                             void act(() =>
-                              navigator.clipboard.writeText(
-                                sessionMarkdown(
-                                  session,
-                                  runs,
-                                  latest?.agent && latest.agent !== 'auto'
-                                    ? latest.agent
-                                    : 'Jackalope',
+                              copyText(
+                                async () => {
+                                  const store = useLiveSessionStore.getState();
+                                  await store.loadAllReplies(session.id);
+                                  return sessionMarkdown(
+                                    session,
+                                    useLiveSessionStore.getState().runs,
+                                    latest?.agent && latest.agent !== 'auto'
+                                      ? latest.agent
+                                      : 'Jackalope',
+                                  );
+                                },
+                                session.batches.some((batch) =>
+                                  replyOmitted(runById.get(batch.runId)),
                                 ),
                               ),
                             ),
@@ -622,7 +663,7 @@ export function LiveSessionView({
           />
         </div>
       ) : (
-        (error || workspace.error || session.error || retryable) && (
+        (error || workspace.error || session.error || replyError || retryable) && (
           <div className="live-notice">
             <InlineNotice
               tone="error"
@@ -640,7 +681,11 @@ export function LiveSessionView({
                 )
               }
             >
-              {error || workspace.error || session.error || session.batches.at(-1)?.error}
+              {error ||
+                workspace.error ||
+                session.error ||
+                replyError ||
+                session.batches.at(-1)?.error}
             </InlineNotice>
           </div>
         )
@@ -706,6 +751,7 @@ export function LiveSessionView({
               label="conversation"
               rows={rows}
               items={items}
+              searchUnloaded={searchUnloaded}
               renderRow={(index) => {
                 const message = session.messages[index];
                 const batch = message.runId ? batchById.get(message.runId) : undefined;
@@ -766,7 +812,7 @@ export function LiveSessionView({
                         />
                       </div>
                     </article>
-                    {lastInBatch && run?.result && (
+                    {lastInBatch && run && (run.result || replyOmitted(run)) && (
                       <article className="live-message live-reply">
                         <span className="live-mascot">
                           <AgentCharacter
@@ -780,17 +826,26 @@ export function LiveSessionView({
                               (run.agent === 'auto' ? 'Jackalope' : run.agent)}
                           </span>
                           <div data-find-part="1">
-                            <Suspense fallback={<p>{run.result}</p>}>
-                              <TranscriptResult
-                                recent={recentBatches.has(run.id) || formatted.current.has(run.id)}
-                                onFormatted={() => formatted.current.add(run.id)}
-                                content={run.result}
-                                active={isActive(run)}
-                                onOpenLink={(url) => void act(() => openExternalUrl(url))}
+                            {replyOmitted(run) ? (
+                              <OmittedReply
+                                chars={run.resultChars ?? 0}
+                                onLoad={() => requestReply(run.id)}
                               />
-                            </Suspense>
+                            ) : (
+                              <Suspense fallback={<p>{run.result}</p>}>
+                                <TranscriptResult
+                                  recent={
+                                    recentBatches.has(run.id) || formatted.current.has(run.id)
+                                  }
+                                  onFormatted={() => formatted.current.add(run.id)}
+                                  content={run.result}
+                                  active={isActive(run)}
+                                  onOpenLink={(url) => void act(() => openExternalUrl(url))}
+                                />
+                              </Suspense>
+                            )}
                           </div>
-                          {!isActive(run) && (
+                          {!isActive(run) && !!run.result && (
                             <div className="live-receipt">
                               {run.endedAt && <MessageTime at={run.endedAt} />}
                               <CopyButton
@@ -1058,5 +1113,21 @@ function MessageTime({ at }: { at: string }) {
     <time className="live-time" dateTime={at} title={date.toLocaleString()}>
       {label}
     </time>
+  );
+}
+
+/** A reply the snapshot left out: holds its expected height and loads once rendered. */
+function OmittedReply({ chars, onLoad }: { chars: number; onLoad: () => void }) {
+  const load = useRef(onLoad);
+  load.current = onLoad;
+  useEffect(() => load.current(), []);
+  return (
+    <p
+      className="live-muted"
+      role="status"
+      style={{ minHeight: Math.min(2000, Math.ceil(chars / 90) * 22) }}
+    >
+      Loading reply…
+    </p>
   );
 }

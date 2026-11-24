@@ -40,8 +40,16 @@ function search(text: string, needle: string, limit?: number) {
     : occurrences(text, needle, limit);
 }
 
-/** Searches each row's text parts in order: the data, not what happens to be rendered. */
-export function findMatches(rows: readonly (readonly string[])[], query: string) {
+/**
+ * Searches each row's text parts in order: the data, not what happens to be rendered.
+ * A part that is not loaded yet (null) counts the occurrences `unloaded` reports for its
+ * row, so find also covers text that only the native side holds.
+ */
+export function findMatches(
+  rows: readonly (readonly (string | null)[])[],
+  query: string,
+  unloaded?: ReadonlyMap<number, number>,
+) {
   const needle = query.trim();
   const matches: TranscriptMatch[] = [];
   if (!needle) return { matches, truncated: false };
@@ -49,9 +57,13 @@ export function findMatches(rows: readonly (readonly string[])[], query: string)
     const parts = rows[row];
     for (let part = 0; part < parts.length; part++) {
       const text = parts[part];
-      if (!text) continue;
-      const starts = search(text, needle, MATCH_LIMIT - matches.length);
-      for (let nth = 0; nth < starts.length; nth++) matches.push({ row, part, nth });
+      const count =
+        text === null
+          ? Math.min(unloaded?.get(row) ?? 0, MATCH_LIMIT - matches.length)
+          : text
+            ? search(text, needle, MATCH_LIMIT - matches.length).length
+            : 0;
+      for (let nth = 0; nth < count; nth++) matches.push({ row, part, nth });
       if (matches.length >= MATCH_LIMIT) return { matches, truncated: true };
     }
   }

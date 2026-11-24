@@ -1,3 +1,4 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { Button, IconButton, Input } from '@jackalope/ui';
 import { defaultRangeExtractor, type Range, useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowDown, ChevronDown, ChevronUp, X } from 'lucide-react';
@@ -38,8 +39,11 @@ import './transcript.css';
 
 export interface TranscriptRow {
   key: string;
-  /** Searchable text, one entry per element in the row marked `data-find-part="<index>"`. */
-  text: readonly string[];
+  /**
+   * Searchable text, one entry per element in the row marked `data-find-part="<index>"`;
+   * null while that text is not loaded, when `searchUnloaded` counts it instead.
+   */
+  text: readonly (string | null)[];
   /** Expected height in pixels until the row has rendered and been measured. */
   estimate: number;
 }
@@ -78,6 +82,7 @@ export function Transcript({
   className,
   label,
   handle,
+  searchUnloaded,
 }: {
   rows: readonly TranscriptRow[];
   renderRow: (index: number) => ReactNode;
@@ -95,6 +100,8 @@ export function Transcript({
   /** What the transcript holds, as in "Find in conversation". */
   label: string;
   handle?: Ref<TranscriptHandle>;
+  /** Occurrences of a query in each row's unloaded text, by row key. */
+  searchUnloaded?: (query: string) => Promise<ReadonlyMap<string, number>>;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLElement>(null);
@@ -224,14 +231,41 @@ export function Transcript({
   const returnFocus = useRef<HTMLElement | null>(null);
   const searched = useDeferredValue(findOpen ? query.trim() : '');
   const searchedRows = useDeferredValue(rows);
-  const found = useMemo(
-    () =>
-      findMatches(
-        searchedRows.map((row) => row.text),
-        searched,
-      ),
-    [searchedRows, searched],
-  );
+  const hasUnloaded = searchedRows.some((row) => row.text.includes(null));
+  const [remote, setRemote] = useState<{
+    query: string;
+    counts?: ReadonlyMap<string, number>;
+    error?: string;
+  }>({ query: '' });
+  const searchRef = useRef(searchUnloaded);
+  searchRef.current = searchUnloaded;
+  useEffect(() => {
+    const search = searchRef.current;
+    if (!searched || !hasUnloaded || !search) return;
+    let live = true;
+    search(searched).then(
+      (counts) => live && setRemote({ query: searched, counts }),
+      (cause) => live && setRemote({ query: searched, error: describeError(cause) }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [searched, hasUnloaded]);
+  const found = useMemo(() => {
+    const counts = remote.query === searched ? remote.counts : undefined;
+    const unloaded = new Map<number, number>();
+    if (counts)
+      searchedRows.forEach((row, index) => {
+        const count = counts.get(row.key);
+        if (count) unloaded.set(index, count);
+      });
+    return findMatches(
+      searchedRows.map((row) => row.text),
+      searched,
+      unloaded,
+    );
+  }, [searchedRows, searched, remote]);
+  const remoteError = remote.query === searched ? remote.error : undefined;
   const paintState = useRef({ found, current, searched });
   paintState.current = { found, current, searched };
   const frame = useRef(0);
@@ -319,18 +353,20 @@ export function Transcript({
     },
     [follow, virtualizer, schedulePaint],
   );
+  // A new query, or counts for unloaded text arriving, starts again from the reading position.
+  const searchKey = `${searched}\u0000${remote.query === searched && remote.counts ? 1 : 0}`;
   const lastSearch = useRef('');
   useEffect(() => {
-    if (lastSearch.current === searched) {
+    if (lastSearch.current === searchKey) {
       if (current >= found.matches.length) setCurrent(found.matches.length - 1);
       return;
     }
-    lastSearch.current = searched;
+    lastSearch.current = searchKey;
     const range = virtualizer.range;
     const index = firstMatchFrom(found.matches, range?.startIndex ?? 0);
     setCurrent(index);
     reveal(found.matches[index]);
-  }, [found, searched, current, virtualizer, reveal]);
+  }, [found, searchKey, current, virtualizer, reveal]);
   const step = (direction: 1 | -1) => {
     const next = stepMatch(current, found.matches.length, direction);
     setCurrent(next);
@@ -408,7 +444,8 @@ export function Transcript({
               }}
             />
             <span className="transcript-find-count" role="status">
-              {searched ? matchLabel(current, found.matches.length, found.truncated) : ''}
+              {remoteError ??
+                (searched ? matchLabel(current, found.matches.length, found.truncated) : '')}
             </span>
             <IconButton
               label="Previous match"

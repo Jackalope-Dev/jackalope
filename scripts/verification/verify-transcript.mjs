@@ -35,12 +35,15 @@ const lorem='The change keeps keyboard focus on the trigger, narrows the retry w
 const reply=i=>['## Reply '+i,...Array.from({length:i%4+1},(_,p)=>lorem+' Paragraph '+p+' of reply '+i+'.'),...(i%3===0?[fence+'ts\\nexport const value'+i+' = '+i+';\\nconsole.log(value'+i+');\\n'+fence]:[]),...(i%5===0?['- First point for '+i+'\\n- Second point\\n- Third point']:[]),...(i===1234?['The needle-1234 answer.']:[]),...(i%400===7?['A zebra crossing.']:[])].join('\\n\\n');
 const at=i=>new Date(Date.UTC(2026,8,1)+i*60000).toISOString();
 const base={taskId:'task',liveSessionId:'session',projectId:'atlas',projectName:'Atlas',projectPath:'/fixture/atlas',workspace:'/fixture/atlas-session',branch:'session/atlas',targetBranch:'main',baseHead:'base',agent:'codex',account:'Personal',prompt:'Fixture',sessionId:'provider',activity:[],diagnostics:[],prompts:[],error:null,persistenceError:null,exitCode:0,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:false}};
-const runs=Array.from({length:count},(_,i)=>({...base,id:'r'+i,status:'review',startedAt:at(i),endedAt:at(i),result:reply(i)}));
+// As the native snapshot sends them: the newest 40 replies in full, older ones left out.
+const full=new Map(Array.from({length:count},(_,i)=>['r'+i,reply(i)]));
+const runs=Array.from({length:count},(_,i)=>({...base,id:'r'+i,status:'review',startedAt:at(i),endedAt:at(i),...(i<count-40?{result:'',resultOmitted:true,resultChars:reply(i).length}:{result:reply(i)})}));
 const messages=Array.from({length:count},(_,i)=>({id:'m'+i,text:'Message '+i+': please look at '+(i%7===0?'the zebra list and ':'')+'item '+i+'.',createdAt:at(i),runId:'r'+i,canceled:false}));
 const batches=runs.map((run,i)=>({runId:run.id,messageIds:['m'+i],previousRunId:i?'r'+(i-1):null,error:null,settled:true}));
 const session={id:'session',title:'Long transcript',request:{projectId:'atlas',projectName:'Atlas',projectPath:'/fixture/atlas',agent:'codex'},createdAt:at(0),updatedAt:at(count),paused:false,closed:false,pinned:false,draft:{text:'',revision:0},error:null,messages,batches};
 const f=window.transcriptFixture={calls:[],longTasks:[]};
 new PerformanceObserver(list=>f.longTasks.push(...list.getEntries().map(entry=>({start:entry.startTime,duration:entry.duration})))).observe({type:'longtask',buffered:true});
+f.storeRuns=()=>useLiveSessionStore.getState().runs;
 f.session=changes=>useLiveSessionStore.setState(s=>({sessions:s.sessions.map(item=>({...item,...changes(item)}))}));
 f.runs=changes=>useLiveSessionStore.setState(s=>({runs:changes(s.runs)}));
 f.startReply=()=>{const i=useLiveSessionStore.getState().sessions[0].messages.length;f.session(s=>({messages:[...s.messages,{id:'m'+i,text:'Message '+i+': stream a reply.',createdAt:at(i),runId:'r'+i,canceled:false}],batches:[...s.batches,{runId:'r'+i,messageIds:['m'+i],previousRunId:null,error:null,settled:false}]}));f.runs(r=>[...r,{...base,id:'r'+i,status:'running',startedAt:at(i),endedAt:null,result:'Starting'}]);return 'r'+i;};
@@ -50,6 +53,8 @@ window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
 window.__TAURI_INTERNALS__={transformCallback:()=>0,metadata:{currentWindow:{label:'main'},currentWebview:{label:'main'}},invoke:async(command,args={})=>{
 f.calls.push({command,args});
 if(command==='live_session_send'){const s=useLiveSessionStore.getState().sessions[0];f.session(item=>({messages:[...item.messages,{id:args.messageId,text:args.text,createdAt:new Date().toISOString(),runId:null,canceled:false}],draft:{text:'',revision:item.draft.revision+1}}));return {text:'',revision:s.draft.revision+1};}
+if(command==='live_session_results'){f.pages=(f.pages??0)+1;return args.runIds.filter(id=>full.has(id)).slice(0,100).map(id=>({id,result:full.get(id)}));}
+if(command==='live_session_search'){const q=args.query.trim().toLowerCase();const counts={};for(const [id,text] of full){const n=text.toLowerCase().split(q).length-1;if(n)counts[id]=n;}return counts;}
 if(command==='live_session_draft'){const s=useLiveSessionStore.getState().sessions[0];return {text:args.text,revision:s.draft.revision+1};}
 if(command==='desktop_attach_support')return {drag:false,pick:false,badge:false};
 if(command.startsWith('plugin:event|'))return 0;
@@ -206,7 +211,7 @@ async function checkBehavior(page) {
     true,
     'focus returns to where find opened',
   );
-  assert.equal(await page.evaluate(() => CSS.highlights.has('transcript-match')), false);
+  await page.waitForFunction(() => !CSS.highlights.has('transcript-match'));
 
   // Mod+F stays with the view in front when the conversation is hidden.
   await page.getByRole('button', { name: 'Review', exact: true }).click();
@@ -233,6 +238,23 @@ async function checkBehavior(page) {
   assert.equal(await page.locator(`[data-index="${selected.index}"]`).count(), 1);
   assert.equal(await page.evaluate(() => getSelection().toString()), selected.text);
   await page.evaluate(() => getSelection().removeAllRanges());
+
+  // Copy as Markdown loads every reply the snapshot left out first.
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Copy conversation as Markdown' }).click();
+  let copied = '';
+  for (let attempt = 0; attempt < 100 && !copied; attempt++) {
+    await page.waitForTimeout(100);
+    copied = await page.evaluate(() => navigator.clipboard.readText());
+  }
+  assert.ok(copied.includes('## Reply 0\n') && copied.includes('## Reply 1999\n'));
+  assert.equal(
+    await page.evaluate(
+      () => window.transcriptFixture.storeRuns().filter((run) => run.resultOmitted).length,
+    ),
+    0,
+  );
 }
 
 async function checkLayout(page, name) {
@@ -438,7 +460,7 @@ try {
     }
     assert.deepEqual(errors, []);
     console.log(
-      'Transcript browser fixtures passed: bounded rendering, following, Jump to latest, send returns to the end, find across unrendered rows, selection retention, reduced motion and light/dark at three widths. No native execution.',
+      'Transcript browser fixtures passed: bounded rendering, following, Jump to latest, send returns to the end, find across unrendered and unloaded replies, selection retention, copying with replies loaded on demand, reduced motion and light/dark at three widths. No native execution.',
     );
   }
 } finally {

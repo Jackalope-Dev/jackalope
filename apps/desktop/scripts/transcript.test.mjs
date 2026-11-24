@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { loadReplyPages, replyOmitted, withReplies } from '../src/lib/session-replies.ts';
 import {
   findMatches,
   firstMatchFrom,
@@ -74,4 +75,70 @@ test('following continues through growth and stops when the person reads back', 
   assert.equal(jumpBehavior(400, 500, false), 'smooth');
   assert.equal(jumpBehavior(400, 500, true), 'auto');
   assert.equal(jumpBehavior(5000, 500, false), 'auto');
+});
+
+test('find counts unloaded text from native counts in reading order', () => {
+  const rows = [
+    ['first retry', null],
+    ['no match', 'retry here'],
+    ['', null],
+  ];
+  const { matches } = findMatches(
+    rows,
+    'retry',
+    new Map([
+      [0, 2],
+      [2, 1],
+    ]),
+  );
+  assert.deepEqual(matches, [
+    { row: 0, part: 0, nth: 0 },
+    { row: 0, part: 1, nth: 0 },
+    { row: 0, part: 1, nth: 1 },
+    { row: 1, part: 1, nth: 0 },
+    { row: 2, part: 1, nth: 0 },
+  ]);
+  assert.equal(findMatches(rows, 'retry').matches.length, 2);
+});
+
+test('omitted replies load in pages and fill in without touching other runs', async () => {
+  const run = (id, extra = {}) => ({ id, result: '', ...extra });
+  const runs = [
+    run('a', { resultOmitted: true, resultChars: 3 }),
+    run('b', { result: 'kept' }),
+    run('c', { resultOmitted: true, resultChars: 2 }),
+  ];
+  assert.equal(replyOmitted(runs[0]), true);
+  assert.equal(replyOmitted(runs[1]), false);
+  assert.equal(replyOmitted(undefined), false);
+  const asked = [];
+  let state = runs;
+  await loadReplyPages(
+    ['a', 'c', 'a'],
+    async (ids) => {
+      asked.push(ids);
+      // One reply per page, as when a page fills its size cap.
+      return ids.slice(0, 1).map((id) => ({ id, result: id.repeat(3) }));
+    },
+    (replies) => {
+      state = withReplies(state, replies);
+    },
+  );
+  assert.deepEqual(asked, [['a', 'c'], ['c']]);
+  assert.equal(state[0].result, 'aaa');
+  assert.equal(state[0].resultOmitted, false);
+  assert.equal(state[1], runs[1]);
+  assert.equal(state[2].result, 'ccc');
+  // A page with nothing new ends the load instead of asking forever.
+  let calls = 0;
+  await loadReplyPages(
+    ['gone'],
+    async () => {
+      calls++;
+      return [];
+    },
+    () => {},
+  );
+  assert.equal(calls, 1);
+  assert.equal(withReplies(runs, []), runs);
 });

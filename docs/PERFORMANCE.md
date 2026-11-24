@@ -71,8 +71,16 @@ mock native commands; it does not prove installed shell or window behavior.
 - Find in conversation (Mod+F, configurable) searches the message and reply data, so
   unrendered and unformatted rows match, then scrolls to the match and highlights
   rendered matches with the CSS highlight API. Matches stop counting at 5,000. It stays
-  out of hidden conversations, dialogs and the terminal. Native snapshots still send the
-  focused conversation's full messages and reply text.
+  out of hidden conversations, dialogs and the terminal. Replies that are not loaded
+  are counted natively (`live_session_search`).
+- The renderer asks for the open conversation with `replies: 40`; older finished replies
+  arrive with `resultOmitted` and `resultChars` instead of `result`, load in pages of at
+  most 500 replies and about 512K characters (`live_session_results`) as their rows
+  render, and Copy as Markdown loads every reply first. Callers that omit `replies`,
+  such as the terminal-command host, still receive every reply. Active runs always keep
+  their text, and the omission never reaches saved history. Revision fingerprints are 64
+  bits, so an idle refresh costs about 48 bytes per record. Run summaries are not
+  bounded yet and dominate a long conversation's first snapshot.
 - Usage & quota offers opt-in timing capture for the current window. At most 2,000
   samples stay in memory; exports contain metric names and aggregate timings, never
   command arguments or content. Event Timing covers events at least 16 ms, and long-task

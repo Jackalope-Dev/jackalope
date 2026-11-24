@@ -2693,6 +2693,8 @@ impl TaskRuntime {
                 steerable: false,
                 pending_tools: Default::default(),
                 details_omitted: false,
+                result_omitted: false,
+                result_chars: None,
                 activity: notes,
                 diagnostics: vec![],
                 error: None,

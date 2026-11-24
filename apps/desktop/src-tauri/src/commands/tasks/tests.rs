@@ -75,6 +75,8 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         steerable: false,
         pending_tools: Default::default(),
         details_omitted: false,
+        result_omitted: false,
+        result_chars: None,
         activity: vec![],
         diagnostics: vec![],
         error: None,
