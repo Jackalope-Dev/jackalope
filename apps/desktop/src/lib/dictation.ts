@@ -44,3 +44,30 @@ export async function recordingWave(blob: Blob): Promise<Uint8Array> {
     await context.close();
   }
 }
+
+/**
+ * Puts dictated text where the caret was in `field` (the end when it was never
+ * placed), spaced from the words around it. Returns the new text and caret.
+ */
+export function insertDictation(
+  current: string,
+  value: string,
+  field?: HTMLTextAreaElement | null,
+): { text: string; caret: number } {
+  const at = field && field.value === current ? field.selectionEnd : current.length;
+  const before = current.slice(0, at);
+  const after = current.slice(at);
+  const lead = before && !/\s$/.test(before) ? ' ' : '';
+  const trail = after && !/^\s/.test(after) ? ' ' : '';
+  const text = `${before}${lead}${value}${trail}${after}`;
+  return { text, caret: before.length + lead.length + value.length };
+}
+
+/** Focuses `field` with its caret at `caret` once React has rendered the new text. */
+export function placeCaret(field: HTMLTextAreaElement | null | undefined, caret: number) {
+  requestAnimationFrame(() => {
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(caret, caret);
+  });
+}

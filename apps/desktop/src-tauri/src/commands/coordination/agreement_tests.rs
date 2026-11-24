@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use agreements::{Action, AgreementInput};
 
@@ -109,7 +110,7 @@ fn interface_requires_every_invited_owner_and_blocks_descendants() {
 fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
     let repo = Repo::new();
     let mut run = repo.run("api");
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     let history = repo.root.join("history");
     std::fs::create_dir(&history).unwrap();
     std::fs::write(
@@ -126,12 +127,12 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
     let service = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
     let id = Uuid::new_v4().to_string();
     {
-        let mut inner = service.inner.lock().unwrap();
+        let mut inner = service.state();
         inner.ledger.items = vec![a.clone(), b.clone(), child];
         let mut proposal = request(Action::Propose, &id);
         proposal.participants = vec![b.id.clone()];
         change(&mut inner.ledger, &[run.clone()], &a, proposal).unwrap();
-        service.save(&inner.ledger).unwrap();
+        service.commit(&mut inner, |_| Ok::<_, String>(())).unwrap();
         inner.enabled.insert("p".into());
         assert!(!ready_items(&inner, &[run.clone()], &[run.id.clone()])
             .iter()
@@ -143,10 +144,10 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
         .contains("Interface"));
     drop(service);
     let restored = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
-    assert!(restored.inner.lock().unwrap().enabled.is_empty());
+    assert!(restored.state().enabled.is_empty());
     assert_eq!(restored.view().unwrap().agreements[0].status, "pending");
     {
-        let mut inner = restored.inner.lock().unwrap();
+        let mut inner = restored.state();
         change(
             &mut inner.ledger,
             &[run.clone()],
@@ -154,7 +155,9 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
             request(Action::Accept, &id),
         )
         .unwrap();
-        restored.save(&inner.ledger).unwrap();
+        restored
+            .commit(&mut inner, |_| Ok::<_, String>(()))
+            .unwrap();
         inner.enabled.insert("p".into());
         assert!(ready_items(&inner, &[run.clone()], &[run.id.clone()])
             .iter()
@@ -211,7 +214,7 @@ impl Repo {
             project_path: self.root.to_string_lossy().into(),
             workspace: workspace.to_string_lossy().into(),
             base_head: self.git(&["rev-parse", "HEAD"]),
-            status: "review".into(),
+            status: RunStatus::Review,
             started_at: "now".into(),
             ..Default::default()
         }
@@ -296,7 +299,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
             id: id.into(),
             task_id: id.into(),
             project_id: "p".into(),
-            status: "review".into(),
+            status: RunStatus::Review,
             started_at: "now".into(),
             ..Default::default()
         };
@@ -309,7 +312,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
     let runtime = TaskRuntime::with_test_access(history).unwrap();
     let service = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
     for id in ["grok-run", "claude-run"] {
-        runtime.update(id, |r| r.status = "running".into());
+        runtime.update(id, |r| r.status = RunStatus::Running);
         service
             .inner
             .lock()
@@ -322,16 +325,31 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
         h.insert("authorization", format!("Bearer {id}").parse().unwrap());
         h
     };
+    let claim = |id: &str, input: AgreementInput| {
+        let service = service.clone();
+        let credential = headers(id);
+        async move {
+            let caller = service.caller(&credential).map_err(ToolError::from)?;
+            let transport = crate::commands::bridge::Transport::Http;
+            agreements::agreement(
+                Call {
+                    service,
+                    caller,
+                    transport,
+                },
+                input,
+            )
+            .await
+        }
+    };
     let (a, b) = tokio::join!(
-        agreements::bridge_agreement(
-            WebState(service.clone()),
-            headers("grok-run"),
-            Json(request(Action::Claim, &Uuid::new_v4().to_string()))
+        claim(
+            "grok-run",
+            request(Action::Claim, &Uuid::new_v4().to_string())
         ),
-        agreements::bridge_agreement(
-            WebState(service.clone()),
-            headers("claude-run"),
-            Json(request(Action::Claim, &Uuid::new_v4().to_string()))
+        claim(
+            "claude-run",
+            request(Action::Claim, &Uuid::new_v4().to_string())
         )
     );
     assert_eq!(usize::from(a.is_ok()) + usize::from(b.is_ok()), 1);
@@ -343,19 +361,12 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
     std::fs::create_dir(repo.root.join("queue/queue.json")).unwrap();
     let mut input = request(Action::Claim, &Uuid::new_v4().to_string());
     input.resource = "other responsibility".into();
-    assert!(agreements::bridge_agreement(
-        WebState(service.clone()),
-        headers("grok-run"),
-        Json(input)
-    )
-    .await
-    .is_err());
-    assert_eq!(service.inner.lock().unwrap().ledger.agreements.len(), 1);
-    runtime.update("grok-run", |r| r.status = "review".into());
-    assert!(agreements::bridge_agreement(
-        WebState(service.clone()),
-        headers("grok-run"),
-        Json(request(Action::Claim, &Uuid::new_v4().to_string()))
+    assert!(claim("grok-run", input).await.is_err());
+    assert_eq!(service.state().ledger.agreements.len(), 1);
+    runtime.update("grok-run", |r| r.status = RunStatus::Review);
+    assert!(claim(
+        "grok-run",
+        request(Action::Claim, &Uuid::new_v4().to_string())
     )
     .await
     .is_err());

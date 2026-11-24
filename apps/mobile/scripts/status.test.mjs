@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { moveNewWorkDraft } from '../src/drafts.ts';
-import {
-  groupWork,
-  requestText,
-  taskStatus,
-  workRows,
-  workSummary,
-  workTitle,
-} from '../src/status.ts';
+import { groupWork, isOlder, workAction, workRows, workSummary } from '../src/status.ts';
 
 const task = (fields) => ({
   id: 'run',
@@ -24,46 +17,6 @@ const task = (fields) => ({
   prompts: [],
   activity: [],
   ...fields,
-});
-
-test('titles skip section headings and Markdown markers', () => {
-  assert.equal(
-    workTitle('### 🎯 Objective\n\nThe pre-commit hook rejected a commit'),
-    'The pre-commit hook rejected a commit',
-  );
-  assert.equal(workTitle('Live session: **Ship** the `beta`\nmore'), 'Ship the beta');
-  assert.equal(workTitle('- keep snake_case names'), 'keep snake_case names');
-  assert.equal(workTitle('## Only a heading'), 'Only a heading');
-  assert.equal(workTitle('  \n'), 'Untitled work');
-});
-
-test('a live session request shows only the messages, not the host instructions', () => {
-  const batch = [
-    'Live session: Fix the footer …',
-    'Handle the following user messages in order as one coherent batch. Do not commit.',
-    'This folder is not a Git repository. Edit files in place.',
-    '',
-    'User message 8465324d-d302-4373-bb75-8d9fb063a288:',
-    'Fix the footer on mobile',
-    '- keep the links',
-    '',
-    'User answer (Scope) 121fa6f3-a12a-4753-a332-1096052ccf16:',
-    'Phone only',
-    '',
-  ].join('\n');
-  assert.equal(requestText(batch), 'Fix the footer on mobile\n- keep the links\n\nPhone only');
-  assert.equal(workTitle(batch), 'Fix the footer …');
-  assert.equal(
-    requestText('Live session: Fix the footer …\nHandle the following user messages in'),
-    'Fix the footer …',
-  );
-  assert.equal(requestText('  Plain request\nUser message 1:\n'), 'Plain request\nUser message 1:');
-});
-
-test('an unanswered question in the list marks running work as needing you', () => {
-  const asked = task({ prompts: [{ id: 'q', status: 'pending' }] });
-  assert.equal(taskStatus(asked).label, 'Needs your answer');
-  assert.equal(taskStatus(task({})).label, 'Working');
 });
 
 test('rows list waiting conversations, then the latest attempt per thread', () => {
@@ -118,7 +71,7 @@ test('groups put unstarted conversations first, then the newest work', () => {
     [
       ['Needs you', ['waiting', 'new', 'old']],
       ['Working', ['running']],
-      ['Recent', ['done']],
+      ['Finished', ['done']],
     ],
   );
   assert.deepEqual(
@@ -126,7 +79,7 @@ test('groups put unstarted conversations first, then the newest work', () => {
     [
       ['Needs you', 0],
       ['Working', 0],
-      ['Recent', 0],
+      ['Finished', 0],
     ],
   );
 });
@@ -176,4 +129,94 @@ test('an empty draft leaves the other computer untouched, and storage failures a
     removeItem: () => {},
   };
   assert.equal(moveNewWorkDraft(broken, 'a', 'b'), false);
+});
+
+test('queued and paused work stays under Working, as on the desktop', () => {
+  const groups = groupWork([
+    row('queued', { label: 'Queued', needsYou: false, working: false }),
+    row('paused', { label: 'Paused', needsYou: false, working: false }),
+    row('stopped', { label: 'Stopped', needsYou: false, working: false }),
+  ]);
+  assert.deepEqual(
+    groups.map(([label, items]) => [label, items.map((item) => item.id)]),
+    [
+      ['Needs you', []],
+      ['Working', ['queued', 'paused']],
+      ['Finished', ['stopped']],
+    ],
+  );
+});
+
+test('rows name their next step and drop statuses the step already says', () => {
+  const status = (label) => ({ label, variant: 'default', needsYou: false, working: false });
+  assert.deepEqual(workAction({ status: status('Needs your answer'), conversation: true }), {
+    action: 'Answer question',
+    showStatus: false,
+  });
+  assert.equal(
+    workAction({ status: status('Ready to review'), conversation: false }).action,
+    'Review result',
+  );
+  assert.equal(
+    workAction({ status: status('Ready to review'), conversation: true }).action,
+    'Reply',
+  );
+  assert.deepEqual(workAction({ status: status('Needs attention'), conversation: false }), {
+    action: 'Inspect task',
+    showStatus: true,
+  });
+  assert.equal(workAction({ status: status('Stopped'), conversation: false }).showStatus, true);
+});
+
+test('titles drop a leading run id, and old waiting work reads as older', () => {
+  const [first] = workRows({
+    projects: [{ id: 'p', name: 'Site' }],
+    sessions: [],
+    tasks: [task({ title: 'resume 02f4245e-f796-4353-a8e0-b8cc79871beb Always allow python' })],
+  });
+  assert.equal(first.title, 'Always allow python');
+  const now = Date.parse('2026-11-12T00:00:00Z');
+  assert.equal(isOlder({ startedAt: '2026-11-01T00:00:00Z' }, now), true);
+  assert.equal(isOlder({ startedAt: '2026-11-10T00:00:00Z' }, now), false);
+  assert.equal(isOlder({}, now), false);
+});
+
+test('an unreachable computer says whether it is offline and when it was last seen', async () => {
+  const { connectionState, lastSeen } = await import('../src/status.ts');
+  assert.equal(
+    connectionState(
+      'The host is unreachable. Work continues there; reconnect to check whether your last action completed.',
+    ),
+    'offline',
+  );
+  assert.equal(connectionState('Connection interrupted. Try again.'), 'offline');
+  assert.equal(connectionState('This device was removed on the host.'), "can't connect");
+  const now = Date.parse('2026-11-12T12:00:00Z');
+  assert.equal(lastSeen('2026-11-12T10:00:00Z', now), 'last seen 2h ago');
+  assert.equal(lastSeen('2026-11-12T11:59:50Z', now), 'last seen just now');
+  assert.equal(lastSeen(undefined, now), 'not reached from this phone yet');
+});
+
+test('rows carry the project hint a host sends, and hosts without hints still list', () => {
+  const sessions = [
+    { id: 's', title: 'Chat', projectId: 'b', paused: false, error: null, pending: 1 },
+  ];
+  const hinted = workRows({
+    projects: [
+      { id: 'p', name: 'shop', hint: 'take2' },
+      { id: 'b', name: 'shop', hint: 'take3' },
+    ],
+    sessions,
+    tasks: [task({ projectName: 'shop' })],
+  });
+  assert.deepEqual(
+    hinted.map((row) => [row.projectId, row.projectHint]),
+    [
+      ['b', 'take3'],
+      ['p', 'take2'],
+    ],
+  );
+  const older = workRows({ projects: [{ id: 'b', name: 'shop' }], sessions, tasks: [] });
+  assert.equal(older[0].projectHint, undefined);
+  assert.equal(older[0].projectName, 'shop');
 });

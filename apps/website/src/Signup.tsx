@@ -1,5 +1,6 @@
 import { Button, Checkbox, IconButton, Input } from '@jackalope/ui';
-import { accessMessage, accessOrigin, accessRequest } from './access-api';
+import { accessMessage, accessOrigin, accessRequest, useSignupMode } from './access-api';
+import { reportConversion } from './analytics';
 import { waitlistReferral } from './referral';
 import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -17,6 +18,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
   const [message, setMessage] = useState('');
   const request = useRef<AbortController | null>(null);
   const challenge = useRef<TurnstileHandle | null>(null);
+  const mode = useSignupMode();
   useEffect(() => () => request.current?.abort(), []);
   const action = popup ? signupActions.popup : signupActions.inline;
   async function subscribe(event: FormEvent<HTMLFormElement>) {
@@ -70,13 +72,14 @@ export function Signup({ popup = false }: { popup?: boolean }) {
         return;
       }
       setState('success');
+      reportConversion('signup');
       setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
           ? 'Check your email and confirm it to finish creating your account.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
-            : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
+            : 'Thanks for making room for Jackalope. Watch your inbox for occasional product notes.',
       );
       form.reset();
     } catch (error) {
@@ -103,7 +106,14 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               <p>{message}</p>
             </div>
           </div>
-          {accessOrigin && (
+          {/* Before the email is confirmed there is no account to open, so open signup
+              offers the download; a waitlist signup can look up its place. */}
+          {mode === 'open' && (
+            <a className="button button-secondary" href="/download/">
+              Download Jackalope <ArrowRight size={16} />
+            </a>
+          )}
+          {accessOrigin && mode === 'waitlist' && (
             <a className="button button-secondary" href="/waitlist/">
               Open my account <ArrowRight size={16} />
             </a>
@@ -169,7 +179,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             <noscript>
               <p className="signup-consent">
                 Without JavaScript, this form joins the email list for launch news and product notes
-                through Sequenzy, rather than creating an access request. Unsubscribe anytime.
+                rather than creating an account. Unsubscribe anytime.
               </p>
             </noscript>
           )}

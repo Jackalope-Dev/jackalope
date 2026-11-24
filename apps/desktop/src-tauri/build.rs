@@ -1,3 +1,20 @@
+/// Writes an executable into src-tauri/resources only when its bytes or mode differ.
+/// `tauri dev` watches that directory and restarts the build on any change, including a
+/// permission change, so rewriting an unchanged file restarts this script indefinitely.
+fn stage(destination: &std::path::Path, bytes: &[u8]) {
+    if std::fs::read(destination).ok().as_deref() != Some(bytes) {
+        std::fs::write(destination, bytes).unwrap();
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(destination).unwrap().permissions().mode();
+        if mode & 0o777 != 0o755 {
+            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+}
+
 fn main() {
     let root = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
     // Tauri embeds `frontendDist` at compile time. Debug checks and tests of a
@@ -11,8 +28,9 @@ fn main() {
     let package = root.join("../../../node_modules/agent-browser");
     let metadata = std::fs::read_to_string(package.join("package.json"))
         .expect("Run pnpm install --frozen-lockfile before building Jackalope");
+    // The computer image installs the same version (resources/computer/Dockerfile).
     assert!(
-        metadata.contains("\"version\": \"0.40.0\""),
+        metadata.contains("\"version\": \"0.41.1\""),
         "Unexpected agent-browser version"
     );
     let target = std::env::var("TARGET").unwrap();
@@ -47,15 +65,7 @@ fn main() {
         package.join("package.json").display()
     );
     let staged = destination.join(format!("agent-browser{suffix}"));
-    let bytes = std::fs::read(&source).unwrap();
-    if std::fs::read(&staged).ok().as_deref() != Some(bytes.as_slice()) {
-        std::fs::write(&staged, bytes).unwrap();
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(staged, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
+    stage(&staged, &std::fs::read(&source).unwrap());
     if target.contains("apple") {
         let source = root.join("src/commands/desktop_control/macos.swift");
         println!("cargo:rerun-if-changed={}", source.display());
@@ -110,15 +120,7 @@ fn main() {
             .expect("Building macOS desktop control requires Xcode command-line tools");
         assert!(status.success(), "macOS desktop helper compilation failed");
         let destination = root.join("resources/desktop-control/jackalope-desktop-control");
-        let bytes = std::fs::read(&output).unwrap();
-        if std::fs::read(&destination).ok().as_deref() != Some(bytes.as_slice()) {
-            std::fs::write(&destination, bytes).unwrap();
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        stage(&destination, &std::fs::read(&output).unwrap());
     }
     if target.contains("linux") {
         let source = root.join("src/commands/desktop_control/linux.c");
@@ -163,15 +165,43 @@ fn main() {
             .expect("Linux desktop control requires a native C compiler");
         assert!(status.success(), "Linux desktop helper compilation failed");
         let destination = root.join("resources/desktop-control/jackalope-desktop-control");
-        let bytes = std::fs::read(&output).unwrap();
-        if std::fs::read(&destination).ok().as_deref() != Some(bytes.as_slice()) {
-            std::fs::write(&destination, bytes).unwrap();
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        stage(&destination, &std::fs::read(&output).unwrap());
     }
-    tauri_build::build()
+    let mut windows = tauri_build::WindowsAttributes::new();
+    if target.ends_with("-windows-msvc") {
+        // Tauri's manifest requests Common Controls v6, which the dialog and menu code
+        // import TaskDialogIndirect from, but Tauri links it into the binaries only. A
+        // library test that reaches that code then loads System32's comctl32 5.82, which
+        // lacks it, and the test executable fails with STATUS_ENTRYPOINT_NOT_FOUND. The
+        // linker embeds the same manifest in every executable instead.
+        windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+        let manifest =
+            std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("app.manifest");
+        std::fs::write(&manifest, WINDOWS_APP_MANIFEST).unwrap();
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!("cargo:rustc-link-arg=/MANIFESTUAC:NO");
+        println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
+    }
+    if let Err(error) =
+        tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
+    {
+        panic!("{error:#}");
+    }
 }
+
+/// Tauri's default Windows application manifest.
+const WINDOWS_APP_MANIFEST: &str = r#"<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
+"#;

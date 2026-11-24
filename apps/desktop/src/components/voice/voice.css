@@ -1,0 +1,175 @@
+/* Recording: the mic becomes a live level meter beside a stop square. Specific enough
+   to widen and tint over composer toolbars' compact icon pills, only while recording. */
+.ui-button.voice-button[data-size="icon"][data-state="recording"] {
+  --voice-level: 0;
+  width: auto;
+  gap: 6px;
+  padding-inline: 8px;
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.voice-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+.voice-level > span {
+  width: 3px;
+  height: calc(4px + var(--voice-level) * 12px * var(--w, 1));
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transition: height 80ms linear;
+}
+.voice-level > span:nth-child(1),
+.voice-level > span:nth-child(4) {
+  --w: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-level > span {
+    transition: none;
+  }
+}
+
+.voice-setup {
+  width: min(520px, calc(100vw - 32px));
+}
+.voice-setup-body {
+  display: grid;
+  gap: 16px;
+}
+.voice-setup-models {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.voice-setup-models legend {
+  margin-bottom: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.voice-setup-model-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.voice-setup-size {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.voice-setup-stage {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 20px 16px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+}
+.voice-setup-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.voice-setup-status svg {
+  color: var(--color-success);
+}
+
+/* Downloading ripples the bars; filled bars show how much has arrived. */
+.voice-wave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+}
+.voice-wave > span {
+  width: 5px;
+  height: calc(var(--h) * 100%);
+  border-radius: var(--radius-full);
+  background: var(--color-border-subtle);
+  transform-origin: center;
+  transition: background-color 240ms ease;
+}
+.voice-wave > span[data-filled] {
+  background: var(--color-accent);
+}
+.voice-wave[data-active] > span {
+  animation: voice-ripple 1.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -70ms);
+}
+.voice-wave[data-settled] > span {
+  animation: voice-settle 600ms ease-out both;
+  animation-delay: calc(var(--i) * 18ms);
+}
+@keyframes voice-ripple {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes voice-settle {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-wave > span,
+  .voice-wave[data-active] > span,
+  .voice-wave[data-settled] > span {
+    animation: none;
+    transition: none;
+  }
+}
+
+.voice-settings-models {
+  display: grid;
+  gap: 8px;
+}
+.voice-settings-model {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.voice-settings-model[data-current] {
+  background: var(--color-accent-subtle);
+}
+.voice-settings-model-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.voice-settings-model-actions {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .voice-settings-model {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.voice-settings-detail {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}

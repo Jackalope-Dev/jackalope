@@ -39,7 +39,10 @@ impl TaskRuntime {
         let inner = self.inner.lock().unwrap();
         let mut runs: Vec<&TaskRun> = inner.runs.values().collect();
         runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
-        let awaiting_review = runs.iter().filter(|run| run.status == "review").count();
+        let awaiting_review = runs
+            .iter()
+            .filter(|run| run.status == RunStatus::Review)
+            .count();
         let recent = runs
             .into_iter()
             .take(recent_limit)

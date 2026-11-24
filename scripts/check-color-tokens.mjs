@@ -1,11 +1,13 @@
 // Fails when app code references a color token that no theme defines, or uses a
 // fixed Tailwind palette color instead of a theme token. Undefined custom
-// properties render as nothing, and fixed palette shades only suit one theme.
+// properties render as nothing, and fixed palette shades only suit one theme. It also
+// rejects light-dark() in stylesheets: the production build rewrites it into toggles that
+// the theme's inline color-scheme never switches, so both colours end up in the value and
+// the declaration is dropped. Set a token per scheme in packages/brand instead.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { root } from './lib/paths.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
 const sources = ['apps/desktop/src', 'packages/ui/src', 'packages/brand/src'];
 const extensions = /\.(css|ts|tsx)$/;
 const palette =
@@ -36,6 +38,9 @@ for (const { path, text } of all) {
     const where = `${relative(root, join(root, path))}:${index + 1}`;
     for (const [, name] of line.matchAll(/var\((--color-[\w-]+)/g))
       if (!defined.has(name)) problems.push(`${where} uses undefined ${name}`);
+    // Comments may name the function; only declarations count.
+    if (path.endsWith('.css') && line.includes('light-dark(') && line.includes(':'))
+      problems.push(`${where} uses light-dark(); set a per-scheme token in packages/brand`);
     if (path.endsWith('.tsx'))
       for (const [match] of line.matchAll(palette))
         problems.push(`${where} uses fixed palette color ${match}; use a theme token`);

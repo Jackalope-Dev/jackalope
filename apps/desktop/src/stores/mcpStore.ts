@@ -1,5 +1,5 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
-import { createReadCache } from '../lib/read-cache.ts';
 import {
   deleteMcpServer,
   listMcpServers,
@@ -7,7 +7,8 @@ import {
   type McpServerConfig,
   probeMcpServer,
   saveMcpServer,
-} from '../lib/tauri-bridge.ts';
+} from '../lib/mcp-client.ts';
+import { createReadCache } from '../lib/read-cache.ts';
 import { useProjectStore } from './projectStore.ts';
 import { useSettingsStore } from './settingsStore.ts';
 
@@ -155,7 +156,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
     } catch (e) {
       if (version !== connectionsVersion) return;
       set({
-        serversError: e instanceof Error ? e.message : String(e),
+        serversError: describeError(e),
         loadingServers: false,
       });
     }
@@ -208,7 +209,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
           [key]: {
             ok: false,
             tools: [],
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           },
         },
         probingIds: { ...s.probingIds, [key]: false },
@@ -254,7 +255,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
     } catch (cause) {
       if (version !== searchVersion) return;
       set({
-        marketplaceError: cause instanceof Error ? cause.message : String(cause),
+        marketplaceError: describeError(cause),
         loadingMarketplace: false,
       });
     }
@@ -302,7 +303,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
       if (version !== inspectVersion) return;
       set({
         inspectingMarkdown: server.description || 'No additional documentation available.',
-        inspectError: cause instanceof Error ? cause.message : String(cause),
+        inspectError: describeError(cause),
         loadingMarkdown: false,
       });
     }

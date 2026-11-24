@@ -1,21 +1,31 @@
-import { Badge, LoadingIcon, DropdownMenu as Menu, SearchField, SegmentedNav } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  InlineNotice,
+  LoadingIcon,
+  DropdownMenu as Menu,
+  SearchField,
+  SegmentedControl,
+  SegmentedNav,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents } from '../../lib/agent-catalog';
+import { builtinAgents, MCP_CONFIG_AGENTS, MCP_SIGN_IN_AGENTS } from '../../lib/agent-catalog';
+import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure, redactConnection } from '../../lib/mcp-connection';
-import { nativeTask } from '../../lib/task-runtime';
-import type { McpServerConfig } from '../../lib/tauri-bridge';
+import { invokeNative } from '../../lib/native/transport';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
-import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
+import { agentAccountFor, useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
-import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import {
   recommendationFor,
   recommendationGroups,
@@ -26,6 +36,7 @@ import { McpAddCustomModal } from './McpAddCustomModal';
 import { McpMarketplaceCard } from './McpMarketplaceCard';
 import { McpServerPage } from './McpServerPage';
 import './mcp.css';
+import { agentName, agentShortName } from '../../stores/agentConfigStore';
 
 const CATEGORIES = [
   { id: 'all', label: 'All' },
@@ -46,7 +57,7 @@ export function McpWorkspace({
   onViewChange?: (view: 'configured' | 'marketplace') => void;
 } = {}) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
+  const project = useActiveProject();
   const {
     servers,
     loadingServers,
@@ -175,7 +186,7 @@ export function McpWorkspace({
   };
 
   const signIn = (server: McpServerConfig, agent: string) =>
-    void nativeTask('mcp_authenticate', {
+    void invokeNative('mcp_authenticate', {
       id: server.id,
       scope: server.scope,
       agent,
@@ -282,7 +293,7 @@ export function McpWorkspace({
                           setCustomModalOpen(true);
                         }}
                       >
-                        Custom connection
+                        Add custom connection…
                       </Menu.Item>
                       <Menu.Item
                         className="workspace-menu-item"
@@ -347,7 +358,7 @@ export function McpWorkspace({
               )}
 
               <WorkspaceToolbar className="mb-4">
-                <FilterGroup
+                <SegmentedControl
                   label="Connection scope"
                   value={scopeFilter}
                   onChange={setScopeFilter}
@@ -363,14 +374,10 @@ export function McpWorkspace({
                           },
                         ]
                       : []),
-                    ...(
-                      [
-                        ['global', 'Global'],
-                        ['claude', 'Claude Code'],
-                        ['codex', 'Codex'],
-                        ['grok', 'Grok'],
-                      ] as const
-                    ).map(([id, label]) => ({
+                    ...[
+                      ['global', 'Global'],
+                      ...MCP_CONFIG_AGENTS.map((id) => [id, agentName(id)]),
+                    ].map(([id, label]) => ({
                       id,
                       label,
                       count: servers.filter((s) => s.scope === id).length,
@@ -414,17 +421,16 @@ export function McpWorkspace({
                     const key = `${server.scope}:${server.id}`;
                     const probe = probeResults[key];
                     const isProbing = !!probingIds[key];
+                    const agentScope = MCP_SIGN_IN_AGENTS.includes(server.scope);
                     const signInAgents =
                       !server.discovery &&
                       server.transport === 'http' &&
-                      (server.scope === 'codex' ||
-                        server.scope === 'claude' ||
+                      (agentScope ||
                         server.scope.startsWith('project:') ||
                         server.scope === 'global')
-                        ? (server.scope === 'codex' || server.scope === 'claude'
-                            ? [server.scope]
-                            : ['codex', 'claude']
-                          ).filter((agent) => !server.agents || server.agents.includes(agent))
+                        ? (agentScope ? [server.scope] : MCP_SIGN_IN_AGENTS).filter(
+                            (agent) => !server.agents || server.agents.includes(agent),
+                          )
                         : [];
 
                     return (
@@ -545,7 +551,7 @@ export function McpWorkspace({
                                     className="workspace-menu-item"
                                     onSelect={() => signIn(server, agent)}
                                   >
-                                    Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
+                                    Sign in with {agentShortName(agent)}
                                   </Menu.Item>
                                 ))}
                                 <Menu.Item
@@ -586,23 +592,19 @@ export function McpWorkspace({
 
           {activeTab === 'marketplace' && (
             <section>
-              {!useMcpMarketplace ? (
-                <div className="mcp-privacy-banner">
-                  <div>
-                    <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-                      MCP Marketplace is currently disabled
-                    </h3>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setUseMcpMarketplace(true);
-                    }}
-                  >
-                    <Globe size={15} />
-                    Enable Marketplace
-                  </Button>
-                </div>
-              ) : (
+              <SettingGroup>
+                <SettingRow
+                  title="Use MCP marketplace"
+                  description="Searches and server details come from allmcps.com, which publicly logs requests. Publisher avatars load from GitHub. Your connected agents and MCP servers use their own services."
+                >
+                  <Switch
+                    label="Use MCP marketplace"
+                    checked={useMcpMarketplace}
+                    onCheckedChange={setUseMcpMarketplace}
+                  />
+                </SettingRow>
+              </SettingGroup>
+              {!useMcpMarketplace ? null : (
                 <>
                   <div className="mcp-search-bar relative">
                     <SearchField
@@ -614,7 +616,7 @@ export function McpWorkspace({
                   </div>
 
                   <div className="mcp-browse-controls">
-                    <FilterGroup
+                    <SegmentedControl
                       label="Marketplace collection"
                       value={directory ? 'directory' : 'recommended'}
                       onChange={(value) => {
@@ -648,7 +650,7 @@ export function McpWorkspace({
                   ) : (
                     <>
                       {directory && (
-                        <FilterGroup
+                        <SegmentedControl
                           className="mcp-category-filter"
                           label="Category"
                           value={selectedCategory}
@@ -703,7 +705,7 @@ export function McpWorkspace({
             </section>
           )}
 
-          <ConfirmAction
+          <ConfirmDialog
             open={!!removing}
             onOpenChange={(open) => {
               if (!open) setRemoving(null);

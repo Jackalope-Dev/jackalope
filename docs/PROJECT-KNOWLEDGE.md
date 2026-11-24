@@ -25,8 +25,9 @@ match future task instructions. Task-derived entries retain a link to the source
 attempt. Manual entries stay under your control. Jackalope also derives bounded local lessons
 from saved user feedback and repository evidence, and keeps
 [learned lessons](#learned-lessons) from conversations and finished work. It does not
-rewrite repository instructions or make background model calls unless you turn on
-[lesson export or agent reflection](#optional-extensions) for a project.
+rewrite repository instructions unless you turn on
+[lesson export](#optional-extensions) for a project. Its only background model calls
+are [agent reflection](#optional-extensions), which is on by default and bounded.
 
 The composer previews matching lessons under **Saved project context**. Skip an
 individual lesson or disable matching for that task. The native launcher applies
@@ -86,6 +87,39 @@ folders. It does not follow directory symlinks. Manifest reads are capped at
 500-per-profile knowledge limits also bound automatic entries and suppression
 records. Older observations remain historical; these bounds are not a complete
 semantic analysis of every repository or every user action.
+
+## Rules from other tools
+
+Project context also offers rule files written for other coding tools as automatic
+lessons of kind `rules`: Cursor `.cursor/rules/**/*.mdc` (and `.md`) and `.cursorrules`,
+Windsurf `.windsurf/rules/**/*.md` and `.windsurfrules`, Cline `.clinerules` (a file, or
+a folder of `.md` and `.txt` files) and GitHub Copilot `.github/copilot-instructions.md`
+and `.github/instructions/**/*.instructions.md`. `AGENTS.md` and `CLAUDE.md` are not
+offered; agents read them as their own CLI does.
+
+Each rule arrives paused, labelled **Rule from another tool**, and is supplied to tasks
+only after you choose **Use in tasks** or turn it on in its editor. It then matches like
+any lesson, by words in the request; there is no always-on lesson. Frontmatter sets its
+scope and matching words:
+
+- Always applies: Cursor `alwaysApply: true`, Windsurf `trigger: always_on` or no
+  frontmatter, Cline rules without `paths`, `.cursorrules`, `.windsurfrules`,
+  `copilot-instructions.md`, and globs of `*`, `**` or `**/*`. Matching words come from
+  the file name, `description` and text.
+- Path-scoped: Cursor `globs`, Windsurf `trigger: glob`, Cline `paths` and Copilot
+  `applyTo` (comma-separated). Folder and extension names in the globs lead the matching
+  words, so a request that names them selects the rule.
+- Applied when relevant: Cursor rules with only a `description`, other Windsurf triggers
+  and Copilot instructions without `applyTo`.
+
+`enabled: false` in frontmatter skips a file. A lesson names the file, its scope, the
+`description` and as much of the text as fits in 800 bytes, and tells the agent to read
+the full file. Jackalope never changes these files. Scans read the project folder only,
+without following directory links, up to four folder levels and 200 directory entries
+across the rule folders; they offer at most 20 files of up to 64 KB of UTF-8 text each and skip
+anything resolving outside the project. A rule whose file disappears is paused, a
+changed file refreshes its lesson unless you edited it, and removing one keeps it from
+being offered again.
 
 ## Learned lessons
 
@@ -286,8 +320,8 @@ changing a default.
 ### Optional extensions
 
 These are per-project settings in Project settings and the terminal's `/settings`.
-All are off by default except sync inclusion, which only applies once lesson sync is
-on for the desktop.
+Agent reflection is on by default, as is sync inclusion, which only applies once lesson
+sync is on for the desktop; export is off.
 
 **Reflect with an agent** also shows finished work to the project's default agent
 (the routing agent and account configured in Agents) once the task or conversation
@@ -336,7 +370,7 @@ Saved drafts preserve the workflow selection and skipped-lesson settings.
 
 ## Local change monitors
 
-In **Tasks → Recurring → New schedule**, choose a run policy:
+In **Bots → Schedules → New schedule**, choose a run policy:
 
 - **Run an agent every time** preserves ordinary scheduled execution.
 - **Run an agent only after code changes** checks locally first and launches the

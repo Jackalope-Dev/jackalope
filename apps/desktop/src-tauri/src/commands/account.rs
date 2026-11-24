@@ -11,6 +11,7 @@ pub mod beta;
 pub mod feedback;
 pub mod lesson_sync;
 pub mod settings_sync;
+pub mod skill_sync;
 mod waitlist;
 
 fn sha256_hex(value: &str) -> String {
@@ -36,18 +37,10 @@ impl AccountService {
         }
     }
     fn read(&self) -> Result<Option<SavedAccount>, String> {
-        account_storage::read(&self.path)?
-            .map(|bytes| {
-                serde_json::from_slice(&bytes)
-                    .map_err(|_| "The saved account record is invalid.".into())
-            })
-            .transpose()
+        account_storage::read_json(&self.path, "The saved account record is invalid.")
     }
     fn save(&self, record: &SavedAccount) -> Result<(), String> {
-        account_storage::write(
-            &self.path,
-            &serde_json::to_vec(record).map_err(|_| "Could not encode the account record.")?,
-        )
+        account_storage::write_json(&self.path, record)
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -152,7 +145,10 @@ fn endpoints(app: &AppHandle) -> Result<(reqwest::Url, reqwest::Url), String> {
 /// instead of taking a new one. The platform identifier never leaves the
 /// machine; only a hash of it, scoped to Jackalope, is sent.
 fn machine_key() -> Option<String> {
-    let identifier = platform_machine_id()?;
+    key_for(&platform_machine_id()?)
+}
+
+fn key_for(identifier: &str) -> Option<String> {
     let identifier = identifier.trim();
     (!identifier.is_empty()).then(|| sha256_hex(&format!("jackalope-device-v1:{identifier}")))
 }
@@ -179,16 +175,13 @@ fn platform_machine_id() -> Option<String> {
 
 #[cfg(windows)]
 fn platform_machine_id() -> Option<String> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let output = std::process::Command::new("reg")
+    let output = super::process_control::hidden(&mut std::process::Command::new("reg"))
         .args([
             "query",
             r"HKLM\SOFTWARE\Microsoft\Cryptography",
             "/v",
             "MachineGuid",
         ])
-        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok()?;
     String::from_utf8_lossy(&output.stdout)
@@ -392,6 +385,26 @@ fn device_metadata(development: bool, isolated: bool) -> serde_json::Value {
         "profileKind": if isolated { "isolated" } else { "default" },
     })
 }
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::account::app_account_status,
+            commands::account::settings_sync::app_settings_sync,
+            commands::account::lesson_sync::app_lesson_sync,
+            commands::account::skill_sync::app_skill_sync,
+            commands::account::app_account_connect,
+            commands::account::app_account_open_browser,
+            commands::account::app_account_referrals,
+            commands::account::app_account_open_referrals,
+            commands::account::app_account_poll,
+            commands::account::app_account_disconnect,
+            commands::account::beta::app_account_beta,
+            commands::account::feedback::app_account_feedback,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn app_account_status(
     app: AppHandle,
@@ -750,18 +763,15 @@ mod tests {
     use super::*;
     #[test]
     fn machine_key_is_stable_and_never_the_raw_identifier() {
-        let Some(key) = machine_key() else {
-            // Some sandboxes expose no machine identifier; the connection then
-            // simply omits the key.
-            return;
-        };
+        let raw = "4C4C4544-0042-3510-8051-B4C04F4D3732";
+        let key = key_for(&format!("{raw}\n")).unwrap();
         assert!(
             valid_token(&key),
             "the service only accepts 64 lowercase hex"
         );
-        assert_eq!(machine_key().as_deref(), Some(key.as_str()));
-        let raw = platform_machine_id().unwrap_or_default();
-        assert!(!key.contains(raw.trim()) || raw.trim().is_empty());
+        assert_eq!(key_for(raw).as_deref(), Some(key.as_str()));
+        assert!(!key.contains(raw) && !key.contains(&raw.to_lowercase()));
+        assert_eq!(key_for(" \n"), None);
     }
     #[test]
     fn account_hashes_preserve_lowercase_hex_and_leading_zeroes() {

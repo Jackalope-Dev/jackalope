@@ -75,8 +75,8 @@ Ordinary commits never silently bump versions. Publication workflows create immu
 channel/version tags only after their source and artifact checks pass.
 
 Agents can use the repository [release skill](../.agents/skills/jackalope-release/SKILL.md)
-for requests such as “prepare the next beta from master” or “promote this tested beta
-SHA to stable.” It follows the same commands and leaves commits to the maintainer.
+for requests such as "prepare the next beta from master" or "promote this tested beta
+SHA to stable." It follows the same commands and leaves commits to the maintainer.
 
 ## Windows Store releases
 
@@ -128,6 +128,11 @@ Every candidate runs the native account-access tests. Repository and platform ch
 run once per commit in **Verify platforms**, not again in each Cloud or Store build;
 publication and Store submission wait up to 45 minutes for those checks on the exact
 source commit and stop if any failed. Release builds start without a Rust cache.
+On master and ordinary pull requests, Verify skips trial packages and reports Intel
+macOS from a quick job, and a newer master push cancels the older run. Pushes to beta
+or stable, pull requests into them and manual runs build trial packages and run Intel
+macOS. Windows runs its native tests once, with the Store build's features when
+`RELEASE_DISTRIBUTION=store`.
 Signing credentials are passed only to signing/build steps, not dependency installation
 or test steps. Every platform supplies a receipt with source, version, channel,
 configuration and artifact hashes. Candidate artifacts are retained for 30 days.

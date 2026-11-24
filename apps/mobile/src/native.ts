@@ -1,5 +1,5 @@
+import type { RemoteAction } from '@jackalope/contracts/remote';
 import { invoke } from '@tauri-apps/api/core';
-import type { RemoteAction } from '../../desktop/src/components/remote/useRemoteWorkspace';
 
 /** A host this phone is paired with. Its token stays in the native layer. */
 export interface Host {

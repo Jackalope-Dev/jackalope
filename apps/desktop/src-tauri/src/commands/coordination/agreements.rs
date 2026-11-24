@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::scope_path::any_overlap;
 use crate::commands::tasks::TaskRun;
 use rmcp::schemars;
 use serde::Serialize;
@@ -112,7 +113,7 @@ fn validate_claim(
             && a.kind == "ownership"
             && live(a)
             && a.id != except
-            && (a.resource == resource || overlaps(&a.paths, paths))
+            && (a.resource == resource || any_overlap(&a.paths, paths))
     }) {
         return Err(format!(
             "Already claimed by task {} (agreement {}). Request a handoff from that owner.",
@@ -124,7 +125,7 @@ fn validate_claim(
             && i.id != owner
             && !i.canceled
             && i.run_id.as_ref().is_none_or(|id| !merged.contains(id))
-            && overlaps(&i.scopes, paths)
+            && any_overlap(&i.scopes, paths)
     }) {
         return Err(format!("These paths belong to {}. Keep the existing assignment or revise the plan with the user.", other.title));
     }
@@ -154,7 +155,7 @@ pub(super) fn require_clean_paths(
             continue;
         }
         let (_, paths) = super::scope_audit::changed_paths(run)?;
-        if overlaps(&a.paths, &paths) {
+        if any_overlap(&a.paths, &paths) {
             return Err("The owner still has changes in these paths. Preserve or integrate that work before transferring or releasing ownership.".into());
         }
     }
@@ -288,7 +289,7 @@ pub(super) fn change(
             if ledger
                 .items
                 .iter()
-                .any(|i| i.id == actor.id && overlaps(&i.scopes, &a.paths))
+                .any(|i| i.id == actor.id && any_overlap(&i.scopes, &a.paths))
             {
                 return Err("This claim includes the original task's declared scope. Revise the plan with the user before transferring those paths.".into());
             }
@@ -383,62 +384,61 @@ pub(super) fn interface_block(ledger: &Ledger, project: &str, task: &str) -> Opt
         .map(|a| format!("Interface agreement '{}' is {}. Ask its participants to respond, or cancel it explicitly in Coordination & handoffs.", a.resource, a.status))
 }
 
-pub(in crate::commands) async fn bridge_agreement(
-    WebState(service): WebState<Coordinator>,
-    headers: HeaderMap,
-    Json(input): Json<AgreementInput>,
-) -> Result<Json<Agreement>, (StatusCode, String)> {
-    let actor = service
-        .authorized(&headers)
-        .map_err(|s| (s, "This task cannot access coordination.".into()))?;
+/// `agreement`: claims a responsibility, proposes an interface or answers a
+/// handoff for the caller's task.
+pub(in crate::commands) async fn agreement(
+    call: Call,
+    input: AgreementInput,
+) -> Result<serde_json::Value, ToolError> {
+    let actor = call
+        .service
+        .assignment(&call.caller)
+        .map_err(|s| ToolError::status(s, "This task cannot access coordination."))?;
+    let Call {
+        service, caller, ..
+    } = call;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service
-            .inner
-            .lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        let _guard = crate::commands::integration::execution_guard()
-            .map_err(|e| (StatusCode::CONFLICT, e))?;
-        service
-            .authorized_locked(&inner, &headers)
-            .map_err(|s| (s, "This task is no longer active.".into()))?;
-        let runs = service
-            .runtime
-            .integration_runs()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-        let mut ledger = inner.ledger.clone();
-        let before = serde_json::to_vec(&ledger.agreements).unwrap_or_default();
-        let merged = crate::commands::integration::applied_run_ids(&service.runtime)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-        let result = change(&mut ledger, &runs, &actor, input, &merged)
-            .map_err(|e| (StatusCode::CONFLICT, e))?;
-        if before != serde_json::to_vec(&ledger.agreements).unwrap_or_default() {
-            announce(&mut ledger, &result, &actor.id);
+        service.transact(|inner, _guard| {
             service
-                .save(&ledger)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-            inner.ledger = ledger;
-        }
-        Ok(Json(result))
+                .authorized_locked(inner, &caller)
+                .map_err(|s| ToolError::status(s, "This task is no longer active."))?;
+            let runs = service
+                .runtime
+                .integration_runs()
+                .map_err(ToolError::failed)?;
+            let merged = crate::commands::integration::applied_run_ids(&service.runtime)
+                .map_err(ToolError::failed)?;
+            let mut ledger = inner.ledger.clone();
+            let result = change(&mut ledger, &runs, &actor, input, &merged)
+                .map_err(|e| ToolError::status(StatusCode::CONFLICT, e))?;
+            if serde_json::to_vec(&inner.ledger.agreements).ok()
+                != serde_json::to_vec(&ledger.agreements).ok()
+            {
+                service.commit(inner, |saved| {
+                    *saved = ledger;
+                    announce(saved, &result, &actor.id);
+                    Ok::<_, ToolError>(())
+                })?;
+            }
+            json(result)
+        })
     })
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map_err(|e| ToolError::failed(e.to_string()))?
 }
 
 impl Coordinator {
-    fn authorized_locked(&self, inner: &Inner, headers: &HeaderMap) -> Result<(), StatusCode> {
-        let token = headers
-            .get("authorization")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-        let token = crate::commands::tasks::bridge_token(token);
+    /// Whether `caller` still has an active, unfinished attempt, checked with
+    /// the coordinator state held.
+    fn authorized_locked(&self, inner: &Inner, caller: &Caller) -> Result<(), StatusCode> {
+        let token = crate::commands::tasks::bridge_token(caller.token());
         let (_, run_id) = inner.grants.get(&token).ok_or(StatusCode::UNAUTHORIZED)?;
         if self
             .runtime
             .integration_runs()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .iter()
-            .any(|r| &r.id == run_id && active(&r.status) && !r.finishing)
+            .any(|r| &r.id == run_id && r.status.is_active() && !r.finishing)
         {
             Ok(())
         } else {

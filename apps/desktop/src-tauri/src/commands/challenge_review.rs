@@ -7,7 +7,6 @@
 
 use super::{
     coordination::Coordinator,
-    git_command::{command as git_command, Policy},
     integration,
     process_control::CommandResult,
     tasks::{RunRequest, TaskRun, TaskRuntime, WorkspaceMode},
@@ -54,7 +53,6 @@ pub struct ChallengeRerun {
     pub result: Option<CommandResult>,
 }
 
-const ACTIVE: [&str; 4] = ["starting", "running", "stopping", "interrupted"];
 const COMMAND_LIMIT: usize = 2_000;
 
 fn excerpt(text: &str, limit: usize) -> String {
@@ -196,16 +194,6 @@ fn findings_block(reply: &str) -> Option<&str> {
     Some(&body[..body.find("```").unwrap_or(body.len())])
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = git_command(path, args, Policy::Isolated)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
 /// Starts one reviewer for a finished attempt. `request` carries the reviewer's agent,
 /// account and project settings; its prompt and workspace are replaced here.
 pub(super) fn start(
@@ -225,7 +213,7 @@ pub(super) fn start(
             .ok_or("The result to review no longer exists.")?;
         if runs
             .iter()
-            .any(|run| run.workspace == author.workspace && ACTIVE.contains(&run.status.as_str()))
+            .any(|run| run.workspace == author.workspace && run.status.is_live())
         {
             return Err("Wait for this work to finish before reviewing it.".into());
         }
@@ -233,7 +221,6 @@ pub(super) fn start(
             return Err("This result has no workspace to review.".into());
         }
         let directory = runtime.integration_directory();
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let (tree, base) =
             integration::snapshot_commit(author, &directory, "Jackalope review snapshot")?;
         request.prompt = match kind {
@@ -269,21 +256,6 @@ pub(super) fn start(
     Ok(id)
 }
 
-/// Removes a disposable worktree however the rerun ends.
-struct Disposable {
-    project: PathBuf,
-    path: PathBuf,
-}
-
-impl Drop for Disposable {
-    fn drop(&mut self) {
-        let path = self.path.to_string_lossy().into_owned();
-        let _ = git(&self.project, &["worktree", "remove", "--force", &path]);
-        let _ = std::fs::remove_dir_all(&self.path);
-        let _ = git(&self.project, &["worktree", "prune"]);
-    }
-}
-
 pub(super) fn rerun(
     runtime: &TaskRuntime,
     id: &str,
@@ -307,7 +279,7 @@ pub(super) fn rerun(
     }
     if runs
         .iter()
-        .any(|other| other.workspace == run.workspace && ACTIVE.contains(&other.status.as_str()))
+        .any(|other| other.workspace == run.workspace && other.status.is_live())
     {
         return Err("Wait for the reviewer to finish before running its findings again.".into());
     }
@@ -325,11 +297,7 @@ pub(super) fn rerun(
         .join("challenge")
         .join(uuid::Uuid::new_v4().simple().to_string());
     let workspace = path.to_string_lossy().into_owned();
-    git(
-        &project,
-        &["worktree", "add", "--detach", &workspace, &commit],
-    )?;
-    let disposable = Disposable { project, path };
+    let disposable = verification::DisposableWorktree::add(&project, path, &commit)?;
     let lease = verification::reserve_workspace(&workspace)?;
     drop(guard);
     super::workspace_setup::copy_files(&run.project_path, &workspace, &run.setup_files)?;
@@ -389,6 +357,19 @@ fn save_rerun(runtime: &TaskRuntime, id: &str, rerun: &ChallengeRerun) -> Result
     let bytes = serde_json::to_vec(&saved).map_err(|e| e.to_string())?;
     super::history::write_atomic(&path, &bytes)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::challenge_review::task_start_challenge,
+            commands::challenge_review::task_start_agent_review,
+            commands::challenge_review::task_challenge_reply,
+            commands::challenge_review::task_challenge_rerun,
+            commands::challenge_review::task_challenge_reruns,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn task_start_challenge(

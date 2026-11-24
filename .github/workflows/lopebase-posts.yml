@@ -1,0 +1,58 @@
+name: LopeBase posts
+# LopeBase publishes each blog post as a pull request that adds, edits or removes one
+# apps/website/content/blog/<slug>.md file. This approves those pull requests and
+# queues them to merge once master's required checks pass; `pnpm verify` builds the
+# site, so a post that does not parse never merges. Merging to master deploys the
+# website and the production API through Workers Builds.
+#
+# Needs the LOPEBASE_MERGE_TOKEN secret: a fine-grained token for a code owner with
+# Pull requests and Contents write on this repository. Set the LOPEBASE_PR_AUTHOR
+# variable if LopeBase opens pull requests as anyone other than lopebase[bot].
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: lopebase-posts-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  merge:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'lopebase/') &&
+      github.event.pull_request.user.login == (vars.LOPEBASE_PR_AUTHOR || 'lopebase[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+    steps:
+      # Nothing is checked out: this job only reads the file list and calls the API,
+      # so the merge token never meets code from the pull request.
+      - name: Confirm the pull request only adds or edits blog posts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | "\(.status) \(.filename)"')
+          printf '%s\n' "$files"
+          if [ -z "$files" ]; then
+            echo "::error::The pull request changes no files."
+            exit 1
+          fi
+          other=$(printf '%s\n' "$files" | grep -vE '^(added|modified|removed) apps/website/content/blog/[a-z0-9]+(-[a-z0-9]+)*\.md$' || true)
+          if [ -n "$other" ]; then
+            echo "::error::Only apps/website/content/blog/*.md changes merge on their own. Review this one by hand."
+            exit 1
+          fi
+      - name: Approve and merge when checks pass
+        env:
+          GH_TOKEN: ${{ secrets.LOPEBASE_MERGE_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Add the LOPEBASE_MERGE_TOKEN secret so LopeBase posts can merge."
+            exit 1
+          fi
+          gh pr review "$PR" --repo "$REPO" --approve --body "LopeBase post: only blog Markdown changed. Merging when checks pass."
+          gh pr merge "$PR" --repo "$REPO" --squash --auto

@@ -1,10 +1,13 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { type Comparison, useCompareStore } from '../stores/compareStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { agentAccountFor, type Project } from '../stores/projectStore';
 import { useTaskStore } from '../stores/taskStore';
 import { attemptLabel, buildJudgePrompt } from './compare-judge';
-import type { ContextSelection } from './knowledge';
-import { nativeTask, type Review, type RunRequest, type TaskRun } from './task-runtime';
+import type { ContextSelection } from './knowledge-types';
+import { checksAutomatically } from './project-automation.ts';
+import type { RunRequest, TaskRun } from './run-types';
+import { taskReview } from './task-client';
 import { taskTitle } from './task-title';
 
 /**
@@ -50,7 +53,7 @@ export async function startComparison({
           verifyCommand: project.preferences?.verifyCommand,
           prepareCommand: project.preferences?.prepareCommand,
           setupFiles: project.preferences?.setupFiles,
-          autoVerify: project.preferences?.autoVerify ?? true,
+          autoVerify: checksAutomatically(project.preferences),
           effort: 'balanced',
           codexSpeed,
           contextSelection,
@@ -70,7 +73,7 @@ export async function startComparison({
         runId,
       });
     } catch (error) {
-      failures.push(`${agent.name}: ${String(error)}`);
+      failures.push(`${agent.name}: ${describeError(error)}`);
     }
   }
   if (!comparison.taskIds.length) {
@@ -106,9 +109,7 @@ export async function startComparisonJudge({
   if (attempts.length < 2 || !first)
     throw new Error('Judging needs at least two finished attempts.');
   const reviews = await Promise.all(
-    attempts.map((attempt) =>
-      nativeTask<Review>('task_review', { id: attempt.id }).catch(() => undefined),
-    ),
+    attempts.map((attempt) => taskReview(attempt.id).catch(() => undefined)),
   );
   const prompt = buildJudgePrompt(
     comparison.prompt,

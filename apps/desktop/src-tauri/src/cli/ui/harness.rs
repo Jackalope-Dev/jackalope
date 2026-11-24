@@ -15,7 +15,7 @@ use super::{App, Click, Event, NextStart, Overview};
 use crate::connection::Connection;
 use crate::protocol::{
     AgentStatus, Handshake, Message, Project, Question, Request, Response, RunCheck, RunStage,
-    RunStep, RunSummary, SessionSummary, SessionView, VERSION,
+    RunStatus, RunStep, RunSummary, SessionSummary, SessionView, VERSION,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::backend::TestBackend;
@@ -143,7 +143,7 @@ pub fn conversation(id: &str, title: &str, messages: &[(&str, &str)]) -> Session
             })
             .collect(),
         run_id: Some(format!("run-{id}")),
-        status: Some("review".into()),
+        status: Some(RunStatus::Review),
         agent: Some("Claude Code".into()),
         account: None,
         model: None,
@@ -446,7 +446,7 @@ mod tests {
                 ("agent", "I looked at the schema and the nightly jobs."),
             ],
         );
-        view.status = Some("running".into());
+        view.status = Some(RunStatus::Running);
         view.questions = vec![question(
             &view,
             "Which database should the reporting service use?",
@@ -680,7 +680,7 @@ mod tests {
     fn running_work_shows_its_stages_and_newest_steps_live() {
         let mut harness = Harness::new();
         let mut view = conversation("c1", "Fix login", &[("you", "Fix the login redirect loop")]);
-        view.status = Some("running".into());
+        view.status = Some(RunStatus::Running);
         view.partial = "The redirect check runs before the session is cleared".into();
         view.run = Some(run_summary(None));
         harness.add(view);
@@ -722,12 +722,12 @@ mod tests {
         done.run = Some(run_summary(Some(220_000)));
         harness.add(done);
         let mut busy = conversation("c2", "Add search", &[("you", "Add search")]);
-        busy.status = Some("running".into());
+        busy.status = Some(RunStatus::Running);
         busy.agent = Some("Codex".into());
         busy.step = Some("Running checks".into());
         harness.add(busy);
         let mut asking = conversation("c3", "Pick a database", &[("you", "Set up reporting")]);
-        asking.status = Some("running".into());
+        asking.status = Some(RunStatus::Running);
         asking.questions = vec![question(
             &asking,
             "Postgres or SQLite?",
@@ -893,7 +893,7 @@ mod tests {
             .requests()
             .into_iter()
             .filter_map(|request| match request {
-                Request::SessionAction { action, .. } => Some(action),
+                Request::SessionAction { action, .. } => Some(action.to_string()),
                 Request::MergePrepare { .. } => Some("prepare".into()),
                 Request::MergeApply { .. } => Some("apply".into()),
                 _ => None,
@@ -973,5 +973,44 @@ mod tests {
         harness.app.show(Some("c3".into()));
         let screen = harness.render(100, 30);
         assert!(!screen.contains("orchestrated"), "{screen}");
+    }
+
+    #[test]
+    fn a_proposed_swarm_round_shows_in_the_plan_panel_and_approves_with_a_command() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let plan = crate::protocol::PlanView {
+            id: "plan-1".into(),
+            title: "Add CSV export".into(),
+            status: "running".into(),
+            revision: Some(1),
+            progress: Some(
+                "swarm (beta) round 1/5 · next round waits for your approval · 2/2 tasks checked"
+                    .into(),
+            ),
+            next_round: vec!["Add the button".into()],
+            ..Default::default()
+        };
+        harness.host.lock().unwrap().reply = Some(Box::new(move |request| match request {
+            Request::PlanDetail { .. } | Request::PlanAction { .. } => Some(Response::Plan {
+                plan: Box::new(plan.clone()),
+            }),
+            _ => None,
+        }));
+        harness.app.open_plan("plan-1".into());
+        let screen = harness.render(140, 40);
+        assert!(screen.contains("Next round waits for you"), "{screen}");
+        assert!(screen.contains("· Add the button"), "{screen}");
+        harness.submit("/rounds later");
+        harness.submit("/rounds approve");
+        let sent: Vec<(String, String)> = harness
+            .requests()
+            .into_iter()
+            .filter_map(|request| match request {
+                Request::PlanAction { action, text, .. } => Some((action.to_string(), text)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sent, [("rounds".to_string(), "approve".to_string())]);
     }
 }

@@ -64,7 +64,6 @@ mod tests {
         assert!(next.runs.is_empty());
         assert_eq!(next.revisions.as_ref().unwrap().len(), 500);
         assert!(bytes_after < bytes_before / 20);
-        println!("Unchanged 500-attempt snapshot: {bytes_before} bytes full, {bytes_after} bytes incremental");
     }
     #[test]
     fn fingerprints_detect_same_length_edits() {

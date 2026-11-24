@@ -1,7 +1,10 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::Path;
+
+mod rules;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -200,7 +203,7 @@ fn task_candidates(
             values.push(candidate(project_id, path, &format!("preference:{}", words(line)), "User preference", format!("Previously requested by the user: {line}\nApply only when relevant to the current task; newer instructions take precedence."), keywords, "preference", format!("Task {}: {}", run.id, line), Some(run)));
         }
         if run.task_id != run.id
-            && run.status == "reviewed"
+            && run.status == RunStatus::Reviewed
             && values.len() == before_preferences
             && runs.iter().any(|original| {
                 original.id == run.task_id
@@ -262,7 +265,7 @@ fn review_resolution(
         })
         .max_by(|a, b| a.started_at.cmp(&b.started_at).then(a.id.cmp(&b.id)))?;
     if latest.id == source.id
-        || latest.status != "reviewed"
+        || latest.status != RunStatus::Reviewed
         || latest.details_omitted
         || latest.persistence_error.is_some()
         || latest.error.is_some()
@@ -309,7 +312,7 @@ fn verified_checks(
         BTreeMap::new();
     for run in runs {
         if run.project_id != project_id
-            || run.status != "reviewed"
+            || run.status != RunStatus::Reviewed
             || run.persistence_error.is_some()
             || canonical(&run.project_path).ok().as_deref() != Some(path)
         {
@@ -449,6 +452,11 @@ fn repository_candidates(project_id: &str, path: &str) -> Result<Vec<KnowledgeEn
     Ok(entries)
 }
 
+/// Lessons read from repository files, paused when their file disappears.
+fn from_files(kind: &str) -> bool {
+    matches!(kind, "repository" | "rules")
+}
+
 impl KnowledgeStore {
     pub(super) fn learn(
         &self,
@@ -462,11 +470,12 @@ impl KnowledgeStore {
         let mut entries = self.read()?;
         let mut candidates = repository_candidates(project_id, &path)?;
         candidates.extend(test_conventions(project_id, &path));
+        candidates.extend(rules::candidates(project_id, &path));
         candidates.extend(task_candidates(project_id, &path, runs));
         candidates.extend(verified_checks(project_id, &path, runs));
         let repo_ids: HashSet<_> = candidates
             .iter()
-            .filter(|e| e.automatic.as_ref().is_some_and(|a| a.kind == "repository"))
+            .filter(|e| e.automatic.as_ref().is_some_and(|a| from_files(&a.kind)))
             .map(|e| e.id.clone())
             .collect();
         let mut merged: BTreeMap<String, KnowledgeEntry> = BTreeMap::new();
@@ -492,7 +501,7 @@ impl KnowledgeStore {
                 && old
                     .automatic
                     .as_ref()
-                    .is_some_and(|a| a.kind == "repository" && a.managed)
+                    .is_some_and(|a| from_files(&a.kind) && a.managed)
                 && !repo_ids.contains(&old.id)
                 && old.enabled
             {

@@ -20,22 +20,29 @@ representative benefit and installed-platform acceptance remain open.
 
 - One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
   activity and quota freshness. Desktop preferences include power, running services, zoom,
-  shortcuts, editor/shell choices, saved actions and optional local dictation.
-  Split terminals can retain stopped output without replaying commands. Explicit
+  shortcuts, editor/shell choices and local voice to text. Task terminals offer each
+  project's preparation, verification and saved commands as buttons, and split terminals
+  can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
 - One workspace layout keeps recent work in a collapsible sidebar beside the open item,
-  with list and board views of the work list.
+  with favorites, pinned work and folders, an Inbox of what needs you, a Library of
+  screenshots and files from work, and list and board views of the work list.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
-  unread results; recently opened work stays in tabs.
+  unread results; recently opened work stays in tabs. Claude Code and Codex conversations
+  from outside Jackalope appear read-only under their project and can be continued where
+  they ran.
   Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.
 
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Plan mode interviews read-only, then runs an approved plan as one agent, planned
-  subtasks or a swarm with an independent review against it.
+  subtasks or a swarm with an independent review against it. A swarm (beta) runs in
+  rounds until an orchestrator finds every acceptance criterion met. Agents can decide
+  routine questions, checked rounds and in-scope deviations for the person, who is asked
+  only for sign-ins, payment, secrets and changes of direction.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and
   GitHub/Linear/Jira issue intake keep corrections and source work together.
@@ -51,11 +58,15 @@ representative benefit and installed-platform acceptance remain open.
   and provider delegation with sequential fallback.
 - Recurring schedules, local change monitors, project lessons, codebase maps, MCP
   connections with curated discovery and guided setup, browser tools and Ask Jackalope.
+- Skill Sync: a Skills page lists personal and project agent skills, and the ones a
+  person chooses sync through their account to the same folders on their other
+  computers without being committed. Changes on two computers become a conflict to
+  resolve. Installed two-desktop acceptance remains open.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
-- Account connection with optional open signup and Turnstile-protected signup,
-  waitlist/referral progress, platform download guidance and optional settings sync,
-  feedback and reporting.
+- Free signup with email confirmation and Turnstile protection, desktop account
+  connection, platform downloads, optional settings sync, feedback and reporting.
+  A configurable waitlist mode with referral progress remains available to operators.
 
 These capabilities describe source behavior. Provider, platform, delivery and
 installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
@@ -66,7 +77,7 @@ for the detailed inventory and [contributor priorities](TODO.md) for outstanding
 Native sleep prevention, macOS window/menu and unread-badge integration, and Windows
 pairing with a separately configured WSL Linux host are implemented for native
 acceptance. WSL requires its own running Jackalope host, Linux projects/accounts and
-Python 3. Dictation requires a local transcription service. Installed permissions,
+Python 3. Local voice to text needs native microphone and model-download acceptance. Installed permissions,
 recovery and cross-platform behavior still require validation.
 
 Trusted-host pairing and a responsive web companion support scoped task check-ins,
@@ -136,8 +147,8 @@ and background rich rendering are implemented. Local [performance fixtures](PERF
 exercise these contracts; installed startup, memory and responsiveness acceptance remains open.
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
-large-project performance in installed builds. Complete signing, installation,
-updates and secure storage for each intended platform. Required account access
+large-project performance in installed builds. Validate installation, updates and
+secure storage on each platform. Required account access
 in every build, optional settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
@@ -145,9 +156,9 @@ account/settings sync, Unix process guardians and tray/Dock recovery. macOS and 
 window-control helpers, a GNOME 46 Wayland extension and an XDG desktop portal
 backend for other Wayland desktops are implemented for validation.
 Installed acceptance remains in progress. Cross-platform signing and branch-based
-release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
-update checks and installation are implemented for validation; live signing, publication and
-installed upgrades remain acceptance work,
+release automation use Windows Store and Mac/Linux Cloud candidates, and public
+downloads are available for all three platforms. In-app Store update checks and
+installation are implemented; installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. KDE Plasma and other GNOME versions use the portal backend, which still
 needs installed acceptance; desktops without the RemoteDesktop portal remain unsupported.
@@ -160,8 +171,12 @@ on-demand connection. A Screen view shows the task browser's viewport and deskto
 grant state with revoke controls. Persistent agent browser profiles, one per project and
 optionally per bot, keep sign-ins between tasks with per-site permission and a
 person-only sign-in window. Bots can also have their own computer, a Linux sandbox in
-Docker or a paired cloud machine the person runs, where desktop and browser tools act
-instead of on the person's desktop; tasks get one only with the person's approval.
+Docker, a paired cloud machine the person runs or a machine on their own Agent37
+account, where desktop and browser tools act instead of on the person's desktop; tasks
+get one only with the person's approval. A project can run its Claude Code and Codex
+task agents on such a computer while checks, review and merging stay local, and a
+swarm can spread its tasks across this device and the person's computers, each placed by
+what it needs and which host has room, with a lost host's task retried once elsewhere.
 Local sandboxes start when needed and stop when idle or when Jackalope quits.
 Jackalope-hosted computers are planned, not available. Installed and live-account
 acceptance remain open.
@@ -185,7 +200,10 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 
 ## Further out: work across machines
 
-Managed hosting (including hosted Artifacts repositories), agent-native repository
-workflows, shared workspaces and team collaboration
-depend on validated individual remote workflows. These remain exploratory directions.
+Jackalope Cloud, an always-on host that keeps coordinating work while the laptop is away so
+phones and other computers stay useful, comes first in this direction. Managed hosting
+(including hosted Artifacts repositories), agent-native repository workflows, shared
+workspaces and team collaboration depend on validated individual remote workflows. A
+skills directory for browsing and submitting shared skills is also under consideration;
+today a skill is shared by exporting its folder. These remain exploratory directions.
 See [BACKEND.md](BACKEND.md).

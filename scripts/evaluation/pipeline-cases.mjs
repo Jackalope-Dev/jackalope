@@ -1,5 +1,4 @@
 import { writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
 
 export const pipelineCases = [8, 160].map((size) => {
   const incidents = Array.from({ length: size }, (_, index) => ({
@@ -38,7 +37,7 @@ export const pipelineCases = [8, 160].map((size) => {
   };
 });
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   if (!process.argv[2]) throw new Error('Supply an output suite JSON path.');
   await writeFile(process.argv[2], `${JSON.stringify({ cases: pipelineCases }, null, 2)}\n`);
 }

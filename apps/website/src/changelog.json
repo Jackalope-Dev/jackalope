@@ -1,8 +1,330 @@
 [
   {
+    "id": "pick-up-quota-stopped-work-where-it-left-off",
+    "date": "2026-11-20",
+    "title": "Pick up quota-stopped work where it left off.",
+    "description": "Retrying a task the provider quota stopped now continues from its changes instead of starting over.",
+    "items": [
+      "Add an optional focus line for the next agent, and see the handoff context it received in Task details.",
+      "A provider refusing a request is reported as a refusal and no longer switches accounts."
+    ]
+  },
+  {
+    "id": "bring-rules-from-other-coding-tools",
+    "date": "2026-11-20",
+    "title": "Bring rules from other coding tools.",
+    "description": "Project context offers your Cursor, Windsurf, Cline and GitHub Copilot rule files as lessons you can turn on.",
+    "items": [
+      "Each rule arrives paused and keeps its file's scope, so path rules match requests that name those folders or file types.",
+      "Oh My Pi is listed among the known ACP agents in Add agent."
+    ]
+  },
+  {
+    "id": "your-skills-on-every-computer",
+    "date": "2026-11-20",
+    "title": "Your skills on every computer.",
+    "description": "Skills you keep outside the repo can now sync between your computers through your account, without ever being committed.",
+    "items": [
+      "The new Skills page in Agents shows your Claude Code, Codex and shared agent skills, personal and per project.",
+      "You choose which skills sync. Skill sync is off until you turn it on, and it needs settings sync.",
+      "If a skill changed on two computers, Jackalope shows both copies and waits for you to pick one. Nothing gets overwritten.",
+      "Synced project skills never go into a file the repo tracks, and new ones are kept out of your commits."
+    ],
+    "note": "Committed skills already travel with the repo, so they stay as they are. Skills that look like they hold a credential stay on the computer."
+  },
+  {
+    "id": "keep-working-while-jackalope-uses-a-window",
+    "date": "2026-11-19",
+    "title": "Keep working while Jackalope uses a window.",
+    "description": "Desktop control keeps going in the background while you use other apps, and work that isn't about code skips the code setup.",
+    "items": [
+      "Switch to other apps or move the window, and Jackalope keeps reading it and using its buttons and fields. Clicks at a spot on screen and key presses wait until you bring the window back.",
+      "Only clicking or typing in the granted window pauses control. Typing in other apps never does.",
+      "If a turn ends while control is paused, the window's badge shows Resume. Click it and Jackalope carries on without you typing anything.",
+      "Checking a web page, a connection or an attached window runs right in your project folder, with no worktree, setup or checks. Options → Treat as code work switches it back.",
+      "General gives you a place for work that doesn't belong to any project."
+    ],
+    "note": "Background control works on Windows and macOS. On Linux X11, any input still pauses it."
+  },
+  {
+    "id": "hand-an-agent-a-window",
+    "date": "2026-11-19",
+    "title": "Hand an agent a window.",
+    "description": "Drag the agent out of a conversation and drop it on any window to let it see that window, or see and control it.",
+    "items": [
+      "Jackalope names the window under your pointer and asks before giving any access.",
+      "See-only lets the agent read and screenshot the window without clicking or typing.",
+      "Prefer the keyboard? Press Enter on the agent to pick from a list of open windows."
+    ],
+    "note": "The drag works on Windows and macOS. Linux X11 uses the window list, and Wayland keeps the system picker."
+  },
+  {
+    "id": "inbox-library-and-a-sidebar-you-can-arrange",
+    "date": "2026-11-19",
+    "title": "Inbox, Library and a sidebar you can arrange.",
+    "description": "Inbox gathers what needs you across projects, and Library collects the screenshots and files your work made.",
+    "items": [
+      "Pin projects and conversations as favorites, pin work to the top of a project, and group work into folders.",
+      "Inbox shows questions, failed checks, reviews, new results and app alerts like a low allowance in one place.",
+      "Library filters by project and kind and remembers your choice.",
+      "Switch or create branches from the branch menu in the status bar.",
+      "A project with no work yet shows starting points and its pages instead of an empty list."
+    ]
+  },
+  {
+    "id": "talk-instead-of-typing",
+    "date": "2026-11-19",
+    "title": "Talk instead of typing.",
+    "description": "Every composer has a mic button that turns speech into text on your computer.",
+    "items": [
+      "Pick a Fast, Balanced or Most accurate Whisper model the first time you use it. It downloads once and resumes if interrupted.",
+      "Recordings stay on your computer and aren't saved.",
+      "Your own local transcription server still works as an option in Settings."
+    ]
+  },
+  {
+    "id": "back-and-forward-and-settings-that-stay-in-settings",
+    "date": "2026-11-16",
+    "title": "Back and Forward, and settings that stay in Settings",
+    "description": "Easier to move around the app and find your way back.",
+    "items": [
+      "Back and Forward buttons sit beside the app name; Alt+Left and Alt+Right (Cmd+[ and Cmd+] on Mac) and a mouse's side buttons work too.",
+      "Agents, Routing, Tools, Connected apps and Devices now open inside Settings instead of taking you to another page.",
+      "A site icon fetched for a project shows in the icon dialog straight away."
+    ]
+  },
+  {
+    "id": "a-clearer-board-better-defaults-and-a-button-fix",
+    "date": "2026-11-15",
+    "title": "A clearer board, better defaults and a button fix",
+    "description": "A round of polish across the work board, project setup and first-run defaults.",
+    "items": [
+      "The board shows Needs you, Working, In review, Drafts and Finished as side-by-side lanes, and rows say why they need you, such as a failed check.",
+      "Finished work is checked automatically, your computer stays awake while agents work, and updates download in the background. Each can be turned off.",
+      "Replies can be read aloud, and a conversation can be copied as Markdown.",
+      "Fixed primary buttons, including Connect account, showing a faint label in installed builds."
+    ]
+  },
+  {
+    "id": "follow-pull-requests-from-the-work-list",
+    "date": "2026-11-15",
+    "title": "Follow pull requests from the work list",
+    "description": "Jackalope keeps watching a pull request after a task opens it, so you can see what it needs without checking GitHub.",
+    "items": [
+      "The work list and board show whether a pull request is waiting on checks or review, needs a fix, or is ready to merge, and notify you when that changes.",
+      "One click drafts a fix for failed checks, review comments or a conflict for the task's own agent; pushing the update and merging each ask first.",
+      "Add agent lists known ACP agents such as Cursor, GitHub Copilot CLI, Goose and Qwen Code, and fills in the ones installed on your computer.",
+      "Share a project's bots as one file and import a shared file after reviewing it."
+    ]
+  },
+  {
+    "id": "a-cleaner-guided-jackalope-on-desktop-and-phone",
+    "date": "2026-11-12",
+    "title": "A cleaner, guided Jackalope on desktop and phone",
+    "description": "Settings, setup and the everyday screens are reorganised and guided, with a new look for buttons and the frosted window.",
+    "items": [
+      "Settings are regrouped so things are easier to find: Devices brings Hosts and Remote access together, Agents holds Routing, and project settings live on each project in tabs, with a How hands-on? preset.",
+      "Setup screens guide you step by step, show what's connected with a live diagram, and check keys and codes as you type.",
+      "The sidebar starts with an Inbox of what needs you, and each project lists only its live work.",
+      "Projects can use their website's icon, and project menus can open the folder in your editor or Finder.",
+      "Bots have a new gallery with characters that come alive, and schedules use one clear When picker.",
+      "Fewer bottom-right alerts: only new things that need you, grouped together.",
+      "The phone app has a new look, shows offline computers, and a laptop can show a phone pairing code for another computer that allows it."
+    ],
+    "note": "Not yet tested in the installed app or on a device."
+  },
+  {
+    "id": "pick-up-terminal-conversations-in-jackalope",
+    "date": "2026-11-12",
+    "title": "Pick up terminal conversations in Jackalope.",
+    "description": "Claude Code and Codex conversations you had in a terminal or another app now show up under the project they worked in.",
+    "items": [
+      "Open one to read it, with the tools the agent used.",
+      "Continue in Jackalope resumes that conversation in the same checkout or worktree, under the same account.",
+      "Sessions are read only on this computer and nothing is uploaded. Turn it off in Settings under Privacy."
+    ],
+    "note": "Claude Code and Codex only for now."
+  },
+  {
+    "id": "agents-waste-less-time-on-long-runs",
+    "date": "2026-11-12",
+    "title": "Agents waste less time on long runs",
+    "description": "Changes from studying a long desktop task that spent most of its hour waiting.",
+    "items": [
+      "With auto-approve on, an agent can stop a process it started, such as a dev server in its own worktree, without asking you first. Stopping processes by name still asks.",
+      "If you answer a question after the agent stopped waiting, your answer reaches the agent with its next step instead of waiting for it to check. Questions can link straight to a System Settings pane.",
+      "When an agent can't control your Mac because a permission is missing, the task shows which one, opens the right System Settings pane and offers a restart once the work has stopped.",
+      "Large planned tasks are split into steps that can each be checked, starting with a read-only audit when the work needs one. Steps from an approved plan no longer repeat the same briefing.",
+      "A run that ends early still shows the tokens it used."
+    ],
+    "note": "Not yet tested in the installed app."
+  },
+  {
+    "id": "resume-work-jackalope-closed-in-the-middle-of",
+    "date": "2026-11-12",
+    "title": "Resume work Jackalope closed in the middle of",
+    "description": "Work that was running when Jackalope closed or restarted now has a Resume button, so you can pick it up instead of starting over.",
+    "items": [
+      "Resume shows anything still running in the task's workspace, such as a dev server the agent started, so you can stop it first. Checking works on macOS and Linux.",
+      "Resuming continues the agent's conversation in the same workspace, with any instructions you add. If no conversation was saved, the work starts again in that workspace.",
+      "Text on task, settings and other workspace pages can now be selected and copied."
+    ],
+    "note": "Not yet tested in the installed app."
+  },
+  {
+    "id": "swarm-tasks-keep-their-work-when-a-computer-drops-out",
+    "date": "2026-11-07",
+    "title": "Swarm tasks keep their work when a computer drops out",
+    "description": "Swarms that run on computers now hold to that choice and keep what a task did on a computer that stopped answering.",
+    "items": [
+      "Under Computers only, a swarm task with an automatic agent is given only an agent that runs on computers, and stops with the reason when none can, instead of running on this device.",
+      "When a computer that stopped answering comes back, the changes a retried task left there are saved as a patch on the lost attempt, shown in its task details with the path to copy, and never applied over the retry.",
+      "A computer that stopped answering stays skipped for ten minutes even if Jackalope restarts."
+    ],
+    "note": "Beta. Not yet tested across real computers in the installed app."
+  },
+  {
+    "id": "computers-take-as-many-agents-as-they-have-room-for",
+    "date": "2026-11-07",
+    "title": "Computers take as many agents as they have room for",
+    "description": "A computer now tells Jackalope how many agents it can run at once from its processors and memory, so swarms put more work on larger added computers and less on small ones.",
+    "items": [
+      "A computer added to a project's swarms takes one agent for every two processors and 4 GB of memory, up to eight. Set JACKALOPE_RUNNER_SLOTS on the computer to choose a different number. A project's own computer keeps the shared limit on agents on computers.",
+      "uv, installed on a computer when a connection needs it, now comes from a fixed release and is checked against its known fingerprint before it runs.",
+      "Repository search by agents on a computer now ranks files by the names they declare, like searches on this device."
+    ],
+    "note": "Update the computer's image to use these."
+  },
+  {
+    "id": "swarms-spread-across-your-computers",
+    "date": "2026-11-06",
+    "title": "Swarms spread across your computers",
+    "description": "A swarm can now run its tasks across this device and your computers at once, each placed where it can run and where there is room.",
+    "items": [
+      "Choose where a project's swarms run under Swarms run on in Project settings: anywhere, computers only or this device only, and add other computers to share the work.",
+      "Each task goes to a host that has what it needs, such as the browser tools, a secret it names or a connection it was given, and its activity says why it went there.",
+      "The swarm board, round view and task details show where each task runs and how busy each host is; a task whose computer stops answering is retried once on another host."
+    ],
+    "note": "Beta. Not yet tested across real computers in the installed app."
+  },
+  {
+    "id": "agents-on-a-computer-keep-their-tools-there",
+    "date": "2026-11-06",
+    "title": "Agents on a computer keep their tools there",
+    "description": "A project's agents on a computer now run Jackalope's workspace tools next to their files, on every kind of computer.",
+    "items": [
+      "Saved checks, check output and source reads run in the computer's copy of the workspace for writing agents.",
+      "Browser tools run on the computer itself on local sandboxes, cloud machines and Agent37, so a dev server the agent starts is reachable at localhost. Each website is still asked about on this device first.",
+      "Browser screenshots are saved in the computer's workspace, where the agent can open them, and appear with the attempt and its review when the changes come back.",
+      "Computers on an older image keep working as before; update the image to use the new tools."
+    ]
+  },
+  {
+    "id": "faster-workspaces-for-agents-on-a-computer",
+    "date": "2026-11-06",
+    "title": "Faster workspaces for agents on a computer",
+    "description": "Agents on a project computer now receive the workspace as a Git bundle of only what the computer lacks, and bring results, screenshots and large tool answers back in resumable, checked transfers.",
+    "items": [
+      "Retries and later attempts send only what changed, and the agent on the computer sees the project's Git history.",
+      "Screenshots and other saved output come back as content-checked transfers that resume after a dropped connection.",
+      "On-demand tool results up to 1 MB reach an agent on a computer whole instead of as a preview.",
+      "Computers on older images, and repositories a bundle cannot carry such as LFS or shallow clones, keep sending files as before."
+    ]
+  },
+  {
+    "id": "agents-get-your-project-s-context-automatically",
+    "date": "2026-11-06",
+    "title": "Agents get your project's context automatically",
+    "description": "Project instructions, cloud resources and pasted images reach every agent on its own, in a worktree or on a project's computer, with nothing to commit or paste.",
+    "items": [
+      "Agents see your Cloudflare resources and their bindings at launch, with the full details in .jackalope/cloudflare.json in their workspace.",
+      "Project instructions reach every agent again, whatever started the work.",
+      "Pasted images are copied into the task's workspace, so agents on a computer can open them too.",
+      "Jackalope keeps this context current on every attempt and out of commits."
+    ]
+  },
+  {
+    "id": "local-tools-for-agents-on-a-computer",
+    "date": "2026-11-06",
+    "title": "Local tools for agents on a computer",
+    "description": "Agents writing code on a project's computer can use the project's on-demand connections that run as programs, such as npx and uvx servers, right in the workspace they edit.",
+    "items": [
+      "Each connection starts on the computer with its saved settings and any project secrets it refers to, sent as privately as project secrets.",
+      "Missing uv is installed automatically. A connection the computer cannot run, such as one using Docker, runs on this device when it does not need the workspace, and the task says why when it cannot be used.",
+      "Claude Code still asks before these tools run, using your project's approval rules."
+    ]
+  },
+  {
+    "id": "see-which-agent-is-working",
+    "date": "2026-11-06",
+    "title": "See which agent is working",
+    "description": "Tasks show the logo of the agent that worked on them most recently.",
+    "items": [
+      "The sidebar, task lists and the phone companion show each task's agent by its product logo, with a ring while it works or waits for you.",
+      "Bots keep their own characters."
+    ]
+  },
+  {
+    "id": "cloud-resources-for-your-projects",
+    "date": "2026-11-06",
+    "title": "Cloud resources for your projects",
+    "description": "Create R2 storage, a D1 database, KV, Queues, Hyperdrive and Turnstile in your own Cloudflare account from Project settings, with wrangler bindings ready to copy.",
+    "items": [
+      "Each resource is found by name before it is created, so retrying never makes duplicates.",
+      "Progress shows each step as it runs, and permission problems name exactly what to add.",
+      "Names, IDs and bindings are saved to .jackalope/cloudflare.json with no secrets."
+    ]
+  },
+  {
+    "id": "connections-and-secrets-for-agents-on-a-computer",
+    "date": "2026-11-06",
+    "title": "Connections and secrets for agents on a computer",
+    "description": "Agents running on a project's computer use the project's on-demand connections, and every project can give its agents their own API keys.",
+    "items": [
+      "On-demand connections reach agents on a computer through Jackalope, while credentials and sign-ins stay on this device.",
+      "Connections that cannot work on a computer are named in the task's activity instead of disappearing.",
+      "Project settings has a Secrets section for keys such as service API keys, available to agents on this device, on computers or both."
+    ]
+  },
+  {
+    "id": "agents-decide-the-routine-you-decide-what-matters",
+    "date": "2026-11-06",
+    "title": "Agents decide the routine, you decide what matters",
+    "description": "On approved plans, agents can answer routine questions, approve checked swarm rounds and accept small in-scope changes for you, so a long build keeps moving.",
+    "items": [
+      "A local check sends sign-ins, payment, secrets, publishing, deletes and changes of direction to you; everything else goes to an agent from another model family, whose answer stands only when it is confident.",
+      "Every agent decision shows who decided, why and how sure, with Override, and anything sent to you says why.",
+      "Agents ask for steps only you can take, such as signing in or adding a secret, with a clear Needs you card.",
+      "A new repository without commits gets its first commit automatically when work starts."
+    ]
+  },
+  {
+    "id": "swarms-that-keep-going-until-the-work-is-done",
+    "date": "2026-11-05",
+    "title": "Swarms that keep going until the work is done",
+    "description": "A plan approved as a swarm runs in rounds: after each round merges, an orchestrator checks the result against the plan's acceptance criteria and either declares it done or starts the next round.",
+    "items": [
+      "Each round's verdict, evidence, check result and next assignments appear on the plan's Progress tab.",
+      "A round can run up to 24 assignments when your agents run on a computer or concurrency allows.",
+      "Swarms no longer need a connected swarm Worker. Set the round limit under Planning in Project settings.",
+      "Choose Ask me first to approve, edit or stop each next round before it starts, from the app or the terminal.",
+      "Large swarms can split each review across up to four orchestrators, one per area of the plan."
+    ]
+  },
+  {
+    "id": "agents-that-run-on-a-computer",
+    "date": "2026-11-05",
+    "title": "Agents that run on a computer",
+    "description": "A project can run its Claude Code and Codex agents on a computer instead of your machine, while checks, review and merging stay with you.",
+    "items": [
+      "Choose a local sandbox, a cloud machine you run or your own Agent37 account under Agents run on in Project settings.",
+      "Agents there use a Claude Code token or API key you save for computers, never your local accounts.",
+      "Jackalope tools such as peers, questions and the browser are not available to them yet."
+    ]
+  },
+  {
     "id": "jackalope-violet",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Jackalope Violet",
     "description": "New installs start in Jackalope Violet, in the app, the terminal and the website.",
     "items": ["Themes you have already chosen stay as they are."]
@@ -10,7 +332,6 @@
   {
     "id": "routing-that-never-holds-up-work",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Routing that never holds up work",
     "description": "Choosing an agent for a task is quicker and can no longer stall it.",
     "items": [
@@ -21,7 +342,6 @@
   {
     "id": "run-cards-and-a-board-in-the-terminal",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Run cards and a board in the terminal",
     "description": "The terminal shows each run as one card with what the agent did, and a board of everything that is open.",
     "items": [
@@ -34,7 +354,6 @@
   {
     "id": "a-clearer-frosted-window",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "A clearer frosted window",
     "description": "The frosted window now shows your desktop through it on both macOS and Windows.",
     "items": [
@@ -46,7 +365,6 @@
   {
     "id": "easier-phone-pairing",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Easier phone pairing",
     "description": "Pair a phone by typing a short code, with Tailscale setup walked through step by step.",
     "items": [
@@ -59,7 +377,6 @@
   {
     "id": "land-work-your-way",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Land work your way",
     "description": "Finish a task with a pull request or keep it local, with AI-written messages.",
     "items": [
@@ -70,7 +387,6 @@
   {
     "id": "agent-review-in-place",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Agent review in place",
     "description": "Ask another agent to review finished work without leaving the task, then hand its fixes back in one click.",
     "items": [
@@ -85,7 +401,6 @@
   {
     "id": "fewer-permission-questions",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "Fewer permission questions",
     "description": "Auto-approved projects now ask only when an agent does something that really needs you.",
     "items": [
@@ -100,7 +415,6 @@
   {
     "id": "a-calmer-terminal-conversation",
     "date": "2026-11-03",
-    "status": "In development",
     "title": "A calmer terminal conversation",
     "description": "The jackalope command keeps the conversation readable while it asks you things, and is easier to tidy up.",
     "items": [
@@ -113,7 +427,6 @@
   {
     "id": "ship-merged-work-to-artifacts-and-production",
     "date": "2026-11-02",
-    "status": "In development",
     "title": "Ship merged work to Artifacts and production",
     "description": "Projects that merge verified work automatically now push each merge to Artifacts and can deploy it.",
     "items": [
@@ -125,7 +438,6 @@
   {
     "id": "see-the-whole-swarm-at-a-glance",
     "date": "2026-11-02",
-    "status": "In development",
     "title": "See the whole swarm at a glance",
     "description": "The Swarm page now opens on a live map of every task working toward the target branch.",
     "items": [
@@ -137,7 +449,6 @@
   {
     "id": "let-verified-work-merge-on-its-own-within-rules-you-commit",
     "date": "2026-11-02",
-    "status": "In development",
     "title": "Let verified work merge on its own, within rules you commit",
     "description": "An autonomy policy in your repository decides which checked changes Jackalope can merge locally without waiting for you.",
     "items": [
@@ -150,7 +461,6 @@
   {
     "id": "conversations-that-keep-going",
     "date": "2026-10-31",
-    "status": "In development",
     "title": "Conversations that keep going",
     "description": "Conversations continue until you pause or stop them, or until a reply needs you.",
     "items": [
@@ -162,7 +472,6 @@
   {
     "id": "compare-plan-and-come-back-with-less-effort",
     "date": "2026-10-31",
-    "status": "In development",
     "title": "Compare, plan and come back with less effort",
     "description": "A second agent can judge compared attempts, plan mode looks things up instead of asking, and returning to Jackalope shows what needs you.",
     "items": [
@@ -176,7 +485,6 @@
   {
     "id": "agents-that-show-their-work",
     "date": "2026-10-30",
-    "status": "In development",
     "title": "Agents that show their work",
     "description": "Review now shows how well each claim is backed, lets other agents try to break a result, and keeps a log of the decisions behind long work.",
     "items": [
@@ -189,7 +497,6 @@
   {
     "id": "a-denser-workspace-built-around-projects-and-their-agents",
     "date": "2026-10-30",
-    "status": "In development",
     "title": "A denser workspace built around projects and their agents",
     "description": "The desktop app now puts every project and its running work in the sidebar and gives more of the window to the work itself.",
     "items": [
@@ -203,7 +510,6 @@
   {
     "id": "finish-work-from-the-terminal-and-stay-in-sync-with-the-app",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Finish work from the terminal and stay in sync with the app",
     "description": "The jackalope terminal now picks up changes made in the app right away and can merge, open pull requests and take back queued messages.",
     "items": [
@@ -216,7 +522,6 @@
   {
     "id": "easier-agent-questions-in-the-app-and-terminal",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Easier agent questions in the app and terminal",
     "description": "Questions from agents now get room to read and answer, stay in sync between the app and the terminal, and can still be answered after a task stops.",
     "items": [
@@ -230,7 +535,6 @@
   {
     "id": "desktop-control-on-kde-plasma-and-other-wayland-desktops",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Desktop control on KDE Plasma and other Wayland desktops",
     "description": "Agents can now control one app or the whole desktop on Wayland desktops that offer the standard remote desktop portal, after you approve your desktop's own prompt.",
     "items": [
@@ -241,7 +545,6 @@
   {
     "id": "bots-get-their-own-computer",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Bots get their own computer",
     "description": "A bot can now work on its own Linux desktop with a browser, running in Docker on your machine or on a cloud machine you run, instead of on your computer.",
     "items": [
@@ -255,7 +558,6 @@
   {
     "id": "agent-browsers-that-stay-signed-in",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Agent browsers that stay signed in",
     "description": "Give agents and bots their own browser profile, sign in once, and keep your everyday browser untouched.",
     "items": [
@@ -268,7 +570,6 @@
   {
     "id": "before-and-after-screenshots-in-review",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Before and after screenshots in Review",
     "description": "Finished work now arrives with screenshots of the pages it changed, so you can check the end state without running anything.",
     "items": [
@@ -280,7 +581,6 @@
   {
     "id": "agents-can-use-your-apps-and-signed-in-browser",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Agents can use your apps and signed-in browser",
     "description": "Desktop control is much faster, acts on what it sees by name, and lets you grant one window, one app or your whole desktop.",
     "items": [
@@ -294,7 +594,6 @@
   {
     "id": "plan-with-me-before-code-changes",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Plan with me before code changes",
     "description": "Plan mode reads your code first, asks only what it cannot find, and drafts one plan for you to approve before any work starts.",
     "items": [
@@ -308,7 +607,6 @@
   {
     "id": "lessons-that-travel-and-tidy-themselves",
     "date": "2026-10-29",
-    "status": "In development",
     "title": "Lessons that travel and tidy themselves",
     "description": "Learned lessons can now follow you between desktops, stay free of duplicates and reach agents outside Jackalope.",
     "items": [
@@ -322,7 +620,6 @@
   {
     "id": "faster-steadier-claude-code-tasks",
     "date": "2026-10-28",
-    "status": "In development",
     "title": "Faster, steadier Claude Code tasks",
     "description": "Claude Code now keeps one warm session per conversation and checks its own work as it goes.",
     "items": [
@@ -335,7 +632,6 @@
   {
     "id": "a-redesigned-terminal",
     "date": "2026-10-28",
-    "status": "In development",
     "title": "A redesigned terminal",
     "description": "The jackalope terminal now looks and works like the app, with tabs for every open conversation.",
     "items": [
@@ -348,7 +644,6 @@
   {
     "id": "jackalope-learns-from-your-work",
     "date": "2026-10-28",
-    "status": "In development",
     "title": "Jackalope learns from your work.",
     "description": "Every agent now benefits from lessons Jackalope saves in the background from what you tell it and from checks that pass.",
     "items": [
@@ -361,7 +656,6 @@
   {
     "id": "auto-approved-agent-requests-and-project-workspace-modes",
     "date": "2026-10-28",
-    "status": "In development",
     "title": "Auto-approved agent requests and project workspace modes",
     "description": "Agents keep working without stopping for routine permission requests, and each project chooses where its tasks run.",
     "items": [
@@ -372,7 +666,6 @@
   {
     "id": "recursive-flint-for-local-agents",
     "date": "2026-10-27",
-    "status": "In development",
     "title": "Recursive Flint for local agents",
     "description": "Local agent setup now offers Recursive Flint, a fast open coding model for computers with 48 GB of memory or more.",
     "items": [
@@ -383,7 +676,6 @@
   {
     "id": "free-to-sign-up-no-waitlist",
     "date": "2026-10-26",
-    "status": "Released",
     "title": "Free to sign up, no waitlist",
     "description": "Anyone can create a free Jackalope account and download the app right away.",
     "items": [
@@ -394,7 +686,6 @@
   {
     "id": "claude-code-asks-before-it-acts",
     "date": "2026-10-26",
-    "status": "Released",
     "title": "Claude Code asks before it acts",
     "description": "When Claude Code needs a command or tool its settings do not already allow, Jackalope shows you the request and waits for your answer.",
     "items": [
@@ -406,7 +697,6 @@
   {
     "id": "one-name-for-every-kind-of-work",
     "date": "2026-10-12",
-    "status": "In development",
     "title": "One name for every kind of work",
     "description": "Everything in the work list is work, labelled by how it runs.",
     "items": [
@@ -418,7 +708,6 @@
   {
     "id": "follow-terminal-runs-as-they-happen",
     "date": "2026-10-12",
-    "status": "In development",
     "title": "Follow, review and ship work from the terminal",
     "description": "Scripts and CI can watch a jackalope -p run as it moves, and anyone can read its changes from the terminal.",
     "items": [
@@ -430,7 +719,6 @@
   {
     "id": "agent-choices-and-schedules-in-one-place",
     "date": "2026-10-12",
-    "status": "In development",
     "title": "Agent choices and schedules in one place",
     "description": "Agents and Bots each gather what used to be split across separate pages.",
     "items": [
@@ -441,7 +729,6 @@
   {
     "id": "open-pull-requests-and-fix-failing-checks-from-a-task",
     "date": "2026-10-12",
-    "status": "In development",
     "title": "Open pull requests and fix failing checks from a task",
     "description": "Delivery now goes from a finished task to a pull request without leaving Jackalope.",
     "items": [
@@ -452,7 +739,6 @@
   {
     "id": "a-quicker-start-and-a-simpler-workspace",
     "date": "2026-10-12",
-    "status": "In development",
     "title": "A quicker start and a simpler workspace",
     "description": "New projects get to their first task sooner, and the workspace keeps your work in view.",
     "items": [
@@ -464,7 +750,6 @@
   {
     "id": "see-what-agents-are-doing-from-the-terminal",
     "date": "2026-10-08",
-    "status": "In development",
     "title": "See what agents are doing from the terminal.",
     "description": "The jackalope command shows live progress, changed files and questions as work runs.",
     "items": [
@@ -478,7 +763,6 @@
   {
     "id": "a-cleaner-more-consistent-workspace",
     "date": "2026-10-08",
-    "status": "In development",
     "title": "A cleaner, more consistent workspace.",
     "description": "Pages, tabs and controls now share one look across the app, with smoother motion.",
     "items": [
@@ -492,7 +776,6 @@
   {
     "id": "bots-remember-and-keep-their-conversations-together",
     "date": "2026-10-07",
-    "status": "In development",
     "title": "Bots remember and keep their conversations together.",
     "description": "Messages to a bot continue its latest conversation, and bots carry what they learn into new ones.",
     "items": [
@@ -507,7 +790,6 @@
   {
     "id": "agents-start-sooner-and-keep-their-own-playbook",
     "date": "2026-10-06",
-    "status": "In development",
     "title": "Agents start sooner and keep their own playbook.",
     "description": "Jackalope now gives agents the facts and rules of your workspace and lets each agent's own tooling decide how to work.",
     "items": [
@@ -519,7 +801,6 @@
   {
     "id": "bots-that-work-on-their-own",
     "date": "2026-10-05",
-    "status": "In development",
     "title": "Bots that work on their own.",
     "description": "Bots can now wake themselves up, work with each other and bring you the decisions that need you.",
     "items": [
@@ -532,7 +813,6 @@
   {
     "id": "download-jackalope-on-windows-macos-and-linux",
     "date": "2026-10-04",
-    "status": "Released",
     "title": "Download Jackalope on Windows, macOS and Linux.",
     "description": "Desktop builds are now public on every platform. Signing in still needs an approved waitlist spot or an Instant Access Pass.",
     "items": [
@@ -544,7 +824,6 @@
   {
     "id": "a-warmer-welcome-and-faster-updates",
     "date": "2026-10-02",
-    "status": "In development",
     "title": "A warmer welcome and faster updates",
     "description": "New members get a short tour, feedback is always one click away and updates can be ready before you restart.",
     "items": [
@@ -557,7 +836,6 @@
   {
     "id": "bots-get-their-own-home",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Bots get their own home, and quick questions stay quick",
     "description": "Talk to your bots right where they live, pick from more ready-made bots, and get answers without waiting on a full workspace setup.",
     "items": [
@@ -571,7 +849,6 @@
   {
     "id": "customizable-bots-and-clearer-agent-picker",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Customizable bots and a clearer agent picker",
     "description": "Give each bot its own look, and pick agents by their familiar product icons.",
     "items": [
@@ -584,7 +861,6 @@
   {
     "id": "agents-coordinate-as-a-swarm",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Agents coordinate and split work on their own",
     "description": "Parallel agents now hand each other finished pieces, hear about conflicts as they happen, and split off new work without waiting for you.",
     "items": [
@@ -597,7 +873,6 @@
   {
     "id": "automatic-subtasks",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Big requests split into subtasks automatically",
     "description": "Send a substantial request and Jackalope plans independent pieces and starts them in parallel, without a separate review step.",
     "items": [
@@ -609,7 +884,6 @@
   {
     "id": "agents-see-each-others-work-live",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Agents see each other's work as it happens",
     "description": "Agents working on the same project can read each other's in-progress changes instead of waiting for them to finish.",
     "items": [
@@ -621,7 +895,6 @@
   {
     "id": "bots-connected-apps-agent-screen",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Bots, connected apps and the agent's screen",
     "description": "Save agents with their own role, connect apps once for every agent, and watch what an agent's browser shows.",
     "items": [
@@ -636,7 +909,6 @@
   {
     "id": "cloudflare-artifacts-projects-beta",
     "date": "2026-10-01",
-    "status": "In development",
     "title": "Cloudflare Artifacts projects (beta)",
     "description": "Keep projects on Cloudflare Artifacts, Git storage built for agents, using your own Cloudflare account.",
     "items": [
@@ -649,7 +921,6 @@
   {
     "id": "tabs-unread-work-and-live-change-counts",
     "date": "2026-09-29",
-    "status": "In development",
     "title": "Tabs, unread work and live change counts",
     "description": "Keep several tasks open at once and see what changed, what is still running and what you have not read yet.",
     "items": [
@@ -662,7 +933,6 @@
   {
     "id": "compare-agents-and-attach-files-to-requests",
     "date": "2026-09-29",
-    "status": "In development",
     "title": "Compare agents and attach files to requests",
     "description": "Send one request to several agents at once, keep the best result, and give agents screenshots and files without copying paths.",
     "items": [
@@ -675,7 +945,6 @@
   {
     "id": "ask-jackalope-usage-date-and-project",
     "date": "2026-09-28",
-    "status": "In development",
     "title": "Ask Jackalope usage keeps its date and project",
     "description": "Usage & quota can show when a helper question happened and which project was open, including after a new conversation.",
     "items": [
@@ -687,7 +956,6 @@
   {
     "id": "connect-local-engines-and-schedule-webhooks",
     "date": "2026-09-28",
-    "status": "In development",
     "title": "Connect local engines and schedule webhooks",
     "description": "Jackalope can use an ACP CLI, a local OpenAI-compatible model server, and a loopback webhook for a schedule.",
     "items": [
@@ -699,7 +967,6 @@
   {
     "id": "terminal-repository-setup",
     "date": "2026-09-27",
-    "status": "In development",
     "title": "Start the terminal in any project directory",
     "description": "The jackalope command can create a Git repository when the current directory does not have one yet.",
     "items": [
@@ -711,7 +978,6 @@
   {
     "id": "terminal-commands-that-match-other-agent-clis",
     "date": "2026-09-27",
-    "status": "In development",
     "title": "Terminal commands that match other agent CLIs",
     "description": "The jackalope terminal command now works the way people coming from other agent CLIs expect.",
     "items": [
@@ -726,7 +992,6 @@
   {
     "id": "faster-terminal-conversations",
     "date": "2026-09-26",
-    "status": "In development",
     "title": "Faster terminal conversations",
     "description": "The jackalope command keeps you moving while agents work.",
     "items": [
@@ -742,7 +1007,6 @@
   {
     "id": "project-agent-preferences-stay-with-each-project",
     "date": "2026-09-24",
-    "status": "In development",
     "title": "Project agent preferences stay with each project.",
     "description": "Keep work and personal projects on their own agents and accounts.",
     "items": [
@@ -753,7 +1017,6 @@
   {
     "id": "jackalope-in-your-terminal",
     "date": "2026-09-23",
-    "status": "In development",
     "title": "Jackalope in your terminal",
     "description": "A jackalope command brings routed conversations to any Git repository and shares them with the desktop app.",
     "items": [
@@ -767,7 +1030,6 @@
   {
     "id": "recoverable-test-output",
     "date": "2026-09-22",
-    "status": "In development",
     "title": "Less repetitive test output",
     "description": "Agents can receive concise successful test results with the complete captured output still available.",
     "items": [
@@ -779,7 +1041,6 @@
   {
     "id": "focused-workspace-desktop-integrations",
     "date": "2026-09-21",
-    "status": "In development",
     "title": "One workspace, closer to your desktop",
     "description": "A shared Work page and bottom status bar keep task context close, with more control over desktop and terminal behavior.",
     "items": [
@@ -794,7 +1055,6 @@
   {
     "id": "opencode-task-permissions",
     "date": "2026-09-18",
-    "status": "In development",
     "title": "Answer OpenCode requests within the task",
     "description": "OpenCode tasks can ask for a specific permission or structured answer and continue through the existing task question flow.",
     "items": [
@@ -806,7 +1066,6 @@
   {
     "id": "flexible-task-workspaces",
     "date": "2026-09-18",
-    "status": "In development",
     "title": "A workspace that fits your workflow",
     "description": "Project layouts, task terminals, separate windows and reversible chat topics keep work and feedback together.",
     "items": [
@@ -819,7 +1078,6 @@
   {
     "id": "focused-workflows-and-trusted-hosts",
     "date": "2026-09-18",
-    "status": "In development",
     "title": "Review, revise and continue across devices",
     "description": "More direct ways to turn issues and review feedback into the next useful action.",
     "items": [
@@ -832,7 +1090,6 @@
   {
     "id": "connect-api-providers-without-a-separate-cli-install",
     "date": "2026-09-18",
-    "status": "In development",
     "title": "Connect API providers without a separate CLI install",
     "description": "Jackalope can prepare a private agent runner when connecting DeepSeek and other supported API providers.",
     "items": [
@@ -846,7 +1103,6 @@
   {
     "id": "curated-mcp-marketplace",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "Find and connect useful tools",
     "description": "The MCP marketplace starts with a curated collection of publisher tools and guides you through connection setup.",
     "items": [
@@ -858,7 +1114,6 @@
   {
     "id": "context-evidence",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "Smaller tool responses and clearer task evidence",
     "description": "Select the fields an agent needs from large tool results, then review concise answers to the task requirements.",
     "items": [
@@ -870,7 +1125,6 @@
   {
     "id": "more-control-over-task-speed",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "More control over task speed.",
     "description": "Choose Codex processing speed and inspect where task time goes.",
     "items": [
@@ -882,7 +1136,6 @@
   {
     "id": "jev-decision-assistance",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "More context for Jev decisions",
     "description": "Optional Jev assistance helps select context, assess results and focus review, with clearer routing evidence and usage.",
     "items": [
@@ -894,7 +1147,6 @@
   {
     "id": "gemini-cli-can-run-tasks",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "Gemini CLI can run tasks.",
     "description": "Run Gemini CLI worker tasks from Jackalope with your selected account.",
     "items": [
@@ -906,7 +1158,6 @@
   {
     "id": "see-what-your-agents-are-doing",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "See what your agents are doing.",
     "description": "Follow active work with file activity and live check output in tasks and chats.",
     "items": [
@@ -917,7 +1168,6 @@
   {
     "id": "faster-code-review-and-more-reliable-checks",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "Faster code review and more reliable checks.",
     "description": "Large diffs open promptly, and agents can run the saved project check without asking you to repeat its command.",
     "items": [
@@ -928,7 +1178,6 @@
   {
     "id": "task-review-and-followups",
     "date": "2026-09-17",
-    "status": "In development",
     "title": "Clearer task review and follow-ups",
     "description": "Review the output and changes with less clutter, and choose how to send the next instruction.",
     "items": [
@@ -939,7 +1188,6 @@
   {
     "id": "less-repeated-work-between-request-and-result",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "Less repeated work between request and result",
     "description": "Task startup, repository context, and durable output handling now do less repeated work, with more detailed performance measurements.",
     "items": [
@@ -952,7 +1200,6 @@
   {
     "id": "jev-fallback-preference",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "Choose a fallback for Jev decisions",
     "description": "Keep local rules as the default fallback or choose an agent when Jev cannot make a usable decision.",
     "items": [
@@ -964,7 +1211,6 @@
   {
     "id": "combined-task-delivery",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "One result from parallel work",
     "description": "Jackalope brings related changes together and keeps integration work inside your task.",
     "items": [
@@ -977,7 +1223,6 @@
   {
     "id": "reviewed-task-planning",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "Review the approach, then follow one task",
     "description": "Task assessments and reviewed plans keep related work together under one parent.",
     "items": [
@@ -990,7 +1235,6 @@
   {
     "id": "choose-how-jackalope-makes-decisions",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "Choose how Jackalope makes decisions.",
     "description": "Project preferences bring local rules, agent reasoning, and optional Jev-assisted routing into one guided setup.",
     "items": [
@@ -1002,7 +1246,6 @@
   {
     "id": "updates-through-microsoft-store",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "Updates through Microsoft Store.",
     "description": "Windows update controls use Microsoft Store delivery.",
     "items": [
@@ -1013,7 +1256,6 @@
   {
     "id": "from-a-chat-to-a-reviewed-change",
     "date": "2026-09-16",
-    "status": "In development",
     "title": "From a chat to a reviewed change",
     "description": "A more complete local workflow for starting, reviewing and returning to useful work.",
     "items": [
@@ -1027,7 +1269,6 @@
   {
     "id": "desktop-download-page",
     "date": "2026-09-15",
-    "status": "In development",
     "title": "A home for desktop downloads.",
     "description": "Find your platform and a clear path into Jackalope early access.",
     "items": [
@@ -1039,7 +1280,6 @@
   {
     "id": "desktop-waitlist-progress",
     "date": "2026-09-15",
-    "status": "In development",
     "title": "Your waitlist, in the desktop app",
     "description": "Connect before early access to see your place and bring friends along.",
     "items": [
@@ -1050,7 +1290,6 @@
   {
     "id": "review-merge-and-clean-up-in-one-place",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "Review, merge, and clean up in one place",
     "description": "Finished work keeps review, merge into the target branch, and workspace cleanup together.",
     "items": [
@@ -1062,7 +1301,6 @@
   {
     "id": "see-who-is-working-at-a-glance",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "See who is working at a glance",
     "description": "The work list shows each agent's character, live status, and the next useful action.",
     "items": [
@@ -1074,7 +1312,6 @@
   {
     "id": "chat-is-the-first-tasks-view",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "Chat is the first Tasks view.",
     "description": "Opening Tasks starts a conversation. Inbox keeps the work list for planning, review, and archive.",
     "items": [
@@ -1085,7 +1322,6 @@
   {
     "id": "a-clearer-path-from-request-to-delivery",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "A clearer path from request to delivery",
     "description": "Find work across projects, inspect results with a persistent follow-up, and prepare the next delivery step.",
     "items": [
@@ -1098,7 +1334,6 @@
   {
     "id": "live-task-setup-progress-and-retry",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "Live task setup progress and retry",
     "description": "Tasks report the step they are on while it runs, explain why a setup command was stopped, skip setup that is already current, and can be retried after a failure.",
     "items": [
@@ -1112,7 +1347,6 @@
   {
     "id": "an-easier-way-to-clear-old-tasks",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "An easier way to clear old tasks.",
     "description": "Keep your task list focused with reversible cleanup.",
     "items": [
@@ -1123,7 +1357,6 @@
   {
     "id": "live-sessions",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "Keep the ideas coming",
     "description": "Capture quick changes in a running conversation while your agent works.",
     "items": [
@@ -1135,7 +1368,6 @@
   {
     "id": "let-the-task-choose-its-approach",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "Let the task choose its approach.",
     "description": "Start a task without deciding whether to split it first.",
     "items": [
@@ -1147,7 +1379,6 @@
   {
     "id": "a-simpler-task-view",
     "date": "2026-09-11",
-    "status": "In development",
     "title": "A simpler task view",
     "description": "Follow work and review results in a clearer task layout.",
     "items": [
@@ -1158,7 +1389,6 @@
   {
     "id": "usage-insights-across-projects",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "See where your tokens go",
     "description": "Usage connects spending to tasks and saved outcomes across your projects.",
     "items": [
@@ -1169,7 +1399,6 @@
   {
     "id": "clearer-agreements-between-agents",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Clearer agreements between agents.",
     "description": "Agents can record ownership handoffs and agree on shared interfaces across separate worktrees.",
     "items": [
@@ -1182,7 +1411,6 @@
   {
     "id": "gnome-wayland-window-control",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Window control on GNOME Wayland",
     "description": "Ubuntu GNOME 46 gains scoped window control through an optional Jackalope extension.",
     "items": [
@@ -1194,7 +1422,6 @@
   {
     "id": "match-agent-effort-to-the-task",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Match agent effort to the task",
     "description": "Task effort now requests matching reasoning levels from Codex and Claude, with clearer usage records and more reliable long checks.",
     "items": [
@@ -1205,7 +1432,6 @@
   {
     "id": "local-agent-setup",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "A guided start with local AI",
     "description": "An optional path to trying Jackalope without an AI provider subscription, with clear requirements and download choices.",
     "items": [
@@ -1218,7 +1444,6 @@
   {
     "id": "native-window-control-beyond-windows",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Native window control beyond Windows",
     "description": "macOS and Linux X11 window-control backends are implemented for native validation.",
     "items": [
@@ -1231,7 +1456,6 @@
   {
     "id": "know-which-desktop-is-connected",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Know which desktop is connected.",
     "description": "Connected desktops now shows app and profile details to help identify separate installations and test profiles.",
     "items": [
@@ -1241,7 +1465,6 @@
   {
     "id": "more-focused-task-guidance-and-verification",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "More focused task guidance and verification",
     "description": "Task instructions stay closer to your request, and long successful checks return compact results with stored output available when needed.",
     "items": [
@@ -1255,7 +1478,6 @@
   {
     "id": "smoother-task-history-and-review",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Smoother task history and review",
     "description": "Task updates and large histories do less work in the desktop interface.",
     "items": [
@@ -1266,7 +1488,6 @@
   {
     "id": "better-coordination-from-request-to-review",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Better coordination from request to review.",
     "description": "Feature plans preserve the complete request and can continue from verified predecessor snapshots.",
     "items": [
@@ -1277,7 +1498,6 @@
   {
     "id": "kimi-code-joins-the-workspace",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Kimi Code joins the workspace",
     "description": "Use Kimi for tasks and routing, with broader tool and usage coverage across existing agents.",
     "items": [
@@ -1289,7 +1509,6 @@
   {
     "id": "account-access-in-every-build",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Account access in every build.",
     "description": "Development and release builds now use the same account access checks.",
     "items": [
@@ -1299,7 +1518,6 @@
   {
     "id": "more-at-home-on-every-desktop",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "More at home on every desktop.",
     "description": "Task notifications, accounts, and background cleanup now cover more of the macOS and Linux experience.",
     "items": [
@@ -1312,7 +1530,6 @@
   {
     "id": "preparing-for-more-desktops",
     "date": "2026-09-10",
-    "status": "In development",
     "title": "Preparing for more desktops.",
     "description": "Cross-platform foundations are ready for native testing on macOS and Linux.",
     "items": [
@@ -1324,7 +1541,6 @@
   {
     "id": "project-lessons-grounded-in-your-work",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Project lessons grounded in your work",
     "description": "Jackalope learns from local task feedback and repository evidence, and shows recorded findings in Performance & insights.",
     "items": [
@@ -1335,7 +1551,6 @@
   {
     "id": "a-predictable-local-work-cycle",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "A predictable local work cycle",
     "description": "Completed tasks get automatic checkpoints, followed by a reviewed merge and safe worktree cleanup.",
     "items": [
@@ -1348,7 +1563,6 @@
   {
     "id": "hourly-recurring-tasks",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Hourly recurring tasks",
     "description": "Schedule regular checks without writing a cron expression.",
     "items": [
@@ -1359,7 +1573,6 @@
   {
     "id": "ask-jackalope-from-your-workspace",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Ask Jackalope from your workspace.",
     "description": "Your companion connects your configured agent to official help and reviewed app actions.",
     "items": [
@@ -1371,7 +1584,6 @@
   {
     "id": "explore-where-jackalope-goes-next",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Explore where Jackalope goes next.",
     "description": "An interactive roadmap connects the workspace we have built with the release work and ideas ahead.",
     "items": [
@@ -1382,7 +1594,6 @@
   {
     "id": "smarter-project-settings",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Smarter project settings.",
     "description": "Repository context helps fill project setup defaults.",
     "items": [
@@ -1393,7 +1604,6 @@
   {
     "id": "practical-coding-agent-guides",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Practical guides for working with coding agents.",
     "description": "Five longer reads cover worktrees, working with two agents, code review, MCP connections and choosing a workspace.",
     "items": [
@@ -1404,7 +1614,7 @@
   {
     "id": "updated-product-tour",
     "date": "2026-09-09",
-    "status": "Website",
+    "kind": "website",
     "title": "A fresh look around Jackalope",
     "description": "Explore the updated app in a new 64-second product tour.",
     "items": [
@@ -1416,7 +1626,6 @@
   {
     "id": "unified-agent-account-list",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "See all your agent accounts together",
     "description": "Existing CLI logins and added accounts now share one account list with detected identities and editable names.",
     "items": [
@@ -1428,7 +1637,6 @@
   {
     "id": "simpler-automatic-task-setup",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Describe the task and let Jackalope handle setup",
     "description": "Task creation now puts your intent first, with a compact setup summary and optional customization.",
     "items": [
@@ -1440,7 +1648,6 @@
   {
     "id": "worktree-cleanup-ready",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Clearer worktree cleanup",
     "description": "Clean up merged worktrees when only disposable build output or dependencies remain.",
     "items": [
@@ -1451,7 +1658,6 @@
   {
     "id": "account-setup-and-optional-settings-sync",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Connect once, set up each project.",
     "description": "Check early access and app privacy on launch, then set up projects with their own agent choices.",
     "items": [
@@ -1464,7 +1670,6 @@
   {
     "id": "visual-project-context",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Your project at a glance",
     "description": "Repository knowledge is easier to scan and turn into work.",
     "items": [
@@ -1476,7 +1681,6 @@
   {
     "id": "stay-in-control-of-desktop-assistance",
     "date": "2026-09-09",
-    "status": "In development",
     "title": "Stay in control of desktop assistance.",
     "description": "A clear status bar and theme-colored glow show when Jackalope is using your computer.",
     "items": [
@@ -1488,7 +1692,7 @@
   {
     "id": "knowledgebase-and-diagnostics",
     "date": "2026-09-08",
-    "status": "Website",
+    "kind": "website",
     "title": "Guides and help, close at hand",
     "description": "Find answers about Jackalope in a searchable knowledgebase, with direct access from the desktop app.",
     "items": [
@@ -1499,7 +1703,6 @@
   {
     "id": "quota-aware-task-routing",
     "date": "2026-09-08",
-    "status": "In development",
     "title": "Task routing with quota awareness",
     "description": "Jackalope's default agent can select an enabled agent, configured model and account for automatic tasks.",
     "items": [
@@ -1512,7 +1715,6 @@
   {
     "id": "palettes-that-follow-your-color",
     "date": "2026-09-08",
-    "status": "In development",
     "title": "Palettes that follow your color.",
     "description": "Choose Single, Duo or Trio to build a coordinated theme from one primary color.",
     "items": [
@@ -1523,7 +1725,6 @@
   {
     "id": "your-next-hop-into-jackalope",
     "date": "2026-09-08",
-    "status": "In development",
     "title": "Your next hop into Jackalope.",
     "description": "Track your waitlist place, bring people along, and share Instant Access Passes once you are in.",
     "items": [
@@ -1535,7 +1736,6 @@
   {
     "id": "workspace-foundations",
     "date": "2026-09-06",
-    "status": "In development",
     "title": "More of the work, in one place.",
     "description": "The current development build brings task work and project context into a more focused workspace.",
     "items": [
@@ -1549,7 +1749,7 @@
   {
     "id": "a-first-look",
     "date": "2026-09-06",
-    "status": "Website",
+    "kind": "website",
     "title": "A first look at Jackalope.",
     "description": "A place to explore the product and follow what comes next.",
     "items": [

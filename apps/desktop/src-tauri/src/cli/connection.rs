@@ -10,7 +10,6 @@ use crate::protocol::{
 };
 
 pub struct Connection {
-    endpoint: String,
     client: Option<Client>,
     /// The handshake last seen, refreshed on reconnect.
     handshake: Handshake,
@@ -23,7 +22,6 @@ pub fn unexpected() -> String {
 impl Connection {
     pub fn new(handshake: Handshake, client: Client) -> Self {
         Self {
-            endpoint: handshake.endpoint.clone(),
             client: Some(client),
             handshake,
         }
@@ -32,7 +30,6 @@ impl Connection {
     /// A connection that opens on first use, for threads of their own.
     pub fn lazy(handshake: Handshake) -> Self {
         Self {
-            endpoint: handshake.endpoint.clone(),
             client: None,
             handshake,
         }
@@ -45,11 +42,10 @@ impl Connection {
     fn connect(&mut self) -> Result<&mut Client, String> {
         if self.client.is_none() {
             if let Some(handshake) = read_handshake() {
-                self.endpoint = handshake.endpoint.clone();
                 self.handshake = handshake;
             }
             self.client = Some(
-                Client::connect(&self.endpoint)
+                Client::connect(&self.handshake.endpoint)
                     .map_err(|_| "Jackalope is not running. Start it with 'jackalope'.")?,
             );
         }
@@ -61,7 +57,7 @@ impl Connection {
             Ok(response) => Ok(response),
             Err(error) => {
                 self.client = None;
-                if !read_only(request) {
+                if !request.is_idempotent() {
                     return Err(error);
                 }
                 self.connect()?.send(request).inspect_err(|_| {
@@ -138,28 +134,6 @@ impl Connection {
     }
 }
 
-/// Whether sending `request` twice is harmless.
-fn read_only(request: &Request) -> bool {
-    matches!(
-        request,
-        Request::Ping
-            | Request::Projects
-            | Request::EnsureProject { .. }
-            | Request::Sessions
-            | Request::SessionDetail { .. }
-            | Request::Watch { .. }
-            | Request::Overview
-            | Request::CommitPolicy { .. }
-            | Request::ShowWindow
-            | Request::ShowChanges { .. }
-            | Request::SetAccent { .. }
-            | Request::SetProjectSettings { .. }
-            | Request::Learnings { .. }
-            | Request::Learning { .. }
-            | Request::SetLearningArchived { .. }
-    )
-}
-
 /// `ls` prints short ids, so accept any unambiguous prefix.
 pub fn resolve(sessions: &[SessionSummary], prefix: &str) -> Result<String, String> {
     let mut matches = sessions
@@ -211,12 +185,13 @@ mod tests {
 
     #[test]
     fn only_reads_are_retried() {
-        assert!(read_only(&Request::Sessions));
-        assert!(!read_only(&Request::Send {
+        assert!(Request::Sessions.is_idempotent());
+        assert!(!Request::Send {
             draft_revision: None,
             session_id: "s".into(),
             text: "t".into()
-        }));
-        assert!(!read_only(&Request::Stop { run_id: "r".into() }));
+        }
+        .is_idempotent());
+        assert!(!Request::Stop { run_id: "r".into() }.is_idempotent());
     }
 }

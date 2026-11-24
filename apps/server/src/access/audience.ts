@@ -1,3 +1,9 @@
+import {
+  PREFERENCE_AGENTS,
+  PREFERENCE_PLATFORMS,
+  PREFERENCE_PRIORITIES,
+} from '@jackalope/contracts/access';
+
 /**
  * Describes a member to Sequenzy.
  *
@@ -43,39 +49,14 @@ export const MANAGED_TAGS = [
   'signup-website-popup',
   'signup-access-pass',
   'signup-waitlist-referral',
-  'platform-windows',
-  'platform-macos',
-  'platform-linux',
-  'agent-codex',
-  'agent-claude',
-  'agent-opencode',
-  'agent-grok',
-  'agent-antigravity',
-  'agent-cursor',
-  'agent-gemini',
-  'agent-other',
-  'agent-exploring',
-  'wants-parallel',
-  'wants-review',
-  'wants-context',
-  'wants-accounts',
-  'wants-recurring',
-  'wants-remote',
-] as const;
+  ...PREFERENCE_PLATFORMS.map((value) => `platform-${value}` as const),
+  ...PREFERENCE_AGENTS.map((value) => `agent-${value}` as const),
+  ...PREFERENCE_PRIORITIES.map((value) => `wants-${value}` as const),
+];
 
-const PLATFORMS = new Set(['windows', 'macos', 'linux']);
-const AGENTS = new Set([
-  'codex',
-  'claude',
-  'opencode',
-  'grok',
-  'antigravity',
-  'cursor',
-  'gemini',
-  'other',
-  'exploring',
-]);
-const PRIORITIES = new Set(['parallel', 'review', 'context', 'accounts', 'recurring', 'remote']);
+const PLATFORMS = new Set<string>(PREFERENCE_PLATFORMS);
+const AGENTS = new Set<string>(PREFERENCE_AGENTS);
+const PRIORITIES = new Set<string>(PREFERENCE_PRIORITIES);
 
 const parse = (value: string | null): Record<string, unknown> => {
   if (!value) return {};

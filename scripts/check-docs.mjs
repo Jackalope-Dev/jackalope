@@ -1,18 +1,16 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { documentationIssues } from './docs-policy.mjs';
+import { root } from './lib/paths.mjs';
+import { git } from './lib/proc.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-const files = execFileSync(
-  'git',
-  ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-  { cwd: root, encoding: 'utf8' },
-).split('\0');
+const files = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0');
 const missing = [];
 const documents = new Map();
-for (const file of new Set(files.filter((file) => /\.mdx?$/.test(file)))) {
+// Website posts are published content, not repository documentation; the website build
+// validates them.
+const isDocument = (file) => /\.mdx?$/.test(file) && !file.startsWith('apps/website/content/');
+for (const file of new Set(files.filter(isDocument))) {
   const source = path.join(root, file);
   if (!existsSync(source)) continue;
   const content = readFileSync(source, 'utf8');

@@ -1,56 +1,67 @@
+import { isActive, isDone, isRetryable, isRunning, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
+  Button,
   Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
   Disclosure,
   DisclosureSummary,
+  InlineNotice,
   DropdownMenu as Menu,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
+  BookOpen,
   CalendarClock,
   Check,
   ChevronRight,
+  Code,
   Copy,
-  GitMerge,
+  GitBranch,
+  ListTree,
   MailPlus,
   MoreHorizontal,
   Square,
+  SquareArrowOutUpRight,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { waitForStoppedAttempt } from '../../lib/continue-task';
+import { listMcpServers, type McpServerConfig } from '../../lib/mcp-client';
 import { projectConnections } from '../../lib/mcp-connection';
+import { openInBrowser } from '../../lib/native/env';
 import { recoveryHandoff } from '../../lib/project-return';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
+import { PROMPT_MAX_CHARS, type TaskRun } from '../../lib/run-types';
 import {
-  canRetry,
-  isActive,
-  nativeTask,
-  PROMPT_MAX_CHARS,
+  markReviewed,
+  releaseInterrupted,
   retryTask,
-  statusLabel,
-  type TaskRun,
-} from '../../lib/task-runtime';
+  stopAndSettle,
+  stopPreview as stopPreviewTask,
+  stopTask,
+} from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';
-import { latestAttempt, taskDecision } from '../../lib/task-workflow';
-import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/tauri-bridge';
+import { latestAttempt, pullRequestDecision, taskDecision } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentScreen } from './AgentScreen';
 import { DecisionTrail } from './DecisionTrail';
+import { DesktopPermissionNotice } from './DesktopPermissionNotice';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
+import { ResumeInterrupted, resumePrompt, StopInterrupted } from './ResumeInterrupted';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { SplitTaskButton } from './SplitTaskButton';
 import { TaskActivity } from './TaskActivity';
@@ -75,8 +86,10 @@ import { WorkFeedbackInbox } from './WorkFeedbackInbox';
 import { ChangeSize } from './WorkSignals';
 import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
-import { useWorkspaceActions } from './WorkTools';
+import { isPopOutPane, PopOutButton, useWorkspaceActions } from './WorkTools';
 import './task-detail.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { ActionError } from '../ui/ActionError';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 const TaskTerminal = lazy(() =>
@@ -136,7 +149,9 @@ export function TaskDetail({
   useEffect(() => {
     if (workRequest?.id !== run.id) return;
     const section = workRequest.section;
-    if (section === 'question' || section === 'recovery') {
+    if (section === 'resume') {
+      document.getElementById('task-resume')?.focus();
+    } else if (section === 'question' || section === 'recovery') {
       document
         .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
         ?.querySelector<HTMLElement>('button, input, textarea')
@@ -191,6 +206,7 @@ export function TaskDetail({
   const title = taskTitle(
     sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt,
     sourceIdea?.title,
+    [run.projectPath, run.workspace],
   );
   /** Adds review or preview feedback to the follow-up draft, keeping what is typed. */
   const addToReply = (text: string, focus = false) => {
@@ -198,12 +214,13 @@ export function TaskDetail({
     draft(key, { prompt: appendFeedbackDraft(current, text, PROMPT_MAX_CHARS) });
     if (focus) document.getElementById('task-reply')?.focus();
   };
-  const pending = run.prompts?.filter((p) => p.status === 'pending') ?? [];
+  // Questions an agent is deciding stay visible so the person can answer first.
+  const pending = run.prompts?.filter((p) => p.status !== 'answered') ?? [];
   const isolated =
     !!run.workspace &&
     run.workspace.replaceAll('\\', '/').toLowerCase() !==
       run.projectPath.replaceAll('\\', '/').toLowerCase();
-  const finished = !active && ['review', 'reviewed'].includes(run.status);
+  const finished = !active && isDone(run);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
   const changes = useChangeStats([run])[run.id]?.value;
   const changedFiles = changes?.files;
@@ -214,7 +231,11 @@ export function TaskDetail({
         useWorkViewStore.getState().setViewing(null);
     };
   }, [run.id]);
-  const decision = taskDecision(run, integrated, changedFiles);
+  const pullRequest = usePullRequestStore((state) => state.tracked[run.taskId]);
+  const decision = pullRequestDecision(
+    taskDecision(run, integrated, changedFiles),
+    isLatest ? pullRequest : undefined,
+  );
   const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
     run,
     draftKey: key,
@@ -225,7 +246,9 @@ export function TaskDetail({
     onError: setError,
   });
   const inspect = (section: string) => {
-    if (section === 'question' || section === 'recovery') {
+    if (section === 'resume') {
+      document.getElementById('task-resume')?.focus();
+    } else if (section === 'question' || section === 'recovery') {
       document
         .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
         ?.scrollIntoView({ block: 'center' });
@@ -256,36 +279,48 @@ export function TaskDetail({
         if (alive) setConnections(projectConnections(servers, run.projectId));
       })
       .catch((cause) => {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       });
     return () => {
       alive = false;
     };
   }, [tab, detailsOpen, isLatest, connections, run.projectId]);
-  const act = async (command: string) => {
+  const act = async (work: () => Promise<unknown>) => {
     if (acting) return;
     setActing(true);
     setError('');
     try {
-      await nativeTask(command, { id: run.id });
+      await work();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setActing(false);
     }
   };
   /** Start a fresh attempt at this task and follow it. */
-  const retry = async () => {
+  /** Picks up an interrupted attempt the person checked: its conversation, or a fresh attempt. */
+  const resumeInterrupted = async (instructions: string) => {
+    await releaseInterrupted(run.id);
+    await refresh();
+    if (run.sessionId) {
+      await startContinuation(resumePrompt(instructions));
+      return;
+    }
+    const id = await retryTask(run.id);
+    await refresh();
+    useExecutionStore.getState().select(id);
+  };
+  const retry = async (focus?: string) => {
     if (retrying || submitting) return;
     setRetrying(true);
     setError('');
     try {
-      const id = await retryTask(run.id);
+      const id = await retryTask(run.id, focus);
       await refresh();
       useExecutionStore.getState().select(id);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setRetrying(false);
     }
@@ -293,18 +328,16 @@ export function TaskDetail({
 
   /** Starts the next attempt from this one with `prompt`; throws when it cannot. */
   const startContinuation = async (prompt: string, stopPreview = false) => {
-    if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
-    if (active) {
-      await nativeTask('task_stop', { id: run.id });
-      await waitForStoppedAttempt(
+    if (stopPreview) await stopPreviewTask(run.id);
+    if (active)
+      await stopAndSettle(
         run.id,
         async () => {
           await refresh();
           return useExecutionStore.getState().runs.find((r) => r.id === run.id);
         },
-        () => new Promise((resolve) => setTimeout(resolve, 250)),
+        { saved: 'follow-up', resumable: true },
       );
-    }
     if (latestAttempt(useExecutionStore.getState().runs, run.taskId)?.id !== run.id)
       throw new Error('A newer attempt exists. Open the latest result before continuing.');
     await start({
@@ -328,7 +361,7 @@ export function TaskDetail({
       if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
         draft(key, { prompt: '' });
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setActing(false);
     }
@@ -353,7 +386,7 @@ export function TaskDetail({
     try {
       await openInBrowser(href);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, []);
   const copyResult = async () => {
@@ -361,7 +394,7 @@ export function TaskDetail({
       await navigator.clipboard.writeText(run.result);
       setNotice('Result copied.');
     } catch (cause) {
-      setError(`Could not copy the result: ${String(cause)}`);
+      setError(`Could not copy the result: ${describeError(cause)}`);
     }
   };
   const captureRecovery = () => {
@@ -454,7 +487,17 @@ export function TaskDetail({
           />
         )}
         <div className="task-detail-utilities">
-          {!active && isLatest && (
+          {!active && isLatest && run.status === 'interrupted' && !integrated ? (
+            <>
+              <ResumeInterrupted
+                id="task-resume"
+                run={run}
+                disabled={acting || submitting}
+                onResume={resumeInterrupted}
+              />
+              <StopInterrupted run={run} disabled={acting || submitting} onStopped={refresh} />
+            </>
+          ) : !active && isLatest ? (
             <Button
               disabled={acting || submitting}
               loading={acting}
@@ -463,7 +506,7 @@ export function TaskDetail({
             >
               {decision.action}
             </Button>
-          )}
+          ) : null}
           <WorkSourceLink prompts={attempts.map((attempt) => attempt.prompt)} />
           {attempts.length > 1 && (
             <Select
@@ -491,80 +534,52 @@ export function TaskDetail({
                 sideOffset={8}
                 collisionPadding={12}
               >
-                {!!run.result && (
-                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
-                    <Copy size={16} />
-                    Copy output
-                  </Menu.Item>
-                )}
-                {finished && isLatest && (
-                  <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
-                    <CalendarClock size={16} />
-                    Make recurring
-                  </Menu.Item>
-                )}
-                {finished && isLatest && run.status === 'review' && (
+                {workspaceActions.editor && (
                   <Menu.Item
                     className="workspace-menu-item"
-                    disabled={acting || !!run.persistenceError}
-                    onSelect={() => void act('task_mark_reviewed')}
+                    onSelect={workspaceActions.editor.onSelect}
                   >
-                    <Check size={16} /> Mark reviewed
+                    <Code size={16} aria-hidden="true" />
+                    {workspaceActions.editor.label}
                   </Menu.Item>
                 )}
-                {finished && (
-                  <Menu.Item
-                    className="workspace-menu-item"
-                    onSelect={() => {
-                      setTab('changes');
-                      if (isLatest && isolated) setIntegrating(true);
-                      setReviewSection('delivery');
-                    }}
-                  >
-                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Merge and publish'}
-                  </Menu.Item>
-                )}
-                <Menu.Item className="workspace-menu-item" onSelect={() => setContextOpen(true)}>
-                  Task context
-                </Menu.Item>
-                {!!workspaceActions.groups.length && (
+                {!!workspaceActions.more.length && (
                   <Menu.Sub>
                     <Menu.SubTrigger className="workspace-menu-item workspace-menu-sub">
-                      Workspace
+                      <SquareArrowOutUpRight size={16} aria-hidden="true" />
+                      Open in…
                       <ChevronRight size={14} aria-hidden="true" />
                     </Menu.SubTrigger>
                     <Menu.Portal>
                       <Menu.SubContent className="workspace-menu">
-                        {workspaceActions.groups.map((group, index) => [
-                          index > 0 && (
-                            <Menu.Separator
-                              key={`separator-${group[0]?.id}`}
-                              className="menu-separator"
-                            />
-                          ),
-                          ...group.map((entry) => (
+                        {workspaceActions.more.map((entry) => {
+                          const Icon =
+                            entry.id === 'copy-branch'
+                              ? GitBranch
+                              : entry.id === 'copy-path'
+                                ? Copy
+                                : Code;
+                          return (
                             <Menu.Item
                               key={entry.id}
                               className="workspace-menu-item"
                               onSelect={entry.onSelect}
                             >
+                              <Icon size={16} aria-hidden="true" />
                               {entry.label}
                             </Menu.Item>
-                          )),
-                        ])}
+                          );
+                        })}
                       </Menu.SubContent>
                     </Menu.Portal>
                   </Menu.Sub>
                 )}
-                <Menu.Item
-                  className="workspace-menu-item"
-                  onSelect={() => {
-                    setTab('activity');
-                    setDetailsOpen(true);
-                  }}
-                >
-                  Task details
-                </Menu.Item>
+                {!!run.result && (
+                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
+                    <Copy size={16} aria-hidden="true" />
+                    Copy output
+                  </Menu.Item>
+                )}
                 <Menu.Item
                   className="workspace-menu-item"
                   onSelect={() => {
@@ -572,8 +587,38 @@ export function TaskDetail({
                     onBack();
                   }}
                 >
-                  <MailPlus size={16} /> Mark unread
+                  <MailPlus size={16} aria-hidden="true" /> Mark unread
                 </Menu.Item>
+                <Menu.Separator className="menu-separator" />
+                {finished && isLatest && (
+                  <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
+                    <CalendarClock size={16} aria-hidden="true" />
+                    Make recurring…
+                  </Menu.Item>
+                )}
+                <Menu.Item className="workspace-menu-item" onSelect={() => setContextOpen(true)}>
+                  <BookOpen size={16} aria-hidden="true" />
+                  Context…
+                </Menu.Item>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    setTab('activity');
+                    setDetailsOpen(true);
+                  }}
+                >
+                  <ListTree size={16} aria-hidden="true" />
+                  Activity details
+                </Menu.Item>
+                {finished && isLatest && run.status === 'review' && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    disabled={acting || !!run.persistenceError}
+                    onSelect={() => void act(() => markReviewed(run.id))}
+                  >
+                    <Check size={16} aria-hidden="true" /> Mark reviewed without opening
+                  </Menu.Item>
+                )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
@@ -608,7 +653,7 @@ export function TaskDetail({
                   <Button
                     variant="outline"
                     disabled={acting || run.status === 'stopping'}
-                    onClick={() => void act('task_stop')}
+                    onClick={() => void act(() => stopTask(run.id))}
                   >
                     <Square size={14} />
                     Stop
@@ -619,7 +664,7 @@ export function TaskDetail({
           />
         )}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error || workspaceActions.error} />
       {notice && (
         <p role="status" className="task-muted">
           {notice}
@@ -645,12 +690,19 @@ export function TaskDetail({
       {run.error && (
         <TaskFailure
           message={run.error}
+          kind={run.failureKind}
           preparation={run.preparation}
           retrying={retrying}
-          onRetry={isLatest && canRetry(run) && !integrated ? () => void retry() : undefined}
+          onRetry={
+            isLatest && isRetryable(run) && !integrated ? (focus) => void retry(focus) : undefined
+          }
+          continuesProgress={
+            !!run.quotaFailure && !!run.workspace && run.workspace !== run.projectPath
+          }
           onInspect={() => setTab('activity')}
         />
       )}
+      <DesktopPermissionNotice key={run.id} run={run} />
       {!!pending.length && (
         <TaskQuestions>
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
@@ -659,7 +711,7 @@ export function TaskDetail({
               key={p.id}
               runId={run.id}
               prompt={p}
-              active={['starting', 'running'].includes(run.status)}
+              active={isRunning(run)}
               accountShown={active}
               onContinue={
                 canContinue && !active
@@ -686,6 +738,9 @@ export function TaskDetail({
               </Tabs.Trigger>
             ))}
           </Tabs.List>
+          {workspaceActions.popOut && isPopOutPane(tab) && (
+            <PopOutButton pane={tab} onPopOut={workspaceActions.popOut} />
+          )}
         </div>
         <div className="result-canvas">
           <Tabs.Content value="result" forceMount hidden={tab !== 'result'}>
@@ -790,6 +845,7 @@ export function TaskDetail({
                         key={run.id}
                         run={run}
                         integrated={integrated}
+                        onFollowUp={canContinue ? (text) => addToReply(text, true) : undefined}
                         onHandoff={(text) => {
                           const id = useTaskStore.getState().addTask({
                             projectId: run.projectId,
@@ -924,7 +980,7 @@ export function TaskDetail({
               setToolsOpen(false);
               void listMcpServers(run.projectId)
                 .then((servers) => setConnections(projectConnections(servers, run.projectId)))
-                .catch((cause) => setError(String(cause)));
+                .catch((cause) => setError(describeError(cause)));
             }}
           />
         </Suspense>

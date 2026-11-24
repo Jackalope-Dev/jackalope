@@ -1,13 +1,14 @@
 import { EchoMark } from '@jackalope/brand/echo';
 import { applyThemeTokens } from '@jackalope/brand/theme';
+import { Button } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { prepareWorkspace } from '../../lib/workspace-preparation';
-import { type Project, useProjectStore } from '../../stores/projectStore';
+import { type Project, useActiveProject } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
-import { Button } from '../ui/button';
 import './onboarding.css';
+import { describeError } from '@jackalope/contracts/errors';
 
 export function WorkspaceTransition({
   onComplete,
@@ -18,9 +19,7 @@ export function WorkspaceTransition({
   onBack: () => void;
   project?: Project;
 }) {
-  const activeProject = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const activeProject = useActiveProject();
   const project = pendingProject ?? activeProject;
   const appTheme = useThemeStore((state) => state.appTheme);
   const preview = pendingProject ? (pendingProject.preferences?.theme ?? appTheme) : undefined;
@@ -66,7 +65,7 @@ export function WorkspaceTransition({
         setChecks((current) =>
           current.map((check) =>
             check.id === id
-              ? { ...check, state, error: cause === undefined ? undefined : String(cause) }
+              ? { ...check, state, error: cause === undefined ? undefined : describeError(cause) }
               : check,
           ),
         );

@@ -55,19 +55,13 @@ pub fn assignments(doc: &PlanDocument, shape: &str) -> Result<String, String> {
         let mut scopes: Vec<String> = tasks.iter().flat_map(|task| task.scopes.clone()).collect();
         scopes.sort();
         scopes.dedup();
-        let briefing = tasks
-            .iter()
-            .filter(|task| !task.briefing.is_empty())
-            .map(|task| format!("{}: {}", task.key, task.briefing))
-            .collect::<Vec<_>>()
-            .join("\n");
+        // No briefing: the request is the rendered plan, which holds every task's briefing.
         serde_json::json!([{
             "key": "plan",
             "title": bounded(&doc.title, 160),
             "prompt": format!("Implement every remaining task in the approved plan, in dependency order: {}.", open.join(", ")),
             "scopes": scopes,
             "outcomes": outcomes(doc, &[]),
-            "briefing": bounded(&briefing, 4000),
         }])
     } else {
         serde_json::Value::Array(
@@ -95,11 +89,14 @@ pub fn assignments(doc: &PlanDocument, shape: &str) -> Result<String, String> {
     serde_json::to_string(&value).map_err(|error| error.to_string())
 }
 
-/// Picks the shape the planner recommended when it is available.
-pub fn default_shape(doc: &PlanDocument, swarm_connected: bool) -> &'static str {
+/// Picks the shape the planner recommended; plans with more tasks than
+/// planned subtasks run default to a swarm.
+pub fn default_shape(doc: &PlanDocument) -> &'static str {
+    let open = remaining(doc).len();
     match doc.front.recommended_shape.trim() {
-        "swarm" if swarm_connected => "swarm",
-        "subtasks" | "swarm" if remaining(doc).len() > 1 => "subtasks",
+        _ if open > super::artifact::MAX_TASKS => "swarm",
+        "swarm" => "swarm",
+        "subtasks" if open > 1 => "subtasks",
         _ => "single",
     }
 }

@@ -1,3 +1,4 @@
+import { Button } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   GitCompareArrows,
@@ -10,7 +11,6 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
-import { Button } from '../ui/button';
 import './welcome.css';
 
 const SEEN_KEY = 'jackalope.welcome.seen';
@@ -147,9 +147,8 @@ export function WelcomeDialog() {
               <motion.div variants={rise} className="welcome-beta">
                 <Megaphone size={18} aria-hidden="true" />
                 <p>
-                  <strong>You’re early, and that helps.</strong> Expect rough edges. Tell us what
-                  breaks, what’s confusing or what you wish it did. Feedback is always one click
-                  away in the bottom bar.
+                  <strong>We read every note.</strong> Tell us what breaks, what’s confusing or what
+                  you wish it did. Feedback is always one click away in the bottom bar.
                 </p>
               </motion.div>
               <motion.div variants={rise} className="welcome-actions">

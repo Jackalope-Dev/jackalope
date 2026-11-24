@@ -182,6 +182,7 @@ export function Notes() {
                   <small>
                     {entry.date}
                     {entry.status ? ` · ${entry.status}` : ''}
+                    {entry.version ? ` v${entry.version}` : ''}
                   </small>
                   <small>{entry.description}</small>
                 </span>

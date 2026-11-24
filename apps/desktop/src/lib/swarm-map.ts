@@ -1,7 +1,8 @@
+import { isActive, isDone } from '@jackalope/contracts/runs';
 import type { QueueView } from './queue';
+import type { TaskRun } from './run-types';
 import type { SwarmConflict, SwarmFile } from './swarm';
-import type { TaskRun } from './task-runtime';
-import { taskTitle } from './task-title.ts';
+import { runTitle } from './task-title.ts';
 
 /** Where one piece of work sits on its way to the target branch. */
 export type SwarmPhase = 'queued' | 'working' | 'checking' | 'ready' | 'attention' | 'merged';
@@ -26,6 +27,8 @@ export interface SwarmAgent {
   detail: string;
   /** The planned task this work belongs to. */
   plan: string | null;
+  /** The host the work runs on, once it has started. */
+  host: string | null;
   files: string[];
   /** Files reported only partially by the swarm Worker. */
   truncated: boolean;
@@ -63,7 +66,6 @@ interface SwarmForkInput {
   error: string | null;
 }
 
-const ACTIVE = new Set(['starting', 'running', 'stopping']);
 const RECENT_MS = 24 * 60 * 60 * 1000;
 const MERGED_SHOWN = 6;
 
@@ -122,16 +124,16 @@ export function swarmMap({
     const fork = forkByRun.get(run.id);
     const { phase, detail } = phaseOf(run, merged, held);
     const since = run.endedAt ?? run.startedAt;
-    if (!ACTIVE.has(run.status) && now - Date.parse(since) > RECENT_MS && phase !== 'ready')
-      continue;
+    if (!isActive(run) && now - Date.parse(since) > RECENT_MS && phase !== 'ready') continue;
     const agent: SwarmAgent = {
       id: run.id,
       runId: run.id,
-      title: fork?.title || taskTitle(run.prompt),
+      title: fork?.title || runTitle(run),
       agent: run.agent,
       phase,
       detail,
       plan: planOfTask.get(run.taskId) ?? null,
+      host: run.host?.name ?? run.remote?.computerName ?? null,
       files: fork && !fork.error ? fork.files.map((file) => file.path) : [],
       truncated: fork?.truncated ?? false,
       conflicts: 0,
@@ -151,6 +153,7 @@ export function swarmMap({
       phase: 'queued',
       detail: item.dependencies.length ? 'Waiting for the work it depends on' : 'Waiting to start',
       plan: item.featureId ? (plans.get(item.featureId)?.title ?? null) : (item.feature ?? null),
+      host: null,
       files: item.scopes,
       truncated: false,
       conflicts: 0,
@@ -203,7 +206,7 @@ function phaseOf(
 ): { phase: SwarmPhase; detail: string } {
   const question = run.prompts?.find((prompt) => prompt.status === 'pending');
   if (question) return { phase: 'attention', detail: `Asks: ${question.question}` };
-  if (ACTIVE.has(run.status)) {
+  if (isActive(run)) {
     if (run.finishing || run.progress?.step === 'verification')
       return { phase: 'checking', detail: run.progress?.detail || 'Running the project checks' };
     return {
@@ -212,7 +215,7 @@ function phaseOf(
     };
   }
   if (merged.has(run.id)) return { phase: 'merged', detail: 'Merged into the target branch' };
-  if (run.status === 'review' || run.status === 'reviewed') {
+  if (isDone(run)) {
     if (run.verificationError || (run.verification && !run.verification.result.success))
       return { phase: 'attention', detail: 'Checks failed' };
     if (!run.verification?.tree) return { phase: 'attention', detail: 'Not checked yet' };

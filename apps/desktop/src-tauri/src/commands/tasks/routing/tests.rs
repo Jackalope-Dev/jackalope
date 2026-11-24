@@ -134,6 +134,113 @@ fn routing_excludes_shared_exhausted_accounts_but_preserves_other_model_pools() 
 }
 
 #[test]
+fn new_work_returns_to_the_preferred_account_once_its_quota_resets() {
+    // Handoffs belong to one attempt and capacity is read fresh, so nothing keeps a
+    // project on the account a handoff moved it to.
+    let now = Utc::now().timestamp();
+    let read = |remaining: f64, resets_at: i64| CapacityRecord {
+        agent: "claude".into(),
+        status: "reported".into(),
+        account: "Preferred".into(),
+        source: "Fixture".into(),
+        observed_at: Some(Utc::now().to_rfc3339()),
+        detail: String::new(),
+        windows: vec![capacity::CapacityWindow {
+            pool_id: "claude:preferred:five_hour".into(),
+            pool_name: "Claude".into(),
+            window: "five_hour".into(),
+            used_percent: Some(100.0 - remaining),
+            remaining_percent: Some(remaining),
+            duration_minutes: Some(300),
+            resets_at: Some(resets_at),
+        }],
+    };
+    let preferred = |record: &CapacityRecord| {
+        let mut option = candidate(
+            "preferred",
+            "claude",
+            "sonnet",
+            remaining(record, Some("sonnet"), now),
+        );
+        option.preferred = true;
+        option
+    };
+    let backup = candidate("backup", "codex", "small", Some(60.0));
+    let first = |options: Vec<Candidate>, handoffs: &[Handoff]| {
+        let open: Vec<_> = options
+            .into_iter()
+            .filter(|option| eligible(option, handoffs))
+            .collect();
+        rank_by_capacity(&open, "fixture").0.id.clone()
+    };
+
+    let cooling = preferred(&read(0.0, now + 3600));
+    let handoff = Handoff {
+        quota_pools: cooling.quota_pools.clone(),
+        agent: cooling.agent.clone(),
+        model: cooling.model.clone(),
+        binding: cooling.binding.clone(),
+        session_id: None,
+        result: String::new(),
+        usage: Usage::default(),
+        failure: QuotaFailure {
+            model_only: false,
+            message: "Claude's five-hour usage limit is used up.".into(),
+        },
+        recorded_at: Utc::now().to_rfc3339(),
+    };
+    // The attempt that handed off never returns, even once capacity looks available.
+    let reset = preferred(&read(100.0, now + 5 * 3600));
+    assert_eq!(
+        first(vec![reset.clone(), backup.clone()], &[handoff]),
+        "backup"
+    );
+    // New work starts without handoffs; until the window resets its reading excludes it.
+    assert_eq!(first(vec![cooling, backup.clone()], &[]), "backup");
+    // After the reset time the preferred account leads again, whether the provider
+    // reports the new window or only the old one, which no longer counts.
+    assert_eq!(first(vec![reset, backup.clone()], &[]), "preferred");
+    let expired = preferred(&read(0.0, now - 1));
+    assert_eq!(expired.remaining_percent, None);
+    assert_eq!(first(vec![expired, backup], &[]), "preferred");
+}
+
+#[test]
+fn a_handoff_focus_is_one_bounded_line_from_the_person() {
+    assert_eq!(focus_line(None), "");
+    assert_eq!(focus_line(Some(" \n\t ")), "");
+    assert_eq!(
+        focus_line(Some("Fix the parser,\n\nthen the docs")),
+        "The person asked the next agent to focus on: Fix the parser, then the docs\n"
+    );
+    let long = focus_line(Some(&"é".repeat(HANDOFF_FOCUS_MAX + 50)));
+    assert_eq!(long.matches('é').count(), HANDOFF_FOCUS_MAX);
+    assert_eq!(long.lines().count(), 1);
+}
+
+#[test]
+fn refusals_are_not_quota_failures() {
+    // Loose limit wording inside a refusal does not hand off another account.
+    for event in [
+        serde_json::json!({"type":"result","is_error":true,"result":"API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy. Asking again will hit the limit of what it can do."}),
+        serde_json::json!({"type":"turn.failed","error":{"message":"The response was blocked by the content filter (content_filter); the request is over the limit of acceptable content."}}),
+        serde_json::json!({"type":"error","message":"Response was blocked due to SAFETY: limit reached for this prompt"}),
+    ] {
+        assert!(quota_failure(&event).is_none(), "{event}");
+    }
+    // A quota error code still wins over refusal wording beside it.
+    assert!(quota_failure(&serde_json::json!({"type":"error","error":{"code":"insufficient_quota","message":"See the usage policy for limits."}})).is_some());
+    assert!(super::super::gemini::quota_failure(
+        "Response was blocked due to SAFETY; daily quota unaffected"
+    )
+    .is_none());
+    assert!(super::super::gemini::quota_failure(
+        "RESOURCE_EXHAUSTED: blocked due to safety retries"
+    )
+    .is_some());
+}
+
+#[test]
 fn routing_owned_process_handoff_preserves_workspace_and_restart_history() {
     exercise_quota_handoff(true);
 }
@@ -209,8 +316,8 @@ fn main() {
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
     policy.automatic_quota_handoff = Some(enabled);
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for (id, adapter) in [("fixture-a", "codex"), ("fixture-b", "claude")] {
@@ -239,7 +346,7 @@ fn main() {
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         assert!(
@@ -250,7 +357,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(50));
     };
     if !enabled {
-        assert_eq!(settled.status, "failed");
+        assert_eq!(settled.status, RunStatus::Failed);
         assert!(settled
             .error
             .as_deref()
@@ -262,11 +369,53 @@ fn main() {
         assert!(Path::new(&settled.workspace).join("partial.txt").is_file());
         assert!(!Path::new(&settled.workspace).join("completed.txt").exists());
         assert!(runtime.inner.lock().unwrap().processes.is_empty());
+
+        // A retry picks up the preserved changes in the same workspace with the person's
+        // focus. Routing starts afresh, so it returns to the account the quota stopped.
+        policy.automatic_quota_handoff = Some(true);
+        std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+        let mut retry = runtime.retry_request(&id).unwrap();
+        retry.handoff_focus = Some("  Finish the parser\n before the docs ".into());
+        let retry_id = retry.id.clone();
+        runtime.start(retry).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        let retried = loop {
+            let run = runtime.inner.lock().unwrap().runs[&retry_id].clone();
+            if !run.status.is_active() {
+                break run;
+            }
+            assert!(std::time::Instant::now() < deadline, "Retry timed out");
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        assert_eq!(
+            retried.status,
+            RunStatus::Review,
+            "{:?} / {:?}",
+            retried.error,
+            retried.activity
+        );
+        assert_eq!(retried.workspace, settled.workspace);
+        assert!(retried
+            .activity
+            .iter()
+            .any(|line| line.starts_with("Continuing in the previous attempt's workspace")));
+        let history = retried.routing.as_ref().unwrap();
+        assert_eq!(history.decisions[0].agent, "fixture-a");
+        assert_eq!(history.handoffs.len(), 1);
+        let context = retried.handoff_context.as_deref().unwrap();
+        assert!(context.starts_with("Jackalope quota handoff:"), "{context}");
+        assert!(context.contains(
+            "The person asked the next agent to focus on: Finish the parser before the docs\n"
+        ));
+        assert!(Path::new(&retried.workspace).join("completed.txt").exists());
+        while Arc::strong_count(&runtime._owner) > 1 {
+            std::thread::sleep(Duration::from_millis(10));
+        }
         return;
     }
     assert_eq!(
         settled.status,
-        "review",
+        RunStatus::Review,
         "{:?} / {:?} at {}",
         settled.error,
         settled.activity,
@@ -300,7 +449,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(20));
     }
     restored.stop(&cancel_id).unwrap();
-    while restored.inner.lock().unwrap().runs[&cancel_id].status != "stopped" {
+    while restored.inner.lock().unwrap().runs[&cancel_id].status != RunStatus::Stopped {
         assert!(std::time::Instant::now() < deadline, "Router did not stop");
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -308,6 +457,42 @@ fn main() {
     let canceled = restored.inner.lock().unwrap().runs[&cancel_id].clone();
     assert!(canceled.routing.as_ref().unwrap().decisions.is_empty());
     assert!(!Path::new(&canceled.workspace).join("partial.txt").exists());
+}
+
+#[test]
+fn claude_rejecting_requests_names_the_used_up_window_and_when_it_resets() {
+    // Field names as the Claude Agent SDK types SDKRateLimitInfo; resetsAt is Unix seconds.
+    let event = |info: serde_json::Value| {
+        quota_failure(&serde_json::json!({"type":"rate_limit_event","rate_limit_info":info,"uuid":"0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f","session_id":"5f0e1d2c-3b4a-4958-a6b7-c8d9e0f1a2b3"}))
+            .unwrap()
+    };
+    let resets = chrono::TimeZone::timestamp_opt(&chrono::Local, 1_794_520_800, 0)
+        .unwrap()
+        .format("%b %-d at %-I:%M %p")
+        .to_string();
+    let weekly = event(
+        serde_json::json!({"status":"rejected","resetsAt":1_794_520_800,"rateLimitType":"seven_day","utilization":1.0}),
+    );
+    assert_eq!(
+        weekly.message,
+        format!("Claude's weekly usage limit is used up. It resets {resets}.")
+    );
+    assert!(!weekly.model_only);
+    assert_eq!(
+        event(serde_json::json!({"status":"rejected","rateLimitType":"five_hour"})).message,
+        "Claude's five-hour usage limit is used up until it resets."
+    );
+    assert_eq!(
+        event(
+            serde_json::json!({"status":"rejected","rateLimitType":"seven_day_opus","resetsAt":0})
+        )
+        .message,
+        "Claude's weekly Opus usage limit is used up until it resets."
+    );
+    assert_eq!(
+        event(serde_json::json!({"status":"rejected"})).message,
+        "Claude's usage limit is used up until it resets."
+    );
 }
 
 #[test]
@@ -366,7 +551,7 @@ fn routing_reserves_active_account_headroom_and_releases_finished_work() {
     run.account_binding = Some(option.binding.clone());
     reserve_active_headroom(&mut option, &[run.clone(), run.clone()], "new-task");
     assert_eq!(option.remaining_percent, Some(30.0));
-    run.status = "review".into();
+    run.status = RunStatus::Review;
     reserve_active_headroom(&mut option, &[run], "new-task");
     assert_eq!(option.remaining_percent, Some(30.0));
 }
@@ -400,8 +585,8 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "codex".into();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), *id == "codex");
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), id == "codex");
     }
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
@@ -412,7 +597,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     let deadline = std::time::Instant::now() + Duration::from_secs(180);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         if std::time::Instant::now() >= deadline {
@@ -423,7 +608,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
     };
     assert_eq!(
         settled.status,
-        "review",
+        RunStatus::Review,
         "{:?} / {:?} at {}",
         settled.error,
         settled.activity,
@@ -492,14 +677,18 @@ fn a_routing_agent_routes_on_a_fast_model_at_its_lowest_effort() {
     assert_eq!(routing_model("codex", None), None);
     let args = |adapter: &str| {
         let mut command = Command::new("fixture");
-        routing_effort(&mut command, adapter);
+        routing_effort(
+            &mut command,
+            adapter,
+            routing_model(adapter, None).as_deref(),
+        );
         command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
     };
     assert_eq!(args("claude"), ["--effort", "low"]);
-    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"minimal\""]);
+    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"low\""]);
     assert!(args("opencode").is_empty());
 }
 
@@ -558,8 +747,8 @@ fn main() {
     .unwrap();
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
-    for id in BUILTIN_AGENTS {
-        policy.enabled_agents.insert((*id).into(), false);
+    for id in crate::commands::agents::builtin_ids() {
+        policy.enabled_agents.insert(id.into(), false);
     }
     policy.default_meta_agent = "fixture-a".into();
     for id in ["fixture-a", "fixture-b"] {
@@ -587,7 +776,7 @@ fn main() {
     let deadline = started + Duration::from_secs(25);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
-        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+        if !run.status.is_active() {
             break run;
         }
         assert!(
@@ -598,9 +787,11 @@ fn main() {
         std::thread::sleep(Duration::from_millis(50));
     };
     assert_eq!(
-        settled.status, "review",
+        settled.status,
+        RunStatus::Review,
         "{:?} / {:?}",
-        settled.error, settled.activity
+        settled.error,
+        settled.activity
     );
     let routing = settled.routing.as_ref().unwrap();
     let decision = routing.decisions.last().unwrap();
@@ -611,7 +802,10 @@ fn main() {
         .and_then(|receipt| receipt.fallback_reason.clone())
         .unwrap_or_default();
     assert!(
-        reason.contains("did not answer within 8 seconds"),
+        reason.contains(&format!(
+            "did not answer within {} seconds",
+            super::process::ROUTING_BUDGET.as_secs()
+        )),
         "{reason}"
     );
     assert!(routing
@@ -626,4 +820,19 @@ fn main() {
         .unwrap();
     assert!(routed < 12_000, "routing took {routed} ms");
     assert!(runtime.inner.lock().unwrap().processes.is_empty());
+}
+
+#[test]
+fn computers_only_routing_offers_only_agents_that_run_on_computers() {
+    let mut offered = 0;
+    for agent in crate::commands::agents::all() {
+        let id = agent.id.as_str();
+        if routable(id, true) {
+            offered += 1;
+            assert!(routable(id, false), "{id}");
+            assert!(crate::commands::agents::runs_on_computers(id), "{id}");
+        }
+    }
+    assert!(offered > 0);
+    assert!(!routable("unknown", false));
 }

@@ -1,4 +1,4 @@
-import type { ScreenshotArtifact } from './task-runtime.ts';
+import type { ScreenshotArtifact } from './run-types.ts';
 
 /** Most distinct pages captured per attempt; matches the native limit. */
 export const REVIEW_PAGE_LIMIT = 6;

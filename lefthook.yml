@@ -10,6 +10,9 @@ pre-commit:
       run: node scripts/git-hooks.mjs preserved pre-commit
     - name: staged checks
       run: node scripts/git-hooks.mjs staged
+    - name: staged secrets
+      run: node scripts/check-secrets.mjs --staged
+      tags: [secrets]
 
 pre-push:
   piped: true
@@ -20,4 +23,6 @@ pre-push:
     - name: verify
       run: pnpm verify --changed
     - name: secrets
-      run: pnpm check:secrets
+      run: node scripts/check-secrets.mjs --push "{1}"
+      use_stdin: true
+      tags: [secrets]

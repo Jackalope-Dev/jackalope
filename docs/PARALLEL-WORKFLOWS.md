@@ -10,9 +10,10 @@ isolated parallel work, coordination and review before integration.
 Task review and preview open beside the task on windows at least 1280 pixels wide and
 take the full width on narrower ones; the toggle is saved per task. Conversations
 instead switch the whole view between Conversation, Review, Preview, Terminal and
-Screen tabs. Their options menu holds Task context (workspace, branch and saved
-checks), Topics and a Workspace submenu for editors, separate task windows and copying
-the path or branch. The task toolbar shows the branch and changes since a
+Screen tabs. Their options menu holds the preferred editor, Task context (workspace,
+branch and saved checks), Topics and an Open in… submenu for the other editor and copying
+the path or branch. Review, Preview and Terminal each pop out to a separate window from
+the button at the end of the tabs. The task toolbar shows the branch and changes since a
 previous visit, with the same Task context and Workspace tools. Terminal opens a shell
 view in that exact workspace. New task branches and worktree folders are named after the
 request with a short id suffix, such as `jackalope/fix-login-bug-909b03`.
@@ -40,7 +41,7 @@ selected agent account.
 **Queue message** saves input for the next batch. **Stop and send** pauses dispatch,
 waits for actual shutdown and saves the message before resuming. Failed saves retain
 the draft. A paused queue keeps new messages until explicitly resumed.
-Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
+Use the pop-out button beside the tabs for a separate window; its pin controls always-on-top. Closing the
 window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.
 
@@ -91,8 +92,8 @@ when the project's fallback is explicitly Agent-powered; both calls retain usage
 Sessions with batch or
 cost limits retain their existing serial flow.
 
-**Automatic subtasks** are on by default (Project settings → Tasks → Split work
-into subtasks). When parallel planning is available, a request is planned and started
+**Automatic subtasks** are on by default (Project settings → Automation → Split
+work into subtasks). When parallel planning is available, a request is planned and started
 without a review click if a model assessment recommends parallel or investigative
 work, or local rules find a request they do not classify as small. A model's one-lead
 choice and small requests start one agent as before. The planner may still return a
@@ -107,7 +108,9 @@ development agent. The agent receives the complete request and checks repository
 boundaries before proposing one to four assignments, or up to eight when the
 concurrency limit is higher. Each assignment includes a planner briefing (key files,
 patterns, contracts, checks and pitfalls, under 1,500 characters) that the worker
-receives so it can skip repeated discovery; workers are told to confirm it. Review ownership and
+receives so it can skip repeated discovery; workers are told to confirm it. Every worker
+also receives the complete request after its assignment, so the planner does not copy it
+into assignments. Review ownership and
 dependencies, then choose **Start reviewed plan**. Native validation rejects cycles,
 escaping paths and independent assignments with overlapping scopes, for automatic and
 reviewed plans alike. A changed planner attempt requires another review. Planning
@@ -116,6 +119,13 @@ workspaces must remain unchanged before implementation starts.
 Planning considers integration and review effort, shared contracts, generated files,
 manifests and lockfiles. Shared changes have one owner or an explicit dependency.
 Tightly coupled work stays together; a small request can remain one assignment.
+Assignments are sized for one agent session: a request spanning many independent
+areas, screens or files, or a long verification checklist, is split into separately
+verifiable assignments, each saying how its result is checked. Work that must first
+discover the current state (an audit, sweep or investigation) starts with a read-only
+audit assignment that reports its findings, and later assignments depend on it.
+Shared groundwork, such as a shared component, is a prerequisite its consumers depend
+on. There is no minimum assignment count.
 
 Planning accounts for repeated discovery, setup and checks in each assignment.
 Dispatch prioritizes prerequisites on the longest remaining dependency chains,
@@ -207,7 +217,12 @@ and steps; their saved storage is left intact until the plan is saved.
 2. In Work's options menu, choose **Plan feature work**. Add focused tasks, or **Import a
    plan** from JSON, from that page's options menu. Review titles, instructions, assigned agents, owned paths and dependencies.
 3. Choose the concurrency limit and **Run ready tasks**. The limit counts currently
-   active application attempts across projects. Explicit single-task launches remain
+   active application attempts across projects. Automatic, the default, follows what this
+   computer can run: one agent per two CPUs and per 4 GiB of memory, whichever allows
+   fewer, from 1 to 16, the budget an added computer's runner uses. The menu marks that
+   number as recommended; a chosen number (1 to 16) is saved in `queue.json` and kept, and
+   one above the recommendation shows that it may slow the computer down. Provider
+   quota and account limits still apply separately. Explicit single-task launches remain
    available separately. Pausing dispatch leaves current attempts running; each has Stop.
 4. Follow work or read structured progress/blocker/handoff messages. Each task gets
    a separate worktree from the resolved target commit. Shared scopes wait for integration;
@@ -225,7 +240,9 @@ and steps; their saved storage is left intact until the plan is saved.
 The [example plan](./examples/parallel-plan.json) demonstrates the import schema.
 It is not an automatic launch. Edit agents, scopes and prompts for your project
 and review every task before dispatch. Native schedules use the same guarded
-runtime; proactive proposals and remote execution remain roadmap work.
+runtime; proactive proposals remain roadmap work. Claude Code and Codex agents can run on
+a project's computer while the queue, reservations and integration stay local; see
+[agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 
 Optional feature staging consumes verified immutable predecessor snapshots before final
 integration. Queue admission favors critical paths and fair project access; finishing
@@ -267,7 +284,7 @@ without `judge` or `combine` fields and work as before.
 
 The native `Coordinator` owns a durable queue. It validates a complete imported plan,
 rejects missing dependencies/cycles/invalid scopes, and saves it atomically before
-dispatch. A mutex and the runtime’s shared integration exclusion serialize eligibility
+dispatch. A mutex and the runtime's shared integration exclusion serialize eligibility
 checks, reservation and launch. A persisted run ID is the claim; a missing or failed
 attempt is not silently reclaimed after restart. History and queue ownership locks
 prevent two app instances from using the same journals concurrently.
@@ -292,7 +309,7 @@ are capped at 16 KiB and message text at 4,000 bytes. Messages are untrusted wor
 observations. They never start another task, grant permission, mark a result successful,
 or merge work. Codex/Grok use their allowed shell/network tools to call REST. Claude receives
 a per-run `--mcp-config` with an environment placeholder and explicit permission
-for just `mcp__jackalope__project` and `mcp__jackalope__message`. This uses Claude’s
+for just `mcp__jackalope__project` and `mcp__jackalope__message`. This uses Claude's
 supported tool interface without weakening its shell policy or writing credentials
 to configuration files. MCP validates the current credential for every request;
 stateless transport prevents authorization leaking between client sessions. It is not a security boundary against
@@ -308,8 +325,8 @@ for limits, migration/recovery and provider-independent delivery boundaries.
 Manual tasks appear in the project inventory with explicitly unknown scopes.
 Directed messages accept recipientTaskId (recipient_task_id in the MCP schema)
 from that inventory. Acknowledgments mean read, not agreement or permission.
-Codex receives the MCP bridge for all bridged tasks; Grok, OpenCode and Antigravity
-receive the same capabilities through permitted HTTP. See the current
+Codex, Claude, OpenCode and Kimi receive the MCP bridge on bridged tasks; Grok,
+Antigravity and Gemini receive the same capabilities through permitted HTTP. See the current
 [capability contract](ORCHESTRATION-CAPABILITIES.md) for limits and notifications.
 
 Named ownership claims and interface agreements persist alongside the queue.
@@ -328,13 +345,13 @@ or interrupted ownership, and snapshots all tracked/staged/untracked nonignored 
 through a separate temporary Git index. Forced additions already in the source index are
 preserved. The source index and files are not staged, reset or committed in place.
 
-Git `commit-tree` and `merge-tree` prepare the combined result against captured the target branch.
+Git `commit-tree` and `merge-tree` prepare the combined result against the captured target branch.
 The app retains a reference and durable review receipt. A conflict produces a blocked
 review with the conflicting paths; it does not touch the target branch. Reiterate an affected task,
 or resolve with ordinary Git tools and prepare a new review. There is no conflict editor yet.
 
-Apply rechecks the selected sources’ HEAD, content tree and index/worktree state, current
-the target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
+Apply rechecks the selected sources' HEAD, content tree and index/worktree state, the current
+target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
 performs a fast-forward only, with automatic stash and ignored-file overwrite disabled.
 No push or destructive reset is performed. When selected in the approval, cleanup
 rechecks each source and removes its worktree and matching local branch. A cleanup
@@ -385,7 +402,7 @@ are deleted. Old applied receipts and saved task data remain readable.
 ## Usage and capacity
 
 Task token history remains attributable to attempts/projects. Connected capacity adds
-the signed-in Codex account’s supported app-server limits, with native windows, shared
+the signed-in Codex account's supported app-server limits, with native windows, shared
 pool identity, source time, reset times, unknown values and stale/error states. The
 reader initializes a bounded short-lived app-server process and requests
 `account/rateLimits/read`; it does not launch a model task or read private auth files.
@@ -436,7 +453,7 @@ Sources and reuse: [Axum](https://docs.rs/axum/latest/axum/) (MIT),
 [Claude per-run MCP configuration](https://code.claude.com/docs/en/mcp),
 [Codex app-server](https://learn.chatgpt.com/docs/app-server),
 [Claude status-line telemetry](https://code.claude.com/docs/en/statusline).
-The bridge uses the application’s existing Tokio runtime; no sidecar runtime is required.
+The bridge uses the application's existing Tokio runtime; no sidecar runtime is required.
 
 ## Verification
 

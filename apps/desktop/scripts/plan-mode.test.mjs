@@ -8,7 +8,6 @@ import {
   manualPlan,
   planAssumption,
   shapeChoices,
-  stateTone,
   taskWaves,
 } from '../src/lib/plan-mode.ts';
 
@@ -45,18 +44,22 @@ test('criteria list the tasks that cover them', () => {
 
 test('shapes explain why one is unavailable', () => {
   const document = { tasks };
-  const offline = shapeChoices({ swarmConnected: false, document });
-  assert.equal(
-    offline.find((choice) => choice.shape === 'swarm').unavailable.includes('swarm'),
-    true,
-  );
-  assert.equal(offline.find((choice) => choice.shape === 'subtasks').unavailable, undefined);
+  // A swarm runs without a connected Worker.
+  const choices = shapeChoices({ document });
+  assert.equal(choices.find((choice) => choice.shape === 'swarm').unavailable, undefined);
+  assert.equal(choices.find((choice) => choice.shape === 'subtasks').unavailable, undefined);
   const lastTask = shapeChoices({
-    swarmConnected: true,
     document: { tasks: tasks.map((task, i) => ({ ...task, status: i ? 'done' : '' })) },
   });
   assert.match(lastTask.find((choice) => choice.shape === 'subtasks').unavailable, /one task/);
   assert.equal(lastTask.find((choice) => choice.shape === 'single').unavailable, undefined);
+  assert.equal(lastTask.find((choice) => choice.shape === 'swarm').unavailable, undefined);
+  // More tasks than planned subtasks run need a swarm.
+  const large = shapeChoices({
+    document: { tasks: Array.from({ length: 9 }, (_, i) => ({ key: `t${i}`, status: '' })) },
+  });
+  assert.match(large.find((choice) => choice.shape === 'subtasks').unavailable, /at most 8/);
+  assert.equal(large.find((choice) => choice.shape === 'swarm').unavailable, undefined);
 });
 
 test('the recommended option leads and stop options come last', () => {
@@ -67,14 +70,6 @@ test('the recommended option leads and stop options come last', () => {
   assert.deepEqual(choices, ['Comma', 'Tabs']);
   assert.deepEqual(stops, ['Use your recommendations for the rest', 'Done, draft the plan']);
   assert.deepEqual(interviewOptions({ options: ['A'] }).choices, ['A']);
-});
-
-test('states map to tones with failures distinct from success', () => {
-  assert.equal(stateTone('check-passed'), 'success');
-  assert.equal(stateTone('human-accepted'), 'success');
-  assert.equal(stateTone('check-failed'), 'danger');
-  assert.equal(stateTone('agent-claimed'), 'accent');
-  assert.equal(stateTone('unassessed'), 'muted');
 });
 
 test('plan-started managed tasks do not report a missing planner attempt', () => {

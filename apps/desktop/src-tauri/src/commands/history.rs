@@ -1,20 +1,18 @@
 use serde::Serialize;
 use std::path::Path;
 
+/// A saved record of at most `limit` bytes. A larger one is refused, and kept
+/// on disk for recovery.
 pub(super) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
-    use std::io::Read;
-    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    let mut bytes = Vec::new();
-    file.take(limit + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > limit {
-        return Err(format!("History exceeds the {limit}-byte load limit; the original remains available for recovery."));
+    match super::platform::read_capped(path, limit) {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) => Err(std::io::Error::from(std::io::ErrorKind::NotFound).to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => Err(format!("History exceeds the {limit}-byte load limit; the original remains available for recovery.")),
+        Err(error) => Err(error.to_string()),
     }
-    Ok(bytes)
 }
 
-pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     replace_with(path, |file| std::io::Write::write_all(file, bytes))
         .map_err(|error| error.to_string())
 }

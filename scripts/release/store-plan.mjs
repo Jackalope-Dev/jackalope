@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 
 export function storePlan(env, inputs, notes) {
-  if (!['beta', 'stable'].includes(env.GITHUB_REF_NAME))
+  if (!isReleaseChannel(env.GITHUB_REF_NAME))
     throw new Error('Store releases require the beta or stable branch');
   const automatic = env.GITHUB_EVENT_NAME === 'push';
   const mode = automatic ? 'submission' : inputs.mode;
@@ -54,7 +54,7 @@ async function main() {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+if (import.meta.main)
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

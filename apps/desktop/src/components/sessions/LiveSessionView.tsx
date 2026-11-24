@@ -1,5 +1,6 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { CopyButton, SegmentedControl } from '@jackalope/ui';
+import { isActive } from '@jackalope/contracts/runs';
+import { Button, CopyButton, InlineNotice, SegmentedControl, Tooltip } from '@jackalope/ui';
 import {
   AlarmClock,
   ArrowLeft,
@@ -26,9 +27,11 @@ import {
   sessionRunNeedsAttention,
   sessionWork,
 } from '../../lib/live-session';
-import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import type { TaskRun } from '../../lib/run-types';
+import { sessionMarkdown } from '../../lib/session-export';
+import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -41,6 +44,7 @@ import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
 import { DecisionTrail } from '../tasks/DecisionTrail';
+import { DesktopPermissionNotice } from '../tasks/DesktopPermissionNotice';
 import { MergeReview } from '../tasks/MergeReview';
 import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
@@ -49,17 +53,18 @@ import { TaskPreview } from '../tasks/TaskPreview';
 import { useWorkSeen, WorkContextDetails } from '../tasks/WorkContext';
 import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
-import { useWorkspaceActions } from '../tasks/WorkTools';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Tooltip } from '../ui/Tooltip';
+import { isPopOutPane, PopOutButton, useWorkspaceActions } from '../tasks/WorkTools';
 import { ChatOptions } from './ChatOptions';
+import { ReadAloudButton } from './ReadAloudButton';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
 import { SessionTopics } from './SessionTopics';
 import { TranscriptResult } from './TranscriptResult';
+import { WindowGlob } from './WindowGlob';
 import './live-session.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
 
 const TaskTerminal = lazy(() =>
   import('../tasks/TaskTerminal').then((module) => ({ default: module.TaskTerminal })),
@@ -175,8 +180,7 @@ export function LiveSessionView({
         },
       }));
     });
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { run: act, busy, error, setError } = useAction(() => refresh());
   const [review, setReview] = useState<SessionReview | null>(null);
   const reviewAttempt = useRef('');
   const transcript = useRef<HTMLDivElement>(null);
@@ -187,18 +191,6 @@ export function LiveSessionView({
   const tooled = !detached && !simple;
   useWorkSeen(tooled ? latest : undefined);
   const workspace = useWorkspaceActions(tooled ? latest : undefined);
-  const act = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-      await refresh();
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
   useEffect(() => {
     const node = transcript.current;
     if (collapsed || !node) return;
@@ -221,11 +213,14 @@ export function LiveSessionView({
       setReview(null);
     }
   }, [latest?.id, latest?.status, session.paused]);
-  const windowAction = (action: 'minimize' | 'close') =>
-    act(async () => {
+  const windowAction = async (action: 'minimize' | 'close') => {
+    try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow()[action]();
-    });
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+  };
   const changeStats = useChangeStats([latest]);
   const latestChanges = latest ? changeStats[latest.id]?.value : undefined;
   // Review holds queued messages so the diff stays put; leaving Review lets them run again
@@ -269,7 +264,7 @@ export function LiveSessionView({
     void act(async () => {
       if (!active) return;
       await sessionCommand('action', { id: session.id, action: 'pause' });
-      await nativeTask('task_stop', { id: active.id });
+      await stopTask(active.id);
     });
   const retryable = !active && !!session.batches.at(-1)?.error;
   const tools = (
@@ -280,6 +275,7 @@ export function LiveSessionView({
             detached
               ? []
               : [
+                  ...(workspace.editor ? [workspace.editor] : []),
                   ...(integrated
                     ? []
                     : [{ id: 'pause', label: pauseLabel, onSelect: togglePause, disabled: busy }]),
@@ -299,6 +295,26 @@ export function LiveSessionView({
                         },
                       ]
                     : []),
+                  ...(session.messages.length
+                    ? [
+                        {
+                          id: 'copy-conversation',
+                          label: 'Copy conversation as Markdown',
+                          onSelect: () =>
+                            void act(() =>
+                              navigator.clipboard.writeText(
+                                sessionMarkdown(
+                                  session,
+                                  runs,
+                                  latest?.agent && latest.agent !== 'auto'
+                                    ? latest.agent
+                                    : 'Jackalope',
+                                ),
+                              ),
+                            ),
+                        },
+                      ]
+                    : []),
                   ...(simple
                     ? []
                     : [
@@ -313,8 +329,8 @@ export function LiveSessionView({
                 ]
           }
           submenus={
-            workspace.groups.length
-              ? [{ id: 'workspace', label: 'Workspace', groups: workspace.groups }]
+            workspace.more.length
+              ? [{ id: 'open-in', label: 'Open in…', groups: [workspace.more] }]
               : []
           }
           items={[
@@ -443,13 +459,20 @@ export function LiveSessionView({
             <ArrowLeft size={18} />
           </Button>
         )}
-        <span className="live-mascot" aria-hidden="true" ref={mascotRef}>
+        <WindowGlob
+          conversation={session.id}
+          provider={provider}
+          agent="Jackalope"
+          disabled={session.closed}
+          mascotRef={mascotRef}
+          onAttached={append}
+        >
           <AgentCharacter
             provider={provider}
             state={questions.length ? 'waiting' : active ? 'working' : 'idle'}
             gaze={mascotGaze}
           />
-        </span>
+        </WindowGlob>
         <div className="live-title" data-tauri-drag-region={detached || undefined}>
           <h1 data-tauri-drag-region={detached || undefined}>{session.title}</h1>
           <span className="live-muted" data-tauri-drag-region={detached || undefined}>
@@ -600,6 +623,10 @@ export function LiveSessionView({
                   ]),
             ]}
           />
+          {/* A conversation pops out its review, preview and terminal; the transcript stays. */}
+          {workspace.popOut && tab !== 'conversation' && isPopOutPane(tab) && (
+            <PopOutButton pane={tab} onPopOut={workspace.popOut} />
+          )}
         </div>
       )}
       <div className="live-columns">
@@ -709,6 +736,7 @@ export function LiveSessionView({
                                 text={run.result}
                                 label="Copy reply"
                               />
+                              <ReadAloudButton className="live-copy" text={run.result} />
                             </div>
                           )}
                         </div>
@@ -768,7 +796,7 @@ export function LiveSessionView({
                       try {
                         nextChat(deliveryHandoff(latest, true, 'the next change'));
                       } catch (cause) {
-                        setError(String(cause));
+                        setError(describeError(cause));
                       }
                     }}
                   >
@@ -776,6 +804,7 @@ export function LiveSessionView({
                   </Button>
                 </div>
               )}
+              {latest && <DesktopPermissionNotice key={latest.id} run={latest} />}
               {questions.map((prompt) => (
                 <AgentQuestion
                   key={prompt.id}
@@ -861,6 +890,7 @@ export function LiveSessionView({
                         run={latest}
                         integrated={integrated}
                         onHandoff={integrated ? nextChat : append}
+                        onFollowUp={session.closed ? undefined : append}
                       />
                       <TaskLearning run={latest} allowSave />
                     </>

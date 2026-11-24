@@ -16,6 +16,15 @@ fn repository(directory: &str) -> Result<PathBuf, String> {
     Ok(directory)
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::cli_terminal::cli_terminal_open,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Opens the user's terminal running `jackalope` in `directory`.
 #[tauri::command]
 pub fn cli_terminal_open(directory: String) -> Result<(), String> {
@@ -142,8 +151,6 @@ fn open_system_terminal(
     command: &Path,
     arguments: &[String],
 ) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let started = if super::platform::find_on_path("wt.exe").is_some() {
         std::process::Command::new("wt.exe")
             .arg("-d")
@@ -152,12 +159,11 @@ fn open_system_terminal(
             .args(arguments)
             .spawn()
     } else {
-        std::process::Command::new("cmd.exe")
+        super::process_control::hidden(&mut std::process::Command::new("cmd.exe"))
             .args(["/C", "start", "Jackalope", "/D"])
             .arg(directory)
             .arg(command)
             .args(arguments)
-            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
     };
     started

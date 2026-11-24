@@ -1,6 +1,6 @@
-import { Input, SegmentedControl } from '@jackalope/ui';
+import { Button, InlineNotice, Input, SegmentedControl } from '@jackalope/ui';
 import { ArrowRight, Cloud, FolderOpen, FolderPlus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   type ArtifactsStatus,
   artifactsStatus,
@@ -8,12 +8,10 @@ import {
   suggestRepoName,
   validRepoName,
 } from '../../lib/cloudflare-artifacts';
+import { invokeNative } from '../../lib/native/transport';
 import { createProject, openProject } from '../../lib/project-setup';
-import { nativeTask } from '../../lib/task-runtime';
 import type { Project } from '../../stores/projectStore';
 import { ArtifactsConnectForm } from '../settings/ArtifactsConnection';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { ProjectPreview } from './ProjectPreview';
 
 /** Open an existing repository, or create a new project folder locally or backed by Cloudflare Artifacts. */
@@ -24,6 +22,7 @@ export function OnboardingProjectStep({
   busy,
   attempt,
   clearError,
+  errorNotice,
   onOpened,
 }: {
   initialPath: string;
@@ -32,6 +31,8 @@ export function OnboardingProjectStep({
   busy: boolean;
   attempt: (action: () => Promise<void>) => Promise<void>;
   clearError: () => void;
+  /** The flow's error, placed above the actions so the sticky footer never covers it. */
+  errorNotice: ReactNode;
   /** Called with the provisional project; `created` is true for a new folder. */
   onOpened: (project: Project, created: boolean) => Promise<void>;
 }) {
@@ -54,7 +55,7 @@ export function OnboardingProjectStep({
   }, [desktop, projectMode]);
   useEffect(() => {
     if (!desktop || !creating) return;
-    void nativeTask<string>('task_project_directory')
+    void invokeNative<string>('task_project_directory')
       .then((directory) => {
         setDefaultDirectory(directory);
         setDirectoryError('');
@@ -149,6 +150,7 @@ export function OnboardingProjectStep({
           />
         </section>
       )}
+      {needsConnection && errorNotice}
       <form
         hidden={needsConnection}
         onSubmit={(event) => {
@@ -226,7 +228,7 @@ export function OnboardingProjectStep({
                 disabled={!desktop || busy}
                 onClick={() =>
                   void attempt(async () => {
-                    const selected = await nativeTask<string | null>('task_pick_project');
+                    const selected = await invokeNative<string | null>('task_pick_project');
                     if (selected) {
                       setParentPath(selected);
                       setDirectoryError('');
@@ -267,7 +269,7 @@ export function OnboardingProjectStep({
                 disabled={!desktop || busy}
                 onClick={() =>
                   void attempt(async () => {
-                    const selected = await nativeTask<string | null>('task_pick_project');
+                    const selected = await invokeNative<string | null>('task_pick_project');
                     if (selected) setPath(selected);
                   })
                 }
@@ -279,6 +281,7 @@ export function OnboardingProjectStep({
             <ProjectPreview path={path} />
           </>
         )}
+        {!needsConnection && errorNotice}
         <div className="onboarding-actions">
           <Button
             type="submit"

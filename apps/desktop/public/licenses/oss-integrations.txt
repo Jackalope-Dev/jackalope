@@ -13,9 +13,17 @@ notify-debouncer-mini 0.7.0: MIT OR Apache-2.0; MIT selected here.
 See notify-debouncer-mini.txt.
 gix 0.87.1: MIT OR Apache-2.0; MIT selected here. See gix.txt.
 
+Copy-on-write cloning of installed dependency folders into new task worktrees
+adapts code from oh-my-pi (crates/iso): MIT. See oh-my-pi.txt.
+Upstream: https://github.com/can1357/oh-my-pi
+
 Product marks in agent pickers adapt SVG paths from @lobehub/icons 5.22.0: MIT.
 See lobehub-icons.txt. Each mark is a trademark of its owner and identifies
 that product only; no endorsement is implied.
+
+Compaction of passing test and build output adapts runner recognition from
+oh-my-pi (crates/shell minimizer filters): MIT. See oh-my-pi.txt.
+Upstream: https://github.com/can1357/oh-my-pi
 
 The separately bundled agent-browser executable includes axe-core 4.12.1.
 Its MPL-2.0 license and corresponding-source notice accompany that executable.

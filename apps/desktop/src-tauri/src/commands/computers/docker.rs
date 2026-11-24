@@ -1,14 +1,16 @@
 //! The `local-docker` provider: one container per computer from the image in
-//! `resources/computer`, built locally on first use. Containers run as an
-//! unprivileged user with no capabilities, `no-new-privileges`, CPU, memory and
-//! process limits, no host mounts unless a task shares its project read-only,
-//! and a named volume for the home folder. The viewer and browser ports are
+//! `resources/computer`, pulled from its published build (see [`super::image`])
+//! or built locally on first use. Containers run as an unprivileged user with
+//! no capabilities, `no-new-privileges`, CPU, memory and process limits, no
+//! host mounts unless a task shares its project read-only, and a named volume
+//! for the home folder. The viewer and browser ports are
 //! published on the host's loopback interface only; with networking off the
 //! container has no network at all. The agent is reached with `docker exec`,
 //! so it needs no port or secret.
 
-use super::{Computer, MachineState, Provider, Transport};
+use super::{AgentError, Computer, MachineState, Provider, Transport};
 use crate::commands::desktop_control::helper::{Helper, Launch, Launcher};
+use crate::commands::platform::poll_until;
 use crate::commands::process_control::{self, Limits};
 use serde::Serialize;
 use serde_json::Value;
@@ -22,17 +24,13 @@ use std::{
 
 pub(crate) const LABEL: &str = "dev.jackalope.computer";
 const CONFIG_LABEL: &str = "dev.jackalope.computer.config";
-const IMAGE_FILES: &[&str] = &["Dockerfile", "start.sh", "agent.py"];
+pub(crate) const IMAGE_FILES: &[&str] = &["Dockerfile", "start.sh", "agent.py", "protocol.json"];
 const QUICK: Duration = Duration::from_secs(20);
 
 fn docker(args: &[&str]) -> Command {
     let mut command = Command::new("docker");
     command.args(args);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
+    crate::commands::process_control::hidden(&mut command);
     command
 }
 
@@ -208,10 +206,7 @@ pub(crate) fn image_tag(directory: &Path) -> Result<String, String> {
         digest.update((bytes.len() as u64).to_le_bytes());
         digest.update(&bytes);
     }
-    let hex: String = digest.finalize()[..6]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let hex = super::artifacts::hex(&digest.finalize()[..6]);
     Ok(format!("jackalope-computer:{hex}"))
 }
 
@@ -239,10 +234,7 @@ pub(crate) fn config_digest(computer: &Computer, image: &str) -> String {
     })
     .unwrap_or_default();
     let digest = Sha256::digest(format!("{image}\n{settings}").as_bytes());
-    digest[..8]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    super::artifacts::hex(&digest[..8])
 }
 
 /// `docker create` arguments. The viewer password comes from the CLI's
@@ -330,20 +322,46 @@ fn inspect(computer: &Computer) -> Result<Option<(String, String)>, String> {
     }
 }
 
-/// Builds the image unless it already exists, reporting build output lines.
+/// Pulls the published image for this version and definition and tags it as
+/// `tag`. Fails when it is not published, cannot be reached, or has no build
+/// for this machine's architecture (it is published for amd64 only).
+fn pull_published(
+    id: &str,
+    directory: &Path,
+    tag: &str,
+    progress: &dyn Fn(&str),
+) -> Result<(), String> {
+    let published = super::image::published(directory)?;
+    progress("Downloading the computer image");
+    let output = supervised(
+        id,
+        &["pull", &published],
+        Limits::supervised(Duration::from_secs(30 * 60), Duration::from_secs(5 * 60)),
+        progress,
+    )?;
+    if !output.success {
+        return Err(clean(&output.stderr));
+    }
+    run(&["tag", &published, tag], QUICK)?;
+    Ok(())
+}
+
+/// Uses the published image or builds it unless it already exists,
+/// reporting Docker's output lines.
 fn ensure_image(id: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
     let directory = super::image_directory()?;
     let tag = image_tag(&directory)?;
     if run(&["image", "inspect", "--format", "{{.Id}}", &tag], QUICK).is_ok() {
         return Ok(tag);
     }
+    if pull_published(id, &directory, &tag, progress).is_ok() {
+        return Ok(tag);
+    }
     progress("Building the computer image (first use takes a few minutes)");
     let context = directory.to_string_lossy().into_owned();
-    let latest: Arc<Mutex<String>> = Arc::default();
-    let seen = latest.clone();
-    let id = id.to_string();
-    let output = process_control::run_supervised(
-        docker(&[
+    let output = supervised(
+        id,
+        &[
             "build",
             "--progress",
             "plain",
@@ -352,8 +370,33 @@ fn ensure_image(id: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
             "--tag",
             &tag,
             &context,
-        ]),
+        ],
         Limits::supervised(Duration::from_secs(45 * 60), Duration::from_secs(10 * 60)),
+        progress,
+    )?;
+    if !output.success {
+        return Err(format!(
+            "The computer image did not build: {}",
+            clean(&output.stderr)
+        ));
+    }
+    Ok(tag)
+}
+
+/// Runs a long Docker command, showing its latest output line as the
+/// computer's phase and reporting the last one when it ends.
+fn supervised(
+    id: &str,
+    args: &[&str],
+    limits: Limits,
+    progress: &dyn Fn(&str),
+) -> Result<process_control::CommandResult, String> {
+    let latest: Arc<Mutex<String>> = Arc::default();
+    let seen = latest.clone();
+    let id = id.to_string();
+    let output = process_control::run_supervised(
+        docker(args),
+        limits,
         || false,
         move |bytes, _| {
             if let Some(line) = String::from_utf8_lossy(bytes)
@@ -373,14 +416,7 @@ fn ensure_image(id: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
     if !line.is_empty() {
         progress(&line);
     }
-    let output = output?;
-    if !output.success {
-        return Err(format!(
-            "The computer image did not build: {}",
-            clean(&output.stderr)
-        ));
-    }
-    Ok(tag)
+    output
 }
 
 /// Detection reused for a few seconds, so status polling does not run Docker
@@ -465,22 +501,24 @@ impl Provider for LocalDocker {
         progress("Starting the desktop");
         run(&["start", &name], Duration::from_secs(60))?;
         let mut transport = self.transport(root, computer)?;
-        let deadline = Instant::now() + Duration::from_secs(90);
-        loop {
-            match transport.call(
+        let mut last = String::new();
+        let answered = poll_until(
+            Instant::now() + Duration::from_secs(90),
+            Duration::from_secs(1),
+            || match transport.call(
                 &serde_json::json!({"action":"list"}),
                 Duration::from_secs(20),
                 &AtomicBool::new(false),
             ) {
-                Ok(_) => return Ok(()),
-                Err(error) if Instant::now() >= deadline => {
-                    return Err(format!(
-                        "The computer started but its desktop did not answer: {error}"
-                    ))
+                Ok(_) => Ok::<_, String>(Some(())),
+                Err(error) => {
+                    last = error.message;
+                    Ok(None)
                 }
-                Err(_) => std::thread::sleep(Duration::from_secs(1)),
-            }
-        }
+            },
+        )?;
+        answered
+            .ok_or_else(|| format!("The computer started but its desktop did not answer: {last}"))
     }
 
     fn stop(&self, _: &Path, computer: &Computer) -> Result<(), String> {
@@ -562,15 +600,15 @@ pub(crate) fn stop_detached(names: &[String]) {
         .stderr(std::process::Stdio::null());
     #[cfg(windows)]
     {
+        use crate::commands::process_control::CREATE_NO_WINDOW;
         use std::os::windows::process::CommandExt;
-        // CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, so a job that closes
-        // with the app does not end the stop; retried without breakaway when
-        // the job forbids it.
-        command.creation_flags(0x08000000 | 0x01000000);
+        // CREATE_BREAKAWAY_FROM_JOB, so a job that closes with the app does not
+        // end the stop; retried without breakaway when the job forbids it.
+        command.creation_flags(CREATE_NO_WINDOW | 0x0100_0000);
         if command.spawn().is_ok() {
             return;
         }
-        command.creation_flags(0x08000000);
+        command.creation_flags(CREATE_NO_WINDOW);
     }
     if let Err(error) = command.spawn() {
         eprintln!("Bot computers could not be stopped on quit: {error}");
@@ -596,10 +634,13 @@ impl Transport for Resident {
         payload: &Value,
         timeout: Duration,
         canceled: &AtomicBool,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, AgentError> {
         self.0
             .call(payload, timeout, canceled)
-            .map_err(String::from)
+            .map_err(|error| AgentError {
+                code: error.code,
+                message: error.message,
+            })
     }
 
     fn shutdown(&mut self) {

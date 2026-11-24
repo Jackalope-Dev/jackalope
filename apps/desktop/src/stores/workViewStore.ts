@@ -9,6 +9,10 @@ export interface WorkView {
 export const defaultWorkView: WorkView = { filter: 'all', layout: 'list', query: '' };
 interface WorkViewState {
   scope: 'all' | 'project';
+  /** The Inbox page is open in place of the all-projects work list; picking a scope closes it. */
+  inbox: boolean;
+  openInbox: () => void;
+  closeInbox: () => void;
   views: Record<string, WorkView>;
   reading: Record<string, string>;
   split: Record<string, boolean>;
@@ -39,6 +43,9 @@ export const useWorkViewStore = create<WorkViewState>()(
   persist(
     (set) => ({
       scope: 'project',
+      inbox: false,
+      openInbox: () => set({ scope: 'all', inbox: true }),
+      closeInbox: () => set({ inbox: false }),
       views: {},
       reading: {},
       split: {},
@@ -79,9 +86,9 @@ export const useWorkViewStore = create<WorkViewState>()(
         })),
       request: null,
       listRequest: null,
-      openList: (filter) => set({ scope: 'all', listRequest: filter }),
+      openList: (filter) => set({ scope: 'all', inbox: false, listRequest: filter }),
       clearListRequest: () => set({ listRequest: null }),
-      setScope: (scope) => set({ scope }),
+      setScope: (scope) => set({ scope, inbox: false }),
       setView: (key, view) => set((state) => ({ views: { ...state.views, [key]: view } })),
       open: (id, section = 'result') =>
         set((state) => ({
@@ -90,8 +97,18 @@ export const useWorkViewStore = create<WorkViewState>()(
     }),
     {
       name: 'jackalope-work-views',
-      partialize: ({ scope, views, reading, split, navCollapsed, collapsedProjects, sizes }) => ({
+      partialize: ({
         scope,
+        inbox,
+        views,
+        reading,
+        split,
+        navCollapsed,
+        collapsedProjects,
+        sizes,
+      }) => ({
+        scope,
+        inbox,
         views,
         reading,
         split,

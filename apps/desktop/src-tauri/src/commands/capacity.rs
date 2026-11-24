@@ -6,15 +6,9 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::State;
-use tokio::{
-    io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader},
-    process::Command,
-    sync::Mutex,
-    time::timeout,
-};
+use tokio::{process::Command, sync::Mutex, time::timeout};
 
 pub(in crate::commands) mod antigravity;
-pub(crate) mod client;
 mod connected;
 pub(in crate::commands) mod kimi;
 mod routing_cache;
@@ -46,11 +40,7 @@ pub struct CapacityRecord {
 #[derive(Default)]
 struct Cache {
     checked: Option<Instant>,
-    codex: Option<CapacityRecord>,
-    claude: Option<CapacityRecord>,
-    grok: Option<CapacityRecord>,
-    kimi: Option<CapacityRecord>,
-    antigravity: Option<CapacityRecord>,
+    records: std::collections::HashMap<&'static str, CapacityRecord>,
 }
 
 #[derive(Default)]
@@ -61,15 +51,10 @@ fn unavailable(agent: &str, status: &str, detail: &str, account: Option<String>)
         agent: agent.into(),
         status: status.into(),
         account: account.unwrap_or_else(|| "Account identity not available for this agent".into()),
-        source: match agent {
-            "codex" => "Codex account/rateLimits/read",
-            "claude" => "Claude CLI get_usage (experimental)",
-            "grok" => "Grok CLI x.ai/billing",
-            "kimi" => "Kimi Code membership usages",
-            "antigravity" => "Antigravity CLI /usage",
-            _ => "No connected quota adapter",
-        }
-        .into(),
+        source: super::agents::find(agent)
+            .and_then(|agent| agent.quota_source.as_deref())
+            .unwrap_or("No connected quota adapter")
+            .into(),
         observed_at: None,
         detail: detail.into(),
         windows: vec![],
@@ -133,40 +118,6 @@ fn parse_codex(value: &Value) -> Result<CapacityRecord, String> {
     })
 }
 
-async fn response<R: AsyncRead + Unpin>(
-    reader: &mut BufReader<R>,
-    expected: u64,
-    bytes: &mut usize,
-) -> Result<Value, String> {
-    loop {
-        let mut line = vec![];
-        let size = (&mut *reader)
-            .take(262_145)
-            .read_until(b'\n', &mut line)
-            .await
-            .map_err(|_| "Could not read the Codex quota response".to_string())?;
-        *bytes += size;
-        if size > 262_144 || *bytes > 1_048_576 {
-            return Err("Codex quota output exceeded the response limit".into());
-        }
-        if size == 0 {
-            return Err("Codex closed before returning quota information".into());
-        }
-        let value: Value = serde_json::from_slice(&line)
-            .map_err(|_| "Codex returned an invalid quota response".to_string())?;
-        if value["id"].as_u64() != Some(expected) {
-            continue;
-        }
-        if value.get("error").is_some() {
-            return Err("Codex could not read subscription limits. Check its sign-in and network connection, then refresh.".into());
-        }
-        return value
-            .get("result")
-            .cloned()
-            .ok_or_else(|| "Codex returned no quota result".into());
-    }
-}
-
 #[cfg(test)]
 async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
     let binding = super::agent_profiles::bind_account(profiles_root, "codex", None)?;
@@ -176,32 +127,22 @@ async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, S
 async fn read_codex_bound(
     binding: &super::agent_profiles::AccountBinding,
 ) -> Result<CapacityRecord, String> {
-    let executable = super::tasks::executable("codex")?;
-    let mut command = Command::new(executable);
-    command
-        .args(["app-server", "--listen", "stdio://"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
-    #[cfg(windows)]
-    command.creation_flags(0x08000000);
-    let mut child = command
-        .spawn()
-        .map_err(|_| "Could not start Codex to read its quota".to_string())?;
+    let mut client =
+        super::cli_rpc::Client::spawn_bound(binding, &["app-server", "--listen", "stdio://"])?;
     let result = timeout(Duration::from_secs(15), async {
-        let mut input = child.stdin.take().ok_or("Codex quota input unavailable")?;
-        let mut output = BufReader::new(child.stdout.take().ok_or("Codex quota output unavailable")?);
-        let mut bytes = 0;
         let initialize = json!({"id":0,"method":"initialize","params":{"clientInfo":{"name":"jackalope","title":"Jackalope","version":"0.1.0"}}});
-        input.write_all(format!("{initialize}\n").as_bytes()).await.map_err(|_| "Could not initialize Codex quota reader")?;
-        response(&mut output, 0, &mut bytes).await?;
-        input.write_all(b"{\"method\":\"initialized\",\"params\":{}}\n{\"id\":1,\"method\":\"account/rateLimits/read\"}\n").await.map_err(|_| "Could not request Codex quota")?;
-        parse_codex(&response(&mut output, 1, &mut bytes).await?)
+        client.request(initialize).await?;
+        client.notify(json!({"method":"initialized","params":{}})).await?;
+        let limits = client
+            .request(json!({"id":1,"method":"account/rateLimits/read"}))
+            .await
+            .map_err(|failure| match failure.error {
+                super::cli_rpc::RpcError::Rejected => "Codex could not read subscription limits. Check its sign-in and network connection, then refresh.".to_string(),
+                _ => failure.message(),
+            })?;
+        parse_codex(&limits)
     }).await.unwrap_or_else(|_| Err("Codex quota refresh timed out after 15 seconds. Check its sign-in and network connection.".into()));
-    let _ = child.start_kill();
-    let _ = timeout(Duration::from_secs(2), child.wait()).await;
+    client.close().await;
     result
 }
 
@@ -221,16 +162,39 @@ pub(in crate::commands) async fn routing_snapshot(
     current_snapshot(record, Utc::now().timestamp())
 }
 
+/// The agents whose account quota Jackalope can read.
+#[derive(Clone, Copy)]
+enum QuotaReader {
+    Codex,
+    Claude,
+    Grok,
+    Kimi,
+    Antigravity,
+}
+
+impl QuotaReader {
+    fn of(adapter: &str) -> Option<Self> {
+        Some(match adapter {
+            "codex" => Self::Codex,
+            "claude" => Self::Claude,
+            "grok" => Self::Grok,
+            "kimi" => Self::Kimi,
+            "antigravity" => Self::Antigravity,
+            _ => return None,
+        })
+    }
+}
+
 async fn refresh_routing_snapshot(
     binding: &super::agent_profiles::AccountBinding,
 ) -> CapacityRecord {
-    let result = match binding.adapter.as_str() {
-        "codex" => read_codex_bound(binding).await,
-        "claude" => connected::read_claude_bound(binding).await,
-        "grok" => connected::read_grok_bound(binding).await,
-        "kimi" => kimi::read_bound(binding).await,
-        "antigravity" => antigravity::read_bound(binding).await,
-        _ => {
+    let result = match QuotaReader::of(&binding.adapter) {
+        Some(QuotaReader::Codex) => read_codex_bound(binding).await,
+        Some(QuotaReader::Claude) => connected::read_claude_bound(binding).await,
+        Some(QuotaReader::Grok) => connected::read_grok_bound(binding).await,
+        Some(QuotaReader::Kimi) => kimi::read_bound(binding).await,
+        Some(QuotaReader::Antigravity) => antigravity::read_bound(binding).await,
+        None => {
             return unavailable(
                 &binding.adapter,
                 "unsupported",
@@ -295,26 +259,27 @@ pub(in crate::commands) async fn routing_snapshots(
         .collect()
 }
 
-fn failed_refresh(previous: Option<&CapacityRecord>, message: &str) -> CapacityRecord {
-    if let Some(previous) = previous {
-        let mut record = previous.clone();
-        record.status = "stale".into();
-        record.detail = format!("{message} Values below are the last successful snapshot.");
-        record
-    } else {
-        unavailable("codex", "unavailable", message, None)
-    }
+/// Agents whose account quota Jackalope reads, in display order.
+fn quota_agents() -> impl Iterator<Item = &'static str> {
+    super::agents::all()
+        .iter()
+        .filter(|agent| agent.capabilities.capacity)
+        .map(|agent| agent.id.as_str())
 }
 
+/// `agent`'s record after a refresh that returned `result`. A failed refresh
+/// keeps the previous snapshot, marked stale, unless `installed` finds the
+/// agent was removed.
 fn connected_refresh(
     agent: &str,
     previous: Option<&CapacityRecord>,
     result: Result<CapacityRecord, String>,
+    installed: impl FnOnce() -> bool,
 ) -> CapacityRecord {
     match result {
         Ok(record) => record,
         Err(message) => {
-            if super::tasks::executable(agent).is_err() {
+            if !installed() {
                 return unavailable(agent, "notInstalled", &message, None);
             }
             if let Some(previous) = previous.filter(|r| r.observed_at.is_some()) {
@@ -346,6 +311,15 @@ fn current_snapshot(mut record: CapacityRecord, now: i64) -> CapacityRecord {
     record
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::capacity::capacity_snapshot,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn capacity_snapshot(
     service: State<'_, CapacityService>,
@@ -358,47 +332,30 @@ pub async fn capacity_snapshot(
         || (refresh.unwrap_or(false) && age.is_some_and(|age| age >= Duration::from_secs(60)));
     if should_refresh {
         let profiles_root = runtime.profiles_root();
-        let (codex, claude, grok, kimi, antigravity) = tokio::join!(
-            account_snapshot(&profiles_root, "codex"),
-            account_snapshot(&profiles_root, "claude"),
-            account_snapshot(&profiles_root, "grok"),
-            account_snapshot(&profiles_root, "kimi"),
-            account_snapshot(&profiles_root, "antigravity")
-        );
-        cache.codex = Some(match codex {
-            Ok(record) => record,
-            Err(error) => failed_refresh(
-                cache.codex.as_ref().filter(|r| r.observed_at.is_some()),
-                &error,
-            ),
-        });
-        cache.claude = Some(connected_refresh("claude", cache.claude.as_ref(), claude));
-        cache.grok = Some(connected_refresh("grok", cache.grok.as_ref(), grok));
-        cache.kimi = Some(connected_refresh("kimi", cache.kimi.as_ref(), kimi));
-        cache.antigravity = Some(connected_refresh(
-            "antigravity",
-            cache.antigravity.as_ref(),
-            antigravity,
-        ));
+        let mut reads = tokio::task::JoinSet::new();
+        for agent in quota_agents() {
+            let root = profiles_root.clone();
+            reads.spawn(async move { (agent, account_snapshot(&root, agent).await) });
+        }
+        while let Some(read) = reads.join_next().await {
+            let (agent, result) = read.map_err(|error| error.to_string())?;
+            let record = connected_refresh(agent, cache.records.get(agent), result, || {
+                super::tasks::executable(agent).is_ok()
+            });
+            cache.records.insert(agent, record);
+        }
         cache.checked = Some(Instant::now());
     }
-    let mut records: Vec<_> = [
-        ("codex", &cache.codex),
-        ("claude", &cache.claude),
-        ("grok", &cache.grok),
-        ("kimi", &cache.kimi),
-        ("antigravity", &cache.antigravity),
-    ]
-    .into_iter()
-    .map(|(agent, record)| {
-        current_snapshot(
-            record.clone().unwrap_or_else(|| {
-                unavailable(agent, "unavailable", "No quota snapshot yet", None)
-            }),
-            Utc::now().timestamp(),
-        )
-    })
-    .collect();
+    let mut records: Vec<_> = quota_agents()
+        .map(|agent| {
+            current_snapshot(
+                cache.records.get(agent).cloned().unwrap_or_else(|| {
+                    unavailable(agent, "unavailable", "No quota snapshot yet", None)
+                }),
+                Utc::now().timestamp(),
+            )
+        })
+        .collect();
     if let Some(record) = super::jev::capacity_record(&runtime) {
         records.push(record);
     }
@@ -408,6 +365,18 @@ pub async fn capacity_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_agent_with_capacity_has_a_quota_reader() {
+        for agent in super::super::agents::all() {
+            assert_eq!(
+                QuotaReader::of(&agent.id).is_some(),
+                agent.capabilities.capacity,
+                "{}",
+                agent.id
+            );
+        }
+    }
 
     #[test]
     fn a_confirmed_account_change_or_unsupported_plan_discards_old_windows() {
@@ -422,7 +391,7 @@ mod tests {
                 "No subscription data",
                 Some("new@example.com".into()),
             );
-            let result = connected_refresh("claude", Some(&previous), Ok(next));
+            let result = connected_refresh("claude", Some(&previous), Ok(next), || true);
             assert_eq!(result.account, "new@example.com");
             assert_eq!(result.status, status);
             assert!(result.windows.is_empty());
@@ -463,11 +432,17 @@ mod tests {
     #[test]
     fn refresh_error_keeps_original_observation_time_and_marks_stale() {
         let record = parse_codex(&json!({"rateLimits":{"primary":{"usedPercent":20}}})).unwrap();
-        let stale = failed_refresh(Some(&record), "Connection failed");
+        let failed = || Err("Connection failed".to_string());
+        let stale = connected_refresh("codex", Some(&record), failed(), || true);
         assert_eq!(stale.status, "stale");
         assert_eq!(stale.observed_at, record.observed_at);
         assert_eq!(stale.windows[0].remaining_percent, Some(80.0));
-        assert!(failed_refresh(None, "Offline").windows.is_empty());
+        let removed = connected_refresh("codex", Some(&record), failed(), || false);
+        assert_eq!(removed.status, "notInstalled");
+        assert!(removed.windows.is_empty());
+        let offline = connected_refresh("codex", None, failed(), || true);
+        assert_eq!(offline.status, "unavailable");
+        assert!(offline.windows.is_empty());
     }
 
     #[test]
@@ -482,22 +457,5 @@ mod tests {
             current_snapshot(record, Utc::now().timestamp()).status,
             "stale"
         );
-    }
-
-    #[tokio::test]
-    async fn protocol_bounds_and_error_payload_are_safe() {
-        let mut bytes = 0;
-        let mut reader =
-            BufReader::new(&b"{\"id\":1,\"error\":{\"message\":\"secret upstream data\"}}\n"[..]);
-        assert!(!response(&mut reader, 1, &mut bytes)
-            .await
-            .unwrap_err()
-            .contains("secret"));
-        let oversized = vec![b'x'; 262_145];
-        let mut reader = BufReader::new(oversized.as_slice());
-        assert!(response(&mut reader, 1, &mut 0)
-            .await
-            .unwrap_err()
-            .contains("limit"));
     }
 }

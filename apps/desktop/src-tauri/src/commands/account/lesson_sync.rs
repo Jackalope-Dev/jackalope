@@ -125,7 +125,7 @@ async fn call(
 async fn included_projects(runtime: &TaskRuntime) -> Result<(Vec<SyncProject>, usize), String> {
     let projects: Vec<(String, String)> = crate::commands::project_registry::list(runtime)
         .into_iter()
-        .filter(|project| project.settings().sync_lessons)
+        .filter(|project| project.settings.resolve().sync_lessons)
         .map(|project| (project.id, project.path))
         .collect();
     tauri::async_runtime::spawn_blocking(move || sync_projects(&projects))

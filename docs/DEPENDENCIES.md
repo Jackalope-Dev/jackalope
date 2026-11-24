@@ -13,21 +13,23 @@ Website screenshots and walkthroughs use explicit fictional sample data.
 See [licensing and redistribution](LICENSING.md) for project materials and trademarks.
 The desktop bundles agent-browser's native executable, Apache-2.0 license and
 embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
+The published bot computer image is not listed here: its Debian and npm packages
+keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.md#the-image).
 
 ## JavaScript packages
 
 | Package | Version | Declared license |
 | --- | --- | --- |
-| @biomejs/biome | 2.6.4 | MIT OR Apache-2.0 |
-| @biomejs/cli-win32-x64 | 2.6.4 | MIT OR Apache-2.0 |
+| @biomejs/biome | 2.6.5 | MIT OR Apache-2.0 |
+| @biomejs/cli-darwin-arm64 | 2.6.5 | MIT OR Apache-2.0 |
 | @cloudflare/kv-asset-handler | 0.5.0 | MIT OR Apache-2.0 |
 | @cloudflare/unenv-preset | 2.16.2 | MIT OR Apache-2.0 |
-| @cloudflare/vitest-plugin | 1.4.9 | MIT |
-| @cloudflare/workerd-windows-64 | 1.20261023.1 | Apache-2.0 |
+| @cloudflare/vitest-plugin | 1.5.0 | MIT |
+| @cloudflare/workerd-darwin-arm64 | 1.20261102.1 | Apache-2.0 |
 | @cspotcode/source-map-support | 0.8.1 | MIT |
-| @dagrejs/dagre | 3.1.1 | MIT |
-| @dagrejs/graphlib | 4.0.5 | MIT |
-| @esbuild/win32-x64 | 0.28.2 | MIT |
+| @dagrejs/dagre | 3.1.3 | MIT |
+| @dagrejs/graphlib | 4.0.6 | MIT |
+| @esbuild/darwin-arm64 | 0.28.2 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
@@ -36,16 +38,18 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @fontsource-variable/jetbrains-mono | 5.3.0 | OFL-1.1 |
 | @fontsource-variable/plus-jakarta-sans | 5.3.0 | OFL-1.1 |
 | @img/colour | 1.1.0 | MIT |
-| @img/sharp-win32-x64 | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
+| @img/sharp-darwin-arm64 | 0.35.5 | Apache-2.0 |
+| @img/sharp-libvips-darwin-arm64 | 1.3.4 | LGPL-3.0-or-later |
 | @jridgewell/gen-mapping | 0.3.13 | MIT |
 | @jridgewell/remapping | 2.3.5 | MIT |
 | @jridgewell/resolve-uri | 3.1.2 | MIT |
 | @jridgewell/sourcemap-codec | 1.6.0 | MIT |
 | @jridgewell/trace-mapping | 0.3.9, 0.3.31 | MIT |
-| @lopebase/adapter | 0.4.1 | MIT |
-| @oxc-parser/binding-win32-x64-msvc | 0.153.0 | MIT |
-| @oxc-project/types | 0.153.0, 0.155.0 | MIT |
-| @oxc-resolver/binding-win32-x64-msvc | 11.24.2 | MIT |
+| @lopebase/adapter | 0.4.2 | MIT |
+| @opentelemetry/api | 1.10.0 | Apache-2.0 |
+| @oxc-parser/binding-darwin-arm64 | 0.155.0 | MIT |
+| @oxc-project/types | 0.155.0, 0.156.0 | MIT |
+| @oxc-resolver/binding-darwin-arm64 | 11.24.2 | MIT |
 | @pierre/diffs | 1.4.1 | apache-2.0 |
 | @pierre/theme | 2.0.0 | apache-2.0 |
 | @pierre/theming | 1.0.1 | apache-2.0 |
@@ -53,106 +57,100 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @poppinss/dumper | 0.6.5 | MIT |
 | @poppinss/exception | 1.2.3 | MIT |
 | @radix-ui/number | 1.1.3 | MIT |
-| @radix-ui/primitive | 1.1.7 | MIT |
-| @radix-ui/react-arrow | 1.1.15 | MIT |
-| @radix-ui/react-collection | 1.1.15 | MIT |
+| @radix-ui/primitive | 1.2.0 | MIT |
+| @radix-ui/react-arrow | 1.1.17 | MIT |
+| @radix-ui/react-collection | 1.2.0 | MIT |
 | @radix-ui/react-compose-refs | 1.1.5 | MIT |
-| @radix-ui/react-context | 1.2.2 | MIT |
-| @radix-ui/react-context-menu | 2.3.7 | MIT |
-| @radix-ui/react-dialog | 1.1.23 | MIT |
-| @radix-ui/react-direction | 1.1.4 | MIT |
-| @radix-ui/react-dismissable-layer | 1.1.19 | MIT |
-| @radix-ui/react-dropdown-menu | 2.1.24 | MIT |
-| @radix-ui/react-focus-guards | 1.1.6 | MIT |
-| @radix-ui/react-focus-scope | 1.1.16 | MIT |
+| @radix-ui/react-context | 1.3.0 | MIT |
+| @radix-ui/react-context-menu | 2.4.1 | MIT |
+| @radix-ui/react-dialog | 1.3.1 | MIT |
+| @radix-ui/react-direction | 1.2.0 | MIT |
+| @radix-ui/react-dismissable-layer | 1.2.1 | MIT |
+| @radix-ui/react-dropdown-menu | 2.2.1 | MIT |
+| @radix-ui/react-focus-guards | 1.2.0 | MIT |
+| @radix-ui/react-focus-scope | 1.3.1 | MIT |
 | @radix-ui/react-id | 1.1.4 | MIT |
-| @radix-ui/react-menu | 2.1.24 | MIT |
-| @radix-ui/react-popover | 1.1.23 | MIT |
-| @radix-ui/react-popper | 1.3.7 | MIT |
-| @radix-ui/react-portal | 1.1.17 | MIT |
-| @radix-ui/react-presence | 1.1.10 | MIT |
-| @radix-ui/react-primitive | 2.1.10 | MIT |
-| @radix-ui/react-roving-focus | 1.1.19 | MIT |
-| @radix-ui/react-select | 2.3.7 | MIT |
-| @radix-ui/react-slot | 1.3.3 | MIT |
-| @radix-ui/react-tabs | 1.1.21 | MIT |
-| @radix-ui/react-tooltip | 1.2.16 | MIT |
-| @radix-ui/react-use-callback-ref | 1.1.4 | MIT |
-| @radix-ui/react-use-controllable-state | 1.2.6 | MIT |
+| @radix-ui/react-menu | 2.2.1 | MIT |
+| @radix-ui/react-popover | 1.3.1 | MIT |
+| @radix-ui/react-popper | 1.4.0 | MIT |
+| @radix-ui/react-portal | 1.2.0 | MIT |
+| @radix-ui/react-presence | 1.1.11 | MIT |
+| @radix-ui/react-primitive | 2.2.0 | MIT |
+| @radix-ui/react-roving-focus | 1.2.1 | MIT |
+| @radix-ui/react-select | 2.4.1 | MIT |
+| @radix-ui/react-slot | 1.5.0 | MIT |
+| @radix-ui/react-tabs | 1.2.1 | MIT |
+| @radix-ui/react-tooltip | 1.4.1 | MIT |
+| @radix-ui/react-use-callback-ref | 1.1.5 | MIT |
+| @radix-ui/react-use-controllable-state | 1.3.0 | MIT |
 | @radix-ui/react-use-effect-event | 0.0.5 | MIT |
 | @radix-ui/react-use-is-hydrated | 0.1.3 | MIT |
 | @radix-ui/react-use-layout-effect | 1.1.4 | MIT |
-| @radix-ui/react-use-previous | 1.1.4 | MIT |
 | @radix-ui/react-use-rect | 1.1.4 | MIT |
-| @radix-ui/react-use-size | 1.1.4 | MIT |
-| @radix-ui/react-visually-hidden | 1.2.11 | MIT |
+| @radix-ui/react-use-size | 1.1.5 | MIT |
+| @radix-ui/react-visually-hidden | 1.2.13 | MIT |
 | @radix-ui/rect | 1.1.3 | MIT |
 | @resvg/resvg-js | 2.6.2 | MPL-2.0 |
-| @resvg/resvg-js-win32-x64-msvc | 2.6.2 | MPL-2.0 |
-| @rolldown/binding-win32-x64-msvc | 1.2.15 | MIT |
+| @resvg/resvg-js-darwin-arm64 | 2.6.2 | MPL-2.0 |
+| @rolldown/binding-darwin-arm64 | 1.2.16 | MIT |
 | @rolldown/pluginutils | 1.0.1 | MIT |
-| @shikijs/core | 4.5.0 | MIT |
-| @shikijs/engine-javascript | 4.5.0 | MIT |
-| @shikijs/engine-oniguruma | 4.5.0 | MIT |
-| @shikijs/langs | 4.5.0 | MIT |
-| @shikijs/primitive | 4.5.0 | MIT |
-| @shikijs/themes | 4.5.0 | MIT |
-| @shikijs/transformers | 4.5.0 | MIT |
-| @shikijs/types | 4.5.0 | MIT |
-| @shikijs/vscode-textmate | 10.0.2 | MIT |
+| @shikijs/core | 4.6.0 | MIT |
+| @shikijs/engine-javascript | 4.6.0 | MIT |
+| @shikijs/engine-oniguruma | 4.6.0 | MIT |
+| @shikijs/langs | 4.6.0 | MIT |
+| @shikijs/primitive | 4.6.0 | MIT |
+| @shikijs/themes | 4.6.0 | MIT |
+| @shikijs/transformers | 4.6.0 | MIT |
+| @shikijs/types | 4.6.0 | MIT |
+| @shikijs/vscode-textmate | 10.1.0 | MIT |
 | @sindresorhus/is | 7.2.0 | MIT |
 | @speed-highlight/core | 1.2.24 | CC0-1.0 |
-| @standard-schema/spec | 1.1.0 | MIT |
 | @streamdown/code | 1.1.1 | Apache-2.0 |
-| @tailwindcss/node | 4.3.3 | MIT |
-| @tailwindcss/oxide | 4.3.3 | MIT |
-| @tailwindcss/oxide-win32-x64-msvc | 4.3.3 | MIT |
-| @tailwindcss/vite | 4.3.3 | MIT |
+| @tailwindcss/node | 4.3.4 | MIT |
+| @tailwindcss/oxide | 4.3.4 | MIT |
+| @tailwindcss/oxide-darwin-arm64 | 4.3.4 | MIT |
+| @tailwindcss/oxide-wasm32-wasi | 4.3.4 | MIT |
+| @tailwindcss/vite | 4.3.4 | MIT |
 | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT |
 | @tauri-apps/cli | 2.12.4 | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-x64-msvc | 2.12.4 | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-arm64 | 2.12.4 | Apache-2.0 OR MIT |
 | @tauri-apps/plugin-barcode-scanner | 2.5.3 | MIT OR Apache-2.0 |
 | @tauri-apps/plugin-opener | 2.7.2 | MIT OR Apache-2.0 |
 | @types/chai | 5.2.3 | MIT |
 | @types/d3-color | 3.1.3 | MIT |
 | @types/d3-drag | 3.0.7 | MIT |
 | @types/d3-interpolate | 3.0.4 | MIT |
-| @types/d3-selection | 3.0.11 | MIT |
+| @types/d3-selection | 3.0.12 | MIT |
 | @types/d3-transition | 3.0.9 | MIT |
-| @types/d3-zoom | 3.0.8 | MIT |
+| @types/d3-zoom | 3.0.9 | MIT |
 | @types/debug | 4.1.13 | MIT |
 | @types/deep-eql | 4.0.2 | MIT |
-| @types/estree | 1.0.9 | MIT |
+| @types/estree | 1.0.9, 1.0.10 | MIT |
 | @types/estree-jsx | 1.0.5 | MIT |
 | @types/hast | 3.0.5 | MIT |
 | @types/mdast | 4.0.4 | MIT |
 | @types/ms | 2.1.0 | MIT |
-| @types/node | 26.6.3 | MIT |
+| @types/node | 26.6.6 | MIT |
 | @types/react | 19.3.0 | MIT |
 | @types/react-dom | 19.3.0 | MIT |
 | @types/unist | 2.0.11, 3.0.3 | MIT |
-| @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 |
+| @typescript/typescript-darwin-arm64 | 7.0.2 | Apache-2.0 |
 | @ungap/structured-clone | 1.4.0 | ISC |
-| @vitejs/plugin-react | 6.1.1 | MIT |
-| @vitest/expect | 4.1.12 | MIT |
-| @vitest/mocker | 4.1.12 | MIT |
-| @vitest/pretty-format | 4.1.12 | MIT |
-| @vitest/runner | 4.1.12 | MIT |
-| @vitest/snapshot | 4.1.12 | MIT |
-| @vitest/spy | 4.1.12 | MIT |
-| @vitest/utils | 4.1.12 | MIT |
+| @vitejs/plugin-react | 6.2.1 | MIT |
+| @vitest/mocker | 5.1.0 | MIT |
+| @vitest/spy | 5.1.0 | MIT |
 | @xterm/addon-fit | 0.11.0 | MIT |
 | @xterm/addon-web-links | 0.12.0 | MIT |
 | @xterm/xterm | 6.0.0 | MIT |
-| @xyflow/react | 12.12.0 | MIT |
-| @xyflow/system | 0.0.83 | MIT |
-| agent-browser | 0.40.0 | Apache-2.0 |
+| @xyflow/react | 12.12.1 | MIT |
+| @xyflow/system | 0.0.84 | MIT |
+| agent-browser | 0.41.1 | Apache-2.0 |
 | aria-hidden | 1.2.6 | MIT |
 | assertion-error | 2.0.1 | MIT |
 | bail | 2.0.2 | MIT |
 | blake3-wasm | 2.1.5 | MIT |
 | ccount | 2.0.1 | MIT |
-| chai | 6.2.2 | MIT |
+| chai | 6.3.0 | MIT |
 | character-entities | 2.0.2 | MIT |
 | character-entities-html4 | 2.1.0 | MIT |
 | character-entities-legacy | 3.0.0 | MIT |
@@ -161,18 +159,17 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | classcat | 5.0.5 | MIT |
 | clsx | 2.1.1 | MIT |
 | comma-separated-tokens | 2.0.3 | MIT |
-| convert-source-map | 2.0.0 | MIT |
 | cookie | 1.1.1 | MIT |
 | csstype | 3.2.3 | MIT |
-| d3-color | 3.1.0 | ISC |
-| d3-dispatch | 3.0.1 | ISC |
-| d3-drag | 3.0.0 | ISC |
-| d3-ease | 3.0.1 | BSD-3-Clause |
-| d3-interpolate | 3.0.1 | ISC |
-| d3-selection | 3.0.0 | ISC |
-| d3-timer | 3.0.1 | ISC |
-| d3-transition | 3.0.1 | ISC |
-| d3-zoom | 3.0.0 | ISC |
+| d3-color | 3.1.1 | ISC |
+| d3-dispatch | 3.0.2 | ISC |
+| d3-drag | 3.0.1 | ISC |
+| d3-ease | 3.0.2 | BSD-3-Clause |
+| d3-interpolate | 3.0.2 | ISC |
+| d3-selection | 3.0.1 | ISC |
+| d3-timer | 3.0.2 | ISC |
+| d3-transition | 3.0.2 | ISC |
+| d3-zoom | 3.0.1 | ISC |
 | debug | 4.4.3 | MIT |
 | decode-named-character-reference | 1.3.0 | MIT |
 | dequal | 2.0.3 | MIT |
@@ -180,7 +177,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | detect-node-es | 1.1.0 | MIT |
 | devlop | 1.1.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
-| enhanced-resolve | 5.24.5 | MIT |
+| enhanced-resolve | 5.26.1 | MIT |
 | entities | 6.0.1 | BSD-2-Clause |
 | error-stack-parser-es | 1.0.5 | MIT |
 | es-module-lexer | 2.3.2 | MIT |
@@ -193,7 +190,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | fd-package-json | 2.0.0 | MIT |
 | fdir | 6.5.0 | MIT |
 | formatly | 0.11.4 | MIT |
-| framer-motion | 13.4.6 | MIT |
+| framer-motion | 13.5.1 | MIT |
+| fsevents | 2.3.3 | MIT |
 | get-nonce | 1.0.1 | MIT |
 | get-tsconfig | 4.14.3 | MIT |
 | graceful-fs | 4.2.11 | ISC |
@@ -201,7 +199,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | hast-util-parse-selector | 4.0.0 | MIT |
 | hast-util-raw | 9.1.0 | MIT |
 | hast-util-sanitize | 5.0.2 | MIT |
-| hast-util-to-html | 9.0.5 | MIT |
+| hast-util-to-html | 9.0.5, 9.0.6 | MIT |
 | hast-util-to-jsx-runtime | 2.3.6 | MIT |
 | hast-util-to-parse5 | 8.0.1 | MIT |
 | hast-util-whitespace | 3.0.0 | MIT |
@@ -215,17 +213,17 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | is-hexadecimal | 2.0.1 | MIT |
 | is-plain-obj | 4.1.0 | MIT |
 | jiti | 2.7.0 | MIT |
-| jose | 6.2.12 | MIT |
+| jose | 6.2.15 | MIT |
 | kleur | 4.1.5 | MIT |
-| knip | 6.41.0 | ISC |
+| knip | 6.44.1 | ISC |
 | lefthook | 2.2.2 | MIT |
-| lefthook-windows-x64 | 2.2.2 | MIT |
-| lightningcss | 1.32.0, 1.33.0 | MPL-2.0 |
-| lightningcss-win32-x64-msvc | 1.32.0, 1.33.0 | MPL-2.0 |
+| lefthook-darwin-arm64 | 2.2.2 | MIT |
+| lightningcss | 1.33.0 | MPL-2.0 |
+| lightningcss-darwin-arm64 | 1.33.0 | MPL-2.0 |
 | longest-streak | 3.1.0 | MIT |
 | lru_map | 0.4.1 | MIT |
-| lucide-react | 1.48.0 | ISC |
-| magic-string | 0.30.21 | MIT |
+| lucide-react | 1.69.0 | ISC |
+| magic-string | 1.4.5 | MIT |
 | markdown-table | 3.0.4 | MIT |
 | marked | 18.1.2 | MIT |
 | mdast-util-find-and-replace | 3.0.2 | MIT |
@@ -271,16 +269,16 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | micromark-util-subtokenize | 2.1.0 | MIT |
 | micromark-util-symbol | 2.0.1 | MIT |
 | micromark-util-types | 2.0.2 | MIT |
-| miniflare | 5.20261023.1-beta | MIT |
-| motion | 13.4.6 | MIT |
-| motion-dom | 13.4.5 | MIT |
-| motion-utils | 13.3.0 | MIT |
+| miniflare | 5.20261102.0-beta | MIT |
+| motion | 13.5.1 | MIT |
+| motion-dom | 13.5.1 | MIT |
+| motion-utils | 13.5.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nanoid | 3.3.20 | MIT |
-| obug | 2.1.4 | MIT |
+| obug | 3.0.0 | MIT |
 | oniguruma-parser | 0.12.2 | MIT |
 | oniguruma-to-es | 4.3.6 | MIT |
-| oxc-parser | 0.153.0 | MIT |
+| oxc-parser | 0.155.0 | MIT |
 | oxc-resolver | 11.24.2 | MIT |
 | package-manager-detector | 1.9.0 | MIT |
 | parse-entities | 4.0.2 | MIT |
@@ -290,10 +288,10 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | picocolors | 1.1.1 | ISC |
 | picomatch | 4.0.7 | MIT |
 | playwright-core | 1.64.1 | Apache-2.0 |
-| postcss | 8.5.31 | MIT |
+| postcss | 8.5.32 | MIT |
 | property-information | 7.2.0 | MIT |
-| react | 19.3.0 | MIT |
-| react-dom | 19.3.0 | MIT |
+| react | 19.3.1 | MIT |
+| react-dom | 19.3.1 | MIT |
 | react-markdown | 10.1.0 | MIT |
 | react-remove-scroll | 2.7.2 | MIT |
 | react-remove-scroll-bar | 2.3.8 | MIT |
@@ -310,17 +308,15 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | remark-stringify | 11.0.0 | MIT |
 | remend | 1.4.0 | Apache-2.0 |
 | resolve-pkg-maps | 1.0.0 | MIT |
-| rolldown | 1.2.15 | MIT |
+| rolldown | 1.2.16 | MIT |
 | scheduler | 0.28.0 | MIT |
-| semver | 7.8.5 | ISC |
+| semver | 7.8.6 | ISC |
 | sharp | 0.35.5 | Apache-2.0 |
-| shiki | 4.5.0 | MIT |
-| siginfo | 2.0.0 | ISC |
+| shiki | 4.6.0 | MIT |
 | smol-toml | 1.9.1 | BSD-3-Clause |
 | source-map-js | 1.2.2 | BSD-3-Clause |
 | space-separated-tokens | 2.0.2 | MIT |
-| stackback | 0.0.2 | MIT |
-| std-env | 4.2.0 | MIT |
+| std-env | 4.3.0 | MIT |
 | streamdown | 2.7.1 | Apache-2.0 |
 | stringify-entities | 4.0.4 | MIT |
 | strip-json-comments | 5.0.3 | MIT |
@@ -328,17 +324,16 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | style-to-object | 1.0.14 | MIT |
 | supports-color | 10.2.2 | MIT |
 | tailwind-merge | 3.7.0 | MIT |
-| tailwindcss | 4.3.3 | MIT |
+| tailwindcss | 4.3.4 | MIT |
 | tapable | 2.3.3 | MIT |
-| tinybench | 2.9.0 | MIT |
+| tinybench | 6.2.3 | MIT |
 | tinyexec | 1.3.1 | MIT |
 | tinyglobby | 0.2.17 | MIT |
-| tinyrainbow | 3.1.1 | MIT |
 | trim-lines | 3.0.1 | MIT |
 | trough | 2.2.0 | MIT |
 | tslib | 2.8.1 | 0BSD |
 | typescript | 7.0.2 | Apache-2.0 |
-| unbash | 5.1.0 | ISC |
+| unbash | 6.0.3 | ISC |
 | undici | 7.30.1 | MIT |
 | undici-types | 8.9.0 | MIT |
 | unenv | 2.0.0-rc.24 | MIT |
@@ -354,19 +349,19 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | vfile | 6.0.3 | MIT |
 | vfile-location | 5.0.3 | MIT |
 | vfile-message | 4.0.3 | MIT |
-| vite | 8.3.5 | MIT |
-| vitest | 4.1.12 | MIT |
+| vite | 8.3.6 | MIT |
+| vitest | 5.1.0 | MIT |
 | walk-up-path | 4.0.0 | ISC |
 | web-namespaces | 2.0.1 | MIT |
-| why-is-node-running | 2.3.0 | MIT |
-| workerd | 1.20261023.1 | Apache-2.0 |
-| wrangler | 4.154.0 | MIT OR Apache-2.0 |
+| why-is-node-running | 3.2.1 | MIT |
+| workerd | 1.20261102.1 | Apache-2.0 |
+| wrangler | 4.156.2 | MIT OR Apache-2.0 |
 | ws | 8.21.0 | MIT |
 | yaml | 2.9.1 | ISC |
 | youch | 4.1.0-beta.10 | MIT |
 | youch-core | 0.3.3 | MIT |
 | zod | 4.6.6, 4.6.7 | MIT |
-| zustand | 4.5.7, 5.0.15 | MIT |
+| zustand | 4.5.7, 5.0.16 | MIT |
 | zwitch | 2.0.4 | MIT |
 
 ## Rust packages
@@ -386,7 +381,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | arrayvec | 0.7.8 | MIT OR Apache-2.0 |
 | async-broadcast | 0.7.2 | MIT OR Apache-2.0 |
 | async-channel | 2.5.0 | Apache-2.0 OR MIT |
-| async-executor | 1.14.0 | Apache-2.0 OR MIT |
+| async-executor | 1.14.1 | Apache-2.0 OR MIT |
 | async-io | 2.6.0 | Apache-2.0 OR MIT |
 | async-lock | 3.4.2 | Apache-2.0 OR MIT |
 | async-process | 2.5.0 | Apache-2.0 OR MIT |
@@ -407,6 +402,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | base64 | 0.21.7 | MIT OR Apache-2.0 |
 | base64 | 0.22.1 | MIT OR Apache-2.0 |
 | base64 | 0.23.1 | MIT OR Apache-2.0 |
+| bindgen | 0.72.1 | BSD-3-Clause |
 | bit-set | 0.5.3 | MIT/Apache-2.0 |
 | bit-set | 0.8.0 | Apache-2.0 OR MIT |
 | bit-vec | 0.6.3 | MIT/Apache-2.0 |
@@ -438,6 +434,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | cbc | 0.1.2 | MIT OR Apache-2.0 |
 | cc | 1.5.1 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
+| cexpr | 0.6.0 | Apache-2.0/MIT |
 | cfb | 0.14.0 | MIT |
 | cfg_aliases | 0.1.1 | MIT |
 | cfg_aliases | 0.2.2 | MIT |
@@ -447,6 +444,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
 | chrono-tz | 0.10.4 | MIT OR Apache-2.0 |
 | cipher | 0.4.4 | MIT OR Apache-2.0 |
+| clang-sys | 1.9.1 | Apache-2.0 |
 | clru | 0.6.3 | MIT |
 | cmake | 0.1.58 | MIT OR Apache-2.0 |
 | combine | 4.6.8 | MIT |
@@ -570,49 +568,49 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | getrandom | 0.4.3 | MIT OR Apache-2.0 |
 | gio | 0.18.4 | MIT |
 | gio-sys | 0.18.1 | MIT |
-| gix | 0.87.1 | MIT OR Apache-2.0 |
-| gix-actor | 0.42.0 | MIT OR Apache-2.0 |
-| gix-attributes | 0.35.0 | MIT OR Apache-2.0 |
-| gix-chunk | 0.8.0 | MIT OR Apache-2.0 |
-| gix-command | 0.10.1 | MIT OR Apache-2.0 |
-| gix-commitgraph | 0.39.0 | MIT OR Apache-2.0 |
-| gix-config | 0.60.0 | MIT OR Apache-2.0 |
-| gix-config-value | 0.19.1 | MIT OR Apache-2.0 |
-| gix-date | 0.16.0 | MIT OR Apache-2.0 |
-| gix-diff | 0.67.1 | MIT OR Apache-2.0 |
-| gix-discover | 0.55.0 | MIT OR Apache-2.0 |
-| gix-error | 0.3.2 | MIT OR Apache-2.0 |
-| gix-features | 0.49.1 | MIT OR Apache-2.0 |
-| gix-filter | 0.34.0 | MIT OR Apache-2.0 |
-| gix-fs | 0.22.1 | MIT OR Apache-2.0 |
-| gix-glob | 0.27.1 | MIT OR Apache-2.0 |
-| gix-hash | 0.26.2 | MIT OR Apache-2.0 |
-| gix-hashtable | 0.16.0 | MIT OR Apache-2.0 |
-| gix-lock | 24.0.0 | MIT OR Apache-2.0 |
-| gix-macros | 0.1.6 | MIT OR Apache-2.0 |
-| gix-note | 0.1.1 | MIT OR Apache-2.0 |
-| gix-object | 0.64.1 | MIT OR Apache-2.0 |
-| gix-odb | 0.84.0 | MIT OR Apache-2.0 |
-| gix-pack | 0.74.2 | MIT OR Apache-2.0 |
-| gix-packetline | 0.22.2 | MIT OR Apache-2.0 |
-| gix-path | 0.12.6 | MIT OR Apache-2.0 |
-| gix-protocol | 0.65.1 | MIT OR Apache-2.0 |
-| gix-quote | 0.8.0 | MIT OR Apache-2.0 |
-| gix-ref | 0.67.1 | MIT OR Apache-2.0 |
-| gix-refspec | 0.45.1 | MIT OR Apache-2.0 |
-| gix-revision | 0.49.1 | MIT OR Apache-2.0 |
-| gix-revwalk | 0.35.0 | MIT OR Apache-2.0 |
-| gix-sec | 0.14.2 | MIT OR Apache-2.0 |
-| gix-shallow | 0.13.0 | MIT OR Apache-2.0 |
-| gix-tempfile | 24.0.0 | MIT OR Apache-2.0 |
-| gix-trace | 0.1.21 | MIT OR Apache-2.0 |
-| gix-transport | 0.59.2 | MIT OR Apache-2.0 |
-| gix-traverse | 0.61.0 | MIT OR Apache-2.0 |
-| gix-url | 0.38.0 | MIT OR Apache-2.0 |
-| gix-utils | 0.3.6 | MIT OR Apache-2.0 |
-| gix-validate | 0.11.4 | MIT OR Apache-2.0 |
-| gix-worktree-stream | 0.36.1 | MIT OR Apache-2.0 |
-| gix-zlib | 0.1.0 | MIT OR Apache-2.0 |
+| gix | 0.90.0 | MIT OR Apache-2.0 |
+| gix-actor | 0.44.1 | MIT OR Apache-2.0 |
+| gix-attributes | 0.37.1 | MIT OR Apache-2.0 |
+| gix-chunk | 0.10.1 | MIT OR Apache-2.0 |
+| gix-command | 0.12.1 | MIT OR Apache-2.0 |
+| gix-commitgraph | 0.42.0 | MIT OR Apache-2.0 |
+| gix-config | 0.62.2 | MIT OR Apache-2.0 |
+| gix-config-value | 0.21.1 | MIT OR Apache-2.0 |
+| gix-date | 0.18.1 | MIT OR Apache-2.0 |
+| gix-diff | 0.70.0 | MIT OR Apache-2.0 |
+| gix-discover | 0.57.1 | MIT OR Apache-2.0 |
+| gix-error | 0.5.2 | MIT OR Apache-2.0 |
+| gix-filter | 0.36.1 | MIT OR Apache-2.0 |
+| gix-fs | 0.24.1 | MIT OR Apache-2.0 |
+| gix-glob | 0.29.1 | MIT OR Apache-2.0 |
+| gix-hash | 0.28.1 | MIT OR Apache-2.0 |
+| gix-hashtable | 0.18.1 | MIT OR Apache-2.0 |
+| gix-lock | 26.0.1 | MIT OR Apache-2.0 |
+| gix-macros | 0.2.1 | MIT OR Apache-2.0 |
+| gix-note | 0.3.1 | MIT OR Apache-2.0 |
+| gix-object | 0.66.1 | MIT OR Apache-2.0 |
+| gix-odb | 0.87.0 | MIT OR Apache-2.0 |
+| gix-pack | 0.77.0 | MIT OR Apache-2.0 |
+| gix-packetline | 0.24.1 | MIT OR Apache-2.0 |
+| gix-parallel | 0.50.1 | MIT OR Apache-2.0 |
+| gix-path | 0.14.1 | MIT OR Apache-2.0 |
+| gix-protocol | 0.68.0 | MIT OR Apache-2.0 |
+| gix-quote | 0.10.1 | MIT OR Apache-2.0 |
+| gix-ref | 0.69.1 | MIT OR Apache-2.0 |
+| gix-refspec | 0.47.1 | MIT OR Apache-2.0 |
+| gix-revision | 0.52.0 | MIT OR Apache-2.0 |
+| gix-revwalk | 0.38.0 | MIT OR Apache-2.0 |
+| gix-sec | 0.16.1 | MIT OR Apache-2.0 |
+| gix-shallow | 0.15.1 | MIT OR Apache-2.0 |
+| gix-tempfile | 26.0.1 | MIT OR Apache-2.0 |
+| gix-trace | 0.3.1 | MIT OR Apache-2.0 |
+| gix-transport | 0.62.0 | MIT OR Apache-2.0 |
+| gix-traverse | 0.64.0 | MIT OR Apache-2.0 |
+| gix-url | 0.40.1 | MIT OR Apache-2.0 |
+| gix-utils | 0.5.2 | MIT OR Apache-2.0 |
+| gix-validate | 0.13.1 | MIT OR Apache-2.0 |
+| gix-worktree-stream | 0.39.0 | MIT OR Apache-2.0 |
+| gix-zlib | 0.4.0 | MIT OR Apache-2.0 |
 | glib | 0.18.5 | MIT |
 | glib-macros | 0.18.5 | MIT |
 | glib-sys | 0.18.1 | MIT |
@@ -623,13 +621,11 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | gtk-sys | 0.18.2 | MIT |
 | gtk3-macros | 0.18.2 | MIT |
 | halfbrown | 0.4.0 | Apache-2.0/MIT |
-| hash32 | 0.3.1 | MIT OR Apache-2.0 |
 | hashbrown | 0.12.3 | MIT OR Apache-2.0 |
 | hashbrown | 0.14.5 | MIT OR Apache-2.0 |
 | hashbrown | 0.15.5 | MIT OR Apache-2.0 |
 | hashbrown | 0.16.1 | MIT OR Apache-2.0 |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 |
-| heapless | 0.8.0 | MIT OR Apache-2.0 |
 | heck | 0.4.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | hermit-abi | 0.5.3 | MIT OR Apache-2.0 |
@@ -672,6 +668,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | ipnet | 2.12.1 | MIT OR Apache-2.0 |
 | is-docker | 0.2.0 | MIT |
 | is-wsl | 0.4.0 | MIT |
+| itertools | 0.13.0 | MIT OR Apache-2.0 |
 | itertools | 0.14.0 | MIT OR Apache-2.0 |
 | itoa | 1.0.18 | MIT OR Apache-2.0 |
 | javascriptcore-rs | 1.1.2 | MIT |
@@ -704,6 +701,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | libc | 0.2.191 | MIT OR Apache-2.0 |
 | libdbus-sys | 0.2.7 | Apache-2.0/MIT |
 | libloading | 0.7.4 | ISC |
+| libloading | 0.8.9 | ISC |
 | libm | 0.2.16 | MIT |
 | libredox | 0.1.23 | MIT |
 | line-clipping | 0.3.8 | MIT OR Apache-2.0 |
@@ -825,6 +823,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 |
 | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | precomputed-hash | 0.1.1 | MIT |
+| prettyplease | 0.2.37 | MIT OR Apache-2.0 |
 | proc-macro-crate | 1.3.1 | MIT OR Apache-2.0 |
 | proc-macro-crate | 2.0.2 | MIT OR Apache-2.0 |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 |
@@ -832,13 +831,13 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | proc-macro-error-attr | 1.0.4 | MIT OR Apache-2.0 |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | process-wrap | 10.0.1 | Apache-2.0 OR MIT |
-| prodash | 31.0.0 | MIT |
+| prodash | 31.0.1 | MIT |
 | pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | qrcode | 0.14.1 | MIT OR Apache-2.0 |
 | quick-xml | 0.41.0 | MIT |
 | quinn | 0.11.11 | MIT OR Apache-2.0 |
-| quinn-proto | 0.11.18 | MIT OR Apache-2.0 |
-| quinn-udp | 0.5.15 | MIT OR Apache-2.0 |
+| quinn-proto | 0.11.19 | MIT OR Apache-2.0 |
+| quinn-udp | 0.5.16 | MIT OR Apache-2.0 |
 | quote | 1.0.47 | MIT OR Apache-2.0 |
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
@@ -865,11 +864,11 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | reqwest | 0.13.5 | MIT OR Apache-2.0 |
 | rfd | 0.17.2 | MIT |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
-| rmcp | 3.8.0 | Apache-2.0 |
-| rmcp-macros | 3.8.0 | Apache-2.0 |
+| rmcp | 3.9.0 | Apache-2.0 |
+| rmcp-macros | 3.9.0 | Apache-2.0 |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
-| rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
+| rustix | 1.1.6 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT |
 | rustls-native-certs | 0.8.4 | Apache-2.0 OR ISC OR MIT |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 |
@@ -877,6 +876,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | rustls-platform-verifier-android | 0.1.1 | MIT OR Apache-2.0 |
 | rustls-webpki | 0.103.16 | ISC |
 | rustversion | 1.0.23 | MIT OR Apache-2.0 |
+| ruzstd | 0.9.1 | MIT |
 | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 |
 | same-file | 1.0.6 | Unlicense/MIT |
 | schannel | 0.1.29 | MIT |
@@ -912,11 +912,12 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
 | sha1 | 0.10.7 | MIT OR Apache-2.0 |
-| sha1-checked | 0.10.0 | MIT OR Apache-2.0 |
+| sha1dc | 0.1.5 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | sha2 | 0.11.1 | MIT OR Apache-2.0 |
 | shared_library | 0.1.9 | Apache-2.0/MIT |
 | shell-words | 1.1.1 | MIT/Apache-2.0 |
+| shlex | 1.3.0 | MIT OR Apache-2.0 |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
 | signal-hook | 0.3.18 | Apache-2.0/MIT |
 | signal-hook-mio | 0.2.5 | MIT OR Apache-2.0 |
@@ -1053,7 +1054,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | web-time | 1.1.0 | MIT OR Apache-2.0 |
 | webkit2gtk | 2.0.2 | MIT |
 | webkit2gtk-sys | 2.0.2 | MIT |
-| webpki-root-certs | 1.0.9 | CDLA-Permissive-2.0 |
+| webpki-root-certs | 1.0.11 | CDLA-Permissive-2.0 |
 | webview2-com | 0.39.1 | MIT |
 | webview2-com-macros | 0.8.1 | MIT |
 | webview2-com-sys | 0.39.1 | MIT |
@@ -1063,6 +1064,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | wezterm-dynamic | 0.2.1 | MIT |
 | wezterm-dynamic-derive | 0.1.1 | MIT |
 | wezterm-input-types | 0.1.0 | MIT |
+| whisper-rs | 0.16.0 | Unlicense |
+| whisper-rs-sys | 0.15.0 | Unlicense |
 | winapi | 0.3.9 | MIT/Apache-2.0 |
 | winapi-i686-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
 | winapi-util | 0.1.11 | Unlicense OR MIT |

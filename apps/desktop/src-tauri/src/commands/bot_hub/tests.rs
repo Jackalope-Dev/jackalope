@@ -71,6 +71,7 @@ fn bot(fixture: &Fixture, name: &str) -> HubBot {
             "previousRunId": null,
         }))
         .unwrap(),
+        projects: vec![],
     }
 }
 
@@ -84,6 +85,7 @@ fn schedule(expression: &str) -> WakeDefinition {
             expression: expression.into(),
             timezone: "UTC".into(),
         },
+        project_id: None,
     }
 }
 
@@ -93,6 +95,7 @@ fn conversation(fixture: &Fixture, bot: &HubBot) -> TaskRun {
         .hub
         .deliver(
             bot,
+            None,
             "Start",
             MessageOrigin {
                 kind: "wake".into(),
@@ -714,7 +717,7 @@ fn edits_reach_open_conversations_and_new_ones_recall_recent_work() {
 }
 
 #[test]
-fn bridge_agents_reach_the_same_bot_tools_by_name() {
+fn bot_tools_act_for_the_calling_bot_only() {
     let fixture = fixture();
     let scout = bot(&fixture, "Scout");
     let helper = bot(&fixture, "Helper");
@@ -723,41 +726,29 @@ fn bridge_agents_reach_the_same_bot_tools_by_name() {
         .sync(vec![scout.clone(), helper.clone()])
         .unwrap();
     let run = conversation(&fixture, &scout);
-    let listed = fixture
-        .hub
-        .call(&run, "bots", serde_json::json!({}))
-        .unwrap();
+    let directory = || serde_json::from_value::<DirectoryInput>(serde_json::json!({})).unwrap();
+    let listed = fixture.hub.directory(&run, directory()).unwrap();
     assert_eq!(listed["bots"][0]["name"], "Helper");
     fixture
         .hub
-        .call(
+        .remember(
             &run,
-            "remember",
-            serde_json::json!({"note": "Ship on Fridays."}),
+            serde_json::from_value(serde_json::json!({"note": "Ship on Fridays."})).unwrap(),
         )
         .unwrap();
     assert!(fixture
         .hub
         .notes_prompt(&scout.id)
         .contains("Ship on Fridays."));
-    let error = fixture
-        .hub
-        .call(&run, "remember", serde_json::json!({"text": "wrong field"}))
-        .unwrap_err();
-    assert!(error.starts_with("Invalid arguments"));
-    assert!(fixture
-        .hub
-        .call(&run, "delete_everything", serde_json::json!({}))
-        .unwrap_err()
-        .contains("remember"));
+    assert!(
+        serde_json::from_value::<RememberInput>(serde_json::json!({"text": "wrong field"}))
+            .is_err()
+    );
     let outsider = TaskRun {
         id: Uuid::new_v4().to_string(),
         ..Default::default()
     };
-    assert!(fixture
-        .hub
-        .call(&outsider, "bots", serde_json::json!({}))
-        .is_err());
+    assert!(fixture.hub.directory(&outsider, directory()).is_err());
 }
 
 fn recall(query: &str, conversation: Option<&str>) -> RecallInput {
@@ -788,6 +779,7 @@ fn bots_recall_only_their_own_earlier_conversations() {
         .hub
         .deliver(
             &scout,
+            None,
             "The lockfile check fails on Windows.",
             origin(),
             None,
@@ -795,12 +787,13 @@ fn bots_recall_only_their_own_earlier_conversations() {
         .unwrap();
     fixture
         .hub
-        .deliver(&scout, "Review the release notes.", origin(), None)
+        .deliver(&scout, None, "Review the release notes.", origin(), None)
         .unwrap();
     let (theirs, _) = fixture
         .hub
         .deliver(
             &other,
+            None,
             "A lockfile question for someone else.",
             origin(),
             None,
@@ -830,9 +823,56 @@ fn bots_recall_only_their_own_earlier_conversations() {
     assert!(read["text"].as_str().unwrap().contains("Wake-up (Test)"));
     assert!(read["nextOffset"].is_null());
     assert!(fixture.hub.recall(&run, recall("", Some(&theirs))).is_err());
-    let through_bridge = fixture
+}
+
+#[test]
+fn a_shared_bot_starts_in_the_project_that_asks_and_wakes_only_where_it_works() {
+    let fixture = fixture();
+    let mut scout = bot(&fixture, "Scout");
+    let mut second = scout.request.clone();
+    second.project_id = "second".into();
+    second.project_name = "Second".into();
+    scout.projects.push(second);
+    fixture.hub.sync(vec![scout.clone()]).unwrap();
+    let origin = || MessageOrigin {
+        kind: "wake".into(),
+        label: "Test".into(),
+        bot_id: None,
+        bot_name: None,
+        session_id: None,
+    };
+    let (there, _) = fixture
         .hub
-        .call(&run, "recall", serde_json::json!({"query": "release"}))
+        .deliver(
+            &scout,
+            Some("second"),
+            "Check this project.",
+            origin(),
+            None,
+        )
         .unwrap();
-    assert_eq!(through_bridge["conversations"].as_array().unwrap().len(), 1);
+    let (elsewhere, _) = fixture
+        .hub
+        .deliver(&scout, Some("unknown"), "Check that one.", origin(), None)
+        .unwrap();
+    let project = |id: &str| {
+        fixture
+            .hub
+            .sessions
+            .bot_sessions(&scout.id)
+            .into_iter()
+            .find(|session| session.id == id)
+            .map(|session| session.request.project_id)
+            .unwrap()
+    };
+    assert_eq!(project(&there), "second");
+    assert_eq!(project(&elsewhere), "fixture");
+
+    let mut wake = schedule("0 9 * * *");
+    wake.project_id = Some("second".into());
+    scout.wakes = vec![wake.clone()];
+    fixture.hub.sync(vec![scout.clone()]).unwrap();
+    wake.project_id = Some("unknown".into());
+    scout.wakes = vec![wake];
+    assert!(fixture.hub.sync(vec![scout]).is_err());
 }

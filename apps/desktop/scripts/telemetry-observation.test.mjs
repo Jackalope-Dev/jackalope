@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { operationCounts, taskCounts } from '../../server/admin/metrics.ts';
+import { operationCounts, taskCounts } from '@jackalope/contracts/telemetry';
 import { observeOperation, telemetryOperation } from '../src/lib/operation-telemetry.ts';
 import { createTaskTelemetry } from '../src/lib/task-telemetry.ts';
 

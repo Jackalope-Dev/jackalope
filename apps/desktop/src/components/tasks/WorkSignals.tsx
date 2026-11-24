@@ -1,14 +1,13 @@
+import { isActive } from '@jackalope/contracts/runs';
 import { FileDiff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { WorkItem } from '../../lib/task-collection';
-import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOpenWorkStore } from '../../stores/openWorkStore';
 import {
-  type ChangeStats,
   compactElapsed,
   isUnread,
   openSignalKey,
@@ -17,6 +16,7 @@ import {
   useWorkSignalsStore,
 } from '../../stores/workSignalsStore';
 import './work-signals.css';
+import type { ChangeStats } from '../../lib/run-types';
 
 /** Key of the work open in the main view. */
 export function useOpenSignalKey() {
@@ -50,16 +50,16 @@ export function useWorkSignals() {
 }
 
 export const changeSummary = (stats: ChangeStats) =>
-  `+${stats.added} −${stats.removed} in ${stats.files} ${stats.files === 1 ? 'file' : 'files'}`;
+  `+${stats.added.toLocaleString()} −${stats.removed.toLocaleString()} in ${stats.files.toLocaleString()} ${stats.files === 1 ? 'file' : 'files'}`;
 
 /** The size of a change, for headers with room for it. */
 export function ChangeSize({ stats }: { stats: ChangeStats }) {
   return (
     <span className="work-signal-diff" title={changeSummary(stats)}>
-      <span className="work-signal-added">+{stats.added}</span>
-      <span className="work-signal-removed">−{stats.removed}</span>
+      <span className="work-signal-added">+{stats.added.toLocaleString()}</span>
+      <span className="work-signal-removed">−{stats.removed.toLocaleString()}</span>
       <span className="work-signal-files">
-        {stats.files} {stats.files === 1 ? 'file' : 'files'}
+        {stats.files.toLocaleString()} {stats.files === 1 ? 'file' : 'files'}
       </span>
     </span>
   );
@@ -105,8 +105,8 @@ export function WorkSignals({
       )}
       {stats && changed && !compact && (
         <span className="work-signal-diff" title={changeSummary(stats)}>
-          <span className="work-signal-added">+{stats.added}</span>
-          <span className="work-signal-removed">−{stats.removed}</span>
+          <span className="work-signal-added">+{stats.added.toLocaleString()}</span>
+          <span className="work-signal-removed">−{stats.removed.toLocaleString()}</span>
         </span>
       )}
       {unread && (

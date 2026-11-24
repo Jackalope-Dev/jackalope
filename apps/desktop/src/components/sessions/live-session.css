@@ -80,11 +80,17 @@
 }
 .live-tabbar {
   display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 0 20px 12px;
   overflow-x: auto;
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
   flex: none;
+}
+/* The current panel's pop-out button sits at the far end of the tabs. */
+.live-tabbar > .ui-button {
+  margin-left: auto;
 }
 .live-status-actions {
   display: flex;
@@ -170,9 +176,6 @@
   :is(.live-copy, .live-time) {
     transition: none;
   }
-}
-.work-context-path {
-  user-select: text;
 }
 .live-message > p {
   white-space: pre-wrap;
@@ -272,26 +275,43 @@
   width: 76px;
   height: 76px;
 }
+/* The card is the field, like the new-work composer: no second box around the draft. */
 .live-composer {
-  padding: 12px;
+  padding: 10px 10px 8px 14px;
   margin: 12px max(20px, (100% - 56rem) / 2) 20px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
   flex: none;
+  cursor: text;
+}
+.live-composer:focus-within {
+  border-color: var(--color-border-focus);
+  outline: 1px solid var(--color-border-focus);
 }
 .live-composer textarea {
-  resize: vertical;
-  max-height: 180px;
+  field-sizing: content;
   width: 100%;
+  min-height: 48px;
+  max-height: 180px;
+  padding: 4px 2px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.live-composer textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .live-composer-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 4px;
+  cursor: default;
 }
 /* Attach sits on the left; sending actions stay on the right. */
 .live-composer-actions > [aria-label="Attach files"] {
@@ -364,9 +384,6 @@
   background: var(--color-surface-elevated);
   text-align: left;
 }
-.live-start-toolbar {
-  display: flex;
-}
 .chat-options-dialog {
   width: min(560px, calc(100vw - 32px));
 }
@@ -407,14 +424,39 @@
 .live-start-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   flex-wrap: wrap;
 }
 .live-start-buttons {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   margin-left: auto;
+}
+/* Composer controls belong to the box rather than floating on it: compact pills with no
+   plastic shell at rest, filling on hover. Send keeps its colour at the same size. */
+:is(.live-start-actions, .live-composer-actions, .external-continue-actions) .ui-button {
+  height: var(--control-height-compact, 32px);
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+}
+:is(.live-start-actions, .live-composer-actions) .ui-button[data-size="icon"] {
+  width: var(--control-height-compact, 32px);
+  padding: 0;
+}
+:is(.live-start-actions, .live-composer-actions) .ui-button:not([data-variant="primary"]) {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--color-text-secondary);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:is(.live-start-actions, .live-composer-actions)
+  .ui-button:not([data-variant="primary"]):is(:hover, [data-state="open"]) {
+  background-color: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+  color: var(--color-text-primary);
 }
 .live-session-detached .live-header {
   padding: 16px 10px 10px 14px;
@@ -588,6 +630,8 @@
 }
 .agent-picker-pane {
   display: grid;
+  /* A long model list scrolls; without this its rows shrink to their minimum height. */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 6px;
   min-width: 0;
@@ -715,4 +759,99 @@
   width: var(--control-height, 36px);
   height: var(--control-height, 36px);
   border-radius: var(--radius-sm);
+}
+
+/* A conversation from outside Jackalope: the read-only transcript, then the way to continue it. */
+.external-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+.external-session-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.external-transcript {
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+}
+.external-transcript :is(.live-message > p, .live-reply > div) {
+  user-select: text;
+}
+.external-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -10px 0 22px 46px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+/* A frosted card that floats over the transcript: the conversation scrolls behind it,
+   blurred, so the box stands out without an opaque band across the page. */
+.external-continue {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 56rem;
+  margin: 12px auto;
+  padding: 12px 12px 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  cursor: text;
+  /* 90% keeps muted placeholder text legible over the blurred transcript. */
+  background: color-mix(in srgb, var(--color-surface-elevated) 90%, transparent);
+  box-shadow: var(--shadow-surface);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+.external-continue:hover:not(:focus-within) {
+  border-color: var(--color-text-muted);
+}
+.external-continue:focus-within {
+  border-color: var(--color-border-focus);
+  outline: 1px solid var(--color-border-focus);
+}
+.external-continue-actions {
+  cursor: default;
+}
+.external-continue textarea {
+  resize: none;
+  field-sizing: content;
+  min-height: 48px;
+  max-height: min(240px, 35vh);
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  line-height: 1.5;
+}
+.external-continue textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.external-continue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+html[data-window-glass] .external-continue {
+  background: var(--glass-pane);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .external-continue,
+  html[data-window-glass] .external-continue {
+    background: var(--color-surface-elevated);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }

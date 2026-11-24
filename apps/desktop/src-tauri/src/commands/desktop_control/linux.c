@@ -41,6 +41,14 @@ static int xi_opcode;
 static GArray *synthetic_devices;
 static guint resume_source;
 static guint32 resume_after;
+/* When the agent's XTEST input last arrived, and the person's recent presses, in
+ * monotonic microseconds: control pauses only when the person disrupts the agent. */
+static gint64 last_agent_input;
+static gint64 person_input[8];
+static guint person_count;
+#define CLASH_WINDOW (G_USEC_PER_SEC * 6 / 10)
+#define TAKEOVER_WINDOW (G_USEC_PER_SEC * 3 / 2)
+#define TAKEOVER_COUNT 3
 static GtkCssProvider *style;
 static char *previous_theme;
 
@@ -761,6 +769,30 @@ static void pause_control(const char *message) {
     save_state();
   }
 }
+/* Why a press by the person should pause control, or NULL when it can pass: a single
+ * stray click or key leaves the agent working; one that lands while the agent is acting,
+ * or several in quick succession, pause it. Same rule as the macOS and Windows helpers. */
+static const char *disruption(gint64 now) {
+  guint kept = 0;
+  for (guint i = 0; i < person_count; i++)
+    if (now - person_input[i] < TAKEOVER_WINDOW)
+      person_input[kept++] = person_input[i];
+  if (kept == G_N_ELEMENTS(person_input)) {
+    memmove(person_input, person_input + 1, sizeof(person_input[0]) * (kept - 1));
+    kept--;
+  }
+  person_input[kept++] = now;
+  person_count = kept;
+  if (last_agent_input && now - last_agent_input < CLASH_WINDOW) {
+    person_count = 0;
+    return "You stepped in while Jackalope was acting";
+  }
+  if (person_count >= TAKEOVER_COUNT) {
+    person_count = 0;
+    return "You're using this window";
+  }
+  return NULL;
+}
 static void cancel_control(void) {
   status = "canceled";
   reason = "Canceled by the user";
@@ -842,16 +874,27 @@ static void input_events(void) {
       update_devices();
     } else {
       XIRawEvent *raw = event.xcookie.data;
-      if (!synthetic(raw->sourceid)) {
+      int type = event.xcookie.evtype;
+      /* Buttons 4 to 7 are the scroll wheel, which never pauses control. */
+      gboolean press = type == XI_RawKeyPress ||
+                       (type == XI_RawButtonPress && (raw->detail < 4 || raw->detail > 7));
+      gint64 now = g_get_monotonic_time();
+      if (synthetic(raw->sourceid)) {
+        if (press)
+          last_agent_input = now;
+      } else {
         if (resume_source && (gint32)(raw->time - resume_after) <= 0) {
           XFreeEventData(display, &event.xcookie);
           continue;
         }
-        if (event.xcookie.evtype == XI_RawKeyPress &&
-            raw->detail == XKeysymToKeycode(display, XK_Escape))
-          cancel_control();
-        else
-          pause_control("Physical input detected");
+        if (type == XI_RawKeyPress && raw->detail == XKeysymToKeycode(display, XK_Escape)) {
+          person_count = 0;
+          pause_control("You pressed Escape");
+        } else if (press) {
+          const char *why = disruption(now);
+          if (why)
+            pause_control(why);
+        }
       }
     }
     XFreeEventData(display, &event.xcookie);

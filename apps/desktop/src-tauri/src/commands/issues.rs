@@ -37,20 +37,14 @@ fn connections(runtime: &TaskRuntime) -> Result<Vec<Connection>, String> {
     let path = runtime
         .integration_directory()
         .join("issue-connections.bin");
-    account_storage::read(&path)?
-        .map(|data| {
-            serde_json::from_slice(&data).map_err(|_| {
-                "Issue connections could not be read. Your saved settings were preserved.".into()
-            })
-        })
-        .unwrap_or(Ok(Vec::new()))
+    Ok(account_storage::read_json(
+        &path,
+        "Issue connections could not be read. Your saved settings were preserved.",
+    )?
+    .unwrap_or_default())
 }
 fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
+    super::http::client(Duration::from_secs(20))
 }
 async fn response(request: reqwest::RequestBuilder) -> Result<Value, String> {
     let mut response = request
@@ -63,17 +57,14 @@ async fn response(request: reqwest::RequestBuilder) -> Result<Value, String> {
             response.status().as_u16()
         ));
     }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
+    let bytes = super::http::read_bounded(&mut response, 2_000_000)
         .await
-        .map_err(|_| "The issue response was interrupted. Retry.")?
-    {
-        if bytes.len() + chunk.len() > 2_000_000 {
-            return Err("The issue response is too large. Narrow your search.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
+        .map_err(|error| match error {
+            super::http::BodyError::Interrupted => "The issue response was interrupted. Retry.",
+            super::http::BodyError::TooLarge => {
+                "The issue response is too large. Narrow your search."
+            }
+        })?;
     let value: Value = serde_json::from_slice(&bytes)
         .map_err(|_| "The issue service returned an unreadable response.")?;
     if value.get("errors").is_some() {
@@ -131,6 +122,18 @@ fn jira(connection: &Connection, route: &str) -> Result<reqwest::RequestBuilder,
         .basic_auth(&connection.email, Some(&connection.token)))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::issues::project_issues,
+            commands::issues::issue_connections,
+            commands::issues::issue_connection_save,
+            commands::issues::issue_connection_remove,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn issue_connections(state: State<'_, TaskRuntime>) -> Result<Vec<Value>, String> {
     Ok(connections(&state)?.into_iter().map(|connection| json!({"provider":connection.provider,"site":connection.site,"email":connection.email})).collect())
@@ -150,9 +153,9 @@ pub async fn issue_connection_save(
     let mut saved = connections(&state)?;
     saved.retain(|item| item.provider != connection.provider);
     saved.push(connection);
-    account_storage::write(
+    account_storage::write_json(
         &state.integration_directory().join("issue-connections.bin"),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
+        &saved,
     )
 }
 #[tauri::command]
@@ -163,9 +166,9 @@ pub fn issue_connection_remove(
     let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
     let mut saved = connections(&state)?;
     saved.retain(|item| item.provider != provider);
-    account_storage::write(
+    account_storage::write_json(
         &state.integration_directory().join("issue-connections.bin"),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
+        &saved,
     )
 }
 fn text(value: &Value, field: &str) -> String {

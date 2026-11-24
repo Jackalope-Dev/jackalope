@@ -1,16 +1,17 @@
-import { Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useRef } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { insertDictation, placeCaret } from '../../lib/dictation';
 import { appendAttachments } from '../../lib/prompt-attachments';
+import type { TaskRun } from '../../lib/run-types';
+import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { TaskFollowUp } from '../../lib/task-followups';
-import type { TaskRun } from '../../lib/task-runtime';
-import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
+import { ActionError } from '../ui/ActionError';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
+import { VoiceButton } from '../voice/VoiceButton';
 import { AttachButton } from './AttachButton';
 
 /** The task's single follow-up composer with its queued follow-ups. */
@@ -50,6 +51,7 @@ export function TaskFollowUpPanel({
   onRecover: () => void;
 }) {
   const form = useRef<HTMLFormElement>(null);
+  const replyField = useRef<HTMLTextAreaElement>(null);
   const agentName = useExecutionStore(
     (state) =>
       state.runners.find((runner) => runner.id === run.agent)?.name ??
@@ -65,7 +67,7 @@ export function TaskFollowUpPanel({
   return (
     <div className="task-next">
       <h2 className="task-followup-heading">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
-      {queueError && <InlineNotice tone="error">{queueError}</InlineNotice>}
+      <ActionError error={queueError} />
       {followups.length > 0 && (
         <ul className="task-followup-queue" aria-label="Queued follow-ups">
           {followups.map((item) => (
@@ -102,16 +104,22 @@ export function TaskFollowUpPanel({
         </ul>
       )}
       {canContinue ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer convenience; the field and buttons stay reachable by keyboard
         <form
           ref={form}
           className="task-followup-form"
           data-dragging={attachments.dragging || undefined}
+          onClick={(event) => {
+            // The card reads as the field, so a click on its padding focuses the draft.
+            if (event.target === event.currentTarget) replyField.current?.focus();
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             onSend();
           }}
         >
           <Textarea
+            ref={replyField}
             id="task-reply"
             aria-label="Follow-up instructions"
             className="task-reply"
@@ -148,6 +156,14 @@ export function TaskFollowUpPanel({
                 disabled={submitting || acting}
               />
             )}
+            <VoiceButton
+              disabled={submitting || acting}
+              onText={(value) => {
+                const next = insertDictation(reply, value, replyField.current);
+                onReply(next.text);
+                placeCaret(replyField.current, next.caret);
+              }}
+            />
             <p className="task-muted">
               {followups.length && previewRunning
                 ? 'Queued follow-ups wait until the managed preview stops.'
@@ -190,7 +206,7 @@ export function TaskFollowUpPanel({
         <>
           <p className="task-muted mb-3">
             {run.status === 'interrupted'
-              ? 'Inspect the agent session and workspace before starting more work; ownership could not be confirmed after interruption.'
+              ? 'Jackalope closed before this attempt finished. Resume it to send follow-ups.'
               : integrated
                 ? 'Start a new task from the updated target branch, with this result attached.'
                 : active

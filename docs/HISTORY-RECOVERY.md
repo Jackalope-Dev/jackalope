@@ -8,7 +8,7 @@ checkpoints and crash recovery. A failed save never establishes successful persi
 
 The work list offers individual archive actions, and its options menu offers **Select
 tasks** and **Archive finished**. Bulk actions apply only to tasks matching the current
-project, search and status filters. **Show archived work** in the same menu lists manually
+project, search and status filters. **Archived** in the status filter lists manually
 archived tasks and saved ideas with restore actions; Undo restores the last successful
 archive batch. Results, usage, queue references and workspaces remain available.
 Archiving does not accept a result, remove a worktree or delete history.
@@ -35,7 +35,7 @@ an error. A new task can use a reviewed copy of the retained workspace.
 
 ## Terminal snapshots
 
-Settings → Desktop can retain the last terminal output locally. Each pane saves a
+Settings → Editor & terminal can retain the last terminal output locally. Each pane saves a
 bounded snapshot of up to 256 KiB when stopped or during orderly shutdown, under
 `integrations/terminal-output` in the native profile. The restored view is stopped;
 starting a shell is a separate action and never replays previous input. Abrupt exits

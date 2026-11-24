@@ -99,12 +99,18 @@ pub(super) fn select_measured(
     snapshots: &mut VecDeque<Snapshot>,
 ) -> (CallToolResult, SelectionStats) {
     let mut stats = SelectionStats::default();
-    let structured = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
+    let structured = crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ResultQueries,
+        "on",
+    );
     let preview = automatic_preview(
         &result,
         selection.is_none()
             && structured
-            && crate::commands::experiments::is("JACKALOPE_RESULT_PREVIEW", "on"),
+            && crate::commands::experiments::is(
+                crate::commands::experiments::Experiment::ResultPreview,
+                "on",
+            ),
     );
     let result = select_inner(
         result,
@@ -114,6 +120,33 @@ pub(super) fn select_measured(
         structured,
     );
     (result, stats)
+}
+
+/// A truncated preview of a result too large to deliver, with the complete
+/// original captured for `read_tool_result`. `None` when the result cannot be
+/// previewed, such as an error or non-text content.
+pub(super) fn bounded(
+    result: CallToolResult,
+    snapshots: &mut VecDeque<Snapshot>,
+) -> Option<CallToolResult> {
+    let before = snapshots.back().map(|snapshot| snapshot.handle.clone());
+    let selection = Selection {
+        rows: None,
+        json_pointers: vec![],
+        max_chars: Some(2000),
+    };
+    let structured = crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::ResultQueries,
+        "on",
+    );
+    let preview = select_inner(
+        result,
+        Some(&selection),
+        snapshots,
+        &mut SelectionStats::default(),
+        structured,
+    );
+    (snapshots.back().map(|snapshot| &snapshot.handle) != before.as_ref()).then_some(preview)
 }
 
 fn automatic_preview(result: &CallToolResult, enabled: bool) -> Option<Selection> {

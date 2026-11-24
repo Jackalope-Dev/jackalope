@@ -1067,6 +1067,19 @@ fieldset {
   font-size: 10px;
   color: var(--color-accent-ink);
 }
+.change-date .change-status[data-state="released"] {
+  color: var(--color-success);
+}
+.change-date .change-status[data-state="coming-soon"],
+.change-date .change-status[data-state="website"] {
+  color: var(--color-text-muted);
+}
+.change-status small {
+  margin-left: 6px;
+  font-size: inherit;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
 .change-entry h2 {
   font-size: 30px;
   letter-spacing: -1.2px;

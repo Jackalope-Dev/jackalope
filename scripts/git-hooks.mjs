@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = process.cwd();
-const dependency = (file) => fileURLToPath(new URL(`../node_modules/${file}`, import.meta.url));
+const dependency = (file) => fileURLToPath(import.meta.resolve(file));
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -127,4 +127,4 @@ if (action === 'install') install();
 else if (action === 'preserved') preserved(args[0], args.slice(1));
 else if (action === 'push') push(args);
 else if (action === 'staged') staged();
-else throw new Error('Expected install, preserved or staged.');
+else throw new Error('Expected install, preserved, push or staged.');

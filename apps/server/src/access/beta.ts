@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ServiceError as AccessError } from '../errors';
+import { ServiceError } from '../errors';
 
 // Store package flights are managed by hand in Partner Center, so a request is
 // a to-do for the operator rather than an automatic membership change.
@@ -53,7 +53,7 @@ export async function withdrawBeta(env: Env, memberId: string, now = Date.now())
   )
     .bind(now, memberId)
     .run();
-  if (result.meta.changes !== 1) throw new AccessError(409, 'no_pending_request');
+  if (result.meta.changes !== 1) throw new ServiceError(409, 'no_pending_request');
   return { request: await latestBetaRequest(env, memberId) };
 }
 

@@ -1,40 +1,47 @@
-import { selectWork, workTarget } from '../../lib/work-selection';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { parseDispatchPaused, pausedDispatchMessages } from '../../lib/dispatch-paused';
+import { openWork, selectWork, useAllRuns, useWorkspaceWork } from '../../lib/work-selection';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import { DropdownMenu as Menu } from '@jackalope/ui';
-import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { useShallow } from 'zustand/react/shallow';
+import { describeError } from '@jackalope/contracts/errors';
 import {
-  collectWorkspaceWork,
-  selectedManagedTask,
-  type WorkItem,
-} from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
+  Button,
+  EmptyState,
+  InlineNotice,
+  LoadingState,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
+import { FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
+import { invokeNative } from '../../lib/native/transport';
+import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
+import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useExternalSessionStore } from '../../stores/externalSessionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { isGeneralProject, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
-import { SessionStart } from '../sessions/SessionStart';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { Select, SelectItem } from '../ui/Select';
+import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
+import { ActionError } from '../ui/ActionError';
+import { DismissButton } from '../ui/DismissButton';
+import { DispatchPausedNotices } from './DispatchPausedNotice';
+import { ProjectLaunchpad } from './ProjectLaunchpad';
 import { WorkCatchUp } from './WorkCatchUp';
+import { WorkHeader } from './WorkHeader';
 
 const ManagedTaskView = lazy(() =>
   import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),
 );
 const LiveSessionView = lazy(() =>
   import('../sessions/LiveSessionView').then((m) => ({ default: m.LiveSessionView })),
+);
+const ExternalSessionView = lazy(() =>
+  import('../sessions/ExternalSessionView').then((m) => ({ default: m.ExternalSessionView })),
 );
 const TaskDetail = lazy(() => import('./TaskDetail').then((m) => ({ default: m.TaskDetail })));
 const ProjectQueue = lazy(() =>
@@ -50,13 +57,15 @@ const ArchivedHistory = lazy(() =>
 export function TaskWorkspace({
   onCapture,
   onSchedule,
-  composerVisible = true,
   composerFocus = 0,
+  composerSeed,
+  onComposerSeedApplied,
 }: {
   onCapture: (ideaId?: string) => void;
   onSchedule: (runId: string) => void;
-  composerVisible?: boolean;
   composerFocus?: number;
+  composerSeed?: ComposerSeed | null;
+  onComposerSeedApplied?: (seed: ComposerSeed) => void;
 }) {
   const { projects, activeProjectId } = useProjectStore(
     useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
@@ -72,15 +81,21 @@ export function TaskWorkspace({
   const runs = useExecutionStore((state) => state.runs);
   const sessions = useLiveSessionStore((state) => state.sessions);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
-  const sessionRuns = useLiveSessionStore((state) => state.runs);
-  const allRuns = useMemo(
-    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-    [runs, sessionRuns],
+  const external = useExternalSessionStore((state) =>
+    state.sessions.find((session) => session.key === state.selectedKey),
   );
+  const sessionRuns = useLiveSessionStore((state) => state.runs);
+  const allRuns = useAllRuns();
   const selectedId = useExecutionStore((state) => state.selectedId);
   const select = useExecutionStore((state) => state.select);
   const loading = useExecutionStore((state) => state.loading);
-  const error = useExecutionStore((state) => state.error) || managed.error;
+  // Paused dispatches have their own notices; other queue errors show as they are.
+  const pausedMessages = pausedDispatchMessages(managed.queue?.pausedIntegrations, managed.error);
+  /** Why General could not be opened from the switcher. */
+  const [generalError, setGeneralError] = useState('');
+  const error =
+    useExecutionStore((state) => state.error) ||
+    (parseDispatchPaused(managed.error) ? null : managed.error);
   const ideas = useTaskStore((state) => state.tasks);
   const {
     scope,
@@ -102,24 +117,28 @@ export function TaskWorkspace({
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
   const [parallel, setParallel] = useState(false);
-  const [composerExpanded, setComposerExpanded] = useState(false);
+  /** A launchpad starting point, handed to the composer like any other seed. */
+  const [starterSeed, setStarterSeed] = useState<ComposerSeed | null>(null);
   const hasWork = !!(
     runs.length ||
     ideas.length ||
     sessions.length ||
     managed.queue.managedTasks?.length
   );
-  const previousProject = useRef(activeProjectId);
+  // The mascot stays quiet about work this list already shows.
   useEffect(() => {
-    if (previousProject.current === activeProjectId) return;
-    previousProject.current = activeProjectId;
-    setComposerExpanded(false);
+    useCompanionStore.getState().setOnWorkList(true);
+    return () => useCompanionStore.getState().setOnWorkList(false);
+  }, []);
+  const previousList = useRef(projectFilter);
+  useEffect(() => {
+    if (previousList.current === projectFilter) return;
+    previousList.current = projectFilter;
     setArchived(false);
     setParallel(false);
-  }, [activeProjectId]);
+  }, [projectFilter]);
   useEffect(() => {
     if (!composerFocus) return;
-    setComposerExpanded(true);
     setArchived(false);
     setParallel(false);
     const frame = requestAnimationFrame(() => {
@@ -148,8 +167,7 @@ export function TaskWorkspace({
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
-      if (item.session) useProjectStore.getState().selectProject(item.session.request.projectId);
-      if (item.managed || item.session || item.run) selectWork(workTarget(item));
+      if (item.managed || item.session || item.run) openWork(item);
       else if (item.idea) {
         // A draft opens in the composer over whichever task was open.
         selectWork({ task: useExecutionStore.getState().selectedId ?? undefined });
@@ -169,32 +187,23 @@ export function TaskWorkspace({
   const project = projects.find(
     (p) => p.id === (projectFilter === 'all' ? activeProjectId : projectFilter),
   );
-  const items = useMemo(
-    () =>
-      collectWorkspaceWork(
-        projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
-        ideas,
-        allRuns,
-        sessions,
-        integratedIds,
-        archived,
-        managed.queue,
-      ),
-    [projectFilter, ideas, allRuns, sessions, integratedIds, archived, managed.queue],
-  );
+  const items = useWorkspaceWork({
+    projectId: projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
+    archived,
+  });
   const archiveItems = async (selected: WorkItem[], archive: boolean) => {
     const failures: string[] = [];
     const updatedRuns: string[] = [];
     for (const item of selected) {
       try {
         if (item.run) {
-          await nativeTask('task_set_archived', { id: item.run.id, archived: archive });
+          await invokeNative('task_set_archived', { id: item.run.id, archived: archive });
           updatedRuns.push(item.run.id);
         } else if (item.idea) {
           useTaskStore.getState().setArchived(item.idea.id, archive);
         }
       } catch (cause) {
-        failures.push(`${item.title}: ${String(cause)}`);
+        failures.push(`${item.title}: ${describeError(cause)}`);
       }
     }
     await useExecutionStore.getState().refresh();
@@ -265,6 +274,12 @@ export function TaskWorkspace({
         <LiveSessionView key={selectedSession.id} session={selectedSession} runs={sessionRuns} />
       </Suspense>
     );
+  if (external && (projectFilter === 'all' || external.projectId === projectFilter))
+    return (
+      <Suspense fallback={<LoadingState label="Loading conversation…" />}>
+        <ExternalSessionView key={external.key} session={external} />
+      </Suspense>
+    );
   if (parallel && project)
     return (
       <Suspense fallback={<LoadingState label="Loading queue…" />}>
@@ -272,77 +287,64 @@ export function TaskWorkspace({
       </Suspense>
     );
 
+  // The page's commands share the work list's menu; without a list they get their own.
+  // New work is the composer bar, and Repo TODOs is a project page view.
+  const pageMenuItems = project && (
+    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+      <Workflow size={16} aria-hidden="true" />
+      Plan feature work
+    </Menu.Item>
+  );
+  // Its starting points are code work, which General never holds.
+  const general = isGeneralProject(project);
+  const launchpad = project && projectFilter !== 'all' && !general && (
+    <ProjectLaunchpad
+      project={project}
+      onStart={(text) => setStarterSeed({ id: crypto.randomUUID(), text })}
+    />
+  );
   return (
     <WorkspacePage className="task-home">
-      <WorkspaceHeading
-        title="Work"
-        action={
-          <div className="task-home-actions">
-            {hasWork && !(composerVisible && composerExpanded) && (
-              <Button
-                onClick={() => {
-                  setComposerExpanded(true);
-                  requestAnimationFrame(() => {
-                    const input =
-                      document.querySelector<HTMLTextAreaElement>('.task-home textarea');
-                    input?.focus();
-                    input?.scrollIntoView({ block: 'center' });
-                  });
-                }}
-              >
-                <Plus size={16} />
-                New work
-              </Button>
-            )}
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="outline" aria-label="More work actions">
-                  <MoreHorizontal size={18} />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
-                  <Menu.Item className="workspace-menu-item" onSelect={() => onCapture()}>
-                    <Radio size={16} />
-                    Save a draft
-                  </Menu.Item>
-                  {project && (
-                    <Menu.Item
-                      className="workspace-menu-item"
-                      onSelect={() => navigateWorkspace('repo-todos')}
-                    >
-                      <ListTodo size={16} />
-                      Repo TODOs
-                    </Menu.Item>
-                  )}
-                  {project && (
-                    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
-                      <Workflow size={16} />
-                      Plan feature work
-                    </Menu.Item>
-                  )}
-                </Menu.Content>
-              </Menu.Portal>
-            </Menu.Root>
-          </div>
-        }
+      <WorkHeader
+        scope={scope}
+        project={project}
+        onScopeChange={(next) => {
+          setGeneralError('');
+          setScope(next);
+        }}
+        onError={setGeneralError}
       />
-      {composerVisible && (!hasWork || composerExpanded) && (
-        <SessionStart
-          embedded
-          key={project?.id ?? 'none'}
-          project={project}
-          starters={!hasWork}
-          onOpenProject={() => useOnboardingStore.getState().begin()}
-        />
+      {generalError && (
+        <InlineNotice tone="error" action={<DismissButton onDismiss={() => setGeneralError('')} />}>
+          {generalError}
+        </InlineNotice>
       )}
+      <SessionStart
+        embedded
+        seed={starterSeed ?? composerSeed}
+        onSeedApplied={(seed) => {
+          if (seed.id === starterSeed?.id) setStarterSeed(null);
+          else onComposerSeedApplied?.(seed);
+        }}
+        key={project?.id ?? 'none'}
+        project={project}
+        starters={!hasWork && !launchpad && !general}
+        onOpenProject={() => useOnboardingStore.getState().begin()}
+      />
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (
         <div className="sr-only">
           <WorkspaceSectionHeading titleId="task-work" title="Your work" />
         </div>
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
+      <DispatchPausedNotices
+        messages={pausedMessages}
+        onShowProject={(projectId) => {
+          useProjectStore.getState().selectProject(projectId);
+          setScope('project');
+        }}
+      />
       {hasWork && !archived && <WorkCatchUp />}
       {hasWork ? (
         <Suspense fallback={<LoadingState label="Loading work list…" />}>
@@ -351,44 +353,39 @@ export function TaskWorkspace({
             archived={archived}
             onArchive={archiveItems}
             onArchivedChange={setArchived}
-            scope={
-              <Select
-                aria-label="Filter by project"
-                value={scope}
-                onValueChange={(value) => setScope(value as 'all' | 'project')}
-              >
-                <SelectItem value="all">All projects</SelectItem>
-                <SelectItem value="project">{project?.name ?? 'No project yet'}</SelectItem>
-              </Select>
-            }
+            menuItems={pageMenuItems}
             emptyState={
-              <EmptyState
-                icon={FolderOpen}
-                title={
-                  archived
-                    ? 'No archived tasks'
-                    : projectFilter === 'all'
-                      ? 'No current tasks'
-                      : 'No tasks in this project'
-                }
-                description={
-                  archived
-                    ? 'Tasks you archive will appear here.'
-                    : 'Start new work, or browse repository TODOs to find tasks.'
-                }
-                action={
-                  projectFilter !== 'all' && projects.length > 1 ? (
-                    <Button variant="outline" onClick={() => setScope('all')}>
-                      Show all projects
-                    </Button>
-                  ) : archived ? undefined : (
-                    <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
-                      <ListTodo size={16} />
-                      Browse Repo TODOs
-                    </Button>
-                  )
-                }
-              />
+              !archived && launchpad ? (
+                launchpad
+              ) : (
+                <EmptyState
+                  icon={FolderOpen}
+                  title={
+                    archived
+                      ? 'No archived tasks'
+                      : projectFilter === 'all'
+                        ? 'No current tasks'
+                        : 'No tasks in this project'
+                  }
+                  description={
+                    archived
+                      ? 'Tasks you archive will appear here.'
+                      : 'Start new work, or browse repository TODOs to find tasks.'
+                  }
+                  action={
+                    projectFilter !== 'all' && projects.length > 1 ? (
+                      <Button variant="outline" onClick={() => setScope('all')}>
+                        Show all projects
+                      </Button>
+                    ) : archived ? undefined : (
+                      <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+                        <ListTodo size={16} />
+                        Browse Repo TODOs
+                      </Button>
+                    )
+                  }
+                />
+              )
             }
             view={view}
             onViewChange={setView}
@@ -396,7 +393,27 @@ export function TaskWorkspace({
             onOpen={openItem}
           />
         </Suspense>
-      ) : null}
+      ) : (
+        <>
+          {pageMenuItems && (
+            <div className="work-toolbar work-toolbar-solo">
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="ghost" aria-label="Work actions">
+                    <MoreHorizontal size={18} />
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                    {pageMenuItems}
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu.Root>
+            </div>
+          )}
+          {launchpad}
+        </>
+      )}
       {archived && (
         <Suspense fallback={<LoadingState label="Loading archive…" />}>
           <ArchivedHistory />

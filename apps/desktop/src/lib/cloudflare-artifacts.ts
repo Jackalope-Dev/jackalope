@@ -1,7 +1,6 @@
-import { syncAgentConfig } from '../stores/agentConfigStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
+import { invokeNative } from './native/transport';
 import { commitProjectSetup, projectGitState } from './project-setup';
-import { nativeTask } from './task-runtime';
 
 export { suggestRepoName, validRepoName } from './artifacts-repo-name';
 
@@ -26,6 +25,8 @@ export interface CloudflareAccount {
 
 export interface ArtifactsProjectLink {
   repository: boolean;
+  /** A repository's top level with no commits yet. */
+  unborn?: boolean;
   remote?: string | null;
   repo?: string | null;
   namespace?: string | null;
@@ -52,7 +53,7 @@ interface CreatedProject {
   pushError?: string | null;
 }
 
-export const artifactsStatus = () => nativeTask<ArtifactsStatus>('cloudflare_artifacts_status');
+export const artifactsStatus = () => invokeNative<ArtifactsStatus>('cloudflare_artifacts_status');
 
 export const connectArtifacts = (connection: {
   accountId: string;
@@ -60,43 +61,58 @@ export const connectArtifacts = (connection: {
   jurisdiction: ArtifactsJurisdiction;
   token: string;
 }) =>
-  nativeTask<ArtifactsStatus>('cloudflare_artifacts_connect', {
+  invokeNative<ArtifactsStatus>('cloudflare_artifacts_connect', {
     connection: { ...connection, jurisdiction: connection.jurisdiction || null },
   });
 
-export const disconnectArtifacts = () => nativeTask<void>('cloudflare_artifacts_disconnect');
+/** The accounts a pasted API token covers, so only the token needs pasting. */
+export const cloudflareTokenAccounts = (token: string) =>
+  invokeNative<CloudflareAccount[]>('cloudflare_token_accounts', { token });
 
-/** Prepares Connect Cloudflare and returns the consent page to open in the browser. */
-export const beginCloudflareSignIn = () => nativeTask<string>('cloudflare_oauth_begin');
+export const disconnectArtifacts = () => invokeNative<void>('cloudflare_artifacts_disconnect');
+
+/**
+ * Prepares Connect Cloudflare and returns the consent page to open in the browser.
+ * `scopes` asks for extra product access, such as creating D1 databases.
+ */
+export const beginCloudflareSignIn = (options: { workers?: boolean; scopes?: string[] } = {}) =>
+  invokeNative<string>('cloudflare_oauth_begin', {
+    workers: options.workers ?? false,
+    scopes: options.scopes ?? null,
+  });
 /** Waits for the browser to return; resolves with the accounts the person shared. */
 export const completeCloudflareSignIn = () =>
-  nativeTask<CloudflareAccount[]>('cloudflare_oauth_complete');
-export const cancelCloudflareSignIn = () => nativeTask<void>('cloudflare_oauth_cancel');
+  invokeNative<CloudflareAccount[]>('cloudflare_oauth_complete');
+export const cancelCloudflareSignIn = () => invokeNative<void>('cloudflare_oauth_cancel');
 export const connectCloudflareAccount = (connection: {
   accountId: string;
   namespace: string;
   jurisdiction: ArtifactsJurisdiction;
 }) =>
-  nativeTask<ArtifactsStatus>('cloudflare_oauth_connect', {
+  invokeNative<ArtifactsStatus>('cloudflare_oauth_connect', {
     ...connection,
     jurisdiction: connection.jurisdiction || null,
   });
 
+/** Saves a newer sign-in for the connected account, keeping its namespace. */
+export const reauthorizeCloudflare = () =>
+  invokeNative<ArtifactsStatus>('cloudflare_oauth_reauthorize');
+
 export const artifactsProject = (projectPath: string) =>
-  nativeTask<ArtifactsProjectLink>('cloudflare_artifacts_project', { projectPath });
+  invokeNative<ArtifactsProjectLink>('cloudflare_artifacts_project', { projectPath });
 
 export const convertToArtifacts = (projectPath: string, repoName: string, description: string) =>
-  nativeTask<ArtifactsPushResult>('cloudflare_artifacts_convert', {
+  invokeNative<ArtifactsPushResult>('cloudflare_artifacts_convert', {
     projectPath,
     repoName,
     description,
   });
 
 export const pushToArtifacts = (projectPath: string) =>
-  nativeTask<ArtifactsPushResult>('cloudflare_artifacts_push', { projectPath });
+  invokeNative<ArtifactsPushResult>('cloudflare_artifacts_push', { projectPath });
 
 export const shareArtifactsReview = (projectPath: string, hours: 1 | 24 | 168) =>
-  nativeTask<ArtifactsReviewShare>('cloudflare_artifacts_share', { projectPath, hours });
+  invokeNative<ArtifactsReviewShare>('cloudflare_artifacts_share', { projectPath, hours });
 
 /** Creates the Artifacts repository and the local folder, then pushes the first commit. */
 export async function createArtifactsProject(
@@ -105,8 +121,7 @@ export async function createArtifactsProject(
   repoName: string,
   options: { provisional?: boolean } = {},
 ): Promise<{ project: Project; pushError?: string }> {
-  await syncAgentConfig();
-  const created = await nativeTask<CreatedProject>('cloudflare_artifacts_create_project', {
+  const created = await invokeNative<CreatedProject>('cloudflare_artifacts_create_project', {
     name: name.trim(),
     parentPath,
     repoName,
@@ -123,7 +138,6 @@ export async function createArtifactsProject(
         name: created.project.name,
         path: created.project.path,
         ...projectGitState(created.project),
-        agentProvider: 'codex' as const,
         worktrees: [],
       };
   return {

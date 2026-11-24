@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { appendFile, writeFile } from 'node:fs/promises';
 
+// Cheap local prefilter: output without one of these summaries cannot be
+// projected by the native endpoint, so it never leaves the process.
+const SUMMARY_MARKERS = [
+  ' passed',
+  '# pass ',
+  ' target(s) in ',
+  'ok  \t',
+  'Projects in this build:',
+];
+
 export default async function nativeTools() {
   const mode = process.env.JACKALOPE_NATIVE_TOOLS;
   const endpoint = process.env.JACKALOPE_BRIDGE_URL;
@@ -37,7 +47,7 @@ export default async function nativeTools() {
       const bytes = Buffer.byteLength(original);
       if (bytes <= 2000 || bytes > 50_000 || capturedBytes + pendingBytes + bytes > 20_000_000)
         return;
-      if (!original.includes(' passed') && !original.includes('# pass ')) return;
+      if (!SUMMARY_MARKERS.some((marker) => original.includes(marker))) return;
       const body = JSON.stringify({ output: original, exit_code: 0, truncated: false });
       if (Buffer.byteLength(body) > 60_000) return;
       const started = performance.now();

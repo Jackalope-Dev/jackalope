@@ -89,6 +89,15 @@ fn read(project: &Path, limit: usize) -> Result<Vec<GraphLine>, String> {
     Ok(parse(&String::from_utf8_lossy(&output.stdout)))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::commit_graph::project_commit_graph,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 /// Recent commits across local branches, newest first, with graph drawing.
 #[tauri::command]
 pub async fn project_commit_graph(

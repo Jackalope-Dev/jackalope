@@ -1,11 +1,10 @@
-import { syncAgentConfig } from '../stores/agentConfigStore.ts';
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 export interface QueueItem {
   stagedDependencies?: boolean;
   feature?: string | null;
   featureId?: string | null;
-  contextSelection?: import('./knowledge').ContextSelection;
+  contextSelection?: import('./knowledge-types.ts').ContextSelection;
   id: string;
   projectId: string;
   title: string;
@@ -90,10 +89,28 @@ export interface QueueView {
   items: QueueItem[];
   messages: QueueMessage[];
   enabledProjects: string[];
+  /** Agents that may run at once on this device. */
   concurrency: number;
+  /** Whether `concurrency` follows `recommendedConcurrency`. */
+  automaticConcurrency?: boolean;
+  /** What this device's CPUs and memory can run at once. */
+  recommendedConcurrency?: number;
+  maxConcurrency?: number;
+  /** Agents that may run at once on project computers, apart from `concurrency`. */
+  remoteConcurrency?: number;
   bridgeUrl: string | null;
   bridgeError: string | null;
   mergedRunIds: string[];
+  /** Applied integrations whose merge left the target branch; their dependents wait. */
+  pausedIntegrations?: PausedIntegration[];
+}
+interface PausedIntegration {
+  planId: string;
+  projectPath: string;
+  targetBranch: string;
+  commit: string;
+  /** The native explanation, in the same wording dispatch reports. */
+  message: string;
 }
 export interface IntegrationPlan {
   id: string;
@@ -129,13 +146,11 @@ export async function queueCommand<T>(
   command: QueueCommand,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  if (command === 'queue_dispatch' || command === 'queue_add' || command === 'queue_import')
-    await syncAgentConfig();
-  return nativeTask<T>(command, args);
+  return invokeNative<T>(command, args);
 }
 export const queueSnapshot = () => queueCommand<QueueView>('queue_snapshot');
-export const integrationPlans = () => nativeTask<IntegrationPlan[]>('integration_plans');
+export const integrationPlans = () => invokeNative<IntegrationPlan[]>('integration_plans');
 export const prepareIntegration = (runIds: string[], commitMessage?: string) =>
-  nativeTask<IntegrationPlan>('integration_prepare', { runIds, commitMessage });
+  invokeNative<IntegrationPlan>('integration_prepare', { runIds, commitMessage });
 export const applyIntegration = (planId: string, cleanup = false) =>
-  nativeTask<IntegrationPlan>('integration_apply', { planId, cleanup });
+  invokeNative<IntegrationPlan>('integration_apply', { planId, cleanup });

@@ -77,7 +77,9 @@
     color: var(--color-text-primary);
     font-size: var(--text-sm, 0.875rem);
     line-height: 1.5;
-    transition: border-color 140ms ease;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
   }
   .form-control-multiline {
     resize: vertical;
@@ -85,10 +87,11 @@
   .form-control:hover:not(:disabled):not(:focus-visible) {
     border-color: var(--color-text-muted);
   }
-  /* Inset so scrolling dialogs and panels never clip the ring of a full-width field. */
+  /* Focus sits on the field's own edge, so scrolling dialogs and panels never clip it. */
   .form-control:focus-visible {
-    outline: 2px solid var(--color-border-focus);
-    outline-offset: -1px;
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-border-focus) 45%, transparent);
   }
   .form-control:disabled {
     cursor: not-allowed;
@@ -107,7 +110,7 @@
     flex-wrap: wrap;
     gap: 8px 12px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--radius-md, 8px);
     background: color-mix(in srgb, var(--notice-color) 7%, transparent);
     color: var(--notice-color);
     font-size: var(--text-sm, 0.875rem);
@@ -135,6 +138,15 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+  }
+  /* With an action, the icon, text and button share one center line rather than a short
+     line of text sitting at the top of a taller button. */
+  .inline-notice:has(> .inline-notice-action) {
+    align-items: center;
+    padding-block: 8px;
+  }
+  .inline-notice:has(> .inline-notice-action) > svg {
+    margin-top: 0;
   }
   @media (max-width: 600px) {
     .app-dialog.task-dialog {
@@ -169,4 +181,13 @@
     box-shadow: var(--shadow-pop);
     color: var(--color-text-primary);
   }
+}
+
+/* Unlayered, so a confirm dialog also stacks above an app's own dialog z-index
+   (the desktop styles task-dialog without a layer). */
+:is(.ui-dialog-overlay, .task-dialog-overlay)[data-layer="confirm"] {
+  z-index: 90;
+}
+:is(.ui-dialog, .task-dialog)[data-layer="confirm"] {
+  z-index: 91;
 }

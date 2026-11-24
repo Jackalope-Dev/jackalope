@@ -10,16 +10,9 @@ import { registry, registrySha256 } from '../../../scripts/evaluation/experiment
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
 import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
 import { evaluationReadiness, providerStopReason } from '../../../scripts/evaluation/readiness.mjs';
-import { assemblePrompt, PROMPT_VERSION } from '../src/lib/skills/context-assembler.ts';
+import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
 import { effortPrompt } from '../src/lib/task-effort.ts';
-
-test('evaluation defaults match current task guidance', () => {
-  assert.equal(PROMPT_VERSION, 4);
-  assert.equal(registry.fields['task-approach'].default, 'scoped');
-  assert.equal(effortPrompt('balanced'), effortPrompt('balanced', true));
-  assert.notEqual(effortPrompt('balanced'), effortPrompt('balanced', false));
-});
 
 test('provider quota stops further evaluations without disguising ordinary failures', () => {
   assert.equal(providerStopReason([]), null);

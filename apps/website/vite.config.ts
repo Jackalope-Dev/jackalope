@@ -1,15 +1,46 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
 import { Resvg } from '@resvg/resvg-js';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
-import changelog from './src/changelog.json' with { type: 'json' };
-import { normalizePath, siteOrigin } from './src/content.ts';
+import { agentDiscoveryFiles } from './src/agent-discovery.ts';
+import type { ReleaseMap } from './src/changelog.ts';
+import { normalizePath, siteOrigin, updatesWith } from './src/content.ts';
 import { platformDownloads } from './src/platform-downloads.ts';
 import { discoveryFiles, pageHtml, routes } from './src/seo.ts';
 
-export default defineConfig(({ mode }) => {
+/**
+ * Release state for changelog entries. The website build passes the map it read
+ * from release tags (and stops when it cannot read any); the dev server reads
+ * local tags itself and falls back to Coming soon when there are none.
+ */
+function changelogReleases(): ReleaseMap {
+  if (process.env.JACKALOPE_CHANGELOG_RELEASES)
+    return JSON.parse(process.env.JACKALOPE_CHANGELOG_RELEASES) as ReleaseMap;
+  if (process.env.CHANGELOG_RELEASES === 'skip') return {};
+  try {
+    return JSON.parse(
+      execFileSync(
+        process.execPath,
+        [fileURLToPath(new URL('../../scripts/release/changelog-releases.mjs', import.meta.url))],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true },
+      ),
+    ) as ReleaseMap;
+  } catch {
+    return {};
+  }
+}
+
+/** LopeBase's page counter, after a stub that queues conversions reported before it loads. */
+const pageCounter = [
+  '<script>window.lopebase=window.lopebase||{q:[],conversion:function(){window.lopebase.q.push(arguments)}};</script>',
+  '<script defer src="https://app.lopebase.com/lb.js" data-site="jackalope.jackalope._l9ChvQTrEHDcH1B"></script>',
+].join('\n');
+
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   platformDownloads(env);
   const site = new URL(env.VITE_SITE_URL || siteOrigin);
@@ -32,11 +63,13 @@ export default defineConfig(({ mode }) => {
   const favicon = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="${characterMarkViewBox}"><title>Jackalope</title><rect x="25" y="-3" width="128" height="128" rx="26" fill="#ffffff"/><g fill="#171717">${mark}</g></svg>`;
   const renderIcon = (size: number) =>
     new Resvg(favicon, { fitTo: { mode: 'width', value: size } }).render().asPng();
+  const releases = changelogReleases();
   // Published so the admin broadcast composer can read the same product notes
-  // the site shows, instead of keeping a second copy that drifts.
+  // the site shows, with the same release state, instead of a copy that drifts.
   const files = {
-    ...discoveryFiles(site.origin, env),
-    'changelog.json': JSON.stringify(changelog),
+    ...discoveryFiles(site.origin, env, releases),
+    ...agentDiscoveryFiles(site.origin),
+    'changelog.json': JSON.stringify(updatesWith(releases)),
   };
   const icons = {
     'favicon-32.png': renderIcon(32),
@@ -91,7 +124,18 @@ export default defineConfig(({ mode }) => {
           });
         },
         transformIndexHtml(html, context) {
-          return pageHtml(html, context.path === '/index.html' ? '/' : context.path, site.origin);
+          const page = pageHtml(
+            html,
+            context.path === '/index.html' ? '/' : context.path,
+            site.origin,
+            env,
+          );
+          // The cookieless page counter belongs to the canonical site: development
+          // servers and builds for another origin do not report to it. Prerendering
+          // reuses this built head, so every page carries the tag once.
+          return command === 'build' && site.origin === siteOrigin
+            ? page.replace('</head>', `${pageCounter}\n</head>`)
+            : page;
         },
         generateBundle() {
           this.emitFile({ type: 'asset', fileName: 'favicon.svg', source: favicon });
@@ -100,6 +144,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
+    define: { __CHANGELOG_RELEASES__: JSON.stringify(releases) },
     server: { port: 5180, strictPort: true },
     preview: { port: 5180, strictPort: true },
     build: {

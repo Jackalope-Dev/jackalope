@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { RELEASE_CHANNELS } from '../../packages/contracts/src/platform.ts';
+import { cloudTargets } from '../../packages/contracts/src/release.ts';
 import {
   allowedActions,
   branchProtection,
@@ -6,6 +8,8 @@ import {
   environmentProtection,
   managedRulesets,
 } from './github-policy.mjs';
+
+const unixTargets = cloudTargets.filter((target) => target !== 'windows-x86_64');
 
 const args = process.argv.slice(2);
 const value = (name) => args[args.indexOf(name) + 1];
@@ -149,19 +153,19 @@ for (const [name, value] of Object.entries({
   CLOUD_DRAFT_UPLOAD_ENABLED: 'false',
   CLOUD_SIGNING_READY: 'false',
   APPLE_SIGNING_READY: 'false',
-  CLOUD_RELEASE_TARGETS: '["darwin-aarch64","darwin-x86_64","linux-x86_64"]',
+  CLOUD_RELEASE_TARGETS: JSON.stringify(unixTargets),
   CLOUD_ACCEPTED_TARGETS: '[]',
   CLOUD_BETA_TEST_TARGETS: '[]',
 })) {
   if (!variables.some((variable) => variable.name === name))
     api(`${prefix}/actions/variables`, 'POST', { name, value });
 }
-const cloudTargets = variables.find(({ name }) => name === 'CLOUD_RELEASE_TARGETS');
-if (cloudTargets) {
-  const unix = JSON.parse(cloudTargets.value).filter((target) => target !== 'windows-x86_64');
+const configuredTargets = variables.find(({ name }) => name === 'CLOUD_RELEASE_TARGETS');
+if (configuredTargets) {
+  const unix = JSON.parse(configuredTargets.value).filter((target) => target !== 'windows-x86_64');
   api(`${prefix}/actions/variables/CLOUD_RELEASE_TARGETS`, 'PATCH', {
     name: 'CLOUD_RELEASE_TARGETS',
-    value: JSON.stringify(unix.length ? unix : ['darwin-aarch64', 'darwin-x86_64', 'linux-x86_64']),
+    value: JSON.stringify(unix.length ? unix : unixTargets),
   });
 }
 for (const name of ['CLOUD_ACCEPTED_TARGETS', 'CLOUD_BETA_TEST_TARGETS']) {
@@ -181,7 +185,7 @@ api(
   { name: 'RELEASE_DISTRIBUTION', value: 'store' },
 );
 const branches = list(`${prefix}/branches`);
-for (const branch of ['beta', 'stable']) {
+for (const branch of RELEASE_CHANNELS) {
   if (!branches.some(({ name }) => name === branch))
     api(`${prefix}/git/refs`, 'POST', {
       ref: `refs/heads/${branch}`,

@@ -1,5 +1,5 @@
+import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { FeedbackForm } from './FeedbackForm';
 import './settings.css';
 

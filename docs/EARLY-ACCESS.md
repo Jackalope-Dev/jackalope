@@ -1,16 +1,28 @@
-# Early access and invitations
+# Account access and invitations
+
+The website collects signups in D1. The `OPEN_SIGNUP` setting chooses how a signup
+becomes an approved member:
+
+- Open signup (`true`, the tracked production and staging setting): confirming the signup email
+  approves the member and starts a member sign-in session, so the person can pair a
+  desktop without a second email.
+- Waitlist mode (`false`, the tracked local setting): confirming the
+  email verifies a waitlist session and any newsletter request bound to that link,
+  but cannot grant membership or download access. An owner approves members from
+  `https://api.jackalope.dev/admin/access`, behind Cloudflare Access.
+
+Signup accepts addresses at reserved test domains (`example.com`, `example.net`,
+`example.org`, `.test`, `.invalid`, `.example`, `.localhost`, `.local`) and at
+throwaway inbox domains, including their subdomains, with the same response as a
+real signup but stores nothing and sends no email, like the honeypot field. The
+throwaway list lives in `apps/server/src/access/signup-domains.ts`; add domains
+there when bot signups show up in the email history.
 
 See [waitlist referrals and passes](WAITLIST-REFERRALS.md) for ranked waitlists,
-separate status sessions and Instant Access Pass presentation. Signup confirmation
-verifies a waitlist session and any newsletter request bound to that link. With
-`OPEN_SIGNUP` off it cannot grant membership or download access; with it on, the
-confirmation approves that member and also starts a member sign-in session, so the
-person can pair a desktop without a second email.
-
-The website collects admission requests in D1. An owner approves them from
-`https://api.jackalope.dev/admin/access`, behind Cloudflare Access. The worker also
-verifies the Access JWT issuer, audience, expiry, signature and exact owner email.
-Public request bodies cannot approve members or choose invitation limits.
+separate status sessions and Instant Access Pass presentation in waitlist mode.
+The worker verifies the Access JWT issuer, audience, expiry, signature and exact
+owner email for every admin request. Public request bodies cannot approve members
+or choose invitation limits.
 
 The admin dashboard includes setup checks, access filters/search, person details,
 website/desktop sign-in progress, recent email history and confirmed access actions.
@@ -36,9 +48,9 @@ inbox acceptance.
   Accepted invitations remain counted, including after access revocation.
   Owners see their invitees' emails and acceptance status; recipients see that
   disclosure before accepting through a shared link.
-- The gate covers the member hub and private prerelease downloads. Every desktop
-  build requires approved account access for new native work. Standalone agent
-  CLI use remains independent of Jackalope sign-in; see
+- The gate covers the member hub and member download links, which record the
+  first download. Every desktop build requires approved account access for new
+  native work. Standalone agent CLI use remains independent of Jackalope sign-in; see
   [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) and [STORE-RELEASE.md](STORE-RELEASE.md).
 
 ## Configuration
@@ -54,7 +66,7 @@ older mail remains readable without a delivery lookup reference.
 | Setting | Value / purpose |
 | --- | --- |
 | `EARLY_ACCESS_ENABLED` | `true` after migration, email and owner policy setup |
-| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch. CI deploys take it from `PRODUCTION_OPEN_SIGNUP` / `STAGING_OPEN_SIGNUP` or the `COMMUNITY_CONFIG` JSON; otherwise the tracked value applies (`true` in production, `false` elsewhere) |
+| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch. CI deploys take it from `PRODUCTION_OPEN_SIGNUP` / `STAGING_OPEN_SIGNUP` or the `COMMUNITY_CONFIG` JSON; otherwise the tracked value applies (`true` in production and staging, `false` locally). Staging sends real email, so keep it on unless waitlist copy is wanted there |
 | `ACCESS_WEB_ORIGIN` | Exact HTTPS marketing origin, normally `https://jackalope.dev` |
 | `ACCESS_EMAIL_FROM` | Verified Sequenzy sender, `Jackalope <hello@hello.jackalope.dev>` |
 | `ACCESS_EMAIL_REPLY_TO` | `contact@jackalope.dev` |
@@ -65,7 +77,7 @@ older mail remains readable without a delivery lookup reference.
 | `ACCESS_SECRET` | Worker secret, independent random 32+ characters for each environment |
 | `SEQUENZY_API_KEY` | Worker secret with `transactional:send`; verify minimum permission for email-send lookups before enabling admin delivery checks |
 | `VITE_ACCESS_API` | Website build variable, `https://api.jackalope.dev` |
-| `VITE_TURNSTILE_SITE_KEY` | Website build variable: the public key of a managed Turnstile widget for the website's hostname. Unset shows no challenge |
+| `VITE_TURNSTILE_SITE_KEY` | Website build variable: the public key of a managed Turnstile widget for the website's hostname. Unset, production builds use jackalope.dev's widget (`apps/website/src/Turnstile.tsx`); set it to an empty string to show no challenge, or to your own key for another hostname |
 | `TURNSTILE_SECRET` | Optional Worker secret for that widget. When set, signup requires a Siteverify-confirmed token for the `signup` action from the `ACCESS_WEB_ORIGIN` hostname and fails closed otherwise. Set the site key and secret together |
 
 The shared deployment helper reads individual `STAGING_` / `PRODUCTION_` settings
@@ -84,9 +96,10 @@ The worker denies admin requests even on a workers.dev URL without a valid JWT.
 
 ## Email and newsletter behavior
 
-New waitlist registrations queue a separate transactional signup confirmation in
-the same D1 batch as the member insert. It does not create an access token, grant
-approval, or require newsletter consent. Duplicate registrations without a new
+New signups queue a separate transactional signup confirmation in the same D1
+batch as the member insert. Queuing it does not create an access token, grant
+approval, or require newsletter consent; with open signup, consuming its link
+approves the member. Duplicate registrations without a new
 newsletter request do not resend confirmations. A new optional newsletter request
 can send an existing member a confirmation link, subject to the per-address
 cooldown. Confirmation mail does not
@@ -139,6 +152,9 @@ For unsynced newsletter consent, an operator may reset `newsletter_attempts` and
 `newsletter_next_at` for the affected consenting member after correcting the cause.
 Never reset `newsletter_synced_at` to resubscribe someone who opted out.
 
+Recurring product update emails are drafted and sent from LopeBase, which reads
+the website's public changelog feed. The admin composer remains for one-off notes.
+
 ## Private installers and rollout
 
 Approved members can also connect the desktop through browser approval using the
@@ -156,11 +172,12 @@ Upload only a reviewed, signed candidate to the selected private R2 bucket under
 `early-access/vX.Y.Z/Jackalope-setup.exe`, then set `ACCESS_INSTALLER_KEY` in the
 environment's deployment configuration. The authenticated download endpoint streams
 that object with `no-store`; the public update route rejects this prefix. Do not
-enable the R2 public development URL. No installer is seeded by this feature.
+enable the R2 public development URL. Deployment does not seed an installer, so the
+key stays empty until one is uploaded.
 
-Public stable/beta update feeds are a separate release decision. This feature does
-not retroactively make a published update object private. Keep public publication
-disabled while prerelease distribution is invite-only.
+The public stable and beta update feeds are separate from this private installer
+path. Setting `ACCESS_INSTALLER_KEY` does not make an already published update
+object private.
 
 For rollback, disable `EARLY_ACCESS_ENABLED`, clear `VITE_ACCESS_API` and rebuild
 the website. Preserve the additive D1 tables and Worker secrets for recovery.

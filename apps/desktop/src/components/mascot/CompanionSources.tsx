@@ -1,22 +1,25 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { useEffect, useMemo, useState } from 'react';
+import { navigateWorkspace, openSettings } from '../../lib/app-events';
+import { markAnnounced } from '../../lib/companion-announce';
 import { taskNotices } from '../../lib/companion-tasks';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type PlanSummary, planCommands } from '../../lib/plan-mode';
-import type { TaskRun } from '../../lib/task-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import type { TaskRun } from '../../lib/run-types';
+import { openRun, selectWork } from '../../lib/work-selection';
 import { useBotStore } from '../../stores/botStore';
+import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
 export function openCompanionTask(run: TaskRun) {
-  useProjectStore.getState().selectProject(run.projectId);
-  useExecutionStore.getState().select(run.id);
+  openRun(run.id);
   navigateWorkspace('kanban');
   requestAnimationFrame(() => document.getElementById('workspace-content')?.focus());
 }
@@ -41,7 +44,7 @@ export function CompanionSources() {
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let alive = true;
-    void nativeTask<{ state: string; email: string | null }>('app_account_status')
+    void invokeNative<{ state: string; email: string | null }>('app_account_status')
       .then((account) => {
         if (alive && account.state === 'connected' && account.email)
           setReferralAccount(account.email);
@@ -61,7 +64,7 @@ export function CompanionSources() {
       opening = true;
       try {
         while (alive) {
-          const id = await nativeTask<string | null>('notification_take_open');
+          const id = await invokeNative<string | null>('notification_take_open');
           if (!id || !alive) return;
           // Bot cards and suggestions open their bot rather than a task.
           if (id.startsWith('bot:')) {
@@ -80,7 +83,7 @@ export function CompanionSources() {
           else if (alive) navigateWorkspace('kanban');
         }
       } catch (error) {
-        if (alive) useNotificationStore.setState({ error: String(error) });
+        if (alive) useNotificationStore.setState({ error: describeError(error) });
       } finally {
         opening = false;
       }
@@ -94,7 +97,7 @@ export function CompanionSources() {
         } else stop();
       })
       .catch((error) => {
-        if (alive) useNotificationStore.setState({ error: String(error) });
+        if (alive) useNotificationStore.setState({ error: describeError(error) });
       });
     window.addEventListener('focus', open);
     return () => {
@@ -118,6 +121,20 @@ export function CompanionSources() {
   );
   const viewing = useWorkViewStore((state) => state.viewing);
   useCompanionNotices('tasks', taskNotices(runs, openCompanionTask, viewing));
+  // A task the person opens is seen: its notice counts as read and never pops up afterwards.
+  const viewedRun = viewing ? runs.find((item) => item.id === viewing) : undefined;
+  const viewed = viewedRun
+    ? taskNotices([viewedRun], () => {})
+        .map((notice) => notice.id)
+        .join('\n')
+    : '';
+  useEffect(() => {
+    if (!viewed) return;
+    const ids = viewed.split('\n');
+    markAnnounced(ids);
+    const { readIds, markRead } = useCompanionStore.getState();
+    if (ids.some((id) => !readIds.includes(id))) markRead(ids);
+  }, [viewed]);
   // Deviations are recorded as attempts report, so re-read plans when runs change.
   const runSignal = useMemo(() => runs.map((run) => `${run.id}:${run.status}`).join(), [runs]);
   const [waitingPlans, setWaitingPlans] = useState<PlanSummary[]>([]);
@@ -156,7 +173,10 @@ The work departed from the approved plan.`,
             detail: error,
             kind: 'attention',
             actionLabel: 'Open tasks',
-            onOpen: () => navigateWorkspace('live-sessions'),
+            onOpen: () => {
+              selectWork();
+              navigateWorkspace('kanban');
+            },
           },
         ]
       : [],

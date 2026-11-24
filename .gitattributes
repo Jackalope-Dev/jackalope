@@ -1,8 +1,12 @@
 * text=auto eol=lf
 patches/*.patch whitespace=-space-before-tab
+# Vendored upstream sources keep their original whitespace; provenance.json pins them.
+patches/whisper-rs-sys/** -whitespace
 *.png binary
 *.bmp binary
 *.ico binary
 *.icns binary
 *.webm binary
 *.woff2 binary
+# Captured tool output keeps its exact whitespace, such as Go's `ok  <tab>package`.
+apps/desktop/src-tauri/src/commands/verification/fixtures/** whitespace=-space-before-tab

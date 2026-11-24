@@ -89,6 +89,12 @@ pub struct Helper {
     runtime: TaskRuntime,
 }
 
+impl crate::services::Service for Helper {
+    fn shutdown(&self) {
+        Helper::stop(self)
+    }
+}
+
 impl Helper {
     pub fn new(directory: PathBuf, runtime: TaskRuntime) -> Self {
         let directory = directory.join("helper");
@@ -369,7 +375,6 @@ impl Helper {
     }
 }
 
-const HELPER_ADAPTERS: [&str; 5] = ["claude", "codex", "opencode", "grok", "kimi"];
 const ARCHIVE_LIMIT: usize = 100;
 
 fn account_key_for(binding: &agent_profiles::AccountBinding) -> String {
@@ -435,7 +440,12 @@ impl Helper {
         let policy = self.runtime.policy()?;
         let root = self.runtime.profiles_root();
         let mut agents = vec![policy.default_meta_agent.clone()];
-        agents.extend(HELPER_ADAPTERS.iter().map(|a| a.to_string()));
+        agents.extend(
+            super::agents::all()
+                .iter()
+                .filter(|agent| agent.orchestrates)
+                .map(|agent| agent.id.clone()),
+        );
         agents.retain(|agent| !agent.is_empty());
         let mut seen = std::collections::HashSet::new();
         agents.retain(|agent| seen.insert(agent.clone()));
@@ -444,7 +454,7 @@ impl Helper {
             let Ok((adapter, _)) = policy.resolve(&agent) else {
                 continue; // Not installed or disabled.
             };
-            if !HELPER_ADAPTERS.contains(&adapter.as_str()) {
+            if !super::agents::orchestrates(&adapter) {
                 continue;
             }
             let Ok(bindings) = agent_profiles::routing_accounts(&root, &adapter, None) else {
@@ -456,7 +466,7 @@ impl Helper {
                 {
                     continue;
                 }
-                let Ok(model) = policy.model_for_account(&agent, None, &binding) else {
+                let Ok(model) = policy.model_for_account(&root, &agent, None, &binding) else {
                     continue;
                 };
                 candidates.push(Candidate {
@@ -495,6 +505,7 @@ impl Helper {
                 candidate.model.as_deref(),
                 prompt,
                 canceled,
+                super::tasks::helper_process::TURN_LIMIT,
             )
             .and_then(|response| accept(&response.result).map(|value| (value, response)));
             match attempt {
@@ -588,6 +599,24 @@ fn usage_turn(turn: &Turn, archived: bool) -> HelperUsageTurn {
         source: turn.source.clone(),
     }
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::helper::helper_snapshot,
+            commands::helper::helper_usage,
+            commands::helper::helper_sync,
+            commands::helper::helper_send,
+            commands::helper::helper_sharpen,
+            commands::helper::helper_sharpen_cancel,
+            commands::helper::helper_stop,
+            commands::helper::helper_new_conversation,
+            commands::helper::helper_action,
+            commands::helper::helper_connection,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub fn helper_snapshot(helper: State<'_, Helper>) -> View {

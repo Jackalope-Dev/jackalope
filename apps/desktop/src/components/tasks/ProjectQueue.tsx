@@ -1,15 +1,23 @@
+import { isActive, isDone, isRetryable, statusLabel } from '@jackalope/contracts/runs';
 import {
   Badge,
+  Button,
+  ConfirmDialog,
   Disclosure,
   DisclosureSummary,
+  InlineNotice,
+  LoadingState,
   DropdownMenu as Menu,
   SegmentedNav,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
   CircleAlert,
   Clock3,
+  FileInput,
   GitMerge,
   GitPullRequest,
   Layers3,
@@ -21,6 +29,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { ownerComputer } from '../../lib/computers';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type QueueCommand,
   type QueueItem,
@@ -28,16 +38,11 @@ import {
   queueCommand,
   queueSnapshot,
 } from '../../lib/queue';
-import { isActive, nativeTask, statusLabel } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { stopTask } from '../../lib/task-client';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { AddWork } from './AddWork';
 import { CoordinationAutomation } from './CoordinationAutomation';
 import { CoordinationDecisions } from './CoordinationDecisions';
@@ -46,12 +51,17 @@ import { FeaturePlanner } from './FeaturePlanner';
 import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
+import { ActionError } from '../ui/ActionError';
 
 const emptyQueue: QueueView = {
   items: [],
   messages: [],
   enabledProjects: [],
   concurrency: 3,
+  automaticConcurrency: true,
+  remoteConcurrency: 8,
   bridgeUrl: null,
   bridgeError: null,
   mergedRunIds: [],
@@ -68,10 +78,32 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   const [importing, setImporting] = useState(false);
   const [tab, setTab] = useState('plan');
   const [filter, setFilter] = useState('all');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const {
+    run: runAction,
+    busy,
+    error,
+    setError,
+  } = useAction(async () => {
+    await load();
+    await refresh();
+  });
   const [loading, setLoading] = useState(true);
+  const [onComputer, setOnComputer] = useState(false);
   const desktop = isTauriEnvironment();
+  useEffect(() => {
+    if (!desktop) return;
+    let disposed = false;
+    ownerComputer({ kind: 'project', id: project.id })
+      .then((computer) => !disposed && setOnComputer(!!computer))
+      .catch(() => !disposed && setOnComputer(false));
+    return () => {
+      disposed = true;
+    };
+  }, [desktop, project.id]);
+  const remoteConcurrency = queue.remoteConcurrency ?? 8;
+  const recommended = queue.recommendedConcurrency;
+  const automatic = queue.automaticConcurrency ?? false;
+  const crowded = !automatic && recommended !== undefined && queue.concurrency > recommended;
   const load = async () => {
     if (desktop) setQueue(await queueSnapshot());
     setLoading(false);
@@ -86,7 +118,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           if (!disposed) setQueue(result);
         }
       } catch (error) {
-        if (!disposed) setError(String(error));
+        if (!disposed) setError(describeError(error));
       } finally {
         if (!disposed) {
           setLoading(false);
@@ -99,35 +131,18 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       disposed = true;
       clearTimeout(timer);
     };
-  }, [desktop]);
+  }, [desktop, setError]);
   const items = queue.items.filter((i) => i.projectId === project.id && !i.canceled);
   const enabled = queue.enabledProjects.includes(project.id);
-  const act = async (command: QueueCommand | 'task_stop', args: Record<string, unknown>) => {
-    setBusy(true);
-    setError('');
-    try {
-      if (command === 'task_stop') await nativeTask(command, args);
-      else await queueCommand(command, args);
-      await load();
-      await refresh();
-    } catch (error) {
-      setError(String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const act = (command: QueueCommand, args: Record<string, unknown>) =>
+    runAction(() => queueCommand(command, args));
   const state = (item: QueueItem) => {
     const original = runs.find((r) => r.id === item.runId);
     const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
     if (item.runId && queue.mergedRunIds.includes(item.runId)) return 'merged';
-    if (
-      item.error ||
-      run?.dependencyInvalidated ||
-      (run && ['failed', 'stopped', 'interrupted'].includes(run.status))
-    )
-      return 'attention';
+    if (item.error || run?.dependencyInvalidated || (run && isRetryable(run))) return 'attention';
     if (run && isActive(run)) return 'active';
-    if (run && ['review', 'reviewed'].includes(run.status)) return 'review';
+    if (run && isDone(run)) return 'review';
     if (item.runId) return 'attention';
     return 'queued';
   };
@@ -199,10 +214,11 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
             <Menu.Portal>
               <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
                 <Menu.Item className="workspace-menu-item" onSelect={() => setAdding(true)}>
-                  <ListPlus size={16} />
+                  <ListPlus size={16} aria-hidden="true" />
                   Add work
                 </Menu.Item>
                 <Menu.Item className="workspace-menu-item" onSelect={() => setImporting(true)}>
+                  <FileInput size={16} aria-hidden="true" />
                   Import a plan
                 </Menu.Item>
               </Menu.Content>
@@ -271,29 +287,72 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       ) : (
         <>
           <div className="queue-controls">
-            <label htmlFor="projectqueue-field-2" className="task-label">
-              Concurrent tasks
-              <Select
-                id="projectqueue-field-2"
-                aria-label="Concurrent tasks"
-                className="task-input"
-                value={String(queue.concurrency)}
-                disabled={busy || !desktop}
-                onValueChange={(value) =>
-                  void act('queue_dispatch', {
-                    projectId: project.id,
-                    enabled,
-                    concurrency: Number(value),
-                  })
-                }
-              >
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n} across projects
+            <div className="queue-limits">
+              <label htmlFor="projectqueue-field-2" className="task-label">
+                Concurrent tasks
+                <Select
+                  id="projectqueue-field-2"
+                  aria-label="Concurrent tasks"
+                  aria-describedby={crowded ? 'projectqueue-limit-note' : undefined}
+                  className="task-input"
+                  value={automatic ? 'automatic' : String(queue.concurrency)}
+                  disabled={busy || !desktop}
+                  onValueChange={(value) =>
+                    void act('queue_dispatch', {
+                      projectId: project.id,
+                      enabled,
+                      concurrency: value === 'automatic' ? value : Number(value),
+                    })
+                  }
+                >
+                  <SelectItem value="automatic">
+                    {recommended ? `Automatic (${recommended} on this computer)` : 'Automatic'}
                   </SelectItem>
-                ))}
-              </Select>
-            </label>
+                  {Array.from(
+                    { length: Math.max(queue.maxConcurrency ?? 6, queue.concurrency) },
+                    (_, i) => i + 1,
+                  ).map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} across projects{n === recommended ? ' (recommended)' : ''}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </label>
+              {crowded && (
+                <p id="projectqueue-limit-note" className="task-label queue-limit-note">
+                  More than {recommended} at once may slow this computer down.
+                </p>
+              )}
+              {onComputer && (
+                <label htmlFor="projectqueue-remote-limit" className="task-label">
+                  <span className="inline-flex items-center gap-2">
+                    On computers <Badge variant="accent">Beta</Badge>
+                  </span>
+                  <Select
+                    id="projectqueue-remote-limit"
+                    aria-label="Concurrent tasks on computers"
+                    className="task-input"
+                    value={String(remoteConcurrency)}
+                    disabled={busy || !desktop}
+                    onValueChange={(value) =>
+                      void act('queue_dispatch', {
+                        projectId: project.id,
+                        enabled,
+                        remoteConcurrency: Number(value),
+                      })
+                    }
+                  >
+                    {[...new Set([1, 2, 4, 8, 12, 16, 24, 32, remoteConcurrency])]
+                      .sort((a, b) => a - b)
+                      .map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} at once
+                        </SelectItem>
+                      ))}
+                  </Select>
+                </label>
+              )}
+            </div>
             <Button
               disabled={
                 !desktop ||
@@ -308,7 +367,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 void act('queue_dispatch', {
                   projectId: project.id,
                   enabled: !enabled,
-                  concurrency: queue.concurrency,
                 })
               }
             >
@@ -391,7 +449,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                         <p className="task-muted text-xs">{item.scopes.join(', ')}</p>
                       )}
                       {phase === 'queued' && <p className="queue-wait">{reason(item)}</p>}
-                      {item.error && <InlineNotice tone="error">{item.error}</InlineNotice>}
+                      <ActionError error={item.error} />
                       <Disclosure className="mt-2">
                         <DisclosureSummary className="task-summary">Task brief</DisclosureSummary>
                         <p className="queue-brief">{item.prompt}</p>
@@ -413,48 +471,42 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                             Retry in a new worktree
                           </Button>
                         )}
-                        {phase !== 'merged' && (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                aria-label={`More actions for ${item.title}`}
-                                disabled={busy}
-                              >
-                                <MoreHorizontal size={16} />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Portal>
-                              <Menu.Content className="workspace-menu" align="start" sideOffset={8}>
-                                {run && isActive(run) ? (
-                                  <Menu.Item
-                                    className="workspace-menu-item"
-                                    onSelect={() => void act('task_stop', { id: run.id })}
-                                  >
-                                    Stop agent
-                                  </Menu.Item>
-                                ) : item.runId ? (
-                                  <Menu.Item
-                                    className="workspace-menu-item"
-                                    onSelect={() =>
-                                      void act('queue_release', { id: item.id, retry: false })
-                                    }
-                                  >
-                                    Abandon & release scope
-                                  </Menu.Item>
-                                ) : (
-                                  <Menu.Item
-                                    className="workspace-menu-item"
-                                    onSelect={() => void act('queue_cancel', { id: item.id })}
-                                  >
-                                    Remove from plan
-                                  </Menu.Item>
-                                )}
-                              </Menu.Content>
-                            </Menu.Portal>
-                          </Menu.Root>
-                        )}
+                        {phase !== 'merged' &&
+                          (run && isActive(run) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void runAction(() => stopTask(run.id))}
+                            >
+                              Stop agent
+                            </Button>
+                          ) : (
+                            <ConfirmDialog
+                              trigger={
+                                <Button variant="ghost" size="sm" disabled={busy}>
+                                  {item.runId ? 'Abandon' : 'Remove'}
+                                </Button>
+                              }
+                              title={
+                                item.runId
+                                  ? `Abandon ${item.title}?`
+                                  : `Remove ${item.title} from the plan?`
+                              }
+                              description={
+                                item.runId
+                                  ? 'It leaves the plan and the files it reserved are released for other work. Its attempt and worktree are kept.'
+                                  : 'It leaves the plan before any agent starts on it.'
+                              }
+                              label={item.runId ? 'Abandon and release scope' : 'Remove from plan'}
+                              busyLabel={item.runId ? 'Releasing…' : 'Removing…'}
+                              onConfirm={async () => {
+                                await (item.runId
+                                  ? act('queue_release', { id: item.id, retry: false })
+                                  : act('queue_cancel', { id: item.id }));
+                              }}
+                            />
+                          ))}
                       </div>
                     </div>
                   </article>

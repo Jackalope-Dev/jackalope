@@ -40,7 +40,7 @@ export const growthPages: MarketingPage[] = [
     description:
       'Compare Jackalope with Codex app, Cursor, Superset, Orca, and other coding-agent workspaces by agent choice, execution, and review.',
     headline: 'Your agents are a choice. So is your workspace.',
-    lede: 'Choose a workspace around the way you brief agents, follow parallel work, and review changes. Here is how Jackalope fits.',
+    lede: "Choose a workspace around the way you brief agents, follow parallel work, and review changes. Here's how Jackalope fits.",
     image: 'review',
     signals: ['Your agent accounts', 'Project context', 'Parallel worktrees', 'Combined review'],
     sections: [
@@ -54,7 +54,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Match the workspace to the requirement.',
         paragraphs: [
-          'Use this to narrow a trial to the workflows you actually need. Jackalope’s current focus is local task continuity, project context, and combined review; remote hosts and shared human teams remain future work.',
+          "Use this to narrow a trial to the workflows you actually need. Jackalope's current focus is local task continuity, project context, and combined review; remote hosts and shared human teams remain future work.",
         ],
         table: {
           columns: ['Requirement', 'Products to examine', 'What to check'],
@@ -62,7 +62,7 @@ export const growthPages: MarketingPage[] = [
             [
               'Codex with local and cloud environments',
               'Codex app',
-              'Whether Codex’s own worktrees and Git review cover the workflow, or you need several agent CLIs together.',
+              "Whether Codex's own worktrees and Git review cover the workflow, or you need several agent CLIs together.",
             ],
             [
               'An integrated agent and cloud workflow',
@@ -159,7 +159,7 @@ export const growthPages: MarketingPage[] = [
             label: 'A worked parallel plan',
           },
           {
-            href: '/guides/review-ai-generated-code/',
+            href: '/blog/review-ai-generated-code-checklist/',
             label: 'What to inspect in the result',
           },
         ],
@@ -167,7 +167,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Separate availability from a roadmap.',
         paragraphs: [
-          'Jackalope is in early access. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative’s own site before making a purchase or migration decision.',
+          "Signing up for Jackalope is free, and downloads are public for Windows, macOS and Linux. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative's own site before making a purchase or migration decision.",
           'Treat workspace fees, model usage, and remote compute as separate costs. A documented feature is a reason to run a trial, not evidence that a particular account, repository, or deployment has passed one.',
         ],
         links: [
@@ -227,21 +227,21 @@ export const growthPages: MarketingPage[] = [
         title: 'Review the combination, not just each reply.',
         paragraphs: [
           'Two isolated tasks can still make incompatible assumptions. Jackalope prepares a combined patch for review and rechecks the source and target before integration. The final decision stays explicit.',
-          'The interface tour uses sample project data. Then try the same workflow on a disposable repository.',
+          'The interface tour uses sample project data. After watching it, try the same workflow on a disposable repository.',
         ],
       },
       {
         title: 'Recognize the point where bookkeeping becomes work.',
         paragraphs: [
           'Try your next two tasks with a short record beside each terminal: project, branch, account, requested result, and current blocker. If that is easy to maintain and your review tools preserve the evidence you need, a terminal workflow may be enough.',
-          'A workspace becomes more useful when you repeatedly reopen sessions to remember a decision, miss a waiting question, or lose track of which patch a test run covered. Those are observable costs you can compare with Jackalope’s task history and review flow when early access is available.',
+          "A workspace becomes more useful when you repeatedly reopen sessions to remember a decision, miss a waiting question, or lose track of which patch a test run covered. Those are observable costs you can compare with Jackalope's task history and review flow.",
         ],
       },
       {
         title: 'Move one workflow at a time.',
         paragraphs: [
           'Keep your existing editor and CLI configuration while trying one local project. Reproduce its build in a fresh task worktree, complete a small change, ask for a follow-up, and inspect the result. Include cleanup in the trial so you know where unfinished files remain.',
-          'You can still inspect worktrees with ordinary Git tools. Review project instructions and tool configuration in both places; adding a workspace does not remove the agent’s existing permissions or provider costs.',
+          "You can still inspect worktrees with ordinary Git tools. Review project instructions and tool configuration in both places; adding a workspace does not remove the agent's existing permissions or provider costs.",
         ],
         links: [
           {
@@ -257,16 +257,16 @@ export const growthPages: MarketingPage[] = [
     ],
     related: [
       { href: '/compare/', label: 'Compare coding-agent workspaces' },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
       { href: '/git-worktrees-for-ai-agents/', label: 'Understand Git worktrees' },
     ],
   },
   {
     path: '/features/browser-automation-for-coding-agents/',
     kind: 'Product guide',
-    title: 'Browser automation for coding agents | Jackalope',
+    title: 'Browser automation for coding agents: screenshots & a11y',
     description:
-      'Keep browser sessions, screenshots, and accessibility findings attached to coding-agent tasks in Jackalope.',
+      'Let Claude Code, Codex and other agents drive a browser: fill forms, capture screenshots at each size, and keep accessibility findings with the task.',
     headline: 'Give browser work a place in the task.',
     lede: 'A UI change needs more than a confident summary. Jackalope gives agent tasks owned browser sessions and recorded evidence you can return to during review.',
     image: 'review',
@@ -312,7 +312,7 @@ export const growthPages: MarketingPage[] = [
         title: 'Keep browser and native acceptance separate.',
         paragraphs: [
           'The selected agent needs a supported path to the browser tools. Codex, Claude Code, OpenCode, and Kimi Code support direct project connections. Grok, Antigravity, and Gemini CLI use on-demand discovery through a permitted HTTP client. Check the selected account and tool permissions, and use a test environment appropriate to the brief.',
-          'A browser preview does not exercise a packaged desktop application’s native permissions or operating-system integration. For a change that crosses that boundary, retain the browser evidence and name the additional installed-app check needed before acceptance.',
+          "A browser preview does not exercise a packaged desktop application's native permissions or operating-system integration. For a change that crosses that boundary, retain the browser evidence and name the additional installed-app check needed before acceptance.",
         ],
         links: [
           {
@@ -327,7 +327,10 @@ export const growthPages: MarketingPage[] = [
       },
     ],
     related: [
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated changes' },
+      {
+        href: '/blog/review-ai-generated-code-checklist/',
+        label: 'Review agent-generated changes',
+      },
       { href: '/tour/', label: 'Watch the interface tour' },
       { href: '/features/project-context-for-coding-agents/', label: 'Project context and tools' },
     ],
@@ -342,7 +345,7 @@ export const growthPost = {
   date: '2026-09-08',
   readingTime: '2 min read',
   description:
-    'Tell us which agents and workflows matter to you, and bring other developers into early access.',
+    'Tell us which agents and workflows matter to you, and bring other developers along.',
   sections: [
     {
       title: 'A workspace for the way you build.',
@@ -360,8 +363,8 @@ export const growthPost = {
     {
       title: 'Bring someone who would use it.',
       paragraphs: [
-        'Approved members receive five Instant Access Passes. A valid invitation grants access once the recipient verifies their email, without another manual approval, and that person receives five passes of their own. Downloads appear when a reviewed build is available.',
-        'Share with people who would find the workflow useful. The benefit is direct access for the person you invite.',
+        'Signup is open, so anyone can create a free account with their email and download Jackalope for Windows, macOS or Linux.',
+        'Share it with people who would find the workflow useful.',
       ],
     },
   ],

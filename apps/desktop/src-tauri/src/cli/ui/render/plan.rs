@@ -115,6 +115,19 @@ pub fn lines(view: &PlanView) -> Vec<Line<'static>> {
             Style::default().fg(brand::accent()),
         ));
     }
+    if !view.next_round.is_empty() {
+        lines.push(Line::styled(
+            "Next round waits for you",
+            Style::default().fg(brand::warning()),
+        ));
+        for title in &view.next_round {
+            lines.push(Line::raw(format!("  · {title}")));
+        }
+        lines.push(Line::styled(
+            "/rounds approve to start it · edit it in the app · /rounds stop",
+            muted,
+        ));
+    }
     if !view.assumptions.is_empty() {
         lines.push(Line::default());
         lines.push(heading("Assumptions"));
@@ -309,5 +322,26 @@ mod tests {
             ..view
         };
         assert!(text(&lines(&criteria)).contains("test criteria: pnpm test csv"));
+    }
+
+    #[test]
+    fn a_proposed_swarm_round_lists_its_work_and_how_to_decide() {
+        let view = PlanView {
+            title: "Plan".into(),
+            status: "running".into(),
+            revision: Some(1),
+            progress: Some("swarm (beta) round 1/5 · next round waits for your approval".into()),
+            next_round: vec!["Add the button".into(), "Fix the parser".into()],
+            ..Default::default()
+        };
+        let shown = text(&lines(&view));
+        assert!(shown.contains("Next round waits for you"));
+        assert!(shown.contains("  · Add the button"));
+        assert!(shown.contains("/rounds approve"));
+        let quiet = PlanView {
+            next_round: vec![],
+            ..view
+        };
+        assert!(!text(&lines(&quiet)).contains("Next round waits"));
     }
 }

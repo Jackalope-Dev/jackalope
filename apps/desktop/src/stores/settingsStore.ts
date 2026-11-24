@@ -24,6 +24,8 @@ export interface SettingsState {
   shortcuts: Record<string, string>;
   dictationEndpoint: string;
   dictationModel: string;
+  /** The local voice model used for dictation; empty until one is installed. */
+  voiceModel: string;
 
   // Runners & execution
   defaultRunner: DefaultRunnerId;
@@ -56,7 +58,7 @@ export interface SettingsState {
   exportSettings: () => string;
 }
 
-export const DEFAULT_SETTINGS: Omit<
+const DEFAULT_SETTINGS: Omit<
   SettingsState,
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {
@@ -71,10 +73,11 @@ export const DEFAULT_SETTINGS: Omit<
   terminalShell: 'default',
   preferredEditor: 'vscode',
   terminalLinks: true,
-  retainTerminalOutput: false,
+  retainTerminalOutput: true,
   shortcuts: {},
   dictationEndpoint: '',
   dictationModel: 'whisper-1',
+  voiceModel: '',
 
   defaultRunner: 'codex' as const,
   concurrencyLimit: 2,

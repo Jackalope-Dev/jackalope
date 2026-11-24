@@ -8,11 +8,11 @@
 //! finish cleanly, on app exit, or when the account changes. A follow-up that finds no
 //! matching warm process resumes the session from disk with `--resume`, as before.
 
+use super::agent_process::{self, AgentProcess};
 use super::*;
-use crate::commands::process_control::ProcessTree;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::process::{Child, ChildStdin};
+use std::process::ChildStdin;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
@@ -36,6 +36,8 @@ pub(super) struct Hooks {
     pub context: bool,
     pub permission: bool,
     pub timing: bool,
+    /// Delivers answers that arrived after the agent's ask returned pending.
+    pub answers: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -50,22 +52,23 @@ pub(super) struct Settings {
 
 impl Settings {
     fn from_experiments(personal_setup: Option<bool>) -> Self {
-        use crate::commands::experiments::is;
-        let persistent = is("JACKALOPE_CLAUDE_SESSION", "persistent");
-        let hook = |name: &str| persistent && is(name, "on");
+        use crate::commands::experiments::{is, Experiment};
+        // Each hook requires a persistent session in the registry.
+        let hook = |experiment| is(experiment, "on");
         Self {
-            persistent,
+            persistent: is(Experiment::ClaudeSession, "persistent"),
             isolated: personal_setup
-                .map_or_else(|| is("JACKALOPE_CLAUDE_ISOLATION", "on"), |own| !own),
-            partials: is("JACKALOPE_CLAUDE_PARTIALS", "on"),
-            fallback: is("JACKALOPE_CLAUDE_FALLBACK", "auto"),
-            shared_cache: is("JACKALOPE_CLAUDE_PROMPT_CACHE", "shared"),
+                .map_or_else(|| is(Experiment::ClaudeIsolation, "on"), |own| !own),
+            partials: is(Experiment::ClaudePartials, "on"),
+            fallback: is(Experiment::ClaudeFallback, "auto"),
+            shared_cache: is(Experiment::ClaudePromptCache, "shared"),
             hooks: Hooks {
-                edit_check: hook("JACKALOPE_CLAUDE_EDIT_CHECK"),
-                stop_check: hook("JACKALOPE_CLAUDE_STOP_CHECK"),
-                context: hook("JACKALOPE_CLAUDE_CONTEXT_HOOK"),
-                permission: hook("JACKALOPE_CLAUDE_PERMISSION_HOOK"),
-                timing: hook("JACKALOPE_CLAUDE_TOOL_TIMING"),
+                edit_check: hook(Experiment::ClaudeEditCheck),
+                stop_check: hook(Experiment::ClaudeStopCheck),
+                context: hook(Experiment::ClaudeContextHook),
+                permission: hook(Experiment::ClaudePermissionHook),
+                timing: hook(Experiment::ClaudeToolTiming),
+                answers: true,
             },
         }
     }
@@ -163,6 +166,9 @@ pub(super) fn registrations(hooks: &Hooks) -> Value {
     }
     if hooks.timing {
         post.push(json!({"hookCallbackIds":["timing"],"timeout":10}));
+    }
+    if hooks.answers {
+        post.push(json!({"hookCallbackIds":["answers"],"timeout":10}));
     }
     if !post.is_empty() {
         events.insert("PostToolUse".into(), Value::Array(post));
@@ -263,8 +269,7 @@ enum Output {
 }
 
 pub(super) struct Session {
-    child: Arc<Mutex<Child>>,
-    tree: ProcessTree,
+    process: Arc<AgentProcess>,
     stdin: Arc<Mutex<ChildStdin>>,
     output: mpsc::Receiver<Output>,
     diagnostics: mpsc::Receiver<String>,
@@ -275,16 +280,11 @@ pub(super) struct Session {
     account: Option<PathBuf>,
     /// The process-wide cost Claude last reported, so a later turn records only its share.
     cost: Option<f64>,
-    _runner_lease: Option<crate::commands::managed_runtime::UseGuard>,
 }
 
 impl Session {
     fn alive(&self) -> bool {
-        self.child
-            .lock()
-            .unwrap()
-            .try_wait()
-            .is_ok_and(|status| status.is_none())
+        self.process.alive()
     }
 
     fn release_alias(&self) {
@@ -297,10 +297,7 @@ impl Session {
 impl Drop for Session {
     fn drop(&mut self) {
         self.release_alias();
-        self.tree.terminate();
-        let mut child = self.child.lock().unwrap();
-        let _ = child.kill();
-        let _ = child.wait();
+        let _ = self.process.finish();
     }
 }
 
@@ -487,8 +484,12 @@ impl Partials {
         self.published = Instant::now();
         let mut inner = runtime.inner.lock().unwrap();
         if let Some(run) = inner.runs.get_mut(id) {
-            if run.streaming != self.text {
-                run.streaming.clone_from(&self.text);
+            let mut text = self.text.clone();
+            if let Some(secrets) = &run.secrets {
+                secrets.streaming(&mut text);
+            }
+            if run.streaming != text {
+                run.streaming = text;
                 runtime.writer.changed(id);
             }
         }
@@ -520,6 +521,7 @@ impl Turn {
             "timing" if self.hooks.timing => self.timing(input),
             "stop" if self.hooks.stop_check => self.stop(),
             "context" if self.hooks.context => self.context(),
+            "answers" if self.hooks.answers && self.bridge => self.answers(),
             _ => json!({}),
         }
     }
@@ -547,8 +549,12 @@ impl Turn {
             .chars()
             .take(160)
             .collect();
-        match crate::commands::permission_risk::assess(tool, tool_input, Path::new(&self.workspace))
-        {
+        let scope = crate::commands::permission_risk::Scope::of_run(
+            &self.runtime,
+            &self.id,
+            Path::new(&self.workspace),
+        );
+        match crate::commands::permission_risk::assess(tool, tool_input, &scope) {
             crate::commands::permission_risk::Verdict::Routine => {
                 self.activity(&format!("Auto-approved {label}"));
                 json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow",
@@ -665,6 +671,32 @@ impl Turn {
         }
     }
 
+    /// Answers the person gave after the agent's question returned pending, delivered
+    /// once after the agent's next tool call so it need not be polling at that moment.
+    fn answers(&self) -> Value {
+        let answered = self.runtime.take_late_answers(&self.id, None);
+        if answered.is_empty() {
+            return json!({});
+        }
+        let mut text = String::from(
+            "Jackalope: answers arrived for questions you asked earlier. Do not poll user_response for these.",
+        );
+        for prompt in &answered {
+            let question: String = prompt.question.chars().take(300).collect();
+            text.push_str(&format!(
+                "\n- Question {} ({question:?}): {}",
+                prompt.id,
+                prompt
+                    .answer
+                    .as_deref()
+                    .unwrap_or_default()
+                    .trim()
+                    .replace('\n', "\n  ")
+            ));
+        }
+        json!({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":text}})
+    }
+
     fn context(&self) -> Value {
         let Some(request) = &self.context else {
             return json!({});
@@ -737,8 +769,6 @@ pub(super) struct Launch<'a> {
     pub previous_session: Option<String>,
     pub settings: Settings,
     pub final_check: bool,
-    pub context_by_hook: bool,
-    pub runner_lease: Option<crate::commands::managed_runtime::UseGuard>,
 }
 
 pub(super) struct Outcome {
@@ -760,9 +790,8 @@ impl TaskRuntime {
             previous_session,
             settings,
             final_check,
-            context_by_hook,
-            runner_lease,
         } = launch;
+        let context_by_hook = settings.hooks.context;
         cmd.current_dir(&workspace);
         let key = identity(&cmd, &settings.hooks);
         let warm = previous_session
@@ -773,31 +802,12 @@ impl TaskRuntime {
             .as_ref()
             .map(|context| context.token.clone());
         let started = Instant::now();
-        let mut inner = self.inner.lock().unwrap();
-        if inner.canceled.contains(id) {
-            drop(inner);
-            self.update(id, |run| {
-                run.status = "stopped".into();
-                run.ended_at = Some(Utc::now().to_rfc3339());
-            });
-            return Ok(None);
-        }
-        if inner.runs.values().any(|run| {
-            run.id != id
-                && run.workspace == workspace
-                && ["starting", "running", "stopping"].contains(&run.status.as_str())
-        }) {
-            return Err(
-                "Another attempt is using this workspace. Stop it or wait before continuing."
-                    .into(),
-            );
-        }
-        let (mut session, transport, spawn_attempts) = match warm {
-            Some(session) => {
-                inner.processes.insert(id.into(), session.child.clone());
-                drop(inner);
-                (session, "reused", 1)
-            }
+        let account = request
+            .account_binding
+            .as_ref()
+            .map(|binding| binding.directory.clone());
+        let claimed = self.register_process(id, Some(&workspace), || match warm {
+            Some(session) => Ok((Some(session.process.clone()), (session, "reused", 1))),
             None => {
                 if let Some(previous) = &previous_session {
                     cmd.args(["--resume", previous]);
@@ -805,53 +815,27 @@ impl TaskRuntime {
                 cmd.stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped());
-                let (mut child, attempts) = super::runtime::spawn_agent(&mut cmd, &request.agent)?;
-                let tree = match ProcessTree::attach(&child) {
-                    Ok(tree) => tree,
-                    Err(error) => {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        return Err(error);
-                    }
-                };
+                let spawned = AgentProcess::spawn(&mut cmd, &request.agent)?;
                 let (Some(stdin), Some(stdout), Some(stderr)) =
-                    (child.stdin.take(), child.stdout.take(), child.stderr.take())
+                    (spawned.stdin, spawned.stdout, spawned.stderr)
                 else {
-                    tree.terminate();
-                    let _ = child.kill();
-                    let _ = child.wait();
                     return Err("Claude Code did not expose its session streams.".into());
                 };
-                let child = Arc::new(Mutex::new(child));
-                inner.processes.insert(id.into(), child.clone());
-                drop(inner);
                 let (lines, output) = mpsc::channel();
                 std::thread::spawn(move || {
-                    let _ = crate::commands::process_control::bounded_lines(
-                        BufReader::new(stdout),
-                        1_000_000,
-                        |line, truncated| {
-                            let _ = lines.send(Output::Line(line, truncated));
-                        },
-                    );
+                    let _ = agent_process::read_lines(stdout, |line, truncated| {
+                        let _ = lines.send(Output::Line(line, truncated));
+                    });
                     let _ = lines.send(Output::Closed);
                 });
                 let (errors, diagnostics) = mpsc::channel();
                 std::thread::spawn(move || {
-                    let _ = crate::commands::process_control::bounded_lines(
-                        BufReader::new(stderr),
-                        6000,
-                        |mut line, truncated| {
-                            if truncated {
-                                line.push_str(" [truncated]");
-                            }
-                            let _ = errors.send(line);
-                        },
-                    );
+                    agent_process::read_diagnostics(stderr, |line| {
+                        let _ = errors.send(line);
+                    });
                 });
                 let session = Session {
-                    child,
-                    tree,
+                    process: spawned.process.clone(),
                     stdin: Arc::new(Mutex::new(stdin)),
                     output,
                     diagnostics,
@@ -859,35 +843,26 @@ impl TaskRuntime {
                     workspace: workspace.clone(),
                     session_id: None,
                     bridge_token: bridge_token.clone(),
-                    account: request
-                        .account_binding
-                        .as_ref()
-                        .map(|binding| binding.directory.clone()),
+                    account,
                     cost: None,
-                    _runner_lease: runner_lease,
                 };
                 let transport = if previous_session.is_some() {
                     "resumed"
                 } else {
                     "started"
                 };
-                (session, transport, attempts)
+                Ok((
+                    Some(spawned.process),
+                    (session, transport, spawned.attempts),
+                ))
             }
+        })?;
+        let Some((mut session, transport, spawn_attempts)) = claimed else {
+            self.mark_stopped(id);
+            return Ok(None);
         };
-        self.update_checked(id, |run| {
+        self.process_started(id, started.elapsed(), spawn_attempts, |run| {
             run.efficiency.claude_transport = Some(transport.into());
-            run.efficiency.timing("processSpawn", started.elapsed());
-            run.process_contained = cfg!(windows);
-            if run.status == "starting" {
-                run.status = "running".into();
-            }
-            run.progress = None;
-            if spawn_attempts > 1 {
-                activity(
-                    run,
-                    &format!("The agent process started after {spawn_attempts} attempts."),
-                );
-            }
         })?;
         if let (Some(own), Some(current)) = (&session.bridge_token, &bridge_token) {
             if own != current {
@@ -935,7 +910,7 @@ impl TaskRuntime {
         }
         state.partials.complete(self, id);
         session.release_alias();
-        let quota_stopped = self.claude_quota_stopped(id);
+        let quota_stopped = self.quota_handoff(id);
         while let Ok(line) = session.diagnostics.recv_timeout(if state.closed {
             Duration::from_millis(200)
         } else {
@@ -943,14 +918,11 @@ impl TaskRuntime {
         }) {
             let _ = self.update_output(id, |run| run.diagnostics.push(line));
         }
-        self.inner.lock().unwrap().processes.remove(id);
+        self.unregister_process(id);
         let exit_code = if state.closed || !session.alive() {
-            session.tree.terminate();
             session
-                .child
-                .lock()
-                .unwrap()
-                .wait()
+                .process
+                .finish()
                 .ok()
                 .and_then(|status| status.code())
         } else {
@@ -980,15 +952,6 @@ impl TaskRuntime {
             exit_code,
             quota_stopped,
         }))
-    }
-
-    fn claude_quota_stopped(&self, id: &str) -> bool {
-        self.inner
-            .lock()
-            .unwrap()
-            .runs
-            .get(id)
-            .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some())
     }
 
     fn initialize(
@@ -1060,10 +1023,9 @@ impl TaskRuntime {
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
             }
-            if !quota_stopped && self.claude_quota_stopped(&turn.id) {
+            if !quota_stopped && self.quota_handoff(&turn.id) {
                 quota_stopped = true;
-                session.tree.terminate();
-                let _ = session.child.lock().unwrap().kill();
+                session.process.terminate();
             }
         }
     }

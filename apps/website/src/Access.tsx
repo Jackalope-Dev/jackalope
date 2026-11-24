@@ -1,42 +1,25 @@
+import type { AccessMember } from '@jackalope/contracts/access';
+import { isAccessToken } from '@jackalope/contracts/links';
 import { Button, CopyButton, Input, LoadingState, MailIcon, Panel, Textarea } from '@jackalope/ui';
 import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
+import {
+  AccessRequestError,
+  accessMessage,
+  accessOrigin,
+  accessRequest,
+  useSignupMode,
+} from './access-api';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import './access.css';
 import './waitlist.css';
 import { AccessPasses } from './AccessPasses';
 
-interface Invitation {
-  id: string;
-  email: string;
-  status: string;
-  expires_at: number;
-  accepted_at: number | null;
-  downloaded_at: number | null;
-  connected_at: number | null;
-  last_sent: number;
-}
-interface Membership {
-  email: string;
-  /** Anyone can join, so Instant Access Passes no longer admit anyone. */
-  openSignup?: boolean;
-  limit: number;
-  remaining: number;
-  accepted: number;
-  downloaded: number;
-  connected: number;
-  shareUrl: string;
-  invites: Invitation[];
-  download: { url: string; bytes?: number; kind?: 'store' } | null;
-  macos?: { id: string; label: string; url: string }[];
-}
-
 const invitationMessage =
   'I have an Instant Access Pass to Jackalope: one cross-platform workspace for coding agents, Git worktrees, and review. Skip the waitlist after verifying your email, while a pass is available.';
 
 export function AccessPage() {
-  const [member, setMember] = useState<Membership | null>(null);
+  const [member, setMember] = useState<AccessMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -46,8 +29,10 @@ export function AccessPage() {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [sent, setSent] = useState(false);
   const pending = useRef(false);
+  /** Pass links keep working under open signup, but nobody needs one to get an account. */
+  const open = useSignupMode() === 'open';
   const refreshMembership = useCallback(() => {
-    void accessRequest<Membership>('me')
+    void accessRequest<AccessMember>('me')
       .then((value) => {
         setMember(value);
         setError('');
@@ -66,7 +51,7 @@ export function AccessPage() {
       const raw = new URLSearchParams(current.hash.slice(1)).get('token');
       if (raw) {
         history.replaceState(null, '', current.pathname + current.search);
-        if (/^[a-f0-9]{64}$/.test(raw)) {
+        if (isAccessToken(raw)) {
           setToken(raw);
           setError('');
         } else setError('This link is incomplete. Request a new sign-in link below.');
@@ -74,18 +59,18 @@ export function AccessPage() {
     }
     readLink();
     window.addEventListener('hashchange', readLink);
-    if (share && /^[a-f0-9]{64}$/.test(share)) setInvite(share);
+    if (share && isAccessToken(share)) setInvite(share);
     const controller = new AbortController();
     async function load() {
       try {
-        setMember(await accessRequest<Membership>('me', undefined, controller.signal));
+        setMember(await accessRequest<AccessMember>('me', undefined, controller.signal));
       } catch (e) {
         if (!(e instanceof AccessRequestError && e.status === 401) && !controller.signal.aborted)
           setError(accessMessage(e));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-      if (share && /^[a-f0-9]{64}$/.test(share)) {
+      if (share && isAccessToken(share)) {
         try {
           setAvailable(
             (
@@ -127,7 +112,7 @@ export function AccessPage() {
     await act(async () => {
       await accessRequest('accept', { token });
       setToken('');
-      setMember(await accessRequest<Membership>('me'));
+      setMember(await accessRequest<AccessMember>('me'));
       setNotice('You’re signed in.');
     });
   }
@@ -159,7 +144,7 @@ export function AccessPage() {
       return;
     }
     await act(async () => {
-      const updated = await accessRequest<Membership>('invites', { emails });
+      const updated = await accessRequest<AccessMember>('invites', { emails });
       setMember((current) => (current ? { ...current, ...updated } : current));
       form.reset();
       setNotice(
@@ -169,7 +154,7 @@ export function AccessPage() {
   }
   async function change(id: string, action: 'resend' | 'revoke') {
     await act(async () => {
-      const updated = await accessRequest<Membership>('invites/change', { id, action });
+      const updated = await accessRequest<AccessMember>('invites/change', { id, action });
       setMember((current) => (current ? { ...current, ...updated } : current));
       setNotice(
         action === 'resend'
@@ -206,7 +191,13 @@ export function AccessPage() {
     <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
       <header className="access-heading">
         <h1>{member ? 'Your account' : invite ? 'You’re invited' : 'Sign in'}</h1>
-        {member && <p>Download Jackalope and share your Instant Access Passes.</p>}
+        {member && (
+          <p>
+            {member.openSignup
+              ? 'Download Jackalope and connect your desktop.'
+              : 'Download Jackalope and share your Instant Access Passes.'}
+          </p>
+        )}
       </header>
       {error && (
         <p className="access-alert" role="alert">
@@ -220,10 +211,10 @@ export function AccessPage() {
       <DesktopConnection email={member?.email ?? null} refreshMembership={refreshMembership} />
       {loading ? null : !accessOrigin ? (
         <Panel variant="plain" className="access-card access-entry">
-          <h2>Join the waitlist</h2>
-          <p>Sign-in is not available yet. Join the waitlist to hear when early access opens.</p>
+          <h2>Sign-in isn’t available here</h2>
+          <p>This site isn’t connected to Jackalope accounts. Sign up for product notes instead.</p>
           <a className="button button-primary" href="/#newsletter">
-            Join the waitlist <ArrowRight size={17} />
+            Sign up <ArrowRight size={17} />
           </a>
         </Panel>
       ) : member ? (
@@ -594,16 +585,22 @@ export function AccessPage() {
                   </ul>
                 </div>
               )}
-              <h2>{invite ? 'Claim your pass' : 'Sign in'}</h2>
+              <h2>
+                {invite ? (open ? 'Create your free account' : 'Claim your pass') : 'Sign in'}
+              </h2>
               <p>
                 {invite
-                  ? 'Enter your email. Follow the link we send to claim your pass while a place is available.'
+                  ? open
+                    ? 'Jackalope is free to join. Enter your email and follow the link we send to finish.'
+                    : 'Enter your email. Follow the link we send to claim your pass while a place is available.'
                   : 'Enter the email address you signed up with to receive a sign-in link.'}
               </p>
               {invite && available === false && (
                 <p className="access-alert">
-                  All passes on this link are claimed or reserved right now. You can still sign in
-                  if you already have an account, or <a href="/#newsletter">sign up free</a>.
+                  {open
+                    ? 'This invitation link has no places left, and you don’t need one. Sign in if you already have an account, or '
+                    : 'All passes on this link are claimed or reserved right now. You can still sign in if you already have an account, or '}
+                  <a href="/#newsletter">sign up free</a>.
                 </p>
               )}
               <form onSubmit={signIn}>
@@ -648,6 +645,11 @@ export function AccessPage() {
               <a className="text-link" href="/#newsletter">
                 New here? Sign up free <ArrowRight size={14} />
               </a>
+              {open && (
+                <a className="text-link" href="/download/">
+                  Download Jackalope <ArrowDownToLine size={14} />
+                </a>
+              )}
             </>
           )}
         </Panel>

@@ -1,6 +1,7 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime.ts';
-import { isTauriEnvironment } from '../lib/tauri-bridge.ts';
+import { isTauriEnvironment } from '../lib/native/env.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 
 export interface ReleaseStatus {
   currentVersion: string;
@@ -51,6 +52,9 @@ interface UpdateState {
   lastAttempt: number | null;
   lastChecked: number | null;
   dismissedVersion: string | null;
+  /** The update details dialog is open, from the title bar or the companion notice. */
+  detailsOpen: boolean;
+  showDetails: (open: boolean) => void;
   setAutoCheck: (value: boolean) => void;
   setAutoDownload: (value: boolean) => void;
   download: () => Promise<void>;
@@ -74,13 +78,16 @@ interface PreferenceStorage {
 }
 export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStorage) {
   let autoCheck = true;
-  let autoDownload = false;
+  // On unless turned off: a found update is ready when the person next restarts. Installing
+  // still waits for idle work and their Restart to update.
+  let autoDownload = true;
   try {
     storage ??= localStorage;
     autoCheck = storage.getItem('jackalope-auto-update-check') !== 'false';
-    autoDownload = storage.getItem('jackalope-auto-update-download') === 'true';
+    autoDownload = storage.getItem('jackalope-auto-update-download') !== 'false';
   } catch {
     autoCheck = false;
+    autoDownload = false;
   }
   let loading: Promise<void> | undefined;
   return create<UpdateState>()((set, get) => ({
@@ -113,7 +120,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         });
         await get().load();
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ changingChannel: false });
       }
@@ -126,6 +133,8 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     lastAttempt: null,
     lastChecked: null,
     dismissedVersion: null,
+    detailsOpen: false,
+    showDetails: (detailsOpen) => set({ detailsOpen }),
     setAutoCheck: (autoCheck) => {
       set({ autoCheck });
       try {
@@ -165,7 +174,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         );
         if (availableUpdateId(get().release) === version) set({ downloadedVersion: version });
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ downloading: false, downloadProgress: null });
       }
@@ -178,7 +187,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         try {
           set({ release: await bridge.status(false), error: null });
         } catch (error) {
-          set({ error: String(error) });
+          set({ error: describeError(error) });
         }
       })();
       try {
@@ -207,7 +216,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
           set({ downloadedVersion: null });
         if (get().autoDownload) void get().download();
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ checking: false });
       }
@@ -234,7 +243,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
           set({ installed: true, release: { ...state.release, storeUpdateAvailable: false } });
         }
       } catch (error) {
-        set({ error: String(error) });
+        set({ error: describeError(error) });
       } finally {
         set({ installing: false, progress: null });
       }
@@ -243,19 +252,19 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
 }
 export const useUpdateStore = createUpdateStore({
   desktop: isTauriEnvironment,
-  status: (check) => nativeTask<ReleaseStatus>('app_release_status', { check }),
-  setChannel: (channel) => nativeTask('app_release_channel', { channel }),
+  status: (check) => invokeNative<ReleaseStatus>('app_release_status', { check }),
+  setChannel: (channel) => invokeNative('app_release_channel', { channel }),
   download: async (version, onProgress, channel) => {
     const { Channel } = await import('@tauri-apps/api/core');
     const progress = new Channel<UpdateProgress>();
     progress.onmessage = onProgress;
-    await nativeTask('app_download_update', { version, progress, channel });
+    await invokeNative('app_download_update', { version, progress, channel });
   },
   install: async (version, onProgress, channel) => {
     const { Channel } = await import('@tauri-apps/api/core');
     const progress = new Channel<UpdateProgress>();
     progress.onmessage = onProgress;
-    await nativeTask('app_install_update', { version, progress, channel });
+    await invokeNative('app_install_update', { version, progress, channel });
   },
   now: Date.now,
 });

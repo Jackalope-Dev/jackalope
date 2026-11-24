@@ -4,23 +4,68 @@
   flex-shrink: 0;
   gap: 4px;
   padding: 8px 24px;
+  /* Tabs shrink like browser tabs before the strip scrolls; it then scrolls by trackpad,
+     wheel or focus without a scrollbar track under the tabs. */
   overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--color-border);
 }
+.work-tabs::-webkit-scrollbar {
+  display: none;
+}
 .work-tab {
+  --work-tab-bg: var(--color-surface);
   display: flex;
-  flex-shrink: 0;
+  flex: 0 1 240px;
   align-items: center;
-  max-width: 240px;
+  min-width: 136px;
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
 }
 .work-tab:hover {
-  background: var(--color-surface-hover);
+  --work-tab-bg: var(--color-surface-hover);
+  background: var(--work-tab-bg);
 }
 .work-tab[data-current] {
+  --work-tab-bg: var(--color-accent-subtle);
   color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
+  background: var(--work-tab-bg);
+}
+/* The project's mark with the agent as a badge on its corner, cut out of the tab. */
+.work-tab-marks {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+}
+.work-tab-marks .project-tree-mark {
+  width: 22px;
+  height: 22px;
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+/* A project with its own theme carries its accent, so tabs from differently themed
+   projects tell apart at a glance; the mark itself remains the non-colour cue. */
+.work-tab-marks[data-themed] .project-tree-mark {
+  background: color-mix(in srgb, var(--project-accent) 22%, var(--color-surface));
+  box-shadow: inset 0 0 0 1.5px var(--project-accent);
+  color: var(--color-text-primary);
+}
+.work-tab-agent {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+}
+.work-tab-agent .agent-avatar[data-size="xs"] {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--radius-xs);
+  outline: 2px solid var(--work-tab-bg);
+}
+.work-tab-agent .agent-avatar svg {
+  width: 10px;
+  height: 10px;
 }
 .work-tab-open {
   display: flex;

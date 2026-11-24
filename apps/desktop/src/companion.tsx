@@ -1,11 +1,12 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
-import { Button, FormField, Input } from '@jackalope/ui';
+import { describeError } from '@jackalope/contracts/errors';
+import type { RemoteAction } from '@jackalope/contracts/remote';
+import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { type RemoteAction, RemoteWorkspace } from './components/remote/RemoteWorkspace';
-import { InlineNotice } from './components/ui/InlineNotice';
+import { RemoteWorkspace } from './components/remote/RemoteWorkspace';
 import './index.css';
-import './components/ui/experience.css';
+import '@jackalope/ui/styles.css';
 import './components/tasks/task-workspace.css';
 
 const code = new URLSearchParams(location.hash.slice(1)).get('pair') ?? '';
@@ -120,14 +121,14 @@ function Companion() {
                 setError('Connected for this visit. This browser could not save the pairing.');
               }
             } catch (cause) {
-              if (attempt === pairingAttempt.current) setError(String(cause));
+              if (attempt === pairingAttempt.current) setError(describeError(cause));
             } finally {
               if (attempt === pairingAttempt.current) setBusy(false);
             }
           }}
         >
           <h2>Connect to your host</h2>
-          <p>Create a pairing link in Jackalope → Settings → Remote access.</p>
+          <p>Create a pairing link in Jackalope → Devices → Let devices use this one.</p>
           <FormField label="Device name">
             <Input
               value={name}

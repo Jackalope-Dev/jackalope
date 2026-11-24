@@ -238,6 +238,16 @@ pub(super) fn runtime_overlay(binding: &AccountBinding) -> Result<Option<Value>,
     Ok(Some(configuration(&record, api_key.as_deref())))
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::openai_endpoint::openai_endpoint_models,
+            commands::openai_endpoint::openai_endpoint_connect,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn openai_endpoint_models(
     base_url: String,

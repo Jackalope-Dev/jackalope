@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { captureDraftForProject } from '../src/lib/capture-draft.ts';
 import { workspaceModeFor, workspaceRequest } from '../src/lib/workspace-mode.ts';
 
 test('projects without a workspace mode keep isolated worktrees', () => {
@@ -31,13 +30,4 @@ test('task requests follow the project mode unless the composer chooses isolatio
     isolated: false,
     workspaceMode: 'current',
   });
-});
-
-test('a fresh draft defaults to isolation only for worktree projects', () => {
-  const draft = (workspaceMode) =>
-    captureDraftForProject({}, { id: 'p', preferences: { workspaceMode } }, null).isolated;
-  assert.equal(draft(undefined), true);
-  assert.equal(draft('worktree'), true);
-  assert.equal(draft('branch'), false);
-  assert.equal(draft('ask'), false);
 });

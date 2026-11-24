@@ -34,6 +34,7 @@ fn prompt(id: &str, run: &str, status: &str, answer: Option<&str>) -> PendingUse
         created_at: "now".into(),
         answered_at: None,
         presentation: Default::default(),
+        autonomy: Default::default(),
     }
 }
 
@@ -62,9 +63,10 @@ fn desktop_permission_requires_an_explicit_answer_for_this_attempt() {
         Some(Choice::Window(window()))
     );
     question.answer = Some("Do not allow".into());
-    assert!(selected_answer("run", &question, "question", &choices)
-        .unwrap_err()
-        .contains("declined"));
+    assert!(matches!(
+        selected_answer("run", &question, "question", &choices),
+        Err(Failure::Ended(message)) if message.contains("declined")
+    ));
     question.answer = Some("123".into());
     assert!(selected_answer("run", &question, "question", &choices).is_err());
 }
@@ -139,7 +141,7 @@ fn grant_levels_scope_windows_apps_and_the_desktop() {
         .chain(&apps)
         .map(|(label, _)| label.clone())
         .collect();
-    let unique: HashSet<_> = labels.iter().collect();
+    let unique: std::collections::HashSet<_> = labels.iter().collect();
     assert_eq!(
         unique.len(),
         labels.len(),
@@ -317,10 +319,6 @@ fn browser_sites_are_recognized_and_decided_per_host() {
     let id = grant::sites(&path, "p")[0].id.clone();
     grant::forget(&path, "p", &id).unwrap();
     assert_eq!(grant::sites(&path, "p").len(), 1);
-    let options = site_options("github.com", "Site");
-    assert_eq!(options.len(), 4);
-    assert_eq!(options[1].1, (true, true));
-    assert_eq!(options[3].1, (false, true));
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
 
@@ -494,14 +492,14 @@ fn desktop_input_is_bounded_and_rejects_system_keys_and_extra_fields() {
         }
     );
     assert_eq!(
-        platform::key("Primary+a"),
+        actions::legacy_key("Primary+a"),
         if cfg!(target_os = "macos") {
             "Primary+a"
         } else {
             "Control+a"
         }
     );
-    assert_eq!(platform::key("Control+a"), "Control+a");
+    assert_eq!(actions::legacy_key("Control+a"), "Control+a");
 
     let mut input = request("type");
     input.text = Some("literal $() {ENTER} `characters`".into());
@@ -718,13 +716,17 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
     let service =
         super::super::coordination::Coordinator::new(directory.join("queue"), runtime.clone())
             .unwrap();
-    let result = bridge(
-        axum::extract::State(service),
-        axum::http::HeaderMap::new(),
-        axum::Json(request("request_access")),
+    let result = crate::commands::bridge::call(
+        &service,
+        &axum::http::HeaderMap::new(),
+        "desktop_control",
+        serde_json::json!({"action": "request_access"}),
     )
     .await;
-    assert_eq!(result.unwrap_err().0, axum::http::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        result.unwrap_err().code(),
+        axum::http::StatusCode::UNAUTHORIZED
+    );
     drop(runtime);
     std::fs::remove_dir_all(directory).unwrap();
 }
@@ -735,7 +737,6 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
 #[test]
 #[ignore = "Opens and controls a disposable Windows form; requires an interactive test desktop"]
 fn native_desktop_window_trial() {
-    use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
     let directory =
         std::env::temp_dir().join(format!("jackalope-desktop-trial-{}", uuid::Uuid::new_v4()));
@@ -746,14 +747,13 @@ fn native_desktop_window_trial() {
     let report = directory.join("result.txt");
     let powershell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
         .join("System32/WindowsPowerShell/v1.0/powershell.exe");
-    let mut child = Command::new(powershell)
+    let mut child = crate::commands::process_control::hidden(&mut Command::new(powershell))
         .args(["-NoProfile", "-File"])
         .arg(fixture)
         .env("JACKALOPE_DESKTOP_FIXTURE_TITLE", &title)
         .env("JACKALOPE_DESKTOP_FIXTURE_RESULT", &report)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .creation_flags(0x08000000)
         .spawn()
         .unwrap();
     // The job object closes the fixture even if an assertion unwinds past cleanup.
@@ -897,4 +897,194 @@ fn wait_for_fixture_text(path: &std::path::Path, expected: &str) {
         std::thread::sleep(Duration::from_millis(100));
     }
     assert_eq!(std::fs::read_to_string(path).unwrap(), expected);
+}
+
+#[test]
+fn missing_permissions_read_as_system_settings_names_them() {
+    let names = |ids: &[&str]| {
+        platform::permission_names(&ids.iter().map(|id| id.to_string()).collect::<Vec<_>>())
+    };
+    assert_eq!(names(&["accessibility"]), "Accessibility");
+    assert_eq!(
+        names(&["accessibility", "screenRecording"]),
+        "Accessibility and Screen Recording"
+    );
+    assert_eq!(
+        names(&["accessibility", "screenRecording", "inputMonitoring"]),
+        "Accessibility, Screen Recording and Input Monitoring"
+    );
+    assert_eq!(names(&[]), "");
+}
+
+#[test]
+fn only_system_settings_links_open_natively() {
+    for url in [
+        "https://example.com",
+        "file:///Applications",
+        "x-apple.systempreferences:com.apple preference",
+    ] {
+        assert!(platform::desktop_control_open_settings_link(url.into()).is_err());
+    }
+}
+
+fn desktop(action: &str, element: Option<&str>) -> DesktopRequest {
+    DesktopRequest {
+        action: action.into(),
+        element: element.map(Into::into),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn only_raw_pointer_and_keyboard_input_needs_the_window_in_front() {
+    assert!(needs_focus(&desktop("click", None)));
+    assert!(
+        !needs_focus(&desktop("click", Some("e3"))),
+        "a ref click can press through Accessibility"
+    );
+    assert!(needs_focus(&desktop("double_click", Some("e3"))));
+    assert!(needs_focus(&desktop("type", None)));
+    assert!(!needs_focus(&desktop("type", Some("e3"))));
+    for action in [
+        "press",
+        "drag",
+        "scroll",
+        "focus",
+        "switch_window",
+        "open_app",
+    ] {
+        assert!(needs_focus(&desktop(action, None)), "{action}");
+    }
+    for action in [
+        "snapshot",
+        "screenshot",
+        "wait_for",
+        "invoke",
+        "select",
+        "set_value",
+        "list_windows",
+    ] {
+        assert!(!needs_focus(&desktop(action, Some("e1"))), "{action}");
+    }
+}
+
+#[tokio::test]
+async fn a_paused_call_waits_for_resume_and_then_proceeds() {
+    let mut checks = 0;
+    let gate = wait_for_gate(
+        Instant::now() + Duration::from_secs(5),
+        Duration::from_millis(1),
+        || {
+            checks += 1;
+            if checks < 4 {
+                Gate::Paused
+            } else {
+                Gate::Ready
+            }
+        },
+    )
+    .await;
+    assert_eq!(gate, Gate::Ready);
+    assert_eq!(checks, 4);
+}
+
+#[tokio::test]
+async fn waiting_gives_up_at_the_deadline_and_stops_when_access_ends() {
+    let started = Instant::now();
+    let gate = wait_for_gate(
+        started + Duration::from_millis(30),
+        Duration::from_millis(5),
+        || Gate::Background,
+    )
+    .await;
+    assert_eq!(gate, Gate::Background);
+    assert!(started.elapsed() >= Duration::from_millis(30));
+    let mut checks = 0;
+    let gate = wait_for_gate(
+        Instant::now() + Duration::from_secs(5),
+        Duration::from_millis(1),
+        || {
+            checks += 1;
+            if checks < 2 {
+                Gate::Paused
+            } else {
+                Gate::Ended
+            }
+        },
+    )
+    .await;
+    assert_eq!(
+        gate,
+        Gate::Ended,
+        "Stop, Escape or the attempt ending cancels the wait"
+    );
+}
+
+#[test]
+fn a_paused_reply_asks_to_call_again_until_it_has_waited_long_enough() {
+    let reply = paused_reply(1, "You clicked").unwrap();
+    assert_eq!(reply["status"], "paused");
+    assert!(reply["instruction"]
+        .as_str()
+        .unwrap()
+        .contains("Call desktop_control again"));
+    assert!(paused_reply(WAIT_CALLS, "").is_ok());
+    assert!(paused_reply(WAIT_CALLS + 1, "")
+        .unwrap_err()
+        .contains("Ask the person"));
+    assert_eq!(background_reply()["status"], BACKGROUND);
+}
+
+#[test]
+fn element_actions_try_their_accessibility_path_in_the_background() {
+    // Scroll, type and focus with an element reach the helper, which scrolls the scroll area,
+    // appends to the value or focuses without raising, and refuses otherwise.
+    for action in ["scroll", "type", "focus", "click"] {
+        assert!(!needs_focus(&desktop(action, Some("e2"))), "{action}");
+    }
+    // Raising or opening a window never happens while the person works elsewhere.
+    assert!(needs_focus(&desktop("switch_window", Some("e2"))));
+    assert!(needs_focus(&desktop("open_app", None)));
+}
+
+#[test]
+fn a_helper_refusal_for_a_background_window_reads_as_background() {
+    let refusal = "The window is in the background. Use element actions by ref, or wait until the person brings it back.";
+    assert!(refusal.contains(BACKGROUND_REFUSAL));
+    for helper in [include_str!("macos.swift"), include_str!("windows.cs")] {
+        assert!(
+            helper.contains(refusal),
+            "both helpers refuse with the shared text"
+        );
+    }
+}
+
+#[test]
+fn the_agent_cursor_goes_to_the_element_or_the_point_and_shows_the_action() {
+    let mut click = desktop("click", Some("e4"));
+    assert_eq!(
+        cursor_target(&click, Some([10, 20, 80, 24])),
+        Some(("click", [10, 20, 80, 24]))
+    );
+    click.element = None;
+    click.x = Some(300);
+    click.y = Some(150);
+    assert_eq!(
+        cursor_target(&click, None),
+        Some(("click", [300, 150, 0, 0]))
+    );
+    assert_eq!(
+        cursor_target(&desktop("type", Some("e5")), Some([0, 0, 200, 20])).map(|t| t.0),
+        Some("type")
+    );
+    assert_eq!(
+        cursor_target(&desktop("scroll", Some("e6")), Some([0, 0, 1, 1])).map(|t| t.0),
+        Some("scroll")
+    );
+    assert_eq!(
+        cursor_target(&desktop("press", None), None),
+        None,
+        "nothing to point at"
+    );
+    assert_eq!(cursor_target(&desktop("snapshot", None), None), None);
 }

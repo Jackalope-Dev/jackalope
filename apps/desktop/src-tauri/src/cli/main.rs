@@ -10,12 +10,23 @@ mod clipboard;
 mod connection;
 mod files;
 mod git;
+#[path = "../commands/git_command.rs"]
+#[allow(dead_code)]
+mod git_command;
 mod history;
 mod host;
+mod merge;
 mod once;
 mod planning;
 mod prefs;
+#[path = "../commands/process_control/console.rs"]
+#[allow(dead_code)]
+mod process_control;
 mod protocol;
+// Shared with the app so both measure a checkout's changes the same way.
+#[path = "../commands/repo.rs"]
+#[allow(dead_code)]
+mod repo;
 mod shell;
 mod subcommands;
 mod ui;
@@ -49,6 +60,9 @@ USAGE
   jackalope plan show <id>       print a plan (--json)
   jackalope plan approve <id> [single|subtasks|swarm]
                                  approve the latest revision and start it (--yes)
+  jackalope plan rounds <id> [pause|resume|stop|approve]
+                                 show a swarm's rounds, or act on them; approve
+                                 starts a proposed next round (--yes)
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
 
@@ -146,6 +160,9 @@ fn run() -> Result<(), String> {
         Command::PlanShow { id, json } => planning::show(cli.cold_start, &id, json),
         Command::PlanApprove { id, shape, yes } => {
             planning::approve(cli.cold_start, &id, shape, yes)
+        }
+        Command::PlanRounds { id, action, yes } => {
+            planning::rounds(cli.cold_start, &id, action, yes)
         }
         Command::Plans { json } => planning::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),

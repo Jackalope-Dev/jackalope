@@ -1,10 +1,12 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
+import { isRetryable } from '@jackalope/contracts/runs';
 import { sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
 import { capturedPages } from './review-captures.ts';
+import type { ScreenshotArtifact, TaskRun } from './run-types.ts';
 import type { WorkItem } from './task-collection.ts';
 import { requirementAssessment } from './task-outcomes.ts';
-import type { PendingUserPrompt, ScreenshotArtifact, TaskRun } from './task-runtime.ts';
 import { looksLikePlan, taskDecision } from './task-workflow.ts';
 import { signalKey } from './work-signals.ts';
 
@@ -266,7 +268,7 @@ function decisionFor(
         : undefined,
     };
   }
-  if (checksFailed(run) && run && !['failed', 'stopped', 'interrupted'].includes(run.status))
+  if (checksFailed(run) && run && !isRetryable(run))
     return {
       kind: 'failed-check',
       decision: 'The project checks fail. Ask for a fix, or inspect the changes yourself.',
@@ -286,7 +288,7 @@ function decisionFor(
       risk: { level: 'low', reason: 'Nothing runs while it is paused.' },
     };
   const stopped =
-    (run && ['failed', 'stopped', 'interrupted'].includes(run.status)) ||
+    (run && isRetryable(run)) ||
     !!item.session?.error ||
     !!managed?.error ||
     item.statusLabel === 'Needs attention';
@@ -385,7 +387,7 @@ function eventFor(
   if (pendingQuestions(item, runs, queue).length) return undefined;
   if (run?.persistenceError)
     return { ...base, outcome: 'Finished, but its history did not save', tone: 'warning' };
-  if (checksFailed(run) && run && !['failed', 'stopped', 'interrupted'].includes(run.status))
+  if (checksFailed(run) && run && !isRetryable(run))
     return {
       ...base,
       outcome: run.verificationError
@@ -431,7 +433,7 @@ const kindNames: Record<CatchUpDecision['kind'], [string, string]> = {
   stopped: ['a stopped task', 'stopped tasks'],
   paused: ['a paused plan', 'paused plans'],
   review: ['a review', 'reviews'],
-  other: ['another item', 'other items'],
+  other: ['one more', 'more'],
 };
 
 /** One sentence naming what waits on the person, or saying nothing does. */
@@ -449,9 +451,10 @@ export function catchUpHeadline(waiting: CatchUpDecision[]): string {
   }
   const counts = new Map<CatchUpDecision['kind'], number>();
   for (const item of waiting) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
-  const parts = [...counts].map(([kind, count]) =>
-    count === 1 ? kindNames[kind][0] : `${count} ${kindNames[kind][1]}`,
-  );
+  // Unnamed kinds read as "and one more", so they always come last.
+  const parts = [...counts]
+    .sort(([a], [b]) => Number(a === 'other') - Number(b === 'other'))
+    .map(([kind, count]) => (count === 1 ? kindNames[kind][0] : `${count} ${kindNames[kind][1]}`));
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
   return `${waiting.length} things need you: ${list}.`;
 }

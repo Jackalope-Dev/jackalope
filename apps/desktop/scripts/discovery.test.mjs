@@ -126,7 +126,7 @@ test('repository discovery preserves tasks, conventions, stack and assembled con
   assert.ok(discovered.techStack.includes('Rust'));
   assert.equal(discovered.openTasks.filter((t) => t.status === 'open').length, 3);
   assert.ok(discovered.conventions.length >= 3);
-  assert.equal(discovered.tokenUsageEstimate, 0); // 0 LLM tokens!
+  assert.equal(discovered.tokenUsageEstimate, 0);
 
   const assembled = assemblePrompt({
     rawPrompt: 'Build the audit log component',

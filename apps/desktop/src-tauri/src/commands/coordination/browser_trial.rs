@@ -1,3 +1,4 @@
+use crate::commands::tasks::RunStatus;
 use crate::commands::{
     coordination::Coordinator,
     tasks::{RunRequest, TaskRuntime},
@@ -71,7 +72,7 @@ async fn installed_agents_verify_browser_flow() {
                 .into_iter()
                 .find(|r| r.id == id)
                 .unwrap();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 println!(
                     "{agent}: {}, screenshots={}, validations={}, result={}",
                     run.status,
@@ -79,7 +80,7 @@ async fn installed_agents_verify_browser_flow() {
                     run.validation_steps.len(),
                     run.result
                 );
-                if run.status != "review"
+                if run.status != RunStatus::Review
                     || !run.result.contains(&nonce)
                     || run.screenshots.is_empty()
                     || !run.validation_steps.iter().any(|s| s.status == "passed")

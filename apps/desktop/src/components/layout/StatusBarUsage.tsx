@@ -1,16 +1,26 @@
-import { Popover, RefreshIcon } from '@jackalope/ui';
+import { Button, Popover, RefreshIcon, Tooltip } from '@jackalope/ui';
 import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { navigateWorkspace } from '../../lib/app-events';
 import { capacityWindowDisplay, capacityWindowName } from '../../lib/capacity-display';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
+import {
+  isAgentAllowedForProject,
+  useActiveProject,
+  useProjectStore,
+} from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
-import { Button } from '../ui/button';
-import { navigateWorkspace } from './navigation';
+import {
+  formatPercent,
+  resetsIn,
+  StatusBarUsageCard,
+  type UsageSummary,
+  updatedAgo,
+} from './StatusBarUsageCard';
 import './statusbar-usage.css';
 
 const agentName = (id: string) =>
@@ -42,15 +52,6 @@ function AllowanceMeter({
   );
 }
 
-/** Time until a window resets, in its largest whole unit: "in 3h", "in 2d". */
-function resetsIn(ms: number) {
-  const minutes = Math.max(1, Math.round(ms / 60_000));
-  if (minutes < 60) return `in ${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `in ${hours}h`;
-  return `in ${Math.round(hours / 24)}d`;
-}
-
 export function StatusBarUsage({ remote }: { remote: boolean }) {
   const { records, loading, error, fetch } = useCapacityStore(
     useShallow((s) => ({ records: s.records, loading: s.loading, error: s.error, fetch: s.fetch })),
@@ -72,9 +73,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
     };
   }, [fetch]);
   const projectId = useProjectStore((state) => state.activeProjectId);
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const enabledAgents = useAgentConfigStore((state) => state.enabledAgents);
   const runs = useExecutionStore((state) => state.runs);
   const projectAgents = new Set(
@@ -90,16 +89,44 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
       isAgentEnabled(record.agent) &&
       (record.windows.length > 0 || projectAgents.has(record.agent)),
   );
-  const summaries = accounts.map((record) => {
-    const windows = record.windows.map((window) => ({
-      ...capacityWindowDisplay(record, window, now),
-      name: capacityWindowName(window),
-    }));
+  const summaries: UsageSummary[] = accounts.map((record) => {
+    // The first pool is the plan itself; only further pools (such as one model's own
+    // allowance) need their name to tell windows apart.
+    const mainPool = record.windows[0]?.poolId;
+    const windows = record.windows.map((window) => {
+      const longName = capacityWindowName(window);
+      const name = longName.replace(/ (window|allowance)$/, '');
+      return {
+        ...capacityWindowDisplay(record, window, now),
+        key: `${window.poolId}:${window.window}`,
+        longName,
+        name: window.poolId === mainPool ? name : `${window.poolName} · ${name}`,
+        resetsAt: window.resetsAt,
+      };
+    });
+    // The most limiting window leads: an unknown one, else the least remaining.
     const limiting =
       windows.find((window) => window.remaining === null) ??
-      windows.sort((a, b) => (a.remaining ?? 100) - (b.remaining ?? 100))[0];
-    return { record, ...limiting };
+      [...windows].sort((a, b) => (a.remaining ?? 100) - (b.remaining ?? 100))[0];
+    return {
+      record,
+      agentName: agentName(record.agent),
+      windows: limiting ? [limiting, ...windows.filter((window) => window !== limiting)] : [],
+    };
   });
+  // What each meter measures: the agent's most limiting allowance window and when it resets.
+  const describe = ({ agentName, windows: [limiting] }: UsageSummary) => {
+    if (limiting?.remaining == null) return `${agentName}: ${limiting?.label ?? 'Not reported'}`;
+    const resets =
+      limiting.resetsAt != null && limiting.resetsAt * 1000 > now
+        ? `, resets ${resetsIn(limiting.resetsAt * 1000 - now)}`
+        : '';
+    return `${agentName}: ${limiting.label} in the ${limiting.longName.toLowerCase()}${resets}`;
+  };
+  const observed = summaries
+    .map((summary) => Date.parse(summary.record.observedAt ?? ''))
+    .filter(Number.isFinite);
+  const freshness = observed.length ? `Updated ${updatedAgo(Math.min(...observed), now)}` : null;
   const label = remote ? 'This computer’s quota' : 'Usage & quota';
   const refresh = () => {
     setNow(Date.now());
@@ -114,42 +141,54 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
         }
       }}
     >
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className="statusbar-usage"
-          aria-label={[
-            label,
-            ...summaries.map(
-              (summary) => `${agentName(summary.record.agent)}: ${summary.label ?? 'Not reported'}`,
-            ),
-          ].join(', ')}
-        >
-          <Gauge size={15} aria-hidden="true" />
-          {!summaries.length && <span className="statusbar-usage-label">{label}</span>}
-          {summaries.slice(0, 2).map((summary) => (
-            <span
-              key={summary.record.agent}
-              className="statusbar-quota"
-              data-tone={summary.tone ?? 'unknown'}
-              title={`${agentName(summary.record.agent)} · ${summary.name ?? 'Account allowance'} · ${summary.label ?? 'Not reported'}`}
-            >
-              <ProviderMark provider={summary.record.agent} size={16} />
-              <span className="statusbar-quota-readout">
-                <span>
-                  {summary.remaining == null
-                    ? '—'
-                    : `${summary.remaining.toLocaleString(undefined, { maximumFractionDigits: summary.remaining < 10 ? 1 : 0 })}%`}
+      <Tooltip
+        side="top"
+        className={summaries.length ? 'usage-card-tooltip' : undefined}
+        // The trigger's label already reads every account as a sentence; the card is visual.
+        label={summaries.length ? 'Select to see every window or refresh.' : undefined}
+        content={
+          summaries.length ? (
+            <StatusBarUsageCard
+              summaries={summaries}
+              now={now}
+              freshness={freshness}
+              loading={loading}
+              error={error}
+            />
+          ) : (
+            label
+          )
+        }
+      >
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            className="statusbar-usage"
+            aria-label={[label, ...summaries.map(describe), freshness].filter(Boolean).join('. ')}
+          >
+            <Gauge size={15} aria-hidden="true" />
+            {!summaries.length && <span className="statusbar-usage-label">{label}</span>}
+            {summaries.slice(0, 2).map(({ record, windows: [limiting] }) => (
+              <span
+                key={record.agent}
+                className="statusbar-quota"
+                data-tone={limiting?.tone ?? 'unknown'}
+              >
+                <ProviderMark provider={record.agent} size={16} />
+                <span className="statusbar-quota-readout">
+                  <span>
+                    {limiting?.remaining == null ? '—' : formatPercent(limiting.remaining)}
+                  </span>
+                  <AllowanceMeter remaining={limiting?.remaining ?? null} label="" compact />
                 </span>
-                <AllowanceMeter remaining={summary.remaining ?? null} label="" compact />
               </span>
-            </span>
-          ))}
-          {summaries.length > 2 && (
-            <span className="statusbar-quota-more">+{summaries.length - 2}</span>
-          )}
-        </button>
-      </Popover.Trigger>
+            ))}
+            {summaries.length > 2 && (
+              <span className="statusbar-quota-more">+{summaries.length - 2}</span>
+            )}
+          </button>
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Content
           className="statusbar-allowances"

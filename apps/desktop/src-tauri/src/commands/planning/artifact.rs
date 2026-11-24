@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const MAX_DOCUMENT_BYTES: usize = 96_000;
+/// Tasks a plan may run as one agent or planned subtasks.
 pub const MAX_TASKS: usize = 8;
+/// Tasks a document may hold; plans over `MAX_TASKS` run as a swarm.
+pub const MAX_SWARM_TASKS: usize = 24;
 pub const MAX_CRITERIA: usize = 12;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -299,8 +302,10 @@ impl PlanDocument {
         if self.goal.trim().is_empty() {
             return Err("The plan needs a Goal section.".into());
         }
-        if self.tasks.is_empty() || self.tasks.len() > MAX_TASKS {
-            return Err(format!("A plan needs between one and {MAX_TASKS} tasks."));
+        if self.tasks.is_empty() || self.tasks.len() > MAX_SWARM_TASKS {
+            return Err(format!(
+                "A plan needs between one and {MAX_SWARM_TASKS} tasks."
+            ));
         }
         if self.criteria.is_empty() || self.criteria.len() > MAX_CRITERIA {
             return Err(format!(

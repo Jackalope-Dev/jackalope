@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
-import { createServer } from '../../apps/desktop/node_modules/vite/dist/node/index.js';
+import { createServer } from 'vite';
 
 const directory = path.resolve('apps/desktop/scratch/workbench-ui');
 const output = path.resolve('output/playwright/workbench');
@@ -142,7 +142,8 @@ try {
       /Feedback from attempt fixture-run/,
     );
     assert.equal(await page.getByText('Searchable older answer', { exact: false }).count(), 1);
-    await page.getByRole('button', { name: 'Format earlier response' }).click();
+    // Earlier replies format as they scroll into view.
+    await page.getByText('Searchable older answer', { exact: false }).scrollIntoViewIfNeeded();
     await page.getByRole('heading', { name: 'Earlier result' }).waitFor();
     await page.getByRole('button', { name: 'Ask agent to fix' }).click();
     await page.getByText('Error: Feedback storage full', { exact: true }).waitFor();

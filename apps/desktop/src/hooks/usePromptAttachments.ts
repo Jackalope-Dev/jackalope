@@ -1,7 +1,8 @@
+import { describeError } from '@jackalope/contracts/errors';
 import { type ClipboardEvent, type RefObject, useEffect, useRef, useState } from 'react';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { attachmentReference } from '../lib/prompt-attachments';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 
 const PASTE_TYPES: Record<string, string> = {
   'image/png': 'png',
@@ -78,7 +79,7 @@ export function usePromptAttachments({
     void Promise.all(
       images.map(async (file) => {
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const path = await nativeTask<string>('prompt_attachment_save', {
+        const path = await invokeNative<string>('prompt_attachment_save', {
           projectPath,
           extension: PASTE_TYPES[file.type],
           bytes: Array.from(bytes),
@@ -87,17 +88,17 @@ export function usePromptAttachments({
       }),
     )
       .then((references) => attach.current(references))
-      .catch((cause) => setError(String(cause)))
+      .catch((cause) => setError(describeError(cause)))
       .finally(() => setBusy(false));
   };
   const pick = async () => {
     if (!available) return;
     setError('');
     try {
-      const paths = await nativeTask<string[]>('prompt_attachment_pick', { projectPath });
+      const paths = await invokeNative<string[]>('prompt_attachment_pick', { projectPath });
       if (paths.length) attach.current(paths.map((path) => attachmentReference(path, projectPath)));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   return { available, dragging, busy, error, clearError: () => setError(''), onPaste, pick };

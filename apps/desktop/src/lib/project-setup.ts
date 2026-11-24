@@ -1,24 +1,24 @@
-import { syncAgentConfig } from '../stores/agentConfigStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
-import { useExecutionStore } from '../stores/executionStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
-import { captureDraftForProject } from './capture-draft';
 import { missingProjectDefaults } from './context/project-defaults';
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 
-interface ProjectInfo {
+/** A folder the native side checked: its resolved path, name and Git state. */
+export interface ProjectInfo {
   path: string;
   name: string;
   branch: string;
   repository: boolean;
 }
 
+export const validateProject = (path: string) =>
+  invokeNative<ProjectInfo>('task_validate_project', { path });
+
 export async function openProject(
   path: string,
   options: { provisional?: boolean; pending?: Project | null } = {},
 ) {
-  await syncAgentConfig();
-  const info = await nativeTask<ProjectInfo>('task_validate_project', { path: path.trim() });
+  const info = await validateProject(path.trim());
   const project = projectFromInfo(info, options.pending);
   return options.provisional ? project : commitProjectSetup(project);
 }
@@ -28,8 +28,7 @@ export async function createProject(
   parentPath: string | null,
   options: { provisional?: boolean } = {},
 ) {
-  await syncAgentConfig();
-  const info = await nativeTask<ProjectInfo>('task_create_project', {
+  const info = await invokeNative<ProjectInfo>('task_create_project', {
     name: name.trim(),
     parentPath,
   });
@@ -53,7 +52,6 @@ function projectFromInfo(info: ProjectInfo, pending?: Project | null): Project {
         name: info.name,
         path: info.path,
         ...git,
-        agentProvider: 'codex' as const,
         worktrees: [],
       };
 }
@@ -68,7 +66,6 @@ export function projectGitState(info: {
 }
 
 export function commitProjectSetup(pending: Project): Project {
-  const previousProjectId = useProjectStore.getState().activeProjectId;
   let project = useProjectStore.getState().completeSetup(pending);
   const memory = useContextMemoryStore.getState().getMemory(project.id);
   if (memory?.projectPath === project.path) {
@@ -77,13 +74,6 @@ export function commitProjectSetup(pending: Project): Project {
       project = { ...project, preferences: { ...project.preferences, ...defaults } };
       useProjectStore.getState().updateProjectPreferences(project.id, defaults);
     }
-  }
-  const execution = useExecutionStore.getState();
-  if (execution.drafts.capture) {
-    execution.draft(
-      'capture',
-      captureDraftForProject(execution.drafts, project, previousProjectId),
-    );
   }
   void useContextMemoryStore
     .getState()

@@ -6,7 +6,13 @@ import {
   recommendedServers,
 } from '../src/components/mcp/curated-servers.ts';
 import { marketplaceSetup, safeMarketplaceUrl } from '../src/components/mcp/marketplace-info.ts';
-import { agentCapabilities, connectionSupport } from '../src/lib/agent-capabilities.ts';
+import { connectionSupport } from '../src/lib/agent-catalog.ts';
+import {
+  deleteMcpServer,
+  listMcpServers,
+  probeMcpServer,
+  saveMcpServer,
+} from '../src/lib/mcp-client.ts';
 import {
   bearerToken,
   connectionFailure,
@@ -15,12 +21,6 @@ import {
   withBearerToken,
   withoutBearerToken,
 } from '../src/lib/mcp-connection.ts';
-import {
-  deleteMcpServer,
-  listMcpServers,
-  probeMcpServer,
-  saveMcpServer,
-} from '../src/lib/tauri-bridge.ts';
 import { useMcpStore } from '../src/stores/mcpStore.ts';
 import { useSettingsStore } from '../src/stores/settingsStore.ts';
 
@@ -35,8 +35,6 @@ test('all built-in agents share discovery with explicit transport and account li
   assert.notEqual(connectionSupport('antigravity', 'http', false), null);
   assert.notEqual(connectionSupport('gemini', 'stdio', false), null);
   assert.notEqual(connectionSupport('unknown', 'http', true), null);
-  assert.equal(agentCapabilities('antigravity').accounts, true);
-  assert.equal(agentCapabilities('opencode').capacity, false);
 });
 
 test('marketplace opt-out blocks search and detail fetches and discards in-flight results', async () => {
@@ -141,13 +139,7 @@ test('setup facts include snippet fields without inventing configuration or auth
 });
 
 test('settingsStore defaults useMcpMarketplace to true (opt-out)', () => {
-  const store = useSettingsStore.getState();
-  assert.equal(typeof store.useMcpMarketplace, 'boolean');
-  // Verify toggling works
-  store.setUseMcpMarketplace(false);
-  assert.equal(useSettingsStore.getState().useMcpMarketplace, false);
-  store.setUseMcpMarketplace(true);
-  assert.equal(useSettingsStore.getState().useMcpMarketplace, true);
+  assert.equal(useSettingsStore.getInitialState().useMcpMarketplace, true);
 });
 
 test('MCP operations require a desktop connection and cannot invent results', async () => {

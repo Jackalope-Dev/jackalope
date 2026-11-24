@@ -1,13 +1,11 @@
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { KnowledgeLibrary } from '../knowledge/KnowledgeLibrary';
 import { CodebaseMemoryBar } from '../tasks/CodebaseMemoryBar';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 
 export function ProjectContext() {
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   return (
     <WorkspacePage className="project-context-page">
       <WorkspaceHeading title="Project context" />

@@ -1,6 +1,8 @@
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import type { PendingUserPrompt } from '../../lib/task-runtime';
-import { respondToPrompt } from '../../lib/task-runtime';
+import { openInBrowser } from '../../lib/native/env';
+import { planCommands } from '../../lib/plan-mode';
+import { respondToPrompt } from '../../lib/task-client';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -45,10 +47,15 @@ export function UserPromptCard({
       throw new Error(
         'This request is no longer waiting for a response. Refresh the task to see its current state.',
       );
-    useMascotStore.getState().setMood('working');
     useMascotStore.getState().say('Your response is saved for the agent.', 3000);
     await useExecutionStore.getState().refresh();
   };
+  const override = prompt.answeredBy
+    ? async (value: string) => {
+        await planCommands.overridePrompt(runId, prompt.id, value);
+        await useExecutionStore.getState().refresh();
+      }
+    : undefined;
   return (
     <AgentQuestion
       key={`${runId}:${prompt.id}`}
@@ -58,6 +65,8 @@ export function UserPromptCard({
       agentDetail={agentDetail}
       onAnswer={answer}
       onContinue={onContinue}
+      onOverride={override}
+      onOpenLink={(url) => void openInBrowser(url)}
     />
   );
 }

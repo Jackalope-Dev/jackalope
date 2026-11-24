@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::computers::pool;
 
 pub(super) fn ordered_plan(items: Vec<PlanEntry>) -> Result<Vec<PlanEntry>, String> {
     if items.is_empty() || items.len() > 100 {
@@ -41,27 +42,7 @@ pub(super) fn ordered_plan(items: Vec<PlanEntry>) -> Result<Vec<PlanEntry>, Stri
     Ok(ordered)
 }
 
-pub(super) fn active(status: &str) -> bool {
-    ["starting", "running", "stopping"].contains(&status)
-}
-
-pub(super) fn overlaps(a: &[String], b: &[String]) -> bool {
-    a.iter().any(|a| {
-        b.iter().any(|b| {
-            a == "."
-                || b == "."
-                || a == b
-                || a.starts_with(&format!("{b}/"))
-                || b.starts_with(&format!("{a}/"))
-        })
-    })
-}
-
-fn covered(paths: &[String], path: &str) -> bool {
-    paths
-        .iter()
-        .any(|p| p == "." || p == path || path.starts_with(&format!("{p}/")))
-}
+use crate::commands::scope_path::{self, any_contains, ScopePath};
 
 /// Whether two items own a common path that neither handed to a subtask.
 pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> bool {
@@ -69,16 +50,14 @@ pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> boo
     let right = agreements::effective_scopes(ledger, b);
     left.iter().any(|x| {
         right.iter().any(|y| {
-            let deeper = if x == "." {
+            let deeper = if scope_path::contains(x, y) {
                 y
-            } else if y == "." || x == y || x.starts_with(&format!("{y}/")) {
+            } else if scope_path::contains(y, x) {
                 x
-            } else if y.starts_with(&format!("{x}/")) {
-                y
             } else {
                 return false;
             };
-            !covered(&a.excluded_scopes, deeper) && !covered(&b.excluded_scopes, deeper)
+            !any_contains(&a.excluded_scopes, deeper) && !any_contains(&b.excluded_scopes, deeper)
         })
     })
 }
@@ -89,13 +68,18 @@ pub(super) fn scopes(values: Vec<String>) -> Result<Vec<String>, String> {
             "Name the files or folders this task owns (use . for the whole project).".into(),
         );
     }
-    values.into_iter().map(|value| {
-        let value = value.trim().replace('\\', "/").trim_end_matches('/').to_lowercase();
-        if value.is_empty() || value.chars().any(char::is_control) || value.len() > 500 || value.starts_with('/') || value.contains(':') || value.contains('*') || value.split('/').any(|p| p == ".." || (p == "." && value != ".") || p.is_empty()) {
-            return Err("Scopes must be relative file or folder paths, without wildcards or parent traversal.".into());
-        }
-        Ok(value)
-    }).collect()
+    values
+        .into_iter()
+        .map(|value| {
+            ScopePath::parse(&value)
+                .filter(|path| !path.as_str().contains('*'))
+                .map(|path| path.key())
+                .ok_or_else(|| {
+                    "Scopes must be relative file or folder paths, without wildcards or parent traversal."
+                        .into()
+                })
+        })
+        .collect()
 }
 
 fn dependency_priority(items: &[QueueItem]) -> HashMap<String, usize> {
@@ -138,16 +122,75 @@ fn dependency_priority(items: &[QueueItem]) -> HashMap<String, usize> {
     memo
 }
 
+/// The host an active attempt counts against: where the pool placed it,
+/// where it ran, or its project's computer for attempts from before the pool.
+pub(super) fn host_of(inner: &Inner, run: &crate::commands::tasks::TaskRun) -> String {
+    run.host
+        .as_ref()
+        .map(|host| host.id.clone())
+        .or_else(|| run.remote.as_ref().map(|remote| remote.computer_id.clone()))
+        .unwrap_or_else(|| {
+            if inner.remote_projects.contains(&run.project_id) {
+                inner
+                    .pool
+                    .pinned(&run.project_id, true)
+                    .map(|(id, _)| id)
+                    .unwrap_or_else(|| format!("project:{}", run.project_id))
+            } else {
+                pool::DEVICE.into()
+            }
+        })
+}
+
+/// Running attempts per host, leaving out attempts that are only finishing.
+pub(super) fn host_load(
+    inner: &Inner,
+    runs: &[crate::commands::tasks::TaskRun],
+) -> HashMap<String, usize> {
+    let mut load = HashMap::new();
+    for run in runs.iter().filter(|r| r.status.is_active() && !r.finishing) {
+        *load.entry(host_of(inner, run)).or_default() += 1;
+    }
+    load
+}
+
 pub(super) fn ready_items(
     inner: &Inner,
     runs: &[crate::commands::tasks::TaskRun],
     merged: &[String],
 ) -> Vec<QueueItem> {
-    let active_runs: Vec<_> = runs.iter().filter(|r| active(&r.status)).collect();
-    let slots = inner
-        .concurrency
-        .saturating_sub(active_runs.iter().filter(|r| !r.finishing).count());
-    let mut reserved = Vec::new();
+    placed_items(inner, runs, merged)
+        .into_iter()
+        .map(|(item, _)| item)
+        .collect()
+}
+
+/// Queued work that may start now, each with the host the capacity pool
+/// chose for it, or why no host it may use can take it. Planned work (with a
+/// feature) is placed across the project's pool by its needs and the
+/// project's choice of hosts; other queued work keeps to its project's
+/// computer or this device. This device and computers keep separate limits.
+pub(super) fn placed_items(
+    inner: &Inner,
+    runs: &[crate::commands::tasks::TaskRun],
+    merged: &[String],
+) -> Vec<(QueueItem, Result<pool::RunHost, String>)> {
+    let active_runs: Vec<_> = runs.iter().filter(|r| r.status.is_active()).collect();
+    let mut load = host_load(inner, runs);
+    let limits = pool::Limits {
+        device: inner.concurrency,
+        remote: inner.remote_concurrency,
+    };
+    let remote_running: usize = load
+        .iter()
+        .filter(|(host, _)| host.as_str() != pool::DEVICE)
+        .map(|(_, count)| count)
+        .sum();
+    let mut remote_free = inner.remote_concurrency.saturating_sub(remote_running);
+    let device_free = |load: &HashMap<String, usize>| {
+        load.get(pool::DEVICE).copied().unwrap_or(0) < inner.concurrency
+    };
+    let mut reserved: Vec<(&QueueItem, Result<pool::RunHost, String>)> = Vec::new();
     let priority = dependency_priority(&inner.ledger.items);
     let mut pending: Vec<_> = inner
         .ledger
@@ -174,11 +217,8 @@ pub(super) fn ready_items(
                                 || other.canceled
                                 || other.run_id.as_ref().is_some_and(|id| {
                                     runs.iter().find(|run| &run.id == id).is_none_or(|run| {
-                                        !active(&run.status)
-                                            && (!matches!(
-                                                run.status.as_str(),
-                                                "review" | "reviewed"
-                                            ) || run.error.is_some()
+                                        !run.status.is_active()
+                                            && (!run.status.is_done() || run.error.is_some()
                                                 || run.persistence_error.is_some()
                                                 || run.dependency_invalidated
                                                 || run.verification_error.is_some()
@@ -203,7 +243,7 @@ pub(super) fn ready_items(
         *counts.entry(run.project_id.clone()).or_default() += 1;
     }
     let mut reorder = true;
-    while !pending.is_empty() && reserved.len() < slots {
+    while !pending.is_empty() && (device_free(&load) || remote_free > 0) {
         if reorder {
             pending.sort_by_key(|item| {
                 std::cmp::Reverse((
@@ -234,7 +274,7 @@ pub(super) fn ready_items(
                         || (item.staged_dependencies
                             && runs.iter().any(|run| {
                                 &run.id == id
-                                && ["review", "reviewed"].contains(&run.status.as_str())
+                                && run.status.is_done()
                                 && run.error.is_none()
                                 && crate::commands::integration::dependencies::checked_or_unchecked(
                                     run,
@@ -273,17 +313,48 @@ pub(super) fn ready_items(
         });
         if pending_overlap
             || active_overlap
-            || reserved.iter().any(|other: &&QueueItem| {
-                other.project_id == item.project_id && item_overlap(&inner.ledger, other, item)
+            || reserved.iter().any(|(other, host)| {
+                host.is_ok()
+                    && other.project_id == item.project_id
+                    && item_overlap(&inner.ledger, other, item)
             })
         {
             continue;
         }
-        *counts.entry(item.project_id.clone()).or_default() += 1;
-        reserved.push(item);
-        reorder = true;
+        let swarm = item.feature_id.is_some();
+        let hosts = inner.pool.hosts(
+            &item.project_id,
+            swarm,
+            inner.remote_projects.contains(&item.project_id),
+            limits,
+            &load,
+        );
+        let (policy, needs) = if swarm {
+            (
+                inner.pool.policy(&item.project_id),
+                inner.pool.needs.get(&item.id).cloned().unwrap_or_default(),
+            )
+        } else {
+            (pool::SwarmHosts::Anywhere, pool::Needs::default())
+        };
+        match pool::place(policy, &hosts, &needs, remote_free, None) {
+            pool::Decision::Wait(_) => continue,
+            pool::Decision::Refuse(reason) => reserved.push((item, Err(reason))),
+            pool::Decision::Place(host) => {
+                *load.entry(host.id.clone()).or_default() += 1;
+                if !host.is_device() {
+                    remote_free -= 1;
+                }
+                *counts.entry(item.project_id.clone()).or_default() += 1;
+                reserved.push((item, Ok(host)));
+                reorder = true;
+            }
+        }
     }
-    reserved.into_iter().cloned().collect()
+    reserved
+        .into_iter()
+        .map(|(item, host)| (item.clone(), host))
+        .collect()
 }
 
 pub(super) fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
@@ -302,6 +373,7 @@ pub(super) fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String
 #[cfg(test)]
 mod scheduling_tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
     fn item(id: &str, project: &str, deps: &[&str]) -> QueueItem {
         serde_json::from_value(serde_json::json!({"id":id,"projectId":project,"projectName":project,"projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":[id],"dependencies":deps,"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
     }
@@ -342,6 +414,9 @@ mod scheduling_tests {
             },
             enabled: ["a".into(), "b".into()].into(),
             concurrency: 2,
+            remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
+            remote_projects: HashSet::new(),
+            pool: Default::default(),
             grants: HashMap::new(),
             url: None,
             error: None,
@@ -353,6 +428,151 @@ mod scheduling_tests {
             ["root", "peer"]
         );
         assert!(!ready.iter().any(|i| i.id == "child"));
+    }
+
+    #[test]
+    fn computer_projects_use_their_own_slots() {
+        let mut items: Vec<_> = (0..5)
+            .map(|n| item(&format!("cloud{n}"), "cloud", &[]))
+            .collect();
+        items.push(item("here", "local", &[]));
+        let inner = Inner {
+            ledger: Ledger {
+                items,
+                ..Default::default()
+            },
+            enabled: ["cloud".into(), "local".into()].into(),
+            concurrency: 1,
+            remote_concurrency: 4,
+            remote_projects: ["cloud".to_string()].into(),
+            pool: Default::default(),
+            grants: HashMap::new(),
+            url: None,
+            error: None,
+            delivered: HashMap::new(),
+        };
+        let ready = ready_items(&inner, &[], &[]);
+        assert_eq!(ready.iter().filter(|i| i.project_id == "cloud").count(), 4);
+        assert_eq!(ready.iter().filter(|i| i.project_id == "local").count(), 1);
+    }
+
+    fn planned(id: &str) -> QueueItem {
+        let mut item = item(id, "p", &[]);
+        item.feature_id = Some("feature".into());
+        item
+    }
+
+    fn pooled(items: Vec<QueueItem>, hosts: pool::SwarmHosts) -> Inner {
+        let computer = |id: &str, pinned_by: Option<&str>, browser| pool::PoolComputer {
+            id: id.into(),
+            name: id.into(),
+            pinned_by: pinned_by.map(str::to_string),
+            health: pool::PoolHealth {
+                browser: Some(browser),
+                ..Default::default()
+            },
+        };
+        let browser = || pool::Needs {
+            browser: true,
+            computer_only: Some("STAGING_KEY is available only to computers".into()),
+            ..Default::default()
+        };
+        Inner {
+            ledger: Ledger {
+                items,
+                ..Default::default()
+            },
+            enabled: ["p".into()].into(),
+            concurrency: 1,
+            remote_concurrency: 8,
+            remote_projects: ["p".to_string()].into(),
+            pool: pool::Pool {
+                loaded: true,
+                // The project's computer has room but no browser tools, so
+                // browser-checked forks that must run on a computer spread to
+                // the added computer.
+                computers: vec![
+                    computer("Box", Some("p"), false),
+                    computer("Lab", None, true),
+                ],
+                projects: [(
+                    "p".to_string(),
+                    pool::ProjectHosts {
+                        swarm_hosts: Some(hosts),
+                        computers: vec!["Lab".into()],
+                    },
+                )]
+                .into(),
+                needs: [
+                    ("s1".to_string(), browser()),
+                    ("s2".to_string(), browser()),
+                    (
+                        "s3".to_string(),
+                        pool::Needs {
+                            device_only: Some("kimi cannot run on a computer".into()),
+                            ..Default::default()
+                        },
+                    ),
+                ]
+                .into(),
+            },
+            grants: HashMap::new(),
+            url: None,
+            error: None,
+            delivered: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn planned_work_spreads_across_the_pool_and_other_work_keeps_its_host() {
+        let items = vec![
+            item("q1", "p", &[]),
+            planned("s1"),
+            planned("s2"),
+            planned("s3"),
+        ];
+        let inner = pooled(items.clone(), pool::SwarmHosts::Anywhere);
+        let placed: Vec<_> = placed_items(&inner, &[], &[])
+            .into_iter()
+            .map(|(item, host)| (item.id, host.unwrap().id))
+            .collect();
+        assert_eq!(
+            placed,
+            [
+                ("q1".to_string(), "Box".to_string()),
+                ("s1".into(), "Lab".into()),
+                ("s2".into(), "Lab".into()),
+                ("s3".into(), "device".into()),
+            ]
+        );
+        // A running attempt holds its host's slot.
+        let running = crate::commands::tasks::TaskRun {
+            id: "busy".into(),
+            project_id: "p".into(),
+            status: RunStatus::Running,
+            host: Some(pool::RunHost::device(String::new())),
+            ..Default::default()
+        };
+        let mut busy = inner;
+        let mut done = item("done", "p", &[]);
+        done.run_id = Some("busy".into());
+        busy.ledger.items.push(done);
+        let placed = placed_items(&busy, &[running], &[]);
+        assert_eq!(placed.len(), 3);
+        assert!(placed
+            .iter()
+            .all(|(item, host)| item.id != "s3" && host.as_ref().unwrap().id != "device"));
+        // A fork that only this device can run is refused when swarms run
+        // only on computers, and the others still place.
+        let strict = pooled(items, pool::SwarmHosts::Computers);
+        let placed = placed_items(&strict, &[], &[]);
+        let refused = placed.iter().find(|(item, _)| item.id == "s3").unwrap();
+        assert!(refused
+            .1
+            .as_ref()
+            .unwrap_err()
+            .contains("only on computers"));
+        assert_eq!(placed.iter().filter(|(_, host)| host.is_ok()).count(), 3);
     }
 }
 

@@ -112,6 +112,7 @@
 }
 
 .bots-avatar {
+  position: relative;
   display: grid;
   flex-shrink: 0;
   place-items: center;
@@ -289,17 +290,10 @@
   gap: 12px;
 }
 
-.bots-switch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: var(--control-height, 36px);
-}
-
 /* Every row takes the tallest card's height, so the grid reads as even tiles. */
 .bots-templates {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   grid-auto-rows: 1fr;
   gap: 12px;
   /* Each list item lays out its tile so the tile fills the row height. */
@@ -312,28 +306,25 @@
 }
 
 .bots-template {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
+  display: block;
   width: 100%;
   height: 100%;
-  min-height: 72px;
-  padding: 14px 16px;
+  padding: 0;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color 140ms,
-    background 140ms;
 }
 
 .bots-template:hover:not(:disabled) {
   border-color: var(--color-border);
-  background: var(--color-surface-hover);
+}
+
+.bots-template:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
 
 .bots-template:disabled {
@@ -341,35 +332,51 @@
   opacity: 0.6;
 }
 
-.bots-template strong {
-  display: block;
-  font-weight: 600;
-}
-
-.bots-template-role {
-  display: -webkit-box;
-  margin-top: 2px;
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.bots-template-add {
-  color: var(--color-text-muted);
-}
-
-.bots-template:hover:not(:disabled) .bots-template-add {
-  color: var(--color-accent-ink);
-}
-
 .bot-editor {
-  width: min(44rem, calc(100vw - 32px));
+  width: min(56rem, calc(100vw - 32px));
+}
+
+/* The preview sits beside the form, and above it once the dialog is narrow. */
+.bot-editor-main {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+.bot-editor-preview {
+  position: sticky;
+  top: 0;
+  display: grid;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+@media (max-width: 1000px) {
+  .bot-editor-main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  /* A compact row keeps the form in view at 960 by 640. */
+  .bot-editor-preview {
+    position: static;
+    width: min(100%, 24rem);
+  }
+  .bot-editor-preview .bots-cast {
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+  .bot-editor-preview .bots-cast-stage {
+    height: auto;
+    min-height: 72px;
+  }
+  .bot-editor-preview .bots-cast-copy {
+    align-content: center;
+  }
 }
 
 /* Contained dialogs pad their own body and footer to line up with the header. */
-.bot-editor-form {
+.bot-editor-body {
   display: grid;
   flex: 1;
   align-content: start;
@@ -377,6 +384,12 @@
   min-height: 0;
   padding: 0 32px 20px;
   overflow-y: auto;
+}
+
+.bot-editor-form {
+  display: grid;
+  align-content: start;
+  gap: 20px;
 }
 
 .bot-editor-steps {
@@ -482,18 +495,6 @@
   margin: 0;
   padding: 16px 32px 20px;
   border-top: 1px solid var(--color-border-subtle);
-}
-
-.bot-editor-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-@media (max-width: 640px) {
-  .bot-editor-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .bot-editor-field {
@@ -731,7 +732,7 @@
 }
 
 /* Scrolling grid containers drop bottom padding in some WebViews; this keeps space above the footer. */
-.bot-editor-form::after {
+.bot-editor-body::after {
   content: "";
   height: 4px;
 }
@@ -775,4 +776,150 @@
 .bots-note {
   overflow-wrap: anywhere;
   font-size: var(--text-sm);
+}
+
+/* Bots overview: one card per project with the bots that work in it. */
+.bots-projects {
+  --workspace-card-min-width: 260px;
+}
+
+.bots-project {
+  display: grid;
+  grid-template-rows: auto 40px 16px;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms,
+    background 140ms;
+}
+
+.bots-project:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+}
+
+.bots-project:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.bots-project-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bots-project-heading strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-project-heading > svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.bots-project-crew {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bots-project[data-empty] .bots-project-crew {
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* A bot that also works in other projects carries a small ring so it reads as shared. */
+.bots-project-member {
+  display: grid;
+  padding: 1px;
+  border-radius: var(--radius-full);
+}
+
+.bots-project-member[data-shared] {
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.bots-project-hint {
+  padding-inline: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.bots-project-more {
+  padding-inline: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.bots-project-summary {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-project-summary[data-waiting] {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.bots-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bots-project {
+    transition: none;
+  }
+}
+
+.bots-team-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(560px, calc(100vw - 40px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+.bots-team-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bots-team-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--control-height);
+  min-width: 0;
+}
+.bots-team-name {
+  flex: none;
+  font-weight: 500;
+}
+.bots-team-role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -83,8 +83,10 @@ pub fn reflect(
             return;
         }
     }
-    let _ = store.update(&record.id, |saved| {
+    if let Err(error) = store.update(&record.id, |saved| {
         saved.reflected = true;
         Ok(())
-    });
+    }) {
+        eprintln!("Plan reflection was recorded but the plan was not marked reflected: {error}");
+    }
 }

@@ -1,20 +1,22 @@
-import { Input } from '@jackalope/ui';
+import { isActive } from '@jackalope/contracts/runs';
+import { Button, InlineNotice, Input } from '@jackalope/ui';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
+import { projectTerminalCommands, type TerminalCommand } from '../../lib/terminal-commands';
 import { saveWorkFeedback } from '../../lib/work-feedback';
-import { useSavedActionsStore } from '../../stores/savedActionsStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { ActionError } from '../ui/ActionError';
 
 interface TerminalView {
   generation: string;
@@ -67,12 +69,10 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
   const [query, setQuery] = useState('');
   const [searchMessage, setSearchMessage] = useState('');
   const searchLine = useRef(-1);
-  const savedCommands = useSavedActionsStore((state) => state.actions).filter(
-    (action) =>
-      action.kind === 'command' && (!action.projectId || action.projectId === run.projectId),
+  const preferences = useProjectStore(
+    (state) => state.projects.find((project) => project.id === run.projectId)?.preferences,
   );
-  const [commandId, setCommandId] = useState('');
-  const command = savedCommands.find((action) => action.id === commandId);
+  const commands = projectTerminalCommands(preferences);
   const findOutput = () => {
     const terminal = terminalRef.current;
     if (!terminal || !query) return;
@@ -166,7 +166,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       if (disposed || !host.current?.clientWidth) return;
       fit.fit();
       if (writable)
-        void nativeTask('task_terminal_resize', {
+        void invokeNative('task_terminal_resize', {
           id: terminalId,
           generation,
           cols: terminal.cols,
@@ -193,7 +193,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
           event.preventDefault();
           void navigator.clipboard
             .writeText(terminal.getSelection())
-            .catch((cause) => setError(String(cause)));
+            .catch((cause) => setError(describeError(cause)));
         }
         return false;
       }
@@ -201,9 +201,9 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
     });
     const input = terminal.onData((input) => {
       if (writable)
-        void nativeTask('task_terminal_write', { id: terminalId, generation, input }).catch(
+        void invokeNative('task_terminal_write', { id: terminalId, generation, input }).catch(
           (cause) => {
-            if (!disposed) setError(String(cause));
+            if (!disposed) setError(describeError(cause));
           },
         );
     });
@@ -213,14 +213,14 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       if (loading || disposed || document.hidden) return;
       loading = true;
       try {
-        let view = await nativeTask<TerminalView | null>('task_terminal_status', {
+        let view = await invokeNative<TerminalView | null>('task_terminal_status', {
           id: terminalId,
           cursor,
           generation,
         });
         if (!view && !restored && useSettingsStore.getState().retainTerminalOutput) {
           restored = true;
-          view = await nativeTask<TerminalView | null>('task_terminal_restore', {
+          view = await invokeNative<TerminalView | null>('task_terminal_restore', {
             id: run.taskId,
             slot,
           });
@@ -242,7 +242,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
           cursor = view.cursor;
         }
       } catch (cause) {
-        if (!disposed) setError(String(cause));
+        if (!disposed) setError(describeError(cause));
       } finally {
         loading = false;
       }
@@ -286,7 +286,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
     try {
       if (!running && run.liveSessionId)
         await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
-      await nativeTask(running ? 'task_terminal_stop' : 'task_terminal_start', {
+      await invokeNative(running ? 'task_terminal_stop' : 'task_terminal_start', {
         id: running ? terminalId : run.id,
         slot,
         retainOutput: useSettingsStore.getState().retainTerminalOutput,
@@ -295,7 +295,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       });
       await reload.current();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -328,41 +328,33 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
         </Button>
       </div>
       <p className="work-context-path">{workspace}</p>
-      {!!savedCommands.length && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label="Saved terminal command"
-            value={commandId || '__choose'}
-            onValueChange={setCommandId}
-          >
-            <SelectItem value="__choose" disabled>
-              Choose a saved command…
-            </SelectItem>
-            {savedCommands.map((action) => (
-              <SelectItem key={action.id} value={action.id}>
-                {action.name}
-              </SelectItem>
-            ))}
-          </Select>
-          <Button
-            variant="outline"
-            disabled={!command || !running || busy}
-            onClick={() => {
-              if (!command) return;
-              setBusy(true);
-              void nativeTask('task_terminal_write', {
-                id: terminalId,
-                generation: generationRef.current,
-                input: `${command.body}\r`,
-              })
-                .catch((reason) => setError(String(reason)))
-                .finally(() => setBusy(false));
-            }}
-          >
-            Run command
-          </Button>
-          {command && <code className="work-context-path">{command.body}</code>}
-        </div>
+      {!!commands.length && (
+        <fieldset className="flex flex-wrap items-center gap-2">
+          <legend className="ui-sr-only">Project commands</legend>
+          {commands.map((item: TerminalCommand) => (
+            <Button
+              key={item.id}
+              variant="outline"
+              size="sm"
+              title={item.command}
+              aria-label={`Run ${item.name}: ${item.command}`}
+              disabled={!running || busy}
+              onClick={() => {
+                setBusy(true);
+                void invokeNative('task_terminal_write', {
+                  id: terminalId,
+                  generation: generationRef.current,
+                  input: `${item.command}\r`,
+                })
+                  .catch((reason) => setError(describeError(reason)))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {item.name}
+            </Button>
+          ))}
+          {!running && <span className="task-muted text-sm">Start the terminal to run these.</span>}
+        </fieldset>
       )}
       <form
         className="flex flex-wrap items-center gap-2"
@@ -386,7 +378,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
         </Button>
         <span role="status">{searchMessage}</span>
       </form>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div ref={host} className="task-terminal-screen" />
       {hasSelection && (
         <Button
@@ -401,7 +393,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
               setError('');
               setFeedbackSaved(true);
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             }
           }}
         >

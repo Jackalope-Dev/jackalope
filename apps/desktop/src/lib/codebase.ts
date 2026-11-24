@@ -1,4 +1,4 @@
-import { isTauriEnvironment } from './tauri-bridge.ts';
+import { invokeNative } from './native/transport.ts';
 
 interface CodebaseFile {
   symbols?: { name: string; line: number; kind: string }[];
@@ -40,9 +40,7 @@ export function scanCodebase(repoPath: string, force = true): Promise<CodebaseSn
   if (pending) return pending;
   if (prepared?.path === repoPath) prepared = undefined;
   const result = (async () => {
-    if (!isTauriEnvironment()) throw new Error('Open the desktop app to analyze local files.');
-    const { invoke } = await import('@tauri-apps/api/core');
-    const value = await invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
+    const value = await invokeNative<CodebaseSnapshot>('codebase_scan', { repoPath });
     const oldest = snapshots.keys().next().value;
     if (snapshots.size >= 8 && oldest !== undefined) snapshots.delete(oldest);
     snapshots.set(repoPath, { value, at: Date.now() });
@@ -65,10 +63,7 @@ export function preparedCodebase(repoPath: string): Promise<CodebaseSnapshot> | 
 }
 
 export async function watchCodebase(repoPath: string, onChange: (unavailable: boolean) => void) {
-  const [{ invoke }, { listen }] = await Promise.all([
-    import('@tauri-apps/api/core'),
-    import('@tauri-apps/api/event'),
-  ]);
+  const { listen } = await import('@tauri-apps/api/event');
   let id: string | undefined;
   const unlisten = await listen<{ id: string; unavailable: boolean }>(
     'codebase-changed',
@@ -77,13 +72,13 @@ export async function watchCodebase(repoPath: string, onChange: (unavailable: bo
     },
   );
   try {
-    id = await invoke<string>('codebase_watch', { repoPath });
+    id = await invokeNative<string>('codebase_watch', { repoPath });
   } catch (error) {
     unlisten();
     throw error;
   }
   return async () => {
     unlisten();
-    await invoke('codebase_unwatch', { id });
+    await invokeNative('codebase_unwatch', { id });
   };
 }

@@ -1,10 +1,13 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
+import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { type FeatureMapEntry, featureMapForRegistry } from '../lib/feature-map.ts';
+import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
+import { isTauriEnvironment } from '../lib/native/env.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
-import { nativeTask } from '../lib/task-runtime.ts';
-import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import type { TerminalCommand } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
@@ -35,6 +38,8 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
+  terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
   autoVerify?: boolean;
   /** Superseded by `workspaceMode`; `false` still means current-branch work. */
@@ -106,9 +111,24 @@ export interface Project {
   description?: string;
   /** Sidebar icon key from ProjectMark's set; the initial shows when unset. */
   icon?: string;
+  /** The site icon as a data URL, shown when `icon` is `website`. */
+  iconImage?: string;
+  /** The address the site icon was fetched from, offered again when changing it. */
+  website?: string;
   preferences?: ProjectPreferences;
-  agentProvider: 'codex' | 'grok' | 'claude-code' | 'openhands' | 'ollama' | 'antigravity';
+  /** Written by earlier versions and kept in saved projects; nothing reads it. */
+  agentProvider?: string;
 }
+
+/**
+ * The General project: a plain folder Jackalope keeps in its data directory for work
+ * without a project, such as operating a web page or checking a connection. A fixed id
+ * keeps it one project across windows and the terminal's project mirror.
+ */
+export const GENERAL_PROJECT_ID = 'jackalope-general';
+
+export const isGeneralProject = (project: Pick<Project, 'id'> | undefined) =>
+  project?.id === GENERAL_PROJECT_ID;
 
 interface ProjectState {
   projects: Project[];
@@ -131,8 +151,16 @@ interface ProjectState {
 
 let worktreeRequest = 0;
 
+/**
+ * Drops the Windows verbatim prefix (`\\?\C:\...`) that earlier project creation saved;
+ * Git cannot add worktrees under such a path. UNC verbatim paths are left alone.
+ */
+function ordinaryProjectPath(path: string) {
+  return /^\\\\\?\\[A-Za-z]:\\/.test(path) ? path.slice(4) : path;
+}
+
 export function projectPathKey(path: string) {
-  const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
+  const normalized = ordinaryProjectPath(path).replaceAll('\\', '/').replace(/\/$/, '');
   return typeof navigator !== 'undefined' && navigator.platform.includes('Win')
     ? normalized.toLowerCase()
     : normalized;
@@ -269,7 +297,7 @@ export const useProjectStore = create<ProjectState>()(
         } catch (e) {
           if (request === worktreeRequest && get().activeProjectId === active.id) {
             set({
-              worktreesError: e instanceof Error ? e.message : String(e),
+              worktreesError: describeError(e),
             });
           }
         } finally {
@@ -287,7 +315,7 @@ export const useProjectStore = create<ProjectState>()(
           await get().loadWorktreesForActiveProject();
           return { ok: true, entry };
         } catch (e) {
-          const error = e instanceof Error ? e.message : String(e);
+          const error = describeError(e);
           console.error('Failed to spawn worktree', e);
           return { ok: false, error };
         }
@@ -295,11 +323,15 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'jackalope-projects',
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const state = persisted as { projects?: Project[]; activeProjectId?: string | null };
         return {
-          projects: (state.projects ?? []).map((project) => ({ ...project, worktrees: [] })),
+          projects: (state.projects ?? []).map((project) => ({
+            ...project,
+            path: ordinaryProjectPath(project.path),
+            worktrees: [],
+          })),
           activeProjectId: state.activeProjectId ?? null,
         };
       },
@@ -332,6 +364,8 @@ interface ProjectRecord {
   /** Mirrored one way so a terminal approving a plan uses the app's check. */
   verifyCommand?: string;
   autoVerify?: boolean;
+  /** Project instructions, given to every task agent at launch. */
+  instructions?: string;
   prepareCommand?: string;
   setupFiles?: string[];
   previewCommand?: string;
@@ -346,6 +380,14 @@ interface ProjectRecord {
  * the theme store, which imports this one, so it is pushed rather than read.
  */
 let appAccent: string | undefined;
+
+function selectActiveProject(state: Pick<ProjectState, 'projects' | 'activeProjectId'>) {
+  return state.projects.find((project) => project.id === state.activeProjectId);
+}
+
+export function useActiveProject() {
+  return useProjectStore(selectActiveProject);
+}
 
 export function setRegistryAppAccent(accent: string) {
   if (accent === appAccent) return;
@@ -370,6 +412,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     editCheck: preferences?.editCheck,
     verifyCommand: preferences?.verifyCommand?.trim() || undefined,
     autoVerify: preferences?.autoVerify,
+    instructions: preferences?.customInstructions?.trim() || undefined,
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
     previewCommand: preferences?.previewCommand?.trim() || undefined,
@@ -386,7 +429,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
 export async function mergeProjectRegistry() {
   if (!isTauriEnvironment()) return;
   try {
-    const records = await nativeTask<ProjectRecord[]>('project_registry_list', {});
+    const records = await invokeNative<ProjectRecord[]>('project_registry_list', {});
     const state = useProjectStore.getState();
     const known = new Set(state.projects.map((project) => projectPathKey(project.path)));
     const added = records
@@ -394,10 +437,10 @@ export async function mergeProjectRegistry() {
       .map<Project>((record) => ({
         id: record.id,
         name: record.name,
-        path: record.path,
+        path: ordinaryProjectPath(record.path),
         gitBranch: '',
+        ...(record.id === GENERAL_PROJECT_ID ? { plainFolder: true } : {}),
         worktrees: [],
-        agentProvider: 'codex',
       }));
     if (added.length) {
       useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));
@@ -467,7 +510,7 @@ function mirrorProjects(projects: Project[]) {
   mirrorSync = mirrorSync
     .then(async () => {
       if (encoded === mirrored) return;
-      await nativeTask('project_registry_save', { projects: records });
+      await invokeNative('project_registry_save', { projects: records });
       mirrored = encoded;
     })
     .catch(() => {

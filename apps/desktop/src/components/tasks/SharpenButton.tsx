@@ -1,19 +1,19 @@
+import { describeError } from '@jackalope/contracts/errors';
+import { Button, InlineNotice, Tooltip } from '@jackalope/ui';
 import { Sparkles, Square, Undo2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { agentAdapter } from '../../lib/agent-catalog';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   canUndoSharpen,
   sharpenDraft,
   sharpenUnavailableReason,
   stopSharpen,
 } from '../../lib/sharpen';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Tooltip } from '../ui/Tooltip';
 
 type Sharpen = ReturnType<typeof useSharpen>;
 
@@ -47,7 +47,7 @@ export function useSharpen({
   const reason = sharpenUnavailableReason({
     desktop: isTauriEnvironment(),
     runners,
-    adapterFor: (id) => customAgents.find((agent) => agent.id === id)?.adapter ?? id,
+    adapterFor: (id) => agentAdapter(id, customAgents),
     isEnabled,
   });
   const sharpen = async () => {
@@ -67,7 +67,7 @@ export function useSharpen({
       apply(rewritten);
       setUndo({ original, rewritten });
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const message = describeError(cause);
       if (!/Stopped\.$/.test(message)) setError(message);
     } finally {
       running.current = false;
@@ -92,7 +92,8 @@ export function useSharpen({
   };
 }
 
-/** The composer control: Sharpen, Stop while it runs, then Undo sharpen. */
+/** The composer control: Sharpen, Stop while it runs, then Undo sharpen. Labelled, since
+ * a bare sparkle does not say what it does. */
 export function SharpenButton({
   state,
   draft,
@@ -108,12 +109,12 @@ export function SharpenButton({
         <Button
           type="button"
           variant="ghost"
-          size="icon"
           aria-label="Stop sharpening"
           aria-busy
           onClick={state.stop}
         >
           <Square size={16} aria-hidden="true" />
+          Stop
         </Button>
       </Tooltip>
     );
@@ -123,28 +124,24 @@ export function SharpenButton({
         <Button
           type="button"
           variant="ghost"
-          size="icon"
           aria-label="Undo sharpen"
           disabled={disabled}
           onClick={state.undo}
         >
           <Undo2 size={18} aria-hidden="true" />
+          Undo
         </Button>
       </Tooltip>
     );
-  const unavailable = state.reason ?? (draft.trim() ? undefined : 'Write a draft to sharpen.');
+  const unavailable = state.reason ?? (draft.trim() ? undefined : 'Write a draft first.');
+  const about =
+    'Rewrites your draft into a deeper version of the same task. Uses one agent call; nothing is sent.';
   return (
-    <Tooltip
-      content={
-        unavailable ??
-        'Sharpen: rewrite this draft into a deeper version of the same task. Uses one agent call; nothing is sent.'
-      }
-    >
+    <Tooltip content={unavailable ? `${about} ${unavailable}` : about}>
       {/* aria-disabled keeps the reason reachable by hover and keyboard focus. */}
       <Button
         type="button"
         variant="ghost"
-        size="icon"
         aria-label={unavailable ? `Sharpen draft. ${unavailable}` : 'Sharpen draft'}
         aria-disabled={!!unavailable || disabled || undefined}
         onClick={() => {
@@ -152,6 +149,7 @@ export function SharpenButton({
         }}
       >
         <Sparkles size={18} aria-hidden="true" />
+        Sharpen
       </Button>
     </Tooltip>
   );

@@ -92,7 +92,7 @@ export const recentPosts: BlogPost[] = [
       },
       {
         label: 'Git worktrees for AI coding agents',
-        href: '/blog/git-worktrees-for-ai-coding-agents/',
+        href: '/git-worktrees-for-ai-agents/',
       },
     ],
   },
@@ -166,7 +166,7 @@ export const recentPosts: BlogPost[] = [
         title: 'Start where the idea shows up',
         paragraphs: [
           'Many coding tasks start in a terminal: a failing test, a stack trace, a TODO you just grepped. Switching to another window to describe the work breaks that moment. The jackalope command lets you describe it right there, in the repository you are already in.',
-          'Run jackalope in any Git repository and type what you need, the same way you would in a chat. The repository becomes a Jackalope project if it was not one already, and the conversation uses the same accounts, agents and approved access as the desktop app.',
+          'Run jackalope in any Git repository and type what you need, the same way you would in a chat. The repository becomes a Jackalope project if it was not one already, and the conversation uses the same accounts, agents and Jackalope sign-in as the desktop app.',
         ],
         code: {
           label: 'Common commands',
@@ -213,7 +213,7 @@ export const recentPosts: BlogPost[] = [
         title: 'Review the result where review belongs',
         paragraphs: [
           'A terminal is a good place to start and steer work; a diff with checks beside it is a better place to accept it. When the work is ready, /diff opens the changes in the app so you can inspect files and check output, then commit or merge deliberately.',
-          'The jackalope command installs with the app on macOS, Windows and Linux. Jackalope is in beta: running work requires a Jackalope account and an installed, signed-in agent CLI or a connected API provider.',
+          'The jackalope command installs with the app on macOS, Windows and Linux. Running work requires a Jackalope account and an installed, signed-in agent CLI or a connected API provider.',
         ],
         links: [
           { label: 'Terminal command guide', href: '/knowledge/terminal-command/' },
@@ -224,11 +224,11 @@ export const recentPosts: BlogPost[] = [
     related: [
       {
         label: 'Use Claude Code and Codex together',
-        href: '/blog/claude-code-and-codex-together/',
+        href: '/guides/run-codex-and-claude-code-in-parallel/',
       },
       {
         label: 'Git worktrees for coding agents',
-        href: '/blog/git-worktrees-for-ai-coding-agents/',
+        href: '/git-worktrees-for-ai-agents/',
       },
       { label: 'Compare Jackalope and terminal tabs', href: '/compare/terminal-tabs/' },
     ],
@@ -247,7 +247,7 @@ export const recentPosts: BlogPost[] = [
       {
         title: 'Can a coding-agent chat become a reviewable change?',
         paragraphs: [
-          'Yes. In Jackalope, a chat keeps its messages, agent account, and changes in one isolated workspace. You can queue a correction while the agent works, pause before review, and inspect the patch and saved checks before merging. These workflows are implemented in the prerelease source; installed-provider and platform acceptance remain in progress.',
+          'Yes. In Jackalope, a chat keeps its messages, agent account, and changes in one isolated workspace. You can queue a correction while the agent works, pause before review, and inspect the patch and saved checks before merging. These workflows are implemented; installed-provider and platform acceptance remain in progress.',
           'Consider a settings form that needs keyboard access. Your first message asks for focus handling. While the agent works, you notice that validation errors also need a clear label. Queue that follow-up so the next batch receives it in order. If the current approach is wrong, use Stop and send to stop the active attempt before continuing with the new direction.',
         ],
         links: [{ label: 'Start and continue a chat', href: '/knowledge/chat-and-follow-ups/' }],
@@ -319,7 +319,7 @@ export const recentPosts: BlogPost[] = [
         paragraphs: [
           'Structured reports can separate completed work, remaining work, and relevant artifacts. A report stays attached to the attempt and its file snapshot. That makes it easier to inspect what an agent was referring to, while keeping its observations distinct from accepted results.',
           'For a useful handoff, ask for the behavior that changed, the checks run, and any decision the next task must make. Keep predecessor workspaces until the combined review is complete. Two patches can each pass their own checks and still disagree at their shared interface.',
-          'These coordination changes are implemented in the prerelease source. Installed execution and recovery checks remain open, and repeatable comparisons are still needed before claiming that staged work improves speed or quality.',
+          'These coordination changes are implemented. Installed execution and recovery checks remain open, and repeatable comparisons are still needed before claiming that staged work improves speed or quality.',
         ],
         links: [{ label: 'How parallel work fits together', href: '/parallel-coding-agents/' }],
       },
@@ -327,7 +327,7 @@ export const recentPosts: BlogPost[] = [
     related: [
       {
         label: 'Using Claude Code and Codex together',
-        href: '/blog/claude-code-and-codex-together/',
+        href: '/guides/run-codex-and-claude-code-in-parallel/',
       },
       { label: 'Reviewing AI-generated code', href: '/blog/review-ai-generated-code-checklist/' },
     ],
@@ -413,7 +413,7 @@ export const recentPosts: BlogPost[] = [
       },
     ],
     related: [
-      { label: 'Code review with evidence', href: '/guides/review-ai-generated-code/' },
+      { label: 'Code review with evidence', href: '/blog/review-ai-generated-code-checklist/' },
       { label: 'See what is taking shape', href: '/changelog/' },
     ],
   },

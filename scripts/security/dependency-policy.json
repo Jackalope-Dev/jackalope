@@ -1,6 +1,18 @@
 {
   "rustWarnings": [
     {
+      "package": "chrono",
+      "version": "0.4.45",
+      "advisory": "RUSTSEC-2026-0543",
+      "reason": "Unmaintained, no patched release. Used directly and by cron, chrono-tz and rmcp; replacing it needs those upstream crates to move first."
+    },
+    {
+      "package": "chrono-tz",
+      "version": "0.10.4",
+      "advisory": "RUSTSEC-2026-0555",
+      "reason": "Unmaintained alongside chrono, no patched release. Schedules use it for time zones; move both together when replacing chrono."
+    },
+    {
       "package": "proc-macro-error",
       "version": "1.0.4",
       "advisory": "RUSTSEC-2024-0370",

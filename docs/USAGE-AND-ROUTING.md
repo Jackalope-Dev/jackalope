@@ -19,7 +19,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for task ownership and
 
 ## Current routing contract
 
-Settings → Decisions selects an app default and optional project overrides. Project
+Agents → Routing selects an app default and optional project overrides. Project
 onboarding includes the same choice. Existing installations retain agent-powered
 routing. Local rules use project preference, capacity and active workload without
 a model call. Agent-powered routing uses the configured default agent. Jev-assisted
@@ -88,7 +88,7 @@ optional assistance has a separate ledger so those calls are not counted twice.
 
 ## Optional Jev assistance
 
-Routing goals and optional assistance in Settings → Decisions can inherit app
+Routing goals and optional assistance in Agents → Routing can inherit app
 settings or use project overrides. All additional helpers default off. While enabled
 and Jev is connected for that scope, relevant repository guidance, candidate lessons,
 diffs, results and check output may be sent to TypeSafe. Each call records usage even
@@ -154,7 +154,7 @@ real-task cost/latency comparisons and native macOS/Linux credential checks rema
 outside coordinator/execution locks. The default agent sees the complete request, its
 acceptance criteria, recorded outcomes and eligible agent/model/account options with
 provider windows; context saved for the worker is left out. It answers without tools at
-its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at minimal
+its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at low
 reasoning) and returns a validated option ID, a short reason, an optional quota
 estimate and up to three ordered alternatives. A routing agent that does not answer
 within eight seconds, or fails without a quota error, leaves the choice to local rules
@@ -172,12 +172,20 @@ attempts sharing the account or an identified quota pool. Reservations are conse
 percentage estimates, not provider-enforced budgets or guarantees against external use.
 
 Quota errors require provider error events, including Claude rejected rate-limit
-events; assistant prose and warning-only events do not trigger handoff. The exhausted
-account/pool is excluded (only an explicitly model-scoped error permits another model
-in that pool). Handoffs retain the owned workspace, original task and progress context.
-They cannot increase project permissions or tools. If the default is also exhausted,
-a saved ranking can select the next currently eligible option; without one, work
-stops with an actionable error. Explicit tasks and continuing sessions are pinned.
+events; assistant prose and warning-only events do not trigger handoff. A provider
+refusal of the content (usage policy, content filter, safety block) is not lost capacity:
+it never hands off and is reported as a refusal, unless a quota error code accompanies
+it. The exhausted account/pool is excluded (only an explicitly model-scoped error permits
+another model in that pool). Handoffs retain the owned workspace, original task and
+progress context. They cannot increase project permissions or tools. If the default is
+also exhausted, a saved ranking can select the next currently eligible option; without
+one, work stops with an actionable error. Explicit tasks and continuing sessions are pinned.
+Exclusions belong to the attempt that handed off; new work and retries route from fresh
+capacity, so a preferred or default account is chosen again once its reported window
+resets. Retrying an attempt the quota stopped continues in its worktree with its
+uncommitted changes and the same progress context, led by an optional focus line from
+the person. The progress context last sent (quota handoff, lost session or such a retry)
+is kept on the attempt under Task details.
 Codex, Claude, Grok, OpenCode and Kimi can coordinate; Antigravity and Gemini CLI are worker-only.
 Automatic quota handoff can be enabled or disabled in the Defaults section of the Agents page with All projects selected.
 
@@ -207,6 +215,13 @@ the latest saved attempt. Individual calls retain provider, model, input/output
 and available cost estimates; task rows combine the selected calls across attempts.
 Dates use the viewer's local time: workers use attempt start dates; routing and
 quota handoffs use recorded dates. These are not per-token billing timestamps.
+
+Attempt usage stores input as every prompt token the provider read, cache included:
+Claude, OpenCode and Antigravity report cache reads and writes beside uncached input,
+which Jackalope adds; Codex and Gemini CLI input already contains its cached part.
+New context is input minus cache reads and writes, and the cache hit rate shown with
+an attempt is cache reads divided by input. A Claude attempt with at least 50,000
+input tokens and no cache reads is flagged, since prompt caching may be off.
 
 Agent selection is measured routing overhead, including failed selections.
 Quota-interrupted worker legs remain separate from the final worker. Prompt,
@@ -279,8 +294,7 @@ See [parallel workflows](PARALLEL-WORKFLOWS.md) for recovery and review behavior
 Users should be able to answer: what did Jackalope use, for which work, what
 capacity remains, and what can I change? Give Usage a clear global destination,
 a project-scoped entry point and a task-level breakdown. Validate its placement
-in navigation; monitoring is a purposeful surface, not a reason to turn the
-working home into a wall of metrics.
+in navigation, and do not turn the working home into a wall of metrics.
 
 - Start with a readable period selector and All projects/project filter. Offer
   grouping and sorting by project, agent, model and account, with task drilldown.

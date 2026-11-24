@@ -8,9 +8,9 @@ async function _verifyPage(page) {
   await page.evaluate(() => document.fonts.ready);
   assert(
     await page.evaluate(
-      () => document.documentElement.style.getPropertyValue('--accent-h') === '245',
+      () => document.documentElement.style.getPropertyValue('--accent-h') === '258',
     ),
-    'Default Indigo theme',
+    'Default Jackalope Violet theme',
   );
   assert(
     (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
@@ -50,27 +50,28 @@ async function _verifyPage(page) {
   ]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => scrollTo(0, 0));
-    const logo = page.locator('.lp-hero .lp-ascii-frame');
     assert(
-      await logo.evaluate(
-        (element) =>
-          element.getAttribute('aria-hidden') === 'true' &&
-          getComputedStyle(element).pointerEvents === 'none',
-      ),
-      `Decorative background does not intercept controls at ${width}`,
+      await page
+        .locator('.lp-backdrop')
+        .evaluate((element) => element.getAttribute('aria-hidden') === 'true'),
+      `Decorative lanes are hidden from assistive technology at ${width}`,
     );
-    const session = page.locator('.lp-screen');
-    await session.evaluate((el) => el.scrollIntoView({ behavior: 'instant', block: 'center' }));
-    const visual = await session.boundingBox();
     assert(
-      visual.x >= 0 && visual.x + visual.width <= width,
-      `Complete session illustration at ${width}`,
+      await page.evaluate(() => {
+        const data = document.querySelector('.lp').dataset;
+        return !('motion' in data) && !('pinned' in data);
+      }),
+      `Reduced motion leaves the panes in the page flow at ${width}`,
     );
-    await page.waitForFunction(
-      () => document.querySelector('.lp-screen').dataset.stage === '3',
-      undefined,
-      { timeout: 2000 },
-    );
+    for (const pane of await page.locator('.lp-pane').all()) {
+      await pane.evaluate((el) => el.scrollIntoView({ behavior: 'instant', block: 'center' }));
+      const box = await pane.boundingBox();
+      assert(box.x >= 0 && box.x + box.width <= width, `Complete pane at ${width}`);
+      assert(
+        await pane.evaluate((el) => el.scrollWidth <= el.clientWidth),
+        `Pane text fits at ${width}`,
+      );
+    }
     for (const id of ['how-it-works', 'inside', 'features', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
@@ -103,13 +104,24 @@ async function _verifyPage(page) {
   const headerWaitlistButton = page
     .locator('.landing-header')
     .getByRole('button', { name: 'Sign up', exact: true });
-  await headerWaitlistButton.click();
-  await page.getByRole('dialog', { name: 'Sign up for Jackalope' }).waitFor();
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(
-    (button) => document.activeElement === button,
-    await headerWaitlistButton.elementHandle(),
-  );
+  // Builds with configured downloads link to the download page instead of offering signup.
+  if (await headerWaitlistButton.count()) {
+    await headerWaitlistButton.click();
+    await page.getByRole('dialog', { name: 'Sign up for Jackalope' }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(
+      (button) => document.activeElement === button,
+      await headerWaitlistButton.elementHandle(),
+    );
+  } else {
+    assert(
+      (await page
+        .locator('.landing-header')
+        .getByRole('link', { name: 'Get Jackalope' })
+        .getAttribute('href')) === '/download/',
+      'Header download link',
+    );
+  }
   const terminal = page.getByRole('textbox', { name: 'Message the demo agent' });
   await terminal.fill('!git status');
   await terminal.press('Enter');
@@ -120,35 +132,48 @@ async function _verifyPage(page) {
   );
   assert(
     await page
-      .locator('.lp-hero .lp-line-text')
+      .locator('.lp-line')
       .first()
-      .evaluate((el) => getComputedStyle(el).animationName === 'none'),
-    'Reduced hero motion',
+      .evaluate((el) => getComputedStyle(el).transitionDuration === '0s'),
+    'Reduced statement motion',
   );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.reload();
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-  const scrubTo = (share) =>
-    page.locator('#how-it-works').evaluate((el, at) => {
+  await page.waitForFunction(() => 'pinned' in document.querySelector('.lp').dataset);
+  const scrubPanes = (share) =>
+    page.locator('#inside').evaluate((el, at) => {
       const top = el.getBoundingClientRect().top + scrollY;
       scrollTo({ top: top + (el.offsetHeight - innerHeight) * at, behavior: 'instant' });
     }, share);
-  const stage = () => page.locator('.lp-screen').getAttribute('data-stage');
-  await scrubTo(0);
-  await page.waitForFunction(() => document.querySelector('.lp-screen').dataset.stage === '0');
-  await scrubTo(0.5);
-  await page.waitForFunction(() => document.querySelector('.lp-screen').dataset.stage === '2');
-  await scrubTo(1);
-  await page.waitForFunction(() => document.querySelector('.lp-screen').dataset.stage === '3');
-  assert((await stage()) === '3', 'Scrolling plays the work through to review');
+  await scrubPanes(0);
+  await page.waitForFunction(
+    () => document.querySelector('.lp-pane').getBoundingClientRect().left > 0,
+  );
+  await scrubPanes(1);
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll('.lp-pane')].at(-1).getBoundingClientRect().right <= innerWidth,
+  );
+  assert(
+    await page
+      .locator('.lp-pane')
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().left < 0),
+    'Scrolling moves the panes sideways to the last one',
+  );
+  await page.locator('#features').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.lp-line')].every((line) => line.classList.contains('is-lit')),
+  );
   assert(errors.length === 0, errors.join('\n'));
   return {
     viewports: 5,
     keyboard: true,
     appearance: true,
     reducedMotion: true,
-    scrollSession: true,
+    scrollStory: true,
     terminalDemo: true,
     errors,
   };

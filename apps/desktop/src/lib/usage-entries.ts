@@ -1,4 +1,4 @@
-import type { TaskRun } from './task-runtime.ts';
+import type { TaskRun } from './run-types.ts';
 
 export function usageEntries(runs: TaskRun[]) {
   return [...new Map(runs.map((run) => [run.id, run])).values()].flatMap((run) => [

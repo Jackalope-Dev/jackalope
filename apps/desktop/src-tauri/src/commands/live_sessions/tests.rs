@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use std::process::Command;
 
 #[test]
@@ -374,7 +375,7 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
         id: Uuid::new_v4().to_string(),
         task_id: Uuid::new_v4().to_string(),
         live_session_id: Some(id.clone()),
-        status: "review".into(),
+        status: RunStatus::Review,
         workspace: repo.to_string_lossy().into_owned(),
         project_path: repo.to_string_lossy().into_owned(),
         base_head: base.clone(),
@@ -500,7 +501,7 @@ fn session_integration_requires_paused_latest_work_and_survives_restart() {
         base_head: base.clone(),
         branch: "session-work".into(),
         target_branch: Some("main".into()),
-        status: "review".into(),
+        status: RunStatus::Review,
         prompt: "A useful result".into(),
         started_at: Utc::now().to_rfc3339(),
         ..Default::default()
@@ -601,7 +602,7 @@ fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
     let run = TaskRun {
         id: Uuid::new_v4().to_string(),
         live_session_id: Some(id.clone()),
-        status: "failed".into(),
+        status: RunStatus::Failed,
         error: Some("Agent failed".into()),
         ..Default::default()
     };
@@ -671,7 +672,7 @@ process.stdin.on('end',()=>{
         let active = snapshot
             .runs
             .iter()
-            .filter(|run| ["starting", "running", "stopping"].contains(&run.status.as_str()))
+            .filter(|run| run.status.is_active())
             .count();
         assert!(active <= 1);
         if active == 1 && !sent_followup {
@@ -699,7 +700,7 @@ process.stdin.on('end',()=>{
             assert_eq!(snapshot.runs.len(), 2);
             let workspace = &snapshot.runs[0].workspace;
             assert!(snapshot.runs.iter().all(|run| &run.workspace == workspace
-                && run.status == "review"
+                && run.status == RunStatus::Review
                 && run.checkpoint.is_none()));
             assert_eq!(
                 std::fs::read_to_string(std::path::Path::new(workspace).join("changes.txt"))
@@ -772,4 +773,32 @@ fn bot_persona_is_repeated_in_every_batch_and_stays_out_of_the_transcript() {
             Some(invalid),
         )
         .is_err());
+}
+
+#[test]
+fn non_code_conversations_are_saved_as_such_and_told_to_leave_files_alone() {
+    let (_root, service, existing) = fixture();
+    let mut request = service.snapshot(None).unwrap().sessions[0].request.clone();
+    request.non_code = true;
+    let id = Uuid::new_v4().to_string();
+    service
+        .create(
+            id.clone(),
+            String::new(),
+            request,
+            Some(FirstMessage {
+                id: Uuid::new_v4().to_string(),
+                text: "Check that the website's signup page loads".into(),
+                origin: None,
+            }),
+        )
+        .unwrap();
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    let session = saved.sessions.iter().find(|s| s.id == id).unwrap();
+    assert!(session.request.non_code);
+    let messages = session.messages.iter().collect::<Vec<_>>();
+    assert!(batch_prompt(session, &messages).contains("This is not code work"));
+    let code = saved.sessions.iter().find(|s| s.id == existing).unwrap();
+    assert!(!code.request.non_code);
+    assert!(!batch_prompt(code, &[]).contains("not code work"));
 }

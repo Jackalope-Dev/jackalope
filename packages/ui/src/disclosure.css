@@ -36,6 +36,14 @@
   .ui-disclosure-body > :where(p, ul, ol) {
     margin-block: 0;
   }
+  /* Inside a notice a disclosure is inline detail, so its chevron follows the label. */
+  .inline-notice .ui-disclosure-summary {
+    width: fit-content;
+    gap: 6px;
+  }
+  .inline-notice .ui-disclosure-indicator {
+    margin-left: 0;
+  }
   .ui-disclosure[open] > .ui-disclosure-summary > .ui-disclosure-indicator {
     transform: rotate(180deg);
   }

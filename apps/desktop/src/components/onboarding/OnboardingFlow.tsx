@@ -1,16 +1,15 @@
 import { applyThemeTokens } from '@jackalope/brand/theme';
-import { RefreshIcon, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, RefreshIcon, Switch, Textarea } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
-import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
+import { agentAdapter, builtinAgents, getAgentMetadata, runsTasks } from '../../lib/agent-catalog';
+import { missingProjectDefaults } from '../../lib/context/project-defaults';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { WindowGlass } from '../../lib/window-glass';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
@@ -22,18 +21,19 @@ import { ProviderMark } from '../agents/ProviderMark';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
 import { AgentInstallCatalog, CommandCopy } from './AgentInstallCatalog';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
+import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
 import './onboarding.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { projectReadiness } from '../../lib/readiness';
+import { ActionError } from '../ui/ActionError';
 
-const steps: { id: OnboardingStep; label: string }[] = [
-  { id: 'project', label: 'Project' },
-  { id: 'agent', label: 'Agents' },
-  { id: 'task', label: 'First task' },
+const steps: { id: OnboardingStep; label: string; hint: string }[] = [
+  { id: 'project', label: 'Project', hint: 'The repository your agents work in' },
+  { id: 'agent', label: 'Agents', hint: 'Who does the work' },
+  { id: 'task', label: 'First task', hint: 'Optional, something to start with' },
 ];
 const setupTips: Record<OnboardingStep, string[]> = {
   project: ['Choose the Git repository your agent will work in, or create a new project.'],
@@ -107,7 +107,7 @@ export function OnboardingFlow({
   useEffect(() => {
     if (!desktop || !previewProjectId || !projectPath) return;
     let canceled = false;
-    void nativeTask<ProjectDefaults>('project_readiness', { path: projectPath })
+    void projectReadiness(projectPath)
       .then((defaults) => {
         if (canceled) return;
         const current = useOnboardingStore.getState();
@@ -138,13 +138,11 @@ export function OnboardingFlow({
     };
   }, [previewProjectId, preview]);
   const runner = execution.runners.find((item) => item.id === agent);
-  const runnerAdapter = config.customAgents.find((custom) => custom.id === agent)?.adapter ?? agent;
+  const runnerAdapter = agentAdapter(agent, config.customAgents);
   const available = (id: string) => {
     const options = config.runnerOptions[id];
     return (
-      ['codex', 'claude', 'grok', 'opencode', 'antigravity', 'kimi'].includes(
-        config.customAgents.find((custom) => custom.id === id)?.adapter ?? id,
-      ) &&
+      runsTasks(id, config.customAgents) &&
       config.isAgentEnabled(id) &&
       !(options?.restrictModels && !options.models.some((model) => model.trim()))
     );
@@ -171,7 +169,7 @@ export function OnboardingFlow({
   );
   const invalidAccounts = detectedAgents.some((item) => {
     if (!projectEnabled(item.id)) return false;
-    const adapter = config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
+    const adapter = agentAdapter(item.id, config.customAgents);
     const entry = accounts[adapter];
     if (!entry?.view) return false;
     const enabled = accountProfiles(entry.view, entry.statuses).filter(
@@ -209,6 +207,12 @@ export function OnboardingFlow({
   useEffect(() => {
     if (error) errorMessage.current?.focus();
   }, [error]);
+  // Rendered above each step's sticky actions; after them it would slide under the footer.
+  const errorNotice = error ? (
+    <InlineNotice tone="error" className="mt-4" ref={errorMessage} tabIndex={-1}>
+      {error}
+    </InlineNotice>
+  ) : null;
   const advance = (action: () => void) => {
     if (pendingAdvance.current) return;
     pendingAdvance.current = action;
@@ -234,7 +238,7 @@ export function OnboardingFlow({
     try {
       await action();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       attempting.current = false;
       setBusy(false);
@@ -242,9 +246,24 @@ export function OnboardingFlow({
   };
   const refresh = () =>
     attempt(async () => {
-      await syncAgentConfig();
       await execution.discover();
     });
+  // Agents are usually installed or signed in from a terminal, so returning to the window re-scans.
+  const discover = execution.discover;
+  useEffect(() => {
+    if (!desktop || step !== 'agent') return;
+    let last = 0;
+    const rescan = () => {
+      if (Date.now() - last < 5_000) return;
+      last = Date.now();
+      void discover().then(() => {
+        const accounts = useAgentAccountsStore.getState();
+        for (const id of Object.keys(accounts.agents)) void accounts.load(id, true);
+      });
+    };
+    window.addEventListener('focus', rescan);
+    return () => window.removeEventListener('focus', rescan);
+  }, [desktop, step, discover]);
   const completeSetup = (action: () => void) => advance(action);
   const finish = () => {
     if (!project || !runner?.available || !available(agent) || !projectEnabled(agent)) {
@@ -283,7 +302,10 @@ export function OnboardingFlow({
                 <span className="onboarding-step-number">
                   {itemIndex < index ? <Check size={16} /> : itemIndex + 1}
                 </span>
-                <strong>{item.label}</strong>
+                <span className="onboarding-step-copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.hint}</small>
+                </span>
               </li>
             ))}
           </ol>
@@ -331,6 +353,7 @@ export function OnboardingFlow({
               busy={busy}
               attempt={attempt}
               clearError={() => setError('')}
+              errorNotice={errorNotice}
               onOpened={async (opened, created) => {
                 onboarding.stageProject(
                   opened,
@@ -350,13 +373,11 @@ export function OnboardingFlow({
           {step === 'agent' && (
             <>
               <p className="onboarding-description">
-                Start with one available agent. You can add agents and change project defaults
-                later.
+                Pick an agent to start with. You can add more later.
               </p>
               {(() => {
                 const renderAgentCard = (item: (typeof detectedAgents)[number]) => {
-                  const adapter =
-                    config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
+                  const adapter = agentAdapter(item.id, config.customAgents);
                   const meta = getAgentMetadata(item.id);
                   return (
                     <div
@@ -413,6 +434,16 @@ export function OnboardingFlow({
                               preferences: { ...project.preferences, agentAccounts },
                             });
                           }}
+                          onUnblock={() => {
+                            if (!project?.preferences?.disabledAccounts?.[adapter]) return;
+                            const { [adapter]: _, ...disabledAccounts } =
+                              project.preferences.disabledAccounts;
+                            onboarding.stageProject({
+                              ...project,
+                              preferences: { ...project.preferences, disabledAccounts },
+                            });
+                          }}
+                          onSignedIn={() => void execution.discover()}
                         />
                       )}
                     </div>
@@ -461,10 +492,35 @@ export function OnboardingFlow({
                         <p className="task-muted" role="status">
                           {execution.discovering
                             ? 'Looking for installed agents…'
-                            : 'No agents found yet. Install one below and sign in to it, then re-scan. You can also connect an API key.'}
+                            : 'No agents found. Install one below, or connect an API key.'}
                         </p>
                       )}
                     </fieldset>
+                    {desktop && (
+                      <OnboardingDetectedKeys
+                        disabled={busy}
+                        agents={detectedAgents
+                          .filter((item) => projectEnabled(item.id))
+                          .map((item) => ({
+                            adapter: agentAdapter(item.id, config.customAgents),
+                            name: item.name,
+                          }))}
+                        onUse={(adapter, profileId) => {
+                          if (!project) return;
+                          onboarding.stageProject({
+                            ...project,
+                            preferences: {
+                              ...project.preferences,
+                              agentAccounts: {
+                                ...project.preferences?.agentAccounts,
+                                [adapter]: profileId,
+                              },
+                            },
+                          });
+                          void execution.discover();
+                        }}
+                      />
+                    )}
                     {!detectedAgents.length && !execution.discovering && (
                       <ProviderConnections setup />
                     )}
@@ -472,6 +528,14 @@ export function OnboardingFlow({
                     <AgentInstallCatalog
                       agents={installableAgents}
                       first={!detectedAgents.length && !execution.discovering}
+                      onInstalled={
+                        desktop
+                          ? async (id) => {
+                              await execution.discover();
+                              if (available(id)) setAgent(id);
+                            }
+                          : undefined
+                      }
                     />
                   </>
                 );
@@ -483,7 +547,7 @@ export function OnboardingFlow({
                   Enable at least one available agent to continue.
                 </p>
               )}
-              {execution.error && <InlineNotice tone="error">{execution.error}</InlineNotice>}
+              <ActionError error={execution.error} />
 
               {runner && !runner.signedIn && runner.available && !accounts[runnerAdapter]?.view && (
                 <div className="onboarding-signin-tip">
@@ -495,6 +559,7 @@ export function OnboardingFlow({
                   )}
                 </div>
               )}
+              {errorNotice}
 
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('project')}>
@@ -578,6 +643,7 @@ export function OnboardingFlow({
                   ))}
                 </fieldset>
               )}
+              {errorNotice}
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
                   <ArrowLeft size={16} />
@@ -599,11 +665,6 @@ export function OnboardingFlow({
                 </Button>
               </div>
             </>
-          )}
-          {error && (
-            <InlineNotice tone="error" className="mt-4" ref={errorMessage} tabIndex={-1}>
-              {error}
-            </InlineNotice>
           )}
         </section>
       </main>

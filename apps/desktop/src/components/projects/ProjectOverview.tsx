@@ -1,7 +1,10 @@
 import {
+  Button,
+  CopyButton,
   Disclosure,
   DisclosureSummary,
-  DropdownMenu as Menu,
+  EmptyState,
+  InlineNotice,
   SettingGroup,
   SettingRow,
 } from '@jackalope/ui';
@@ -9,7 +12,6 @@ import {
   FolderOpen,
   GitBranch,
   MonitorPlay,
-  MoreHorizontal,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -17,53 +19,43 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { checksAutomatically } from '../../lib/project-automation';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
-import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { selectWork, workTarget } from '../../lib/work-selection';
+import { runTitle } from '../../lib/task-title';
+import { selectWork, useAllRuns, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
+import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
-import type { Readiness } from '../tasks/WorkspaceReadiness';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './project-overview.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { projectReadiness, type Readiness } from '../../lib/readiness';
 
 export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }) {
-  const project = useProjectStore((state) =>
-    state.projects.find((p) => p.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const runs = useExecutionStore((state) => state.runs);
   const historyError = useExecutionStore((state) => state.historyError);
-  const {
-    sessions,
-    runs: sessionRuns,
-    error: sessionError,
-  } = useLiveSessionStore(
-    useShallow((s) => ({ sessions: s.sessions, runs: s.runs, error: s.error })),
+  const { sessions, error: sessionError } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, error: s.error })),
   );
   const { queue, error: queueError } = useManagedTaskStore(
     useShallow((s) => ({ queue: s.queue, error: s.error })),
   );
   const ideas = useTaskStore((state) => state.tasks);
   const integrated = queue.mergedRunIds;
-  const allRuns = useMemo(
-    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-    [runs, sessionRuns],
-  );
+  const allRuns = useAllRuns();
   const [readinessResult, setReadiness] = useState<{ path: string; value: Readiness } | null>(null);
   const readiness = readinessResult?.path === project?.path ? readinessResult?.value : null;
   const readinessRequest = useRef(0);
@@ -79,10 +71,10 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     setReadiness(null);
     setReadinessError('');
     try {
-      const data = await nativeTask<Readiness>('project_readiness', { path });
+      const data = await projectReadiness(path);
       if (request === readinessRequest.current) setReadiness({ path, value: data });
     } catch (cause) {
-      if (request === readinessRequest.current) setReadinessError(String(cause));
+      if (request === readinessRequest.current) setReadinessError(describeError(cause));
     } finally {
       if (request === readinessRequest.current) setBusyReadiness(false);
     }
@@ -100,18 +92,24 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     };
   }, [project?.path, fetchReadiness]);
 
+  const pullRequests = usePullRequestStore((state) => state.tracked);
   const unfinished = useMemo(
     () =>
-      project ? returnToProject(allRuns, project.id, integrated, { ideas, sessions, queue }) : [],
-    [allRuns, project, integrated, ideas, sessions, queue],
+      project
+        ? returnToProject(allRuns, project.id, integrated, {
+            ideas,
+            sessions,
+            queue,
+            pullRequests,
+          })
+        : [],
+    [allRuns, project, integrated, ideas, sessions, queue, pullRequests],
   );
   const openTask = (item: WorkItem) => {
     // A task opens through its list row rather than straight to its page.
     selectWork(item.run && !item.managed && !item.session ? {} : workTarget(item));
-    if (item.managed) {
+    if (item.managed || item.session) {
       navigateWorkspace('kanban');
-    } else if (item.session) {
-      navigateWorkspace('live-sessions');
     } else if (item.run) {
       useWorkViewStore.getState().open(item.run.id);
     } else {
@@ -160,41 +158,19 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   onClick={() => {
                     selectWork();
                     useProjectStore.getState().selectProject(project.id);
-                    navigateWorkspace('live-sessions');
+                    navigateWorkspace('kanban');
                   }}
                 >
                   <Plus size={14} />
                   New task
                 </Button>
-                <Menu.Root>
-                  <Menu.Trigger asChild>
-                    <Button variant="outline" size="sm" aria-label="Project options">
-                      <MoreHorizontal size={16} aria-hidden="true" />
-                    </Button>
-                  </Menu.Trigger>
-                  <Menu.Portal>
-                    <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-                      <Menu.Item
-                        className="workspace-menu-item"
-                        onSelect={() => {
-                          useWorkViewStore.getState().setScope('project');
-                          selectWork();
-                          navigateWorkspace('kanban');
-                        }}
-                      >
-                        Open task board
-                      </Menu.Item>
-                      <Menu.Separator className="menu-separator" />
-                      <Menu.Item
-                        className="workspace-menu-item"
-                        title={project.path}
-                        onSelect={() => void navigator.clipboard.writeText(project.path)}
-                      >
-                        Copy folder path
-                      </Menu.Item>
-                    </Menu.Content>
-                  </Menu.Portal>
-                </Menu.Root>
+                <CopyButton
+                  variant="outline"
+                  size="sm"
+                  text={project.path}
+                  label="Copy folder path"
+                  title={project.path}
+                />
               </div>
             }
           />
@@ -223,7 +199,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   );
                 localStorage.setItem(key, combined);
                 selectWork();
-                navigateWorkspace('live-sessions');
+                navigateWorkspace('kanban');
               }}
             />
           </Disclosure>
@@ -294,7 +270,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   savedVerify ? (
                     <>
                       <code>{savedVerify}</code>
-                      {project.preferences?.autoVerify
+                      {checksAutomatically(project.preferences)
                         ? ' · runs after each task'
                         : ' · runs when you ask'}
                     </>
@@ -434,7 +410,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 {deliveries.map((run) => (
                   <SettingRow
                     key={run.id}
-                    title={taskTitle(run.prompt)}
+                    title={runTitle(run)}
                     description={`Integrated locally · ${new Date(run.startedAt).toLocaleDateString(
                       undefined,
                       { month: 'short', day: 'numeric', year: 'numeric' },

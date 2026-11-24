@@ -1,17 +1,35 @@
-import { Badge, Input, Textarea } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  InlineNotice,
+  Input,
+  LoadingState,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { agentAdapter } from '../../lib/agent-catalog';
+import { navigateWorkspace, openProjectSettings } from '../../lib/app-events';
+import { runHostName } from '../../lib/computers';
+import { openExternalUrl } from '../../lib/native/env';
 import {
+  type AutonomyEntry,
   approvalVerification,
+  areaStateLabels,
   criterionCoverage,
   criterionStateLabels,
   interviewOptions,
+  type PlanRounds,
   type PlanShape,
   type PlanSummary,
   type PlanView,
   planAssumption,
   planCommands,
+  type RoundAssignment,
+  roundStateLabels,
   type SectionChange,
   shapeChoices,
   stateTone,
@@ -20,24 +38,25 @@ import {
   taskWaves,
 } from '../../lib/plan-mode';
 import { planReviewer } from '../../lib/reviewer-choice';
-import { respondToPrompt } from '../../lib/task-runtime';
+import { respondToPrompt } from '../../lib/task-client';
 import { selectWork } from '../../lib/work-selection';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
+import { HostCapacity } from '../computers/HostCapacity';
+import { EscalationNote } from '../tasks/AgentDecision';
 import { AgentQuestion } from '../tasks/AgentQuestion';
-import { agentAdapter } from '../tasks/CrossModelReviewPanel';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { WorkspaceTabs } from '../ui/WorkspaceTabs';
+import { PlanAutonomyPanel } from './PlanAutonomy';
 import './plan-page.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { useAction } from '../../hooks/useAction';
+import { useNativeResource } from '../../hooks/useNativeResource';
+import { ActionError } from '../ui/ActionError';
 
 type Tab = 'plan' | 'progress' | 'revisions';
 const toneVariant = {
@@ -49,6 +68,10 @@ const toneVariant = {
 
 function StateBadge({ state, label }: { state: string; label: string }) {
   return <Badge variant={toneVariant[stateTone(state)]}>{label}</Badge>;
+}
+
+function BetaBadge() {
+  return <Badge variant="accent">Beta</Badge>;
 }
 
 function Bullets({ items, empty }: { items: string[]; empty: string }) {
@@ -88,15 +111,12 @@ function Assumptions({ items }: { items: string[] }) {
 }
 
 export function PlanPage() {
-  const { activeProjectId, projects } = useProjectStore(
-    useShallow((state) => ({ activeProjectId: state.activeProjectId, projects: state.projects })),
-  );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   const { selectedId, select } = usePlanStore();
   const [plans, setPlans] = useState<PlanSummary[] | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [view, setView] = useState<PlanView | null>(null);
-  const [error, setError] = useState('');
+  const { run: act, error, setError } = useAction(() => Promise.all([load(), loadList()]));
   const runs = useExecutionStore((state) => state.runs);
 
   const loadList = useCallback(async () => {
@@ -106,10 +126,10 @@ export function PlanPage() {
       setPlans(result.plans);
       setProblems(result.problems);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setPlans([]);
     }
-  }, [project]);
+  }, [project, setError]);
   useEffect(() => {
     void loadList();
   }, [loadList]);
@@ -123,26 +143,16 @@ export function PlanPage() {
       setView(await planCommands.get(current));
       setError('');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       loading.current = false;
     }
-  }, [current]);
+  }, [current, setError]);
   // Planning and delivery move with task attempts, so re-read when runs change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs is the change signal
   useEffect(() => {
     void load();
   }, [load, runs]);
-
-  const act = async (work: () => Promise<unknown>) => {
-    setError('');
-    try {
-      await work();
-      await Promise.all([load(), loadList()]);
-    } catch (cause) {
-      setError(String(cause));
-    }
-  };
 
   if (!project)
     return (
@@ -175,7 +185,7 @@ export function PlanPage() {
         <EmptyState
           icon={ClipboardList}
           title="No plans yet"
-          description="Write a request in the composer, then choose Plan with me or Write the plan myself."
+          description="Write a request in the Work composer and choose Options → Plan with me, or choose Plan feature work from the Work menu to write the plan yourself."
           action={
             <Button
               onClick={() => {
@@ -211,7 +221,7 @@ export function PlanPage() {
             ))}
           </nav>
           <div className="plan-detail">
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
             {view && view.id === current ? (
               <PlanDetail view={view} act={act} />
             ) : (
@@ -229,10 +239,16 @@ function PlanDetail({
   act,
 }: {
   view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const [tab, setTab] = useState<Tab>(view.progress ? 'progress' : 'plan');
   const pending = view.deviations.filter((deviation) => deviation.status === 'pending');
+  const deciding = pending.length > 0 && pending.every((deviation) => deviation.agentDeciding);
+  /** Why a deviation came to the person although an agent could have accepted it. */
+  const escalation = (id: string) =>
+    view.autonomy?.entries.find(
+      (entry) => entry.deviationId === id && entry.outcome === 'escalated' && entry.reason,
+    );
   return (
     <section className="plan-detail-body" aria-labelledby="plan-title">
       <header className="plan-detail-header">
@@ -242,6 +258,12 @@ function PlanDetail({
             {statusLabels[view.status]}
             {view.revision ? ` · revision ${view.revision}` : ''}
             {view.approval ? ` · approved by ${view.approval.approvedBy}` : ''}
+            {view.rounds && (
+              <span className="plan-swarm">
+                {' '}
+                · Swarm round {view.rounds.current} of {view.rounds.max} <BetaBadge />
+              </span>
+            )}
           </p>
         </div>
       </header>
@@ -249,9 +271,13 @@ function PlanDetail({
       {pending.length > 0 && (
         <section className="plan-needs-you" aria-labelledby="plan-needs-you">
           <WorkspaceSectionHeading
-            title="Needs you"
+            title={deciding ? 'An agent is deciding' : 'Needs you'}
             titleId="plan-needs-you"
-            description="The work departed from the approved plan. Dependent tasks are paused until you decide."
+            description={
+              deciding
+                ? 'An agent is checking whether this stays within the plan. Dependent tasks wait; you can still decide.'
+                : 'The work departed from the approved plan. Dependent tasks are paused until you decide.'
+            }
           />
           {pending.map((deviation) => (
             <InlineNotice
@@ -286,11 +312,28 @@ function PlanDetail({
                 </div>
               }
             >
+              {deviation.agentDeciding && <Badge variant="accent">Agent deciding</Badge>}{' '}
               <strong>{deviationKinds[deviation.kind]}</strong> {deviation.summary}
               {deviation.amendment && <p>Proposed amendment: {deviation.amendment}</p>}
+              {!deviation.agentDeciding &&
+                (() => {
+                  const sent = escalation(deviation.id);
+                  return sent?.reason ? (
+                    <EscalationNote category={sent.category ?? 'decider'} reason={sent.reason} />
+                  ) : null;
+                })()}
             </InlineNotice>
           ))}
         </section>
+      )}
+      {view.autonomy && (
+        <PlanAutonomyPanel
+          planId={view.id}
+          autonomy={view.autonomy}
+          onChanged={async () => {
+            await act(async () => {});
+          }}
+        />
       )}
       {view.questions.map((prompt) => {
         const { choices, stops } = interviewOptions(prompt);
@@ -304,6 +347,7 @@ function PlanDetail({
               await respondToPrompt(prompt.runId, prompt.id, answer);
               await act(async () => {});
             }}
+            onOpenLink={(url) => void openExternalUrl(url)}
           />
         );
       })}
@@ -337,7 +381,7 @@ function PlanReview({
   act,
 }: {
   view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const doc = view.document;
   const id = useId();
@@ -349,9 +393,13 @@ function PlanReview({
   const planner = useExecutionStore(
     (state) => state.runs.find((candidate) => candidate.id === view.plannerRunId)?.agent,
   );
+  const customAgents = useAgentConfigStore((state) => state.customAgents);
   const reviewer = useMemo(
-    () => planReviewer(runners, { agent: view.agent, model: view.model }, planner, agentAdapter),
-    [runners, view.agent, view.model, planner],
+    () =>
+      planReviewer(runners, { agent: view.agent, model: view.model }, planner, (agent) =>
+        agentAdapter(agent, customAgents),
+      ),
+    [runners, view.agent, view.model, planner, customAgents],
   );
   const [shape, setShape] = useState<PlanShape>(view.shape);
   const [comments, setComments] = useState('');
@@ -416,7 +464,10 @@ function PlanReview({
                   onChange={() => setShape(choice.shape)}
                 />
                 <span>
-                  <strong>{choice.label}</strong>
+                  <strong>
+                    {choice.label}
+                    {choice.shape === 'swarm' && <BetaBadge />}
+                  </strong>
                   <span className="plan-muted">{choice.unavailable ?? choice.detail}</span>
                 </span>
               </label>
@@ -660,11 +711,16 @@ function PlanProgress({
   act,
 }: {
   view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const progress = view.progress;
+  const runs = useExecutionStore((state) => state.runs);
   if (!progress) return null;
   const states = new Map(view.criteria.map((state) => [state.id, state]));
+  const hostOf = (runId: string | null | undefined) => {
+    const run = runId ? runs.find((candidate) => candidate.id === runId) : undefined;
+    return run ? runHostName(run) : null;
+  };
   return (
     <div className="plan-progress">
       {progress.error && <InlineNotice tone="warning">{progress.error}</InlineNotice>}
@@ -687,12 +743,30 @@ function PlanProgress({
           </span>
         )}
       </div>
-      <WorkspaceSectionHeading title="Tasks" level={3} />
+      {view.rounds && (
+        <PlanRoundList
+          planId={view.id}
+          projectId={view.projectId}
+          rounds={view.rounds}
+          escalation={view.autonomy?.entries.find(
+            (entry) =>
+              entry.kind === 'round' &&
+              entry.outcome === 'escalated' &&
+              entry.subject === `Start round ${(view.rounds?.current ?? 0) + 1}`,
+          )}
+          act={act}
+        />
+      )}
+      <WorkspaceSectionHeading
+        title={view.rounds ? `Round ${view.rounds.current} tasks` : 'Tasks'}
+        level={3}
+      />
       <ul className="plan-rows">
         {[...progress.tasks, ...(progress.review ? [progress.review] : [])].map((task) => (
           <li key={`${task.key}:${task.runId ?? ''}`}>
             <span>
               {task.key === 'review' ? 'Independent review' : task.title}
+              {hostOf(task.runId) && <span className="plan-muted"> · on {hostOf(task.runId)}</span>}
               {!!task.outside?.length && (
                 <span className="plan-muted"> · outside scope: {task.outside.join(', ')}</span>
               )}
@@ -757,7 +831,7 @@ function PlanProgress({
           </ul>
         </>
       )}
-      {progress.merged && (
+      {(view.rounds ? view.status === 'done' : progress.merged) && (
         <Button variant="ghost" onClick={() => void act(() => planCommands.archive(view.id))}>
           Archive plan
         </Button>
@@ -766,26 +840,265 @@ function PlanProgress({
   );
 }
 
+/** Each swarm round's verdict, evidence and the work it queued next. */
+function PlanRoundList({
+  planId,
+  projectId,
+  rounds,
+  escalation,
+  act,
+}: {
+  planId: string;
+  projectId: string;
+  rounds: PlanRounds;
+  /** Why the proposed round came to the person although an agent could approve it. */
+  escalation?: AutonomyEntry;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
+}) {
+  const current = rounds.rounds.at(-1);
+  const open = current && ['working', 'reviewing', 'held', 'approval'].includes(current.state);
+  const orchestrators = rounds.orchestrators ?? 1;
+  return (
+    <section className="plan-rounds" aria-labelledby={`${planId}-rounds`}>
+      <WorkspaceSectionHeading
+        title={
+          <span className="plan-swarm">
+            Rounds <BetaBadge />
+          </span>
+        }
+        titleId={`${planId}-rounds`}
+        level={3}
+        description={`Round ${rounds.current} of at most ${rounds.max}. After each merge ${
+          orchestrators > 1
+            ? `up to ${orchestrators} orchestrators check`
+            : 'an orchestrator checks'
+        } the criteria.`}
+      />
+      {open && <HostCapacity projectId={projectId} label="Where this round runs" />}
+      {open && (
+        <div className="plan-actions">
+          <Select
+            aria-label="Next rounds"
+            value={rounds.askFirst ? 'ask' : 'auto'}
+            onValueChange={(value) =>
+              void act(() => planCommands.rounds(planId, value === 'ask' ? 'ask' : 'auto'))
+            }
+          >
+            <SelectItem value="auto">Start next rounds automatically</SelectItem>
+            <SelectItem value="ask">Ask me first</SelectItem>
+          </Select>
+          {current.state !== 'approval' && (
+            <>
+              {rounds.paused ? (
+                <Button
+                  variant="outline"
+                  onClick={() => void act(() => planCommands.rounds(planId, 'resume'))}
+                >
+                  Resume rounds
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => void act(() => planCommands.rounds(planId, 'pause'))}
+                >
+                  Pause rounds
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                onClick={() => void act(() => planCommands.rounds(planId, 'stop'))}
+              >
+                Stop
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {current?.held && <InlineNotice tone="warning">{current.held}</InlineNotice>}
+      {current?.proposal && (
+        <RoundProposal
+          key={current.number}
+          planId={planId}
+          proposal={current.proposal}
+          deciding={!!current.agentDeciding}
+          escalation={escalation}
+          act={act}
+        />
+      )}
+      <ol className="plan-rows">
+        {[...rounds.rounds].reverse().map((round) => (
+          <li key={round.number} className="plan-round">
+            <span>
+              <strong>Round {round.number}</strong>
+              {round.summary && <span className="plan-prose">{round.summary}</span>}
+              {round.check && (
+                <span className="plan-muted">
+                  {round.check.passed ? 'Check passed' : 'Check failed'}: {round.check.command}
+                </span>
+              )}
+              {round.evidence.length > 0 && <Bullets items={round.evidence} empty="" />}
+              {round.next.length > 0 && !round.proposal && (
+                <span className="plan-muted">Next: {round.next.join(' · ')}</span>
+              )}
+              {!!round.areas?.length && (
+                <ul className="plan-round-areas" aria-label={`Round ${round.number} areas`}>
+                  {round.areas.map((area) => (
+                    <li key={area.name}>
+                      <span>
+                        {area.name}
+                        {area.next.length > 0 && (
+                          <span className="plan-muted"> · next: {area.next.join(' · ')}</span>
+                        )}
+                      </span>
+                      <StateBadge state={area.state} label={areaStateLabels[area.state]} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </span>
+            <StateBadge state={round.state} label={roundStateLabels[round.state]} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** The orchestrator's proposed next round: nothing starts until it is approved. */
+function RoundProposal({
+  planId,
+  proposal,
+  deciding,
+  escalation,
+  act,
+}: {
+  planId: string;
+  proposal: RoundAssignment[];
+  /** An agent is deciding it for the person. */
+  deciding: boolean;
+  escalation?: AutonomyEntry;
+  act: (work: () => Promise<unknown>) => Promise<unknown>;
+}) {
+  const id = useId();
+  const [draft, setDraft] = useState<RoundAssignment[] | null>(null);
+  const items = draft ?? proposal;
+  const change = (index: number, edit: Partial<RoundAssignment>) =>
+    setDraft(items.map((item, at) => (at === index ? { ...item, ...edit } : item)));
+  const remove = (index: number) => {
+    const removed = items[index].key;
+    setDraft(
+      items
+        .filter((_, at) => at !== index)
+        .map((item) => ({
+          ...item,
+          dependsOn: item.dependsOn.filter((key) => key !== removed),
+        })),
+    );
+  };
+  const approved = draft?.map((item) => ({
+    ...item,
+    scopes: item.scopes.map((scope) => scope.trim()).filter(Boolean),
+  }));
+  return (
+    <section className="plan-round-proposal" aria-labelledby={`${id}-proposal`}>
+      <WorkspaceSectionHeading
+        title="Next round"
+        titleId={`${id}-proposal`}
+        level={3}
+        description={
+          deciding
+            ? 'An agent is checking this round against the plan. You can still approve, edit or stop it.'
+            : 'Nothing starts until you approve.'
+        }
+      />
+      {!deciding && escalation?.reason && (
+        <EscalationNote category={escalation.category ?? 'decider'} reason={escalation.reason} />
+      )}
+      <ol className="plan-rows">
+        {items.map((item, index) =>
+          draft ? (
+            <li key={item.key} className="plan-round">
+              <span className="plan-proposal-edit">
+                <label htmlFor={`${id}-${index}-title`}>Title</label>
+                <Input
+                  id={`${id}-${index}-title`}
+                  value={item.title}
+                  maxLength={160}
+                  onChange={(event) => change(index, { title: event.target.value })}
+                />
+                <label htmlFor={`${id}-${index}-prompt`}>Instructions</label>
+                <Textarea
+                  id={`${id}-${index}-prompt`}
+                  rows={3}
+                  maxLength={8000}
+                  value={item.prompt}
+                  onChange={(event) => change(index, { prompt: event.target.value })}
+                />
+                <label htmlFor={`${id}-${index}-scopes`}>Scopes</label>
+                <Input
+                  id={`${id}-${index}-scopes`}
+                  value={item.scopes.join(', ')}
+                  placeholder="src/feature"
+                  onChange={(event) =>
+                    change(index, {
+                      scopes: event.target.value.split(',').map((scope) => scope.trimStart()),
+                    })
+                  }
+                />
+              </span>
+              <Button
+                variant="ghost"
+                aria-label={`Remove ${item.title}`}
+                onClick={() => remove(index)}
+              >
+                Remove
+              </Button>
+            </li>
+          ) : (
+            <li key={item.key} className="plan-round">
+              <span>
+                <strong>{item.title}</strong>
+                <span className="plan-muted">
+                  {item.scopes.join(', ')}
+                  {item.dependsOn.length > 0 && ` · after ${item.dependsOn.join(', ')}`}
+                </span>
+              </span>
+            </li>
+          ),
+        )}
+      </ol>
+      <div className="plan-actions">
+        <Button
+          disabled={approved?.length === 0}
+          onClick={() => void act(() => planCommands.rounds(planId, 'approve', approved))}
+        >
+          {draft ? 'Approve edits' : 'Approve'}
+        </Button>
+        {draft ? (
+          <Button variant="outline" onClick={() => setDraft(null)}>
+            Discard edits
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={() => setDraft(proposal)}>
+            Edit
+          </Button>
+        )}
+        <Button variant="ghost" onClick={() => void act(() => planCommands.rounds(planId, 'stop'))}>
+          Stop
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function PlanRevisions({ view }: { view: PlanView }) {
   const numbers = view.revisions.map((revision) => revision.number);
   const [from, setFrom] = useState(numbers.at(-2) ?? numbers[0] ?? 0);
   const [to, setTo] = useState(numbers.at(-1) ?? 0);
-  const [changes, setChanges] = useState<SectionChange[] | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!from || !to || from === to) {
-      setChanges([]);
-      return;
-    }
-    let alive = true;
-    planCommands
-      .diff(view.id, from, to)
-      .then((value) => alive && setChanges(value))
-      .catch((cause) => alive && setError(String(cause)));
-    return () => {
-      alive = false;
-    };
-  }, [view.id, from, to]);
+  const { data: changes, error } = useNativeResource<SectionChange[]>(
+    async () => (!from || !to || from === to ? [] : planCommands.diff(view.id, from, to)),
+    [view.id, from, to],
+  );
   return (
     <div className="plan-revisions">
       <ul className="plan-rows">
@@ -824,7 +1137,7 @@ function PlanRevisions({ view }: { view: PlanView }) {
               ))}
             </Select>
           </div>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           {changes?.length === 0 && <p className="plan-muted">No section changed.</p>}
           {changes?.map((change) => (
             <section key={change.section} className="plan-diff">

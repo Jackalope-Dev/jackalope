@@ -4,11 +4,17 @@ use super::*;
 /// pid and arguments to processes.jsonl. Every user message is one turn: it streams two
 /// text deltas, then sends any hook callbacks the message names and records Jackalope's
 /// replies, then reports a result whose cost is cumulative for the process, as Claude's is.
+/// While forget-sessions exists beside it, it refuses `--resume` as Claude Code does.
 const FAKE_CLAUDE: &str = r#"
 const fs = require('node:fs');
 const readline = require('node:readline');
 const log = (file, value) => fs.appendFileSync(file, JSON.stringify(value) + '\n');
 log('processes.jsonl', { pid: process.pid, args: process.argv.slice(2) });
+const resume = process.argv.indexOf('--resume');
+if (resume >= 0 && fs.existsSync(`${__dirname}/forget-sessions`)) {
+  process.stderr.write(`No conversation found with session ID: ${process.argv[resume + 1]}\n`);
+  process.exit(1);
+}
 const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
 const pending = new Map();
 let next = 0;
@@ -76,6 +82,8 @@ fn request(
 ) -> RunRequest {
     RunRequest {
         retry_of: None,
+        handoff_focus: None,
+        continues: None,
         live_session_id: None,
         effort: None,
         codex_speed: None,
@@ -93,6 +101,7 @@ fn request(
         prepare_command: None,
         setup_files: Vec::new(),
         auto_verify: false,
+        non_code: false,
         target_branch: None,
         account_binding: None,
         model: None,
@@ -187,8 +196,7 @@ impl Fixture {
         let deadline = std::time::Instant::now() + Duration::from_secs(60);
         loop {
             let run = self.runtime.run_snapshot(&id).unwrap();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) && !run.finishing
-            {
+            if !run.status.is_active() && !run.finishing {
                 return run;
             }
             if std::time::Instant::now() > deadline {
@@ -233,9 +241,11 @@ fn follow_ups_reuse_the_warm_process_and_resume_when_it_is_gone() {
     let fixture = Fixture::new(project, persistent());
     let first = fixture.finish(fixture.request(project, "claude-turn-one", "First", None));
     assert_eq!(
-        first.status, "review",
+        first.status,
+        RunStatus::Review,
         "{:?} {:?}",
-        first.error, first.diagnostics
+        first.error,
+        first.diagnostics
     );
     assert_eq!(first.result, "Turn 1 done");
     assert_eq!(
@@ -253,7 +263,7 @@ fn follow_ups_reuse_the_warm_process_and_resume_when_it_is_gone() {
         "Second",
         Some("claude-turn-one"),
     ));
-    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert_eq!(second.status, RunStatus::Review, "{:?}", second.error);
     assert_eq!(second.result, "Turn 2 done");
     assert_eq!(
         second.efficiency.claude_transport.as_deref(),
@@ -292,7 +302,7 @@ fn follow_ups_reuse_the_warm_process_and_resume_when_it_is_gone() {
         "Third",
         Some("claude-turn-two"),
     ));
-    assert_eq!(third.status, "review", "{:?}", third.error);
+    assert_eq!(third.status, RunStatus::Review, "{:?}", third.error);
     assert_eq!(
         third.efficiency.claude_transport.as_deref(),
         Some("resumed")
@@ -341,7 +351,7 @@ fn a_changed_launch_does_not_reuse_the_warm_process() {
     );
     follow_up.effort = Some(super::super::effort::TaskEffort::Thorough);
     let second = fixture.finish(follow_up);
-    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert_eq!(second.status, RunStatus::Review, "{:?}", second.error);
     assert_eq!(
         second.efficiency.claude_transport.as_deref(),
         Some("resumed")
@@ -374,22 +384,13 @@ fn hook_callbacks_answer_through_the_control_protocol() {
             id: project.into(),
             name: "Fixture".into(),
             path: fixture.root.clone(),
-            accent: None,
-            auto_approve: None,
-            workspace_mode: None,
-            learn_automatically: None,
-            learning_cadence: None,
-            sync_lessons: None,
-            agent_reflection: None,
-            export_lessons: None,
-            personal_claude_setup: None,
             edit_check: Some("node lint.cjs {file}".into()),
             ..Default::default()
         }],
     )
     .unwrap();
     let run = fixture.finish(fixture.request(project, "claude-hooks-run", "HOOKS", None));
-    assert_eq!(run.status, "review", "{:?}", run.error);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
     let registered = &fixture.lines("initialize.jsonl")[0];
     assert_eq!(
         registered["PreToolUse"][0]["hookCallbackIds"][0],
@@ -496,7 +497,7 @@ fn a_passing_stop_check_is_reused_by_the_final_check() {
     request.auto_verify = true;
     let run = fixture.finish(request);
     assert_eq!(fixture.json("stops.json"), json!([{}]));
-    assert_eq!(run.status, "review", "{:?}", run.error);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
     assert_eq!(run.efficiency.stop_check_rounds, 1);
     assert_eq!(run.efficiency.native_verification_calls, Some(1));
     assert_eq!(run.efficiency.verification_reuses, Some(1));
@@ -529,7 +530,7 @@ process.stdin.on('end', () => {
     )
     .unwrap();
     let run = fixture.finish(fixture.request(project, "claude-one-shot", "Task", None));
-    assert_eq!(run.status, "review", "{:?}", run.error);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
     assert_eq!(run.result, "Done");
     assert_eq!(run.efficiency.claude_transport, None);
     assert!(run.efficiency.first_token_ms.is_some());
@@ -632,26 +633,14 @@ fn launch_flags_follow_settings() {
 
 #[test]
 fn experiments_gate_sessions_hooks_and_isolation() {
-    // The registry defaults: a persistent session with every hook, partial
-    // messages and the fallback model; isolation and the shared cache off.
-    let defaults = Settings::from_experiments(None);
     let all = Hooks {
         edit_check: true,
         stop_check: true,
         context: true,
         permission: true,
         timing: true,
+        answers: true,
     };
-    assert_eq!(
-        defaults,
-        Settings {
-            persistent: true,
-            partials: true,
-            fallback: true,
-            hooks: all,
-            ..Settings::default()
-        }
-    );
     // A project's explicit choice overrides the isolation default either way.
     assert!(Settings::from_experiments(Some(false)).isolated);
     assert!(!Settings::from_experiments(Some(true)).isolated);
@@ -751,5 +740,315 @@ fn the_context_hook_delivers_selected_context_once() {
     assert_eq!(
         turn.answer("permission", &json!({"tool_name":"Bash"})),
         json!({})
+    );
+}
+
+#[test]
+fn a_session_from_outside_jackalope_resumes_in_the_folder_it_ran_in() {
+    let project = "claude-session-external";
+    let fixture = Fixture::new(project, persistent());
+    let worktree = fixture.folder.join(".worktrees").join("mine");
+    git(
+        &fixture.root,
+        &["worktree", "add", "-b", "mine", worktree.to_str().unwrap()],
+    )
+    .unwrap();
+    let worktree = dunce::canonicalize(&worktree).unwrap();
+    let home = crate::commands::agent_profiles::bind_cli_account(
+        &fixture.runtime.profiles_root(),
+        "claude",
+    )
+    .unwrap()
+    .directory;
+    let continued = |id: &str, home: &Path| RunRequest {
+        agent: "claude-fixture".into(),
+        agent_profile_id: Some("__default".into()),
+        isolated: true,
+        continues: Some(ContinuedSession {
+            adapter: "claude".into(),
+            session_id: "0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f".into(),
+            workspace: worktree.to_string_lossy().into_owned(),
+            home: home.to_path_buf(),
+        }),
+        ..fixture.request(project, id, "Carry on", None)
+    };
+
+    // Saved under a directory Jackalope would not use for this account: refused.
+    let refused = fixture
+        .runtime
+        .start(continued(
+            "claude-external-other",
+            Path::new("/elsewhere/.claude"),
+        ))
+        .unwrap_err();
+    assert!(refused.contains("/elsewhere/.claude"), "{refused}");
+
+    let run = fixture.finish(continued("claude-external", &home));
+    assert_eq!(
+        run.status,
+        RunStatus::Review,
+        "{:?} {:?}",
+        run.error,
+        run.diagnostics
+    );
+    assert_eq!(Path::new(&run.workspace), worktree);
+    assert_eq!(run.branch, "mine");
+    assert_eq!(
+        run.base_head,
+        git(&fixture.root, &["rev-parse", "mine"]).unwrap()
+    );
+    assert!(run.continues.is_some());
+    let processes: Vec<Value> = std::fs::read_to_string(worktree.join("processes.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let args: Vec<String> = serde_json::from_value(processes[0]["args"].clone()).unwrap();
+    let resume = args
+        .iter()
+        .position(|arg| arg == "--resume")
+        .expect("resume flag");
+    assert_eq!(args[resume + 1], "0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f");
+    assert!(fixture
+        .runtime
+        .recorded_sessions()
+        .contains("0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f"));
+
+    // Its changes are already in the person's own worktree: no merge, no retry.
+    let merge = crate::commands::integration::prepare_with_message(
+        &fixture.runtime.integration_directory(),
+        &fixture.runtime.integration_runs().unwrap(),
+        &["claude-external".into()],
+        None,
+    )
+    .unwrap_err();
+    assert!(merge.contains("Commit its changes there"), "{merge}");
+    let retry = fixture
+        .runtime
+        .start(RunRequest {
+            retry_of: Some("claude-external".into()),
+            ..fixture.request(project, "claude-external-retry", "Carry on", None)
+        })
+        .unwrap_err();
+    assert!(retry.contains("Send a follow-up"), "{retry}");
+
+    // A follow-up continues the session it reported, still in that worktree.
+    let follow = fixture.finish(RunRequest {
+        agent: "claude-fixture".into(),
+        ..fixture.request(
+            project,
+            "claude-external-two",
+            "And more",
+            Some("claude-external"),
+        )
+    });
+    assert_eq!(follow.status, RunStatus::Review, "{:?}", follow.error);
+    assert_eq!(Path::new(&follow.workspace), worktree);
+    assert!(follow.continues.is_some());
+}
+
+#[test]
+fn a_session_claude_code_no_longer_has_starts_over_once_as_a_new_conversation() {
+    let project = "claude-session-lost";
+    let fixture = Fixture::new(project, persistent());
+    let first = fixture.finish(fixture.request(project, "claude-lost-one", "First", None));
+    assert_eq!(first.status, RunStatus::Review, "{:?}", first.error);
+    fixture.runtime.claude_sessions.clear();
+    std::fs::write(fixture.folder.join("forget-sessions"), "").unwrap();
+
+    let second = fixture.finish(fixture.request(
+        project,
+        "claude-lost-two",
+        "Second",
+        Some("claude-lost-one"),
+    ));
+    assert_eq!(
+        second.status,
+        RunStatus::Review,
+        "{:?} {:?}",
+        second.error,
+        second.activity
+    );
+    assert_eq!(second.result, "Turn 1 done");
+    let refused = second
+        .activity
+        .iter()
+        .position(|line| {
+            line == "Claude Code could not resume the earlier conversation: No conversation found with session ID: fixture-session"
+        })
+        .expect("refusal in activity");
+    assert!(second.activity[refused + 1]
+        .starts_with("Claude Code no longer had this task's earlier conversation"));
+    assert!(second.diagnostics.is_empty(), "{:?}", second.diagnostics);
+    let processes = fixture.lines("processes.jsonl");
+    assert_eq!(processes.len(), 3);
+    let args = |index: usize| -> Vec<String> {
+        serde_json::from_value(processes[index]["args"].clone()).unwrap()
+    };
+    assert!(args(1).iter().any(|arg| arg == "--resume"));
+    assert!(!args(2).iter().any(|arg| arg == "--resume"));
+    let turns = fixture.lines("turns.jsonl");
+    let text = turns.last().unwrap()["text"].as_str().unwrap();
+    assert!(text.contains("Earlier request:\nFirst"), "{text}");
+
+    // The new conversation is resumed normally by the next follow-up.
+    std::fs::remove_file(fixture.folder.join("forget-sessions")).unwrap();
+    let third = fixture.finish(fixture.request(
+        project,
+        "claude-lost-three",
+        "Third",
+        Some("claude-lost-two"),
+    ));
+    assert_eq!(third.status, RunStatus::Review, "{:?}", third.error);
+    assert!(!third
+        .activity
+        .iter()
+        .any(|line| line.contains("could not resume")));
+}
+
+#[test]
+fn a_session_from_outside_jackalope_that_is_gone_never_starts_over() {
+    let project = "claude-session-external-lost";
+    let fixture = Fixture::new(project, persistent());
+    let worktree = fixture.folder.join(".worktrees").join("mine");
+    git(
+        &fixture.root,
+        &["worktree", "add", "-b", "mine", worktree.to_str().unwrap()],
+    )
+    .unwrap();
+    let worktree = dunce::canonicalize(&worktree).unwrap();
+    let home = crate::commands::agent_profiles::bind_cli_account(
+        &fixture.runtime.profiles_root(),
+        "claude",
+    )
+    .unwrap()
+    .directory;
+    std::fs::write(fixture.folder.join("forget-sessions"), "").unwrap();
+    let run = fixture.finish(RunRequest {
+        agent: "claude-fixture".into(),
+        agent_profile_id: Some("__default".into()),
+        continues: Some(ContinuedSession {
+            adapter: "claude".into(),
+            session_id: "0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f".into(),
+            workspace: worktree.to_string_lossy().into_owned(),
+            home,
+        }),
+        ..fixture.request(project, "claude-external-lost", "Carry on", None)
+    });
+    assert_eq!(run.status, RunStatus::Failed);
+    let error = run.error.unwrap();
+    assert!(
+        error.starts_with("Claude Code no longer has this task's earlier conversation: No conversation found with session ID: 0c1d2e3f"),
+        "{error}"
+    );
+    assert!(!run
+        .activity
+        .iter()
+        .any(|line| line.contains("could not resume")));
+    let processes = std::fs::read_to_string(worktree.join("processes.jsonl")).unwrap();
+    assert_eq!(processes.lines().count(), 1);
+}
+
+#[test]
+fn the_answers_hook_delivers_a_late_answer_once() {
+    let folder =
+        std::env::temp_dir().join(format!("jackalope-answers-hook-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let mut run = super::super::tests::sample("claude");
+    run.id = "answers-run".into();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run);
+    let mut prompt = crate::commands::harness::PendingUserPrompt::choice(
+        "answers-run",
+        "Needs you",
+        "Allow Accessibility for Jackalope".into(),
+        vec!["Done".into(), "Declined".into()],
+    );
+    runtime.record_asked_prompt(&prompt);
+    let turn = |bridge| Turn {
+        runtime: runtime.clone(),
+        id: "answers-run".into(),
+        project_id: "answers-project".into(),
+        workspace: folder.to_string_lossy().into_owned(),
+        hooks: Hooks {
+            answers: true,
+            ..Hooks::default()
+        },
+        bridge,
+        final_check: false,
+        edit_check: None,
+        context: None,
+        delivered: AtomicBool::new(false),
+        rounds: AtomicU32::new(0),
+    };
+    let input = json!({"hook_event_name":"PostToolUse","tool_name":"Bash"});
+    assert_eq!(
+        turn(true).answer("answers", &input),
+        json!({}),
+        "unanswered"
+    );
+    assert!(runtime
+        .respond_prompt("answers-run", &prompt.id, "Done\nNote: granted")
+        .unwrap());
+    assert_eq!(
+        turn(false).answer("answers", &input),
+        json!({}),
+        "no bridge, no answers"
+    );
+    let first = turn(true).answer("answers", &input);
+    let text = first["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert_eq!(first["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    assert!(text.contains(&prompt.id) && text.contains("Done\n  Note: granted"));
+    assert_eq!(turn(true).answer("answers", &input), json!({}), "only once");
+    // An answer the agent received while its ask waited is never repeated.
+    prompt.id = "answered-in-time".into();
+    prompt.status = "answered".into();
+    prompt.answer = Some("Done".into());
+    runtime.record_asked_prompt(&prompt);
+    assert_eq!(turn(true).answer("answers", &input), json!({}));
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
+}
+
+#[test]
+fn non_code_work_starts_in_the_checkout_and_never_prepares_or_checks() {
+    let project = "claude-session-non-code";
+    let fixture = Fixture::new(project, persistent());
+    std::fs::write(
+        fixture.folder.join("mark.cjs"),
+        "require('node:fs').writeFileSync(process.argv[2], 'ran');",
+    )
+    .unwrap();
+    // An untracked file makes the attempt look changed, so checks would otherwise run.
+    std::fs::write(fixture.folder.join("person-notes.txt"), "mine").unwrap();
+    let mut request = fixture.request(project, "claude-non-code", "Check the website", None);
+    request.non_code = true;
+    request.isolated = true;
+    request.workspace_mode = Some(crate::cli_protocol::WorkspaceMode::Worktree);
+    request.prepare_command = Some("node mark.cjs prepared.json".into());
+    request.verify_command = Some("node mark.cjs checked.json".into());
+    request.setup_files = vec!["person-notes.txt".into()];
+    request.auto_verify = true;
+    let run = fixture.finish(request);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
+    assert!(run.non_code);
+    assert_eq!(
+        dunce::canonicalize(&run.workspace).unwrap(),
+        dunce::canonicalize(&fixture.folder).unwrap()
+    );
+    assert!(!fixture.folder.join(".worktrees").exists());
+    assert!(!fixture.folder.join("prepared.json").exists());
+    assert!(!fixture.folder.join("checked.json").exists());
+    assert!(run.verification.is_none());
+    assert!(!run.auto_verify && run.prepare_command.is_none() && run.setup_files.is_empty());
+    assert_eq!(
+        git(&fixture.root, &["branch", "--show-current"]).unwrap(),
+        "master"
     );
 }

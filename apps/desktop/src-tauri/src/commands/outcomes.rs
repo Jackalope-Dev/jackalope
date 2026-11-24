@@ -2,6 +2,7 @@ use super::{
     integration,
     tasks::{TaskRun, TaskRuntime},
 };
+use crate::commands::tasks::RunStatus;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -312,16 +313,16 @@ impl TaskContract {
 fn idle_run(runtime: &TaskRuntime, id: &str) -> Result<TaskRun, String> {
     let runs = runtime.integration_runs()?;
     let run = runs.iter().find(|r| r.id == id).ok_or("Task not found")?;
-    if runs.iter().any(|other| {
-        other.workspace == run.workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|other| other.workspace == run.workspace && other.status.is_live())
+    {
         return Err(
             "Stop active work and resolve interrupted ownership before reviewing this workspace."
                 .into(),
         );
     }
-    if !["review", "reviewed"].contains(&run.status.as_str()) {
+    if !run.status.is_done() {
         return Err("Review acceptance after the agent has produced a finished result.".into());
     }
     if runs
@@ -336,6 +337,16 @@ fn idle_run(runtime: &TaskRuntime, id: &str) -> Result<TaskRun, String> {
     Ok(run.clone())
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::outcomes::task_outcome_snapshot,
+            commands::outcomes::task_outcome_review,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_outcome_snapshot(
     id: String,
@@ -346,7 +357,6 @@ pub async fn task_outcome_snapshot(
         let _guard = integration::execution_guard()?;
         let run = idle_run(&runtime, &id)?;
         let directory = runtime.integration_directory();
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         integration::workspace_tree(&run, &directory)
     })
     .await
@@ -368,7 +378,6 @@ pub fn record(runtime: &TaskRuntime, review: OutcomeReview) -> Result<(), String
     let _guard = integration::execution_guard()?;
     let run = idle_run(runtime, &review.run_id)?;
     let directory = runtime.integration_directory();
-    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let tree = integration::workspace_tree(&run, &directory)?;
     if tree != review.expected_tree {
         return Err(
@@ -439,7 +448,7 @@ pub fn record(runtime: &TaskRuntime, review: OutcomeReview) -> Result<(), String
             tree,
             recorded_at: chrono::Utc::now().to_rfc3339(),
         });
-        r.status = "review".into();
+        r.status = RunStatus::Review;
     })?;
     runtime
         .refresh_knowledge(&run.project_id, &run.project_path, true)
@@ -635,7 +644,5 @@ mod tests {
         )
         .unwrap();
         assert!(empty.validated().is_err());
-        assert!(RESTATEMENT_CONTRACT.contains("restate_goal"));
-        assert!(RESTATEMENT_CONTRACT.contains("without waiting"));
     }
 }

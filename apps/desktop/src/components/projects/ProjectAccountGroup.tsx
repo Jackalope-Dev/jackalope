@@ -1,10 +1,15 @@
+import {
+  Button,
+  InlineNotice,
+  LoadingState,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+} from '@jackalope/ui';
 import { useState } from 'react';
 import { accountGroupChoices } from '../../lib/account-groups';
+import { ORCHESTRATING_AGENTS } from '../../lib/agent-catalog';
 import { listAgentProfiles } from '../../lib/agent-profiles';
-import { SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 export function ProjectAccountGroup({
   agents,
   value,
@@ -23,7 +28,7 @@ export function ProjectAccountGroup({
   const load = async (group: 'work' | 'personal') => {
     const entries = await Promise.all(
       agents
-        .filter((a) => ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(a.id))
+        .filter((a) => ORCHESTRATING_AGENTS.includes(a.id))
         .map(async (agent) => ({
           agent: agent.id,
           profiles: (await listAgentProfiles(agent.id)).profiles,

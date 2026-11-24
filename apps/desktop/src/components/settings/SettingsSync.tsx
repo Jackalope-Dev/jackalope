@@ -1,11 +1,16 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect } from 'react';
 import { lessonSyncStatus } from '../../lib/lesson-sync';
 import { useLessonSyncStore } from '../../stores/lessonSyncStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
-import { Button } from '../ui/button';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 export function SettingsSync() {
   const sync = useSettingsSyncStore();
@@ -14,7 +19,7 @@ export function SettingsSync() {
   }, [sync.refresh]);
   return (
     <SettingGroup aria-label="Settings sync">
-      <Setting
+      <SettingRow
         title="Sync settings with my account"
         description="Keep appearance, companion and notification preferences across desktops. Credentials, projects and task history stay local."
       >
@@ -24,7 +29,7 @@ export function SettingsSync() {
           disabled={!sync.available || (sync.busy && !sync.enabled)}
           onCheckedChange={(enabled) => void sync.configure(enabled)}
         />
-      </Setting>
+      </SettingRow>
       <LessonSync settingsOn={sync.enabled && Boolean(sync.owner)} />
       <SettingBody>
         <Disclosure className="space-y-2">
@@ -99,7 +104,7 @@ function LessonSync({ settingsOn }: { settingsOn: boolean }) {
   const { view } = lessons;
   return (
     <>
-      <Setting
+      <SettingRow
         title="Include learned lessons"
         description="Also sync lessons Jackalope learned, with their history, so every desktop signed in to this account uses them. Evidence, use counts and folder paths stay here. Exclude a project in its settings."
       >
@@ -109,7 +114,7 @@ function LessonSync({ settingsOn }: { settingsOn: boolean }) {
           disabled={!settingsOn || !view.available || lessons.busy}
           onCheckedChange={(enabled) => void lessons.configure(enabled)}
         />
-      </Setting>
+      </SettingRow>
       <SettingBody>
         <p role="status">{lessonSyncStatus(view, lessons.busy)}</p>
         {view.enabled && (

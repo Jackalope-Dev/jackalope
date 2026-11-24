@@ -1,5 +1,5 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 
 const phases: Record<string, string> = {
   workspace: 'Workspace preparation',

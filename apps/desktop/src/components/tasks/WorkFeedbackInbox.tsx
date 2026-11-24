@@ -1,8 +1,9 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { describeError } from '@jackalope/contracts/errors';
+import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { useEffect, useRef, useState } from 'react';
+import { useAppEvent } from '../../lib/app-events';
 import { pendingWorkFeedback, type WorkFeedback } from '../../lib/work-feedback';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function WorkFeedbackInbox({
   taskId,
@@ -14,20 +15,21 @@ export function WorkFeedbackInbox({
   const [items, setItems] = useState<WorkFeedback[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const reread = useRef<() => void>(undefined);
+  useAppEvent('work-feedback', () => reread.current?.());
   useEffect(() => {
     const refresh = () => {
       try {
         setItems(pendingWorkFeedback(taskId));
       } catch (cause) {
-        setError(`Saved feedback could not be read: ${String(cause)}`);
+        setError(`Saved feedback could not be read: ${describeError(cause)}`);
       }
     };
     refresh();
+    reread.current = refresh;
     window.addEventListener('storage', refresh);
-    window.addEventListener('jackalope:work-feedback', refresh);
     return () => {
       window.removeEventListener('storage', refresh);
-      window.removeEventListener('jackalope:work-feedback', refresh);
     };
   }, [taskId]);
   if (!items.length && !error) return null;
@@ -53,7 +55,7 @@ export function WorkFeedbackInbox({
                   localStorage.removeItem(item.key);
                   setItems(pendingWorkFeedback(taskId));
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }
@@ -69,7 +71,7 @@ export function WorkFeedbackInbox({
                   localStorage.removeItem(item.key);
                   setItems(pendingWorkFeedback(taskId));
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             >
@@ -77,7 +79,7 @@ export function WorkFeedbackInbox({
             </Button>
           </div>
         ))}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     </Disclosure>
   );

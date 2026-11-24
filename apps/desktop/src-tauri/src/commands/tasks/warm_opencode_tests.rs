@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::process_control::ProcessTree;
 
 struct Fixture(PathBuf);
 impl Drop for Fixture {
@@ -18,7 +19,7 @@ fn warm_opencode_protocol() {
 #[ignore = "Real private API helper protocol with fake loopback provider; set JACKALOPE_OPENCODE_EXE and JACKALOPE_WARM_API_HELPERS=on"]
 fn warm_opencode_api_protocol() {
     assert!(crate::commands::experiments::is(
-        "JACKALOPE_WARM_API_HELPERS",
+        crate::commands::experiments::Experiment::WarmApiHelpers,
         "on"
     ));
     protocol(true);
@@ -146,7 +147,7 @@ http.createServer(async (req, res) => {
             .expect("local server ready");
         assert_eq!(lease.reused, index == 1);
         let server = lease.entry.server.lock().unwrap();
-        endpoint = server.as_ref().unwrap().url.clone();
+        endpoint = server.as_ref().unwrap().endpoint.url.clone();
         drop(server);
         let denied = tauri::async_runtime::block_on(async {
             reqwest::Client::new()
@@ -202,7 +203,7 @@ http.createServer(async (req, res) => {
             .unwrap()
             .as_ref()
             .unwrap()
-            .child
+            .process
             .id();
         working_sets.push(working_set(pid));
         lease.complete();

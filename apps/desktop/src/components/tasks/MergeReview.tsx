@@ -1,20 +1,29 @@
-import { Checkbox, Disclosure, DisclosureBody, DisclosureSummary, FormField } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Input,
+} from '@jackalope/ui';
 import { ArrowRight, Check, GitMerge, GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
 import { applyIntegration, integrationPlans, prepareIntegration } from '../../lib/queue';
-import type { TaskRun } from '../../lib/task-runtime';
-import { taskTitle } from '../../lib/task-title';
+import type { TaskRun } from '../../lib/run-types';
+import { runTitle } from '../../lib/task-title';
 import { mergeDestination } from '../../lib/task-workflow';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { isDone } from '@jackalope/contracts/runs';
+import { ActionError } from '../ui/ActionError';
 export function MergeReview({
   project,
   runs,
@@ -42,7 +51,7 @@ export function MergeReview({
     const item = items.find((item) =>
       runs.some((original) => original.id === item.runId && original.taskId === run?.taskId),
     );
-    return item?.title ?? (run ? taskTitle(run.prompt) : id);
+    return item?.title ?? (run ? runTitle(run) : id);
   };
   const [selected, setSelected] = useState<string[]>(onlyRunIds ?? (onlyRunId ? [onlyRunId] : []));
   const [plans, setPlans] = useState<IntegrationPlan[]>([]);
@@ -61,7 +70,7 @@ export function MergeReview({
       (!onlyRunId || r.id === onlyRunId) &&
       (!onlyRunIds || onlyRunIds.includes(r.id)) &&
       r.projectId === project.id &&
-      ['review', 'reviewed'].includes(r.status) &&
+      isDone(r) &&
       r.workspace &&
       normalizePath(r.workspace) !== normalizePath(r.projectPath) &&
       !merged.includes(r.id) &&
@@ -110,7 +119,7 @@ export function MergeReview({
     }
   }, [onlyRunId, managedTitle, onlyRunIdsKey]);
   useEffect(() => {
-    void load().catch((error) => setError(String(error)));
+    void load().catch((error) => setError(describeError(error)));
   }, [load]);
   const prepare = async () => {
     setBusy(true);
@@ -119,10 +128,10 @@ export function MergeReview({
       const next = await prepareIntegration(chosen, message);
       setPlan(next);
       setPreparedMessage(message);
-      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
+      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? true);
       await load();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
     }
@@ -138,7 +147,7 @@ export function MergeReview({
       await onChanged();
       await load();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
       setApplying(false);
@@ -282,7 +291,7 @@ export function MergeReview({
             : 'Finished tasks arrive here with their results and changes.'}
         </p>
       ) : null}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {managedTitle && !plan && busy && (
         <p className="task-muted" role="status">
           Preparing the combined changes…

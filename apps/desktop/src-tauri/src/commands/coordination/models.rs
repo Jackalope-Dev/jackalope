@@ -172,6 +172,10 @@ pub(super) struct Ledger {
     pub(super) subtask_grants: Vec<String>,
     #[serde(default)]
     pub(super) adoptions: Vec<super::peers::Adoption>,
+    /// Agents the person chose to run at once on this device; absent means
+    /// Automatic, which follows the device's recommendation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) concurrency: Option<usize>,
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -187,10 +191,20 @@ pub struct QueueView {
     pub items: Vec<QueueItem>,
     pub messages: Vec<CoordinationMessage>,
     pub enabled_projects: Vec<String>,
+    /// Agents that may run at once on this device.
     pub concurrency: usize,
+    /// Whether `concurrency` follows `recommended_concurrency`.
+    pub automatic_concurrency: bool,
+    /// What this device's CPUs and memory can run at once.
+    pub recommended_concurrency: usize,
+    pub max_concurrency: usize,
+    /// Agents that may run at once on project computers.
+    pub remote_concurrency: usize,
     pub bridge_url: Option<String>,
     pub bridge_error: Option<String>,
     pub merged_run_ids: Vec<String>,
+    /// Applied integrations whose merge left the target branch; their dependents wait.
+    pub paused_integrations: Vec<crate::commands::integration::PausedIntegration>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, rmcp::schemars::JsonSchema)]

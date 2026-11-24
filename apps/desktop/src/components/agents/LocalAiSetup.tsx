@@ -1,9 +1,8 @@
-import { IconButton } from '@jackalope/ui';
+import { IconButton, LoadingState } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, Cpu, X } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import type { LocalInspection } from '../../lib/local-ai';
-import { LoadingState } from '../ui/LoadingState';
 import './local-ai.css';
 
 const LazyLocalAiSteps = lazy(() =>

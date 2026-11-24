@@ -6,6 +6,7 @@ import {
   paletteGradient,
   type ThemePalette,
   themeTokens,
+  withPreset,
 } from '@jackalope/brand/theme';
 import { Check, Clock3, Moon, Sun } from 'lucide-react';
 import { type PointerEvent, useId } from 'react';
@@ -257,15 +258,7 @@ export function ThemeEditor({
           <button
             key={theme.id}
             type="button"
-            onClick={() =>
-              onChange({
-                ...theme,
-                isDark: value.isDark,
-                appearance: value.appearance,
-                atmosphere: value.atmosphere,
-                harmony: value.harmony,
-              })
-            }
+            onClick={() => onChange(withPreset(theme, value))}
             aria-label={theme.name}
             aria-pressed={value.id === theme.id}
             title={theme.name}

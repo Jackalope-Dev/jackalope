@@ -1,24 +1,23 @@
-import { Input } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { describeError } from '@jackalope/contracts/errors';
 import {
-  defaultShortcuts,
-  displayShortcut,
-  normalizeShortcut,
-  resolveShortcuts,
-  type ShortcutAction,
-  shortcutNames,
-} from '../../lib/shortcuts';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+  Button,
+  FieldCheck,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
+import { useEffect, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
+import { VoiceSettings } from '../voice/VoiceSettings';
 import { CliCommandSetting } from './CliCommandSetting';
-import { Setting, SettingActions, SettingGroup } from './Setting';
 
 export interface DesktopActivity {
   mode: 'off' | 'working' | 'always';
@@ -34,8 +33,6 @@ export function DesktopPreferences() {
   const [activityError, setActivityError] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const bindings = resolveShortcuts(settings.shortcuts);
-  const [drafts, setDrafts] = useState(bindings);
   const windows = /Win/i.test(navigator.platform);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -45,13 +42,13 @@ export function DesktopPreferences() {
       if (document.hidden || pending) return;
       pending = true;
       try {
-        const next = await nativeTask<DesktopActivity>('desktop_activity');
+        const next = await invokeNative<DesktopActivity>('desktop_activity');
         if (!disposed) {
           setActivity(next);
           setActivityError('');
         }
       } catch (reason) {
-        if (!disposed) setActivityError(String(reason));
+        if (!disposed) setActivityError(describeError(reason));
       } finally {
         pending = false;
       }
@@ -67,35 +64,18 @@ export function DesktopPreferences() {
     setSaving(true);
     setError('');
     try {
-      await nativeTask('desktop_keep_awake', { mode });
-      setActivity(await nativeTask('desktop_activity'));
+      await invokeNative('desktop_keep_awake', { mode });
+      setActivity(await invokeNative('desktop_activity'));
     } catch (reason) {
-      setError(String(reason));
+      setError(describeError(reason));
     } finally {
       setSaving(false);
     }
   };
-  const saveShortcuts = () => {
-    const next = Object.fromEntries(
-      Object.entries(drafts).map(([action, value]) => [action, normalizeShortcut(value)]),
-    );
-    if (Object.values(next).some((value) => !value)) {
-      setError(
-        'Use Mod plus a key, optionally Shift or Alt. Common editing and system shortcuts are reserved.',
-      );
-      return;
-    }
-    if (new Set(Object.values(next)).size !== Object.keys(next).length) {
-      setError('Choose a different shortcut for each action.');
-      return;
-    }
-    settings.updateSettings({ shortcuts: next as Record<string, string> });
-    setError('');
-  };
   return (
     <>
-      <SettingGroup title="Display & editor">
-        <Setting title="Interface zoom">
+      <SettingGroup title="Display & editor" data-settings-tile>
+        <SettingRow title="Interface zoom">
           <Select
             aria-label="Interface zoom"
             value={String(settings.interfaceZoom)}
@@ -107,8 +87,8 @@ export function DesktopPreferences() {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting title="Preferred editor">
+        </SettingRow>
+        <SettingRow title="Preferred editor">
           <Select
             aria-label="Preferred editor"
             value={settings.preferredEditor}
@@ -119,10 +99,10 @@ export function DesktopPreferences() {
             <SelectItem value="vscode">VS Code</SelectItem>
             <SelectItem value="cursor">Cursor</SelectItem>
           </Select>
-        </Setting>
+        </SettingRow>
       </SettingGroup>
-      <SettingGroup title="Terminal">
-        <Setting
+      <SettingGroup title="Terminal" data-settings-tile>
+        <SettingRow
           title="Terminal shell"
           description="Applies when starting a terminal. WSL terminals do not change the environment used by agents or checks."
         >
@@ -151,8 +131,8 @@ export function DesktopPreferences() {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting title="Terminal font size">
+        </SettingRow>
+        <SettingRow title="Terminal font size">
           <Select
             aria-label="Terminal font size"
             value={String(settings.terminalFontSize)}
@@ -164,8 +144,8 @@ export function DesktopPreferences() {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Terminal links"
           description="Open clicked HTTP and HTTPS links in your default browser."
         >
@@ -174,9 +154,9 @@ export function DesktopPreferences() {
             checked={settings.terminalLinks}
             onCheckedChange={(terminalLinks) => settings.updateSettings({ terminalLinks })}
           />
-        </Setting>
+        </SettingRow>
         <CliCommandSetting />
-        <Setting
+        <SettingRow
           title="Restore terminal output"
           description="Save the last 256 KiB when a terminal stops or Jackalope quits. After restarting, output is read-only until you start a new shell. Applies to newly started terminals."
         >
@@ -187,10 +167,10 @@ export function DesktopPreferences() {
               settings.updateSettings({ retainTerminalOutput })
             }
           />
-        </Setting>
+        </SettingRow>
       </SettingGroup>
-      <SettingGroup title="Power">
-        <Setting
+      <SettingGroup title="Power" data-settings-tile>
+        <SettingRow
           title="Keep computer awake"
           description="Prevent idle sleep while Jackalope is open. While working covers agent runs and finishing checks; it releases when they finish. Your display can still sleep. Explicit sleep and closing the lid follow your system settings."
         >
@@ -204,9 +184,9 @@ export function DesktopPreferences() {
             <SelectItem value="working">While work runs</SelectItem>
             <SelectItem value="always">While Jackalope is open</SelectItem>
           </Select>
-        </Setting>
+        </SettingRow>
         {activity && (
-          <Setting
+          <SettingRow
             title="Running on this computer"
             description={`${activity.awake ? 'Keeping awake' : 'Idle sleep allowed'} · ${activity.activeWork} active ${
               activity.activeWork === 1 ? 'attempt' : 'attempts'
@@ -231,64 +211,72 @@ export function DesktopPreferences() {
                 Inspect worktrees and disk use
               </Button>
             </div>
-          </Setting>
+          </SettingRow>
         )}
       </SettingGroup>
       <SettingGroup
-        title="Local dictation"
-        description="Connect an OpenAI-compatible transcription server running on this computer. Dictate records only when clicked, then adds text to your draft for review. Jackalope does not save the audio."
+        data-settings-tile
+        title="Voice to text"
+        description="The mic in each composer records only while it is on, then puts the text at your cursor for review. Speech is transcribed on this computer, and Jackalope does not save the audio."
       >
-        <Setting
-          title="Local transcription endpoint"
-          description="Leave empty to disable dictation."
+        <SettingRow title="Voice model" description="Downloaded once and run on this computer.">
+          <VoiceSettings />
+        </SettingRow>
+        <SettingRow
+          title="Your own transcription server"
+          description="Optional. An OpenAI-compatible server on this computer, used only when no voice model is in use."
         >
+          <div className="settings-field-stack">
+            <Input
+              aria-label="Local transcription endpoint"
+              aria-describedby="dictation-endpoint-check"
+              placeholder="http://127.0.0.1:8000/v1/audio/transcriptions"
+              value={settings.dictationEndpoint}
+              onChange={(event) =>
+                settings.updateSettings({ dictationEndpoint: event.target.value })
+              }
+            />
+            <DictationCheck endpoint={settings.dictationEndpoint} />
+          </div>
+        </SettingRow>
+        <SettingRow title="Server model name">
           <Input
-            aria-label="Local transcription endpoint"
-            placeholder="http://127.0.0.1:8000/v1/audio/transcriptions"
-            value={settings.dictationEndpoint}
-            onChange={(event) => settings.updateSettings({ dictationEndpoint: event.target.value })}
-          />
-        </Setting>
-        <Setting title="Transcription model">
-          <Input
-            aria-label="Transcription model"
+            aria-label="Server model name"
             value={settings.dictationModel}
             onChange={(event) => settings.updateSettings({ dictationModel: event.target.value })}
           />
-        </Setting>
-      </SettingGroup>
-      <SettingGroup
-        title="Keyboard shortcuts"
-        description={`Use Mod for ${displayShortcut('Mod')}. Changes apply after saving.`}
-      >
-        {(Object.keys(defaultShortcuts) as ShortcutAction[]).map((action) => (
-          <Setting key={action} title={shortcutNames[action]}>
-            <Input
-              aria-label={`${shortcutNames[action]} shortcut`}
-              value={drafts[action]}
-              onChange={(event) => setDrafts({ ...drafts, [action]: event.target.value })}
-            />
-          </Setting>
-        ))}
-        <SettingActions>
-          <Button variant="outline" onClick={saveShortcuts}>
-            Save shortcuts
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              settings.updateSettings({ shortcuts: {} });
-              setDrafts(defaultShortcuts);
-              setError('');
-            }}
-          >
-            Restore defaults
-          </Button>
-        </SettingActions>
+        </SettingRow>
       </SettingGroup>
       {(error || activityError || activity?.error) && (
         <InlineNotice tone="error">{error || activityError || activity?.error}</InlineNotice>
       )}
     </>
+  );
+}
+
+/** What the endpoint field means right now, from the same URL rule the dictation request uses. */
+function dictationState(endpoint: string): { tone: 'ok' | 'error' | 'info'; message: string } {
+  const value = endpoint.trim();
+  if (!value) return { tone: 'info', message: 'Not set. Dictation uses the voice model above.' };
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { tone: 'error', message: 'Enter a full address, such as http://127.0.0.1:8000/…' };
+  }
+  if (!['http:', 'https:'].includes(url.protocol))
+    return { tone: 'error', message: 'Use an http:// or https:// address.' };
+  return {
+    tone: 'ok',
+    message: `Used when no voice model is in use; recordings go to ${url.host}.`,
+  };
+}
+
+function DictationCheck({ endpoint }: { endpoint: string }) {
+  const state = dictationState(endpoint);
+  return (
+    <FieldCheck id="dictation-endpoint-check" tone={state.tone}>
+      {state.message}
+    </FieldCheck>
   );
 }

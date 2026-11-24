@@ -17,12 +17,11 @@ fn path(runtime: &TaskRuntime) -> PathBuf {
     runtime.integration_directory().join("remote-hosts.bin")
 }
 fn hosts(runtime: &TaskRuntime) -> Result<Vec<Host>, String> {
-    account_storage::read(&path(runtime))?
-        .map(|bytes| {
-            serde_json::from_slice(&bytes)
-                .map_err(|_| "Saved hosts could not be read. The record was preserved.".into())
-        })
-        .unwrap_or(Ok(Vec::new()))
+    Ok(account_storage::read_json(
+        &path(runtime),
+        "Saved hosts could not be read. The record was preserved.",
+    )?
+    .unwrap_or_default())
 }
 fn public(host: &Host) -> Value {
     json!({"id":host.id,"name":host.name,"address":host.address,"ssh":host.ssh,"port":host.port,"wsl":host.wsl})
@@ -54,12 +53,7 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
         .await;
     }
     let (base, authority) = endpoint(host).await?;
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(30))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = crate::commands::http::direct_client(super::pairing::TIMEOUT)?;
     let mut request = client.post(format!("{base}{route}")).json(&value);
     if let Some(authority) = authority {
         request = request.header("Host", authority);
@@ -67,28 +61,25 @@ async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String
     if !host.token.is_empty() {
         request = request.bearer_auth(&host.token);
     }
-    let mut response = request.send().await.map_err(|_| "The host is unreachable. Work continues there; reconnect to check whether your last action completed.")?;
-    let status = response.status();
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
+    let mut response = request
+        .send()
         .await
-        .map_err(|_| "Connection interrupted. Refresh the host before retrying.")?
-    {
-        if bytes.len() + chunk.len() > 4_000_000 {
-            return Err("The host response is too large.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    let value: Value =
-        serde_json::from_slice(&bytes).map_err(|_| "The host returned an unreadable response.")?;
-    if !status.is_success() {
-        return Err(value["error"]
-            .as_str()
-            .unwrap_or("The host declined this request.")
-            .into());
-    }
-    Ok(value)
+        .map_err(|_| super::pairing::UNREACHABLE)?;
+    let status = response.status();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let bytes = crate::commands::http::read_bounded(&mut response, super::pairing::RESPONSE_LIMIT)
+        .await
+        .map_err(|error| match error {
+            crate::commands::http::BodyError::Interrupted => {
+                "Connection interrupted. Refresh the host before retrying."
+            }
+            crate::commands::http::BodyError::TooLarge => super::pairing::TOO_LARGE,
+        })?;
+    super::pairing::reply(status.as_u16(), content_type.as_deref(), &bytes, &host.name)
 }
 #[tauri::command]
 pub fn remote_hosts(state: State<'_, TaskRuntime>) -> Result<Vec<Value>, String> {
@@ -104,7 +95,7 @@ pub async fn remote_host_pair(
     code: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<Value, String> {
-    let Some(code) = super::pairing_code(&code)
+    let Some(code) = super::pairing::pairing_code(&code)
         .filter(|_| !name.trim().is_empty() && name.chars().count() <= 80 && port >= 1024)
     else {
         return Err("Enter a name, host and current pairing code.".into());
@@ -137,7 +128,13 @@ pub async fn remote_host_pair(
         .chars()
         .take(80)
         .collect::<String>();
-    let response = match request(&host, "/api/pair", json!({"code":code,"name":device})).await {
+    let response = match request(
+        &host,
+        super::pairing::PAIR_ROUTE,
+        json!({"code":code,"name":device,"kind":"computer"}),
+    )
+    .await
+    {
         Ok(response) => response,
         Err(error) => {
             transport::close_tunnel(&host.id);
@@ -145,21 +142,14 @@ pub async fn remote_host_pair(
         }
     };
     let mut save = || -> Result<Value, String> {
-        host.token = response["token"]
-            .as_str()
-            .filter(|token| token.len() == 64)
-            .ok_or("The host did not return a device token.")?
-            .into();
+        host.token = super::pairing::device_token(&response)?.into();
         let _guard = CLIENT_LOCK.lock().map_err(|e| e.to_string())?;
         let mut saved = hosts(&state)?;
         if saved.len() >= 20 {
             return Err("Remove an unused host before adding another.".into());
         }
         saved.push(host.clone());
-        account_storage::write(
-            &path(&state),
-            &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
-        )?;
+        account_storage::write_json(&path(&state), &saved)?;
         Ok(public(&host))
     };
     let result = save();
@@ -182,20 +172,46 @@ pub async fn remote_host_request(
         .ok_or("Connect this host again.")?;
     request(
         &host,
-        "/api/request",
+        super::pairing::REQUEST_ROUTE,
         serde_json::to_value(action).map_err(|e| e.to_string())?,
     )
     .await
+}
+/// Asks a paired host for a one-time phone pairing code, which the host allows only when
+/// its owner turned on invitations from paired computers. The phone then pairs with the
+/// host directly over its HTTPS address; nothing is relayed through this computer.
+#[tauri::command]
+pub async fn remote_host_invite_phone(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Value, String> {
+    let host = hosts(&state)?
+        .into_iter()
+        .find(|h| h.id == id)
+        .ok_or("Connect this host again.")?;
+    request(
+        &host,
+        super::pairing::REQUEST_ROUTE,
+        json!({"action":"invitePhone"}),
+    )
+    .await
+    .map_err(|error| {
+        if error.contains("not available remotely") {
+            format!(
+                "Update Jackalope on {} to invite phones from here.",
+                host.name
+            )
+        } else {
+            error
+        }
+    })
 }
 #[tauri::command]
 pub fn remote_host_remove(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
     let _guard = CLIENT_LOCK.lock().map_err(|e| e.to_string())?;
     let mut saved = hosts(&state)?;
     saved.retain(|h| h.id != id);
-    account_storage::write(
-        &path(&state),
-        &serde_json::to_vec(&saved).map_err(|e| e.to_string())?,
-    )?;
+    account_storage::write_json(&path(&state), &saved)?;
     transport::close_tunnel(&id);
     Ok(())
 }

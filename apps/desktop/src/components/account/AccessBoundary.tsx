@@ -1,11 +1,11 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Disclosure, DisclosureSummary, DiscordIcon } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, DiscordIcon, Switch } from '@jackalope/ui';
 import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { WindowGlass } from '../../lib/window-glass';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -17,8 +17,6 @@ import { TitleBar } from '../layout/TitleBar';
 import { JackalopeAccount } from '../settings/JackalopeAccount';
 import { PrivacySettings } from '../settings/PrivacySettings';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { Button } from '../ui/button';
-import { Switch } from '../ui/Switch';
 import './access.css';
 
 const AccessNoticeContext = createContext<ReactNode>(null);
@@ -61,7 +59,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
     const refresh = async () => {
       try {
         const value = isTauriEnvironment()
-          ? await nativeTask<AccessStatus>('app_execution_access')
+          ? await invokeNative<AccessStatus>('app_execution_access')
           : { required: true, allowed: false, validUntil: null };
         if (!canceled) {
           if (!value.allowed) wasDenied.current = true;
@@ -177,17 +175,14 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
             <h1 id="access-verified-heading" ref={successHeading} tabIndex={-1}>
               You’re in.
             </h1>
-            <p role="status">
-              Access confirmed.{' '}
-              {needsSetup ? 'Let’s set up your project.' : 'Welcome back to Jackalope.'}
-            </p>
+            <p role="status">{needsSetup ? 'Let’s set up your project.' : 'Welcome back.'}</p>
           </section>
         ) : (
           <section className="access-welcome" aria-labelledby="access-heading">
             <header className="access-intro">
               <EchoMark animated={false} className="access-mark" />
               <h1 id="access-heading">Welcome to Jackalope.</h1>
-              <p>Sign in, or create a free account, to start working with your agents.</p>
+              <p>Sign in or create a free account to get started.</p>
             </header>
             <Disclosure className="access-privacy">
               <DisclosureSummary>

@@ -1,7 +1,15 @@
-import { Badge, FormField, Input } from '@jackalope/ui';
+import { describeError } from '@jackalope/contracts/errors';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  addCloudMachine,
   type CloudMachine,
   type ComputerPreferences,
   type ComputerStatus,
@@ -19,13 +27,12 @@ import {
   stopComputer,
   testCloudMachine,
 } from '../../lib/computers';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { Agent37Settings } from '../computers/Agent37Connect';
+import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingBody, SettingGroup } from './Setting';
+import { PairMachineForm } from '../computers/PairMachineForm';
+import { ActionError } from '../ui/ActionError';
 
 function dockerSummary(status: DockerStatus) {
   const engine =
@@ -45,7 +52,7 @@ export function ComputersSettings() {
   const [computers, setComputers] = useState<ComputerStatus[]>([]);
   const [preferences, setPreferences] = useState<ComputerPreferences | null>(null);
   const [health, setHealth] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ name: '', url: '', secret: '', viewerUrl: '' });
+  const [pairing, setPairing] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
@@ -65,7 +72,7 @@ export function ComputersSettings() {
   }, []);
 
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
 
   // Keep idle countdowns and starting phases current.
@@ -89,7 +96,7 @@ export function ComputersSettings() {
       await action();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -108,12 +115,12 @@ export function ComputersSettings() {
 
   return (
     <>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <SettingGroup
         title="Local sandboxes"
-        description="Bots and tasks can get their own Linux desktop with a browser, running in Docker on this device. Jackalope never installs Docker for you."
+        description="Bots and tasks get their own Linux desktop and browser in Docker on this device."
       >
-        <Setting
+        <SettingRow
           title={
             docker
               ? docker.available
@@ -144,10 +151,10 @@ export function ComputersSettings() {
               Check again
             </Button>
           </div>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Keep computers running when Jackalope quits"
-          description="Off stops every local sandbox when Jackalope quits; their files are kept. Each sandbox also stops after its idle time, set per computer below or in its bot's settings."
+          description="When off, local sandboxes stop when Jackalope quits. Their files are kept."
         >
           <Switch
             label="Keep computers running when Jackalope quits"
@@ -155,19 +162,19 @@ export function ComputersSettings() {
             disabled={!preferences}
             onCheckedChange={(keepRunningOnQuit) =>
               void setComputerPreferences({ keepRunningOnQuit }).then(setPreferences, (cause) =>
-                setError(String(cause)),
+                setError(describeError(cause)),
               )
             }
           />
-        </Setting>
+        </SettingRow>
       </SettingGroup>
 
       <SettingGroup
         title="Cloud machines"
-        description="Bring your own machine from any cloud provider: run the Jackalope computer image there behind HTTPS and pair it with its secret. The secret is kept in this device's protected storage. Jackalope never stops a cloud machine; its provider's own schedule applies."
+        description="Run the Jackalope computer on any machine you own behind HTTPS. Jackalope never stops it; your provider’s schedule applies."
       >
         {machines.map((machine) => (
-          <Setting
+          <SettingRow
             key={machine.id}
             title={machine.name}
             description={health[machine.id] ?? machine.url}
@@ -182,7 +189,7 @@ export function ComputersSettings() {
               >
                 Test connection
               </Button>
-              <ConfirmAction
+              <ConfirmDialog
                 trigger={
                   <Button variant="outline" disabled={!!busy}>
                     Remove…
@@ -195,80 +202,27 @@ export function ComputersSettings() {
                 onConfirm={() => run(`remove:${machine.id}`, () => removeCloudMachine(machine.id))}
               />
             </div>
-          </Setting>
+          </SettingRow>
         ))}
-        <SettingBody>
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run('add', async () => {
-                await addCloudMachine(
-                  form.name,
-                  form.url,
-                  form.secret,
-                  form.viewerUrl.trim() || null,
-                );
-                setForm({ name: '', url: '', secret: '', viewerUrl: '' });
-              });
-            }}
-          >
-            <FormField label="Name">
-              <Input
-                value={form.name}
-                maxLength={80}
-                placeholder="Research VM"
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-              />
-            </FormField>
-            <FormField label="Agent address">
-              <Input
-                required
-                type="url"
-                spellCheck={false}
-                placeholder="https://computer.example.com"
-                value={form.url}
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, url: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="Pairing secret"
-              description="The JACKALOPE_COMPUTER_TOKEN you set on the machine, at least 32 characters."
-            >
-              <Input
-                required
-                type="password"
-                autoComplete="off"
-                value={form.secret}
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, secret: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="Viewer address"
-              description="Optional. Its noVNC page, opened in your browser for Watch / take over."
-            >
-              <Input
-                type="url"
-                spellCheck={false}
-                value={form.viewerUrl}
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, viewerUrl: event.target.value })}
-              />
-            </FormField>
-            <Button
-              type="submit"
-              loading={busy === 'add'}
-              loadingLabel="Checking…"
-              disabled={!!busy || !form.url.trim() || !form.secret.trim()}
-            >
+        {pairing ? (
+          <SettingBody>
+            <PairMachineForm
+              defaultName={`Cloud machine ${machines.length + 1}`}
+              onCancel={() => setPairing(false)}
+              onPaired={() => {
+                setPairing(false);
+                void refresh().catch((cause) => setError(describeError(cause)));
+              }}
+            />
+          </SettingBody>
+        ) : (
+          <SettingRow title="Pair a cloud machine">
+            <Button variant="outline" disabled={!!busy} onClick={() => setPairing(true)}>
               Pair machine
             </Button>
-          </form>
-        </SettingBody>
-        <Setting
+          </SettingRow>
+        )}
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Jackalope-hosted computers {!hosted && <Badge>Coming soon</Badge>}
@@ -278,16 +232,24 @@ export function ComputersSettings() {
         />
       </SettingGroup>
 
-      <SettingGroup title="Computers" description="Every bot and task computer on this device.">
+      <Agent37Settings />
+
+      <AgentSignIns />
+
+      <SettingGroup
+        title="Computers"
+        description="Every bot, project and task computer on this device."
+      >
         {computers.length === 0 && (
           <SettingBody>
             <p className="settings-section-subtitle">
-              No computers yet. Give a bot one in its settings under Computer.
+              No computers yet. Give a bot one in its settings, or choose where a project's agents
+              run in Project settings.
             </p>
           </SettingBody>
         )}
         {computers.map((computer) => (
-          <Setting
+          <SettingRow
             key={computer.id}
             title={
               <span className="inline-flex items-center gap-2">
@@ -295,12 +257,19 @@ export function ComputersSettings() {
                 <Badge variant={computer.state === 'running' ? 'accent' : 'default'}>
                   {computerStateLabel(computer)}
                 </Badge>
+                {(computer.ownerKind === 'project' || computer.provider === 'agent37') && (
+                  <Badge variant="accent">Beta</Badge>
+                )}
               </span>
             }
             description={[
               computerUsage(computer),
               providerLabel(computer.provider),
-              computer.ownerKind === 'bot' ? 'Bot' : 'Task',
+              computer.ownerKind === 'bot'
+                ? 'Bot'
+                : computer.ownerKind === 'project'
+                  ? 'Project agents'
+                  : 'Task',
               computer.error,
             ]
               .filter(Boolean)
@@ -321,7 +290,7 @@ export function ComputersSettings() {
                   Stop
                 </Button>
               )}
-              <ConfirmAction
+              <ConfirmDialog
                 trigger={
                   <Button variant="outline" disabled={!!busy || computer.state === 'starting'}>
                     Delete…
@@ -330,7 +299,7 @@ export function ComputersSettings() {
                 title={`Delete ${computer.name}?`}
                 description={
                   computer.provider === 'remote-machine'
-                    ? 'The bot stops using this machine. Nothing on the machine is deleted.'
+                    ? 'Jackalope stops using this machine. Nothing on the machine is deleted.'
                     : 'Its desktop, files and browser sign-ins are removed. This cannot be undone.'
                 }
                 label="Delete computer"
@@ -338,7 +307,7 @@ export function ComputersSettings() {
                 onConfirm={() => run(`delete:${computer.id}`, () => deleteComputer(computer.id))}
               />
             </div>
-          </Setting>
+          </SettingRow>
         ))}
       </SettingGroup>
     </>

@@ -48,7 +48,6 @@ mod tests {
         let mut first = pending.register();
         let mut live: Vec<_> = (0..LIMIT).map(|_| pending.register()).collect();
         assert_eq!(first.try_recv(), Ok(()));
-        assert_eq!(pending.0.lock().unwrap().senders.len(), LIMIT);
         assert!(live[0].try_recv().is_err());
         pending.close();
         assert_eq!(
@@ -68,6 +67,9 @@ mod tests {
             drop(pending.register());
         }
         assert_eq!(first.try_recv(), Err(oneshot::error::TryRecvError::Empty));
-        assert_eq!(pending.0.lock().unwrap().senders.len(), 2);
+        let mut live: Vec<_> = (1..LIMIT).map(|_| pending.register()).collect();
+        assert_eq!(first.try_recv(), Err(oneshot::error::TryRecvError::Empty));
+        live.push(pending.register());
+        assert_eq!(first.try_recv(), Ok(()));
     }
 }

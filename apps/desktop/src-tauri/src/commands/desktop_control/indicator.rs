@@ -4,20 +4,109 @@ use std::process::Stdio;
 use std::{path::PathBuf, process::Child};
 
 static ACCENT: OnceLock<Mutex<String>> = OnceLock::new();
+/// `dark|#surface|#text` for the macOS control bar, so it matches the app's look.
+static LOOK: OnceLock<Mutex<String>> = OnceLock::new();
+/// Lets the control bar's Open bring the conversation forward.
+static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+/// The brand's default accent and surfaces, until the app reports its theme.
+const DEFAULT_ACCENT: &str = "#8b5cf6";
+const DEFAULT_LOOK: &str = "dark|#1d1b22|#f4f3f7";
+
+fn hex(value: &str) -> bool {
+    value.len() == 7 && value.starts_with('#') && value[1..].bytes().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Whether a look string is `dark|#rrggbb|#rrggbb` or the light equivalent.
+pub(super) fn valid_look(look: &str) -> bool {
+    let parts: Vec<_> = look.split('|').collect();
+    parts.len() == 3 && ["dark", "light"].contains(&parts[0]) && hex(parts[1]) && hex(parts[2])
+}
+
+fn accent() -> String {
+    ACCENT
+        .get_or_init(|| Mutex::new(DEFAULT_ACCENT.into()))
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| DEFAULT_ACCENT.into())
+}
+
+fn look() -> String {
+    LOOK.get_or_init(|| Mutex::new(DEFAULT_LOOK.into()))
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| DEFAULT_LOOK.into())
+}
 
 #[tauri::command]
-pub fn desktop_control_theme(accent: String) -> Result<(), String> {
-    if accent.len() != 7
-        || !accent.starts_with('#')
-        || !accent[1..].bytes().all(|c| c.is_ascii_hexdigit())
-    {
+pub fn desktop_control_theme(
+    app: tauri::AppHandle,
+    accent: String,
+    look: Option<String>,
+) -> Result<(), String> {
+    let _ = APP.set(app);
+    if !hex(&accent) {
         return Err("Expected a six-digit theme color.".into());
     }
     *ACCENT
-        .get_or_init(|| Mutex::new("#8b5cf6".into()))
+        .get_or_init(|| Mutex::new(DEFAULT_ACCENT.into()))
         .lock()
         .map_err(|e| e.to_string())? = accent;
+    if let Some(look) = look.filter(|look| valid_look(look)) {
+        *LOOK
+            .get_or_init(|| Mutex::new(DEFAULT_LOOK.into()))
+            .lock()
+            .map_err(|e| e.to_string())? = look;
+    }
     Ok(())
+}
+
+/// Passes the bar's button presses and pauses to the dev app's terminal as
+/// `indicator:` lines; release builds ignore them.
+fn forward_trace(file: &std::path::Path) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return;
+    };
+    let _ = std::fs::remove_file(file);
+    for line in text.lines().filter(|line| !line.trim().is_empty()).take(50) {
+        eprintln!("indicator: {}", line.chars().take(200).collect::<String>());
+    }
+}
+
+/// Numbers each agent-cursor event so the bar acts on every one exactly once.
+static CURSOR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// One agent-cursor event for the bar: `seq|kind|x|y|width|height`, in window-relative
+/// helper units (macOS points, Windows physical pixels). A zero-size rect is a point; a
+/// `look` with no rect means the whole window.
+pub(crate) fn cursor_line(seq: u64, kind: &str, rect: [i32; 4]) -> String {
+    let [x, y, width, height] = rect;
+    format!("{seq}|{kind}|{x}|{y}|{width}|{height}")
+}
+
+/// The app, once the main window has reported its theme.
+pub(crate) fn app() -> Option<tauri::AppHandle> {
+    APP.get().cloned()
+}
+
+/// Brings the attempt's conversation, or its task, forward in Jackalope.
+fn open_in_app(runtime: &TaskRuntime, id: &str) {
+    use tauri::{Emitter, Manager};
+    let Some(app) = APP.get() else {
+        return;
+    };
+    let run = runtime.run_snapshot(id);
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+        let _ = main.emit(
+            "work-pane-open",
+            json!({"id": id, "pane": "result", "sessionId": run.and_then(|run| run.live_session_id)}),
+        );
+    }
 }
 
 pub(super) struct Indicator {
@@ -91,12 +180,7 @@ impl Indicator {
         let directory =
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
-        let accent = ACCENT
-            .get_or_init(|| Mutex::new("#8b5cf6".into()))
-            .lock()
-            .unwrap()
-            .clone();
-        std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("theme"), accent()).map_err(|e| e.to_string())?;
         std::fs::write(
             directory.join("logo.png"),
             include_bytes!("../../../icons/32x32.png"),
@@ -105,7 +189,7 @@ impl Indicator {
         let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo,[string]$r.scope,[string]$r.app,[string]$r.label)",include_str!("indicator.cs"));
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
-        let mut command = super::native_command(
+        let mut command = super::platform::native_command(
             &script,
             Some(
                 json!({"window":indicator_window(grant),"scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
@@ -131,23 +215,8 @@ impl Indicator {
                 directory: directory.clone(),
             },
         };
-        for _ in 0..100 {
-            if result.exited()? {
-                return Err(format!(
-                    "Desktop indicator could not start: {}",
-                    std::fs::read_to_string(directory.join("error.log"))
-                        .unwrap_or_default()
-                        .chars()
-                        .take(1200)
-                        .collect::<String>()
-                ));
-            }
-            if result.state().is_ok() {
-                return Ok(result);
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        Err("Desktop indicator did not become ready. No input was enabled.".into())
+        result.ready(&directory)?;
+        Ok(result)
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -168,18 +237,21 @@ impl Indicator {
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
-        let accent = ACCENT
-            .get_or_init(|| Mutex::new("#8b5cf6".into()))
-            .lock()
-            .unwrap()
-            .clone();
-        std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("theme"), accent()).map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("look"), look()).map_err(|e| e.to_string())?;
+        std::fs::write(
+            directory.join("logo.png"),
+            include_bytes!("../../../icons/tray-icon-template.png"),
+        )
+        .map_err(|e| e.to_string())?;
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::platform::command(
             json!({"action":"indicator", "window":indicator_window(grant),
             "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
-            "file":directory.join("state"),"theme":directory.join("theme")}),
+            "file":directory.join("state"),"theme":directory.join("theme"),
+            "look":directory.join("look"),"logo":directory.join("logo.png"),"agent":grant.agent,
+            "resume":grant.resume}),
         )?;
         command
             .stdin(Stdio::null())
@@ -201,23 +273,8 @@ impl Indicator {
                 directory: directory.clone(),
             },
         };
-        for _ in 0..100 {
-            if result.exited()? {
-                return Err(format!(
-                    "Desktop indicator could not start: {}",
-                    std::fs::read_to_string(directory.join("error.log"))
-                        .unwrap_or_default()
-                        .chars()
-                        .take(1200)
-                        .collect::<String>()
-                ));
-            }
-            if result.state().is_ok() {
-                return Ok(result);
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        Err("Desktop indicator did not become ready. No input was enabled.".into())
+        result.ready(&directory)?;
+        Ok(result)
     }
 
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
@@ -247,6 +304,41 @@ impl Indicator {
         }
     }
 
+    /// Waits up to ten seconds for a started bar to report its state.
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    fn ready(&mut self, directory: &std::path::Path) -> Result<(), String> {
+        let ready = crate::commands::platform::poll_until(
+            Instant::now() + Duration::from_secs(10),
+            Duration::from_millis(100),
+            || {
+                if self.exited()? {
+                    return Err(format!(
+                        "Desktop indicator could not start: {}",
+                        std::fs::read_to_string(directory.join("error.log"))
+                            .unwrap_or_default()
+                            .chars()
+                            .take(1200)
+                            .collect::<String>()
+                    ));
+                }
+                Ok(self.state().is_ok().then_some(()))
+            },
+        )?;
+        ready.ok_or_else(|| "Desktop indicator did not become ready. No input was enabled.".into())
+    }
+
+    /// Whether the person closed the bar, which ends control.
+    pub fn closed(&mut self) -> bool {
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+        {
+            self.exited().unwrap_or(false)
+        }
+        #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+        {
+            false
+        }
+    }
+
     pub fn state(&mut self) -> Result<State, String> {
         match &mut self.kind {
             Kind::Process {
@@ -268,6 +360,22 @@ impl Indicator {
                     reason,
                 })
             }
+        }
+    }
+
+    /// Shows the agent's cursor where an action happens: a click ripples, typing blinks a
+    /// caret, scrolling shows a small arrow, reading outlines what was read. Drawn by the bar
+    /// in its click-through, capture-excluded frame, so it never reaches the agent's
+    /// screenshots or the person's input.
+    pub fn cursor(&self, kind: &str, rect: [i32; 4]) {
+        let Kind::Process { directory, .. } = &self.kind else {
+            return;
+        };
+        let seq = CURSOR_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+        let file = directory.join("cursor");
+        let temporary = directory.join("cursor.tmp");
+        if std::fs::write(&temporary, cursor_line(seq, kind, rect)).is_ok() {
+            let _ = std::fs::rename(&temporary, &file);
         }
     }
 
@@ -318,8 +426,12 @@ impl Indicator {
         };
         let state_file = directory.join("state");
         let theme_file = directory.join("theme");
+        let look_file = directory.join("look");
+        let open_file = directory.join("open");
+        let trace_file = directory.join("trace");
         std::thread::spawn(move || {
             let mut prior_color = String::new();
+            let mut prior_look = String::new();
             loop {
                 std::thread::sleep(Duration::from_millis(100));
                 let Some(session) = weak.upgrade() else {
@@ -336,12 +448,19 @@ impl Indicator {
                     let _ = runtime.update_checked(&id, |run|run.activity.push("Desktop access ended: Escape was pressed or the indicator closed. A new grant is required.".into()));
                     break;
                 }
-                let color = ACCENT.get().unwrap().lock().unwrap().clone();
-                if color != prior_color {
-                    if std::fs::write(&theme_file, &color).is_ok() {
-                        prior_color = color;
-                    }
+                let color = accent();
+                if color != prior_color && std::fs::write(&theme_file, &color).is_ok() {
+                    prior_color = color;
                 }
+                let current = look();
+                if current != prior_look && std::fs::write(&look_file, &current).is_ok() {
+                    prior_look = current;
+                }
+                // The bar's Open asks for the conversation; it never changes the grant.
+                if std::fs::remove_file(&open_file).is_ok() {
+                    open_in_app(&runtime, &id);
+                }
+                forward_trace(&trace_file);
             }
         });
     }
@@ -367,6 +486,28 @@ impl Drop for Indicator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cursor_events_carry_their_order_kind_and_window_relative_rect() {
+        assert_eq!(
+            cursor_line(7, "click", [120, 40, 0, 0]),
+            "7|click|120|40|0|0"
+        );
+        assert_eq!(
+            cursor_line(8, "look", [10, 20, 300, 24]),
+            "8|look|10|20|300|24"
+        );
+    }
+
+    #[test]
+    fn the_control_bar_look_is_checked_before_it_reaches_the_helper() {
+        assert!(valid_look("dark|#1d1b22|#f4f3f7"));
+        assert!(valid_look("light|#ffffff|#111111"));
+        assert!(!valid_look("dim|#1d1b22|#f4f3f7"));
+        assert!(!valid_look("dark|#1d1b22"));
+        assert!(!valid_look("dark|1d1b22|#f4f3f7"));
+        assert!(!valid_look("dark|#1d1b22|#f4f3f7|extra"));
+    }
+
     #[test]
     fn indicator_fails_closed_on_missing_stale_or_invalid_state() {
         assert!(parse_state("active|4|1000|1|2|", 4001).is_err());

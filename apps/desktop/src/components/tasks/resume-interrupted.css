@@ -1,0 +1,9 @@
+.resume-interrupted {
+  display: grid;
+  gap: 12px;
+}
+.resume-processes {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+  list-style: disc;
+}

@@ -1,6 +1,6 @@
 # Native browser automation
 
-Jackalope bundles [agent-browser 0.40.0](https://github.com/vercel-labs/agent-browser/tree/v0.40.0)
+Jackalope bundles [agent-browser 0.41.1](https://github.com/vercel-labs/agent-browser/tree/v0.41.1)
 as its local browser engine. It launches installed
 Edge, Chrome or Chromium in a fresh task profile. Users do not need npm, Node, a Vercel
 account, a browser service subscription or a separate agent-browser installation.
@@ -18,7 +18,7 @@ Both native MCP and the authenticated task HTTP bridge expose the same tools:
 | `browser_inspect` | Read element text/value/visibility/enabled/checked state, console messages, page errors, or run an axe accessibility audit. |
 | `browser_tabs` | List, open, switch and close tabs within the same task session. |
 | `browser_screenshot` | Save a full-page PNG through the existing task screenshot artifact and review flow. |
-| `browser_open_profile` | Switch the task's browser tools to a persistent profile: `profile: "project"` (default) or `"bot"` in a bot conversation. See [Persistent agent browser profiles](#persistent-agent-browser-profiles). HTTP bridge: `POST /v1/browser/profile`. |
+| `browser_open_profile` | Switch the task's browser tools to a persistent profile: `profile: "project"` (default) or `"bot"` in a bot conversation. See [persistent agent browser profiles](#persistent-agent-browser-profiles). HTTP bridge: `POST /v1/browser/profile`. |
 
 Take a new snapshot after navigation or a page change before using references.
 The default snapshot includes static text and status output; interactive-only
@@ -35,9 +35,10 @@ Use `browser_inspect` with `kind: "accessibility"` for an automated axe-core aud
 of the current page, optionally with a CSS `selector` scope. This differs from an
 accessibility-tree snapshot: it checks rules and returns findings, affected selectors
 and repair guidance. Both transports retain a validation checkpoint and the bounded
-report. Violations produce a failed checkpoint; incomplete checks remain in progress;
-zero violations and incomplete checks pass only the automated audit. Keyboard,
-screen-reader and other manual acceptance remain necessary. Reports are untrusted
+report. Any rule violation fails the checkpoint. With no violations, any incomplete
+check (one axe-core could not decide) leaves it in progress for manual review. Only
+zero violations and zero incomplete checks pass, and that pass covers the automated
+audit alone: keyboard, screen-reader and other manual acceptance remain necessary. Reports are untrusted
 page content and may be truncated; the response and saved notes disclose truncation.
 
 Codex receives explicit approval for these eight Jackalope tools through its
@@ -114,7 +115,7 @@ person's everyday browser and its profiles are never opened or copied.
   and the task asks **Sign in needed** (`I signed in` / `Skip sign-in`). Agent commands
   wait until the person answers; the window then closes and the agent continues
   headless and must navigate again. A skipped site is not asked again in that task.
-  People can also open the profile from Project settings → **Browser profiles**, the
+  People can also open the profile from Project settings → Integrations → **Browser profiles**, the
   bot editor, or the terminal's `/browser open [url]`; closing the window or choosing
   **Done signing in** (`/browser done`) records its sites.
 - **Closing.** Persistent Chromium is closed with `Browser.close` before its process
@@ -163,7 +164,7 @@ or captured, newest first; at most six distinct pages.
 
 ### Feature map
 
-Project settings keep an optional feature map beside the capture settings
+Project settings keep an optional feature map on their Feature map tab
 (`featureMap` in project preferences, mirrored to the native project ledger). Each
 entry has a name, a page, what working looks like, optional steps to reach it and
 project-relative source globs (`*`, `**`, `?`, `{a,b}`; a plain path also covers the

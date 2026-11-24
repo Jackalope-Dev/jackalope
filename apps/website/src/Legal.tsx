@@ -39,6 +39,14 @@ const privacy: Section[] = [
           Fonts are served with the site. Website appearance choices reset when you reload.
         </p>
         <p>
+          We count page views with LopeBase, a measurement service we operate at app.lopebase.com.
+          It receives the path of the page you viewed, the site or campaign label that brought you
+          here, and a count when a signup form is submitted, an email is confirmed, or a download
+          link is clicked. It sets no cookies, assigns no visitor identifier, and does not store
+          your IP address. Your browser’s session storage remembers the referring source until you
+          close the tab, so those counts can be credited to it.
+        </p>
+        <p>
           Our signup form uses Cloudflare Turnstile to check that a person, not an automated script,
           submitted it. Turnstile receives your IP address and browser and device signals for that
           check under Cloudflare’s privacy policy. We receive the check’s result, not those signals.
@@ -384,7 +392,7 @@ const terms: Section[] = [
   },
   {
     id: 'early-access',
-    title: 'Beta and availability',
+    title: 'Availability',
     content: (
       <>
         <p>
@@ -395,11 +403,11 @@ const terms: Section[] = [
           downloads are offered for the platforms listed on the download page.
         </p>
         <p>
-          Jackalope is beta software. It may contain errors, change substantially, or become
-          unavailable. Back up important work and review changes before using them. We may change,
-          limit, or discontinue the hosted service, with notice where practical and as required by
-          law. These terms do not authorize a charge; any future paid offering needs separately
-          disclosed pricing and purchase terms.
+          Jackalope may contain errors, change substantially, or become unavailable. Back up
+          important work and review changes before using them. We may change, limit, or discontinue
+          the hosted service, with notice where practical and as required by law. These terms do not
+          authorize a charge; any future paid offering needs separately disclosed pricing and
+          purchase terms.
         </p>
       </>
     ),
@@ -560,7 +568,10 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
             ? 'How we handle information across the website, your account, and the desktop app.'
             : 'Using Jackalope’s website and hosted account service.'}
         </p>
-        <p className="article-byline">Updated October 12, 2026 · Jackalope Digital LLC</p>
+        <p className="article-byline">
+          Updated {kind === 'privacy' ? 'October 12, 2026' : 'November 19, 2026'} · Jackalope
+          Digital LLC
+        </p>
       </header>
       <div className="article-body">
         <nav className="legal-nav" aria-label="On this page">

@@ -1,6 +1,6 @@
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 
 /** Opens the user's own terminal running `jackalope` in `directory`. */
 export function openCliTerminal(directory: string) {
-  return nativeTask<void>('cli_terminal_open', { directory });
+  return invokeNative<void>('cli_terminal_open', { directory });
 }

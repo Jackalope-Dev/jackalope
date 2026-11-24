@@ -1,3 +1,4 @@
+use crate::commands::tasks::RunStatus;
 use crate::commands::{outcomes::TaskContract, tasks::TaskRun, verification::Verification};
 use serde::Deserialize;
 use serde_json::Value;
@@ -9,7 +10,7 @@ struct PriorAttempt {
     id: String,
     task_id: String,
     prompt: String,
-    status: String,
+    status: RunStatus,
     started_at: String,
     ended_at: String,
     #[serde(default)]
@@ -37,7 +38,7 @@ pub(super) fn seed(root: &Path, repo: &Path, project: &str, spec: &Value) -> Res
         if uuid::Uuid::parse_str(&entry.id).is_err()
             || uuid::Uuid::parse_str(&entry.task_id).is_err()
             || !ids.insert(entry.id.clone())
-            || !["review", "reviewed", "failed"].contains(&entry.status.as_str())
+            || !(entry.status.is_done() || entry.status == RunStatus::Failed)
             || entry.prompt.len() > 20_000
         {
             return Err(

@@ -1,4 +1,4 @@
-import { SearchField } from '@jackalope/ui';
+import { Button, SearchField, Select, SelectItem } from '@jackalope/ui';
 
 import { useState } from 'react';
 import {
@@ -6,9 +6,7 @@ import {
   type ScheduleTemplate,
   scheduleTemplates,
 } from '../../lib/schedule-templates';
-import { Button } from '../ui/button';
 
-import { Select, SelectItem } from '../ui/Select';
 import './schedule-templates.css';
 
 export function ScheduleTemplateLibrary({

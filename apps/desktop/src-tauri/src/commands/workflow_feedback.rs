@@ -2,6 +2,7 @@ use super::{
     history, integration,
     tasks::{TaskRun, TaskRuntime},
 };
+use crate::commands::tasks::RunStatus;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -41,6 +42,16 @@ fn read(runtime: &TaskRuntime) -> Result<Feedback, String> {
     })
 }
 
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::workflow_feedback::task_usefulness,
+            commands::workflow_feedback::workflow_report,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
+
 #[tauri::command]
 pub async fn task_usefulness(
     state: State<'_, TaskRuntime>,
@@ -59,7 +70,7 @@ pub async fn task_usefulness(
         let _lock = FEEDBACK_LOCK.lock().map_err(|e| e.to_string())?;
         let mut ratings = read(&runtime)?;
         if let Some(useful) = useful {
-            if ["starting", "running", "stopping"].contains(&run.status.as_str()) || run.finishing {
+            if run.status.is_active() || run.finishing {
                 return Err("Wait for this attempt to finish before rating its result.".into());
             }
             if review_minutes.is_some_and(|value| value > 10_080) {
@@ -137,12 +148,12 @@ fn report(runs: &[TaskRun], ratings: &Feedback, now: DateTime<Utc>) -> WorkflowR
             if start >= cutoff && start <= now {
                 active_days.insert(start.date_naive());
                 *attempts.entry(&run.task_id).or_default() += 1;
-                if ["failed", "interrupted"].contains(&run.status.as_str()) {
+                if matches!(run.status, RunStatus::Failed | RunStatus::Interrupted) {
                     result.failed_or_interrupted_attempts += 1;
                 }
             }
         }
-        if ["failed", "interrupted"].contains(&run.status.as_str()) {
+        if matches!(run.status, RunStatus::Failed | RunStatus::Interrupted) {
             failures.insert(run.task_id.as_str());
         }
         latest
@@ -231,14 +242,14 @@ mod tests {
             id: "old".into(),
             task_id: "task".into(),
             started_at: "2026-09-16T09:00:00Z".into(),
-            status: "failed".into(),
+            status: RunStatus::Failed,
             ..Default::default()
         };
         let current = TaskRun {
             id: "current".into(),
             task_id: "task".into(),
             started_at: "2026-09-16T10:00:00Z".into(),
-            status: "reviewed".into(),
+            status: RunStatus::Reviewed,
             ..Default::default()
         };
         let mut ratings = Feedback::from([(

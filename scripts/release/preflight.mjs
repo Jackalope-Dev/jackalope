@@ -1,6 +1,8 @@
+import { PUBLIC_SERVICE_ORIGIN } from '../../packages/contracts/src/release.ts';
+
 const environments = [
   { origin: 'https://staging-api.jackalope.dev' },
-  { origin: 'https://api.jackalope.dev' },
+  { origin: PUBLIC_SERVICE_ORIGIN },
 ];
 
 export async function verifyReadiness(origin, request = fetch) {

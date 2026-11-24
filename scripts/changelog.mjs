@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { root } from './lib/paths.mjs';
 
 const file = fileURLToPath(new URL('../apps/website/src/changelog.json', import.meta.url));
-const allowedStatuses = new Set(['Website', 'In development', 'Released']);
 
 function fail(message) {
   console.error(`Changelog: ${message}`);
@@ -27,7 +27,14 @@ function validate(entries) {
       fail(`${location} has an invalid date.`);
     if (entry.date > previousDate) fail('entries must be newest first.');
     previousDate = entry.date;
-    if (!allowedStatuses.has(entry.status)) fail(`${location} has an unsupported status.`);
+    // Release state comes from beta-v* and stable-v* tags at build time
+    // (scripts/release/changelog-releases.mjs), so it is never written here.
+    if (Object.hasOwn(entry, 'status'))
+      fail(`${location} sets status; release state is derived from release tags, so remove it.`);
+    if (entry.kind !== undefined && entry.kind !== 'website')
+      fail(
+        `${location} has an unsupported kind; use website for site-only changes or leave it out.`,
+      );
     for (const key of ['title', 'description']) {
       if (typeof entry[key] !== 'string' || !entry[key].trim()) fail(`${location} needs ${key}.`);
     }
@@ -76,7 +83,7 @@ if (command === 'check') {
   const entry = {
     id,
     date: values.date ?? new Date().toISOString().slice(0, 10),
-    status: values.status ?? 'In development',
+    kind: values.kind,
     title,
     description: values.description?.trim(),
     items: values.item.map((item) => item.trim()),
@@ -92,7 +99,7 @@ if (command === 'check') {
       `--stdin-file-path=${file}`,
     ],
     {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      cwd: root,
       input: `${JSON.stringify(next, null, 2)}\n`,
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,

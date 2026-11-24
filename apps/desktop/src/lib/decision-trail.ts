@@ -1,4 +1,4 @@
-import type { DecisionEntry, TaskRun } from './task-runtime.ts';
+import type { DecisionEntry, TaskRun } from './run-types.ts';
 
 /** How a reviewer should read one evidence pointer. */
 export type PointerState = 'found' | 'missing' | 'external' | 'unchecked';

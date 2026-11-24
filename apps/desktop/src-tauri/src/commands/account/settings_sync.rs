@@ -5,35 +5,36 @@ pub(super) struct SyncChoice {
     pub enabled: bool,
     pub explicit: bool,
 }
+fn choice_path(state: &AccountService) -> std::path::PathBuf {
+    state.path.with_file_name("settings-sync-choice.bin")
+}
+
 pub(super) fn read_choice(state: &AccountService) -> Result<SyncChoice, String> {
-    account_storage::read(&state.path.with_file_name("settings-sync-choice.bin"))?
-        .map(|bytes| {
-            serde_json::from_slice(&bytes)
-                .map_err(|_| "Could not read the settings sync choice.".into())
-        })
-        .unwrap_or(Ok(SyncChoice {
-            enabled: true,
-            explicit: false,
-        }))
+    Ok(account_storage::read_json(
+        &choice_path(state),
+        "Could not read the settings sync choice.",
+    )?
+    .unwrap_or(SyncChoice {
+        enabled: true,
+        explicit: false,
+    }))
 }
 fn save_choice(state: &AccountService, enabled: bool) -> Result<(), String> {
-    account_storage::write(
-        &state.path.with_file_name("settings-sync-choice.bin"),
-        &serde_json::to_vec(&SyncChoice {
+    account_storage::write_json(
+        &choice_path(state),
+        &SyncChoice {
             enabled,
             explicit: true,
-        })
-        .map_err(|_| "Could not save the settings sync choice.")?,
+        },
     )
 }
 pub(super) fn preserve_choice(state: &AccountService, record: &SavedAccount) -> Result<(), String> {
-    account_storage::write(
-        &state.path.with_file_name("settings-sync-choice.bin"),
-        &serde_json::to_vec(&SyncChoice {
+    account_storage::write_json(
+        &choice_path(state),
+        &SyncChoice {
             enabled: record.settings_sync,
             explicit: !record.settings_sync_automatic,
-        })
-        .map_err(|_| "Could not save the settings sync choice.")?,
+        },
     )
 }
 

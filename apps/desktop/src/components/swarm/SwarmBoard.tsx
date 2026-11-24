@@ -1,25 +1,26 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, Button, InlineNotice, LoadingState } from '@jackalope/ui';
 import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { navigateWorkspace, openCloudResources, openSettings } from '../../lib/app-events';
+import { runHostName } from '../../lib/computers';
 import { type DeployStatus, deliveryPhase, deployStatus } from '../../lib/deploy';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { ago, type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
 import { swarmMap } from '../../lib/swarm-map';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { navigateWorkspace, openSettings } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
+import { HostCapacity } from '../computers/HostCapacity';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { SwarmDelivery } from './SwarmDelivery';
 import { SwarmMap } from './SwarmMap';
 import './swarm.css';
+import { describeError } from '@jackalope/contracts/errors';
+import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 5000;
 const FILES_SHOWN = 8;
@@ -30,9 +31,7 @@ const FILES_SHOWN = 8;
  */
 export function SwarmBoard() {
   const projectId = useProjectStore((state) => state.activeProjectId);
-  const projectPath = useProjectStore(
-    (state) => state.projects.find((project) => project.id === state.activeProjectId)?.path,
-  );
+  const projectPath = useActiveProject()?.path;
   const runs = useExecutionStore((state) => state.runs);
   const queue = useManagedTaskStore((state) => state.queue);
   const [state, setState] = useState<CloudState | null>(null);
@@ -51,7 +50,7 @@ export function SwarmBoard() {
           setState(next);
           setError('');
         })
-        .catch((cause) => alive && setError(String(cause)));
+        .catch((cause) => alive && setError(describeError(cause)));
       if (projectPath)
         deployStatus(projectPath)
           .then((next) => alive && setDelivery(next))
@@ -115,11 +114,12 @@ export function SwarmBoard() {
       {model && isTauriEnvironment() && (
         <SwarmMap model={model} target={target} delivery={deliveryPhase(delivery)} />
       )}
+      <HostCapacity projectId={projectId} label="Where agents run" />
       {delivery && <SwarmDelivery status={delivery} onChange={() => setTick((n) => n + 1)} />}
       {!isTauriEnvironment() && (
         <InlineNotice>The swarm is available in the desktop app.</InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {!state && isTauriEnvironment() && !error && (
         <LoadingState compact label="Reading the swarm…" />
       )}
@@ -142,6 +142,18 @@ export function SwarmBoard() {
         </InlineNotice>
       )}
       {state?.error && <InlineNotice tone="warning">{state.error}</InlineNotice>}
+      {projectId && state?.configured && (
+        <InlineNotice
+          action={
+            <Button variant="outline" onClick={() => openCloudResources(projectId)}>
+              Cloud resources
+            </Button>
+          }
+        >
+          Create R2, D1, KV, Queues and other Cloudflare resources for this project and copy their
+          wrangler bindings.
+        </InlineNotice>
+      )}
       {state?.repo && (
         <p className="swarm-meta">
           <GitFork size={14} aria-hidden="true" />
@@ -198,7 +210,9 @@ export function SwarmBoard() {
                       <div>
                         <strong>{fork.title}</strong>
                         <small>
-                          {run?.agent ?? fork.agent} · <code>{fork.fork}</code>
+                          {run?.agent ?? fork.agent}
+                          {run && runHostName(run) && ` · on ${runHostName(run)}`} ·{' '}
+                          <code>{fork.fork}</code>
                         </small>
                       </div>
                       {hot?.size ? (

@@ -1,9 +1,11 @@
+mod agent_process;
 pub(super) mod antigravity;
 mod claude_session;
 mod delegation;
 mod efficiency;
 pub(super) mod effort;
 pub(in crate::commands) mod events;
+pub(super) mod failure;
 mod gemini;
 pub(super) mod helper_process;
 mod journal;
@@ -17,10 +19,15 @@ mod performance;
 pub(super) mod preparation;
 mod project_setup;
 mod prompt;
+mod resume;
 mod routing;
+pub(in crate::commands) mod runner;
 mod runners;
 mod runtime;
-mod snapshots;
+#[cfg(test)]
+mod secret_canary_tests;
+pub(super) mod served_model;
+pub(crate) mod snapshots;
 pub(super) mod speed;
 mod storage;
 #[cfg(test)]
@@ -28,18 +35,21 @@ mod tests;
 pub(super) mod timing;
 pub(in crate::commands) mod tool_activity;
 mod warm_opencode;
+pub(in crate::commands) mod workspace_processes;
 
 pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
+#[cfg(test)]
+pub(super) use opencode::OpenCodeConfig;
 pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;
-pub(super) use runners::executable;
-pub(super) use runners::BUILTIN_AGENTS;
+pub(super) use runners::{executable, locate};
 pub use snapshots::{task_changes, TaskHighlight};
 
+use super::agents::{Bridge, Prompt, Protocol};
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
 use serde::Serialize;
@@ -59,7 +69,7 @@ use tauri_plugin_dialog::DialogExt;
 struct Inner {
     runs: HashMap<String, TaskRun>,
     recovery: Vec<HistoryRecoveryEntry>,
-    processes: HashMap<String, Arc<Mutex<std::process::Child>>>,
+    processes: HashMap<String, Arc<agent_process::AgentProcess>>,
     canceled: std::collections::HashSet<String>,
 }
 
@@ -93,6 +103,24 @@ impl TaskRuntime {
         self.claude_sessions.invalidate_account(directory);
     }
 
+    /// The agent sessions loaded attempts ran or continued, without cloning run records.
+    pub(in crate::commands) fn recorded_sessions(&self) -> std::collections::HashSet<String> {
+        let Ok(inner) = self.inner.lock() else {
+            return Default::default();
+        };
+        inner
+            .runs
+            .values()
+            .flat_map(|run| {
+                [
+                    run.session_id.clone(),
+                    run.continues.as_ref().map(|c| c.session_id.clone()),
+                ]
+            })
+            .flatten()
+            .collect()
+    }
+
     /// Every loaded run's tool-call total and whether it finished, without
     /// cloning run records.
     pub(in crate::commands) fn learning_activity(&self) -> Vec<RunActivity> {
@@ -107,9 +135,7 @@ impl TaskRuntime {
                 id: run.id.clone(),
                 project_id: run.project_id.clone(),
                 tool_calls: run.efficiency.tool_calls.values().sum(),
-                finished: !run.finishing
-                    && !["starting", "running", "stopping", "routing", "queued"]
-                        .contains(&run.status.as_str()),
+                finished: !run.finishing && !run.status.is_active(),
             })
             .collect()
     }
@@ -117,28 +143,12 @@ impl TaskRuntime {
 
 fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut cmd = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    super::process_control::isolated(&mut cmd);
     cmd
 }
 
 pub(super) fn git(path: &str, args: &[&str]) -> Result<String, String> {
-    let out =
-        super::git_command::command(Path::new(path), args, super::git_command::Policy::Inherited)
-            .output()
-            .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).trim_end().into())
+    super::repo::git(Path::new(path), args, super::repo::Policy::Inherited)
 }
 
 pub(super) fn resolve_target_branch(path: &str, requested: Option<&str>) -> Result<String, String> {
@@ -212,58 +222,67 @@ fn valid_id(id: &str) -> bool {
     (8..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 
+/// Runs an agent CLI's sign-in check for `binding`, for at most 10 seconds.
 pub(super) fn probe_auth(
     path: PathBuf,
     args: Vec<&str>,
     binding: Option<&crate::commands::agent_profiles::AccountBinding>,
-) -> Result<std::process::Output, std::io::Error> {
+) -> Result<super::process_control::CommandResult, String> {
     let mut cmd = command(path);
     cmd.args(args);
     if let Some(binding) = binding {
-        crate::commands::agent_sign_in::ensure_idle(binding).map_err(std::io::Error::other)?;
-        crate::commands::agent_profiles::apply_binding(&mut cmd, binding)
-            .map_err(std::io::Error::other)?;
+        crate::commands::agent_sign_in::ensure_idle(binding)?;
+        crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
     }
-    let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
-    let tree = match super::process_control::ProcessTree::attach(&child) {
-        Ok(tree) => tree,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(std::io::Error::other(error));
-        }
-    };
-    let stdout = child.stdout.take().unwrap();
-    let reader = std::thread::spawn(move || {
-        let mut data = Vec::new();
-        let _ = stdout.take(64_000).read_to_end(&mut data);
-        data
-    });
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
-    loop {
-        if let Some(status) = child.try_wait()? {
-            tree.terminate();
-            return Ok(std::process::Output {
-                status,
-                stdout: reader.join().unwrap_or_default(),
-                stderr: vec![],
-            });
-        }
-        if std::time::Instant::now() >= deadline {
-            tree.terminate();
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Sign-in check timed out. Open the agent CLI to check its configuration, then refresh."));
-        }
-        std::thread::sleep(Duration::from_millis(50));
+    let result = super::process_control::run(cmd, Duration::from_secs(10))?;
+    if result.timed_out {
+        return Err(
+            "Sign-in check timed out. Open the agent CLI to check its configuration, then refresh."
+                .into(),
+        );
     }
+    Ok(result)
 }
+
+macro_rules! tauri_commands {
+    ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
+        $next!($finish [$($done)*
+            commands::tasks::task_runners,
+            commands::tasks::task_read_context,
+            commands::tasks::task_pick_project,
+            commands::tasks::task_validate_project,
+            commands::tasks::task_project_directory,
+            commands::tasks::task_create_project,
+            commands::tasks::task_runs,
+            commands::tasks::snapshots::task_changes,
+            commands::tasks::task_history_recovery,
+            commands::tasks::task_retry,
+            commands::tasks::task_retry_save,
+            commands::tasks::task_export_recovery,
+            commands::tasks::task_archived_runs,
+            commands::tasks::task_set_archived,
+            commands::tasks::task_restore_archived,
+            commands::tasks::task_import_recovery,
+            commands::tasks::task_screenshot,
+            commands::tasks::task_start,
+            commands::tasks::task_stop,
+            commands::tasks::task_release_interrupted,
+            commands::tasks::task_workspace_processes,
+            commands::tasks::task_mark_reviewed,
+            commands::tasks::task_review,
+            commands::tasks::task_respond_prompt,
+        ] $($rest)*)
+    };
+}
+pub(crate) use tauri_commands;
 
 #[tauri::command]
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;
     let profiles_root = runtime.profiles_root();
-    let mut ids: Vec<String> = BUILTIN_AGENTS.iter().map(|id| (*id).into()).collect();
+    let mut ids: Vec<String> = crate::commands::agents::builtin_ids()
+        .map(String::from)
+        .collect();
     ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
     // Each agent's discovery/sign-in probe can take up to probe_auth's own
     // 10-second timeout. Running them in one sequential closure (the
@@ -547,17 +566,21 @@ pub async fn task_respond_prompt(
 }
 
 /// Start a fresh attempt at a task whose last attempt did not finish, reusing that
-/// attempt's prepared workspace when it is safe to.
+/// attempt's prepared workspace when it is safe to. `focus` leads the progress context
+/// when the retry picks up preserved work.
 #[tauri::command]
 pub async fn task_retry(
     id: String,
+    focus: Option<String>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
 ) -> Result<String, String> {
     let runtime = state.inner().clone();
     let coordinator = coordinator.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        coordinator.start_manual(runtime.retry_request(&id)?)
+        let mut request = runtime.retry_request(&id)?;
+        request.handoff_focus = focus.filter(|focus| !focus.trim().is_empty());
+        coordinator.start_manual(request)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -571,6 +594,43 @@ pub async fn task_stop(id: String, state: State<'_, TaskRuntime>) -> Result<(), 
         .map_err(|e| e.to_string())?
 }
 
+/// Processes still running in an attempt's workspace; `None` when this system cannot tell.
+#[tauri::command]
+pub async fn task_workspace_processes(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Option<Vec<workspace_processes::WorkspaceProcess>>, String> {
+    let workspace = {
+        let inner = state.inner.lock().map_err(|e| e.to_string())?;
+        let run = inner.runs.get(&id).ok_or("Attempt not found")?;
+        PathBuf::from(if run.workspace.is_empty() {
+            &run.project_path
+        } else {
+            &run.workspace
+        })
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        workspace_processes::workspace_processes(&workspace)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Clears an interrupted attempt after the person confirmed nothing from it is running.
+#[tauri::command]
+pub async fn task_release_interrupted(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<TaskRun, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        runtime.release_interrupted(&id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
     let state = state.inner().clone();
@@ -582,25 +642,23 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
             .find(|r| r.id == id)
             .ok_or("Attempt not found")?;
         if !current.contract.requirements.is_empty() {
-            if runs.iter().any(|r| {
-                r.workspace == current.workspace
-                    && ["starting", "running", "stopping", "interrupted"]
-                        .contains(&r.status.as_str())
-            }) {
+            if runs
+                .iter()
+                .any(|r| r.workspace == current.workspace && r.status.is_live())
+            {
                 return Err("Resolve active workspace ownership before completing review.".into());
             }
             let directory = state.integration_directory();
-            std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             let tree = super::integration::workspace_tree(current, &directory)?;
             current.contract.require_accepted(&tree)?;
         }
         let mut inner = state.inner.lock().unwrap();
         let run = inner.runs.get_mut(&id).ok_or("Attempt not found")?;
-        if run.status != "review" {
+        if run.status != RunStatus::Review {
             return Err("Only a finished result can be marked reviewed.".into());
         }
         let mut updated = run.clone();
-        updated.status = "reviewed".into();
+        updated.status = RunStatus::Reviewed;
         state.save(&updated)?;
         updated.persistence_error = None;
         *run = updated.clone();

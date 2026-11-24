@@ -154,13 +154,8 @@ fn cache_entry(cache: &Mutex<HashMap<String, Entry>>, key: String) -> Option<Ent
 }
 
 fn cached_snapshot(root: &Path) -> Option<(Arc<CodebaseSnapshot>, bool)> {
-    let clean = crate::commands::git_command::command(
-        root,
-        &["status", "--porcelain=v1", "--untracked-files=normal"],
-        crate::commands::git_command::Policy::Inspection,
-    )
-    .output()
-    .is_ok_and(|output| output.status.success() && output.stdout.is_empty());
+    use crate::commands::repo::{is_dirty, Policy, Untracked};
+    let clean = is_dirty(root, Untracked::Normal, Policy::Inspection) == Ok(false);
     if !clean {
         return Some((Arc::new(scan(root).ok()?), false));
     }
@@ -201,7 +196,7 @@ pub(super) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value, 
     let ranked = crate::commands::retrieval::rank(query, &documents);
     let mut items = Vec::new();
     let mut bytes = 0;
-    for (index, score) in ranked.into_iter().take(12) {
+    for (index, score) in ranked.into_iter().take(super::search().results) {
         let file = &snapshot.files[index];
         let related: Vec<_> = snapshot
             .references
@@ -209,10 +204,14 @@ pub(super) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value, 
             .filter(|r| r.source == file.path || r.target.as_ref() == Some(&file.path))
             .take(4)
             .collect();
-        let symbols: Vec<_> = file.symbols.iter().take(12).collect();
+        let symbols: Vec<_> = file
+            .symbols
+            .iter()
+            .take(super::search().item_symbols)
+            .collect();
         let item = serde_json::json!({"id":file.path,"path":file.path,"score":score,"symbols":symbols,"related":related});
         let size = item.to_string().len();
-        if bytes + size > 16_000 {
+        if bytes + size > super::search().result_bytes {
             break;
         }
         bytes += size;
@@ -682,16 +681,6 @@ mod tests {
             &f.0,
             &["worktree", "remove", "--force", tree.to_str().unwrap()],
         );
-    }
-
-    #[test]
-    #[ignore = "Manual real-repository map; set JACKALOPE_MAP_ROOT and JACKALOPE_MAP_TASK"]
-    fn print_repository_map() {
-        let root = std::env::var("JACKALOPE_MAP_ROOT").unwrap();
-        let task = std::env::var("JACKALOPE_MAP_TASK").unwrap();
-        let map = task_map(Path::new(&root), &task, &[], DEFAULT_BUDGET).expect("map");
-        println!("{map}");
-        println!("--- {} bytes ---", map.len());
     }
 
     #[test]

@@ -1,5 +1,6 @@
-import type { PendingUserPrompt, RunRequest } from './task-runtime';
-import { nativeTask } from './task-runtime.ts';
+import type { PendingUserPrompt } from '@jackalope/contracts/runs';
+import { invokeNative } from './native/transport.ts';
+import type { RunRequest } from './run-types';
 
 export type PlanShape = 'single' | 'subtasks' | 'swarm';
 export type PlanStatus = 'planning' | 'draft' | 'approved' | 'running' | 'done';
@@ -79,6 +80,10 @@ interface PlanDeviation {
   amendment: string;
   status: 'pending' | 'accepted' | 'redo' | 'replan';
   createdAt: string;
+  /** An agent is deciding whether to accept it for you. */
+  agentDeciding?: boolean;
+  /** The agent that accepted it, when one did. */
+  resolvedBy?: string | null;
 }
 
 export interface PlanVerification {
@@ -92,6 +97,122 @@ export interface PlanSettings {
   plannerAgent?: string | null;
   plannerModel?: string | null;
   exportPath: string;
+  /** The most rounds a swarm runs before it waits for a re-plan. */
+  maxRounds?: number;
+  /** New swarms ask before starting each next round. */
+  askBeforeRounds?: boolean;
+  /** The most orchestrators reviewing a swarm round in parallel, 1 to 4. */
+  orchestrators?: number;
+  /** What agents may decide for you in this project's plans. */
+  decide?: DecideSettings;
+}
+
+/** The project's Autonomy settings; a committed autonomy policy can only make them stricter. */
+export interface DecideSettings {
+  questions: boolean;
+  rounds: boolean;
+  deviations: boolean;
+  maxAgentDecisions: number;
+  /** `auto` or an agent ID. */
+  decider: string;
+}
+
+export const defaultDecideSettings: DecideSettings = {
+  questions: false,
+  rounds: false,
+  deviations: false,
+  maxAgentDecisions: 50,
+  decider: 'auto',
+};
+
+/** One decision an agent made, or handed to you, on a plan. */
+export interface AutonomyEntry {
+  id: string;
+  kind: 'question' | 'round' | 'deviation';
+  subject: string;
+  runId?: string | null;
+  promptId?: string | null;
+  deviationId?: string | null;
+  outcome: 'deciding' | 'decided' | 'escalated' | 'person';
+  answer?: string | null;
+  decider?: string | null;
+  deciderRunId?: string | null;
+  rationale: string;
+  confidence?: number | null;
+  evidence: string[];
+  category?: string | null;
+  reason?: string | null;
+  createdAt: string;
+  decidedAt?: string | null;
+  overridden?: { answer: string; by: string; at: string } | null;
+}
+
+export interface PlanAutonomy {
+  questions: boolean;
+  rounds: boolean;
+  deviations: boolean;
+  /** Why agents decide nothing although the project lets them. */
+  blocked: string | null;
+  limit: number;
+  used: number;
+  decided: number;
+  waiting: number;
+  deciding: number;
+  escalate: string[];
+  /** Newest first. */
+  entries: AutonomyEntry[];
+}
+
+/** An assignment an orchestrator proposes for the next swarm round. */
+export interface RoundAssignment {
+  key: string;
+  title: string;
+  prompt: string;
+  scopes: string[];
+  dependsOn: string[];
+  covers: string[];
+  briefing: string;
+}
+
+/** One area's orchestrator review within a round. */
+export interface PlanRoundArea {
+  name: string;
+  scopes: string[];
+  state: 'waiting' | 'reviewing' | 'done' | 'next';
+  summary: string;
+  evidence: string[];
+  next: string[];
+}
+
+export interface PlanRound {
+  number: number;
+  managedTaskId: string;
+  state: 'working' | 'reviewing' | 'approval' | 'held' | 'done' | 'next' | 'limit';
+  summary: string;
+  evidence: string[];
+  check: { command: string; passed: boolean } | null;
+  /** Titles of the assignments the orchestrator named for the next round. */
+  next: string[];
+  held: string | null;
+  reviewRunId: string | null;
+  decidedAt: string | null;
+  /** The next round's assignments while they wait for your approval. */
+  proposal?: RoundAssignment[] | null;
+  /** An agent is deciding the proposal for you. */
+  agentDeciding?: boolean;
+  /** Areas reviewed by parallel orchestrators; empty when one reviews the plan. */
+  areas?: PlanRoundArea[];
+}
+
+export interface PlanRounds {
+  current: number;
+  max: number;
+  /** The current round waits for you to resume it. */
+  paused: boolean;
+  /** Each next round waits for your approval. */
+  askFirst?: boolean;
+  orchestrators?: number;
+  rounds: PlanRound[];
 }
 
 export interface PlanView {
@@ -138,6 +259,10 @@ export interface PlanView {
     review: TaskProgress | null;
     gaps: { severity: 'critical' | 'major' | 'minor'; text: string }[];
   } | null;
+  /** Swarm rounds, for plans approved as a swarm. */
+  rounds: PlanRounds | null;
+  /** What agents decided for you, when the project lets them. */
+  autonomy?: PlanAutonomy | null;
   criteria: { id: string; state: CriterionStateName; detail?: string }[];
   deviations: PlanDeviation[];
   /** How approving now would verify the work, from the project's mirrored check. */
@@ -172,16 +297,16 @@ export interface ManualPlan {
 
 export const planCommands = {
   list: (projectId?: string) =>
-    nativeTask<{ plans: PlanSummary[]; problems: string[] }>('plan_list', { projectId }),
-  get: (id: string) => nativeTask<PlanView>('plan_get', { id }),
+    invokeNative<{ plans: PlanSummary[]; problems: string[] }>('plan_list', { projectId }),
+  get: (id: string) => invokeNative<PlanView>('plan_get', { id }),
   start: (request: RunRequest, goal: string) =>
-    nativeTask<PlanView>('plan_start', { request, goal }),
+    invokeNative<PlanView>('plan_start', { request, goal }),
   create: (request: RunRequest, plan: ManualPlan) =>
-    nativeTask<PlanView>('plan_create', { request, plan }),
+    invokeNative<PlanView>('plan_create', { request, plan }),
   keepPlanning: (id: string, comments: string) =>
-    nativeTask<void>('plan_keep_planning', { id, comments }),
+    invokeNative<void>('plan_keep_planning', { id, comments }),
   save: (id: string, markdown: string, baseRevision: number) =>
-    nativeTask<number>('plan_save', { id, markdown, baseRevision }),
+    invokeNative<number>('plan_save', { id, markdown, baseRevision }),
   approve: (
     id: string,
     revision: number,
@@ -189,18 +314,28 @@ export const planCommands = {
     shape: PlanShape,
     checks?: { verifyCommand?: string; prepareCommand?: string; setupFiles?: string[] },
     reviewer?: string,
-  ) => nativeTask<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
-  replan: (id: string, comments: string) => nativeTask<void>('plan_replan', { id, comments }),
+  ) => invokeNative<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
+  replan: (id: string, comments: string) => invokeNative<void>('plan_replan', { id, comments }),
+  rounds: (
+    id: string,
+    action: 'pause' | 'resume' | 'stop' | 'approve' | 'ask' | 'auto',
+    assignments?: RoundAssignment[],
+  ) => invokeNative<void>('plan_rounds', { id, action, assignments }),
   resolveDeviation: (id: string, deviationId: string, action: 'accept' | 'redo' | 'replan') =>
-    nativeTask<void>('plan_resolve_deviation', { id, deviationId, action }),
-  export: (id: string, path?: string) => nativeTask<string>('plan_export', { id, path }),
+    invokeNative<void>('plan_resolve_deviation', { id, deviationId, action }),
+  /** Sends your answer in place of an agent's and records the override. */
+  overrideDecision: (id: string, entryId: string, answer: string) =>
+    invokeNative<void>('plan_autonomy_override', { id, entryId, answer }),
+  overridePrompt: (runId: string, promptId: string, answer: string) =>
+    invokeNative<void>('task_prompt_override', { runId, promptId, answer }),
+  export: (id: string, path?: string) => invokeNative<string>('plan_export', { id, path }),
   diff: (id: string, from: number, to: number) =>
-    nativeTask<SectionChange[]>('plan_diff', { id, from, to }),
-  revision: (id: string, number: number) => nativeTask<string>('plan_revision', { id, number }),
-  archive: (id: string) => nativeTask<void>('plan_archive', { id }),
-  settings: (projectId: string) => nativeTask<PlanSettings>('plan_settings_get', { projectId }),
+    invokeNative<SectionChange[]>('plan_diff', { id, from, to }),
+  revision: (id: string, number: number) => invokeNative<string>('plan_revision', { id, number }),
+  archive: (id: string) => invokeNative<void>('plan_archive', { id }),
+  settings: (projectId: string) => invokeNative<PlanSettings>('plan_settings_get', { projectId }),
   saveSettings: (projectId: string, settings: PlanSettings) =>
-    nativeTask<void>('plan_settings_set', { projectId, settings }),
+    invokeNative<void>('plan_settings_set', { projectId, settings }),
 };
 
 /** Steps of a written plan as the plan document's tasks; dependencies become indexes. */
@@ -249,23 +384,47 @@ const shapeLabels: Record<PlanShape, { label: string; detail: string }> = {
     label: 'Planned subtasks',
     detail: 'Each task gets its own worker; dependencies run in order.',
   },
-  swarm: { label: 'Swarm', detail: 'Planned subtasks, mirrored through your swarm Worker.' },
+  swarm: {
+    label: 'Swarm',
+    detail:
+      'Rounds of subtasks. After each merge an orchestrator checks the criteria and plans the next round.',
+  },
 };
 
+/** Planned subtasks run at most this many tasks; larger plans run as a swarm. */
+const subtaskLimit = 8;
+
 /** Shapes the person can approve, with why one is unavailable. */
-export function shapeChoices(view: Pick<PlanView, 'swarmConnected' | 'document'>) {
+export function shapeChoices(view: Pick<PlanView, 'document'>) {
   const open = view.document?.tasks.filter((task) => task.status !== 'done').length ?? 0;
   return (Object.keys(shapeLabels) as PlanShape[]).map((shape) => ({
     shape,
     ...shapeLabels[shape],
     unavailable:
-      shape === 'swarm' && !view.swarmConnected
-        ? 'Connect a swarm Worker in Settings first.'
-        : shape !== 'single' && open < 2
+      shape === 'subtasks' && open > subtaskLimit
+        ? `Planned subtasks run at most ${subtaskLimit} tasks.`
+        : shape === 'subtasks' && open < 2
           ? 'The plan has one task left.'
           : undefined,
   }));
 }
+
+export const roundStateLabels: Record<PlanRound['state'], string> = {
+  working: 'Working',
+  reviewing: 'Orchestrator reviewing',
+  approval: 'Needs your approval',
+  held: 'Needs you',
+  done: 'Criteria met',
+  next: 'Next round planned',
+  limit: 'Round limit reached',
+};
+
+export const areaStateLabels: Record<PlanRoundArea['state'], string> = {
+  waiting: 'Waiting',
+  reviewing: 'Reviewing',
+  done: 'Criteria met',
+  next: 'More work',
+};
 
 /** Tasks in dependency waves: each wave can start once the previous one is done. */
 export function taskWaves(tasks: Pick<PlanTask, 'key' | 'dependsOn'>[]) {
@@ -337,10 +496,11 @@ export const taskStateLabels: Record<TaskProgress['state'] | 'done', string> = {
 };
 
 export function stateTone(state: string): 'success' | 'danger' | 'accent' | 'muted' {
-  if (['checked', 'merged', 'done', 'check-passed', 'human-accepted'].includes(state))
+  if (['checked', 'merged', 'done', 'check-passed', 'human-accepted', 'next'].includes(state))
     return 'success';
-  if (['needs-attention', 'check-failed'].includes(state)) return 'danger';
-  if (['running', 'agent-claimed'].includes(state)) return 'accent';
+  if (['needs-attention', 'check-failed', 'held', 'limit', 'approval'].includes(state))
+    return 'danger';
+  if (['running', 'agent-claimed', 'working', 'reviewing'].includes(state)) return 'accent';
   return 'muted';
 }
 

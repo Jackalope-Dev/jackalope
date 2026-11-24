@@ -23,6 +23,17 @@ use permitted HTTP calls. The same bridge implements project awareness, messages
 user questions and saved answers, browser evidence, validation and selected
 on-demand connection discovery. No transport bypasses a denied permission.
 
+Each tool is defined once, so the MCP tool and its HTTP route take the same input,
+run the same handler and fail the same way. An HTTP error is a status with a JSON
+`{"error": ...}` body. A question (`ask_user`, `request_human_action`) waits up to a
+minute for an answer over MCP before it returns pending; over HTTP it returns at once,
+since an agent's shell command may time out sooner and a retried command would ask
+again, and the agent polls `user_response`. An answer saved after the question returned
+pending is owed to the agent until `user_response` returns it; in a persistent Claude Code
+session it also arrives once as context after the agent's next tool call, so an agent that
+stopped polling still receives it. `GET /v1/help` lists each tool's HTTP
+contract; a lean attempt gets a short form unless it asks for `?full=true`.
+
 Project awareness includes manual tasks, queued assignments, latest attempts,
 declared scopes and dependencies. Manual scopes are explicitly unknown. Inventory
 covers loaded history; archived runs are excluded. Agents read it before editing
@@ -54,9 +65,10 @@ their existing APIs.
 If another launch owns the coordinator, optional delivery defers to the next
 checkpoint without consuming messages or delaying the completed tool result.
 
-This is delivery at Jackalope tool-response boundaries, not arbitrary shell or
-provider-tool calls. Non-JSON, streaming and responses over 8 MB remain unchanged;
-no polling model turns, automatic follow-ups or interruptions are introduced.
+This is delivery at Jackalope tool-response boundaries (and `GET /v1/help`), not
+arbitrary shell or provider-tool calls, and it does not depend on whether the MCP
+response streams. A computer runner's callbacks never carry updates, since no agent
+reads them. No polling model turns, automatic follow-ups or interruptions are introduced.
 Agents should still check the inbox before shared-interface changes when they have
 not used the harness recently. A transport interruption can lose a delivered excerpt;
 the durable inbox remains authoritative. Bridge unavailability blocks new launches
@@ -82,6 +94,7 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Read messages | inbox | GET /v1/messages?after=cursor&limit=50 |
 | Acknowledge reading | acknowledge_message | POST /v1/messages/ack with id |
 | Ask a question | ask_user | POST /v1/user-prompt |
+| Ask the person to do something only they can | request_human_action | POST /v1/human-action with kind, title, instructions, optional url and secretName |
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
 | Restate the goal at the start | restate_goal | POST /v1/goal-restatement with goal, problem, smallestChange |
 | Record checks and requirement assessments | record_validation_step | POST /v1/validation-step |
@@ -102,14 +115,32 @@ planning attempt are limited by the plan's question cap and end when the person 
 to stop; a closed question returns `status: closed` with a message instead of reaching
 the person. A planning question without `why_ask` returns `status: not_asked` and does
 not count toward the cap.
+`ask_user` also accepts an optional `category` (`routine`, `secret`, `payment`, `sign_in`,
+`account`, `publish`, `protected_path`, `direction` or `destructive`). When a project lets
+agents decide on approved plans, a routine question from plan work may be answered by a
+read-only decider attempt; the asker receives it prefixed `Answered by <agent> on your
+owner's behalf:` and the saved prompt carries `answeredBy`. Any other category, or a
+question the local classifier flags, reaches the person with an `escalation` reason. See
+[agent decisions](PLAN-MODE.md#agent-decisions).
+`request_human_action` asks the person to sign in, pay, create an account, add a secret or
+take another manual step: `kind` (`secret`, `sign_in`, `payment`, `account` or `other`), a
+`title` up to 120 characters, numbered `instructions` up to 2,000, an optional `url`
+(https, or an `x-apple.systempreferences:` pane identifier that the desktop opens in macOS
+System Settings; other schemes and spaces are refused) and, for a secret, a `secretName` shaped like an environment variable. It is never routed
+to an agent. The app and the phone companion show it as a **Needs you** card with the steps,
+the link, a hint to add a secret under Project settings → Secrets, an optional note and
+**Done** or **I can't do this**; the agent waits like `ask_user` and reads `Done` or
+`Declined`, followed by `Note: ...` when the person wrote one. It counts toward the
+attempt's 100-question limit.
 `record_validation_step` requirement assessments and the optional `safety_fact` carry an
 evidence level that Jackalope checks locally; `restate_goal` records the agent's short
 restatement once at the start. See [task outcomes](TASK-OUTCOMES.md#evidence-levels).
 `plan_deviation` is accepted only from attempts working on an approved plan, records the
 departure for the person and pauses that plan's dispatch; agents never edit the plan.
 
-HTTP messages use recipientTaskId; the MCP schema uses recipient_task_id. Omit it
-for broadcasts. Agents can see project broadcasts, their received messages and
+Messages name a recipient with `recipient_task_id` (`recipientTaskId` is also
+accepted); omit it for broadcasts. A message kind is `progress`, `blocker`, `handoff`,
+`dependency`, `interface`, `completion` or `waiting`. Agents can see project broadcasts, their received messages and
 their own sent messages. The user sees all project messages and acknowledgment
 counts. The retained journal is bounded to 2,000 messages; expired cursors require
 rereading and deduplicating retained messages. There is no infinite audit archive.
@@ -175,6 +206,32 @@ target branch. Once the combined review has started, no more work can join. A
 standalone task's subtasks are ordinary queue tasks with their own review and merge;
 they dispatch on the parent's own key while its run continues, and other manual work
 in the project still holds them. Every spawn posts a project handoff message.
+
+## Swarm rounds
+
+A plan approved as a swarm (beta) runs in rounds of managed assignments. After a
+round's combined result merges, a read-only orchestrator attempt reviews the integrated
+tree against the plan's criteria, running the saved check through `computer_verify`,
+and either declares the plan done with evidence or names the next round's assignments,
+which are validated and scheduled like the first, or wait for the person's approval
+when the plan asks first, or for a deciding agent once the merged round passed its check
+when the project lets agents approve rounds. Up to 4 orchestrators can review a large plan's areas in
+parallel; their verdicts merge into one (done only when every area is done, next
+assignments deduplicated and sequenced where scopes overlap). A round runs at least 8 and at most 24
+assignments, sized to the slots of the project's capacity pool; this device's slots are the
+queue's effective limit, Automatic from its CPUs and memory unless a number is chosen. Every planned or swarm
+fork is placed on one host of that pool (this device or one of the person's computers) by
+what it needs, the project's **Swarms run on** choice and which host has room; the reason
+is recorded in its activity. Under **Computers only** a fork on a computer never falls
+back to this device: automatic routing offers it only agents that run there, and it
+fails with the reason when none can. A fork whose host is lost is retried once elsewhere
+as a fresh attempt; the changes it left there are saved as a patch on the lost attempt,
+never applied, once that computer answers again. Lost computers stay skipped across a
+restart for the rest of their ten minutes (see
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts)). Rounds stop at the
+plan's round limit (default 5), pause and stop with the plan, start paused after a
+restart, and never assign `.jackalope/**`. A swarm Worker is optional. See
+[plan mode](PLAN-MODE.md#swarm-rounds-beta).
 
 ## Ownership and interface decisions
 
@@ -242,6 +299,22 @@ It does not push or remove source worktrees. A persisted merge receipt recovers 
 completed application after interruption. Neither mode establishes semantic correctness
 from checks alone; installed acceptance and measured reduction in duplicate work remain open.
 
+Each task's check ran on its own snapshot, so an automatic merge first needs the saved
+check to pass on the tree it would create. When a task's passing check already covers
+exactly that tree (one task whose target has not moved, or a reconciliation or combined
+review attempt), that result counts and nothing runs. Otherwise Jackalope checks the
+prepared merge commit out into a temporary worktree, copies the project's setup files,
+runs its setup command and then the saved check there with the usual check slots and
+time limits, and removes the worktree. Nothing is merged while it runs; other automatic
+merges for the project wait, and agents keep working. A pass is kept for that tree and
+command, and the merge is prepared again and applied; a target or source that changed
+in the meantime gets a new check. A failure merges nothing and leaves the target and
+source worktrees as they were: each source task records a failed **Combined check**
+with the output, standalone tasks show a failed reconciliation with **Retry
+reconciliation** (which runs the check again), and a planned or swarm result is held
+like a policy hold. Merging by hand in **Review & merge** does not run the combined
+check, and the running check is not shown in the interface.
+
 A project can limit automatic merging with `.jackalope/autonomy.json`, read from the
 target-branch commit the integration starts from, never from a worktree, so a change
 cannot loosen the policy it is judged by:
@@ -267,6 +340,31 @@ Without the file, automatic merging behaves as described above. Protect the file
 define the saved check (such as package scripts and test configuration) so agent work
 cannot weaken the check that verified it.
 
+The same file can limit what agents decide for the person on approved plans. The project's
+**Autonomy** settings turn agent decisions on; a `decide` section can only make them
+stricter, and without one the project's settings apply unchanged:
+
+```json
+{
+  "version": 1,
+  "decide": {
+    "questions": "agent",
+    "rounds": "person",
+    "deviations": "agent",
+    "escalate": ["payment"],
+    "maxAgentDecisions": 30,
+    "decider": "auto"
+  }
+}
+```
+
+`person` turns that kind of agent decision off; `agent` or leaving it out keeps the
+project's setting. `escalate` adds categories to the ones that always reach the person
+(none can be removed), a lower `maxAgentDecisions` replaces the project's, and `decider`
+(`auto` or an agent ID) replaces the project's choice. Unknown fields or categories make
+the policy unreadable, which stops every agent decision. The policy's `protected` paths
+also escalate questions that name them. See [agent decisions](PLAN-MODE.md#agent-decisions).
+
 Required outcomes still need a person unless `acceptOutcomes` is `evidence`. Then an
 outcome counts as accepted when the agent's latest report marks it met with evidence
 Jackalope checked at the ran or reproduced level, and the saved check later passed on
@@ -278,7 +376,9 @@ need a person.
 With a committed policy, a ready planned or swarm result (all assignments plus the
 combined review) also merges automatically when the project merges verified work
 automatically and its queue is running. A held result is not retried until the target
-branch or its attempts change; the task shows why it was not merged.
+branch or its attempts change; the task shows why it was not merged. A merged swarm round then
+goes to its orchestrator review; human acceptance still applies to every round the
+policy holds.
 
 While a project merges verified work automatically, Jackalope also delivers its branch.
 Every 20 seconds it reads the branch head; when the head changes it pushes the branch
@@ -318,14 +418,66 @@ The trial defaults to ten minutes; `JACKALOPE_AGREEMENT_TRIAL_TIMEOUT_SECONDS`
 sets a bounded 30–1200 second deadline. On Windows, run a copied test executable
 when builds are running to avoid locking Cargo's linker output.
 
+## Cloud resources
+
+**Project settings → Integrations → Cloud resources** (or **Cloud resources** on Project → Swarm) creates
+what a project's Worker binds to in the Cloudflare account connected under Settings →
+Cloudflare. Without a connection the card links there instead. The screen offers R2, D1,
+KV, Queues, Durable Objects, Workers, Hyperdrive and Turnstile; R2, KV, Queues and Durable
+Objects start selected. Choices, the name prefix (the project name in lowercase words) and
+Turnstile domains are kept per project across Back, retry and reload until setup succeeds.
+The Hyperdrive connection string is not kept with them: setup saves it in protected native
+storage for the project and sends it only to Cloudflare.
+
+Resources are named `<prefix>-assets` (R2), `-db` (D1), `-config` (KV), `-jobs` (Queue),
+`-postgres` (Hyperdrive) and `-turnstile` (a managed Turnstile widget). Setup runs one step
+at a time, emitting `cloudflare-resources-progress` with the project path and step, and one
+run per project at a time. Each step looks the resource up by name (`GET
+/r2/buckets/{name}`, or the D1, KV, Queues, Hyperdrive and Turnstile list endpoints) and
+creates it only when it is missing, so **Retry** reuses everything a failed run created. An
+existing Hyperdrive config is reused as it is and needs no connection string. Durable Objects
+and Workers are not created by setup; they appear in the bindings and are created when the
+Worker deploys.
+
+The result is written to `.jackalope/cloudflare.json`: account ID, prefix, each resource's
+kind, name, ID (the bucket name for R2, the site key for Turnstile) and binding, and a
+wrangler.jsonc fragment under `wrangler`. It holds no secret and is safe to commit. A
+failed run still records what it set up. Jackalope never edits `wrangler.jsonc`; the result
+view offers **Copy bindings**, per-resource copy buttons, the Turnstile secret key read from
+Cloudflare on demand, and a link to the dashboard. Agents need nothing from the person:
+every attempt receives the manifest as [Jackalope context](CORE-WORKFLOW.md#jackalope-context)
+in its workspace, worktree or computer alike, and its launch input names each resource and
+binding (for example "R2 bucket shop-assets bound as ASSETS") and points to the file. The
+manifest stays ignored by Git there, so it never lands in task commits; committing it
+yourself is optional, and a committed copy is used as it is.
+
+Creating resources needs these account permissions: Workers R2 Storage, D1, Workers KV
+Storage, Queues, Hyperdrive and Turnstile, each Edit. With an API token, a refusal (401, 403
+or error 10000) names the permission the step needs and links to API tokens. With Connect
+Cloudflare, setup asks for the matching scopes (`workers-r2-storage.write`, `d1.write`,
+`workers-kv-storage.write`, `queues.write`, `hyperdrive.write`, `turnstile.write`) once,
+through the same reauthorization Swarm uses, and keeps scopes the sign-in already had. When
+Cloudflare does not allow those scopes for Jackalope's client, sign-in reports which token
+permissions to use instead. An account without R2 turned on (10042) links to the R2 page;
+rate limits ask to retry.
+
+**Remove from Jackalope** only takes a resource out of the manifest (and forgets a saved
+Hyperdrive connection string). **Delete from Cloudflare** is per resource and needs an
+explicit acknowledgment; R2 deletes only empty buckets and Cloudflare's reason is shown.
+Resources Cloudflare no longer has count as deleted.
+
+`cargo test --lib cloudflare_resources::` covers each resource against a local server with
+Cloudflare's response shapes (reuse, create, refusal, rate limit), bindings, the manifest
+and scope gating; `apps/desktop/scripts/cloud-resources.test.mjs` covers the screen's
+defaults and validation. Neither reaches Cloudflare.
 
 ## Visible support
 
 Agent Configuration shows the selected adapter's support and limitations. Task
 options describe tool delivery, and incompatible selected connections show an
 explanation before launch. Custom agents inherit their configured adapter.
-The shared agent-capabilities.json drives frontend checks and native direct
-connection validation.
+The shared agent catalog (`src/lib/agents.json`) drives frontend checks and
+native direct connection validation.
 
 | Capability | Codex | Claude | Grok | OpenCode | Kimi | Antigravity | Gemini CLI |
 | --- | --- | --- | --- | --- | --- | --- | --- |

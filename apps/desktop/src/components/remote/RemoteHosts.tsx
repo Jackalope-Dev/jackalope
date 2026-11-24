@@ -1,30 +1,140 @@
+import { describeError } from '@jackalope/contracts/errors';
+import type { RemoteAction } from '@jackalope/contracts/remote';
 import {
   Button,
+  ChoiceCards,
   Disclosure,
   DisclosureSummary,
+  FieldCheck,
+  FlowDiagram,
   FormField,
+  InlineNotice,
   Input,
+  Popover,
   Select,
   SelectItem,
+  SetupIntro,
+  SetupLayout,
+  type SetupStepState,
+  SetupSteps,
+  SetupSummary,
 } from '@jackalope/ui';
-import { useCallback, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import {
+  ArrowRight,
+  Box,
+  Globe,
+  KeyRound,
+  Laptop,
+  ListChecks,
+  MonitorSmartphone,
+  Server,
+  Smartphone,
+  Terminal,
+  Wifi,
+} from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useId, useState } from 'react';
+import { invokeNative } from '../../lib/native/transport';
+import {
+  checkHttpsOrigin,
+  checkPairingCode,
+  checkSshAlias,
+  type FieldCheckResult,
+  formatPairingCode,
+  thisComputerLabel,
+} from '../../lib/remote-checks';
+import {
+  pairRemoteHost,
+  type RemoteHost,
+  remoteHosts,
+  removeRemoteHost,
+} from '../../lib/remote-hosts';
 import { useHostContextStore } from '../../stores/hostContextStore';
-import { InlineNotice } from '../ui/InlineNotice';
-import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import { WorkspacePage } from '../ui/WorkspacePage';
-import { type RemoteAction, RemoteWorkspace } from './RemoteWorkspace';
+import { InvitePhone } from './InvitePhone';
+import { RemoteWorkspace } from './RemoteWorkspace';
 
-interface Host {
-  id: string;
-  name: string;
-  address: string;
-  ssh: boolean;
-  port: number;
-  wsl?: boolean;
+const METHOD_LABEL: Record<string, string> = { ssh: 'SSH', https: 'HTTPS', wsl: 'WSL' };
+
+/** Where the pairing code is made on the other computer, as the path a person clicks through. */
+const HOST_PATH: { icon: ReactNode; label: string }[] = [
+  { icon: <MonitorSmartphone size={14} />, label: 'Devices' },
+  { icon: <Wifi size={14} />, label: 'Let devices use this one' },
+  { icon: <ListChecks size={14} />, label: 'Choose projects' },
+  { icon: <KeyRound size={14} />, label: 'Create pairing code' },
+];
+
+function HostPath() {
+  return (
+    <ol className="remote-host-path" aria-label="On the other computer">
+      {HOST_PATH.map((step, index) => (
+        <li key={step.label}>
+          {index > 0 && (
+            <ArrowRight size={12} className="remote-host-path-arrow" aria-hidden="true" />
+          )}
+          <span className="remote-host-path-step">
+            <span aria-hidden="true">{step.icon}</span>
+            {step.label}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
 }
-export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
-  const [hosts, setHosts] = useState<Host[]>([]);
+
+function Check({ id, result }: { id: string; result: FieldCheckResult | null }) {
+  return result ? (
+    <FieldCheck id={id} tone={result.tone}>
+      {result.message}
+    </FieldCheck>
+  ) : null;
+}
+
+/**
+ * How to reach a host from the phone app. The phone pairs with each computer directly, so it
+ * keeps working while this one is offline; that pairing is created on the host itself.
+ */
+function PhoneAccess({ id, name }: { id: string; name: string }) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <Button variant="outline">
+          <Smartphone size={16} aria-hidden="true" />
+          Use from your phone
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          className="workspace-menu remote-phone-access"
+          side="bottom"
+          align="end"
+          sideOffset={8}
+          collisionPadding={16}
+        >
+          <h3>Use {name} from your phone</h3>
+          <p>
+            The Jackalope app pairs with each computer directly, so it keeps working while this one
+            is offline. If {name} lets paired computers invite phones, get its code here:
+          </p>
+          <InvitePhone hostId={id} name={name} />
+          <p>Or set it up on {name}:</p>
+          <ol>
+            <li>Keep Jackalope running.</li>
+            <li>
+              Open Devices → Let devices use this one, turn on remote access and choose projects.
+            </li>
+            <li>
+              Set up an HTTPS address there (the Tailscale steps), since phones only use HTTPS.
+            </li>
+            <li>Choose Pair a phone and scan the code with the Jackalope app.</li>
+          </ol>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** Devices → Use other computers: pair with hosts and work on them from here. */
+export function RemoteHosts() {
+  const [hosts, setHosts] = useState<RemoteHost[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
@@ -36,6 +146,13 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [distributions, setDistributions] = useState<string[]>([]);
+  /** The last pairing attempt's real error, shown on the connection diagram. */
+  const [pairError, setPairError] = useState('');
+  /** The furthest step the person has moved on to; earlier steps fold to their summary. */
+  const [reached, setReached] = useState(0);
+  const advance = (step: number) => setReached((value) => Math.max(value, step));
+  const addressCheckId = useId();
+  const codeCheckId = useId();
   const host = hosts.find((item) => item.id === selected) ?? hosts[0];
   useEffect(() => {
     useHostContextStore.setState({
@@ -48,12 +165,12 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   useEffect(() => {
     if (method !== 'wsl') return;
     let disposed = false;
-    void nativeTask<string[]>('wsl_distributions').then(
+    void invokeNative<string[]>('wsl_distributions').then(
       (items) => {
         if (!disposed) setDistributions(items);
       },
       (reason) => {
-        if (!disposed) setError(String(reason));
+        if (!disposed) setError(describeError(reason));
       },
     );
     return () => {
@@ -62,14 +179,14 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   }, [method]);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const next = await nativeTask<Host[]>('remote_hosts');
+      const next = await remoteHosts();
       if (!signal?.aborted) {
         setHosts(next);
         setLoaded(true);
         setError('');
       }
     } catch (cause) {
-      if (!signal?.aborted) setError(String(cause));
+      if (!signal?.aborted) setError(describeError(cause));
     }
   }, []);
   useEffect(() => {
@@ -78,28 +195,237 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
     return () => controller.abort();
   }, [load]);
   const request = useCallback(
-    <T,>(action: RemoteAction) => nativeTask<T>('remote_host_request', { id: host?.id, action }),
+    <T,>(action: RemoteAction) => invokeNative<T>('remote_host_request', { id: host?.id, action }),
     [host?.id],
   );
-  return (
-    <WorkspacePage>
-      <WorkspaceHeading
-        title="Hosts"
-        action={
-          <div className="workspace-actions">
-            <Button variant="outline" onClick={onSetup}>
-              Share this host
+  const addressCheck =
+    method === 'ssh'
+      ? checkSshAlias(address)
+      : method === 'https'
+        ? checkHttpsOrigin(address)
+        : null;
+  const codeCheck = checkPairingCode(code);
+  const placeReady =
+    Boolean(name.trim()) && (method === 'wsl' ? Boolean(address) : addressCheck?.tone === 'ok');
+  const ready = placeReady && codeCheck?.tone === 'ok';
+  const stepState = (index: number): SetupStepState =>
+    index < reached ? 'done' : index === reached ? 'current' : 'upcoming';
+  const place = `${name.trim() || 'Unnamed'} · ${address.trim() || 'no address'}${
+    method !== 'https' && port !== 9472 ? ` (port ${port})` : ''
+  }`;
+  const connectSteps = () => [
+    {
+      id: 'code',
+      title: 'On the other computer, create a pairing code',
+      hint: 'It works once and expires after a few minutes, so make it when you’re ready.',
+      state: stepState(0),
+      summary: 'A pairing code is ready on the other computer.',
+      content: (
+        <>
+          <HostPath />
+          {reached === 0 && (
+            <Button variant="outline" className="justify-self-start" onClick={() => advance(1)}>
+              I have a code
             </Button>
-            <Button
-              variant={adding ? 'outline' : 'primary'}
-              disabled={busy || !loaded}
-              onClick={() => setAdding((value) => !value)}
+          )}
+        </>
+      ),
+    },
+    {
+      id: 'method',
+      title: 'Choose how to reach it',
+      hint: 'Pick the way this computer can already reach the other one.',
+      state: stepState(1),
+      summary: `Over ${METHOD_LABEL[method]}`,
+      content: (
+        <>
+          <ChoiceCards
+            label="Connection"
+            value={method}
+            disabled={busy}
+            onValueChange={(value) => {
+              setMethod(value);
+              setAddress('');
+              setError('');
+              setPairError('');
+              advance(2);
+            }}
+            options={[
+              {
+                value: 'ssh',
+                icon: <Terminal size={18} />,
+                title: 'SSH',
+                description: 'Uses an SSH alias that already works in your terminal.',
+              },
+              {
+                value: 'https',
+                icon: <Globe size={18} />,
+                title: 'HTTPS',
+                description: 'The other computer has an HTTPS address, such as from Tailscale.',
+              },
+              ...(/Win/i.test(navigator.platform)
+                ? [
+                    {
+                      value: 'wsl',
+                      icon: <Box size={18} />,
+                      title: 'WSL distribution',
+                      description: 'A Linux distribution on this PC.',
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          {reached === 1 && (
+            <Button variant="outline" className="justify-self-start" onClick={() => advance(2)}>
+              Continue
+            </Button>
+          )}
+        </>
+      ),
+    },
+    {
+      id: 'address',
+      title: 'Name it and say where it is',
+      hint: 'The name is only for you; the address is how this computer reaches it.',
+      state: stepState(2),
+      summary: place,
+      content: (
+        <>
+          <FormField label="Name" className="remote-field-name">
+            <Input
+              value={name}
+              disabled={busy}
+              required
+              maxLength={80}
+              placeholder="Workstation"
+              onChange={(event) => setName(event.target.value)}
+            />
+          </FormField>
+          <div className="remote-connect-field remote-field-address">
+            <FormField
+              label={
+                method === 'wsl'
+                  ? 'WSL distribution'
+                  : method === 'ssh'
+                    ? 'SSH host'
+                    : 'HTTPS address'
+              }
             >
-              {adding ? 'Cancel' : 'Connect a host'}
-            </Button>
+              {method === 'wsl' ? (
+                <Select
+                  aria-label="WSL distribution"
+                  value={address || '__choose'}
+                  onValueChange={setAddress}
+                  disabled={busy}
+                >
+                  <SelectItem value="__choose" disabled>
+                    {distributions.length ? 'Choose a distribution…' : 'No distributions found'}
+                  </SelectItem>
+                  {distributions.map((distribution) => (
+                    <SelectItem key={distribution} value={distribution}>
+                      {distribution}
+                    </SelectItem>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  type={method === 'ssh' ? 'text' : 'url'}
+                  required
+                  spellCheck={false}
+                  aria-describedby={addressCheck ? addressCheckId : undefined}
+                  placeholder={method === 'ssh' ? 'user@workstation' : 'https://workstation:8443'}
+                  value={address}
+                  disabled={busy}
+                  onChange={(event) => setAddress(event.target.value)}
+                />
+              )}
+            </FormField>
+            <Check id={addressCheckId} result={addressCheck} />
           </div>
-        }
-      />
+          {method === 'wsl' && (
+            <p className="task-muted">
+              Run the Linux build of Jackalope in this distribution (needs Python 3) and create a
+              code there. Tasks run in Linux with its own accounts.
+            </p>
+          )}
+          {(method === 'ssh' || method === 'wsl') && (
+            <Disclosure>
+              <DisclosureSummary>Host port</DisclosureSummary>
+              <Input
+                aria-label="Host port"
+                className="remote-field-port"
+                type="number"
+                min={1024}
+                max={65535}
+                value={port}
+                disabled={busy}
+                onChange={(event) => setPort(Number(event.target.value))}
+              />
+            </Disclosure>
+          )}
+          {reached === 2 && (
+            <Button
+              variant="outline"
+              className="justify-self-start"
+              disabled={!placeReady}
+              onClick={() => advance(3)}
+            >
+              Continue
+            </Button>
+          )}
+        </>
+      ),
+    },
+    {
+      id: 'pair',
+      title: 'Enter the pairing code',
+      hint: 'Type it as shown on the other computer; it formats itself.',
+      state: stepState(3),
+      content: (
+        <div className="remote-connect-field">
+          <FormField label="Pairing code">
+            <Input
+              required
+              autoComplete="off"
+              spellCheck={false}
+              className="remote-connect-code"
+              aria-describedby={codeCheck ? codeCheckId : undefined}
+              placeholder="ABCDE-FGHJK"
+              value={code}
+              disabled={busy}
+              onChange={(event) => setCode(formatPairingCode(event.target.value))}
+            />
+          </FormField>
+          <Check id={codeCheckId} result={codeCheck} />
+          <Button
+            type="submit"
+            className="justify-self-start remote-connect-submit"
+            disabled={busy || !ready}
+            loading={busy}
+            loadingLabel="Connecting…"
+          >
+            Connect
+          </Button>
+        </div>
+      ),
+    },
+  ];
+  return (
+    <>
+      {!!hosts.length && (
+        <div className="workspace-actions remote-hosts-actions">
+          <Button
+            variant={adding ? 'outline' : 'primary'}
+            disabled={busy || !loaded}
+            onClick={() => {
+              setAdding((value) => !value);
+              setPairError('');
+            }}
+          >
+            {adding ? 'Cancel' : 'Connect a host'}
+          </Button>
+        </div>
+      )}
       <div className="remote-workspace">
         {!!hosts.length && (
           <div className="remote-toolbar">
@@ -118,6 +444,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                 </SelectItem>
               ))}
             </Select>
+            {host && <PhoneAccess id={host.id} name={host.name} />}
             {host && (
               <Button
                 variant="ghost"
@@ -126,10 +453,10 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   setBusy(true);
                   setError('');
                   try {
-                    await nativeTask('remote_host_remove', { id: host.id });
-                    setHosts(await nativeTask<Host[]>('remote_hosts'));
+                    await removeRemoteHost(host.id);
+                    setHosts(await remoteHosts());
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   } finally {
                     setBusy(false);
                   }
@@ -156,146 +483,75 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
         )}
         {!loaded && !error && <p role="status">Loading hosts…</p>}
         {loaded && (adding || !hosts.length) && (
-          <form
-            className="remote-setup"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (busy) return;
-              setBusy(true);
-              setError('');
-              try {
-                const paired = await nativeTask<Host>('remote_host_pair', {
-                  name,
-                  address,
-                  ssh: method === 'ssh',
-                  wsl: method === 'wsl',
-                  port,
-                  code: code.trim(),
-                });
-                setHosts(await nativeTask<Host[]>('remote_hosts'));
-                setSelected(paired.id);
-                setAdding(false);
-                setCode('');
-              } catch (cause) {
-                setError(String(cause));
-              } finally {
-                setBusy(false);
+          <>
+            <SetupIntro
+              icon={<Server size={20} />}
+              title="Work on another computer from here"
+              description="Pair with a computer running Jackalope to follow its work, start tasks and answer questions from here."
+            />
+            <SetupLayout
+              aside={
+                <>
+                  <FlowDiagram
+                    from={{ label: thisComputerLabel(), icon: <Laptop size={15} /> }}
+                    to={{ label: name.trim() || 'Other computer', icon: <Server size={15} /> }}
+                    via={METHOD_LABEL[method]}
+                    state={busy ? 'checking' : pairError ? 'failed' : 'idle'}
+                    error={pairError}
+                  />
+                  <SetupSummary
+                    label="Connection so far"
+                    items={[
+                      { label: 'Connection', value: METHOD_LABEL[method] },
+                      { label: 'Name', value: name.trim() || 'Not named yet' },
+                      { label: 'Address', value: address.trim() || 'Not entered yet' },
+                      {
+                        label: 'Pairing code',
+                        value: codeCheck ? codeCheck.message : 'Not entered yet',
+                      },
+                    ]}
+                  />
+                  <p className="remote-phone-note">
+                    <Smartphone size={14} aria-hidden="true" />
+                    Phones pair with each computer directly. To use it from your phone while this
+                    one is offline, turn on Remote access on that computer too.
+                  </p>
+                </>
               }
-            }}
-          >
-            <p className="task-muted">
-              On the host, open Settings → Remote access, choose its projects and create a pairing
-              code.
-            </p>
-            <FormField label="Name">
-              <Input
-                value={name}
-                disabled={busy}
-                required
-                maxLength={80}
-                placeholder="Workstation"
-                onChange={(event) => setName(event.target.value)}
-              />
-            </FormField>
-            <FormField label="Connection">
-              <Select
-                value={method}
-                onValueChange={(value) => {
-                  setMethod(value);
-                  setAddress('');
+            >
+              <form
+                className="remote-setup remote-connect"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (busy) return;
+                  setBusy(true);
                   setError('');
+                  setPairError('');
+                  try {
+                    const paired = await pairRemoteHost({
+                      name,
+                      address,
+                      ssh: method === 'ssh',
+                      wsl: method === 'wsl',
+                      port,
+                      code: code.trim(),
+                    });
+                    setHosts(await remoteHosts());
+                    setSelected(paired.id);
+                    setAdding(false);
+                    setCode('');
+                    setReached(0);
+                  } catch (cause) {
+                    setPairError(describeError(cause));
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
-                disabled={busy}
               >
-                <SelectItem value="ssh">SSH</SelectItem>
-                <SelectItem value="https">HTTPS</SelectItem>
-                {/Win/i.test(navigator.platform) && (
-                  <SelectItem value="wsl">WSL distribution</SelectItem>
-                )}
-              </Select>
-            </FormField>
-            <FormField
-              label={
-                method === 'wsl'
-                  ? 'WSL distribution'
-                  : method === 'ssh'
-                    ? 'SSH host'
-                    : 'HTTPS address'
-              }
-              description={
-                method === 'ssh'
-                  ? 'Use an alias that already connects from your terminal.'
-                  : undefined
-              }
-            >
-              {method === 'wsl' ? (
-                <Select
-                  aria-label="WSL distribution"
-                  value={address || '__choose'}
-                  onValueChange={setAddress}
-                  disabled={busy}
-                >
-                  <SelectItem value="__choose" disabled>
-                    {distributions.length ? 'Choose a distribution…' : 'No distributions found'}
-                  </SelectItem>
-                  {distributions.map((distribution) => (
-                    <SelectItem key={distribution} value={distribution}>
-                      {distribution}
-                    </SelectItem>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  type={method === 'ssh' ? 'text' : 'url'}
-                  required
-                  placeholder={method === 'ssh' ? 'user@workstation' : 'https://workstation:8443'}
-                  value={address}
-                  disabled={busy}
-                  onChange={(event) => setAddress(event.target.value)}
-                />
-              )}
-            </FormField>
-            {method === 'wsl' && (
-              <p className="task-muted">
-                Start the Linux build of Jackalope inside this distribution, configure its projects
-                and agent accounts, then create a pairing code in its Remote access settings. Python
-                3 is required for the connection. Tasks, Git, setup and checks execute in Linux
-                using that host’s credentials.
-              </p>
-            )}
-            {(method === 'ssh' || method === 'wsl') && (
-              <Disclosure>
-                <DisclosureSummary>Host port</DisclosureSummary>
-                <Input
-                  aria-label="Host port"
-                  type="number"
-                  min={1024}
-                  max={65535}
-                  value={port}
-                  disabled={busy}
-                  onChange={(event) => setPort(Number(event.target.value))}
-                />
-              </Disclosure>
-            )}
-            <FormField label="Pairing code">
-              <Input
-                type="password"
-                required
-                autoComplete="off"
-                value={code}
-                disabled={busy}
-                onChange={(event) => setCode(event.target.value)}
-              />
-            </FormField>
-            <Button
-              type="submit"
-              disabled={busy || !address}
-              loading={busy}
-              loadingLabel="Connecting…"
-            >
-              Connect
-            </Button>
-          </form>
+                <SetupSteps label="Connect a host" steps={connectSteps()} />
+              </form>
+            </SetupLayout>
+          </>
         )}
         {host && !adding && (
           <RemoteWorkspace
@@ -305,6 +561,6 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
           />
         )}
       </div>
-    </WorkspacePage>
+    </>
   );
 }

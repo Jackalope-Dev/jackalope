@@ -1,11 +1,24 @@
-import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
+import { DiscordIcon, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
+import {
+  ArrowLeft,
+  ArrowRight,
+  LifeBuoy,
+  Minus,
+  RotateCw,
+  Settings2,
+  Square,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { DISCORD_URL } from '../../lib/community';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { openHelp } from '../../lib/navigation';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
+import { useUpdateBlockers } from '../settings/UpdateBlockers';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { Tooltip } from '../ui/Tooltip';
+import { HISTORY_KEYS } from './useWorkspaceHistory';
 
 const isMac = isMacPlatform();
 
@@ -29,12 +42,15 @@ export function TitleBar({
   themePicker = false,
   center,
   settings,
+  history,
 }: {
   themePicker?: boolean;
   /** Workspace controls centred in the bar, such as search. */
   center?: ReactNode;
   /** Opens Settings from the bar; screens without a settings page leave it out. */
   settings?: { open: () => void; shortcut: string; current: boolean };
+  /** Back and Forward through visited pages; a step that is not there is left undefined. */
+  history?: { back?: () => void; forward?: () => void };
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
@@ -45,6 +61,7 @@ export function TitleBar({
       state.downloadedVersion === availableUpdateId(state.release),
   );
   const updating = useUpdateStore((state) => state.installing);
+  const blocked = useUpdateBlockers().length > 0;
   // Development builds and the beta channel are labeled; stable keeps the plain title.
   const edition = import.meta.env.DEV ? ' - dev' : beta ? ' - Beta' : '';
 
@@ -87,6 +104,39 @@ export function TitleBar({
             <span>Jackalope{edition}</span>
           </div>
         )}
+        {history && (
+          // biome-ignore lint/a11y/useSemanticElements: a fieldset would add form semantics to window chrome.
+          <div
+            className="app-titlebar-history"
+            role="group"
+            aria-label="Page history"
+            onMouseDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            <Tooltip content={`Back (${HISTORY_KEYS.back})`}>
+              <button
+                type="button"
+                className="app-titlebar-history-step"
+                aria-label="Back"
+                disabled={!history.back}
+                onClick={history.back}
+              >
+                <ArrowLeft size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+            <Tooltip content={`Forward (${HISTORY_KEYS.forward})`}>
+              <button
+                type="button"
+                className="app-titlebar-history-step"
+                aria-label="Forward"
+                disabled={!history.forward}
+                onClick={history.forward}
+              >
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+          </div>
+        )}
       </div>
       {center ? (
         <div className="app-titlebar-center">{center}</div>
@@ -98,7 +148,13 @@ export function TitleBar({
       )}
       <div className="app-titlebar-controls">
         {updateReady && (
-          <Tooltip content="The update is downloaded. Jackalope reopens in a few seconds.">
+          <Tooltip
+            content={
+              blocked
+                ? 'Downloaded. Finish or stop active tasks to restart.'
+                : 'The update is downloaded. Jackalope reopens in a few seconds.'
+            }
+          >
             <button
               type="button"
               className="app-titlebar-update"
@@ -106,9 +162,14 @@ export function TitleBar({
               aria-busy={updating}
               onMouseDown={(event) => event.stopPropagation()}
               onDoubleClick={(event) => event.stopPropagation()}
-              onClick={() => void useUpdateStore.getState().install()}
+              onClick={() => {
+                const update = useUpdateStore.getState();
+                // Installing refuses while tasks hold their workspaces; show which ones instead.
+                if (blocked) update.showDetails(true);
+                else void update.install();
+              }}
             >
-              <RotateCw size={13} aria-hidden="true" />
+              <RotateCw size={12} aria-hidden="true" />
               {updating ? 'Restarting…' : 'Restart to update'}
             </button>
           </Tooltip>
@@ -129,18 +190,36 @@ export function TitleBar({
             </button>
           </Tooltip>
         )}
-        <Tooltip content="Help Center">
-          <button
-            type="button"
-            className={`app-titlebar-button app-titlebar-help ${isMac ? 'app-titlebar-help-last' : ''}`}
-            aria-label="Help and knowledgebase"
-            onMouseDown={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
-          >
-            <LifeBuoy size={16} />
-          </button>
-        </Tooltip>
+        <Menu.Root>
+          <Tooltip content="Help and community">
+            <Menu.Trigger asChild>
+              <button
+                type="button"
+                className={`app-titlebar-button app-titlebar-help ${isMac ? 'app-titlebar-help-last' : ''}`}
+                aria-label="Help and community"
+                onMouseDown={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                <LifeBuoy size={16} />
+              </button>
+            </Menu.Trigger>
+          </Tooltip>
+          <Menu.Portal>
+            <Menu.Content className="workspace-menu min-w-52" align="end" sideOffset={8}>
+              <Menu.Item className="workspace-menu-item" onSelect={() => void openHelp()}>
+                <LifeBuoy size={16} aria-hidden="true" />
+                Help Center
+              </Menu.Item>
+              <Menu.Item
+                className="workspace-menu-item"
+                onSelect={() => void openExternalUrl(DISCORD_URL)}
+              >
+                <DiscordIcon size={16} aria-hidden="true" />
+                Join the Discord
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
         {native && !isMac && (
           <>
             <button

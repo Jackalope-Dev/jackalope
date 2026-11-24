@@ -1,0 +1,328 @@
+/* The conversation's agent doubles as a handle: pull it onto a window, or click it. */
+.window-glob {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.window-glob-handle {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+.window-glob-handle:disabled {
+  cursor: default;
+}
+.window-glob-handle[data-phase] {
+  cursor: grabbing;
+}
+/* In a composer toolbar the agent is one of the 32px pills, with a smaller character. */
+.window-glob-compact {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height-compact, 32px);
+  height: var(--control-height-compact, 32px);
+  min-width: 0;
+  min-height: 0;
+}
+.window-glob-compact:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+}
+.window-glob-stretch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+.window-glob-compact .window-glob-stretch {
+  width: 22px;
+  height: 22px;
+}
+.window-glob-character {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+@keyframes window-glob-breathe {
+  0%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+  30% {
+    transform: scale(1.06, 0.97) rotate(-5deg);
+  }
+  60% {
+    transform: scale(0.98, 1.04) rotate(4deg);
+  }
+}
+/* While the agent is out, its spot keeps a soft socket. */
+.window-glob-handle[data-socket] .window-glob-character {
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+}
+.window-glob-handle[data-socket]::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  box-shadow: inset 0 2px 5px color-mix(in srgb, var(--color-text-primary) 18%, transparent);
+}
+/* Away on an attached window: the agent stays, smaller and dimmed, with a linked mark. */
+.window-glob-handle[data-away] .window-glob-character {
+  opacity: 0.6;
+  transform: scale(0.82);
+}
+.window-glob-away {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-surface-elevated);
+  border-radius: var(--radius-full);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+.window-glob-compact .window-glob-away {
+  right: 0;
+  bottom: 0;
+  width: 13px;
+  height: 13px;
+}
+.window-glob-character[data-landed] {
+  animation: window-glob-land 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* A hint that it can be picked up: it breathes and wiggles a little under the pointer. */
+.window-glob-handle:not(:disabled):not([data-phase]):hover .window-glob-character {
+  animation: window-glob-breathe 1.6s ease-in-out infinite;
+}
+@keyframes window-glob-land {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.5);
+  }
+  55% {
+    transform: scale(1.18, 0.88);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.window-glob-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 15rem;
+  padding: 6px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.16);
+  color: var(--color-text-primary);
+  font-size: var(--text-xs);
+  animation: window-glob-hint 6s var(--ease-out) forwards;
+  pointer-events: none;
+}
+.window-glob[data-compact] .window-glob-hint {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+@keyframes window-glob-hint {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  6%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* The pulled-out agent and its gooey neck draw above everything in the window. */
+.window-glob-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+.window-glob-neck {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.window-glob-neck g {
+  fill: var(--color-accent);
+  opacity: 0.32;
+}
+.window-glob-carrier {
+  position: absolute;
+  top: -22px;
+  left: -22px;
+  will-change: transform;
+  animation: window-glob-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes window-glob-pop {
+  from {
+    scale: 0.6;
+  }
+}
+.window-glob-attached {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 14rem;
+  height: 24px;
+  padding: 0 4px 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  flex: none;
+}
+.window-glob-attached-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.window-glob-attached-name:hover {
+  text-decoration: underline;
+}
+.window-glob-attached-name:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.window-glob-detach {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.window-glob-detach:hover {
+  background: color-mix(in srgb, var(--color-accent-ink) 14%, transparent);
+}
+.window-glob-dialog {
+  width: min(480px, calc(100vw - 32px));
+}
+.window-glob-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+.window-glob-list {
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.window-glob-modes {
+  display: grid;
+  gap: 6px;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.window-glob-mode-icon {
+  flex: none;
+  color: var(--color-accent-ink);
+}
+.window-glob-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.window-glob-target > span {
+  display: grid;
+  min-width: 0;
+}
+.window-glob-target strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.window-glob-target span span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.window-glob-site {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.window-glob-site svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+}
+.window-glob-site strong {
+  overflow-wrap: anywhere;
+}
+.window-glob-note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+@media (prefers-reduced-motion: reduce) {
+  .window-glob-handle[data-socket] .window-glob-character {
+    transition: none;
+  }
+  .window-glob-handle:not(:disabled):not([data-phase]):hover .window-glob-character,
+  .window-glob-character[data-landed],
+  .window-glob-carrier,
+  .window-glob-hint {
+    animation: none;
+  }
+}
+
+.window-glob-tip {
+  display: grid;
+  gap: 2px;
+  max-width: 16rem;
+}
+.ui-tooltip.window-glob-tip-hidden {
+  display: none;
+}

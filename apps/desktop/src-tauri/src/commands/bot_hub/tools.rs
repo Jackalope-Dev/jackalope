@@ -9,16 +9,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-/// Tools only bot conversations receive.
-pub const BOT_TOOLS: &[&str] = &[
-    "bots",
-    "bot_message",
-    "present",
-    "suggest_bot",
-    "remember",
-    "recall",
-];
-
 /// Characters of one conversation a single recall returns.
 const RECALL_PAGE: usize = 12_000;
 
@@ -220,7 +210,7 @@ impl BotHub {
                         "id": bot.id,
                         "name": bot.name,
                         "role": bot.role,
-                        "sameProject": bot.request.project_id == me.request.project_id,
+                        "sameProject": bot.works_in(&run.project_id),
                         "project": bot.request.project_name,
                         "acceptsMessages": bot.collaborate,
                         "working": working,
@@ -298,7 +288,14 @@ impl BotHub {
             bot_name: Some(me.name.clone()),
             session_id: Some(session.clone()),
         };
-        let (target, message) = self.deliver(&to, &text, origin, existing.as_deref())?;
+        // A bot that also works in the sender's project answers there.
+        let (target, message) = self.deliver(
+            &to,
+            Some(&run.project_id),
+            &text,
+            origin,
+            existing.as_deref(),
+        )?;
         let relay = Relay {
             id: Uuid::new_v4().to_string(),
             from_bot_id: me.id.clone(),
@@ -532,25 +529,6 @@ impl BotHub {
         Ok(
             json!({"proposalId": id, "status": "The user can create or dismiss this suggestion on the Bots page."}),
         )
-    }
-
-    /// Runs a bot tool by name for agents that reach Jackalope through the HTTP bridge.
-    pub(crate) fn call(&self, run: &TaskRun, tool: &str, input: Value) -> Result<Value, String> {
-        fn parse<T: serde::de::DeserializeOwned>(input: Value) -> Result<T, String> {
-            serde_json::from_value(input).map_err(|error| format!("Invalid arguments: {error}"))
-        }
-        match tool {
-            "bots" => self.directory(run, parse(input)?),
-            "bot_message" => self.message(run, parse(input)?),
-            "present" => self.present(run, parse(input)?),
-            "suggest_bot" => self.suggest(run, parse(input)?),
-            "remember" => self.remember(run, parse(input)?),
-            "recall" => self.recall(run, parse(input)?),
-            _ => Err(format!(
-                "Unknown bot tool. Use one of: {}.",
-                BOT_TOOLS.join(", ")
-            )),
-        }
     }
 
     /// Searches the calling bot's own conversations, or reads one back page by page.

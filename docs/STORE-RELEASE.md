@@ -89,8 +89,8 @@ One-time setup:
 Ready release commits pushed to beta or stable automatically build and submit after
 verification. Beta targets the configured flight; stable targets the base product,
 preserving its audience and listings, and requires `store-stable` approval after
-packaging. Both retain approved-account access while this preview is underway;
-`stable` does not mean publicly discoverable. Required source checks must succeed
+packaging. Both require a Jackalope account for new execution, and publication
+does not change the product's Partner Center audience. Required source checks must succeed
 before any Store write. Publication reserves `store-beta/vX.Y.Z` or
 `store-stable/vX.Y.Z` automatically at the source commit. Do not manually push tags
 to trigger releases, move them or delete them. See [release automation](RELEASE-AUTOMATION.md).
@@ -164,38 +164,43 @@ checks before setting `STORE_ACCEPTED`; retain evidence privately.
 
 ## Access and invitations
 
-Start with **Private audience** and a small known-user group. Collect the personal
-Microsoft-account emails used by those testers, and send Partner Center's special
-authenticated listing link. Work/school identities are not accepted for this mode.
-The Jackalope email used inside the app can differ from the Store account email.
+The Store listing is public. Website builds link the `/download/` page's Windows
+option to it through `MICROSOFT_STORE_URL` in `@jackalope/contracts/release` unless
+`VITE_WINDOWS_STORE_URL` overrides it; an empty value falls back to
+`VITE_WINDOWS_DOWNLOAD_URL` or Coming soon. A reserved product ID or successful
+package build is not availability, so point the override only at a listing the
+intended audience can use.
 
-For the broader waitlist, use **Public audience → available but not discoverable →
-direct link only**, with required approved Jackalope login. Approve members using
-the existing administration flow and send the Store link to each invited batch.
-After installed acceptance, configure private server `ACCESS_STORE_URL` with the
-exact Microsoft product link (`https://apps.microsoft.com/detail/<id>` or
-`https://www.microsoft.com/store/apps/<id>`). The admin page reports the Store link
-as configured; the authenticated download endpoint redirects there without an R2
-installer. This is configuration readiness, not a live Store availability probe.
-The link takes precedence over `ACCESS_INSTALLER_KEY`. Keep it blank until usable.
-The website's `/download/` page separately uses `VITE_WINDOWS_STORE_URL` for public
-availability. Keep that value blank until the listing is usable by the intended
-audience; a reserved product ID or successful package build is not availability.
-Approval emails point to `/download/`, where members confirm their email and see
-platform availability.
-Pass `STAGING_ACCESS_STORE_URL` / `PRODUCTION_ACCESS_STORE_URL` through deployment
-configuration, or include `ACCESS_STORE_URL` in the private community configuration.
+Listing audience and discoverability are Partner Center settings. A **Private
+audience** needs the personal Microsoft-account emails of a known group and
+Partner Center's special authenticated listing link; work/school identities are not
+accepted for that mode. **Public audience → available but not discoverable → direct
+link only** keeps the listing out of search; a hidden link can be forwarded and
+permits installation. Private-to-public audience is a one-way change for that
+product. Removing a tester from the Store private audience does not revoke an
+installed app. The Jackalope email used inside the app can differ from the Store
+account email.
 
-The current referral system also grants invitations to approved members; account
-approval does not impose an exact operator-only cohort size.
+Store installation does not replace the Jackalope account. Every build requires one
+for new execution, so Store discoverability does not change the account
+requirement. With the service's open signup on (the tracked production setting),
+a person signs up on the website and connects the app. In waitlist mode, approve
+members through the existing administration flow; the referral system also grants
+invitations to approved members, so approval does not cap the cohort at an
+operator-chosen size. Membership and device revocation are handled by Jackalope's
+service.
 
-A hidden link can be forwarded and permits installation. Jackalope membership
-controls new execution in every build. No raw installer download is
-needed for this path. Store discoverability does not change the account requirement.
-
-Private-to-public audience is a one-way change for that product. Removing a tester
-from the Store private audience does not revoke an installed app. Membership and
-device revocation are handled by Jackalope's service.
+The private server setting `ACCESS_STORE_URL` takes the exact Microsoft product link
+(`https://apps.microsoft.com/detail/<id>` or `https://www.microsoft.com/store/apps/<id>`)
+for signed-in members. The admin page reports the Store link as configured; the
+authenticated download endpoint redirects there without an R2 installer, preserving
+download milestones. This is configuration readiness, not a live Store availability
+probe. The link takes precedence over `ACCESS_INSTALLER_KEY`; keep it blank until the
+listing is usable. Approval emails point to `/download/`, where members confirm their
+email and see platform availability. Pass `STAGING_ACCESS_STORE_URL` /
+`PRODUCTION_ACCESS_STORE_URL` through deployment configuration, or include
+`ACCESS_STORE_URL` in the private community configuration. No raw installer download
+is needed for this path.
 
 ## Native beta gate
 
@@ -214,18 +219,19 @@ records fail closed. Confirmed revocation removes the credential and denies new 
 Direct launches, continuations, queued and scheduled tasks share native enforcement;
 new PTY sessions are also guarded. Denied schedule occurrences record a skip without
 starting an attempt. Saved results, export/recovery, stopping work and existing
-processes remain available. This is beta admission control, not tamper-proof DRM
+processes remain available. This is account admission control, not tamper-proof DRM
 against someone modifying a local binary or running a separately built client.
 See [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) for approval and credential storage.
 
-Store discovery and installation do not grant early access. Verified waitlist
-members can connect to view queue position, referral progress and sharing, and
-follow website/tour links while waiting. Describe the early-access requirement in
-the listing; installed acceptance must cover both waiting and approved accounts.
+Store discovery and installation do not grant account access. With open signup, a
+new person creates a free account on the website and connects the app. In waitlist
+mode, verified waitlist members can connect to view queue position, referral
+progress and sharing, and follow website/tour links while waiting. Describe the
+account requirement in the listing; installed acceptance covers approved accounts
+and, for waitlist mode, waiting accounts.
 
 ## Remaining acceptance
 
-- Deploy and verify the existing account migration/API/website before inviting anyone.
 - Provide Partner Center identity and a working certification
   account with reproducible login/agent instructions. Magic-link-only access must be
   workable for reviewers; do not add an unauthenticated reviewer bypass.
@@ -243,8 +249,8 @@ the listing; installed acceptance must cover both waiting and approved accounts.
   data retention. Store updates are not controlled by the direct installer's
   task-aware update button; native interrupted-history recovery must be accepted.
 - Verify light/dark, keyboard/focus, reduced motion and both supported window sizes.
-- Submit first to a private audience. No claim of certification or Store-installed
-  acceptance follows from a successful package build or browser fixture.
+- No claim of certification or Store-installed acceptance follows from a successful
+  package build or browser fixture.
 
 ## References
 

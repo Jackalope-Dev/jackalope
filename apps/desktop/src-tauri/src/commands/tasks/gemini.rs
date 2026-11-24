@@ -98,7 +98,7 @@ impl Stream {
                 }
                 self.initialized = self.session(run, &event["session_id"]);
                 if let Some(model) = event["model"].as_str().filter(|model| !model.is_empty()) {
-                    run.model = Some(model.chars().take(160).collect());
+                    super::served_model::observe(run, model);
                 }
             }
             "message" => self.message(run, &event),
@@ -220,13 +220,13 @@ pub(super) fn quota_failure(message: &str) -> Option<super::routing::QuotaFailur
     if lower.contains("retrying") {
         return None;
     }
-    let terminal = [
-        "resource_exhausted",
-        "terminalquotaerror",
-        "exhausted your capacity",
-        "daily quota",
-    ];
-    if terminal.iter().any(|pattern| lower.contains(pattern)) {
+    let code = ["resource_exhausted", "terminalquotaerror"];
+    let wording = ["exhausted your capacity", "daily quota"];
+    // As in `routing::quota_failure`, only an error code outranks a safety block.
+    if code.iter().any(|pattern| lower.contains(pattern))
+        || (wording.iter().any(|pattern| lower.contains(pattern))
+            && !super::failure::refusal(&lower))
+    {
         return Some(super::routing::QuotaFailure {
             model_only: false,
             message: message.chars().take(2000).collect(),

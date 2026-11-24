@@ -1,14 +1,13 @@
-import { Badge, Panel } from '@jackalope/ui';
+import { Badge, Button, Panel } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { projectTaskPresence } from '../../lib/project-return';
 import type { QueueView } from '../../lib/queue';
-import type { WorkItem } from '../../lib/task-collection';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
+import { attentionReason, needsYou, type WorkItem } from '../../lib/task-collection';
 import { selectWork } from '../../lib/work-selection';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
 
 export function ProjectReturn({
   items,
@@ -33,6 +32,8 @@ export function ProjectReturn({
     <div className="space-y-2">
       {items.slice(0, 3).map((item) => {
         const presence = projectTaskPresence(item, runs, queue);
+        // The same reason the work list gives, so a failed check reads the same everywhere.
+        const reason = needsYou(item) ? attentionReason(item) : undefined;
         return (
           <Panel
             key={item.id}
@@ -45,12 +46,15 @@ export function ProjectReturn({
                   <p className="font-medium text-sm break-words text-[var(--color-text-primary)]">
                     {item.title}
                   </p>
-                  <Badge variant={item.stage === 'attention' ? 'warning' : 'outline'}>
-                    {presence.label}
+                  <Badge variant={reason || item.stage === 'attention' ? 'warning' : 'outline'}>
+                    {reason ?? presence.label}
                   </Badge>
                 </div>
                 <p className="text-[var(--color-text-secondary)] text-xs">
-                  {new Date(item.date).toLocaleString()}
+                  {new Date(item.date).toLocaleString(undefined, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
                 </p>
               </div>
             </div>
