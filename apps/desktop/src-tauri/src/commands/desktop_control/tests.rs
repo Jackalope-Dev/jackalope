@@ -732,20 +732,64 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
 }
 
 /// Starts the resident Windows helper, which compiles its C# source, so a change that
-/// breaks the helper fails here rather than on someone's computer.
+/// breaks the helper fails here, with the compiler's message, rather than on someone's
+/// computer.
 #[cfg(windows)]
 #[test]
 fn the_windows_helper_compiles_and_lists_windows() {
-    let mut helper = helper::Helper::new(platform::launcher().unwrap());
-    let listed = helper
-        .call(
-            &json!({"action":"list","deny":[std::process::id()]}),
-            Duration::from_secs(60),
-            &AtomicBool::new(false),
-        )
-        .map_err(String::from)
+    use std::io::Write;
+    use std::process::Stdio;
+    let launch = (platform::launcher().unwrap())().unwrap();
+    let mut command = launch.command;
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .unwrap();
-    assert!(listed["windows"].is_array());
+    {
+        let mut stdin = child.stdin.take().unwrap();
+        for line in &launch.preamble {
+            writeln!(stdin, "{line}").unwrap();
+        }
+        let request = json!({"id":1,"action":"list","deny":[std::process::id()]});
+        writeln!(stdin, "{request}").unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("\"windows\""),
+        "helper output: {stdout}\nerrors: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Compiles the Windows indicator the way a grant does, without showing it.
+#[cfg(windows)]
+#[test]
+fn the_windows_indicator_compiles() {
+    let directory =
+        std::env::temp_dir().join(format!("jackalope-indicator-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = directory.join("indicator.cs");
+    std::fs::write(&source, include_str!("indicator.cs")).unwrap();
+    let powershell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+        .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    let output = crate::commands::process_control::hidden(&mut std::process::Command::new(powershell))
+        .args(["-NoProfile", "-NonInteractive", "-Command"])
+        .arg(format!(
+            "$ErrorActionPreference='Stop'; Add-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition ([IO.File]::ReadAllText('{}'))",
+            source.display()
+        ))
+        .output()
+        .unwrap();
+    let _ = std::fs::remove_dir_all(&directory);
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 /// Opens a disposable form, starts a real indicator and drives the resident

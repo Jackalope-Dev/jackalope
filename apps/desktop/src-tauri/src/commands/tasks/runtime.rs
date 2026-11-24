@@ -1450,7 +1450,7 @@ impl TaskRuntime {
                     "--permission-prompt-tool",
                     "mcp__jackalope__permission_prompt",
                     "--allowedTools",
-                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__record_decision,mcp__jackalope__restate_goal,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
+                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__conflicts,mcp__jackalope__resolve_conflicts,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__record_decision,mcp__jackalope__restate_goal,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
                 ]);
             }
         }
@@ -1907,6 +1907,41 @@ impl TaskRuntime {
     }
     pub(in crate::commands) fn run_snapshot(&self, id: &str) -> Option<TaskRun> {
         self.inner.lock().ok()?.runs.get(id).cloned()
+    }
+    /// Each loaded attempt's ID and whether it is still running or finishing,
+    /// without copying the records.
+    pub(in crate::commands) fn run_activity(&self) -> Vec<(String, bool)> {
+        self.inner.lock().map_or_else(
+            |_| Vec::new(),
+            |inner| {
+                inner
+                    .runs
+                    .values()
+                    .map(|run| (run.id.clone(), run.status.is_active() || run.finishing))
+                    .collect()
+            },
+        )
+    }
+    /// One task's loaded attempts, oldest first, without copying the records.
+    pub(in crate::commands) fn task_attempts(&self, task_id: &str) -> Vec<AttemptState> {
+        let mut attempts: Vec<AttemptState> = self.inner.lock().map_or_else(
+            |_| Vec::new(),
+            |inner| {
+                inner
+                    .runs
+                    .values()
+                    .filter(|run| run.task_id == task_id)
+                    .map(|run| AttemptState {
+                        id: run.id.clone(),
+                        started_at: run.started_at.clone(),
+                        status: run.status.clone(),
+                        archived: run.archived_at.is_some(),
+                    })
+                    .collect()
+            },
+        );
+        attempts.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+        attempts
     }
     pub(in crate::commands) fn has_run(&self, id: &str) -> Result<bool, String> {
         Ok(self
@@ -2534,6 +2569,7 @@ impl TaskRuntime {
                 review_captures: None,
                 review_capturing: false,
                 challenge_of: retried.as_ref().and_then(|old| old.challenge_of.clone()),
+                advisor: None,
                 secrets: None,
             };
             self.save(&run)?;

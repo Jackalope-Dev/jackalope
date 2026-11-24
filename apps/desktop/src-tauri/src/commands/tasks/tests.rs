@@ -89,6 +89,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         review_captures: None,
         review_capturing: false,
         challenge_of: None,
+        advisor: None,
         secrets: None,
     }
 }
@@ -527,6 +528,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                 enabled: true,
                 stale: None,
                 enforced: None,
+                tool_rule: None,
                 source_run_id: None,
                 source_head: None,
                 revision: 0,

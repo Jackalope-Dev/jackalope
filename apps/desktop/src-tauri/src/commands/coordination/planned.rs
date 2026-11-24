@@ -194,6 +194,20 @@ impl Coordinator {
         })
     }
 
+    /// Whether `run` works for a managed task: its planner, an assignment or a
+    /// follow-up on one, or a delivery repair.
+    pub(in crate::commands) fn managed_attempt(
+        &self,
+        run: &crate::commands::tasks::TaskRun,
+    ) -> bool {
+        let Ok(inner) = self.inner.lock() else {
+            return false;
+        };
+        super::managed_delivery::managed_attempt(&inner.ledger, run, |id| {
+            self.runtime.run_snapshot(id).map(|root| root.task_id)
+        })
+    }
+
     pub(crate) fn swarm_connected(&self) -> bool {
         cloud::configured(&self.runtime)
     }

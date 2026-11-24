@@ -15,6 +15,12 @@ impl TaskRuntime {
         Ok(runtime)
     }
 
+    /// Loads an attempt as if it were read from history, for tests outside this module.
+    #[cfg(test)]
+    pub(crate) fn insert_for_test(&self, run: TaskRun) {
+        self.inner.lock().unwrap().runs.insert(run.id.clone(), run);
+    }
+
     pub fn new(directory: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let owner = std::fs::OpenOptions::new()

@@ -87,8 +87,8 @@ as tombstones. History records carry their id, lesson id, time, action, reason,
 revision, origin and title. Evidence references and excerpts, use counts,
 opportunities, recent runs, last use, source tasks and commits, project IDs, names and
 folder paths never leave the desktop. A lesson whose text looks like it holds a
-credential, email address, credential URL or the home folder stays local; the status
-line counts them.
+credential, email address, credential URL or the home folder, or holds a secret value
+Jackalope gave an agent this session, stays local; the status line counts them.
 
 Projects match by a key derived from the repository's root commits, so a clone of the
 same repository matches on every computer without sending a path or remote URL. A

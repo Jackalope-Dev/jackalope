@@ -251,8 +251,8 @@ public static class JackalopeDesktop {
         // Bounds of one window, for the badge on an attached window; geometry only.
         if (action == "bounds") {
             try {
-                var identity = Map(request, "window");
-                var handle = Verify(identity);
+                var badged = Map(request, "window");
+                var handle = Verify(badged);
                 if (Deny(request).Contains(Pid(handle))) return new Dictionary<string, object> { {"bounds", null} };
                 return new Dictionary<string, object> { {"bounds", Bounds(handle)} };
             } catch { return new Dictionary<string, object> { {"bounds", null} }; }

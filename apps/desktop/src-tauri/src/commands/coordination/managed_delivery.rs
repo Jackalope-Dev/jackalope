@@ -435,6 +435,26 @@ fn plan_gaps(task: &managed::ManagedTask, run: &TaskRun) -> Option<String> {
     crate::commands::planning::handoff::open_gaps(&run.validation_steps)
 }
 
+/// Whether `run` belongs to a managed task's automatic work: the planner, an
+/// attempt the task recorded (assignments and delivery repairs), or a later
+/// attempt of an assignment's task. `task_of` gives an attempt's task ID.
+pub(super) fn managed_attempt(
+    ledger: &Ledger,
+    run: &TaskRun,
+    task_of: impl Fn(&str) -> Option<String>,
+) -> bool {
+    ledger
+        .managed_tasks
+        .iter()
+        .any(|task| task.planner_run_id == run.id || task.run_ids.contains(&run.id))
+        || ledger
+            .items
+            .iter()
+            .filter(|item| item.feature_id.is_some())
+            .filter_map(|item| item.run_id.as_deref())
+            .any(|root| root == run.id || task_of(root).as_deref() == Some(run.task_id.as_str()))
+}
+
 fn repair_candidate<'a>(
     ledger: &Ledger,
     task: &managed::ManagedTask,
@@ -1043,6 +1063,40 @@ mod tests {
         runs[1].status = RunStatus::Review;
         runs[2].status = RunStatus::Review;
         assert!(!enqueue_checkpoint(&mut ledger, "parent", &runs));
+    }
+
+    #[test]
+    fn managed_attempts_cover_planners_assignments_their_follow_ups_and_repairs() {
+        let (mut ledger, runs) = fixture();
+        let task_of = |id: &str| {
+            runs.iter()
+                .find(|run| run.id == id)
+                .map(|run| run.task_id.clone())
+        };
+        let attempt = |id: &str, task: &str| TaskRun {
+            id: id.into(),
+            task_id: task.into(),
+            ..Default::default()
+        };
+        for (id, task) in [("planner", "planner"), ("a", "a"), ("a-follow-up", "a")] {
+            assert!(
+                managed_attempt(&ledger, &attempt(id, task), task_of),
+                "{id}"
+            );
+        }
+        ledger.managed_tasks[0].run_ids.push("repair".into());
+        assert!(managed_attempt(
+            &ledger,
+            &attempt("repair", "repair"),
+            task_of
+        ));
+        assert!(!managed_attempt(&ledger, &attempt("own", "own"), task_of));
+        ledger.items[0].feature_id = None;
+        ledger.managed_tasks[0].run_ids.clear();
+        assert!(
+            !managed_attempt(&ledger, &attempt("a-follow-up", "a"), task_of),
+            "a plain queued task is not managed"
+        );
     }
 
     #[test]

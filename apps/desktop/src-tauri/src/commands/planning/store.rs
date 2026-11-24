@@ -395,6 +395,44 @@ pub struct PlanSettings {
     /// What agents may decide for the person in this project's plans.
     #[serde(default)]
     pub decide: DecideSettings,
+    /// Whether another agent reads each finished task turn and leaves notes.
+    #[serde(default)]
+    pub advisor: AdvisorSettings,
+}
+
+/// The project's turn advisor. Off until the person turns it on.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdvisorSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    /// The most notes one review may leave.
+    #[serde(default = "default_advisor_notes")]
+    pub max_notes: u32,
+    /// The most reviews across one task's turns.
+    #[serde(default = "default_advisor_reviews")]
+    pub max_reviews: u32,
+}
+
+pub const MAX_ADVISOR_NOTES: u32 = 5;
+pub const MAX_ADVISOR_REVIEWS: u32 = 50;
+
+fn default_advisor_notes() -> u32 {
+    3
+}
+
+fn default_advisor_reviews() -> u32 {
+    10
+}
+
+impl Default for AdvisorSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_notes: default_advisor_notes(),
+            max_reviews: default_advisor_reviews(),
+        }
+    }
 }
 
 /// The project's Autonomy settings. Everything is off until the person turns
@@ -465,6 +503,7 @@ impl Default for PlanSettings {
             ask_before_rounds: false,
             orchestrators: default_orchestrators(),
             decide: DecideSettings::default(),
+            advisor: AdvisorSettings::default(),
         }
     }
 }
@@ -501,6 +540,16 @@ impl PlanSettings {
             || decider.chars().any(|c| c.is_whitespace() || c.is_control())
         {
             return Err("Choose Automatic or an installed agent to decide.".into());
+        }
+        if !(1..=MAX_ADVISOR_NOTES).contains(&self.advisor.max_notes) {
+            return Err(format!(
+                "Allow between 1 and {MAX_ADVISOR_NOTES} advisor notes per review."
+            ));
+        }
+        if !(1..=MAX_ADVISOR_REVIEWS).contains(&self.advisor.max_reviews) {
+            return Err(format!(
+                "Allow between 1 and {MAX_ADVISOR_REVIEWS} advisor reviews per task."
+            ));
         }
         Ok(())
     }
@@ -680,6 +729,7 @@ pub fn export(record: &PlanRecord, template: &str) -> Result<PathBuf, String> {
     if target.is_symlink() {
         return Err("The export path is a symbolic link.".into());
     }
-    history::write_atomic(&target, revision.markdown.as_bytes())?;
+    let markdown = crate::commands::redaction::outbound(&revision.markdown);
+    history::write_atomic(&target, markdown.as_bytes())?;
     Ok(relative)
 }

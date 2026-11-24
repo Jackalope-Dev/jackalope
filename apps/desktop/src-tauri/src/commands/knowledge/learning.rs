@@ -321,9 +321,11 @@ pub fn attention(entry: &KnowledgeEntry) -> Option<String> {
 }
 
 /// Whether the loop may change this entry: Jackalope wrote it and nobody has
-/// edited it since.
+/// edited it since. A lesson with a tool rule is the person's whatever
+/// `managed` says, since a synced copy can bring `managed` back.
 pub(super) fn owned(entry: &KnowledgeEntry) -> bool {
     !entry.dismissed
+        && entry.tool_rule.is_none()
         && entry
             .automatic
             .as_ref()
@@ -648,6 +650,7 @@ fn apply(
                 }),
                 stale: None,
                 enforced: None,
+                tool_rule: None,
                 source_run_id: lesson.run_id.clone(),
                 source_head: None,
                 revision: 1,

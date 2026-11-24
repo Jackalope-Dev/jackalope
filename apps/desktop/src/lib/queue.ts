@@ -1,3 +1,4 @@
+import type { PlannedCommit } from './commit-split.ts';
 import { invokeNative } from './native/transport.ts';
 
 export interface QueueItem {
@@ -129,6 +130,8 @@ export interface IntegrationPlan {
   commitPolicy?: import('./project-git').CommitPolicy;
   cleanupRequested?: boolean;
   cleanupResults?: { workspace: string; removed: boolean; error: string | null }[];
+  /** The approved split, oldest first; empty or absent for a single commit. */
+  commits?: PlannedCommit[];
 }
 
 export type QueueCommand =

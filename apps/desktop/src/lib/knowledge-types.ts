@@ -1,5 +1,16 @@
 import type { Enforcement, Lifecycle } from './learning.ts';
 
+/** A check on agents' tool calls the person made from a lesson. */
+export interface ToolRule {
+  tools: Array<'shell' | 'write' | 'edit'>;
+  /** A regular expression searched in the shell command or the text written. */
+  pattern?: string;
+  /** A workspace-relative glob; without a slash it matches the file name anywhere. */
+  path?: string;
+  action: 'warn' | 'deny';
+  message: string;
+}
+
 interface ProcessTemplate {
   outcomes: string[];
   steps: string[];
@@ -34,6 +45,7 @@ export interface KnowledgeEntry {
   stale?: string | null;
   /** The repository check that enforces it, from an accepted task. */
   enforced?: Enforcement | null;
+  toolRule?: ToolRule | null;
   process?: ProcessTemplate;
   id: string;
   projectId: string;
