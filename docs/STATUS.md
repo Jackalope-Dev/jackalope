@@ -32,7 +32,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   work such as operating a web page or checking a connection; the sidebar lists it above
   the projects, and once added it holds work like any project.
   Inbox gathers work that needs the person, new results, app alerts (including low
-  allowances), running work and pull requests waiting on others across projects. Library
+  allowances), running work and pull requests waiting on others across projects.
+  Overview (sidebar, Mod+Shift+O) shows running work across projects, each project's
+  status with PRs, checks and previews, accounts at or near their limits with resets, and
+  recent results. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
   attachments and images or PDFs a task's latest workspace changed, filtered by project
   and kind. The title bar holds command search; the bottom bar shows the focused project,

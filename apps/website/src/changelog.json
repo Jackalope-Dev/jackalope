@@ -1,5 +1,16 @@
 [
   {
+    "id": "an-overview-of-everything-running",
+    "date": "2026-11-24",
+    "title": "An Overview of everything running.",
+    "description": "A new Overview page shows live work, each project's status and accounts near their limits in one place.",
+    "items": [
+      "Open it from the sidebar or with Cmd/Ctrl+Shift+O; work waiting on you is listed first.",
+      "Project cards show open pull requests, check results and running previews.",
+      "Inbox's Running now lines up with Needs you and no longer lists finished conversations."
+    ]
+  },
+  {
     "id": "worktrees-that-set-themselves-up",
     "date": "2026-11-24",
     "title": "Worktrees that set themselves up.",

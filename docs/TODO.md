@@ -7,6 +7,8 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept the Overview page in an installed app with real running work, previews and
+  pull requests, and load Cloudflare swarm state app-wide so swarms appear as one item.
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
   credentials, generic notification text), signed device builds and CI builds for both
