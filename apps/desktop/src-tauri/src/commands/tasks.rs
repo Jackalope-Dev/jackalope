@@ -3,7 +3,7 @@ pub(super) mod antigravity;
 mod claude_session;
 mod delegation;
 mod efficiency;
-pub(super) mod effort;
+pub(crate) mod effort;
 pub(in crate::commands) mod events;
 pub(super) mod failure;
 mod gemini;
@@ -27,6 +27,7 @@ mod runtime;
 #[cfg(test)]
 mod secret_canary_tests;
 pub(super) mod served_model;
+pub(crate) mod side_chat;
 pub(crate) mod snapshots;
 pub(super) mod speed;
 mod storage;
@@ -273,6 +274,9 @@ macro_rules! tauri_commands {
             commands::tasks::task_mark_reviewed,
             commands::tasks::task_review,
             commands::tasks::task_respond_prompt,
+            commands::tasks::effort::task_effort_levels,
+            commands::tasks::side_chat::task_side_question,
+            commands::tasks::side_chat::task_side_question_cancel,
         ] $($rest)*)
     };
 }

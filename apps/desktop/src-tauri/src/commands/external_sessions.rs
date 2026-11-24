@@ -996,6 +996,7 @@ pub async fn external_session_continue(
                 id: message_id,
                 text,
                 origin: None,
+                reasoning_effort: None,
             },
         )
     })

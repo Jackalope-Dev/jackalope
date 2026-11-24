@@ -2,11 +2,13 @@ import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
 import { emit, listen } from '@tauri-apps/api/event';
 import { FolderOpen } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { useProviderSkills } from '../../hooks/useProviderSkills';
 import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { startComparison } from '../../lib/compare-launch';
+import type { ComposerCommand } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import type { ContextSelection } from '../../lib/knowledge-types';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
@@ -14,7 +16,9 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
 import { checksAutomatically } from '../../lib/project-automation';
 import { appendAttachments } from '../../lib/prompt-attachments';
+import { rememberPrompt, storedPrompts } from '../../lib/prompt-history';
 import { isQuestionOnly, nonCodeReason } from '../../lib/question-intent';
+import { type ReasoningEffort, savedEffort, saveEffort } from '../../lib/reasoning-effort';
 import type { RunRequest } from '../../lib/run-types';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import {
@@ -39,6 +43,9 @@ import {
   useProjectStore,
 } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { ComposerEffortPicker, useEffortLevels } from '../composer/ComposerEffortPicker';
+import { PastedTextChips } from '../composer/PastedTextChips';
+import { useComposerAssist } from '../composer/useComposerAssist';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
@@ -119,6 +126,19 @@ export function SessionStart({
     } catch {}
     return null;
   });
+  const effortKey = `${draftKey}:effort`;
+  const [effort, setEffortState] = useState<ReasoningEffort | null>(() => savedEffort(effortKey));
+  const setEffort = useCallback(
+    (value: ReasoningEffort | null) => {
+      setEffortState(value);
+      saveEffort(effortKey, value);
+    },
+    [effortKey],
+  );
+  const [effortOpen, setEffortOpen] = useState(false);
+  const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+  /** Plan mode, toggled with /plan: Send starts a planning interview instead of the work. */
+  const [planning, setPlanning] = useState(false);
   const preferred = project?.preferences?.preferredRunner;
   const agents = agentChoice ?? (preferred && preferred !== 'auto' ? [preferred] : []);
   const available = useComposerAgents(project);
@@ -126,6 +146,11 @@ export function SessionStart({
     .map((id) => available.find((agent) => agent.id === id))
     .filter((agent) => !!agent);
   const comparing = chosen.length > 1;
+  const efforts = useEffortLevels(
+    project?.id,
+    comparing ? '' : (chosen[0]?.id ?? 'auto'),
+    chosen.length === 1 ? modelChoice?.id : undefined,
+  );
   const [busy, setBusy] = useState(false);
   const [limits, setLimits] = useState<Limits>(() => {
     try {
@@ -167,6 +192,12 @@ export function SessionStart({
       setText((current) => appendAttachments(current, references));
       input.current?.focus();
     },
+    edit: (change) => {
+      assessment.clear();
+      setText(change);
+      input.current?.focus();
+    },
+    room: () => 12000 - [...latest.current].length,
   });
   const clearAssessment = useRef(assessment.clear);
   clearAssessment.current = assessment.clear;
@@ -214,8 +245,14 @@ ${incoming}`
   }, [seed]);
   if (!text.trim() && (origin.readOnly || origin.ideaId)) setOrigin({});
   if (!text.trim() && treatAsCode) setTreatAsCode(false);
-  /** Started work replaces the idea it came from. */
-  const finishOrigin = () => {
+  const historyScope = `project:${project?.id ?? 'none'}`;
+  const [historyRevision, setHistoryRevision] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-read after each send
+  const history = useMemo(() => storedPrompts(historyScope), [historyScope, historyRevision]);
+  /** Started work replaces the idea it came from and joins this project's prompt history. */
+  const finishOrigin = (sent: string) => {
+    rememberPrompt(historyScope, sent);
+    setHistoryRevision((value) => value + 1);
     if (origin.ideaId) useTaskStore.getState().deleteTask(origin.ideaId);
     if (mounted.current) setOrigin({});
   };
@@ -304,15 +341,53 @@ ${incoming}`
   const comparingRef = useRef(comparing);
   comparingRef.current = comparing;
   const general = isGeneralProject(project);
+  const skills = useProviderSkills(
+    chosen.length === 1 ? chosen[0].adapter : undefined,
+    project?.id,
+  );
+  const commands = useMemo(
+    () => ({
+      model: true,
+      effort: efforts.levels.length > 0,
+      // Planning needs a repository, which General never has.
+      plan: !general && isTauriEnvironment(),
+      provider: skills,
+    }),
+    [efforts.levels.length, general, skills],
+  );
+  const assist = useComposerAssist({
+    input,
+    text,
+    setText: (value) => {
+      assessment.clear();
+      setText(value);
+    },
+    projectPath: project?.path,
+    history,
+    commands,
+    disabled: busy,
+    run: (command: ComposerCommand, argument: string) => {
+      if (command.id === 'model') setAgentPickerOpen(true);
+      else if (command.id === 'effort') setEffortOpen(true);
+      else if (command.id === 'plan') {
+        if (argument) {
+          setText(argument);
+          setPlanning(true);
+        } else setPlanning((current) => !current);
+      }
+    },
+  });
   /** Non-code work Jackalope inferred, which Options can switch back to code work. */
   const inferredNonCode = !general && !!nonCodeReason(text, { window: !!attached });
   const send = async (
-    choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess',
+    requested: 'assess' | 'single' | 'plan' | 'interview' = 'assess',
     override?: string,
   ): Promise<string | undefined> => {
+    const choice = requested === 'assess' && planning ? 'interview' : requested;
     sendError.current = '';
     const value = (override ?? text).trim();
     if (!project || !value || sending.current) return;
+    if (override === undefined && assist.intercept(value)) return;
     if ([...value].length > 12000) {
       setError(
         'This request is too long. Shorten it to 12,000 characters before sending. Your draft is preserved.',
@@ -341,7 +416,7 @@ ${incoming}`
         // A comparison is a one-off choice; the next message goes back to the project default.
         localStorage.removeItem(`${draftKey}:agents`);
         await skipAttached();
-        finishOrigin();
+        finishOrigin(value);
         if (mounted.current) {
           setText(latest.current.trim() === value ? '' : latest.current);
           setAgents(null);
@@ -385,13 +460,18 @@ ${incoming}`
         ...(nonCode ? { nonCode } : {}),
         contextSelection: context,
       };
+      // The chosen level goes with this work; a conversation takes it on its first message.
+      const withEffort = effort ? { ...request, reasoningEffort: effort } : request;
       if (choice === 'interview') {
-        const plan = await planCommands.start(request, value);
+        const plan = await planCommands.start(withEffort, value);
         await skipAttached();
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
-        finishOrigin();
-        if (mounted.current) setText('');
+        finishOrigin(value);
+        if (mounted.current) {
+          setText('');
+          setPlanning(false);
+        }
         usePlanStore.getState().select(plan.id);
         navigateWorkspace('plans');
         return;
@@ -412,9 +492,9 @@ ${incoming}`
         if (!autoStart && result.strategy !== 'single') return;
       }
       if (choice === 'plan' || autoStart) {
-        await assessment.create(request, value, autoStart);
+        await assessment.create(withEffort, value, autoStart);
         await skipAttached();
-        finishOrigin();
+        finishOrigin(value);
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
         return;
@@ -425,13 +505,14 @@ ${incoming}`
       await sessionCommand('create', {
         id: attempt.id,
         request,
-        firstMessage: { id: attempt.messageId, text: value },
+        firstMessage: { id: attempt.messageId, text: value, reasoningEffort: effort },
         limits,
       });
       await useLiveSessionStore.getState().refresh(attempt.id);
-      finishOrigin();
+      finishOrigin(value);
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
+      saveEffort(`jackalope-live-effort:${attempt.id}`, effort);
       localStorage.removeItem(draftKey);
       localStorage.removeItem(`${draftKey}:context`);
       if (handedOff) setAttachRefresh((value) => value + 1);
@@ -475,10 +556,12 @@ ${incoming}`
             void send();
           }}
         >
+          {assist.menu}
           <Textarea
             ref={input}
+            {...assist.fieldProps}
             aria-label="Message"
-            placeholder="Build, fix, or explore…"
+            placeholder={planning ? 'What should we plan?' : 'Build, fix, or explore…'}
             rows={3}
             maxLength={12000}
             value={text}
@@ -491,12 +574,29 @@ ${incoming}`
             onBlur={() => setIsFocused(false)}
             onPaste={attachments.onPaste}
             onKeyDown={(event) => {
+              if (assist.onKeyDown(event)) return;
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 void send();
               }
             }}
           />
+          <PastedTextChips
+            pasted={attachments.pasted}
+            onUndo={attachments.undoPaste}
+            onDismiss={attachments.dismissPaste}
+          />
+          {planning && (
+            <InlineNotice
+              action={
+                <Button type="button" variant="ghost" onClick={() => setPlanning(false)}>
+                  Leave plan mode
+                </Button>
+              }
+            >
+              Plan mode: Send starts a read-only planning conversation before any work.
+            </InlineNotice>
+          )}
           {error && (
             <InlineNotice tone="error" action={<DismissButton onDismiss={() => setError('')} />}>
               {error}
@@ -573,6 +673,11 @@ ${incoming}`
               <ComposerAgentPicker
                 project={project}
                 value={agents}
+                open={agentPickerOpen}
+                onOpenChange={(open) => {
+                  setAgentPickerOpen(open);
+                  if (!open) input.current?.focus();
+                }}
                 model={modelChoice}
                 onModelChange={(next) => {
                   assessment.clear();
@@ -586,6 +691,25 @@ ${incoming}`
                   setAgents(next);
                 }}
               />
+              {!comparing && (
+                <ComposerEffortPicker
+                  levels={efforts.levels}
+                  loaded={efforts.loaded}
+                  automatic={!chosen.length}
+                  value={effort}
+                  onChange={(next) => {
+                    assessment.clear();
+                    pending.current = null;
+                    setEffort(next);
+                  }}
+                  open={effortOpen}
+                  onOpenChange={(open) => {
+                    setEffortOpen(open);
+                    if (!open) input.current?.focus();
+                  }}
+                  disabled={busy}
+                />
+              )}
               <ChatOptions
                 triggerVariant="button"
                 triggerLabel="Options"
@@ -690,7 +814,7 @@ ${incoming}`
                 loading={busy}
                 loadingLabel="Starting…"
               >
-                {comparing ? `Start ${chosen.length} tasks` : 'Send'}
+                {planning ? 'Plan' : comparing ? `Start ${chosen.length} tasks` : 'Send'}
               </Button>
             </div>
           </div>

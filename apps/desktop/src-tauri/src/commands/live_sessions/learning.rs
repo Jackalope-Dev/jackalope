@@ -175,6 +175,7 @@ mod tests {
             run_id: None,
             canceled: false,
             origin: None,
+            reasoning_effort: None,
         }
     }
 

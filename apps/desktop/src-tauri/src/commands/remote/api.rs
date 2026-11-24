@@ -345,6 +345,7 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
                     id,
                     text,
                     origin: None,
+                    reasoning_effort: None,
                 }),
                 SessionLimits::default(),
             )?;

@@ -10,7 +10,7 @@ import React from '/node_modules/.vite/deps/react.js';
 import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
 import { LiveSessionView } from '/src/components/sessions/LiveSessionView.tsx';
 import { SessionStart } from '/src/components/sessions/SessionStart.tsx';
-import { WORKSPACE_VIEWS } from '/src/components/layout/navigation.ts';
+import { WORKSPACE_VIEWS } from '/src/lib/navigation.ts';
 import { useLiveSessionStore } from '/src/stores/liveSessionStore.ts';
 import { useProjectStore } from '/src/stores/projectStore.ts';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
@@ -29,6 +29,7 @@ const f = window.sessionFixture = {
  calls:[], failSend:false, holdSend:false, failPin:false, failCreate:false, holdCreate:false, release:null,
  navigation: WORKSPACE_VIEWS,
  theme: appearance => applyThemeTokens({...DEFAULT_THEME,isDark:appearance==='dark'}),
+ messages: () => useLiveSessionStore.getState().sessions[0].messages,
  update: changes => useLiveSessionStore.setState(s=>({sessions:s.sessions.map(item=>({...item,...changes}))})),
  run: changes => useLiveSessionStore.setState(s=>({runs:s.runs.map(item=>({...item,...changes}))})),
 };
@@ -88,6 +89,11 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
  case 'task_screenshot': return Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='), c=>c.charCodeAt(0));
  case 'task_preview_inspect_cancel': return;
 
+ case 'task_effort_levels': return ['low','medium','high'];
+ case 'project_files_list': return ['src/search.tsx','docs/guide.md'];
+ case 'prompt_attachment_save': return 'C:/Projects/atlas/.jackalope/attachments/pasted.txt';
+ case 'task_side_question': return {text:'Search results use a two-column grid.',model:null};
+ case 'task_side_question_cancel': return;
  case 'plugin:window|minimize': case 'plugin:window|close': return;
  default: throw new Error('Unexpected fixture command: '+command);
  }
@@ -157,6 +163,89 @@ try {
     () => document.activeElement?.getAttribute('aria-label') === 'Conversation options',
   );
   const input = page.getByRole('textbox', { name: 'Message', exact: true });
+  // Composer aids: context, commands, effort, history, mentions, pastes and side questions.
+  await page.evaluate(() =>
+    window.sessionFixture.run({ context: { used: 150000, window: 200000 } }),
+  );
+  await page.getByRole('button', { name: /Context: 150,000 of 200,000 tokens \(75%\)/ }).waitFor();
+  await input.pressSequentially('/');
+  const commands = page.getByRole('listbox', { name: 'Commands' });
+  await commands.waitFor();
+  assert.deepEqual(await commands.getByRole('option').allTextContents(), [
+    '/effortChoose how hard the model thinks',
+    '/clearStart a new conversation; this one stays',
+    '/btw <question>Ask a quick side question without adding it to this work',
+  ]);
+  assert.equal(await input.getAttribute('aria-expanded'), 'true');
+  await input.press('Escape');
+  await commands.waitFor({ state: 'hidden' });
+  await input.pressSequentially('eff');
+  await commands.waitFor();
+  await input.press('Enter');
+  await page.getByRole('button', { name: 'High', exact: true }).click();
+  await page.getByRole('button', { name: 'Effort: High', exact: true }).waitFor();
+  assert.equal(await input.inputValue(), '');
+  await input.focus();
+  await input.press('ArrowUp');
+  assert.equal(await input.inputValue(), 'The search results need more room.');
+  await input.press('ArrowDown');
+  assert.equal(await input.inputValue(), '');
+  await input.pressSequentially('See @sea');
+  await page
+    .getByRole('listbox', { name: 'Files' })
+    .getByRole('option', { name: /src\/search\.tsx/ })
+    .waitFor();
+  await input.press('Enter');
+  assert.equal(await input.inputValue(), 'See @src/search.tsx\n\nAttached file: src/search.tsx');
+  await input.fill('');
+  await input.evaluate((field) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', 'x'.repeat(40000));
+    field.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  await page.getByText('Pasted text · 40,000 characters, 1 line, attached as a file').waitFor();
+  assert.match(
+    await input.inputValue(),
+    /Attached file: C:.Projects.atlas.\.jackalope.attachments.pasted\.txt/,
+  );
+  await page.screenshot({ path: `${output}/composer-paste-1280-dark.png` });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  assert.equal(await input.inputValue(), 'x'.repeat(40000));
+  await input.fill('/btw how is search laid out?');
+  await input.press('Enter');
+  const side = page.getByRole('region', { name: 'Side question' });
+  await side.getByText('Search results use a two-column grid.').waitFor();
+  await page.screenshot({ path: `${output}/composer-side-question-1280-dark.png` });
+  await side.getByRole('button', { name: 'Add to draft', exact: true }).click();
+  assert.equal(await input.inputValue(), 'Search results use a two-column grid.');
+  const asked = await page.evaluate(() =>
+    window.sessionFixture.calls.filter((call) =>
+      ['task_side_question', 'live_session_send'].includes(call.command),
+    ),
+  );
+  assert.deepEqual(
+    asked.map((call) => [call.command, call.runId, call.question]),
+    [['task_side_question', 'run', 'how is search laid out?']],
+  );
+  const before = await page.evaluate(() => window.sessionFixture.messages());
+  await input.fill('Think this one through.');
+  await input.press('Enter');
+  await page.waitForFunction(() => document.querySelector('textarea').value === '');
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.sessionFixture.calls.findLast((call) => call.command === 'live_session_send')
+          .reasoningEffort,
+    ),
+    'high',
+  );
+  await page.evaluate((messages) => {
+    window.sessionFixture.calls.length = 0;
+    window.sessionFixture.update({ messages });
+    window.sessionFixture.run({ context: undefined });
+  }, before);
   await input.fill('Keep the result titles on one line.');
   await page.evaluate(() => {
     window.sessionFixture.failSend = true;

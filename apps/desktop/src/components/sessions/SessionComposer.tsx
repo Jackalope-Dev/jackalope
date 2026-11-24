@@ -1,15 +1,26 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { Button, InlineNotice, Textarea } from '@jackalope/ui';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { useProviderSkills } from '../../hooks/useProviderSkills';
+import { agentAdapter } from '../../lib/agent-catalog';
+import { emitAppEvent } from '../../lib/app-events';
+import type { ComposerCommand } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { appendAttachments } from '../../lib/prompt-attachments';
+import { type ReasoningEffort, savedEffort, saveEffort } from '../../lib/reasoning-effort';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskRun } from '../../lib/run-types';
 import { stopAndSettle, stopPreview } from '../../lib/task-client';
 import { windowKind } from '../../lib/window-kind';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { ComposerEffortPicker, useEffortLevels } from '../composer/ComposerEffortPicker';
+import { ContextMeter } from '../composer/ContextMeter';
+import { PastedTextChips } from '../composer/PastedTextChips';
+import { SideQuestion } from '../composer/SideQuestion';
+import { useComposerAssist } from '../composer/useComposerAssist';
 import { AttachButton } from '../tasks/AttachButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
 import { DismissButton } from '../ui/DismissButton';
@@ -50,14 +61,73 @@ export function SessionComposer({
   latest.current = text;
   const added = useRef(0);
   const form = useRef<HTMLFormElement>(null);
+  const edit = (change: (current: string) => string) => {
+    editing.current = true;
+    setText(change);
+    input.current?.focus();
+  };
   const attachments = usePromptAttachments({
     projectPath: session.request.projectPath,
     target: form,
     disabled: session.closed,
-    onAttach: (references) => {
+    onAttach: (references) => edit((current) => appendAttachments(current, references)),
+    edit,
+    room: () => 12000 - [...latest.current].length,
+  });
+  const effortKey = `jackalope-live-effort:${session.id}`;
+  const [effort, setEffortState] = useState<ReasoningEffort | null>(() => savedEffort(effortKey));
+  const setEffort = useCallback(
+    (value: ReasoningEffort | null) => {
+      setEffortState(value);
+      saveEffort(effortKey, value);
+    },
+    [effortKey],
+  );
+  const [effortOpen, setEffortOpen] = useState(false);
+  const work = active ?? latestRun;
+  const efforts = useEffortLevels(
+    session.request.projectId,
+    work?.agent ?? session.request.agent,
+    work?.model ?? session.request.model ?? undefined,
+  );
+  const customAgents = useAgentConfigStore((state) => state.customAgents);
+  const skills = useProviderSkills(
+    agentAdapter(work?.agent ?? session.request.agent, customAgents),
+    session.request.projectId,
+  );
+  const [side, setSide] = useState<{ id: string; text: string } | null>(null);
+  const history = useMemo(
+    () =>
+      session.messages
+        .filter((message) => !message.origin && !message.canceled)
+        .map((message) => message.text),
+    [session.messages],
+  );
+  const commands = useMemo(
+    () => ({
+      effort: efforts.levels.length > 0,
+      // A detached conversation window has no new-work composer to open.
+      clear: windowKind().kind !== 'liveSession',
+      btw: !!work,
+      provider: skills,
+    }),
+    [efforts.levels.length, work, skills],
+  );
+  const assist = useComposerAssist({
+    input,
+    text,
+    setText: (value) => {
       editing.current = true;
-      setText((current) => appendAttachments(current, references));
-      input.current?.focus();
+      setText(value);
+    },
+    projectPath: session.request.projectPath,
+    history,
+    commands,
+    disabled: session.closed,
+    run: (command: ComposerCommand, argument: string) => {
+      if (command.id === 'effort') setEffortOpen(true);
+      else if (command.id === 'clear') emitAppEvent('new-work', session.request.projectId);
+      else if (command.id === 'btw') setSide({ id: crypto.randomUUID(), text: argument });
     },
   });
   useEffect(() => {
@@ -130,6 +200,7 @@ export function SessionComposer({
   const send = async (mode: 'queue' | 'interrupt' | 'preview' = 'queue') => {
     const value = text.trim();
     if (!value || sending.current || session.closed) return;
+    if (assist.intercept(value)) return;
     if (!pending.current || pending.current.text !== value)
       pending.current = { id: crypto.randomUUID(), text: value };
     const message = pending.current;
@@ -163,8 +234,10 @@ export function SessionComposer({
         messageId: message.id,
         text: value,
         draftRevision: revision.current,
+        reasoningEffort: effort,
       });
       pending.current = null;
+      assist.sent();
       if (!draft.text || latest.current.trim() === value) {
         revision.current = draft.revision;
         saved.current = draft.text;
@@ -197,10 +270,26 @@ export function SessionComposer({
         void send();
       }}
     >
+      {assist.menu}
+      {side && work && (
+        <SideQuestion
+          run={work}
+          question={side}
+          onClose={() => {
+            setSide(null);
+            input.current?.focus();
+          }}
+          onInsert={(answer) => {
+            edit((current) => (current.trim() ? `${current.trimEnd()}\n\n${answer}` : answer));
+            setSide(null);
+          }}
+        />
+      )}
       <Textarea
         ref={input}
+        {...assist.fieldProps}
         aria-label="Message"
-        placeholder="Message…"
+        placeholder="Message, / for commands, @ for files…"
         rows={2}
         maxLength={12000}
         value={text}
@@ -211,11 +300,17 @@ export function SessionComposer({
         }}
         onPaste={attachments.onPaste}
         onKeyDown={(event) => {
+          if (assist.onKeyDown(event)) return;
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             void send();
           }
         }}
+      />
+      <PastedTextChips
+        pasted={attachments.pasted}
+        onUndo={attachments.undoPaste}
+        onDismiss={attachments.dismissPaste}
       />
       {error && (
         <InlineNotice tone="error">
@@ -259,6 +354,19 @@ export function SessionComposer({
             disabled={saving}
           />
         )}
+        <ContextMeter run={work} />
+        <ComposerEffortPicker
+          levels={efforts.levels}
+          loaded={efforts.loaded}
+          value={effort}
+          onChange={setEffort}
+          open={effortOpen}
+          onOpenChange={(open) => {
+            setEffortOpen(open);
+            if (!open) input.current?.focus();
+          }}
+          disabled={saving || session.closed}
+        />
         {active && (
           <Button
             type="button"

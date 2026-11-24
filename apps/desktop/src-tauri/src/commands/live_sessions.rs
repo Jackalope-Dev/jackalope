@@ -35,6 +35,9 @@ pub struct SessionMessage {
     /// Who sent a message that did not come from the person: a wake-up, another bot or a card answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<MessageOrigin>,
+    /// A provider effort level chosen in the composer for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -58,6 +61,8 @@ pub struct FirstMessage {
     /// Set natively by the bot hub; renderer requests cannot claim an origin.
     #[serde(skip)]
     pub(super) origin: Option<MessageOrigin>,
+    #[serde(default, rename = "reasoningEffort")]
+    pub(super) reasoning_effort: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -69,6 +74,9 @@ pub struct SessionBatch {
     pub previous_run_id: Option<String>,
     pub error: Option<String>,
     pub settled: bool,
+    /// The effort level its messages asked for; every message in a batch asks for the same.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -473,6 +481,7 @@ impl LiveSessions {
             if message.text.trim().is_empty() || message.text.chars().count() > 12_000 {
                 return Err("Use a message between 1 and 12,000 characters.".into());
             }
+            super::tasks::effort::chosen(message.reasoning_effort.clone())?;
         }
         // Wake-ups and card answers keep the title naming what started them.
         let title = first_message
@@ -549,6 +558,7 @@ impl LiveSessions {
                     run_id: None,
                     canceled: false,
                     origin: message.origin,
+                    reasoning_effort: message.reasoning_effort,
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
@@ -588,7 +598,19 @@ impl LiveSessions {
         text: String,
         draft_revision: Option<u64>,
     ) -> Result<SessionDraft, String> {
+        self.send_with_effort(id, message_id, text, draft_revision, None)
+    }
+
+    pub(super) fn send_with_effort(
+        &self,
+        id: &str,
+        message_id: String,
+        text: String,
+        draft_revision: Option<u64>,
+        reasoning_effort: Option<String>,
+    ) -> Result<SessionDraft, String> {
         Uuid::parse_str(&message_id).map_err(|_| "Invalid message identifier")?;
+        let reasoning_effort = super::tasks::effort::chosen(reasoning_effort)?;
         if text.trim().is_empty() || text.chars().count() > 12_000 {
             return Err("Use a message between 1 and 12,000 characters.".into());
         }
@@ -618,6 +640,7 @@ impl LiveSessions {
                 run_id: None,
                 canceled: false,
                 origin: None,
+                reasoning_effort,
             });
             session.updated_at = now;
             if draft_revision == Some(session.draft.revision) {
@@ -661,6 +684,7 @@ impl LiveSessions {
                 run_id: None,
                 canceled: false,
                 origin: Some(origin),
+                reasoning_effort: None,
             });
             session.updated_at = now;
             Ok(())
@@ -1141,12 +1165,8 @@ impl LiveSessions {
             {
                 batch.clone()
             } else {
-                let pending: Vec<_> = snapshot
-                    .messages
-                    .iter()
-                    .filter(|m| m.run_id.is_none() && !m.canceled)
-                    .take(8)
-                    .collect();
+                let pending = next_batch(&snapshot.messages);
+                let effort = pending.first().and_then(|m| m.reasoning_effort.clone());
                 if pending.is_empty() {
                     continue;
                 }
@@ -1179,6 +1199,7 @@ impl LiveSessions {
                         .map(|b| b.run_id.clone()),
                     error: None,
                     settled: false,
+                    reasoning_effort: effort,
                 };
                 let claimed = self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
@@ -1236,6 +1257,9 @@ impl LiveSessions {
             request.live_session_id = Some(id.clone());
             request.prompt = batch.prompt.clone();
             request.previous_run_id = batch.previous_run_id.clone();
+            if batch.reasoning_effort.is_some() {
+                request.reasoning_effort = batch.reasoning_effort.clone();
+            }
             if request.previous_run_id.is_none() {
                 request.continues = latest.continues.clone();
             }
@@ -1344,6 +1368,20 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
 }
 
 /// `memory` is the bot's saved notes and recent conversations, placed after its guidance.
+/// The waiting messages the next batch takes, in order: up to eight, stopping before a
+/// message that asks for another effort level so each batch runs at one level.
+fn next_batch(messages: &[SessionMessage]) -> Vec<&SessionMessage> {
+    let mut waiting = messages
+        .iter()
+        .filter(|m| m.run_id.is_none() && !m.canceled)
+        .peekable();
+    let effort = waiting.peek().map(|m| m.reasoning_effort.clone());
+    waiting
+        .take_while(|m| Some(&m.reasoning_effort) == effort.as_ref())
+        .take(8)
+        .collect()
+}
+
 fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory: &str) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
     if let Some(persona) = &session.persona {
@@ -1481,10 +1519,11 @@ pub async fn live_session_send(
     message_id: String,
     text: String,
     draft_revision: Option<u64>,
+    reasoning_effort: Option<String>,
 ) -> Result<SessionDraft, String> {
     let service = service.inner().clone();
     let draft = tauri::async_runtime::spawn_blocking(move || {
-        service.send(&id, message_id, text, draft_revision)
+        service.send_with_effort(&id, message_id, text, draft_revision, reasoning_effort)
     })
     .await
     .map_err(|e| e.to_string())??;

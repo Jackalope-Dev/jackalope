@@ -319,6 +319,7 @@ impl TaskRuntime {
             run.model_reported = false;
             run.usage = Usage::default();
             run.usage_observations.clear();
+            run.context = None;
             run.exit_code = None;
             run.ended_at = None;
             run.status = RunStatus::Starting;
@@ -1093,8 +1094,13 @@ impl TaskRuntime {
         } else {
             return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
-        let reasoning_effort =
-            super::effort::configure(&mut cmd, &adapter, selected_model.as_deref(), req.effort);
+        let reasoning_effort = super::effort::configure_requested(
+            &mut cmd,
+            &adapter,
+            selected_model.as_deref(),
+            req.effort,
+            req.reasoning_effort.as_deref(),
+        );
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
         self.update_checked(id, |run| {
             run.reasoning_effort = reasoning_effort;
@@ -2142,6 +2148,7 @@ impl TaskRuntime {
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
@@ -2570,6 +2577,7 @@ impl TaskRuntime {
                 usage: Usage::default(),
                 mcp_usage: None,
                 usage_observations: vec![],
+                context: None,
                 prompts: vec![],
                 awaiting_answers: Vec::new(),
                 validation_steps: vec![],

@@ -369,6 +369,7 @@ export function TaskDetail({
       isolated: false,
       previousRunId: run.id,
       connectionIds: drafts[key]?.connectionIds,
+      reasoningEffort: drafts[key]?.reasoningEffort ?? undefined,
     });
   };
   const continueTask = async (stopPreview = false) => {
@@ -1031,6 +1032,8 @@ export function TaskDetail({
           acting={acting}
           submitting={submitting}
           onReply={(text) => draft(key, { prompt: text })}
+          effort={drafts[key]?.reasoningEffort ?? null}
+          onEffort={(value) => draft(key, { reasoningEffort: value })}
           onSend={() => void sendFollowUp()}
           onStopAndSend={() => void queueFollowUp(true)}
           onUpdate={(id, action) => void updateFollowUp(id, action)}

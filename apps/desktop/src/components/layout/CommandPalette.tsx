@@ -4,10 +4,10 @@ import { isTerminal } from '@jackalope/contracts/runs';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useProjectFiles } from '../../hooks/useProjectFiles';
 import { emitAppEvent } from '../../lib/app-events';
 import { searchFiles } from '../../lib/file-search';
-import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { type ActiveTab, WORKSPACE_VIEWS } from '../../lib/navigation';
 import { projectNameHints } from '../../lib/project-name-hints';
@@ -23,34 +23,6 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type Command, type CommandContext, matchingCommands } from './commands';
-
-const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
-
-/** Files in the active project for quick open, refreshed at most every 30 seconds. */
-function useProjectFiles(projectPath: string | undefined, enabled: boolean) {
-  const [files, setFiles] = useState<string[]>(
-    () => (projectPath && fileCache.get(projectPath)?.files) || [],
-  );
-  useEffect(() => {
-    if (!enabled || !projectPath || !isTauriEnvironment()) return;
-    const cached = fileCache.get(projectPath);
-    if (cached) setFiles(cached.files);
-    if (cached && Date.now() - cached.loadedAt < 30_000) return;
-    let canceled = false;
-    invokeNative<string[]>('project_files_list', { projectPath })
-      .then((list) => {
-        fileCache.set(projectPath, { files: list, loadedAt: Date.now() });
-        if (!canceled) setFiles(list);
-      })
-      .catch(() => {
-        if (!canceled) setFiles([]);
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [projectPath, enabled]);
-  return files;
-}
 
 export function CommandPalette({
   isOpen,

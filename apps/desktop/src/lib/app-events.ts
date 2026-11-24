@@ -28,6 +28,8 @@ interface AppEvents {
   'open-history-import': undefined;
   /** Adds attachment lines to the open new-work composer. */
   'attach-to-composer': string[];
+  /** Opens the new-work composer for this project, leaving the open work as it is. */
+  'new-work': string;
   /** Working-tree changes were committed or discarded. */
   'changes-updated': undefined;
   /** Feedback was saved for a task. */

@@ -255,6 +255,8 @@ export interface TaskRun {
     cacheRead?: number;
     cacheWrite?: number;
   }[];
+  /** Context after the latest top-level model call; `window` only when the provider states it. */
+  context?: { used: number; window?: number | null } | null;
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
   /** Append-only decision trail the agent reported for this attempt. */
@@ -377,6 +379,8 @@ export interface ScreenshotArtifact {
 }
 export interface RunRequest {
   effort?: TaskEffort;
+  /** A provider effort level chosen for this send; wins over the task approach's level. */
+  reasoningEffort?: string;
   codexSpeed?: 'standard' | 'fast';
   contextSelection?: ContextSelection;
   connectionIds?: string[];

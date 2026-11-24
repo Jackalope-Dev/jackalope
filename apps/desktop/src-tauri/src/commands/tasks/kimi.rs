@@ -423,6 +423,7 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
                 .zip(update["size"].as_u64())
                 .filter(|(_, size)| *size > 0)
             {
+                super::events::observe_context(run, used, Some(size));
                 activity(run, &format!("Context: {used} of {size} tokens. This is context occupancy, not billed usage."));
             }
         }
@@ -1348,6 +1349,7 @@ setInterval(()=>{},1000);
         let mut request = RunRequest {
             retry_of: None,
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             live_session_id: None,
             effort: None,

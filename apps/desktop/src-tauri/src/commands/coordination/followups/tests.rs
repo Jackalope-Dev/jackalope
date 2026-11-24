@@ -38,6 +38,39 @@ fn enqueue(service: &Coordinator, text: &str) -> String {
 }
 
 #[test]
+fn a_chosen_effort_level_is_kept_with_the_follow_up_and_checked() {
+    let (_root, service) = fixture();
+    let id = Uuid::new_v4().to_string();
+    let queue = |effort: Option<&str>| {
+        service.enqueue_followup_with_effort(
+            id.clone(),
+            "source-run",
+            "Think harder".into(),
+            None,
+            false,
+            effort.map(str::to_string),
+        )
+    };
+    queue(Some("xhigh")).unwrap();
+    queue(Some("xhigh")).unwrap();
+    assert!(queue(Some("low")).unwrap_err().contains("different"));
+    assert!(service
+        .enqueue_followup_with_effort(
+            Uuid::new_v4().to_string(),
+            "source-run",
+            "x".into(),
+            None,
+            false,
+            Some("turbo".into()),
+        )
+        .unwrap_err()
+        .contains("Unknown effort level"));
+    let saved = service.followups("task").unwrap();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(saved[0].reasoning_effort.as_deref(), Some("xhigh"));
+}
+
+#[test]
 fn saves_in_order_deduplicates_and_preserves_queue_on_failed_write() {
     let (root, service) = fixture();
     let id = enqueue(&service, "First");

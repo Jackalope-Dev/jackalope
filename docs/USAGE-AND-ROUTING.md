@@ -345,6 +345,24 @@ final integration is explicit and project automatic merge excludes managed tasks
 Existing live-session batch and cost limits retain their serial execution path.
 See [parallel workflows](PARALLEL-WORKFLOWS.md) for recovery and review behavior.
 
+## Composer effort and context
+
+The composers' effort picker sends a provider level for one send (`reasoningEffort` on
+the request, saved on each conversation message and queued follow-up), separate from
+the prompt-only task approach. It wins over the approach's level, and a conversation
+batch never mixes levels. `task_effort_levels` offers the levels Decisions records for
+that adapter and model, otherwise the measured levels in `tasks/effort.rs`, otherwise
+low to high, limited to what the CLI flag takes (Claude Code `--effort` up to `max`,
+Codex `model_reasoning_effort` up to `xhigh`). Agents without an effort flag get no
+picker. Automatic offers low to high and the routed model clamps the level, as it does
+for any level a model lacks.
+
+The context meter shows `TaskRun.context`: the input (with cache) of the latest
+top-level model call, and the window only when the provider states it (Claude Code's
+`modelUsage.contextWindow`, Kimi's `usage_update`). OpenCode reports usage without a
+window, so only the count shows. Codex `exec --json` reports only turn totals, and
+Gemini and Antigravity only totals, so they show no meter.
+
 ## Usage interface contracts
 
 Users should be able to answer: what did Jackalope use, for which work, what
