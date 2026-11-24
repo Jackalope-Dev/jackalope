@@ -425,7 +425,7 @@ impl Fixture {
         git(&root, &["init", "-b", "master"]).unwrap();
         std::fs::write(
             folder.join(".gitignore"),
-            "*.jsonl\n*.json\n*.cjs\nfake-codex*\nhistory/\nno-thread-start\n",
+            "*.jsonl\n*.json\n*.cjs\nfake-codex*\nhistory/\nno-thread-start\nexit-on-turn-start\n",
         )
         .unwrap();
         git(&root, &["add", ".gitignore"]).unwrap();
@@ -894,6 +894,20 @@ fn an_app_server_without_the_needed_methods_falls_back_to_exec_and_says_why() {
     );
     assert!(exec[0]["input"].as_str().unwrap().contains("First"));
     assert_eq!(fixture.runtime.codex_sessions.warm(), 0);
+
+    // A turn Codex may have started is never run again with exec.
+    std::fs::remove_file(fixture.folder.join("no-thread-start")).unwrap();
+    std::fs::write(fixture.folder.join("exit-on-turn-start"), "").unwrap();
+    let lost = fixture.finish(fixture.request("codex-unconfirmed", "Second", None));
+    assert_eq!(lost.status, RunStatus::Failed, "{:?}", lost.activity);
+    assert!(
+        lost.error
+            .as_deref()
+            .is_some_and(|error| error.starts_with("Codex did not confirm the turn started")),
+        "{:?}",
+        lost.error
+    );
+    assert_eq!(fixture.lines("exec.jsonl").len(), 1);
 }
 
 #[test]
@@ -928,6 +942,19 @@ fn a_thread_codex_no_longer_has_starts_over_once_and_failed_turns_fail() {
         failed.error.as_deref(),
         Some("The 'no-such-model-jackalope' model is not supported when using Codex with a ChatGPT account.")
     );
+
+    // A crash ends the turn even while something Codex started keeps its output open.
+    let started = std::time::Instant::now();
+    let crashed = fixture.finish(fixture.request("codex-crashed", "ORPHAN", None));
+    assert_eq!(crashed.status, RunStatus::Failed);
+    assert!(
+        crashed.error.as_deref().is_some_and(
+            |error| error.starts_with("Codex's app-server exited before the turn finished.")
+        ),
+        "{:?}",
+        crashed.error
+    );
+    assert!(started.elapsed() < Duration::from_secs(20));
 }
 
 #[test]
@@ -999,4 +1026,121 @@ fn codex_threads_roll_back_and_fork_by_turn() {
         .rollback_codex_thread("codex-history-3", 1)
         .unwrap_err()
         .contains("Stop the running turn"));
+}
+
+/// Two tiny turns through the installed, signed-in `codex` (not the fake): a file is
+/// created in the workspace, then a write outside it is asked about and denied, in the
+/// same warm app-server. Uses the person's Codex sign-in and quota, so it runs only on
+/// request: `cargo test --no-default-features --lib real_codex -- --ignored --nocapture`.
+#[test]
+#[ignore = "runs the installed codex CLI against the person's account"]
+fn real_codex_runs_turns_in_one_warm_app_server() {
+    let codex = std::env::var("JACKALOPE_REAL_CODEX").unwrap_or_else(|_| {
+        let found = std::process::Command::new("which")
+            .arg("codex")
+            .output()
+            .unwrap();
+        String::from_utf8(found.stdout).unwrap().trim().to_string()
+    });
+    let fixture = Fixture::new("codex-session-real", false);
+    let mut policy = AgentPolicy::default();
+    policy.default_meta_agent = "codex-real".into();
+    policy.custom_agents.push(CustomAgent {
+        id: "codex-real".into(),
+        name: "Codex".into(),
+        command: codex,
+        adapter: Some("codex".into()),
+        args: Vec::new(),
+    });
+    std::fs::write(
+        fixture.runtime.policy_path(),
+        serde_json::to_vec(&policy).unwrap(),
+    )
+    .unwrap();
+    // No managed account: the CLI's own sign-in.
+    std::fs::write(
+        fixture.runtime.profiles_root().join("manifest.json"),
+        br#"{"agents":{}}"#,
+    )
+    .unwrap();
+    let wait = |id: &str, done: &dyn Fn(&TaskRun) -> bool| {
+        let deadline = std::time::Instant::now() + Duration::from_secs(300);
+        loop {
+            let run = fixture.runtime.run_snapshot(id).unwrap();
+            if done(&run) {
+                return run;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{:?} {:?}",
+                run.activity,
+                run.diagnostics
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    };
+    let settled = |run: &TaskRun| !run.status.is_active() && !run.finishing;
+
+    fixture
+        .runtime
+        .start(fixture.request(
+            "codex-real-one",
+            "Create a file named hello.txt in the current directory containing exactly: hi\nDo nothing else.",
+            None,
+        ))
+        .unwrap();
+    let first = wait("codex-real-one", &settled);
+    println!(
+        "turn 1: {:?} transport={:?} error={:?}\nactivity={:#?}",
+        first.status, first.efficiency.codex_transport, first.error, first.activity
+    );
+    assert_eq!(first.efficiency.codex_transport.as_deref(), Some("started"));
+    assert!(first.status != RunStatus::Failed, "{:?}", first.error);
+    let hello = std::fs::read_to_string(fixture.folder.join("hello.txt")).unwrap();
+    assert_eq!(hello.trim(), "hi");
+    assert_eq!(fixture.runtime.codex_sessions.warm(), 1);
+
+    let outside = crate::commands::platform::home_dir()
+        .unwrap()
+        .join(format!(".jackalope-smoke-{}", uuid::Uuid::new_v4()));
+    fixture
+        .runtime
+        .start(fixture.request(
+            "codex-real-two",
+            &format!(
+                "Run this exact shell command: touch {}\nIf the sandbox blocks it, request approval to run it outside the sandbox. If that is denied, stop and reply DENIED.",
+                outside.display()
+            ),
+            Some("codex-real-one"),
+        ))
+        .unwrap();
+    let mut asked = Vec::new();
+    let second = loop {
+        let run = wait("codex-real-two", &|run| {
+            settled(run) || run.prompts.iter().any(|p| p.status == "pending")
+        });
+        if settled(&run) {
+            break run;
+        }
+        for prompt in run.prompts.iter().filter(|p| p.status == "pending") {
+            asked.push(prompt.question.clone());
+            fixture
+                .runtime
+                .respond_prompt("codex-real-two", &prompt.id, "Deny")
+                .unwrap();
+        }
+    };
+    let created = outside.exists();
+    let _ = std::fs::remove_file(&outside);
+    println!(
+        "turn 2: {:?} transport={:?} error={:?} asked={asked:#?}\nresult={:?}\nactivity={:#?}",
+        second.status,
+        second.efficiency.codex_transport,
+        second.error,
+        second.result,
+        second.activity
+    );
+    assert_eq!(second.efficiency.codex_transport.as_deref(), Some("reused"));
+    assert_eq!(second.session_id, first.session_id);
+    assert!(!created, "a write outside the workspace went through");
 }

@@ -48,6 +48,8 @@ const TURN_START_LIMIT: Duration = Duration::from_secs(60);
 const STEER_LIMIT: Duration = Duration::from_secs(15);
 /// How long a stopped turn may take to settle after Codex is asked to interrupt it.
 pub(super) const INTERRUPT_GRACE: Duration = Duration::from_secs(5);
+/// How long the app-server's output may stay open after the process exits.
+const EXIT_GRACE: Duration = Duration::from_secs(2);
 /// Thread settings `codex exec` takes as configuration overrides, which a turn sets
 /// through the protocol instead.
 const PER_TURN: [&str; 4] = [
@@ -297,16 +299,18 @@ impl Sessions {
 
     /// Asks Codex to interrupt attempt `id`'s turn. False when it runs none.
     pub(super) fn interrupt(&self, id: &str) -> bool {
-        let live = self.live.lock().unwrap();
-        let Some(live) = live.get(id) else {
-            return false;
-        };
-        live.connection
-            .send(
-                "turn/interrupt",
+        // The write happens outside the lock, so a slow pipe cannot hold up other turns.
+        let (connection, params) = {
+            let live = self.live.lock().unwrap();
+            let Some(live) = live.get(id) else {
+                return false;
+            };
+            (
+                live.connection.clone(),
                 json!({"threadId": live.thread, "turnId": live.turn}),
             )
-            .is_ok()
+        };
+        connection.send("turn/interrupt", params).is_ok()
     }
 
     #[cfg(test)]
@@ -471,20 +475,36 @@ impl TaskRuntime {
             .connection
             .call("turn/start", turn_params, TURN_START_LIMIT)
         {
-            Ok(response) => response["turn"]["id"].as_str().map(str::to_string),
-            Err(error) => {
+            Ok(response) => response["turn"]["id"]
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| "Codex started the turn without an ID.".to_string()),
+            // Codex answered with an error, so it did not start the turn and exec may run it.
+            Err(error) if error.code.is_some() => {
                 self.settle_diagnostics(id, &session);
                 self.unregister_process(id);
                 return Ok(Outcome::Unavailable(format!(
                     "Codex did not start the turn: {error}"
                 )));
             }
+            Err(error) => Err(format!("Codex did not confirm the turn started: {error}")),
         };
-        let Some(turn) = turn else {
-            self.unregister_process(id);
-            return Ok(Outcome::Unavailable(
-                "Codex started the turn without an ID.".into(),
-            ));
+        // An unconfirmed turn may be running, so it is not run again with exec, which could
+        // apply its changes twice. Dropping the session ends the process.
+        let turn = match turn {
+            Ok(turn) => turn,
+            Err(error) => {
+                self.settle_diagnostics(id, &session);
+                self.unregister_process(id);
+                self.update(id, |run| {
+                    run.error.get_or_insert(error);
+                });
+                return Ok(Outcome::Ran {
+                    success: false,
+                    exit_code: None,
+                    quota_stopped: false,
+                });
+            }
         };
         self.codex_sessions.live.lock().unwrap().insert(
             id.to_string(),
@@ -626,6 +646,7 @@ impl TaskRuntime {
     ) -> bool {
         let mut quota_stopped = false;
         let mut stop_deadline: Option<Instant> = None;
+        let mut exited_at: Option<Instant> = None;
         while state.ended.is_none() {
             while let Ok(line) = session.diagnostics.try_recv() {
                 let _ = self.update_output(id, |run| run.diagnostics.push(line));
@@ -670,7 +691,16 @@ impl TaskRuntime {
                     state.closed = true;
                     return quota_stopped;
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // A process that exited while something it started still holds its
+                    // output open never closes the stream; give the reader a moment first.
+                    if session.process.alive() {
+                        exited_at = None;
+                    } else if exited_at.get_or_insert_with(Instant::now).elapsed() >= EXIT_GRACE {
+                        state.closed = true;
+                        return quota_stopped;
+                    }
+                }
             }
             if !quota_stopped && self.quota_handoff(id) {
                 quota_stopped = true;

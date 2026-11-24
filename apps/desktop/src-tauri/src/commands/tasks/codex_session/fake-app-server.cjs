@@ -233,12 +233,26 @@ if (args[0] === 'exec') {
         return reply({ thread: { id: params.threadId, historyMode: 'paginated' } });
       }
       case 'turn/start': {
+        // Codex took the turn but exited before confirming it.
+        if (fs.existsSync(path.join(dir, 'exit-on-turn-start'))) process.exit(1);
         const turn = id('turn');
         const threads = load();
         threads[params.threadId].push(turn);
         save(threads);
         active = { thread: params.threadId, turn };
         reply({ turn: { id: turn, items: [], status: 'inProgress', error: null } });
+        // Crashes mid-turn, leaving a child that holds this process's output open.
+        if (params.input[0].text.includes('ORPHAN')) {
+          require('node:child_process').spawn(
+            process.execPath,
+            ['-e', 'setTimeout(() => {}, 30000)'],
+            {
+              stdio: ['ignore', 'inherit', 'ignore'],
+            },
+          );
+          setTimeout(() => process.exit(1), 100);
+          return undefined;
+        }
         run(params.threadId, turn, params.input[0].text).then(() => {
           active = null;
         });
