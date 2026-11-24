@@ -915,7 +915,9 @@ pub(super) fn remove_with(
     } else {
         vec!["worktree", "remove", "--", worktree_path]
     };
+    let tasks = super::tasks::rewind::tasks_using(&root, runs);
     repo::git_exact(Path::new(repo_path), &args, Inspection).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
+    super::tasks::rewind::forget_refs(Path::new(repo_path), &tasks, runs, None);
     if delete_branch && !wt.branch.is_empty() {
         delete_merged_branch(
             repo_path,
@@ -1202,11 +1204,13 @@ fn archive(
         ));
     }
     // Nothing else can be recovered from disk now — take the worktree down.
+    let tasks = super::tasks::rewind::tasks_using(path, runs);
     repo::git_exact(
         repo,
         &["worktree", "remove", "--force", "--", worktree_path],
         Inspection,
     )?;
+    super::tasks::rewind::forget_refs(repo, &tasks, runs, Some(&archive_root));
     if branch.starts_with("jackalope/") {
         let _ = repo::git_exact(repo, &["branch", "-D", &branch], Inspection);
     }
@@ -2254,6 +2258,85 @@ mod tests {
             .trim(),
             "change"
         );
+    }
+
+    /// Points `reference` at the current commit, like a turn checkpoint or rewind snapshot.
+    fn hidden_ref(f: &Fixture, reference: &str) {
+        let head = repo::git_exact(&f.repo, &["rev-parse", "HEAD"], Inspection).unwrap();
+        repo::git_exact(&f.repo, &["update-ref", reference, head.trim()], Inspection).unwrap();
+    }
+
+    fn hidden_refs(f: &Fixture) -> Vec<String> {
+        repo::git_exact(
+            &f.repo,
+            &["for-each-ref", "--format=%(refname)", "refs/jackalope"],
+            Inspection,
+        )
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect()
+    }
+
+    #[test]
+    fn cleanup_removes_the_rewind_refs_of_tasks_that_worked_there() {
+        let f = Fixture::new("master");
+        let run = f.run("reviewed");
+        let mut other = f.run("reviewed");
+        other.id = "run-other".into();
+        other.task_id = "task-other".into();
+        other.workspace = f.root.join("still here").to_string_lossy().into_owned();
+        fs::create_dir_all(&other.workspace).unwrap();
+        for reference in [
+            "refs/jackalope/checkpoints/task-fixture/run-fixture",
+            "refs/jackalope/rewinds/task-fixture/rewind-1",
+            "refs/jackalope/checkpoints/task-other/run-other",
+        ] {
+            hidden_ref(&f, reference);
+        }
+        let entry = f.entries(std::slice::from_ref(&run)).remove(1);
+        f.remove(&entry, &[run, other]).unwrap();
+        assert!(!f.worktree.exists());
+        // Another task's refs stay while its workspace exists.
+        assert_eq!(
+            hidden_refs(&f),
+            ["refs/jackalope/checkpoints/task-other/run-other"]
+        );
+    }
+
+    #[test]
+    fn archiving_bundles_rewind_snapshots_before_removing_their_refs() {
+        let f = Fixture::new("main");
+        repo::git_exact(
+            &f.worktree,
+            &["branch", "-m", "jackalope/task-1"],
+            Inspection,
+        )
+        .unwrap();
+        f.commit(&f.worktree, "branch work\n");
+        hidden_ref(&f, "refs/jackalope/checkpoints/task-fixture/run-fixture");
+        hidden_ref(&f, "refs/jackalope/rewinds/task-fixture/rewind-1");
+        let run = f.run("reviewed");
+        let entry = f.entries(std::slice::from_ref(&run)).remove(1);
+        let status = entry.cleanup.as_ref().unwrap();
+        let archived = archive(
+            f.repo.to_str().unwrap(),
+            &entry.path,
+            "main",
+            &entry.head,
+            status.target_head.as_deref().unwrap(),
+            &[run],
+        )
+        .unwrap();
+        assert!(hidden_refs(&f).is_empty());
+        let bundle = PathBuf::from(archived).join("rewinds-task-fixture.bundle");
+        let listed = repo::git_exact(
+            &f.repo,
+            &["bundle", "list-heads", bundle.to_str().unwrap()],
+            Inspection,
+        )
+        .unwrap();
+        assert!(listed.contains("refs/jackalope/rewinds/task-fixture/rewind-1"));
     }
 
     #[test]

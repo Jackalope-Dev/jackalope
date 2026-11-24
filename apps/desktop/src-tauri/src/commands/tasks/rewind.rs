@@ -512,6 +512,116 @@ fn hold_workspace(
     crate::commands::verification::reserve_workspace(workspace)
 }
 
+/// The tasks whose attempts worked in `workspace`. Call before the workspace is removed,
+/// while its path still resolves.
+pub(in crate::commands) fn tasks_using(workspace: &Path, runs: &[TaskRun]) -> Vec<String> {
+    let Ok(target) = std::fs::canonicalize(workspace) else {
+        return Vec::new();
+    };
+    let mut tasks: Vec<String> = runs
+        .iter()
+        .filter(|run| {
+            !run.workspace.is_empty()
+                && std::fs::canonicalize(&run.workspace).is_ok_and(|path| path == target)
+        })
+        .map(|run| run.task_id.clone())
+        .collect();
+    tasks.sort();
+    tasks.dedup();
+    tasks
+}
+
+/// Deletes the hidden checkpoint and rewind refs of `tasks` once their workspace is gone, so
+/// the objects they hold can be collected. Best effort: each refusal or failure is logged and
+/// leaves the refs in place. A task keeps its refs while any of its attempts' workspaces
+/// still exists, or while its latest attempt holds a rewind Undo is still offered for. With
+/// `archive`, the task's rewind snapshots are first saved there as `rewinds-<task>.bundle`,
+/// and kept in the repository if that fails.
+pub(in crate::commands) fn forget_refs(
+    repo: &Path,
+    tasks: &[String],
+    runs: &[TaskRun],
+    archive: Option<&Path>,
+) -> Vec<String> {
+    let mut notes = Vec::new();
+    for task in tasks {
+        let note = match forget_task(repo, task, runs, archive) {
+            Ok(0) => continue,
+            Ok(count) => format!("Removed {} of task {task}", plural(count, "rewind ref")),
+            Err(reason) => format!("Kept the rewind refs of task {task}: {reason}"),
+        };
+        eprintln!("{note}");
+        notes.push(note);
+    }
+    notes
+}
+
+fn forget_task(
+    repo: &Path,
+    task: &str,
+    runs: &[TaskRun],
+    archive: Option<&Path>,
+) -> Result<usize, String> {
+    if task.is_empty()
+        || !task
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err("its identifier cannot name a ref".into());
+    }
+    let attempts = attempts(runs, task);
+    if let Some(open) = attempts
+        .iter()
+        .find(|run| !run.workspace.is_empty() && Path::new(&run.workspace).exists())
+    {
+        return Err(format!("its workspace {} still exists", open.workspace));
+    }
+    if attempts
+        .last()
+        .is_some_and(|latest| latest.rewind.pending().is_some())
+    {
+        return Err("a rewind it can still undo needs them".into());
+    }
+    let list = |prefix: &str| -> Result<Vec<String>, String> {
+        Ok(repo::git(
+            repo,
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                &format!("{prefix}/{task}"),
+            ],
+            Policy::Snapshot,
+        )?
+        .lines()
+        .map(str::to_string)
+        .collect())
+    };
+    let checkpoints = list("refs/jackalope/checkpoints")?;
+    let mut rewinds = list("refs/jackalope/rewinds")?;
+    if let (Some(archive), false) = (archive, rewinds.is_empty()) {
+        let bundle = archive.join(format!("rewinds-{task}.bundle"));
+        let bundle = bundle.to_string_lossy();
+        let mut args = vec!["bundle", "create", &*bundle];
+        args.extend(rewinds.iter().map(String::as_str));
+        let saved = repo::git(repo, &args, Policy::Isolated)
+            .and_then(|_| repo::git(repo, &["bundle", "verify", &bundle], Policy::Isolated));
+        if let Err(error) = saved {
+            eprintln!(
+                "Kept the rewind snapshots of task {task}: they could not be archived: {error}"
+            );
+            rewinds.clear();
+        }
+    }
+    let mut removed = 0;
+    for reference in checkpoints.iter().chain(&rewinds) {
+        match repo::git(repo, &["update-ref", "-d", reference], Policy::Isolated) {
+            Ok(_) => removed += 1,
+            Err(error) => eprintln!("Could not remove {reference}: {error}"),
+        }
+    }
+    Ok(removed)
+}
+
 impl TaskRuntime {
     /// Saves the files attempt `id` starts from and records the outcome on it. A failure
     /// only means this turn cannot be rewound to; the turn goes on.

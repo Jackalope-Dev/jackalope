@@ -632,3 +632,77 @@ fn real_claude_rewind() {
 fn real_codex_rewind() {
     real_rewind_trial("codex", std::env::var("JACKALOPE_REWIND_MODEL").ok());
 }
+
+#[test]
+fn removed_workspaces_lose_their_rewind_refs_unless_still_needed() {
+    let root = std::env::temp_dir().join(format!("jackalope-rewind-refs-{}", uuid::Uuid::new_v4()));
+    let repo = super::super::tests::trial_repository(&root);
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    let tasks = ["gone", "gone-1", "open", "pending"];
+    for task in tasks {
+        for kind in ["checkpoints", "rewinds"] {
+            git(
+                &repo,
+                &[
+                    "update-ref",
+                    &format!("refs/jackalope/{kind}/{task}/ref"),
+                    &head,
+                ],
+            );
+        }
+    }
+    let mut runs = Vec::new();
+    for task in tasks {
+        let mut run = turn("claude", &format!("{task}-run"), 1);
+        run.task_id = task.into();
+        run.workspace = root.join(task).to_string_lossy().into_owned();
+        runs.push(run);
+    }
+    std::fs::create_dir_all(root.join("open")).unwrap();
+    runs[3].rewind.applied = Some(Rewind {
+        id: "r".into(),
+        at: "now".into(),
+        turn_run_id: "pending-run".into(),
+        turn: 1,
+        rewound_run_ids: vec!["pending-run".into()],
+        restored: checkpoint("pending-run"),
+        safety: SafetySnapshot {
+            reference: "refs/jackalope/rewinds/pending/ref".into(),
+            commit: head.clone(),
+            head: head.clone(),
+            tree: head.clone(),
+            index: None,
+        },
+        resume: RewindResume::New,
+        undone_at: None,
+        replaces: None,
+    });
+    let asked: Vec<String> = ["gone", "open", "pending", "bad/id"]
+        .map(str::to_string)
+        .to_vec();
+    let notes = forget_refs(&repo, &asked, &runs, None);
+    let left = git(
+        &repo,
+        &["for-each-ref", "--format=%(refname)", "refs/jackalope"],
+    );
+    let left: Vec<&str> = left.lines().collect();
+    // Only the removed task's refs go, and a task whose name extends it is not touched.
+    assert_eq!(
+        left,
+        [
+            "refs/jackalope/checkpoints/gone-1/ref",
+            "refs/jackalope/checkpoints/open/ref",
+            "refs/jackalope/checkpoints/pending/ref",
+            "refs/jackalope/rewinds/gone-1/ref",
+            "refs/jackalope/rewinds/open/ref",
+            "refs/jackalope/rewinds/pending/ref",
+        ]
+    );
+    assert!(notes
+        .iter()
+        .any(|note| note.contains("Removed 2 rewind refs of task gone")));
+    assert!(notes.iter().any(|note| note.contains("still exists")));
+    assert!(notes.iter().any(|note| note.contains("can still undo")));
+    assert!(notes.iter().any(|note| note.contains("cannot name a ref")));
+    let _ = std::fs::remove_dir_all(&root);
+}
