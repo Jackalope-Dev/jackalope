@@ -51,6 +51,7 @@ const runs=[
  run('reviewer',atlas,{prompt:'Review: show unread counts',agent:'codex',model:'gpt-5.2-codex',status:'running',startedAt:ago(5*MIN),endedAt:null,challengeOf:{runId:'ready',tree:'tree',base:'abc',kind:'review'}}),
  run('worker-1',orbit,{prompt:'Split invoice totals by team',status:'running',startedAt:ago(20*MIN),endedAt:null,progress:{step:'agent',label:'Working',detail:'Editing invoices/teams.ts',startedAt:ago(2*MIN),attempt:1}}),
  run('worker-2',orbit,{prompt:'Team filter on the invoice list',agent:'codex',model:'gpt-5.2-codex',status:'running',startedAt:ago(18*MIN),endedAt:null}),
+ run('limited',atlas,{prompt:'Translate the settings page',status:'failed',failureKind:'quota_exhausted',error:'Claude usage limit reached.',quotaFailure:{modelOnly:false,message:'Claude usage limit reached.',resetsAt:Math.round(now/1000)+90*60},accountBinding:{adapter:'claude',profileId:'team',directory:'/accounts/team',label:'Team'},startedAt:ago(30*MIN),endedAt:ago(25*MIN)}),
  run('planner',orbit,{prompt:'Plan: invoices by team',status:'reviewed',startedAt:ago(25*MIN),endedAt:ago(21*MIN)}),
 ];
 // The misclassified item from the owner's screenshot: a conversation that was finished 41 days
@@ -241,6 +242,11 @@ try {
     assert.match(usage, /Codex/);
     assert.match(usage, /Limit reached/);
     assert.match(usage, /12% remaining/);
+    assert.match(
+      usage,
+      /Usage limit reached\s*Resets /,
+      'limits from recent work show their reset',
+    );
     const finished = await page.locator('.overview-finished').innerText();
     assert.match(finished, /Fix the dark mode toggle flicker\s*Merged · Atlas/);
     await shots('overview');

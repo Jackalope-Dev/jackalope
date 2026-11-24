@@ -22,6 +22,7 @@ import { liveWork } from '../../lib/live-work';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { pullRequestPhaseView } from '../../lib/pull-requests';
 import type { WorkItem } from '../../lib/task-collection';
+import { limitName, observedLimits, resetTime } from '../../lib/usage-limit';
 import {
   openWork,
   selectWork,
@@ -38,11 +39,7 @@ import {
   workActivityTime,
 } from '../../lib/workspace-overview';
 import { useActivityStore } from '../../stores/activityStore';
-import {
-  type CapacityRecord,
-  type CapacityWindow,
-  useCapacityStore,
-} from '../../stores/capacityStore';
+import { useCapacityStore } from '../../stores/capacityStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { isGeneralProject, type Project, useProjectStore } from '../../stores/projectStore';
@@ -202,40 +199,43 @@ function ProjectCard({ summary, now }: { summary: ProjectSummary; now: number })
 }
 
 interface LimitRow {
-  record: CapacityRecord;
-  window: CapacityWindow;
-  remaining: number;
-  label: string;
+  key: string;
+  agent: string;
+  account: string;
+  /** How close the account is, such as "12% remaining · 5-hour window". */
+  detail: string;
+  /** When the limit lifts, when the provider said. */
+  reset?: string;
   tone: 'low' | 'empty';
+  /** Percent left, when an account reader reported one. */
+  remaining: number | null;
 }
 
-/**
- * An account window at or near its limit. `reset` is the slot for when the limit lifts;
- * it renders only when given.
- */
-function UsageRow({ row, reset }: { row: LimitRow; reset?: ReactNode }) {
+/** An account at or near a limit, with when it resets when that is known. */
+function UsageRow({ row }: { row: LimitRow }) {
   return (
     <li className="overview-usage-row" data-tone={row.tone}>
       <span className="overview-usage-mark" aria-hidden="true">
-        <ProviderMark provider={row.record.agent} size={18} />
+        <ProviderMark provider={row.agent} size={18} />
       </span>
       <span className="overview-usage-text">
         <span className="overview-usage-name">
-          {capacityAgentName(row.record.agent)}
-          <span className="overview-usage-account" title={row.record.account}>
-            {' '}
-            · {shortAccount(row.record.account)}
-          </span>
+          {capacityAgentName(row.agent)}
+          {row.account && (
+            <span className="overview-usage-account" title={row.account}>
+              {' '}
+              · {shortAccount(row.account)}
+            </span>
+          )}
         </span>
-        <span className="overview-usage-detail">
-          {row.tone === 'empty' ? 'Limit reached' : row.label} ·{' '}
-          {capacityWindowName(row.window).toLowerCase()}
+        <span className="overview-usage-detail">{row.detail}</span>
+        {row.reset && <span className="overview-usage-reset">{row.reset}</span>}
+      </span>
+      {row.remaining !== null && (
+        <span className="overview-usage-bar" aria-hidden="true">
+          <span className="overview-usage-fill" style={{ width: `${row.remaining}%` }} />
         </span>
-        {reset && <span className="overview-usage-reset">{reset}</span>}
-      </span>
-      <span className="overview-usage-bar" aria-hidden="true">
-        <span className="overview-usage-fill" style={{ width: `${Math.max(row.remaining, 0)}%` }} />
-      </span>
+      )}
     </li>
   );
 }
@@ -243,30 +243,47 @@ function UsageRow({ row, reset }: { row: LimitRow; reset?: ReactNode }) {
 function UsageGlance({ now }: { now: number }) {
   const records = useCapacityStore((state) => state.records);
   const error = useCapacityStore((state) => state.error);
-  const rows = useMemo(
-    () =>
-      records
-        .filter((record) => record.status !== 'notInstalled')
-        .flatMap((record) =>
-          record.windows.flatMap((window): LimitRow[] => {
-            const display = capacityWindowDisplay(record, window, now);
-            return (display.tone === 'low' || display.tone === 'empty') &&
-              display.remaining !== null
-              ? [
-                  {
-                    record,
-                    window,
-                    remaining: display.remaining,
-                    label: display.label,
-                    tone: display.tone,
-                  },
-                ]
-              : [];
-          }),
-        )
-        .sort((a, b) => a.remaining - b.remaining),
-    [records, now],
-  );
+  const runs = useAllRuns();
+  const rows = useMemo(() => {
+    // Limits recent work ran into come first: they stop work until they reset.
+    const hit = observedLimits(runs, now).map(
+      (limit): LimitRow => ({
+        key: `limit:${limit.agent}:${limit.profileId ?? limit.account}`,
+        agent: limit.agent,
+        account: limit.account,
+        detail: `${limitName(limit.kind)} reached`,
+        reset: limit.resetsAt
+          ? `Resets ${resetTime(limit.resetsAt, now)}`
+          : 'Reset time not reported',
+        tone: 'empty',
+        remaining: null,
+      }),
+    );
+    const reported = records
+      .filter((record) => record.status !== 'notInstalled')
+      .flatMap((record) =>
+        record.windows.flatMap((window): LimitRow[] => {
+          const display = capacityWindowDisplay(record, window, now);
+          if ((display.tone !== 'low' && display.tone !== 'empty') || display.remaining === null)
+            return [];
+          return [
+            {
+              key: `${record.agent}:${record.account}:${window.window}`,
+              agent: record.agent,
+              account: record.account,
+              detail: `${display.tone === 'empty' ? 'Limit reached' : display.label} · ${capacityWindowName(window).toLowerCase()}`,
+              reset: window.resetsAt
+                ? `Resets ${resetTime(window.resetsAt * 1000, now)}`
+                : undefined,
+              tone: display.tone,
+              remaining: display.remaining,
+            },
+          ];
+        }),
+      )
+      .sort((a, b) => (a.remaining ?? 0) - (b.remaining ?? 0));
+    return [...hit, ...reported];
+  }, [records, runs, now]);
   return (
     <section className="overview-section" aria-labelledby="overview-usage">
       <div className="overview-section-heading">
@@ -278,10 +295,7 @@ function UsageGlance({ now }: { now: number }) {
         {rows.length ? (
           <ul className="overview-usage">
             {rows.map((row) => (
-              <UsageRow
-                key={`${row.record.agent}:${row.record.account}:${row.window.window}`}
-                row={row}
-              />
+              <UsageRow key={row.key} row={row} />
             ))}
           </ul>
         ) : (
