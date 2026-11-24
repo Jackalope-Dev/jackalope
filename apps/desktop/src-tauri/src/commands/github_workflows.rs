@@ -1,7 +1,12 @@
-use super::process_control;
+use super::{
+    process_control,
+    source_control::{self, bitbucket, gitlab, Route},
+    tasks::TaskRuntime,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{path::Path, process::Command, time::Duration};
+use tauri::State;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -164,15 +169,56 @@ macro_rules! tauri_commands {
 }
 pub(crate) use tauri_commands;
 
+/// Reads an issue, a change request's review threads or a failing CI run from the
+/// project's code host, as a bounded excerpt for a task draft. The name predates
+/// GitLab and Bitbucket, which are read here too.
 #[tauri::command]
 pub async fn project_github_context(
     project_path: String,
     kind: String,
     number: String,
+    state: State<'_, TaskRuntime>,
 ) -> Result<WorkflowContext, String> {
-    tauri::async_runtime::spawn_blocking(move || inspect(Path::new(&project_path), &kind, &number))
-        .await
-        .map_err(|e| e.to_string())?
+    let integration = state.integration_directory();
+    let path = project_path.clone();
+    let route = tauri::async_runtime::spawn_blocking(move || {
+        source_control::route(&integration, Path::new(&path), &path)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let found = match route {
+        Route::GitHub => {
+            return tauri::async_runtime::spawn_blocking(move || {
+                inspect(Path::new(&project_path), &kind, &number)
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        }
+        Route::GitLab(repository) => {
+            let number = identifier(&number)?;
+            tauri::async_runtime::spawn_blocking(move || {
+                gitlab::context(Path::new(&project_path), &repository, &kind, &number)
+            })
+            .await
+            .map_err(|e| e.to_string())??
+        }
+        Route::Bitbucket(repository) => {
+            let number = identifier(&number)?;
+            let credentials = bitbucket::require(&state.integration_directory())?;
+            bitbucket::context(&credentials, &repository, &kind, &number).await?
+        }
+    };
+    let (title, url, text, incomplete) = found;
+    if !url.starts_with("https://") {
+        return Err("The code host returned no item address.".into());
+    }
+    let (text, truncated) = bounded(&text, 8_000);
+    Ok(WorkflowContext {
+        title,
+        url,
+        text,
+        truncated: truncated || incomplete,
+    })
 }
 
 #[cfg(test)]

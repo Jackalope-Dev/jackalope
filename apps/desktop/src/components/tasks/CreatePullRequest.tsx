@@ -5,24 +5,30 @@ import { useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
 import { workingChanges } from '../../lib/project-git';
 import type { TaskRun } from '../../lib/run-types';
+import { type HostKind, hostTerms } from '../../lib/source-control';
 import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 
 /**
  * Commits the task's remaining changes with the project's commit policy, pushes
- * its branch and opens a pull request through the GitHub CLI. Each step runs
+ * its branch and opens a pull request through the GitHub CLI (a merge request through
+ * the GitLab CLI, or a pull request through the Bitbucket API, on those hosts). Each step runs
  * only after the person confirms the title, description and draft choice. The title
  * and description are drafted from the branch's diff alone, so they describe the code
  * rather than the request or conversation that produced it.
  */
 export function CreatePullRequest({
   run,
+  provider,
   disabled,
   onCreated,
 }: {
   run: TaskRun;
+  /** The project's code host; GitHub until it is known. */
+  provider?: HostKind;
   disabled?: boolean;
   onCreated: (url: string) => void;
 }) {
+  const { noun, via } = hostTerms(provider);
   const [draft, setDraft] = useState(true);
   const [uncommitted, setUncommitted] = useState<string[] | null>(null);
   const checkout = { repoPath: run.projectPath, worktreePath: run.workspace };
@@ -44,7 +50,7 @@ export function CreatePullRequest({
       .catch(() => setUncommitted([]));
   };
   const create = async () => {
-    if (!title.trim()) throw new Error('Write a pull request title.');
+    if (!title.trim()) throw new Error(`Write a ${noun} title.`);
     try {
       if (uncommitted?.length)
         await invokeNative('git_commit_changes', {
@@ -68,18 +74,18 @@ export function CreatePullRequest({
     }
   };
   const steps = uncommitted?.length
-    ? `Commits ${uncommitted.length} changed ${uncommitted.length === 1 ? 'file' : 'files'} with your commit settings, pushes ${run.branch} and opens the pull request with your GitHub CLI.`
-    : `Pushes ${run.branch} and opens the pull request with your GitHub CLI.`;
+    ? `Commits ${uncommitted.length} changed ${uncommitted.length === 1 ? 'file' : 'files'} with your commit settings, pushes ${run.branch} and opens the ${noun} with ${via}.`
+    : `Pushes ${run.branch} and opens the ${noun} with ${via}.`;
   return (
     <ConfirmDialog
       trigger={
         <Button variant="outline" disabled={disabled}>
-          <GitPullRequestCreate size={16} aria-hidden="true" /> Create pull request
+          <GitPullRequestCreate size={16} aria-hidden="true" /> Create {noun}
         </Button>
       }
-      title="Create pull request"
+      title={`Create ${noun}`}
       description={uncommitted === null ? 'Reading the task’s changes…' : steps}
-      label={draft ? 'Open draft pull request' : 'Open pull request'}
+      label={draft ? `Open draft ${noun}` : `Open ${noun}`}
       busyLabel="Opening…"
       variant="primary"
       disabled={uncommitted === null || !title.trim()}

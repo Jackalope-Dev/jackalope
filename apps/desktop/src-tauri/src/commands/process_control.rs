@@ -311,6 +311,17 @@ pub fn run_with_input(
     )
 }
 
+/// [`run`], with optional input, passing every byte of output to `observe`
+/// (`true` for stderr), including what falls past the kept output limit.
+pub fn run_observed(
+    command: Command,
+    timeout: Duration,
+    input: Option<Vec<u8>>,
+    observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
+) -> Result<CommandResult, String> {
+    run_supervised_input(command, Limits::total(timeout), || false, observe, input)
+}
+
 fn run_supervised_input(
     mut command: Command,
     limits: Limits,

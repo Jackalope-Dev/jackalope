@@ -22,7 +22,7 @@ interface PullRequestState {
   /** Starts tracking the pull request a task opened; a later attempt re-points it. */
   track: (ids: { taskId: string; runId: string }, url: string, view?: PullRequestView) => void;
   untrack: (taskId: string) => void;
-  /** Reads one pull request from GitHub now. */
+  /** Reads one pull request from its code host now. */
   refresh: (taskId: string) => Promise<void>;
 }
 
@@ -68,7 +68,7 @@ export const usePullRequestStore = create<PullRequestState>()(
         } catch (cause) {
           next = { ...before, error: describeError(cause), checkedAt: new Date().toISOString() };
         }
-        // The pull request may have been untracked or replaced while GitHub answered.
+        // The pull request may have been untracked or replaced while its host answered.
         if (get().tracked[taskId]?.url !== before.url) return;
         set((state) => ({ tracked: { ...state.tracked, [taskId]: next } }));
         // The first read only records where the pull request stands.
@@ -76,6 +76,7 @@ export const usePullRequestStore = create<PullRequestState>()(
           void invokeNative('notification_pull_request', {
             phase: next.phase,
             runId: next.runId,
+            provider: next.provider ?? null,
           }).catch(() => {});
       },
     }),
@@ -97,7 +98,7 @@ export function observePullRequests() {
     try {
       const { tracked, refresh } = usePullRequestStore.getState();
       const visible = typeof document === 'undefined' || document.visibilityState === 'visible';
-      // One at a time: each read is a GitHub CLI process.
+      // One at a time: each read is a CLI process or a few API requests.
       for (const pr of duePullRequests(Object.values(tracked), Date.now(), visible))
         await refresh(pr.taskId);
     } finally {

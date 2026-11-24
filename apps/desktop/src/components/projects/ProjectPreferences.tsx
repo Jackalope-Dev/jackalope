@@ -35,6 +35,7 @@ import { CloudResourcesCard } from './CloudResourcesCard';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectAutomationPreset } from './ProjectAutomationPreset';
+import { ProjectCodeHost } from './ProjectCodeHost';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { ProjectSecretsSettings } from './ProjectSecretsSettings';
@@ -594,6 +595,9 @@ export function ProjectPreferences({
             <ProjectSecretsSettings key={`secrets-${project.id}`} projectId={project.id} />
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="integrations" className="project-settings-panel">
+            {!project.plainFolder && (
+              <ProjectCodeHost key={`code-host-${project.path}`} projectPath={project.path} />
+            )}
             {!project.plainFolder && (
               <ArtifactsProjectSettings
                 key={`artifacts-${project.path}`}

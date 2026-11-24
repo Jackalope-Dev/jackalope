@@ -14,3 +14,21 @@
   gap: 12px;
   max-width: 34rem;
 }
+
+/* The scopes a Bitbucket API token needs, as Bitbucket names them. */
+.code-host-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.code-host-scopes code {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}

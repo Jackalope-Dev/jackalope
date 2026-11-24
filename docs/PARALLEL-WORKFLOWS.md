@@ -72,8 +72,9 @@ changed since the displayed snapshot cannot be marked seen without refreshing.
 If Git has removed the earlier snapshot, the view falls back to all current changes.
 
 Before sending a new chat, optional workflow starters prepare editable issue, PR-review,
-CI-repair or dependency-update requests. GitHub CLI reads use the selected repository;
-imported evidence is bounded and labeled when incomplete. No remote write is performed.
+CI-repair or dependency-update requests. Reads use the selected repository's code host
+(see Code hosts below); imported evidence is bounded and labeled when incomplete. No
+remote write is performed.
 Optional session limits cap the number of batches or pause at a reported cost estimate.
 They only block the next batch; a running batch can exceed the threshold. Missing cost
 for any batch or routing work pauses further dispatch when a cost threshold is set.
@@ -526,3 +527,29 @@ GitHub CLI. Ahead/behind counts use local upstream references, without fetching.
 checks apply to their recorded head; a different local head is shown explicitly.
 Delivery preparation creates an editable handoff and does not publish, merge or deploy.
 Deployment remains unverified until checked in the target environment.
+
+### Code hosts
+
+Delivery, pull request following, issue browsing and workflow starters serve the code
+host of the remote the checkout publishes to (its branch's remote, then `origin`, then
+its only remote). `commands/source_control.rs` recognizes github.com, gitlab.com and
+bitbucket.org, plus self-managed GitLab and GitHub Enterprise hosts named in Settings →
+Connected work; a project's Integrations settings can say its remote is GitHub or GitLab
+instead. Any other host keeps the GitHub CLI path, which is unchanged.
+
+| Host | Access | Change request | Checks and follow-ups |
+| --- | --- | --- | --- |
+| GitHub | `gh` sign-in | Pull request; merge, squash or rebase | Check runs and statuses; review threads; failed runs in starters |
+| GitLab | `glab` sign-in, `glab api --hostname` | Merge request (`Draft:` title); merge or squash as the project allows | Head pipeline jobs; unresolved discussions; the end of failed job logs |
+| Bitbucket Cloud | API token with scopes and the Atlassian email, in protected storage | Pull request (draft); merge commit, squash or fast-forward as the branch allows | Commit build statuses; open comments; the end of failed Pipelines step logs |
+
+GitLab and Bitbucket answers are reported in the GitHub CLI's pull request shape with
+`provider` set, so following, phases and notifications are shared; the UI uses "merge
+request" on GitLab. Merging is refused before the request when the host says the change
+request cannot merge yet, and the host still enforces its pipelines, approvals and merge
+checks; nothing bypasses them. A merge request address is read through glab only on the
+task's own remote host or a configured GitLab host. A missing or signed-out glab, or a
+missing or refused Bitbucket token, is shown with the host's own message and the install
+or `glab auth login --hostname` step. Pushing always uses plain Git with the remote's own
+credentials; Bitbucket Data Center and GitLab or Bitbucket remote publication other than
+opening and merging a change request are not supported.

@@ -101,6 +101,7 @@ pub mod github_workflows;
 pub mod issues;
 pub mod remote;
 pub mod review_progress;
+pub mod source_control;
 pub mod workflow_feedback;
 
 mod resolver_fs;

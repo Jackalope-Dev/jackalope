@@ -79,7 +79,7 @@ export function pullRequestDecision(
 ) {
   if (!pullRequest || !['integrate', 'delivery', 'result', 'changes'].includes(decision.section))
     return decision;
-  const view = pullRequestPhaseView(pullRequest.phase);
+  const view = pullRequestPhaseView(pullRequest.phase, pullRequest.provider);
   if (!view.stage) return decision;
   return {
     label: view.label,

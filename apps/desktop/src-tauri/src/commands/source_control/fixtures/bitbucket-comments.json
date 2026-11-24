@@ -1,0 +1,68 @@
+{
+  "values": [
+    {
+      "id": 501,
+      "type": "pullrequest_comment",
+      "content": {
+        "type": "rendered",
+        "raw": "This drops the cart when the session ends. Keep it for signed-in people.",
+        "markup": "markdown"
+      },
+      "user": { "display_name": "Rae Viewer" },
+      "deleted": false,
+      "inline": { "from": null, "to": 18, "path": "src/cart.ts" },
+      "links": {
+        "html": { "href": "https://bitbucket.org/acme/web/pull-requests/52/_/diff#comment-501" }
+      }
+    },
+    {
+      "id": 502,
+      "type": "pullrequest_comment",
+      "content": { "raw": "Agreed, and add a test." },
+      "user": { "display_name": "Mo Maintainer" },
+      "deleted": false,
+      "parent": { "id": 501 },
+      "inline": { "from": null, "to": 18, "path": "src/cart.ts" },
+      "links": {
+        "html": { "href": "https://bitbucket.org/acme/web/pull-requests/52/_/diff#comment-502" }
+      }
+    },
+    {
+      "id": 503,
+      "type": "pullrequest_comment",
+      "content": { "raw": "Rename this?" },
+      "user": { "display_name": "Rae Viewer" },
+      "deleted": false,
+      "inline": { "from": 4, "to": 4, "path": "src/api.ts" },
+      "resolution": {
+        "type": "comment_resolution",
+        "user": { "display_name": "Ana Author" },
+        "created_on": "2026-11-24T06:40:00+00:00"
+      },
+      "links": {
+        "html": { "href": "https://bitbucket.org/acme/web/pull-requests/52/_/diff#comment-503" }
+      }
+    },
+    {
+      "id": 504,
+      "type": "pullrequest_comment",
+      "content": { "raw": "" },
+      "user": { "display_name": "Rae Viewer" },
+      "deleted": true,
+      "links": {
+        "html": { "href": "https://bitbucket.org/acme/web/pull-requests/52/_/diff#comment-504" }
+      }
+    },
+    {
+      "id": 505,
+      "type": "pullrequest_comment",
+      "content": { "raw": "Can you add a screenshot of the empty cart?" },
+      "user": { "display_name": "Mo Maintainer" },
+      "deleted": false,
+      "links": { "html": { "href": "https://bitbucket.org/acme/web/pull-requests/52#comment-505" } }
+    }
+  ],
+  "pagelen": 100,
+  "size": 5,
+  "page": 1
+}

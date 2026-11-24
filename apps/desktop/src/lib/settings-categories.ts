@@ -137,7 +137,8 @@ export const SETTINGS_CATEGORIES = [
     id: 'Connected work',
     group: 'Integrations',
     icon: Plug,
-    keywords: 'GitHub Linear Jira issues pull requests API token connections',
+    keywords:
+      'GitHub GitLab Bitbucket glab self-managed enterprise code hosts Linear Jira issues pull requests merge requests API token connections',
   },
   {
     id: 'Tools',

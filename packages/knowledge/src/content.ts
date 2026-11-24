@@ -1575,7 +1575,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I discuss specific changes or start from an issue?',
         paragraphs: [
           'In Review, use the line gutter or Add comment to attach feedback to a file and line. Add the unresolved comments to one follow-up, then review and send it. Earlier-patch comments retain their original location and ask the agent to recheck it. Show conversation keeps the result alongside Review or Preview; smaller windows stack the panes.',
-          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI. Connect Linear or Jira Cloud in Settings → Connected work. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
+          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI, GitLab your signed-in GitLab CLI (glab), and Bitbucket Cloud the API token you connect in Settings → Connected work. Connect Linear or Jira Cloud there too. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
         ],
       },
       {
@@ -1605,7 +1605,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'delivery-state',
         question: 'Are my changes published after a local merge?',
         paragraphs: [
-          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and, through your installed and signed-in GitHub CLI, read the PR and its checks. A PR with a different head does not verify your current local result.',
+          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and read the PR and its checks: through your signed-in GitHub CLI, through the GitLab CLI (glab) for a merge request and its pipeline, or with your Bitbucket API token. A PR with a different head does not verify your current local result.',
           'Prepare a PR, CI verification or deployment to create an editable handoff with the result and recorded checks. Review the draft before starting it. The handoff asks for concrete destinations and effects before any publishing action. Deployment stays unverified until behavior is checked in the intended environment.',
         ],
       },

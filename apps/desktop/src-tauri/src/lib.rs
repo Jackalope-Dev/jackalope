@@ -111,6 +111,7 @@ macro_rules! with_commands {
             commands::review_progress,
             commands::schedules,
             commands::skills,
+            commands::source_control,
             commands::system,
             commands::task_strategy,
             commands::tasks,
