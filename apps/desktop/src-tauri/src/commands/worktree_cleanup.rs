@@ -61,6 +61,15 @@ fn canonical(path: &str) -> Result<PathBuf, String> {
     std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
 }
 
+/// The project checkout, Git's first worktree, whose ignored files a worktree may hold unchanged
+/// copies of. A bare repository has no checkout to compare with.
+fn checkout(entries: &[WorktreeEntry]) -> Option<PathBuf> {
+    entries
+        .first()
+        .filter(|main| !main.is_bare)
+        .and_then(|main| canonical(&main.path).ok())
+}
+
 // Resolve the existing ancestor so deleted task folders still protect related
 // worktrees without blocking every unrelated worktree in the repository.
 fn task_workspace(path: &Path) -> Result<PathBuf, String> {
@@ -548,7 +557,7 @@ fn inspect_entries(
     let repo = canonical(repo_path)?;
     let mut entries = list_worktrees(repo_path)?;
     let target = target(&repo, requested);
-    let original = entries.first().and_then(|main| canonical(&main.path).ok());
+    let original = checkout(&entries);
     for index in 0..entries.len() {
         if only.is_some_and(|path| entries[index].path != path) {
             continue;
@@ -668,10 +677,19 @@ pub(super) fn remove(
         );
     }
     let root = canonical(worktree_path)?;
+    let original = checkout(&entries);
+    let mut budget = 200_000usize;
     for discarded in &status.discarded_paths {
         let path = ignored_location(&root, discarded)
             .filter(|path| path.starts_with(&root) && path != &root)
             .ok_or("Ignored path changed. Refresh before cleanup.")?;
+        // An unchanged copy of a checkout file may have been edited since the inspection, which
+        // can take seconds, so the content is checked again right before it goes.
+        if let Some(found) = preserved_content(&root, &path, &mut budget, original.as_deref())? {
+            return Err(format!(
+                "Ignored content now holds secrets or local data: {found}. Refresh before cleanup."
+            ));
+        }
         let metadata = match std::fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
@@ -985,7 +1003,7 @@ fn archive(
     )
     .map_err(|e| e.to_string())?;
 
-    let original = entries.first().and_then(|main| canonical(&main.path).ok());
+    let original = checkout(&entries);
     if let Some(name) = local_content(path, original.as_deref())?.preserved_path {
         return Err(abandon(
             &archive_root,

@@ -166,6 +166,21 @@ fn history_reports_what_finished_the_task_and_when() {
 }
 
 #[test]
+fn a_worktree_is_kept_when_its_processes_cannot_be_listed() {
+    use crate::commands::tasks::workspace_processes::WorkspaceProcess;
+    assert_eq!(process_check(Some(Vec::new())), Ok(()));
+    let server = WorkspaceProcess {
+        pid: 42,
+        name: "node".into(),
+        directory: "/work".into(),
+    };
+    assert!(process_check(Some(vec![server]))
+        .unwrap_err()
+        .contains("node"));
+    assert_eq!(process_check(None).is_err(), !cfg!(windows));
+}
+
+#[test]
 fn decide_never_removes_blocked_unmerged_or_unfinished_worktrees() {
     let settled = |finished, base: &str| Settled {
         finished,

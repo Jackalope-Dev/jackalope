@@ -200,15 +200,24 @@ pub(super) fn decide(
 }
 
 fn processes(path: &Path) -> Result<(), String> {
-    match crate::commands::tasks::workspace_processes::workspace_processes(path) {
-        Some(found) if !found.is_empty() => {
-            let process = &found[0];
-            Err(format!(
+    process_check(crate::commands::tasks::workspace_processes::workspace_processes(path))
+}
+
+/// A worktree is kept when a process runs in it, or when the processes cannot be listed. Windows
+/// has no listing here, but refuses to remove a folder that is a process's working directory.
+pub(super) fn process_check(
+    found: Option<Vec<crate::commands::tasks::workspace_processes::WorkspaceProcess>>,
+) -> Result<(), String> {
+    match found {
+        Some(found) => match found.first() {
+            Some(process) => Err(format!(
                 "{} (process {}) is running in it.",
                 process.name, process.pid
-            ))
-        }
-        _ => Ok(()),
+            )),
+            None => Ok(()),
+        },
+        None if cfg!(windows) => Ok(()),
+        None => Err("The processes running in it could not be checked.".into()),
     }
 }
 
@@ -281,6 +290,10 @@ pub(super) fn run_pass(
         let (runs, applied, plans) = facts()?;
         let checked = history(&path, &runs, &applied, &plans, &retained).and_then(|settled| {
             waited(&settled, retention, now)?;
+            if canonical(&worktree.path)?.parent() != Some(parent.as_path()) {
+                return Err("It no longer resolves inside the .worktrees folder.".into());
+            }
+            processes(&path)?;
             let inspected = inspect_entries(project_path, None, &runs, Some(&worktree.path))?;
             let current = inspected
                 .into_iter()

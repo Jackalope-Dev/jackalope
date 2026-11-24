@@ -429,7 +429,8 @@ was merged by Jackalope, archived, or has commits of its own that are merged int
 `master`, counted from the latest of its attempts' end, archive and merge times. It is kept
 while any attempt using it is active, interrupted, finishing or unsaved, while it belongs
 to a conversation, while a review of its result runs, while a prepared merge of it is not
-applied, while a Keep and combine follow-up reads it, or while any process runs inside it.
+applied, while a Keep and combine follow-up reads it, or while any process runs inside it
+(on macOS and Linux, also while the processes cannot be listed).
 It then goes through the same inspection and removal as Clean up, so uncommitted changes,
 unmerged commits, local data, locks, submodules, terminals, previews and checks keep it.
 Branches are never deleted. Removals and failures are logged in
