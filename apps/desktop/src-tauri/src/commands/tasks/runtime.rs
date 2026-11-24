@@ -1821,6 +1821,20 @@ impl TaskRuntime {
     pub(in crate::commands) fn run_snapshot(&self, id: &str) -> Option<TaskRun> {
         self.inner.lock().ok()?.runs.get(id).cloned()
     }
+    /// Each loaded attempt's ID and whether it is still running or finishing,
+    /// without copying the records.
+    pub(in crate::commands) fn run_activity(&self) -> Vec<(String, bool)> {
+        self.inner.lock().map_or_else(
+            |_| Vec::new(),
+            |inner| {
+                inner
+                    .runs
+                    .values()
+                    .map(|run| (run.id.clone(), run.status.is_active() || run.finishing))
+                    .collect()
+            },
+        )
+    }
     pub(in crate::commands) fn has_run(&self, id: &str) -> Result<bool, String> {
         Ok(self
             .inner
@@ -2445,6 +2459,7 @@ impl TaskRuntime {
                 review_captures: None,
                 review_capturing: false,
                 challenge_of: retried.as_ref().and_then(|old| old.challenge_of.clone()),
+                advisor: None,
                 secrets: None,
             };
             self.save(&run)?;

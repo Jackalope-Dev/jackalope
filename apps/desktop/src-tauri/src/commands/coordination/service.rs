@@ -257,6 +257,7 @@ impl Coordinator {
         self.auto_start_managed()?;
         // Swarm rounds take the plan store and coordinator locks one at a time.
         crate::commands::planning::rounds::tick(self);
+        crate::commands::turn_advisor::tick(self);
         self.runtime.access.ensure()?;
         self.transact(|inner, guard| {
             self.refresh_pool_locked(inner);
@@ -536,6 +537,18 @@ impl Coordinator {
             }
             self.start_manual_locked(inner, guard, request)
                 .map(|_| SessionStart::Started)
+        })
+    }
+
+    /// Whether the coordinator is running and fewer attempts are active than
+    /// its execution limit, so optional helper work may run now.
+    pub(in crate::commands) fn has_free_slot(&self) -> bool {
+        if !self.alive.load(Ordering::Relaxed) {
+            return false;
+        }
+        let limit = self.state().concurrency;
+        self.runtime.integration_runs().is_ok_and(|runs| {
+            runs.iter().filter(|run| run.status.is_active()).count() < limit
         })
     }
 

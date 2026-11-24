@@ -88,6 +88,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         review_captures: None,
         review_capturing: false,
         challenge_of: None,
+        advisor: None,
         secrets: None,
     }
 }

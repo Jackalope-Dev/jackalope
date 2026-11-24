@@ -445,6 +445,11 @@ fn settings_default_and_reject_paths_outside_the_project() {
             max_agent_decisions: 20,
             ..Default::default()
         },
+        advisor: super::store::AdvisorSettings {
+            enabled: true,
+            max_notes: 2,
+            max_reviews: 5,
+        },
     };
     store.save_settings("p", custom.clone()).unwrap();
     assert_eq!(store.settings("p"), custom);
@@ -482,9 +487,26 @@ fn settings_default_and_reject_paths_outside_the_project() {
         };
         assert!(store.save_settings("p", invalid).is_err());
     }
-    // Settings saved before Autonomy existed load with everything off.
+    for advisor in [
+        super::store::AdvisorSettings {
+            max_notes: 0,
+            ..Default::default()
+        },
+        super::store::AdvisorSettings {
+            max_reviews: super::store::MAX_ADVISOR_REVIEWS + 1,
+            ..Default::default()
+        },
+    ] {
+        let invalid = PlanSettings {
+            advisor,
+            ..Default::default()
+        };
+        assert!(store.save_settings("p", invalid).is_err());
+    }
+    // Settings saved before Autonomy and the advisor existed load with everything off.
     let legacy: PlanSettings = serde_json::from_str(r#"{"questionCap":2}"#).unwrap();
     assert_eq!(legacy.decide, super::store::DecideSettings::default());
+    assert!(!legacy.advisor.enabled && legacy.advisor.max_notes == 3);
     assert!(!legacy.decide.questions && !legacy.decide.rounds && !legacy.decide.deviations);
     for max_rounds in [0, super::rounds::MAX_ROUNDS + 1] {
         let rounds = PlanSettings {

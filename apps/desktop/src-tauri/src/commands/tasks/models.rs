@@ -226,6 +226,9 @@ pub struct TaskRun {
     /// The result this attempt challenges, when it is a Challenge reviewer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
+    /// The turn advisor's review of this attempt, when the project has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advisor: Option<crate::commands::turn_advisor::AdvisorReview>,
     /// Secret values the agent was given, which the record never shows. Kept
     /// in memory only, for as long as the attempt can still produce output.
     #[serde(skip)]
@@ -552,6 +555,7 @@ impl TaskRun {
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
             challenge_of: self.challenge_of.clone(),
+            advisor: self.advisor.clone(),
             secrets: None,
         }
     }
