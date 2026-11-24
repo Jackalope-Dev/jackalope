@@ -459,7 +459,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   command or written text and/or a path glob) that warns or blocks: Claude Code
   persistent sessions check shell commands, writes and edits through `PreToolUse`, and
   OpenCode and ACP permission requests are refused on a block; every match is recorded
-  in the attempt's activity. Codex calls are not checked. On by default per project: agent
+  in the attempt's activity. Codex calls, Claude Code without persistent sessions and
+  agents on a computer are not checked. On by default per project: agent
   reflection with the default agent after work ends (bounded to 4 an hour and 20 a
   day, on that account's quota, through the same gate). Off by default: mirroring
   active lessons into a marked `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,

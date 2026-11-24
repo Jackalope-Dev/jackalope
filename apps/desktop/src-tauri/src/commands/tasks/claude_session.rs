@@ -10,7 +10,7 @@
 
 use super::agent_process::{self, AgentProcess};
 use super::*;
-use crate::commands::knowledge::tool_rules::{self, ToolCall, ToolRules};
+use crate::commands::knowledge::tool_rules::{self, RuleAction, ToolCall, ToolRules};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::process::ChildStdin;
@@ -586,6 +586,11 @@ impl Turn {
             return json!({});
         }
         let tool_input = &input["tool_input"];
+        // The `tool_rules` callback denies this call; approving it here would
+        // only record an approval that does not happen.
+        if self.rule_denies(tool, tool_input) {
+            return json!({});
+        }
         let label: String = crate::commands::permission_risk::label(tool, tool_input)
             .split_whitespace()
             .collect::<Vec<_>>()
@@ -611,6 +616,17 @@ impl Turn {
                     "permissionDecisionReason":format!("Jackalope needs the person to approve this because {reason}, and this task has no way to ask. Continue without it or report what is blocked.")}})
             }
         }
+    }
+
+    fn rule_denies(&self, tool: &str, input: &Value) -> bool {
+        self.hooks.tool_rules
+            && ToolCall::claude(tool, input, &self.workspace).is_some_and(|call| {
+                self.rules
+                    .get(&self.runtime, &self.project_id)
+                    .check(&call)
+                    .iter()
+                    .any(|found| found.action == RuleAction::Deny)
+            })
     }
 
     /// Denies a call a project rule blocks, with the rules' messages as the reason, and
@@ -639,7 +655,7 @@ impl Turn {
         for found in &matches {
             self.activity(&tool_rules::activity_line(found, &label));
         }
-        let (denied, warned) = tool_rules::feedback(call.kind, &matches);
+        let (denied, warned) = tool_rules::feedback(&call, &matches);
         let mut output = json!({"hookEventName":"PreToolUse"});
         if let Some(reason) = denied {
             output["permissionDecision"] = json!("deny");

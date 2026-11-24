@@ -9,7 +9,7 @@
       "Warnings let the call run and show the agent your message; blocks refuse it and tell the agent why.",
       "Every match is recorded in the task's activity."
     ],
-    "note": "Rules apply to Claude Code and to permission requests from OpenCode and ACP agents. Codex calls are not checked yet."
+    "note": "Rules apply to Claude Code on this device and to permission requests from OpenCode and ACP agents. Codex, Claude Code with persistent sessions turned off, and agents running on a computer are not checked yet."
   },
   {
     "id": "pick-up-quota-stopped-work-where-it-left-off",

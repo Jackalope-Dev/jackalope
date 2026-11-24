@@ -135,8 +135,10 @@ release dates.
   their requests pass the same auto-approval risk check.
 - [ ] Extend lesson tool rules beyond Claude Code `PreToolUse` and asked OpenCode/ACP
   permission requests: Codex has no pre-tool hook, OpenCode's default permissions do
-  not ask for shell or edits, ACP replies carry no reason, and one-shot Claude Code
-  sessions register no hooks. Exercise rules with real agents before claiming coverage.
+  not ask for shell or edits, ACP replies carry no reason, one-shot Claude Code
+  sessions register no hooks, and Claude Code on a computer runs without the
+  persistent session that carries them. Exercise rules with real agents before
+  claiming coverage.
 - [ ] Run matched Claude Code session and hook trials on the continuation suite against
   the defaults (persistent session, hooks, fallback) and the off variants before
   changing isolation or shared prompt caching.

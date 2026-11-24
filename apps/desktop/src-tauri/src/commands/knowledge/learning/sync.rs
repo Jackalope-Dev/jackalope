@@ -367,9 +367,11 @@ fn adopt(entry: &mut KnowledgeEntry, body: &SyncedBody) {
     entry.content = body.content.clone();
     entry.keywords = body.keywords.clone();
     entry.enabled = body.enabled;
+    // Tool rules stay local, so the other copy cannot know this one is the person's.
+    let ruled = entry.tool_rule.is_some();
     if let Some(source) = entry.automatic.as_mut() {
         source.kind = body.kind.clone();
-        source.managed = body.managed;
+        source.managed = body.managed && !ruled;
     }
     if let Some(state) = lifecycle_mut(entry) {
         state.status = body.status.clone();

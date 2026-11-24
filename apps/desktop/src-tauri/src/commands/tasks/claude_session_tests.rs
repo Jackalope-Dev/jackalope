@@ -43,6 +43,7 @@ async function turn(text) {
       ruleDeny: await hook('tool_rules', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'npm install left-pad' } }),
       ruleWarn: await hook('tool_rules', { hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: process.cwd() + '/src/app.ts', content: 'console.log(1)' } }),
       ruleNone: await hook('tool_rules', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'pnpm install' } }),
+      ruleDenyPermission: await hook('permission', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'npm install left-pad' } }),
     };
     fs.writeFileSync('hooks.json', JSON.stringify(replies));
   }
@@ -465,6 +466,12 @@ fn hook_callbacks_answer_through_the_control_protocol() {
         .unwrap()
         .contains("Use the logger."));
     assert_eq!(hooks["ruleNone"], json!({}));
+    // The permission callback leaves a call a rule denies to that rule.
+    assert_eq!(hooks["ruleDenyPermission"], json!({}));
+    assert!(!run
+        .activity
+        .iter()
+        .any(|line| line.starts_with("Auto-approved Bash: npm install")));
     assert!(context.contains("exit 3"), "{context}");
     assert_eq!(hooks["unknown"], json!({}));
     assert!(run

@@ -52,9 +52,10 @@ pub struct ToolRule {
     pub message: String,
 }
 
-const PATTERN_BYTES: usize = 500;
-const PATH_BYTES: usize = 240;
-const MESSAGE_BYTES: usize = 800;
+// Counted in characters, as the editor counts them.
+const PATTERN_CHARS: usize = 500;
+const PATH_CHARS: usize = 240;
+const MESSAGE_CHARS: usize = 800;
 /// Compiled size allowed for one pattern, so a large repetition is refused at
 /// save time rather than built on every tool call.
 const COMPILED_BYTES: usize = 1 << 20;
@@ -75,16 +76,20 @@ impl ToolRule {
         if self.pattern.is_empty() && self.path.is_empty() {
             return Err("Give the rule a pattern, a path, or both.".into());
         }
-        if self.message.is_empty() || self.message.len() > MESSAGE_BYTES {
+        if self.message.is_empty() || self.message.chars().count() > MESSAGE_CHARS {
             return Err(format!(
-                "Give the rule a message up to {MESSAGE_BYTES} bytes."
+                "Give the rule a message up to {MESSAGE_CHARS} characters."
             ));
         }
-        if self.pattern.len() > PATTERN_BYTES {
-            return Err(format!("Keep the pattern under {PATTERN_BYTES} bytes."));
+        if self.pattern.chars().count() > PATTERN_CHARS {
+            return Err(format!(
+                "Keep the pattern to {PATTERN_CHARS} characters or fewer."
+            ));
         }
-        if self.path.len() > PATH_BYTES {
-            return Err(format!("Keep the path under {PATH_BYTES} bytes."));
+        if self.path.chars().count() > PATH_CHARS {
+            return Err(format!(
+                "Keep the path to {PATH_CHARS} characters or fewer."
+            ));
         }
         if !self.path.is_empty() && self.tools == [ToolKind::Shell] {
             return Err("A path applies to file writes and edits, not shell commands.".into());
@@ -117,7 +122,10 @@ fn glob(path: &str) -> Result<globset::GlobMatcher, globset::Error> {
 /// writes, and the files it touches relative to the workspace.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolCall {
-    pub kind: ToolKind,
+    /// Usually one kind. A file change the agent does not say is a write or an
+    /// edit (OpenCode asks `edit` permission for both) has both, so rules for
+    /// either apply.
+    pub kinds: Vec<ToolKind>,
     pub text: String,
     pub paths: Vec<String>,
 }
@@ -148,48 +156,97 @@ impl ToolCall {
             .filter_map(|key| input[*key].as_str())
             .map(|path| relative(path, workspace))
             .collect();
-        Some(Self { kind, text, paths })
+        Some(Self {
+            kinds: vec![kind],
+            text,
+            paths,
+        })
     }
 
     /// An ACP `session/request_permission` tool call (Kimi Code and custom ACP
-    /// agents). An edit that only supplies new content counts as a write.
+    /// agents), merged with what earlier `tool_call` updates reported about it.
+    /// Agents that send no `kind` are recognized by the tool name before `:` in
+    /// the title (Kimi's `Shell`, `WriteFile` and `StrReplaceFile`). An edit that
+    /// only supplies new content counts as a write.
     pub fn acp(tool_call: &Value, workspace: &str) -> Option<Self> {
         let raw = &tool_call["rawInput"];
-        match tool_call["kind"].as_str()? {
-            "execute" => Some(Self {
-                kind: ToolKind::Shell,
+        let tool = tool_call["title"]
+            .as_str()
+            .unwrap_or_default()
+            .split(':')
+            .next()
+            .unwrap_or_default()
+            .trim();
+        let kind = match (tool_call["kind"].as_str(), tool) {
+            (Some("execute"), _) | (None, "Shell") => ToolKind::Shell,
+            (None, "WriteFile") => ToolKind::Write,
+            (None, "StrReplaceFile") => ToolKind::Edit,
+            (Some("edit"), _) => {
+                let old = ["old_string", "oldText", "old_text", "edit", "edits"]
+                    .iter()
+                    .any(|key| !raw[*key].is_null());
+                if old || !raw["content"].is_string() {
+                    ToolKind::Edit
+                } else {
+                    ToolKind::Write
+                }
+            }
+            _ => return None,
+        };
+        if kind == ToolKind::Shell {
+            return Some(Self {
+                kinds: vec![kind],
                 text: command_text(raw)?,
                 paths: vec![],
-            }),
-            "edit" => {
-                let old = ["old_string", "oldText", "old_text"]
-                    .iter()
-                    .any(|key| raw[*key].is_string());
-                let text = ["new_string", "newText", "new_text", "content"]
-                    .iter()
-                    .find_map(|key| raw[*key].as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                Some(Self {
-                    kind: if old || raw["content"].is_null() {
-                        ToolKind::Edit
-                    } else {
-                        ToolKind::Write
-                    },
-                    text,
-                    paths: ["path", "file_path", "filePath", "abs_path"]
-                        .iter()
-                        .filter_map(|key| raw[*key].as_str())
-                        .map(|path| relative(path, workspace))
-                        .collect(),
-                })
-            }
-            _ => None,
+            });
         }
+        // ACP `diff` content: the reported change to each file.
+        let diffs: Vec<&Value> = tool_call["content"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|item| item["type"] == "diff")
+            .collect();
+        let mut text: Vec<&str> = ["new_string", "newText", "new_text", "content"]
+            .iter()
+            .filter_map(|key| raw[*key].as_str())
+            .take(1)
+            .collect();
+        // Kimi's StrReplaceFile: `edit` is one `{old, new}` or a list of them.
+        for edit in ["edit", "edits"] {
+            match &raw[edit] {
+                Value::Array(edits) => text.extend(edits.iter().filter_map(|e| e["new"].as_str())),
+                single => text.extend(single["new"].as_str()),
+            }
+        }
+        if text.is_empty() {
+            text.extend(diffs.iter().filter_map(|diff| diff["newText"].as_str()));
+        }
+        let mut paths: Vec<String> = ["path", "file_path", "filePath", "abs_path"]
+            .iter()
+            .filter_map(|key| raw[*key].as_str())
+            .chain(diffs.iter().filter_map(|diff| diff["path"].as_str()))
+            .chain(
+                tool_call["locations"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|location| location["path"].as_str()),
+            )
+            .map(|path| relative(path, workspace))
+            .collect();
+        paths.sort();
+        paths.dedup();
+        Some(Self {
+            kinds: vec![kind],
+            text: text.join("\n"),
+            paths,
+        })
     }
 
     /// An OpenCode `permission.asked` request. File text comes from the lines
-    /// the reported diff adds.
+    /// the reported diff adds. OpenCode's write, edit and patch tools all ask
+    /// `edit` permission, so an `edit` request counts as both.
     pub fn opencode(
         permission: &str,
         patterns: &[String],
@@ -198,7 +255,7 @@ impl ToolCall {
     ) -> Option<Self> {
         match permission {
             "bash" => Some(Self {
-                kind: ToolKind::Shell,
+                kinds: vec![ToolKind::Shell],
                 text: command_text(metadata).unwrap_or_else(|| patterns.join("\n")),
                 paths: vec![],
             }),
@@ -212,20 +269,42 @@ impl ToolCall {
                         .join("\n"),
                     None => metadata["content"].as_str().unwrap_or_default().into(),
                 };
-                Some(Self {
-                    kind: if permission == "write" {
-                        ToolKind::Write
-                    } else {
-                        ToolKind::Edit
-                    },
-                    text,
-                    paths: patterns
+                // Patterns are relative to the Git worktree; the metadata has
+                // absolute paths: `files` for a patch, `filepath` for one file.
+                let files: Vec<&str> = metadata["files"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|file| file["filePath"].as_str())
+                    .collect();
+                let paths: Vec<String> = if !files.is_empty() {
+                    files.iter().map(|path| relative(path, workspace)).collect()
+                } else if let Some(path) = metadata["filepath"].as_str() {
+                    vec![relative(path, workspace)]
+                } else {
+                    patterns
                         .iter()
                         .map(|path| relative(path, workspace))
-                        .collect(),
+                        .collect()
+                };
+                Some(Self {
+                    kinds: match permission {
+                        "write" => vec![ToolKind::Write],
+                        "edit" => vec![ToolKind::Write, ToolKind::Edit],
+                        _ => vec![ToolKind::Edit],
+                    },
+                    text,
+                    paths,
                 })
             }
             _ => None,
+        }
+    }
+
+    fn noun(&self) -> &'static str {
+        match self.kinds.as_slice() {
+            [kind] => kind.noun(),
+            _ => "file change",
         }
     }
 }
@@ -243,10 +322,12 @@ fn command_text(input: &Value) -> Option<String> {
 }
 
 /// The path relative to the workspace when it lies inside it; otherwise the
-/// path as given, which relative globs do not match.
+/// path as given, which relative globs do not match. `.` and `..` are resolved
+/// first, without touching the disk, so `src/../migrations/a.sql` matches
+/// `migrations/*.sql`.
 fn relative(path: &str, workspace: &str) -> String {
-    let path = path.replace('\\', "/");
-    let root = workspace.replace('\\', "/");
+    let path = lexical(&path.replace('\\', "/"));
+    let root = lexical(&workspace.replace('\\', "/"));
     let root = root.trim_end_matches('/');
     let inside = !root.is_empty()
         && path.len() > root.len()
@@ -256,12 +337,37 @@ fn relative(path: &str, workspace: &str) -> String {
         } else {
             path.starts_with(root)
         };
-    let path = if inside {
-        &path[root.len() + 1..]
+    if inside {
+        path[root.len() + 1..].to_string()
     } else {
-        &path
-    };
-    path.trim_start_matches("./").to_string()
+        path
+    }
+}
+
+/// Resolves `.` and `..` segments and repeated slashes. A `..` above a
+/// relative path's start is kept, so the path still cannot match a workspace glob.
+fn lexical(path: &str) -> String {
+    let absolute = path.starts_with('/');
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." if parts
+                .last()
+                .is_some_and(|last| *last != ".." && !last.ends_with(':')) =>
+            {
+                parts.pop();
+            }
+            ".." if absolute => {}
+            part => parts.push(part),
+        }
+    }
+    let joined = parts.join("/");
+    if absolute {
+        format!("/{joined}")
+    } else {
+        joined
+    }
 }
 
 /// A rule that matched a tool call.
@@ -289,7 +395,8 @@ pub struct ToolRules {
 
 impl ToolRules {
     /// The rules of lessons that are available: turned on, not removed and
-    /// not archived. A rule that no longer compiles is skipped.
+    /// not archived. A rule that no longer compiles (saved by a version with a
+    /// different syntax) is skipped with a warning in the log.
     pub fn from_entries(entries: &[KnowledgeEntry]) -> Self {
         let rules = entries
             .iter()
@@ -301,13 +408,19 @@ impl ToolRules {
             })
             .filter_map(|entry| {
                 let rule = entry.tool_rule.clone()?;
+                let skip = |error: String| {
+                    eprintln!(
+                        "Tool rule of lesson {} is skipped because it no longer compiles: {error}",
+                        entry.id
+                    );
+                };
                 let pattern = match rule.pattern.as_str() {
                     "" => None,
-                    pattern => Some(regex(pattern).ok()?),
+                    pattern => Some(regex(pattern).map_err(|e| skip(e.to_string())).ok()?),
                 };
                 let path = match rule.path.as_str() {
                     "" => None,
-                    path => Some(glob(path).ok()?),
+                    path => Some(glob(path).map_err(|e| skip(e.to_string())).ok()?),
                 };
                 Some(Compiled {
                     entry_id: entry.id.clone(),
@@ -344,7 +457,11 @@ impl ToolRules {
         let text = &call.text[..end];
         self.rules
             .iter()
-            .filter(|compiled| compiled.rule.tools.contains(&call.kind))
+            .filter(|compiled| {
+                call.kinds
+                    .iter()
+                    .any(|kind| compiled.rule.tools.contains(kind))
+            })
             .filter(|compiled| {
                 compiled
                     .pattern
@@ -375,7 +492,7 @@ impl ToolRules {
 
 /// What the agent is told when rules match: the reason for a denial, when any
 /// rule denies, and the warnings to show while the call proceeds.
-pub fn feedback(kind: ToolKind, matches: &[RuleMatch]) -> (Option<String>, Option<String>) {
+pub fn feedback(call: &ToolCall, matches: &[RuleMatch]) -> (Option<String>, Option<String>) {
     let lines = |action| {
         let lines: Vec<String> = matches
             .iter()
@@ -387,13 +504,13 @@ pub fn feedback(kind: ToolKind, matches: &[RuleMatch]) -> (Option<String>, Optio
     let denied = lines(RuleAction::Deny).map(|lines| {
         format!(
             "Jackalope blocked this {} because it matches this project's tool rules.\n{lines}",
-            kind.noun()
+            call.noun()
         )
     });
     let warned = lines(RuleAction::Warn).map(|lines| {
         format!(
             "Jackalope: this {} matches this project's tool rules. It was allowed; follow the guidance.\n{lines}",
-            kind.noun()
+            call.noun()
         )
     });
     (denied, warned)
@@ -427,7 +544,7 @@ pub fn check_request(
             crate::commands::tasks::events::activity(run, &activity_line(found, &label));
         }
     });
-    feedback(call.kind, &matches).0
+    feedback(&call, &matches).0
 }
 
 /// The activity line recording one match. `label` is the short form of the

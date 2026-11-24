@@ -294,14 +294,16 @@ folder), a message, and what happens on a match:
 
 Only the person makes rules; reflection, the curator and sync never add, change or
 remove one. Adding or changing a rule makes a learned lesson yours, as an edit does,
-so it is not archived or rewritten automatically, and its history records the rule.
-A rule applies while its lesson is available: pausing, archiving or removing the
-lesson stops it. Edits match the text they write, not the text they replace.
+and while it has a rule it is never archived or rewritten automatically, even if a
+synced copy says otherwise. Its history records the rule. A rule applies while its
+lesson is available: pausing, archiving or removing the lesson stops it. Edits match
+the text they write, not the text they replace. Paths are matched after `.` and `..`
+are resolved, so `src/../migrations/a.sql` matches `migrations/*.sql`.
 
 Patterns use the Rust `regex` syntax, which matches in time linear in the input: no
-backreferences or lookaround. A pattern is limited to 500 bytes and a 1 MB compiled
-size, a path to 240 bytes and a message to 800; invalid rules are refused when saved.
-Each call is matched against at most its first 256 KB.
+backreferences or lookaround. A pattern is limited to 500 characters and a 1 MB
+compiled size, a path to 240 characters and a message to 800; invalid rules are
+refused when saved. Each call is matched against at most its first 256 KB.
 
 Where rules apply:
 
@@ -315,8 +317,16 @@ Where rules apply:
   the model, while ACP has no reason field, so the agent sees a plain rejection and the
   attempt stops with the rule's reason. Warnings are recorded only. OpenCode does not
   ask before shell commands or edits by default, so its rules only see requests its
-  permission settings ask about.
-- Codex and the other adapters are not checked.
+  permission settings ask about. OpenCode asks the same `edit` permission for writes,
+  edits and patches, so a rule for either file writes or file edits applies to all
+  three. Kimi's requests carry only a title and a diff, so the arguments Kimi streamed
+  for that call earlier are matched instead.
+- Not checked: Codex and the other adapters, Claude Code with persistent sessions
+  turned off, and any agent running on a [computer](BOT-COMPUTERS.md#agents-on-a-computer).
+
+Rules fail open. If the project's lessons cannot be read, no rule applies; a rule
+saved earlier that no longer compiles is skipped and logged; and if the Claude Code
+check does not answer within its 10-second hook timeout, the call goes ahead.
 
 Every match adds a line such as `Tool rule "Use pnpm" denied Bash: npm install` to the
 attempt's activity.

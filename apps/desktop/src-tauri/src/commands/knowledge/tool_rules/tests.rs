@@ -55,7 +55,19 @@ fn rules_are_checked_before_they_are_saved() {
         ),
         (
             json!({"tools":["shell"],"pattern":"x".repeat(501),"message":"m"}),
-            "500 bytes",
+            "500 characters",
+        ),
+        (
+            json!({"tools":["shell"],"pattern":"é".repeat(501),"message":"m"}),
+            "500 characters",
+        ),
+        (
+            json!({"tools":["shell"],"pattern":"x","message":"日".repeat(801)}),
+            "800 characters",
+        ),
+        (
+            json!({"tools":["edit"],"path":"ü".repeat(241),"message":"m"}),
+            "240 characters",
         ),
         // A pattern whose compiled form is too large is refused, not built per call.
         (
@@ -66,6 +78,11 @@ fn rules_are_checked_before_they_are_saved() {
         let found = check(value).unwrap_err();
         assert!(found.contains(error), "{found}");
     }
+    // Limits count characters, as the editor does, not bytes.
+    assert!(check(json!({
+        "tools":["edit"],"pattern":"é".repeat(500),"path":"ü".repeat(240),"message":"日".repeat(800)
+    }))
+    .is_ok());
     let mut value =
         rule(json!({"tools":["edit","write","edit"],"path":" .\\src\\*.ts ","message":" m "}));
     value.normalize().unwrap();
@@ -109,6 +126,18 @@ fn a_rule_matches_its_tool_kind_pattern_and_path() {
         .is_empty());
     assert!(set
         .check(&write("/elsewhere/src/main.ts", "console.log(1)"))
+        .is_empty());
+    // `.` and `..` are resolved before matching, inside the workspace or out.
+    assert_eq!(
+        set.check(&write("/work/test/../src/./main.ts", "console.log(1)"))
+            .len(),
+        1
+    );
+    assert!(set
+        .check(&write(
+            "/work/src/../../elsewhere/src/main.ts",
+            "console.log(1)"
+        ))
         .is_empty());
     // A glob without a folder matches the file name anywhere.
     assert_eq!(set.check(&write("/work/apps/web/pnpm.lock", "")).len(), 1);
@@ -183,7 +212,7 @@ fn acp_and_opencode_requests_become_tool_calls() {
             "/work"
         ),
         Some(ToolCall {
-            kind: ToolKind::Shell,
+            kinds: vec![ToolKind::Shell],
             text: "git push --force".into(),
             paths: vec![],
         })
@@ -194,29 +223,83 @@ fn acp_and_opencode_requests_become_tool_calls() {
     )
     .unwrap();
     assert_eq!(
-        (write.kind, write.paths),
-        (ToolKind::Write, vec!["src/a.ts".to_string()])
+        (write.kinds, write.paths),
+        (vec![ToolKind::Write], vec!["src/a.ts".to_string()])
     );
     let edit = ToolCall::acp(
         &json!({"kind":"edit","rawInput":{"path":"src/a.ts","oldText":"a","newText":"b"}}),
         "/work",
     )
     .unwrap();
-    assert_eq!((edit.kind, edit.text.as_str()), (ToolKind::Edit, "b"));
-    assert_eq!(ToolCall::acp(&json!({"kind":"read"}), "/work"), None);
-
-    let edit = ToolCall::opencode(
-        "edit",
-        &["/work/src/a.ts".into()],
-        &json!({"diff":"--- a\n+++ b\n-old line\n+new line\n context"}),
+    assert_eq!(
+        (edit.kinds, edit.text.as_str()),
+        (vec![ToolKind::Edit], "b")
+    );
+    // An ACP diff and locations name the file when the input does not.
+    let edit = ToolCall::acp(
+        &json!({"kind":"edit","content":[{"type":"diff","path":"/work/a.sql","oldText":"a","newText":"b"}],
+            "locations":[{"path":"/work/b.sql"}]}),
         "/work",
     )
     .unwrap();
-    assert_eq!(edit.kind, ToolKind::Edit);
+    assert_eq!(
+        (edit.text.as_str(), edit.paths),
+        ("b", vec!["a.sql".into(), "b.sql".into()])
+    );
+    // Kimi's StrReplaceFile arguments: one edit or a list.
+    let edit = ToolCall::acp(
+        &json!({"title":"StrReplaceFile: a.ts","rawInput":{"path":"/work/a.ts","edit":{"old":"a","new":"b"}}}),
+        "/work",
+    )
+    .unwrap();
+    assert_eq!(
+        (edit.kinds, edit.text.as_str()),
+        (vec![ToolKind::Edit], "b")
+    );
+    assert_eq!(ToolCall::acp(&json!({"kind":"read"}), "/work"), None);
+    assert_eq!(
+        ToolCall::acp(&json!({"title":"ReadFile: a.ts"}), "/work"),
+        None
+    );
+
+    // OpenCode 1.18 asks `edit` permission for its edit, write and apply_patch
+    // tools, with the worktree-relative path as the pattern and an absolute
+    // `filepath` (or, for a patch, `files`) in the metadata.
+    let diff = "Index: /work/src/a.ts\n===================================================================\n--- /work/src/a.ts\n+++ /work/src/a.ts\n@@ -1,2 +1,2 @@\n-old line\n+new line\n context\n";
+    let edit = ToolCall::opencode(
+        "edit",
+        &["src/a.ts".into()],
+        &json!({"filepath":"/work/src/a.ts","diff":diff}),
+        "/work",
+    )
+    .unwrap();
+    assert_eq!(edit.kinds, [ToolKind::Write, ToolKind::Edit]);
     assert_eq!(edit.text, "new line");
     assert_eq!(edit.paths, ["src/a.ts"]);
-    let bash = ToolCall::opencode("bash", &["npm i".into()], &json!({}), "/work").unwrap();
-    assert_eq!((bash.kind, bash.text.as_str()), (ToolKind::Shell, "npm i"));
+    let set = rules(vec![
+        json!({"tools":["write"],"path":"src/*.ts","pattern":"new","message":"Writes only."}),
+    ]);
+    assert_eq!(set.check(&edit).len(), 1);
+    let patch = ToolCall::opencode(
+        "edit",
+        &["a.sql".into(), "b/c.sql".into()],
+        &json!({"filepath":"a.sql, b/c.sql","diff":"+x",
+            "files":[{"filePath":"/work/a.sql","relativePath":"a.sql"},{"filePath":"/work/b/c.sql","relativePath":"b/c.sql"}]}),
+        "/work",
+    )
+    .unwrap();
+    assert_eq!(patch.paths, ["a.sql", "b/c.sql"]);
+    let bash = ToolCall::opencode(
+        "bash",
+        &["npm i".into()],
+        &json!({"command":"npm i && ls"}),
+        "/work",
+    )
+    .unwrap();
+    assert_eq!(
+        (bash.kinds, bash.text.as_str()),
+        (vec![ToolKind::Shell], "npm i && ls")
+    );
     assert_eq!(
         ToolCall::opencode("webfetch", &[], &json!({}), "/work"),
         None
@@ -231,9 +314,10 @@ fn feedback_separates_denials_from_warnings() {
         action,
         message: message.into(),
     };
-    assert_eq!(feedback(ToolKind::Shell, &[]), (None, None));
+    let call = shell("npm i");
+    assert_eq!(feedback(&call, &[]), (None, None));
     let (denied, warned) = feedback(
-        ToolKind::Shell,
+        &call,
         &[
             found(RuleAction::Deny, "Use pnpm."),
             found(RuleAction::Warn, "Prefer scripts."),
