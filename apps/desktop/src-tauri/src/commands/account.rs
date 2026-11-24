@@ -25,7 +25,7 @@ fn sha256_hex(value: &str) -> String {
 /// Everything that calls the Jackalope service for a member. These are the only
 /// features that need a Jackalope account; local tasks, conversations, terminals,
 /// previews, checks, swarms, MCP and remote pairing run without one. The
-/// renderer mirrors this list in `lib/account-features.ts`.
+/// renderer mirrors this list in `lib/account.ts`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AccountFeature {
     /// Preferences stored on the account so other desktops can restore them.

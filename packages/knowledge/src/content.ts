@@ -173,7 +173,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Do I need a Jackalope account?',
         paragraphs: [
           'No. Tasks, conversations, terminals and the jackalope command run with your own agent CLIs without one. Choose Continue without an account on the welcome screen, and connect later from Settings → Jackalope account or the sidebar.',
-          'A free account syncs settings, lessons and skills across your computers and adds invitations and the beta program. To connect, choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. Account features keep working offline for up to 72 hours.',
+          'A free account syncs settings, lessons and skills across your computers and adds invitations and the Microsoft Store beta. To connect, choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. Account features keep working offline for up to 72 hours.',
         ],
       },
       {

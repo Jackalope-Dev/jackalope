@@ -262,7 +262,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
             <p>
               {email && !token
                 ? `You’re signed in as ${email}. Choose your platform above to get started.`
-                : 'The app works without one. An account syncs settings, lessons and skills across your computers: sign up with your email, confirm it, then connect the app with the same address.'}
+                : 'The app works without one. An account syncs settings, lessons and skills across your computers. Sign up with your email, confirm it, then connect the app.'}
             </p>
             {email && !token ? (
               <a className="text-link" href="/access/">

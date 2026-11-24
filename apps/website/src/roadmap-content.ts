@@ -27,10 +27,10 @@ export const roadmapStages = [
           'Comment on changed lines and collect feedback into one follow-up. Keep the conversation beside Review or Preview. Select an element in a persistent preview browser to capture its current state, screenshot and style context. Browse GitHub, Linear and Jira issues, then review the task draft before starting. These workflows use the existing workspace controls and remain subject to installed acceptance.',
       },
       {
-        title: 'Sign up and start.',
-        summary: 'Free signup with email confirmation, then pair the desktop.',
+        title: 'Start with or without an account.',
+        summary: 'Use the app right away; a free account adds sync.',
         detail:
-          'Signup is open to everyone. Sign up with your email and confirm it to create your account, then connect the desktop by comparing a code. Optional bot protection guards signup. Connections survive restarts, and the download page lists builds for Windows, macOS and Linux. Installed acceptance remains in progress.',
+          'The app runs without an account. Signup is open to everyone: sign up with your email and confirm it to create a free account, then connect the desktop by comparing a code to sync settings, lessons and skills. Optional bot protection guards signup. Connections survive restarts, and the download page lists builds for Windows, macOS and Linux. Installed acceptance remains in progress.',
       },
       {
         title: 'From request to a result you can inspect.',
@@ -103,7 +103,7 @@ export const roadmapStages = [
         title: 'Your agents, from the terminal.',
         summary: 'A jackalope command that picks up where the app leaves off.',
         detail:
-          'Run jackalope in the current directory to describe work, let Jackalope choose the agent, and watch progress in a terminal conversation. A Git repository keeps each conversation in its own worktree. A folder that is not a repository is edited directly, or becomes a repository after you confirm or pass --init. It shares sessions and account access with the app and can start it in the background. Run shell commands inline, mention files, queue follow-ups while agents work, or send a single message from scripts with jackalope -p. Open it from the status bar, then move the conversation to your own terminal. Answer agent questions without leaving the terminal. Installed setup on each platform is still in progress.',
+          'Run jackalope in the current directory to describe work, let Jackalope choose the agent, and watch progress in a terminal conversation. A Git repository keeps each conversation in its own worktree. A folder that is not a repository is edited directly, or becomes a repository after you confirm or pass --init. It shares sessions with the app and can start it in the background. Run shell commands inline, mention files, queue follow-ups while agents work, or send a single message from scripts with jackalope -p. Open it from the status bar, then move the conversation to your own terminal. Answer agent questions without leaving the terminal. Installed setup on each platform is still in progress.',
       },
       {
         title: 'Bots that work on their own.',

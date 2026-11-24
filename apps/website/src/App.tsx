@@ -56,7 +56,7 @@ const faqs = [
   ],
   [
     'Can I download Jackalope now?',
-    `Yes. Builds for ${platforms} are on the download page. You can use the app without an account; a free account adds sync across your computers, invitations and beta access.`,
+    `Yes. Builds for ${platforms} are on the download page. You can use the app without an account; a free account adds sync across your computers, invitations and the Microsoft Store beta.`,
   ],
   [
     'Why use it instead of more terminal tabs?',

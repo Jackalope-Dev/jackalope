@@ -509,7 +509,7 @@ export function LandingPage({
             <a className="lp-final-download" href="/download/">
               <ArrowDownToLine size={16} aria-hidden="true" />
               <span className="lp-final-download-label">
-                Already have an account? <strong>Download for {platforms}</strong>
+                Or start without one: <strong>Download for {platforms}</strong>
               </span>
               <ArrowRight size={15} aria-hidden="true" />
             </a>

@@ -55,7 +55,7 @@ Submitting feedback does not require telemetry to be enabled. See
 9472. The UI enables explicit project templates; remote requests can supply a project
 identifier and task text, never a project path, executable, agent account or arbitrary
 native command. New sessions use isolation and the host's saved agent/check settings.
-Native execution access and coordinator/runtime safeguards still apply.
+Coordinator/runtime safeguards still apply; no Jackalope account is needed.
 
 The allowlisted API exposes pairing and task status, detail, review, start, follow-up,
 question response, pause/resume and stop. Device tokens are random bearer credentials;

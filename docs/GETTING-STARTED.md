@@ -10,7 +10,7 @@ still apply.
 
 A Jackalope account is optional. Choose **Continue without an account** on the
 welcome screen to start right away, or **Create free account or sign in** to add
-settings, lesson and skill sync across computers, invitations and beta access. That
+settings, lesson and skill sync across computers, invitations and the Microsoft Store beta. That
 opens the website in your browser; confirm the code shown in the app to connect this
 desktop. You can connect later from Settings → Jackalope account. See
 [desktop account connection](DESKTOP-ACCOUNT.md).

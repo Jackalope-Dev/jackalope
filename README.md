@@ -21,7 +21,7 @@ Jackalope uses the agents you already have installed and their existing sign-ins
 **Available for macOS, Windows and Linux.** [Download Jackalope](https://jackalope.dev/download/)
 or build from source. A free Jackalope account is optional: tasks, conversations and
 terminals run with your own agents without one, and connecting adds settings, lesson
-and skill sync across computers, invitations and beta access. See [current status](docs/STATUS.md)
+and skill sync across computers, invitations and the Microsoft Store beta. See [current status](docs/STATUS.md)
 and [release requirements](docs/CROSS-PLATFORM-RELEASES.md) for what is still being
 validated on each platform.
 

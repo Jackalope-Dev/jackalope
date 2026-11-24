@@ -61,7 +61,7 @@ export const ACCOUNT_FEATURES: Record<AccountFeature, { title: string; reason: s
 
 /** What connecting adds, in one sentence, wherever an account is suggested. */
 export const ACCOUNT_BENEFITS =
-  'A free account syncs your settings, lessons and skills across computers, and lets you invite friends and join the beta.';
+  'A free account syncs your settings, lessons and skills across computers, and lets you invite friends and join the Microsoft Store beta.';
 
 /** Where the account stands for gating: only `approved` unlocks account features. */
 export type AccountAccess =

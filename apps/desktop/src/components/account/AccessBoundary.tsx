@@ -57,6 +57,8 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   }, []);
   /** Saves the privacy defaults reviewed here; a failure keeps the person on this screen. */
   const enter = useCallback(async () => {
+    // applyDefaults skips while an earlier failure is recorded, so clear it to retry.
+    useCommunityStore.setState({ error: null });
     await useCommunityStore.getState().applyDefaults();
     const privacy = useCommunityStore.getState();
     if (privacy.error) {
@@ -181,7 +183,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                 </Button>
                 <p>
                   Tasks, conversations and terminals run with your own agents either way. An account
-                  adds sync across your computers, invitations and beta access.
+                  adds sync across your computers, invitations and the Microsoft Store beta.
                 </p>
               </div>
               {error && (

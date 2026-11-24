@@ -798,10 +798,11 @@ approval. Connections persist across restarts and detect approval; offline progr
 remains labeled and cannot authorize execution. Installed and deployed acceptance of
 waitlist mode remain open.
 
-New execution requires approved account access in every desktop build. Previously
-verified accounts retain bounded offline access; saved work remains reviewable after
-expiry. Feedback, reporting and settings sync have separate controls. See
-[account access](DESKTOP-ACCOUNT.md) and [service boundaries](BACKEND.md).
+The Jackalope account is optional: local work runs without one in every desktop build,
+and only account features such as settings, lesson and skill sync, invitations and the
+Store beta program need it. Previously verified accounts keep those features for a
+bounded offline period. Feedback, reporting and settings sync have separate controls. See
+[account connection](DESKTOP-ACCOUNT.md) and [service boundaries](BACKEND.md).
 
 The website provides setup and workflow guides, compatibility tables, sample-workspace
 media and account flows. Its content is shared with bundled native help through
