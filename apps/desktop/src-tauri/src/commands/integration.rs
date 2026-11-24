@@ -2,6 +2,7 @@ pub(in crate::commands) mod combined_check;
 pub(in crate::commands) mod conflicts;
 pub(in crate::commands) mod dependencies;
 pub(in crate::commands) mod split;
+use super::merge_tree;
 use super::repo::{self, Identity, Policy::Snapshot, Seed, Untracked};
 use super::tasks::{TaskRun, TaskRuntime};
 use chrono::Utc;
@@ -529,41 +530,16 @@ pub(in crate::commands) fn prepare_with_message(
             &format!("feat: integrate completed task {}", run.id),
         )?;
         plan.sources.push(source);
-        let output = repo::output(
-            &project,
-            &[
-                "merge-tree",
-                "--write-tree",
-                "--name-only",
-                &combined,
-                &source_commit,
-            ],
-            Snapshot,
-        )?;
-        if !output.status.success() && output.status.code() != Some(1) {
-            return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-        }
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut lines = stdout.lines();
-        let tree = lines
-            .next()
-            .filter(|s| !s.is_empty())
-            .ok_or("Git did not produce an integration tree.")?;
-        preview_target = tree.to_string();
-        if !output.status.success() {
-            plan.conflicts = lines
-                .take_while(|line| !line.is_empty())
-                .map(str::to_string)
-                .collect();
-            if plan.conflicts.is_empty() {
-                plan.conflicts.push("Git reported a merge conflict.".into());
-            }
+        let merged = merge_tree::merge_tree(&project, &[], &combined, &source_commit, Snapshot)?;
+        preview_target = merged.tree.clone();
+        if !merged.conflicts.is_empty() {
+            plan.conflicts = merged.conflicts;
             plan.status = "conflicted".into();
             break;
         }
         combined = commit_tree(
             &project,
-            tree,
+            &merged.tree,
             &[&combined, &source_commit],
             &format!("merge: integrate task {}", run.id),
         )?;
@@ -1972,6 +1948,42 @@ mod tests {
         assert_eq!(
             fs::read_to_string(fixture.project.join("shared.txt")).unwrap(),
             "original\n"
+        );
+    }
+
+    #[test]
+    fn concurrent_xcode_project_additions_integrate_without_conflict() {
+        let mut fixture = Fixture::new();
+        fs::write(
+            fixture.project.join("project.pbxproj"),
+            include_str!("pbxproj/fixtures/base.pbxproj"),
+        )
+        .unwrap();
+        repo::git(&fixture.project, &["add", "."], Snapshot).unwrap();
+        repo::git(&fixture.project, &["commit", "-m", "project"], Snapshot).unwrap();
+        fixture.base = repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap();
+        let runs = vec![
+            fixture.run(
+                1,
+                "project.pbxproj",
+                include_str!("pbxproj/fixtures/core.pbxproj"),
+            ),
+            fixture.run(
+                2,
+                "project.pbxproj",
+                include_str!("pbxproj/fixtures/network.pbxproj"),
+            ),
+        ];
+        let ids: Vec<_> = runs.iter().map(|run| run.id.clone()).collect();
+        let plan = prepare(&fixture.plans, &runs, &ids).unwrap();
+        assert_eq!(plan.status, "ready", "{:?}", plan.conflicts);
+        assert_eq!(
+            apply(&fixture.plans, &runs, &plan.id).unwrap().status,
+            "applied"
+        );
+        assert_eq!(
+            fs::read_to_string(fixture.project.join("project.pbxproj")).unwrap(),
+            include_str!("pbxproj/fixtures/core_and_network.pbxproj")
         );
     }
 

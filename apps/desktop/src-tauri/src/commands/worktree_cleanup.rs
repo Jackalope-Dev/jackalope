@@ -460,15 +460,8 @@ fn content_in_target(path: &Path, head: &str, target: &str) -> Result<bool, Stri
                     Inspection,
                 )
                 .map_err(|_| "Cannot inspect local content safely.".to_string())?;
-                let result = repo::output(
-                    path,
-                    &["merge-tree", "--write-tree", target, &commit],
-                    Inspection,
-                )?;
-                if !result.status.success()
-                    || String::from_utf8_lossy(&result.stdout).lines().next()
-                        != Some(target_tree.trim())
-                {
+                let merged = super::merge_tree::merge_tree(path, &[], target, &commit, Inspection)?;
+                if !merged.conflicts.is_empty() || merged.tree != target_tree.trim() {
                     return Ok(false);
                 }
             }

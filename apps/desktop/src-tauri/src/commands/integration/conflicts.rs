@@ -9,6 +9,7 @@
 //! `public/licenses/oh-my-pi.txt`.
 
 use super::repo::{self, Policy::Snapshot};
+use crate::commands::pbxproj;
 use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -326,6 +327,9 @@ pub(in crate::commands) struct FileView {
     pub blocks: Vec<BlockView>,
     /// Why the file's blocks could not be read, such as an unfinished marker.
     pub error: Option<String>,
+    /// For an Xcode project file, the objects both sides changed incompatibly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -355,9 +359,11 @@ fn view(path: String, text: &str, digest: String) -> FileView {
                 hash: digest,
                 blocks: vec![],
                 error: Some(error),
+                note: None,
             }
         }
     };
+    let note = pbxproj::is_project_file(&path).then(|| project_note(&segments));
     let blocks = segments
         .into_iter()
         .filter_map(|segment| match segment {
@@ -384,6 +390,44 @@ fn view(path: String, text: &str, digest: String) -> FileView {
         hash: digest,
         blocks,
         error: None,
+        note,
+    }
+}
+
+/// What to keep in a conflicted Xcode project file, naming the objects both
+/// sides changed incompatibly. Each side is rebuilt from the diff3 blocks and
+/// merged object by object; the conflicts that remain are the ones to decide.
+fn project_note(segments: &[Segment]) -> String {
+    let side = |choose: fn(&Block) -> Option<&str>| -> Option<String> {
+        segments
+            .iter()
+            .map(|segment| match segment {
+                Segment::Text(text) => Some(text.as_str()),
+                Segment::Block(block) => choose(block),
+            })
+            .collect()
+    };
+    let versions = (
+        side(|block| block.base.as_deref()),
+        side(|block| Some(&block.ours)),
+        side(|block| Some(&block.theirs)),
+    );
+    let guidance = "Xcode project file: keep every object and list entry either side added, \
+        keep each 24-character ID once, and remove an ID only where nothing refers to it.";
+    let conflicts = match versions {
+        (Some(base), Some(ours), Some(theirs)) => pbxproj::merge(&base, &ours, &theirs).err(),
+        _ => None,
+    };
+    match conflicts {
+        Some(conflicts) => format!(
+            "{guidance} Changed incompatibly: {}",
+            conflicts
+                .iter()
+                .map(pbxproj::Conflict::describe)
+                .collect::<Vec<_>>()
+                .join("; ")
+        ),
+        None => guidance.to_string(),
     }
 }
 
@@ -427,6 +471,7 @@ pub(in crate::commands) fn list(workspace: &Path, only: Option<&str>) -> Result<
                 hash: String::new(),
                 blocks: vec![],
                 error: Some(error),
+                note: None,
             }),
         }
     }
@@ -723,6 +768,56 @@ mod tests {
             .unwrap()
             .contains("too large"));
         assert!(entry("large.txt").blocks.is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_conflicted_xcode_project_names_the_objects_to_decide() {
+        let root = std::env::temp_dir().join(format!(
+            "jackalope-pbxproj-conflict-{}-{}",
+            std::process::id(),
+            super::super::unique_id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let fixtures = [
+            ("base", include_str!("../pbxproj/fixtures/base.pbxproj")),
+            (
+                "ours",
+                include_str!("../pbxproj/fixtures/bundle_alpha.pbxproj"),
+            ),
+            (
+                "theirs",
+                include_str!("../pbxproj/fixtures/bundle_beta.pbxproj"),
+            ),
+        ];
+        for (name, text) in fixtures {
+            fs::write(root.join(name), text).unwrap();
+        }
+        let output = repo::output(
+            &root,
+            &["merge-file", "-p", "--diff3", "ours", "base", "theirs"],
+            Snapshot,
+        )
+        .unwrap();
+        let text = String::from_utf8(output.stdout).unwrap();
+        let file = view(
+            "App.xcodeproj/project.pbxproj".into(),
+            &text,
+            hash(text.as_bytes()),
+        );
+        assert_eq!(file.blocks.len(), 2);
+        let note = file.note.unwrap();
+        assert!(note.starts_with("Xcode project file:"), "{note}");
+        for name in [
+            "(Debug)",
+            "(Release)",
+            "buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+        ] {
+            assert!(note.contains(name), "{note}");
+        }
+        assert!(view("notes.txt".into(), &text, String::new())
+            .note
+            .is_none());
         fs::remove_dir_all(root).unwrap();
     }
 }
