@@ -11,7 +11,7 @@ import {
   LoadingState,
   DropdownMenu as Menu,
 } from '@jackalope/ui';
-import { FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
+import { Compass, FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
@@ -104,8 +104,12 @@ export function TaskWorkspace({
     setView: saveView,
     listRequest,
     clearListRequest,
+    hiddenLaunchpads,
+    setLaunchpadHidden,
   } = useWorkViewStore(
     useShallow((s) => ({
+      hiddenLaunchpads: s.hiddenLaunchpads,
+      setLaunchpadHidden: s.setLaunchpadHidden,
       scope: s.scope,
       setScope: s.setScope,
       views: s.views,
@@ -289,19 +293,38 @@ export function TaskWorkspace({
 
   // The page's commands share the work list's menu; without a list they get their own.
   // New work is the composer bar, and Repo TODOs is a project page view.
-  const pageMenuItems = project && (
-    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
-      <Workflow size={16} aria-hidden="true" />
-      Plan feature work
-    </Menu.Item>
-  );
   // Its starting points are code work, which General never holds.
   const general = isGeneralProject(project);
-  const launchpad = project && projectFilter !== 'all' && !general && (
-    <ProjectLaunchpad
-      project={project}
-      onStart={(text) => setStarterSeed({ id: crypto.randomUUID(), text })}
-    />
+  const hasLaunchpad = !!project && projectFilter !== 'all' && !general;
+  const launchpadHidden = !!project && !!hiddenLaunchpads[project.id];
+  const startWith = (text: string) => setStarterSeed({ id: crypto.randomUUID(), text });
+  const launchpad = hasLaunchpad && <ProjectLaunchpad project={project} onStart={startWith} />;
+  // Below a project's work it can be hidden; an empty project still leads with it.
+  const launchpadBelow = hasLaunchpad && !archived && items.length > 0 && !launchpadHidden && (
+    <div className="launchpad-below">
+      <ProjectLaunchpad
+        project={project}
+        onStart={startWith}
+        onHide={() => setLaunchpadHidden(project.id, true)}
+      />
+    </div>
+  );
+  const pageMenuItems = project && (
+    <>
+      <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+        <Workflow size={16} aria-hidden="true" />
+        Plan feature work
+      </Menu.Item>
+      {hasLaunchpad && launchpadHidden && (
+        <Menu.Item
+          className="workspace-menu-item"
+          onSelect={() => setLaunchpadHidden(project.id, false)}
+        >
+          <Compass size={16} aria-hidden="true" />
+          Show starting points
+        </Menu.Item>
+      )}
+    </>
   );
   return (
     <WorkspacePage className="task-home">
@@ -355,7 +378,7 @@ export function TaskWorkspace({
             onArchivedChange={setArchived}
             menuItems={pageMenuItems}
             emptyState={
-              !archived && launchpad ? (
+              !archived && launchpad && !launchpadBelow ? (
                 launchpad
               ) : (
                 <EmptyState
@@ -414,6 +437,7 @@ export function TaskWorkspace({
           {launchpad}
         </>
       )}
+      {launchpadBelow}
       {archived && (
         <Suspense fallback={<LoadingState label="Loading archive…" />}>
           <ArchivedHistory />

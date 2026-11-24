@@ -25,10 +25,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a project row opens that project's work and its menu opens project pages, including
   Appearance. Favorites sit above the tree as tiles sized by how many there are; pinned
   work stays at the top of its project and folders group a project's work, all saved
-  locally. A project with no work shows a launchpad of starting points and project pages.
+  locally. A project with no work leads with a launchpad of starting points and project
+  pages; a project with work shows it below the work list, where it can be hidden per
+  project and brought back from the list's menu.
   The sidebar and the Work project switcher offer General, a place without a project for
-  work such as operating a web page or checking a connection; once added it lists like
-  any project.
+  work such as operating a web page or checking a connection; the sidebar lists it above
+  the projects, and once added it holds work like any project.
   Inbox gathers work that needs the person, new results, app alerts (including low
   allowances), running work and pull requests waiting on others across projects. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted

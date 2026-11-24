@@ -46,6 +46,16 @@
   border-radius: inherit;
   object-fit: cover;
 }
+.launchpad-hide {
+  align-self: flex-start;
+  margin-left: auto;
+}
+/* Below a work list, set apart from it like a section of its own. */
+.launchpad-below {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border-subtle);
+}
 .launchpad-intro {
   display: grid;
   gap: 4px;
