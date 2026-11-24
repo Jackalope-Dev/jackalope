@@ -1,5 +1,16 @@
 [
   {
+    "id": "worktrees-that-set-themselves-up",
+    "date": "2026-11-24",
+    "title": "Worktrees that set themselves up.",
+    "description": "New task worktrees can copy your local files, run setup commands and clean themselves up later.",
+    "items": [
+      "List local files such as .env in .worktreeinclude to copy them into every task worktree.",
+      "Run a saved command whenever a worktree is created, and stop dev servers when the task is merged or archived.",
+      "Optionally remove finished worktrees after a few days; anything with local files or unmerged work is kept."
+    ]
+  },
+  {
     "id": "faster-interruptible-codex-conversations",
     "date": "2026-11-24",
     "title": "Faster, interruptible Codex conversations.",

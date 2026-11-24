@@ -25,6 +25,10 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept worktree lifecycle in an installed app on macOS, Windows and Linux:
+  `.worktreeinclude` copies, worktree commands and their failure output, stopping a marked
+  terminal on merge and archive, and an automatic cleanup pass keeping and removing the
+  right worktrees.
 - [ ] Accept Codex app-server sessions in an installed app on each platform: approvals,
   Send now, Stop, and resume after a restart.
 - [ ] Accept composer side questions (Claude fork-session, `codex exec fork`) and per-send
