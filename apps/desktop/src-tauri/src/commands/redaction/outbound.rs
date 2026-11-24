@@ -7,7 +7,8 @@
 //! The credential shapes and the secret-named environment rule adapt
 //! oh-my-pi's secret obfuscation (MIT); see public/licenses/oh-my-pi.txt.
 
-use super::{KnownSecrets, STRUCTURAL};
+use super::{MARK, STRUCTURAL};
+use aho_corasick::{AhoCorasick, MatchKind};
 use regex::{Regex, RegexSet};
 use serde_json::Value;
 use std::{
@@ -31,8 +32,6 @@ enum Kind {
     Credential,
     /// The password in `scheme://user:password@host`.
     Password,
-    /// A multi-line block, such as a PEM private key.
-    Block,
 }
 
 struct Shape {
@@ -45,11 +44,6 @@ struct Shape {
 /// rule, so identifiers such as `token_expiry_seconds`, Git object ids and
 /// UUIDs are left alone.
 const SHAPES: &[Shape] = &[
-    Shape {
-        label: "private key",
-        pattern: r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----(?s:.*?)(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\z)",
-        kind: Kind::Block,
-    },
     Shape {
         label: "GitHub token",
         pattern: r"gh[opusr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{36,}",
@@ -145,11 +139,10 @@ impl Shape {
     fn accepts(&self, text: &str, start: usize, end: usize) -> bool {
         let found = &text[start..end];
         match self.kind {
-            Kind::Block => true,
             Kind::Credential => found.bytes().any(|b| b.is_ascii_digit()),
             Kind::Password => !found.starts_with(['$', '{', '<', '*', '[', '%']),
             Kind::Token => {
-                !text[..start].chars().next_back().is_some_and(continues)
+                boundary_before(&text[..start])
                     && !text[end..].chars().next().is_some_and(continues)
                     && found.bytes().any(|b| b.is_ascii_digit())
             }
@@ -166,10 +159,7 @@ impl Shape {
             };
             if self.accepts(text, secret.start(), secret.end()) {
                 out.push_str(&text[last..secret.start()]);
-                match self.kind {
-                    Kind::Block => out.push_str(&block(&mark, text, secret.start(), secret.end())),
-                    _ => out.push_str(&mark),
-                }
+                out.push_str(&mark);
                 last = secret.end();
             }
         }
@@ -180,38 +170,189 @@ impl Shape {
     }
 }
 
-/// The replacement for the block at `start..end` of `text`. When each of its
-/// lines starts with the same prefix as its first, such as `+` in a diff, the
-/// replacement keeps that many prefixed lines so hunk lengths stay valid.
-fn block(mark: &str, text: &str, start: usize, end: usize) -> String {
-    let prefix = &text[text[..start].rfind('\n').map_or(0, |at| at + 1)..start];
-    let mut lines = text[start..end].split('\n').skip(1).peekable();
-    let mut out = mark.to_string();
-    if prefix.is_empty() || lines.peek().is_none() {
-        return out;
+/// Whether a token may start after `before`: at a word boundary, or right
+/// after an escape (`\n`, `"`) or percent-encoding (`%3A`), whose last
+/// character would otherwise look like part of the token.
+fn boundary_before(before: &str) -> bool {
+    if !before.chars().next_back().is_some_and(continues) {
+        return true;
     }
-    let mut count = 0;
-    for line in lines {
-        if !line.starts_with(prefix) {
-            return out;
+    let bytes = before.as_bytes();
+    let tail = |len: usize| bytes.len().checked_sub(len).map(|at| &bytes[at..]);
+    let hex = |part: &[u8]| part.iter().all(u8::is_ascii_hexdigit);
+    matches!(tail(2), Some([b'\\', b'n' | b'r' | b't']))
+        || tail(3).is_some_and(|part| part[0] == b'%' && hex(&part[1..]))
+        || tail(6).is_some_and(|part| part.starts_with(b"\\u") && hex(&part[2..]))
+}
+
+const KEY_MARK: &str = "[redacted private key]";
+
+static KEY_BEGIN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----").expect("key header compiles")
+});
+static KEY_END: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\A-----END [A-Z0-9 ]*PRIVATE KEY-----").expect("key footer compiles")
+});
+
+/// A line of a key's body: base64 long enough to hold a digit or symbol, or
+/// an encrypted key's headers. `before_end` accepts the short last line.
+fn key_line(body: &str, before_end: bool, after_dek: bool) -> bool {
+    let body = body.trim_end();
+    let base64 = !body.is_empty()
+        && body
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='));
+    (base64 && (before_end || (body.len() >= 16 && body.bytes().any(|b| !b.is_ascii_alphabetic()))))
+        || body.starts_with("Proc-Type:")
+        || body.starts_with("DEK-Info:")
+        || (body.is_empty() && after_dek)
+}
+
+/// The prefix a line of a key carries before its content, matching the
+/// header line's `header` prefix: the same text, such as `> ` in a quote, or
+/// a diff marker (` `, `+`, `-`) where the header line has one.
+fn line_prefix<'a>(header: &str, line: &'a str) -> &'a str {
+    if !header.is_empty() && line.starts_with(header) {
+        return &line[..header.len()];
+    }
+    if header.starts_with([' ', '+', '-']) && line.starts_with([' ', '+', '-']) {
+        return if line[1..].starts_with(&header[1..]) {
+            &line[..header.len()]
+        } else {
+            &line[..1]
+        };
+    }
+    ""
+}
+
+/// The end of the key whose header is `start..header_end` in `text`, and its
+/// replacement. A key spans its key lines and its END line when present, so a
+/// header with nothing key-like after it masks only itself. When every line of
+/// the key carries a prefix, such as a diff marker, the replacement keeps one
+/// prefixed line per line so diff hunks stay valid.
+fn key(text: &str, start: usize, header_end: usize) -> (usize, String) {
+    let rest = &text[header_end..];
+    if rest.starts_with("\\n") || rest.starts_with("\\r\\n") {
+        return (escaped_key(text, header_end), KEY_MARK.into());
+    }
+    if !rest.starts_with('\n') && !rest.starts_with("\r\n") {
+        return (header_end, KEY_MARK.into());
+    }
+    let header = &text[text[..start].rfind('\n').map_or(0, |at| at + 1)..start];
+    let lines: Vec<(usize, &str)> = text[header_end..]
+        .split('\n')
+        .scan(header_end, |at, line| {
+            let found = (*at, line);
+            *at += line.len() + 1;
+            Some(found)
+        })
+        .collect();
+    // The header line's own ending, then each key line's prefix and ending.
+    let mut kept: Vec<(&str, &str)> = Vec::new();
+    let mut end = header_end;
+    let mut after_dek = false;
+    for (index, &(at, line)) in lines.iter().enumerate().skip(1) {
+        let own = line_prefix(header, line);
+        let body = &line[own.len()..];
+        if let Some(footer) = KEY_END.find(body) {
+            kept.push((own, ""));
+            end = at + own.len() + footer.end();
+            break;
         }
-        count += 1;
+        let before_end = lines
+            .get(index + 1)
+            .is_some_and(|&(_, next)| KEY_END.is_match(&next[line_prefix(header, next).len()..]));
+        if !key_line(body, before_end, after_dek) {
+            break;
+        }
+        after_dek = body.starts_with("DEK-Info:");
+        let ending = if line.ends_with('\r') { "\r" } else { "" };
+        kept.push((own, ending));
+        end = at + line.len() - ending.len();
     }
-    for _ in 0..count {
-        out.push('\n');
-        out.push_str(prefix);
+    let header_ending = if lines[0].1 == "\r" { "\r" } else { "" };
+    let mut out = String::from(KEY_MARK);
+    if kept.is_empty() {
+        return (header_end, out);
     }
-    out
+    if kept.iter().all(|(own, _)| !own.is_empty()) {
+        out.push_str(header_ending);
+        for (index, (own, ending)) in kept.iter().enumerate() {
+            out.push('\n');
+            out.push_str(own);
+            if index + 1 < kept.len() {
+                out.push_str(ending);
+            }
+        }
+    }
+    (end, out)
+}
+
+/// The end of a key written with escaped line breaks (`\n` inside a JSON or
+/// code string) whose header ends at `header_end`.
+fn escaped_key(text: &str, header_end: usize) -> usize {
+    let mut end = header_end;
+    let mut after_dek = false;
+    loop {
+        let rest = &text[end..];
+        let Some(segment) = rest
+            .strip_prefix("\\r\\n")
+            .or_else(|| rest.strip_prefix("\\n"))
+        else {
+            return end;
+        };
+        let start = text.len() - segment.len();
+        if let Some(footer) = KEY_END.find(segment) {
+            return start + footer.end();
+        }
+        let length = segment
+            .find(|c: char| !(c.is_ascii_alphanumeric() || "+/=:,- ".contains(c)))
+            .unwrap_or(segment.len());
+        let body = &segment[..length];
+        let next = &segment[length..];
+        let before_end = KEY_END.is_match(
+            next.strip_prefix("\\r\\n")
+                .or_else(|| next.strip_prefix("\\n"))
+                .unwrap_or(""),
+        );
+        if !key_line(body, before_end, after_dek) {
+            return end;
+        }
+        after_dek = body.starts_with("DEK-Info:");
+        end = start + length;
+    }
+}
+
+/// `text` with private keys masked.
+fn private_keys(text: &str) -> Cow<'_, str> {
+    let mut out = String::new();
+    let mut last = 0;
+    let mut changed = false;
+    for header in KEY_BEGIN.find_iter(text) {
+        if header.start() < last {
+            continue;
+        }
+        let (end, replacement) = key(text, header.start(), header.end());
+        out.push_str(&text[last..header.start()]);
+        out.push_str(&replacement);
+        last = end;
+        changed = true;
+    }
+    if !changed {
+        return Cow::Borrowed(text);
+    }
+    out.push_str(&text[last..]);
+    Cow::Owned(out)
 }
 
 /// `text` with credential shapes masked.
 fn shapes(text: &str) -> Cow<'_, str> {
+    let mut text = private_keys(text);
     let (set, regexes) = &*PATTERNS;
-    let matched = set.matches(text);
+    let matched = set.matches(&text);
     if !matched.matched_any() {
-        return Cow::Borrowed(text);
+        return text;
     }
-    let mut text = Cow::Borrowed(text);
     for index in matched.iter() {
         if let Some(replaced) = SHAPES[index].replace(&regexes[index], &text) {
             text = Cow::Owned(replaced);
@@ -220,13 +361,32 @@ fn shapes(text: &str) -> Cow<'_, str> {
     text
 }
 
+/// Every form of `values` matched in one pass, longest first where several
+/// start at the same place.
+fn matcher<'a>(values: impl Iterator<Item = &'a String>) -> Option<Arc<AhoCorasick>> {
+    let mut forms: Vec<String> = values
+        .filter(|value| value.chars().count() >= super::MIN_CHARS)
+        .flat_map(|value| super::forms(value))
+        .collect();
+    forms.sort();
+    forms.dedup();
+    if forms.is_empty() {
+        return None;
+    }
+    AhoCorasick::builder()
+        .match_kind(MatchKind::LeftmostLongest)
+        .build(forms)
+        .ok()
+        .map(Arc::new)
+}
+
 #[derive(Default)]
 struct Known {
     /// Secrets in this app's own environment.
     environment: Vec<String>,
     /// Values Jackalope handled since, least recently given first.
     remembered: VecDeque<String>,
-    secrets: Option<Arc<KnownSecrets>>,
+    matcher: Option<Arc<AhoCorasick>>,
 }
 
 impl Known {
@@ -241,8 +401,7 @@ impl Known {
     }
 
     fn rebuild(&mut self) {
-        let values = self.environment.iter().chain(&self.remembered).cloned();
-        self.secrets = KnownSecrets::new(values).map(Arc::new);
+        self.matcher = matcher(self.environment.iter().chain(&self.remembered));
     }
 
     fn remember(&mut self, values: &[String]) {
@@ -286,8 +445,8 @@ pub(crate) fn remember(values: &[String]) {
 }
 
 #[cfg(not(test))]
-fn known() -> Option<Arc<KnownSecrets>> {
-    KNOWN.read().ok()?.secrets.clone()
+fn known() -> Option<Arc<AhoCorasick>> {
+    KNOWN.read().ok()?.matcher.clone()
 }
 
 // Tests run in parallel threads of one process, so each test thread keeps its
@@ -303,21 +462,30 @@ pub(crate) fn remember(values: &[String]) {
 }
 
 #[cfg(test)]
-fn known() -> Option<Arc<KnownSecrets>> {
-    KNOWN.with(|known| known.borrow().secrets.clone())
+fn known() -> Option<Arc<AhoCorasick>> {
+    KNOWN.with(|known| known.borrow().matcher.clone())
 }
 
 /// `text` as it may leave this device: known secret values and credential
 /// shapes replaced, everything else as written.
 pub(crate) fn outbound(text: &str) -> Cow<'_, str> {
-    let known = known();
-    match known
-        .as_ref()
-        .map_or(Cow::Borrowed(text), |known| known.redacted(text))
-    {
-        Cow::Borrowed(text) => shapes(text),
-        Cow::Owned(text) => Cow::Owned(shapes(&text).into_owned()),
+    match known().filter(|known| known.is_match(text)) {
+        None => shapes(text),
+        Some(known) => {
+            let mut masked = String::with_capacity(text.len());
+            known.replace_all_with(text, &mut masked, |_, _, out| {
+                out.push_str(MARK);
+                true
+            });
+            Cow::Owned(shapes(&masked).into_owned())
+        }
     }
+}
+
+/// [`outbound`] cut to its first `max` characters. Masking comes first, so a
+/// credential the cut would shorten is still recognized.
+pub(crate) fn outbound_clipped(text: &str, max: usize) -> String {
+    outbound(text).chars().take(max).collect()
 }
 
 /// [`outbound`] for every string in `value`, leaving object keys and the
@@ -341,8 +509,10 @@ pub(crate) fn outbound_value(value: &mut Value) {
     }
 }
 
+/// A variable named for a secret: its name ends in a secret word, so
+/// `NEXTAUTH_URL` and `SSH_AUTH_SOCK` are not.
 static SECRET_NAME: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(?:KEY|SECRET|TOKEN|PASSWORD|PASS|AUTH|CREDENTIAL|PRIVATE|OAUTH)(?:_|$)")
+    Regex::new(r"(?i)(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|PASS|AUTH|CREDENTIALS?|KEY_BASE)$")
         .expect("secret name pattern compiles")
 });
 
@@ -356,15 +526,23 @@ fn location(value: &str) -> bool {
             && matches!(bytes[2], b'\\' | b'/'))
 }
 
+/// An address with no credentials in it: no user, password, query or fragment.
+fn plain_url(value: &str) -> bool {
+    value.contains("://")
+        && reqwest::Url::parse(value).is_ok_and(|url| {
+            url.username().is_empty()
+                && url.password().is_none()
+                && url.query().is_none()
+                && url.fragment().is_none()
+        })
+}
+
 /// The secret values in an environment: secret-named variables, and the
 /// password in any connection URL (raw and percent-decoded).
 fn environment(variables: impl IntoIterator<Item = (String, String)>) -> Vec<String> {
     let mut values = Vec::new();
     for (name, value) in variables {
-        if (SECRET_NAME.is_match(&name)
-            || super::super::process_control::credential_variable(&name))
-            && !location(&value)
-        {
+        if SECRET_NAME.is_match(&name) && !location(&value) && !plain_url(&value) {
             values.push(value.clone());
         }
         if let Some(password) = reqwest::Url::parse(&value)
@@ -559,6 +737,51 @@ mod tests {
     }
 
     #[test]
+    fn a_header_without_a_key_masks_only_what_follows_it_that_looks_like_a_key() {
+        let begin = format!("-----BEGIN {} KEY-----", "PRIVATE");
+        let end = format!("-----END {} KEY-----", "PRIVATE");
+        let (one, two) = (random(64), random(40));
+        assert_eq!(
+            masked(&format!("Paste the line {begin}\nthen the key.\nDone")),
+            "Paste the line [redacted private key]\nthen the key.\nDone"
+        );
+        assert_eq!(
+            masked(&format!(
+                "{begin}\n{one}\n{two}\nThe rest stays.\nAnd this."
+            )),
+            "[redacted private key]\nThe rest stays.\nAnd this."
+        );
+        assert_eq!(
+            masked(&format!(
+                "{begin} goes first.\nNotes\n{begin}\n{one}\n{end}\nafter"
+            )),
+            "[redacted private key] goes first.\nNotes\n[redacted private key]\nafter"
+        );
+        let encrypted = format!(
+            "{begin}\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,{}\n\n{one}\n{end}\nafter",
+            random(32)
+        );
+        assert_eq!(masked(&encrypted), "[redacted private key]\nafter");
+    }
+
+    #[test]
+    fn escaped_private_keys_are_masked_through_their_escaped_breaks() {
+        let begin = format!("-----BEGIN {} KEY-----", "PRIVATE");
+        let end = format!("-----END {} KEY-----", "PRIVATE");
+        let (one, two) = (random(64), random(40));
+        assert_eq!(
+            masked(&format!(
+                r#""key": "{begin}\n{one}\n{two}\n{end}\n", "next": 1"#
+            )),
+            r#""key": "[redacted private key]\n", "next": 1"#
+        );
+        assert_eq!(
+            masked(&format!(r#""key": "{begin}\n{one}\nnext words"#)),
+            r#""key": "[redacted private key]\nnext words"#
+        );
+    }
+
+    #[test]
     fn private_keys_in_a_diff_keep_its_line_count() {
         let begin = format!("-----BEGIN {} KEY-----", "PRIVATE");
         let end = format!("-----END {} KEY-----", "PRIVATE");
@@ -574,6 +797,50 @@ mod tests {
             masked(&format!("> {begin}\n{one}\n{end}\nafter")),
             "> [redacted private key]\nafter"
         );
+        let mixed = format!("@@ -1,4 +1,4 @@\n {begin}\n-{one}\n+{two}\n {end}\n other\n");
+        assert_eq!(
+            masked(&mixed),
+            "@@ -1,4 +1,4 @@\n [redacted private key]\n-\n+\n \n other\n"
+        );
+        let unclosed = format!(
+            "@@ -0,0 +1,2 @@\n+{begin}\n+not a key line\ndiff --git a/b b/b\n@@ -1 +1 @@\n-x\n+y\n"
+        );
+        assert_eq!(
+            masked(&unclosed),
+            unclosed.replace(&begin, "[redacted private key]")
+        );
+    }
+
+    #[test]
+    fn tokens_after_escapes_and_percent_encoding() {
+        let github = format!("ghp_{}", random(36));
+        let stripe = format!("sk_live_{}", random(24));
+        assert_eq!(
+            masked(&format!(r"line\n{github}\tend")),
+            r"line\n[redacted GitHub token]\tend"
+        );
+        assert_eq!(
+            masked(&format!("user%3A{github}%40host")),
+            "user%3A[redacted GitHub token]%40host"
+        );
+        assert_eq!(
+            masked(&format!("key=%20{stripe}")),
+            "key=%20[redacted Stripe key]"
+        );
+        assert_eq!(
+            masked(&format!(r"\u0022{github}\u0022")),
+            r"\u0022[redacted GitHub token]\u0022"
+        );
+        assert_kept(&format!("n{github}"));
+        assert_kept(&format!("%zz{github}"));
+        assert_kept(&format!("1{stripe}"));
+    }
+
+    #[test]
+    fn clipping_comes_after_masking() {
+        let token = format!("ghp_{}", random(36));
+        let clipped = outbound_clipped(&format!("{} {token} more", "x".repeat(9)), 30);
+        assert_eq!(clipped, format!("{} [redacted GitHub tok", "x".repeat(9)));
     }
 
     #[test]
@@ -640,11 +907,11 @@ mod tests {
         known.remember(&[value(MAX_KNOWN)]);
         assert_eq!(known.remembered.len(), MAX_KNOWN);
         assert_eq!(known.remembered.front(), Some(&value(2)));
-        let secrets = known.secrets.unwrap();
+        let matcher = known.matcher.unwrap();
         for kept in [value(0), value(MAX_KNOWN), known.environment[0].clone()] {
-            assert_eq!(secrets.redacted(&kept), super::super::MARK, "{kept}");
+            assert!(matcher.is_match(kept.as_str()), "{kept}");
         }
-        assert_eq!(secrets.redacted(&value(1)), value(1));
+        assert!(!matcher.is_match(value(1).as_str()));
     }
 
     #[test]
@@ -707,6 +974,12 @@ mod tests {
                 ("DATABASE_URL", &format!("postgres://app:{encoded}@db/app")),
                 ("EDITOR", "code --wait --new-window"),
                 ("SHORT_SECRET", "tiny"),
+                ("NEXTAUTH_URL", "http://localhost:3000"),
+                ("OAUTH_TOKEN_URL", "https://auth.example.com/token"),
+                ("AUTH0_AUTH_DOMAIN", "tenant.example.auth0.com"),
+                ("SERVICE_TOKEN", "https://api.example.com/v1"),
+                ("WEBHOOK_SECRET", "https://hooks.example.com/in?sig=abc123"),
+                ("PGPASSWORD", "database-password"),
             ]
             .map(|(name, value)| (name.to_string(), value.to_string())),
         );
@@ -717,6 +990,8 @@ mod tests {
                 "github-token-value".into(),
                 password,
                 encoded,
+                "https://hooks.example.com/in?sig=abc123".into(),
+                "database-password".into(),
             ]
         );
     }

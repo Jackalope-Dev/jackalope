@@ -9,7 +9,7 @@ use base64::Engine as _;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 
-pub(crate) use outbound::{outbound, outbound_value};
+pub(crate) use outbound::{outbound, outbound_clipped, outbound_value};
 
 /// What a value is replaced with.
 pub(crate) const MARK: &str = "[redacted]";

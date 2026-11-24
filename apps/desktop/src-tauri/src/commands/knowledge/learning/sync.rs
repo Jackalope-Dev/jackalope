@@ -87,11 +87,18 @@ fn plain(text: &str, max: usize) -> bool {
     text.len() <= max && !text.contains('\0')
 }
 
-/// Whether text may leave the device: nothing the redactor would replace,
-/// including the home folder, and no credential vocabulary.
+/// Whether text may leave the device: nothing the redactor or outbound
+/// masking would replace, including the home folder, secret values Jackalope
+/// handled, and no credential vocabulary.
 pub(super) fn shareable(text: &str) -> bool {
     let (cleaned, sensitive) = redact::scan(text);
-    !sensitive && cleaned == text && !redact::unsafe_text(text)
+    !sensitive
+        && cleaned == text
+        && !redact::unsafe_text(text)
+        && matches!(
+            crate::commands::redaction::outbound(text),
+            std::borrow::Cow::Borrowed(_)
+        )
 }
 
 impl SyncedLesson {

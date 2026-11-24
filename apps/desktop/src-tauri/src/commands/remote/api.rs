@@ -1,5 +1,6 @@
 use super::super::{
     live_sessions::{FirstMessage, SessionLimits},
+    redaction::outbound_clipped,
     tasks::{review_run, TaskRun},
 };
 use super::pairing::{PAIR_ROUTE, REQUEST_ROUTE};
@@ -173,7 +174,7 @@ fn task(run: &TaskRun, detail: bool) -> Value {
         .filter(|prompt| detail || prompt.status == "pending")
         .take(if detail { usize::MAX } else { LISTED_PROMPTS })
         .collect();
-    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"agent":run.agent,"title":run.prompt.chars().take(if detail { 12_000 } else { 160 }).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"host":if detail { run.host.as_ref().map(|host| host.name.clone()) } else { None },"prompts":prompts,"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
+    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"agent":run.agent,"title":outbound_clipped(&run.prompt, if detail { 12_000 } else { 160 }),"status":run.status,"startedAt":run.started_at,"result":if detail { outbound_clipped(&run.result, 100_000) } else { String::new() },"error":run.error,"host":if detail { run.host.as_ref().map(|host| host.name.clone()) } else { None },"prompts":prompts,"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
 }
 async fn request(
     State(service): State<RemoteAccess>,
@@ -211,8 +212,13 @@ async fn request(
         inner.config.clone()
     };
     let name = action.action.clone();
-    match tauri::async_runtime::spawn_blocking(move || dispatch(&service, &config, action)).await {
-        Ok(Ok(value)) => Json(shared(&name, value)).into_response(),
+    // Masking a large response is CPU work, so it runs off the async thread too.
+    match tauri::async_runtime::spawn_blocking(move || {
+        dispatch(&service, &config, action).map(|value| shared(&name, value))
+    })
+    .await
+    {
+        Ok(Ok(value)) => Json(value).into_response(),
         Ok(Err(error)) => failure(StatusCode::BAD_REQUEST, &error),
         Err(_) => failure(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -815,6 +821,15 @@ mod tests {
         );
         let icons = json!({"icons":{"allowed":token}});
         assert_eq!(shared("projectIcons", icons.clone()), icons);
+        let straddling = TaskRun {
+            prompt: format!("{} {token}", "x".repeat(150)),
+            ..Default::default()
+        };
+        let listed = shared("snapshot", task(&straddling, false));
+        let title = listed["title"].as_str().unwrap();
+        assert_eq!(title.chars().count(), 160);
+        assert!(title.ends_with(" [redacted"), "{title}");
+        assert!(!title.contains("ghp_"));
     }
     #[test]
     fn rejects_rebinding_and_cross_origin_requests() {
