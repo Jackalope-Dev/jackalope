@@ -969,10 +969,7 @@ connection: close
         assert_eq!(refused[0].status, 429);
         let busy = refused[0].piece.as_ref().unwrap();
         assert!(busy.last);
-        assert_eq!(
-            busy.headers,
-            [("retry-after".to_string(), "1".to_string())]
-        );
+        assert_eq!(busy.headers, [("retry-after".to_string(), "1".to_string())]);
 
         // Delivered pieces free their stream's buffer.
         let (call, flow) = relay
