@@ -100,6 +100,13 @@ public static class JackalopeDesktop {
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] static extern short VkKeyScanW(char value);
     [DllImport("user32.dll")] static extern uint SendInput(uint count, Input[] inputs, int size);
+    [DllImport("user32.dll")] static extern bool PostMessageW(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] static extern IntPtr ChildWindowFromPointEx(IntPtr parent, Point point, uint flags);
+    [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr handle, ref Point point);
+    [DllImport("user32.dll")] static extern bool PhysicalToLogicalPointForPerMonitorDPI(IntPtr handle, ref Point point);
+    [DllImport("user32.dll")] static extern bool IsChild(IntPtr parent, IntPtr child);
+    [DllImport("user32.dll")] static extern bool GetGUIThreadInfo(uint thread, ref ThreadInfo info);
+    [StructLayout(LayoutKind.Sequential)] struct ThreadInfo { public int Size; public uint Flags; public IntPtr Active, Focus, Capture, MenuOwner, MoveSize, Caret; public Rect CaretRect; }
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr handle, IntPtr dc, uint flags);
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
@@ -277,8 +284,14 @@ public static class JackalopeDesktop {
         if (expected != null && (expected[0] != bounds[0] || expected[1] != bounds[1] || expected[2] != bounds[2] || expected[3] != bounds[3]))
             throw new Exception("Window moved or resized. Take a new snapshot.");
         var context = new Context { Target = target, Bounds = bounds, Screen = screen, Scope = scope, Deny = deny };
+        // Pointer and keyboard input go to the window where it is while the person works in
+        // another app, when Jackalope allows it for this app; otherwise they need it in front.
+        context.Behind = true.Equals(Field(request, "background")) && scope != "desktop" && target != IntPtr.Zero && Pid(GetForegroundWindow()) != Pid(target);
         switch (action) {
             case "focus":
+                // Switching to a window of an app the person isn't using selects it where it is.
+                if (!Has(request, "element") && context.Behind && scope == "app")
+                    return new Dictionary<string, object> { {"status", "selected"}, {"bounds", bounds} };
                 // UI Automation focus and raising both bring a window in front, so neither
                 // happens while the person works in another app (except for a desktop grant).
                 if (!InFront(context)) throw new Exception(Background);
@@ -312,9 +325,10 @@ public static class JackalopeDesktop {
         }
     }
 
-    class Context { public IntPtr Target; public int[] Bounds; public bool Screen; public string Scope; public HashSet<uint> Deny; }
+    class Context { public IntPtr Target; public int[] Bounds; public bool Screen; public string Scope; public HashSet<uint> Deny; public bool Behind; }
 
     const string Background = "The window is in the background. Use element actions by ref, or wait until the person brings it back.";
+    const string BackgroundNote = "Sent to the window in the background; the person's pointer, keyboard focus and front window did not change. Take a new snapshot to confirm it landed.";
 
     // Whether input may go to the window now: it's in front (or its app is, for an app grant),
     // or the grant covers the whole desktop.
@@ -539,7 +553,7 @@ public static class JackalopeDesktop {
             point = Center(element, context);
         } else point = new Point { X = (int)Number(request, "x"), Y = (int)Number(request, "y") };
         bool focused = Pointer(context, point, action == "right_click" ? "right" : "left", action == "double_click" ? 2 : 1, 0);
-        return Sent("pointer", focused, "Sent mouse input at the target point; the pointer moved.");
+        return Sent("pointer", focused, context.Behind ? BackgroundNote : "Sent mouse input at the target point; the pointer moved.");
     }
 
     static Dictionary<string, object> Select(IDictionary<string, object> request) {
@@ -585,10 +599,10 @@ public static class JackalopeDesktop {
                 return Sent("accessibility", false, "Scrolled through UI Automation; the mouse did not move.");
             }
             bool moved = Pointer(context, Center(element, context), "wheel", 1, wheel);
-            return Sent("pointer", moved, "Sent wheel input over the element; the pointer moved.");
+            return Sent("pointer", moved, context.Behind ? BackgroundNote : "Sent wheel input over the element; the pointer moved.");
         }
         bool focused = Pointer(context, new Point { X = (int)Number(request, "x"), Y = (int)Number(request, "y") }, "wheel", 1, wheel);
-        return Sent("pointer", focused, "Sent wheel input; the pointer moved.");
+        return Sent("pointer", focused, context.Behind ? BackgroundNote : "Sent wheel input; the pointer moved.");
     }
 
     static Dictionary<string, object> Drag(IDictionary<string, object> request, Context context) {
@@ -597,6 +611,7 @@ public static class JackalopeDesktop {
         bool focused = Foreground(context, true);
         var start = Absolute(context, from, true);
         var end = Absolute(context, to, true);
+        if (context.Behind) { PostDrag(context, start, end); return Sent("pointer", false, BackgroundNote); }
         Move(start); System.Threading.Thread.Sleep(30);
         CheckPointer(start);
         Send(new Input[] { MouseInput(2, 0) });
@@ -618,31 +633,48 @@ public static class JackalopeDesktop {
                 // In the background, keys would reach the person's app; add the text through
                 // the control's value instead when it has one, as on macOS.
                 var value = Pattern(element, ValuePattern.Pattern) as ValuePattern;
-                if (value == null || value.Current.IsReadOnly || element.Current.IsPassword) throw new Exception(Background);
-                value.SetValue(value.Current.Value + (Text(request, "text") ?? ""));
-                return Sent("accessibility", false, "Added the text through UI Automation; the window stayed in the background.");
-            }
-            element.SetFocus(); focused = true;
+                if (element.Current.IsPassword) throw new Exception("Password controls are protected. Enter secrets yourself.");
+                if (value != null && !value.Current.IsReadOnly) {
+                    value.SetValue(value.Current.Value + (Text(request, "text") ?? ""));
+                    return Sent("accessibility", false, "Added the text through UI Automation; the window stayed in the background.");
+                }
+                if (!context.Behind) throw new Exception(Background);
+                // UI Automation focus would raise the window, so a click puts the caret there.
+                Pointer(context, Center(element, context), "left", 1, 0);
+                System.Threading.Thread.Sleep(60);
+            } else { element.SetFocus(); focused = true; }
         }
         focused |= Foreground(context, true);
-        CheckFocusedControl();
+        CheckFocusedControl(context);
         TypeKeys(context, Text(request, "text") ?? "");
-        return Sent("keyboard", focused, "Typed literal text with keyboard input.");
+        return Sent("keyboard", focused, context.Behind ? BackgroundNote : "Typed literal text with keyboard input.");
     }
 
     static Dictionary<string, object> Press(IDictionary<string, object> request, Context context) {
-        bool focused = Foreground(context, true);
-        CheckFocusedControl();
         var chord = Map(request, "chord");
         if (chord == null) throw new Exception("Missing key chord.");
         var modifiers = new List<string>();
         var list = Field(chord, "modifiers") as IList;
         if (list != null) foreach (var value in list) modifiers.Add((string)value);
-        Send(Chord(modifiers.ToArray(), Text(chord, "key")));
+        // A posted key can't carry held modifiers: the app reads them from the keyboard the
+        // person is using. Chords wait for the window to come forward.
+        if (context.Behind && modifiers.Count > 0) throw new Exception(Background);
+        bool focused = Foreground(context, true);
+        CheckFocusedControl(context);
+        var keys = Chord(modifiers.ToArray(), Text(chord, "key"));
+        if (context.Behind) { PostKey(context, keys[0].Data.Keyboard.Key, (keys[0].Data.Keyboard.Flags & 1) != 0); return Sent("keyboard", false, BackgroundNote); }
+        Send(keys);
         return Sent("keyboard", focused, "Sent the key chord to the focused control.");
     }
 
-    static void CheckFocusedControl() {
+    static void CheckFocusedControl(Context context) {
+        if (context.Behind) {
+            var handle = FocusWindow(context);
+            AutomationElement element = null;
+            try { element = AutomationElement.FromHandle(handle); } catch { }
+            if (PasswordWindow(handle) || (element != null && element.Current.IsPassword)) throw new Exception("Focused control is unavailable or protected. Enter secrets yourself.");
+            return;
+        }
         var focused = AutomationElement.FocusedElement;
         if (focused == null || focused.Current.IsPassword || PasswordWindow(new IntPtr(focused.Current.NativeWindowHandle))) throw new Exception("Focused control is unavailable or protected. Enter secrets yourself.");
     }
@@ -650,6 +682,9 @@ public static class JackalopeDesktop {
     // ---- low-level input ----
     static bool Foreground(Context context, bool allowSwitch) {
         Guard();
+        // A window taking input in the background stays where it is, and keys the person
+        // holds in another app don't reach it.
+        if (context.Behind) return false;
         bool changed = false;
         IntPtr foreground = GetForegroundWindow();
         if (context.Target != IntPtr.Zero && foreground != context.Target) {
@@ -686,7 +721,99 @@ public static class JackalopeDesktop {
     static Input MouseInput(uint flags, uint data) { var input = new Input(); input.Type = 0; input.Data.Mouse.Flags = flags; input.Data.Mouse.Data = data; input.Data.Mouse.Extra = new UIntPtr(InputTag); return input; }
 
     static void TypeKeys(Context context, string text) {
+        if (context.Behind) {
+            foreach (char value in text) { Guard(); PostMessageW(FocusWindow(context), WM_CHAR, new IntPtr(value), new IntPtr(1)); }
+            return;
+        }
         foreach (char value in text) { Foreground(context, false); Send(new Input[] { KeyInput(0, value, 4), KeyInput(0, value, 6) }); }
+    }
+
+    // ---- background input ----
+    // Messages posted to the window's own controls reach it where it is, without moving the
+    // pointer or keyboard focus. Classic Win32, WinForms, WPF and Chromium windows read them;
+    // UWP and WinUI windows don't, and Jackalope never asks for background input there.
+    const uint WM_MOUSEMOVE = 0x200, WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203,
+        WM_RBUTTONDOWN = 0x204, WM_RBUTTONUP = 0x205, WM_MOUSEWHEEL = 0x20A, WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
+
+    static IntPtr Coordinates(Point point) { return new IntPtr((int)(((uint)(ushort)point.Y << 16) | (ushort)point.X)); }
+
+    // Where a screen point falls for a window that may be DPI-scaled: the window's own
+    // screen and client coordinates, which posted messages carry unscaled.
+    struct Spot { public Point Screen, Client; }
+    static Spot SpotIn(IntPtr window, Point physical) {
+        var previous = SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(window));
+        try {
+            var screen = physical; PhysicalToLogicalPointForPerMonitorDPI(window, ref screen);
+            var client = screen; ScreenToClient(window, ref client);
+            return new Spot { Screen = screen, Client = client };
+        } finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+    }
+
+    // The deepest visible control of the target under a screen point.
+    static IntPtr ControlAt(IntPtr target, Point physical) {
+        var previous = SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(target));
+        try {
+            var screen = physical; PhysicalToLogicalPointForPerMonitorDPI(target, ref screen);
+            IntPtr window = target;
+            for (int depth = 0; depth < 32; depth++) {
+                var local = screen; ScreenToClient(window, ref local);
+                IntPtr child = ChildWindowFromPointEx(window, local, 1 | 4);
+                if (child == IntPtr.Zero || child == window) break;
+                window = child;
+            }
+            return window;
+        } finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+    }
+
+    // The control with keyboard focus on the window's thread, which must be the window or
+    // one of its controls.
+    static IntPtr FocusWindow(Context context) {
+        uint pid;
+        var info = new ThreadInfo(); info.Size = Marshal.SizeOf(typeof(ThreadInfo));
+        IntPtr focus = GetGUIThreadInfo(GetWindowThreadProcessId(context.Target, out pid), ref info) ? info.Focus : IntPtr.Zero;
+        if (focus == IntPtr.Zero) return context.Target;
+        if (focus != context.Target && !IsChild(context.Target, focus)) throw new Exception("Keyboard focus is in another window of the app. Click the field in the granted window first.");
+        return focus;
+    }
+
+    static void Post(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam) {
+        Guard();
+        if (!PostMessageW(handle, message, wParam, lParam)) throw new Exception("Windows refused input for the window. Inspect before retrying.");
+    }
+
+    static void PostPointer(Context context, Point screen, string button, int count, int wheel) {
+        IntPtr control = ControlAt(context.Target, screen);
+        var spot = SpotIn(control, screen);
+        if (button == "wheel") {
+            Post(control, WM_MOUSEWHEEL, new IntPtr((wheel * 120) << 16), Coordinates(spot.Screen));
+            return;
+        }
+        Post(control, WM_MOUSEMOVE, IntPtr.Zero, Coordinates(spot.Client));
+        bool right = button == "right";
+        for (int i = 0; i < count; i++) {
+            uint down = right ? WM_RBUTTONDOWN : i > 0 ? WM_LBUTTONDBLCLK : WM_LBUTTONDOWN;
+            Post(control, down, new IntPtr(right ? 2 : 1), Coordinates(spot.Client));
+            Post(control, right ? WM_RBUTTONUP : WM_LBUTTONUP, IntPtr.Zero, Coordinates(spot.Client));
+        }
+    }
+
+    static void PostDrag(Context context, Point from, Point to) {
+        IntPtr control = ControlAt(context.Target, from);
+        Post(control, WM_LBUTTONDOWN, new IntPtr(1), Coordinates(SpotIn(control, from).Client));
+        try {
+            for (int step = 1; step <= 10; step++) {
+                var screen = new Point { X = from.X + (to.X - from.X) * step / 10, Y = from.Y + (to.Y - from.Y) * step / 10 };
+                Post(control, WM_MOUSEMOVE, new IntPtr(1), Coordinates(SpotIn(control, screen).Client));
+                System.Threading.Thread.Sleep(15);
+            }
+        } finally { PostMessageW(control, WM_LBUTTONUP, IntPtr.Zero, Coordinates(SpotIn(control, to).Client)); }
+    }
+
+    static void PostKey(Context context, ushort key, bool extended) {
+        IntPtr focus = FocusWindow(context);
+        int flags = extended ? 1 << 24 : 0;
+        Post(focus, WM_KEYDOWN, new IntPtr(key), new IntPtr(1 | flags));
+        Post(focus, WM_KEYUP, new IntPtr(key), new IntPtr(unchecked((int)(1 | flags | 0xC0000000))));
     }
 
     static readonly Dictionary<string, ushort> Named = new Dictionary<string, ushort> {
@@ -717,7 +844,8 @@ public static class JackalopeDesktop {
     static Point Absolute(Context context, Point relative, bool check) {
         if (relative.X < 0 || relative.Y < 0 || relative.X >= context.Bounds[2] || relative.Y >= context.Bounds[3]) throw new Exception("Pointer is outside the captured area.");
         var point = new Point { X = context.Bounds[0] + relative.X, Y = context.Bounds[1] + relative.Y };
-        if (check) CheckTarget(context, point);
+        // Input for a background window goes to it directly, whatever covers it.
+        if (check && !context.Behind) CheckTarget(context, point);
         return point;
     }
 
@@ -744,6 +872,7 @@ public static class JackalopeDesktop {
     static bool Pointer(Context context, Point relative, string button, int count, int wheel) {
         bool focused = Foreground(context, true);
         var point = Absolute(context, relative, true);
+        if (context.Behind) { PostPointer(context, point, button, count, wheel); return false; }
         Move(point);
         System.Threading.Thread.Sleep(30);
         Foreground(context, false);
