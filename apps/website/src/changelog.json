@@ -1,5 +1,17 @@
 [
   {
+    "id": "split-a-merge-into-smaller-commits",
+    "date": "2026-11-24",
+    "title": "Split a merge into smaller commits.",
+    "description": "A ready merge review can now land as a short series of ordered commits instead of one large one.",
+    "items": [
+      "Choose Split into commits and your default agent proposes up to 12 commits, with lock files kept beside their manifests.",
+      "Review each commit's files, hunks, dependencies and message, then approve or keep one commit.",
+      "Jackalope applies a split only when its commits add up to exactly the reviewed files.",
+      "Agents reconciling overlapping work resolve conflicts block by block instead of editing marker text."
+    ]
+  },
+  {
     "id": "credentials-stay-out-of-what-leaves-the-app",
     "date": "2026-11-24",
     "title": "Credentials stay out of what leaves the app.",

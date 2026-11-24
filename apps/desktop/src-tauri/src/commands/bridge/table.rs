@@ -43,6 +43,29 @@ pub(super) fn tools() -> Vec<Tool> {
         .placed(Workspace(WORKSPACE_TOOLS))
         .offered(Offer::ContextRead),
         Tool::new(
+            "conflicts",
+            "List the conflict blocks left in this reconciliation worktree: per file a hash and each block's index, line, ours, theirs and base text. Pass path to read one file. Resolve with resolve_conflicts instead of editing marker text.",
+            h::conflicts,
+        )
+        .read_only(true)
+        .open_world(false)
+        .placed(DeviceOnly)
+        .post("/v1/conflicts")
+        .offered(Offer::Reconciliation),
+        Tool::new(
+            "resolve_conflicts",
+            "Resolve every conflict block of one file in one call: each block by index as ours, theirs, base, both (ours then theirs) or custom text. Give the file's hash from conflicts. The file is rewritten only when no conflict marker lines remain; otherwise nothing changes.",
+            h::resolve_conflicts,
+        )
+        .read_only(false)
+        .destructive(false)
+        .idempotent(false)
+        .open_world(false)
+        .placed(DeviceOnly)
+        .post("/v1/conflicts/resolve")
+        .offered(Offer::Reconciliation)
+        .help("Reconciliation conflicts: POST /v1/conflicts {\"path\"?:\"...\"} lists conflict blocks per file with hash, index, ours, theirs and base. POST /v1/conflicts/resolve {\"path\",\"hash\",\"resolutions\":[{\"block\":0,\"choice\":\"ours\"|\"theirs\"|\"base\"|\"both\"|\"custom\",\"text\"?:\"...\"}]} resolves every block of that file at once; text only with custom. A result with marker lines is refused and nothing is written."),
+        Tool::new(
             "browser_navigate",
             "Navigate the task-owned isolated browser to a URL. Later interactions and evidence share this session.",
             h::browser_navigate,
