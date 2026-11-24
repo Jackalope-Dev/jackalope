@@ -30,6 +30,10 @@ placement, dependency ordering and source-before-tests ranking, and reconciliati
 conflict resolution follows its per-block conflict resolutions: MIT. See oh-my-pi.txt.
 Upstream: https://github.com/can1357/oh-my-pi
 
+Credential masking in outbound text adapts token patterns and the secret-named
+environment rule from oh-my-pi: MIT. See oh-my-pi.txt.
+Upstream: https://github.com/can1357/oh-my-pi
+
 The separately bundled agent-browser executable includes axe-core 4.12.1.
 Its MPL-2.0 license and corresponding-source notice accompany that executable.
 

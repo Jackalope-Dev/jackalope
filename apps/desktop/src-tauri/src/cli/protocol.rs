@@ -458,7 +458,7 @@ pub struct LearningEvent {
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
     /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`,
-    /// `stale`, `enforced`, `unenforced` or `unreported`.
+    /// `stale`, `enforced`, `unenforced`, `unreported`, `ruled` or `unruled`.
     pub action: String,
     pub reason: String,
     /// Redacted excerpts of what prompted the change.

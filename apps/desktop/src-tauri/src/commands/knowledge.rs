@@ -11,6 +11,7 @@ use tauri::State;
 
 pub mod automatic;
 pub mod learning;
+pub mod tool_rules;
 pub use automatic::LearningSource;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -38,6 +39,9 @@ pub struct KnowledgeEntry {
     /// task that made it was accepted. A local note like `stale`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enforced: Option<learning::Enforcement>,
+    /// A check on agents' tool calls the person made from this lesson.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_rule: Option<tool_rules::ToolRule>,
     pub id: String,
     pub project_id: String,
     pub project_path: String,
@@ -163,6 +167,12 @@ impl KnowledgeStore {
         {
             return Err("Lessons cannot contain workflow steps.".into());
         }
+        if let Some(rule) = &mut entry.tool_rule {
+            if entry.kind != KnowledgeKind::Memory {
+                return Err("Only lessons can hold a tool rule.".into());
+            }
+            rule.normalize()?;
+        }
         entry.project_path = canonical(&entry.project_path)?;
         let output = super::git_command::command(
             std::path::Path::new(&entry.project_path),
@@ -227,9 +237,19 @@ impl KnowledgeStore {
                 || old.keywords != entry.keywords
                 || old.title != entry.title;
             entry.stale = if edited { None } else { old.stale.clone() };
+            let ruled = match (&old.tool_rule, &entry.tool_rule) {
+                (None, Some(_)) => Some(("ruled", "Made a tool rule by you.")),
+                (Some(_), None) => Some(("unruled", "Tool rule removed by you.")),
+                (Some(old), Some(new)) if old != new => {
+                    Some(("ruled", "Tool rule changed by you."))
+                }
+                _ => None,
+            };
             let was_managed = old.automatic.as_ref().is_some_and(|source| source.managed);
             if let Some(source) = &mut entry.automatic {
-                if edited {
+                // A lesson with a rule is the person's, so Jackalope never
+                // archives or rewrites the rule away.
+                if edited || ruled.is_some() {
                     source.managed = false;
                 }
                 // Turning an archived learned lesson back on restores it.
@@ -258,6 +278,7 @@ impl KnowledgeStore {
             if restored {
                 history.push(("restored", "Restored by you."));
             }
+            history.extend(ruled);
         } else {
             entry.automatic = None;
             entry.dismissed = false;
@@ -325,6 +346,7 @@ impl KnowledgeStore {
             }
             entries[index].dismissed = true;
             entries[index].enforced = None;
+            entries[index].tool_rule = None;
             entries[index].enabled = false;
             entries[index].revision += 1;
             entries[index].title = "Removed automatic lesson".into();

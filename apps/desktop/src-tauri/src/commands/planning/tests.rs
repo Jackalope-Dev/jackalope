@@ -390,13 +390,20 @@ fn records_keep_every_revision_and_export_without_committing() {
         .unwrap();
     store.create(&plan).unwrap();
     assert!(store.create(&plan).is_err(), "ids are unique");
+    // Built at runtime so the repository's secret scan ignores it.
+    let token = format!("sk_live_{}", "a1B2c3D4e5".repeat(3));
     let (saved, number) = store
         .update(&plan.id, |saved| {
             let mut doc = saved.document().unwrap();
             doc.risks.push("Large reports".into());
+            doc.risks.push(format!("Stripe key {token} in fixtures"));
             saved.push_revision(doc, "you", "Edited directly", None)
         })
         .unwrap();
+    assert!(
+        saved.revisions[1].markdown.contains(&token),
+        "stored as written"
+    );
     assert_eq!(number, 2);
     assert_eq!(saved.revisions.len(), 2);
     assert_eq!(saved.document().unwrap().front.revision, 2);
@@ -411,6 +418,9 @@ fn records_keep_every_revision_and_export_without_committing() {
     );
     let text = std::fs::read_to_string(folder.join(&written)).unwrap();
     assert!(text.starts_with("---\n") && text.contains("## Acceptance criteria"));
+    assert!(
+        text.contains("Stripe key [redacted Stripe key] in fixtures") && !text.contains(&token)
+    );
     for escape in ["../outside.md", "/abs.md", "notes.txt", "C:/x.md"] {
         assert!(super::store::export(&saved, escape).is_err(), "{escape}");
     }
