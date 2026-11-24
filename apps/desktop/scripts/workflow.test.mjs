@@ -138,6 +138,47 @@ test('unified work includes live sessions once and respects project scope and ar
   );
 });
 
+test('an unsent message keeps a conversation running only while it can dispatch', () => {
+  // A conversation finished weeks ago with an answer typed into it later that never ran.
+  const finishedRun = {
+    ...run,
+    id: 'old-run',
+    taskId: 'old-task',
+    liveSessionId: 'old',
+    status: 'review',
+    startedAt: '2026-10-13T22:52:14Z',
+    endedAt: '2026-10-13T23:10:00Z',
+  };
+  const session = {
+    id: 'old',
+    title: 'Always allow python3',
+    request: { projectId: 'a' },
+    updatedAt: '2026-11-03T22:00:24Z',
+    messages: [
+      { id: 'sent', runId: 'old-run', canceled: false },
+      { id: 'unsent', runId: null, canceled: false },
+    ],
+    batches: [{ runId: 'old-run', error: null, settled: true }],
+    paused: true,
+    closed: true,
+    error: 'Review the last attempt before continuing.',
+  };
+  const stage = (overrides) =>
+    collectWorkspaceWork('a', [finishedRun], { sessions: [{ ...session, ...overrides }] })[0];
+  const finished = stage({});
+  assert.equal(finished.stage, 'finished');
+  assert.equal(finished.statusLabel, 'Finished');
+  assert.equal(workPresence(finished).state, 'idle');
+  // Paused, the message waits for the person to resume instead of running.
+  const paused = stage({ closed: false, error: null });
+  assert.notEqual(paused.stage, 'working');
+  assert.equal(paused.statusLabel, 'Paused');
+  // Open and dispatching, the queued message is running work.
+  const queued = stage({ closed: false, paused: false, error: null });
+  assert.equal(queued.stage, 'working');
+  assert.equal(queued.statusLabel, 'Queued');
+});
+
 test('global work prioritizes decisions, review, running work and saved projectless ideas', () => {
   const items = collectWork(
     null,

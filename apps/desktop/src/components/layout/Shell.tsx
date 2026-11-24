@@ -1,6 +1,14 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { InlineNotice, LoadingState, SearchIcon, Tooltip } from '@jackalope/ui';
-import { Images, Inbox, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
+import {
+  Images,
+  Inbox,
+  LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import {
   type CSSProperties,
   lazy,
@@ -26,6 +34,7 @@ import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/sh
 import { swarmConnection } from '../../lib/swarm';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useSavedActionsMigration } from '../../lib/use-saved-actions-migration';
+import { useWorktreeRetention } from '../../lib/use-worktree-retention';
 import { ATTACH_OPEN_DRAFT_EVENT } from '../../lib/window-attach';
 import { WindowGlass } from '../../lib/window-glass';
 import { openConversation, openRun, selectWork } from '../../lib/work-selection';
@@ -349,6 +358,7 @@ export function Shell({
   };
   useTrackOpenWork();
   useSavedActionsMigration();
+  useWorktreeRetention();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const selectedManagedId = useManagedTaskStore((state) => state.selectedId);
@@ -443,6 +453,7 @@ export function Shell({
     focusComposer,
     setSearchOpen: setCommandsOpen,
     openSettings: () => navigate('preferences'),
+    openOverview: () => navigate('overview'),
     toggleSettings,
     toggleSidebar: () => useWorkViewStore.getState().toggleNav(),
     terminalProject: remoteHost ? undefined : project,
@@ -638,6 +649,18 @@ export function Shell({
               <span>Inbox</span>
               <NeedsYouCount />
             </button>
+            <Tooltip side="right" content={`Overview (${displayShortcut(shortcuts.overview)})`}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('overview')}
+                aria-current={view.group === 'overview' ? 'page' : undefined}
+                aria-label="Overview"
+                className="workspace-nav-item"
+              >
+                <LayoutDashboard aria-hidden="true" />
+                <span>Overview</span>
+              </button>
+            </Tooltip>
             <button
               type="button"
               onClick={() => setActiveTab('library')}

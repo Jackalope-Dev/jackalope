@@ -32,7 +32,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   work such as operating a web page or checking a connection; the sidebar lists it above
   the projects, and once added it holds work like any project.
   Inbox gathers work that needs the person, new results, app alerts (including low
-  allowances), running work and pull requests waiting on others across projects. Library
+  allowances), running work and pull requests waiting on others across projects.
+  Overview (sidebar, Mod+Shift+O) shows running work across projects, each project's
+  status with PRs, checks and previews, accounts at or near their limits with resets, and
+  recent results. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
   attachments and images or PDFs a task's latest workspace changed, filtered by project
   and kind. The title bar holds command search; the bottom bar shows the focused project,
@@ -90,6 +93,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   `node_modules` folders copy-on-write (APFS `clonefile`, Linux `FICLONE`) when both
   checkouts' dependency manifests match; the command still runs. Other volumes and
   Windows install in full, never by byte copy. Native acceptance remains open.
+- A project's `.worktreeinclude` (gitignore syntax) copies matching Git-ignored files into
+  each new task worktree, copy-on-write where the volume allows, bounded and never
+  following links out. Saved terminal commands can run when a worktree is created or stop
+  their terminal when the task is merged or archived. Remove finished worktrees (off by
+  default) removes merged or archived task worktrees after a chosen period through the
+  existing cleanup guards; worktrees with local files, a running process or unmerged work
+  are kept and logged. Native acceptance remains open.
 - The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.

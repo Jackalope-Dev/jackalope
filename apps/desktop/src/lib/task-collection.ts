@@ -222,10 +222,12 @@ export function collectWorkspaceWork(
         title: withoutLeadingId(session.title),
         date: session.updatedAt,
         question,
+        // Unsent messages only make a conversation running while it dispatches them (its
+        // status is Queued); a paused or finished one keeps them until it is resumed.
         stage:
           question || work.status === 'Needs attention'
             ? 'attention'
-            : work.active || work.pending
+            : work.active || work.status === 'Queued'
               ? 'working'
               : session.closed
                 ? 'finished'

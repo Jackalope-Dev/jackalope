@@ -259,6 +259,56 @@ pub(in crate::commands) fn prepare(
     )
 }
 
+/// Runs one saved project command marked to run when a task worktree is created. It always
+/// runs (no manifest reuse) and is not retried; a failure keeps its output on the attempt.
+pub(in crate::commands) fn run_worktree_command(
+    runtime: &TaskRuntime,
+    id: &str,
+    name: &str,
+    command: &str,
+    workspace: &str,
+) -> Result<PreparationRecord, String> {
+    with_workspace_lease(
+        runtime,
+        workspace,
+        Some(id),
+        "Another attempt owns this workspace. Resolve it before preparation.",
+        |_| Ok(None),
+        |_| {
+            let _slot = runtime.timed(id, "preparationWait", || {
+                leases::check_slot(|| !runtime.is_running(id))
+            })?;
+            runtime.update_checked(id, |run| {
+                run.progress = Some(StepProgress::new("dependencies", name, 1));
+                activity(
+                    run,
+                    &format!("Running {name}, which runs when a worktree is created: {command}"),
+                );
+            })?;
+            let result = runtime.timed(id, "worktreeCommand", || {
+                process_control::run_supervised(
+                    shell(command, workspace)?,
+                    check_limits(PREPARE_STALL_SECS),
+                    || !runtime.is_running(id),
+                    observer(runtime, id),
+                )
+            })?;
+            let record = PreparationRecord::from_result(command, 1, &result);
+            runtime.update_checked(id, |run| {
+                run.diagnostics.push(format!(
+                    "{name} (runs when a worktree is created): {command}\n{}\n{}",
+                    result.stdout, result.stderr
+                ));
+                if !record.success {
+                    run.preparation = Some(record.clone());
+                }
+                run.progress = None;
+            })?;
+            Ok(record)
+        },
+    )
+}
+
 fn run_preparation(
     runtime: &TaskRuntime,
     id: &str,

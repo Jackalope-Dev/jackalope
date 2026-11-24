@@ -7,6 +7,8 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept the Overview page in an installed app with real running work, previews and
+  pull requests, and load Cloudflare swarm state app-wide so swarms appear as one item.
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
   credentials, generic notification text), signed device builds and CI builds for both
@@ -25,6 +27,10 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept worktree lifecycle in an installed app on macOS, Windows and Linux:
+  `.worktreeinclude` copies, worktree commands and their failure output, stopping a marked
+  terminal on merge and archive, and an automatic cleanup pass keeping and removing the
+  right worktrees.
 - [ ] Accept Codex app-server sessions in an installed app on each platform: approvals,
   Send now, Stop, and resume after a restart.
 - [ ] Accept composer side questions (Claude fork-session, `codex exec fork`) and per-send

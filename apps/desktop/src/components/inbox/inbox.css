@@ -115,10 +115,13 @@
   justify-content: space-between;
   gap: 8px;
 }
+/* Every heading row is one control tall, with or without an action, so the columns'
+   headings and the cards beneath them line up. */
 .inbox-section-title {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: var(--control-height);
   margin: 0;
   font-size: var(--text-sm);
   font-weight: 650;
@@ -133,12 +136,50 @@
   font-weight: 600;
   text-align: center;
 }
-/* The rail's sections sit on one quiet card each, so they read apart from the decisions. */
+/* The rail's lists sit on one quiet card each, under their heading, so they read apart
+   from the decisions. */
 .inbox-panel {
-  padding: 14px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-sunken);
+}
+.inbox-panel-quiet {
+  margin: 0;
+  padding: 10px 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+/* The rail's link to the rest: a quiet full-width row under the list. */
+.inbox-panel-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.inbox-panel-more > span:first-child {
+  flex: 1;
+}
+.inbox-panel-more-hint {
+  color: var(--color-text-primary);
+}
+.inbox-panel-more:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
 .inbox-note {
   display: flex;
@@ -468,6 +509,12 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
+.inbox-work-project {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+}
 .inbox-work-detail .project-tree-mark {
   flex-shrink: 0;
   width: 14px;
@@ -477,7 +524,7 @@
   color: var(--color-text-muted);
 }
 
-:is(.inbox-timeline button, .inbox-work-row):focus-visible {
+:is(.inbox-timeline button, .inbox-work-row, .inbox-panel-more):focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
 }

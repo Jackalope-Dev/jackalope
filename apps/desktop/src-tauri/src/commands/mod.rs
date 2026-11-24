@@ -39,6 +39,7 @@ pub mod work_terminal;
 pub mod work_windows;
 pub mod workspace_setup;
 pub mod worktree_cleanup;
+mod worktree_include;
 pub mod worktree_usage;
 
 pub mod agent_context;

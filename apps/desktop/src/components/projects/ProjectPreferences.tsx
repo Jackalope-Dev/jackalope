@@ -40,6 +40,7 @@ import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { ProjectSecretsSettings } from './ProjectSecretsSettings';
 import { ProjectTerminalCommands } from './ProjectTerminalCommands';
 import { RemoveProjectAction } from './RemoveProjectAction';
+import { WorktreeRetentionSetting } from './WorktreeRetentionSetting';
 import '../settings/settings.css';
 
 const WORKSPACE_MODES: Record<WorkspaceMode, { label: string; description: string }> = {
@@ -177,6 +178,7 @@ export function ProjectPreferences({
                   </Select>
                 </SettingRow>
               )}
+              {!project.plainFolder && <WorktreeRetentionSetting project={project} />}
               <SettingRow
                 title="Target branch"
                 description="Starting branch for new tasks and their review."
@@ -275,7 +277,7 @@ export function ProjectPreferences({
               <SettingBody>
                 <FormField
                   label="Copy ignored setup files"
-                  description="One relative file per line. Only these Git-ignored files are copied into new worktrees before preparation; existing files are never overwritten. Keep credentials out of saved prompts and commands."
+                  description="One relative file per line. Only these Git-ignored files are copied into new worktrees before preparation; existing files are never overwritten. A .worktreeinclude file at the project root, in .gitignore syntax, also lists files to copy. Keep credentials out of saved prompts and commands."
                 >
                   <Textarea
                     rows={3}

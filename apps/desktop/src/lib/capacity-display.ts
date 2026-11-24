@@ -3,6 +3,7 @@ import {
   type CapacityRecord,
   type CapacityWindow,
 } from '../stores/capacityStore';
+import { getAgentMetadata } from './agent-catalog.ts';
 
 export function capacityWindowName(window: CapacityWindow) {
   if (window.window === 'weekly') return 'Weekly allowance';
@@ -39,4 +40,13 @@ export function capacityWindowDisplay(record: CapacityRecord, window: CapacityWi
     label: `${percent}% remaining`,
     tone: bounded === 0 ? 'empty' : bounded <= 20 ? 'low' : 'available',
   } as const;
+}
+
+export const capacityAgentName = (agent: string) =>
+  agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
+
+/** Shortens opaque account identifiers; the full value stays in the tooltip. */
+export function shortAccount(account: string) {
+  const match = /^(.*?)\s*([0-9a-f]{8}-[0-9a-f-]{20,})$/i.exec(account);
+  return match ? `${match[1] || 'Account'} …${match[2].slice(-6)}` : account;
 }

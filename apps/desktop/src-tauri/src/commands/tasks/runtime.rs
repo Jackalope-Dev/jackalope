@@ -29,6 +29,25 @@ pub(super) fn preparation_failure(record: &PreparationRecord) -> String {
     }
 }
 
+pub(super) fn worktree_command_failure(name: &str, record: &PreparationRecord) -> String {
+    let command = &record.command;
+    match (&record.reason, record.exit_code) {
+        (Some(reason), _) => format!(
+            "{name} ({command}), which runs when a worktree is created, {reason}. Its output is \
+             recorded below; fix the command in Project settings → Commands, then retry."
+        ),
+        (None, Some(code)) => format!(
+            "{name} ({command}), which runs when a worktree is created, failed with exit code \
+             {code}. Its output is recorded below; fix the command in Project settings → \
+             Commands, then retry."
+        ),
+        (None, None) => format!(
+            "{name} ({command}), which runs when a worktree is created, did not complete. Its \
+             output is recorded below; fix the command in Project settings → Commands, then retry."
+        ),
+    }
+}
+
 impl crate::services::Service for TaskRuntime {
     fn shutdown(&self) {
         TaskRuntime::stop_all(self)
@@ -623,14 +642,24 @@ impl TaskRuntime {
                     )
                 });
             }
-            if let Some(command) = req
+            let worktree_commands = if fresh_worktree {
+                self.copy_worktree_include(id, &root, &workspace)?;
+                crate::commands::project_registry::worktree_commands(self, &req.project_id)
+            } else {
+                Vec::new()
+            };
+            let prepare = req
                 .prepare_command
                 .as_deref()
-                .filter(|command| !command.trim().is_empty())
-            {
-                if fresh_worktree {
+                .filter(|command| !command.trim().is_empty());
+            if fresh_worktree {
+                if let Some(command) =
+                    prepare.or(worktree_commands.first().map(|item| item.command.as_str()))
+                {
                     self.clone_dependencies(id, &root, &workspace, command)?;
                 }
+            }
+            if let Some(command) = prepare {
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
                     self.mark_stopped(id);
@@ -640,7 +669,54 @@ impl TaskRuntime {
                     return Err(preparation_failure(&record));
                 }
             }
+            for item in &worktree_commands {
+                let record = crate::commands::verification::run_worktree_command(
+                    self,
+                    id,
+                    &item.name,
+                    &item.command,
+                    &workspace,
+                )?;
+                if !self.is_running(id) {
+                    self.mark_stopped(id);
+                    return Ok(());
+                }
+                if !record.success {
+                    return Err(worktree_command_failure(&item.name, &record));
+                }
+            }
         }
+        Ok(())
+    }
+
+    /// Copies the Git-ignored files the project's `.worktreeinclude` names into a new worktree
+    /// and records what was copied and skipped in the attempt's activity.
+    fn copy_worktree_include(&self, id: &str, root: &str, workspace: &str) -> Result<(), String> {
+        let outcome = self.timed(id, "worktreeInclude", || {
+            Ok(crate::commands::worktree_include::copy_included(
+                root, workspace,
+            ))
+        })?;
+        if !outcome.present {
+            return Ok(());
+        }
+        let lines = crate::commands::worktree_include::summary(&outcome);
+        self.update(id, |run| {
+            for line in &lines {
+                activity(run, line);
+            }
+            if outcome.copied.len() > 20 || outcome.skipped.len() > 10 {
+                let mut detail = format!(
+                    "{} copied paths:\n{}",
+                    crate::commands::worktree_include::FILE,
+                    outcome.copied.join("\n")
+                );
+                for (path, reason) in &outcome.skipped {
+                    detail.push_str(&format!("\nskipped {path}: {reason}"));
+                }
+                run.diagnostics.push(detail);
+            }
+        });
         Ok(())
     }
 
