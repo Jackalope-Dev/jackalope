@@ -87,6 +87,7 @@ mod site_gate;
 pub mod skills;
 
 pub mod agent_screen;
+pub mod app_store_connect;
 pub mod browser;
 pub mod browser_profiles;
 pub mod cloudflare;
@@ -103,6 +104,7 @@ pub mod remote;
 pub mod review_progress;
 pub mod simulator;
 pub mod simulators;
+pub mod testflight;
 pub mod workflow_feedback;
 pub mod xcode;
 

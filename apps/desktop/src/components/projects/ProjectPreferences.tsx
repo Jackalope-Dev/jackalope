@@ -30,6 +30,7 @@ import { ProjectSwarmHosts } from '../computers/ProjectSwarmHosts';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs } from '../ui/WorkspaceTabs';
+import { AppStoreConnectSettings } from './AppStoreConnectSettings';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { BrowserProfileSettings } from './BrowserProfileSettings';
 import { CloudResourcesCard } from './CloudResourcesCard';
@@ -644,6 +645,7 @@ export function ProjectPreferences({
               projectId={project.id}
               projectPath={project.path}
             />
+            <AppStoreConnectSettings key={`asc-${project.id}`} projectId={project.id} />
             <ProjectComputerSettings
               key={`computer-${project.id}`}
               project={{ id: project.id, name: project.name }}

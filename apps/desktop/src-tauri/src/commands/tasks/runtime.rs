@@ -139,6 +139,7 @@ impl TaskRuntime {
         if let Some(process) = process {
             process.terminate();
         }
+        crate::commands::project_secrets::release(&self.secret_files_root(), id);
         Ok(())
     }
 
@@ -1353,18 +1354,40 @@ impl TaskRuntime {
             )
             .map_err(|error| format!("Project secrets could not be read: {error}"))?;
             secret_names = secrets.iter().map(|(name, _)| name.clone()).collect();
-            if !secrets.is_empty() {
+            cmd.envs(secrets);
+            // File secrets become private files for this attempt only; the
+            // variable names a path, and the contents join the redacted values.
+            let files = crate::commands::project_secrets::files(
+                &self.project_secrets_root(),
+                &req.project_id,
+            )
+            .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+            let written = crate::commands::project_secrets::materialize(
+                &self.secret_files_root(),
+                id,
+                &files,
+            )?;
+            let contents: Vec<String> = files
+                .iter()
+                .flat_map(|file| crate::commands::redaction::file_contents(&file.contents))
+                .collect();
+            if !contents.is_empty() {
+                self.update_checked(id, |run| run.protect(contents))?;
+            }
+            // A file's path is not secret, so it is not redacted from the record.
+            let mut given = secret_names.clone();
+            for (name, path) in written {
+                cmd.env(&name, path);
+                given.push(name);
+            }
+            if !given.is_empty() {
                 self.update_checked(id, |run| {
                     activity(
                         run,
-                        &format!(
-                            "Project secrets for the agent: {}.",
-                            secret_names.join(", ")
-                        ),
+                        &format!("Project secrets for the agent: {}.", given.join(", ")),
                     )
                 })?;
             }
-            cmd.envs(secrets);
         }
         // An iOS project's agent gets the resolved Xcode and its workspace's
         // own Simulator, which boots while the agent starts.
@@ -2094,6 +2117,10 @@ impl TaskRuntime {
     pub fn project_secrets_root(&self) -> PathBuf {
         self.directory.join("project-secrets")
     }
+    /// Each running attempt's file secrets; emptied when the attempt ends and at startup.
+    pub fn secret_files_root(&self) -> PathBuf {
+        self.directory.join("secret-files")
+    }
     pub fn preferences_directory(&self) -> PathBuf {
         self.directory.join("preferences")
     }
@@ -2669,6 +2696,7 @@ impl TaskRuntime {
             runtime.stage(&request.id, None);
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
+            crate::commands::project_secrets::release(&runtime.secret_files_root(), &request.id);
             crate::commands::desktop_control::attempt_ended(&request.id);
             crate::commands::simulator::attempt_ended(&request.id);
             crate::commands::computers::release_run(&request.id);

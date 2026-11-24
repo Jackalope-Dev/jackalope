@@ -5,6 +5,7 @@ import {
   FormField,
   InlineNotice,
   Input,
+  SegmentedControl,
   SettingBody,
   SettingGroup,
   SettingRow,
@@ -19,10 +20,21 @@ import {
   SECRET_NAME_PATTERN,
   SECRET_VALUE_MAX_CHARS,
   type SecretAvailability,
+  type SecretKind,
   setProjectSecret,
 } from '../../lib/project-secrets';
+import { fileSecretError, type SecretFileValue } from '../../lib/secret-file';
 import './project-secrets.css';
 import { describeError } from '@jackalope/contracts/errors';
+import { SecretFileInput } from './SecretFileInput';
+
+const KINDS = [
+  { id: 'variable', label: 'Value' },
+  { id: 'file', label: 'File' },
+] as const;
+
+const FILE_NOTE =
+  'Agents on this device receive the path to a private copy, removed when the attempt ends. File secrets are never sent to computers.';
 
 const AVAILABILITY: { value: SecretAvailability; title: string; description: string }[] = [
   { value: 'both', title: 'All agents', description: 'On this device and on computers.' },
@@ -100,6 +112,9 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
   const [editing, setEditing] = useState('');
   const [replacement, setReplacement] = useState('');
   const [editAvailability, setEditAvailability] = useState<SecretAvailability>('both');
+  const [kind, setKind] = useState<SecretKind>('variable');
+  const [file, setFile] = useState<SecretFileValue | null>(null);
+  const [replacementFile, setReplacementFile] = useState<SecretFileValue | null>(null);
   /** Saved secrets come first; the add form opens on request, or straight away when empty. */
   const [adding, setAdding] = useState(false);
   const duration = motionSeconds('--motion-base', 180);
@@ -132,15 +147,27 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
 
   const existing = secrets.some((secret) => secret.name === name);
   const invalidName = nameError(name);
-  const canAdd = !!name && !invalidName && !!value.trim() && !busy;
+  const hasValue = kind === 'file' ? !!file && !fileSecretError(file.text) : !!value.trim();
+  const canAdd = !!name && !invalidName && hasValue && !busy;
+
+  const resetAdd = () => {
+    setName('');
+    setValue('');
+    setFile(null);
+    setKind('variable');
+    setAvailableTo('both');
+  };
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
     if (!canAdd) return;
-    if (await run('add', () => setProjectSecret(projectId, name, value, availableTo))) {
-      setName('');
-      setValue('');
-      setAvailableTo('both');
+    const saved = await run('add', () =>
+      kind === 'file' && file
+        ? setProjectSecret(projectId, name, file.text, 'local', { fileName: file.fileName })
+        : setProjectSecret(projectId, name, value, availableTo),
+    );
+    if (saved) {
+      resetAdd();
       setAdding(false);
     }
   };
@@ -148,29 +175,35 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
   const startEditing = (secret: ProjectSecret) => {
     setEditing(secret.name);
     setReplacement('');
+    setReplacementFile(null);
     setEditAvailability(secret.availableTo);
   };
 
   const saveEdit = async (event: FormEvent, secret: ProjectSecret) => {
     event.preventDefault();
     const saved = await run(secret.name, () =>
-      setProjectSecret(
-        projectId,
-        secret.name,
-        replacement.trim() ? replacement : null,
-        editAvailability,
-      ),
+      secret.kind === 'file'
+        ? setProjectSecret(projectId, secret.name, replacementFile?.text ?? null, 'local', {
+            fileName: replacementFile?.fileName ?? null,
+          })
+        : setProjectSecret(
+            projectId,
+            secret.name,
+            replacement.trim() ? replacement : null,
+            editAvailability,
+          ),
     );
     if (saved) {
       setEditing('');
       setReplacement('');
+      setReplacementFile(null);
     }
   };
 
   return (
     <SettingGroup
       title="Secrets"
-      description="Agents in this project can read these as environment variables. Anything an agent can read it can use or leak; use keys with spending limits."
+      description="Agents in this project can read these as environment variables, or as files for keys such as .p8 and .pem. Anything an agent can read it can use or leak; use keys with spending limits."
     >
       {error && (
         <SettingBody>
@@ -191,9 +224,10 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
                   <span className="inline-flex items-center gap-2">
                     <code className="project-secret-name">{secret.name}</code>
                     <Badge variant="accent">Saved</Badge>
+                    {secret.kind === 'file' && <Badge>File</Badge>}
                   </span>
                 }
-                description={`${availabilityLabel(secret.availableTo)} · saved ${new Date(
+                description={`${secret.kind === 'file' ? `${secret.fileName ?? 'Pasted file'} · ` : ''}${availabilityLabel(secret.availableTo)} · saved ${new Date(
                   secret.updatedAt,
                 ).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`}
               >
@@ -231,24 +265,39 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
                     className="project-secret-form"
                     onSubmit={(event) => void saveEdit(event, secret)}
                   >
-                    <FormField label="New value" description="Leave empty to keep the saved value.">
-                      <Input
-                        id={`project-secret-replace-${secret.name}`}
-                        type="password"
-                        autoComplete="off"
-                        spellCheck={false}
-                        maxLength={SECRET_VALUE_MAX_CHARS}
-                        className="project-setting-input"
-                        value={replacement}
-                        onChange={(event) => setReplacement(event.target.value)}
+                    {secret.kind === 'file' ? (
+                      <SecretFileInput
+                        label="New file"
+                        description="Choose the replacement file, or paste its contents."
+                        value={replacementFile}
+                        onChange={setReplacementFile}
+                        disabled={!!busy}
                       />
-                    </FormField>
-                    <AvailabilityChoices
-                      label={`${secret.name} is available to`}
-                      value={editAvailability}
-                      onChange={setEditAvailability}
-                      disabled={!!busy}
-                    />
+                    ) : (
+                      <>
+                        <FormField
+                          label="New value"
+                          description="Leave empty to keep the saved value."
+                        >
+                          <Input
+                            id={`project-secret-replace-${secret.name}`}
+                            type="password"
+                            autoComplete="off"
+                            spellCheck={false}
+                            maxLength={SECRET_VALUE_MAX_CHARS}
+                            className="project-setting-input"
+                            value={replacement}
+                            onChange={(event) => setReplacement(event.target.value)}
+                          />
+                        </FormField>
+                        <AvailabilityChoices
+                          label={`${secret.name} is available to`}
+                          value={editAvailability}
+                          onChange={setEditAvailability}
+                          disabled={!!busy}
+                        />
+                      </>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="submit"
@@ -256,7 +305,10 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
                         loading={busy === secret.name}
                         loadingLabel="Saving…"
                         disabled={
-                          !!busy || (!replacement.trim() && editAvailability === secret.availableTo)
+                          !!busy ||
+                          (secret.kind === 'file'
+                            ? !replacementFile || !!fileSecretError(replacementFile.text)
+                            : !replacement.trim() && editAvailability === secret.availableTo)
                         }
                       >
                         Save
@@ -278,6 +330,12 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
       ) : (
         <SettingBody>
           <form className="project-secret-form" onSubmit={(event) => void add(event)}>
+            <SegmentedControl
+              label="Secret type"
+              items={KINDS}
+              value={kind}
+              onChange={(next) => setKind(next)}
+            />
             <div className="project-secret-fields">
               <FormField
                 label="Name"
@@ -294,24 +352,33 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
                   onChange={(event) => setName(toName(event.target.value))}
                 />
               </FormField>
-              <FormField label="Value">
-                <Input
-                  id="project-secret-value"
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  maxLength={SECRET_VALUE_MAX_CHARS}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                />
-              </FormField>
+              {kind === 'variable' && (
+                <FormField label="Value">
+                  <Input
+                    id="project-secret-value"
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={SECRET_VALUE_MAX_CHARS}
+                    value={value}
+                    onChange={(event) => setValue(event.target.value)}
+                  />
+                </FormField>
+              )}
             </div>
-            <AvailabilityChoices
-              label="Available to"
-              value={availableTo}
-              onChange={setAvailableTo}
-              disabled={!!busy}
-            />
+            {kind === 'file' ? (
+              <>
+                <SecretFileInput label="File" value={file} onChange={setFile} disabled={!!busy} />
+                <p className="project-secret-note">{FILE_NOTE}</p>
+              </>
+            ) : (
+              <AvailabilityChoices
+                label="Available to"
+                value={availableTo}
+                onChange={setAvailableTo}
+                disabled={!!busy}
+              />
+            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 type="submit"
@@ -329,8 +396,7 @@ export function ProjectSecretsSettings({ projectId }: { projectId: string }) {
                   disabled={busy === 'add'}
                   onClick={() => {
                     setAdding(false);
-                    setName('');
-                    setValue('');
+                    resetAdd();
                   }}
                 >
                   Cancel

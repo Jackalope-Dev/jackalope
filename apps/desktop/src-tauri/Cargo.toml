@@ -50,6 +50,9 @@ rmcp = { version = "=3.9.0", default-features = false, features = ["server", "ma
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
 base64 = "0.23"
+# ES256 signing for App Store Connect API tokens. Already in the graph
+# through rustls, so it adds no crate.
+ring = "0.17"
 aho-corasick = "1"
 reqwest = { version = "0.13", default-features = false }
 ignore = "0.4"
