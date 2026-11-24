@@ -43,6 +43,11 @@ export interface ComputerStatus {
 export interface ComputerPreferences {
   /** Leave local sandboxes running when Jackalope quits. */
   keepRunningOnQuit: boolean;
+  /**
+   * Agents on a computer reach Anthropic or OpenAI through this device, which adds the saved
+   * API key, instead of receiving the key.
+   */
+  keepApiKeysOnDevice: boolean;
 }
 
 /** Idle stop choices in minutes; 0 is Never. */

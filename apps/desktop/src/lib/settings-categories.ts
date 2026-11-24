@@ -231,7 +231,8 @@ export const SETTINGS_CATEGORIES = [
     id: 'Data & reset',
     group: 'Troubleshooting',
     icon: Database,
-    keywords: 'export clipboard erase delete nuke reset first time setup history local data',
+    keywords:
+      'export clipboard erase delete nuke reset first time setup history local data import claude codex conversations',
   },
 ] as const satisfies readonly CategoryEntry[];
 

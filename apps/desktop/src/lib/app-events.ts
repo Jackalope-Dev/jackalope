@@ -24,6 +24,8 @@ interface AppEvents {
   'open-shortcuts': undefined;
   /** Opens the feedback dialog the status bar holds. */
   'open-feedback': undefined;
+  /** Opens the dialog that imports Claude Code and Codex conversations. */
+  'open-history-import': undefined;
   /** Adds attachment lines to the open new-work composer. */
   'attach-to-composer': string[];
   /** Working-tree changes were committed or discarded. */
@@ -74,3 +76,5 @@ export const openAgentConfiguration = (agentId: string) => emitAppEvent('configu
 export const openShortcuts = () => emitAppEvent('open-shortcuts');
 
 export const openFeedback = () => emitAppEvent('open-feedback');
+
+export const openHistoryImport = () => emitAppEvent('open-history-import');

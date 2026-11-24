@@ -63,6 +63,13 @@ plus a side tar of copied setup files and Jackalope context as artifacts, and
 the run's workspace is checked out from them (sync_checkout); at the end the
 result comes back as a bundle and a manifest of .jackalope/artifacts output
 (sync_result). Runs without either use the tar upload and patch above.
+
+With `provider-proxy`, a run whose API key Jackalope keeps on its own device
+gets a per-run token and a base URL under PROVIDER_PREFIX on its relay instead
+of the key. Those requests skip the bridge secret (the token is checked on the
+person's device), are queued like bridge calls, and their answers arrive in
+run_answer pieces at byte offsets, which the relay streams to the agent as they
+come. A piece sent again is appended only past what is already stored.
 """
 
 import base64
@@ -78,6 +85,7 @@ import os
 import platform
 import re
 import secrets
+import select
 import shlex
 import shutil
 import signal
@@ -158,6 +166,15 @@ RELAY_PENDING_LIMIT = SHARED["relay"]["pendingLimit"]
 # Longer than the bridge's own longest call (a queued saved check).
 RELAY_TIMEOUT = int(os.environ.get("JACKALOPE_RELAY_TIMEOUT") or 2400)
 RELAY_HEADERS = tuple(SHARED["relay"]["headers"])
+# Model provider requests relayed for a run whose API key stays with Jackalope.
+PROVIDER_PREFIX = SHARED["providerProxy"]["prefix"]
+PROVIDER_BODY_LIMIT = SHARED["providerProxy"]["requestLimit"]
+PROVIDER_PIECE_LIMIT = SHARED["providerProxy"]["pieceLimit"]
+PROVIDER_CREDENTIAL_HEADERS = tuple(SHARED["providerProxy"]["credentialHeaders"])
+PROVIDER_HEADERS = tuple(SHARED["providerProxy"]["headers"]) + PROVIDER_CREDENTIAL_HEADERS
+PROVIDER_RESPONSE_HEADERS = frozenset(SHARED["providerProxy"]["responseHeaders"])
+# A streamed provider answer that gets nothing new for this long is cut off.
+PROVIDER_STALL = int(os.environ.get("JACKALOPE_PROVIDER_STALL") or 600)
 CALL_ID = re.compile(r"[0-9a-f]{16,48}")
 # Selected stdio connections of a run.
 CONNECTION_LIMIT = 16
@@ -1199,7 +1216,7 @@ def bridge_calls(directory, reclaim=False):
         call, _, kind = name.partition(".")
         if kind != "req" and not (reclaim and kind == "taken"):
             continue
-        if os.path.exists(os.path.join(queue, call + ".res")):
+        if any(os.path.exists(os.path.join(queue, call + suffix)) for suffix in (".res", ".head")):
             continue
         path = os.path.join(queue, name)
         try:
@@ -1234,6 +1251,9 @@ def run_answer(request):
     content_type = request.get("contentType") or "application/json"
     if not isinstance(content_type, str) or len(content_type) > 200:
         raise Failure("Answer with a content type.")
+    if request.get("piece") is not None:
+        return answer_piece(queue, call, status, content_type, request.get("body"),
+                            request["piece"])
     record = {"status": status, "contentType": content_type}
     if request.get("artifact") is not None:
         # A larger answer was uploaded as an artifact first.
@@ -1257,50 +1277,133 @@ def run_answer(request):
     return {"delivered": True}
 
 
+def answer_piece(queue, call, status, content_type, body, piece):
+    """Stores one piece of a streamed provider answer at its byte offset. The
+    first piece also records the status and the provider's headers; the last
+    marks the answer complete. A piece already stored, in whole or in part, is
+    appended only past what is there, so one sent again is harmless."""
+    if not isinstance(piece, dict):
+        raise Failure("Describe the piece of the answer.")
+    if any(ord(character) < 32 for character in content_type):
+        raise Failure("Answer with a content type.")
+    offset, last = piece.get("offset"), piece.get("last")
+    if (not isinstance(offset, int) or isinstance(offset, bool) or offset < 0
+            or not isinstance(last, bool)):
+        raise Failure("Give the piece's offset and whether it is the last.")
+    if not isinstance(body, str) or len(body) > (PROVIDER_PIECE_LIMIT * 4) // 3 + 4:
+        raise Failure("The piece of the answer is too large.")
+    data = base64.b64decode(body, validate=True)
+    headers = []
+    for item in piece.get("headers") or []:
+        if not (isinstance(item, list) and len(item) == 2
+                and all(isinstance(part, str) for part in item)):
+            raise Failure("Send the answer's headers as name and value pairs.")
+        name, value = item[0].lower(), item[1]
+        if (name in PROVIDER_RESPONSE_HEADERS and len(value) <= 1000
+                and not any(character in value for character in "\r\n\0")):
+            headers.append([name, value])
+    with open(os.path.join(queue, call + ".stream"), "ab") as handle:
+        have = os.fstat(handle.fileno()).st_size
+        if offset > have:
+            raise Failure("An earlier piece of this answer is missing.")
+        handle.write(data[have - offset:])
+    head = os.path.join(queue, call + ".head")
+    if not os.path.exists(head):
+        temporary = head + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump({"status": status, "contentType": content_type, "headers": headers}, handle)
+        os.replace(temporary, head)
+    if last:
+        open(os.path.join(queue, call + ".end"), "w").close()
+    if not os.path.exists(os.path.join(queue, call + ".taken")):
+        # The agent hung up while this piece was stored.
+        forget_call(queue, call)
+        return {"delivered": False}
+    return {"delivered": True}
+
+
+CALL_FILES = (".req", ".taken", ".res", ".body", ".head", ".head.tmp", ".stream", ".end")
+
+
+def forget_call(queue, call):
+    for kind in CALL_FILES:
+        try:
+            os.unlink(os.path.join(queue, call + kind))
+        except FileNotFoundError:
+            pass
+
+
+def waiting_calls(queue):
+    return len({name.partition(".")[0] for name in os.listdir(queue)})
+
+
 class RelayTimeout(Exception):
     pass
+
+
+class Oversized(Exception):
+    pass
+
+
+def queue_call(queue, method, path, headers, body):
+    """Writes one request for Jackalope to the queue and returns its call id."""
+    if waiting_calls(queue) >= RELAY_PENDING_LIMIT:
+        raise Failure("Too many bridge calls are waiting. Try again shortly.")
+    call = f"{time.time_ns():016x}{secrets.token_hex(8)}"
+    temporary = os.path.join(queue, call + ".tmp")
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump({"id": call, "method": method, "path": path, "headers": headers,
+                   "body": base64.b64encode(body).decode()}, handle)
+    os.replace(temporary, os.path.join(queue, call + ".req"))
+    return call
+
+
+def read_answer(queue, call):
+    """A whole answer run_answer stored: (status, content type, body)."""
+    with open(os.path.join(queue, call + ".res"), encoding="utf-8") as handle:
+        result = json.load(handle)
+    if result.get("file") == call + ".body":
+        with open(os.path.join(queue, call + ".body"), "rb") as handle:
+            data = handle.read()
+    else:
+        data = base64.b64decode(result["body"])
+    return (int(result["status"]), result.get("contentType") or "application/json", data)
 
 
 def relay_call(queue, method, path, headers, body, timeout=RELAY_TIMEOUT):
     """Queues one bridge request for Jackalope, which forwards it with the run's
     credential, and waits for the answer: (status, content type, body). A large
     answer arrives as a file run_answer copied from an artifact."""
-    if len(os.listdir(queue)) >= RELAY_PENDING_LIMIT * 2:
-        raise Failure("Too many bridge calls are waiting. Try again shortly.")
-    call = f"{time.time_ns():016x}{secrets.token_hex(8)}"
-
-    def forget():
-        for kind in (".req", ".taken", ".res", ".body"):
-            try:
-                os.unlink(os.path.join(queue, call + kind))
-            except FileNotFoundError:
-                pass
-
-    temporary = os.path.join(queue, call + ".tmp")
-    with open(temporary, "w", encoding="utf-8") as handle:
-        json.dump({"id": call, "method": method, "path": path, "headers": headers,
-                   "body": base64.b64encode(body).decode()}, handle)
-    os.replace(temporary, os.path.join(queue, call + ".req"))
+    call = queue_call(queue, method, path, headers, body)
     answer = os.path.join(queue, call + ".res")
     deadline = time.time() + timeout
     delay = 0.02
     while not os.path.exists(answer):
         if time.time() > deadline:
-            forget()
+            forget_call(queue, call)
             raise RelayTimeout()
         time.sleep(delay)
         delay = min(delay * 2, 0.25)
     try:
-        with open(answer, encoding="utf-8") as handle:
-            result = json.load(handle)
-        if result.get("file") == call + ".body":
-            with open(os.path.join(queue, call + ".body"), "rb") as handle:
-                data = handle.read()
-        else:
-            data = base64.b64decode(result["body"])
+        return read_answer(queue, call)
     finally:
-        forget()
-    return (int(result["status"]), result.get("contentType") or "application/json", data)
+        forget_call(queue, call)
+
+
+def provider_wait(queue, call, timeout=RELAY_TIMEOUT):
+    """Waits for the first piece (".head") or a whole answer (".res") of a
+    provider call and returns which arrived."""
+    deadline = time.time() + timeout
+    delay = 0.02
+    while True:
+        for kind in (".head", ".res"):
+            if os.path.exists(os.path.join(queue, call + kind)):
+                return kind
+        if time.time() > deadline:
+            forget_call(queue, call)
+            raise RelayTimeout()
+        time.sleep(delay)
+        delay = min(delay * 2, 0.1)
 
 
 def relay(directory, runner=None):
@@ -1346,7 +1449,126 @@ def relay(directory, runner=None):
                     {"jsonrpc": "2.0", "id": request["id"], "result": result}).encode())
             return self.failure(413, RELAY_TOO_LARGE)
 
+        def provider_body(self):
+            """The request body, sent with a Content-Length or chunked."""
+            encoding = (self.headers.get("Transfer-Encoding") or "").strip().lower()
+            if encoding == "chunked":
+                body = bytearray()
+                while True:
+                    size = int(self.rfile.readline(1024).split(b";")[0].strip(), 16)
+                    if size < 0:
+                        raise ValueError("negative chunk")
+                    if size == 0:
+                        while self.rfile.readline(1024) not in (b"\r\n", b"\n", b""):
+                            pass
+                        return bytes(body)
+                    if len(body) + size > PROVIDER_BODY_LIMIT:
+                        raise Oversized()
+                    body += self.rfile.read(size)
+                    self.rfile.readline(1024)
+            if encoding:
+                raise ValueError("unsupported transfer encoding")
+            length = int(self.headers.get("Content-Length") or 0)
+            if length < 0:
+                raise ValueError("negative length")
+            if length > PROVIDER_BODY_LIMIT:
+                raise Oversized()
+            return self.rfile.read(length) if length else b""
+
+        def provider(self):
+            """A model provider request: Jackalope checks the run's token on the
+            person's device, adds the API key there and streams the answer back."""
+            if self.headers.get("Origin"):
+                return self.failure(403, "Browser requests are not accepted.")
+            if self.command not in ("GET", "POST") or len(self.path) > 2000:
+                return self.failure(404, "Jackalope does not forward this request to the provider.")
+            if not any(self.headers.get(name) for name in PROVIDER_CREDENTIAL_HEADERS):
+                return self.failure(401, "Send this run's provider token.")
+            try:
+                body = self.provider_body()
+            except Oversized:
+                return self.failure(413, "Requests to the provider through Jackalope are limited "
+                                         f"to {PROVIDER_BODY_LIMIT // (1024 * 1024)} MB.")
+            except (ValueError, OSError):
+                return self.failure(400, "The request body could not be read.")
+            headers = {name: self.headers[name] for name in PROVIDER_HEADERS
+                       if self.headers.get(name)}
+            try:
+                call = queue_call(queue, self.command, self.path, headers, body)
+                arrived = provider_wait(queue, call)
+            except FileNotFoundError:
+                return self.failure(503, "The run has ended.")
+            except RelayTimeout:
+                return self.failure(504, "Jackalope did not answer this request in time.")
+            except Failure as error:
+                return self.failure(503, str(error))
+            try:
+                if arrived == ".res":
+                    status, content_type, answer = read_answer(queue, call)
+                    return self.reply(status, answer, content_type)
+                self.stream(call)
+            finally:
+                forget_call(queue, call)
+
+        def hung_up(self):
+            """Whether the agent closed its connection while waiting."""
+            try:
+                readable, _, _ = select.select([self.connection], [], [], 0)
+                return bool(readable) and not self.connection.recv(1, socket.MSG_PEEK)
+            except OSError:
+                return True
+
+        def stream(self, call):
+            """Sends a provider answer as its pieces arrive, chunked. One that
+            stalls for PROVIDER_STALL is cut off, which the agent sees as a
+            dropped connection; one the agent hangs up on is forgotten, so
+            Jackalope stops sending it."""
+            with open(os.path.join(queue, call + ".head"), encoding="utf-8") as handle:
+                head = json.load(handle)
+            chunked = self.request_version != "HTTP/1.0"
+            self.send_response(int(head["status"]))
+            self.send_header("Content-Type", head.get("contentType") or "application/json")
+            for name, value in head.get("headers") or []:
+                if name in PROVIDER_RESPONSE_HEADERS:
+                    self.send_header(name, value)
+            self.send_header("Cache-Control", "no-store")
+            if chunked:
+                self.send_header("Transfer-Encoding", "chunked")
+            else:
+                self.close_connection = True
+            self.end_headers()
+            stream = os.path.join(queue, call + ".stream")
+            end = os.path.join(queue, call + ".end")
+            position = 0
+            progress = time.time()
+            try:
+                while True:
+                    finished = os.path.exists(end)
+                    data = b""
+                    with contextlib.suppress(FileNotFoundError):
+                        with open(stream, "rb") as handle:
+                            handle.seek(position)
+                            data = handle.read(PROVIDER_PIECE_LIMIT)
+                    if data:
+                        self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data) if chunked else data)
+                        self.wfile.flush()
+                        position += len(data)
+                        progress = time.time()
+                        continue
+                    if finished:
+                        break
+                    if self.hung_up() or time.time() - progress > PROVIDER_STALL:
+                        self.close_connection = True
+                        return
+                    time.sleep(0.02)
+                if chunked:
+                    self.wfile.write(b"0\r\n\r\n")
+            except OSError:
+                self.close_connection = True
+
         def forward(self):
+            if self.path.startswith(PROVIDER_PREFIX):
+                return self.provider()
             supplied = self.headers.get("Authorization", "")
             if not hmac.compare_digest(supplied.encode(), f"Bearer {secret}".encode()):
                 return self.failure(401, "Jackalope bridge credential required.")

@@ -7,6 +7,7 @@ import {
   SettingBody,
   SettingGroup,
   SettingRow,
+  Switch,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type AgentCredential, agentCredentials, setAgentCredential } from '../../lib/computers';
@@ -19,8 +20,19 @@ const HINTS: Record<string, string> = {
   'openai-key': 'Billed to your OpenAI API account.',
 };
 
+interface AgentSignInsProps {
+  /** Agents on a computer get a token instead of the API key, which stays here. */
+  keepApiKeysOnDevice: boolean;
+  disabled: boolean;
+  onKeepApiKeysOnDeviceChange: (keep: boolean) => void;
+}
+
 /** Sign-ins for agents that run on a project's computer. Saved values are never shown again. */
-export function AgentSignIns() {
+export function AgentSignIns({
+  keepApiKeysOnDevice,
+  disabled,
+  onKeepApiKeysOnDeviceChange,
+}: AgentSignInsProps) {
   const [credentials, setCredentials] = useState<AgentCredential[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
@@ -118,6 +130,17 @@ export function AgentSignIns() {
           </SettingRow>
         );
       })}
+      <SettingRow
+        title="Keep API keys on this device"
+        description="Agents on a computer reach Anthropic and OpenAI through this device, so the API key never leaves it. Claude Code sign-in tokens still go to the computer."
+      >
+        <Switch
+          label="Keep API keys on this device"
+          checked={keepApiKeysOnDevice}
+          disabled={disabled}
+          onCheckedChange={onKeepApiKeysOnDeviceChange}
+        />
+      </SettingRow>
     </SettingGroup>
   );
 }

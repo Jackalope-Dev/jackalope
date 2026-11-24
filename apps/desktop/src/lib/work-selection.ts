@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useExecutionStore } from '../stores/executionStore';
 import { useExternalSessionStore } from '../stores/externalSessionStore';
+import { useImportedConversationStore } from '../stores/importedConversationStore';
 import { useLiveSessionStore } from '../stores/liveSessionStore';
 import { useManagedTaskStore } from '../stores/managedTaskStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -21,6 +22,8 @@ export interface WorkTarget {
   plan?: string;
   /** A conversation from outside Jackalope, by its key; read-only until continued. */
   external?: string;
+  /** A conversation imported from Claude Code or Codex; read-only until continued. */
+  imported?: string;
 }
 
 export function selectWork(target: WorkTarget = {}) {
@@ -28,6 +31,7 @@ export function selectWork(target: WorkTarget = {}) {
   useLiveSessionStore.getState().select(target.conversation ?? null);
   useManagedTaskStore.getState().select(target.plan ?? null);
   useExternalSessionStore.getState().select(target.external ?? null);
+  useImportedConversationStore.getState().select(target.imported ?? null);
 }
 
 /** The selection that opens a work-list item; a draft selects nothing. */
@@ -64,6 +68,12 @@ export function showWork(item: WorkItem, section?: string) {
 /** Opens a conversation from outside Jackalope, focusing its project. */
 export function openExternalSession(key: string, projectId: string) {
   selectWork({ external: key });
+  useProjectStore.getState().selectProject(projectId);
+}
+
+/** Opens an imported conversation, focusing its project. */
+export function openImportedConversation(id: string, projectId: string) {
+  selectWork({ imported: id });
   useProjectStore.getState().selectProject(projectId);
 }
 

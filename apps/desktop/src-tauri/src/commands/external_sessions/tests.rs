@@ -328,7 +328,16 @@ fn codex_rollouts_are_listed_by_thread_including_compressed_ones() {
     let entries: Vec<_> = transcript
         .entries
         .iter()
-        .map(|e| (e.role, e.text.as_str(), e.tools.clone()))
+        .map(|e| {
+            (
+                e.role.as_str(),
+                e.text.as_str(),
+                e.tools
+                    .iter()
+                    .map(|tool| tool.name.clone())
+                    .collect::<Vec<_>>(),
+            )
+        })
         .collect();
     assert_eq!(
         entries,
@@ -385,7 +394,16 @@ fn claude_sessions_skip_generated_turns_and_subagent_lines() {
     let entries: Vec<_> = transcript
         .entries
         .iter()
-        .map(|e| (e.role, e.text.as_str(), e.tools.clone()))
+        .map(|e| {
+            (
+                e.role.as_str(),
+                e.text.as_str(),
+                e.tools
+                    .iter()
+                    .map(|tool| tool.name.clone())
+                    .collect::<Vec<_>>(),
+            )
+        })
         .collect();
     assert_eq!(
         entries,

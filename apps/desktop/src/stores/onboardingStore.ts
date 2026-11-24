@@ -5,6 +5,8 @@ import type { Project } from './projectStore';
 /** Routing, commit behavior and appearance use defaults and are edited later in project settings. */
 export type OnboardingStep = 'project' | 'agent' | 'task';
 type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
+/** The one-time offer to import Claude Code and Codex history, made once setup finishes. */
+type HistoryOffer = 'unseen' | 'due' | 'done';
 
 interface OnboardingState {
   status: OnboardingStatus;
@@ -12,6 +14,7 @@ interface OnboardingState {
   projectId: string | null;
   pendingProject: Project | null;
   firstTask: string | null;
+  historyOffer: HistoryOffer;
   initialize: (hasProjects: boolean) => void;
   begin: (projectId?: string) => void;
   selectProject: (projectId: string) => void;
@@ -21,6 +24,8 @@ interface OnboardingState {
   finish: () => void;
   /** Leaves setup started from the workspace without adding the project. */
   cancel: () => void;
+  /** The history offer was shown, or there was nothing to offer. */
+  settleHistoryOffer: () => void;
 }
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -31,6 +36,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       projectId: null,
       pendingProject: null,
       firstTask: null,
+      historyOffer: 'unseen',
       initialize: (hasProjects) => {
         if (get().status === 'new')
           set({ status: hasProjects ? 'complete' : 'active', step: 'project' });
@@ -58,12 +64,13 @@ export const useOnboardingStore = create<OnboardingState>()(
       setFirstTask: (firstTask) => set({ firstTask }),
       go: (step) => set({ step }),
       finish: () =>
-        set({
+        set((state) => ({
           status: 'complete',
           pendingProject: null,
           firstTask: null,
           projectId: null,
-        }),
+          historyOffer: state.historyOffer === 'unseen' ? 'due' : state.historyOffer,
+        })),
       cancel: () =>
         set({
           status: 'complete',
@@ -72,6 +79,7 @@ export const useOnboardingStore = create<OnboardingState>()(
           firstTask: null,
           projectId: null,
         }),
+      settleHistoryOffer: () => set({ historyOffer: 'done' }),
     }),
     {
       name: 'jackalope-onboarding-v1',
@@ -95,6 +103,9 @@ export const useOnboardingStore = create<OnboardingState>()(
           ...kept,
           pendingProject: value.pendingProject ?? null,
           firstTask: value.firstTask ?? null,
+          historyOffer: ['unseen', 'due', 'done'].includes(value.historyOffer ?? '')
+            ? (value.historyOffer as HistoryOffer)
+            : 'unseen',
           step: legacy
             ? value.pendingProject
               ? 'task'

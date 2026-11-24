@@ -32,8 +32,9 @@ import type { TaskRun } from '../../lib/run-types';
 import { sessionMarkdown } from '../../lib/session-export';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
-import { selectWork } from '../../lib/work-selection';
+import { openImportedConversation, selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
+import { useImportedConversationStore } from '../../stores/importedConversationStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useChangeStats } from '../../stores/workSignalsStore';
@@ -89,6 +90,9 @@ export function LiveSessionView({
   onOpenSession?: (id: string) => void;
 }) {
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
+  const imported = useImportedConversationStore((state) =>
+    state.conversations.find((conversation) => conversation.continuedIn === session.id),
+  );
   const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
   const batchById = useMemo(
     () => new Map(session.batches.map((batch) => [batch.runId, batch])),
@@ -487,6 +491,22 @@ export function LiveSessionView({
         </div>
       </header>
       <SessionRecovery />
+      {imported && !detached && (
+        <div className="live-notice">
+          <InlineNotice
+            action={
+              <Button
+                variant="outline"
+                onClick={() => openImportedConversation(imported.id, imported.projectId)}
+              >
+                Earlier messages
+              </Button>
+            }
+          >
+            This continues a {imported.agentName} conversation imported into Jackalope.
+          </InlineNotice>
+        </div>
+      )}
       {detached && (
         <div className="live-statusbar">
           <span className="live-status">{statusText}</span>

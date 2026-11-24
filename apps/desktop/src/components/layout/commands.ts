@@ -1,4 +1,5 @@
 import {
+  History,
   Keyboard,
   LifeBuoy,
   type LucideIcon,
@@ -10,10 +11,10 @@ import {
   Settings2,
   SquareTerminal,
 } from 'lucide-react';
-import { openFeedback, openShortcuts } from '../../lib/app-events';
+import { openFeedback, openHistoryImport, openShortcuts } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { DISCORD_URL } from '../../lib/community';
-import { openExternalUrl } from '../../lib/native/env';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { openHelp } from '../../lib/navigation';
 import type { ShortcutAction } from '../../lib/shortcuts';
 import type { Project } from '../../stores/projectStore';
@@ -31,7 +32,7 @@ export interface CommandContext {
 }
 
 export interface Command {
-  id: ShortcutAction | 'shortcuts' | 'help' | 'feedback' | 'discord';
+  id: ShortcutAction | 'shortcuts' | 'help' | 'feedback' | 'discord' | 'importHistory';
   /** The label in command search. */
   label: (ctx: CommandContext) => string;
   icon: LucideIcon;
@@ -96,6 +97,14 @@ export const COMMANDS: readonly Command[] = [
     shortcut: 'sidebar',
     hidden: true,
     run: (ctx) => ctx.toggleSidebar(),
+  },
+  {
+    id: 'importHistory',
+    label: () => 'Import Claude and Codex history',
+    icon: History,
+    keywords: 'import claude code codex history conversations sessions transcripts migrate',
+    available: () => isTauriEnvironment(),
+    run: () => openHistoryImport(),
   },
   {
     id: 'shortcuts',

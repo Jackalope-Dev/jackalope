@@ -24,16 +24,20 @@ export interface ExternalSessionsView {
   error?: string | null;
 }
 
-interface ExternalTranscriptEntry {
+/** One entry of a Claude Code or Codex transcript, live or imported. */
+export interface TranscriptEntry {
   role: 'user' | 'assistant' | 'tools';
   text: string;
-  tools?: string[];
+  /** Tool calls in order, for a `tools` entry, with what each was given in one line. */
+  tools?: { name: string; summary?: string | null }[];
+  /** Files and images the person attached, by name or path. */
+  attachments?: string[];
   at?: string | null;
 }
 
 export interface ExternalTranscript {
   session: ExternalSession;
-  entries: ExternalTranscriptEntry[];
+  entries: TranscriptEntry[];
   /** Entries before the first one shown, left out because the transcript is long. */
   earlier: number;
   subagentLines: number;

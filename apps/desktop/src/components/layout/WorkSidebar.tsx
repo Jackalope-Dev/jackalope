@@ -41,12 +41,14 @@ import { projectNameHints } from '../../lib/project-name-hints';
 import { attentionReason, type WorkItem, workPresence } from '../../lib/task-collection';
 import {
   openExternalSession,
+  openImportedConversation,
   openWork,
   useWorkspaceWork,
   workProjectId,
 } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useExternalSessionStore } from '../../stores/externalSessionStore';
+import { useImportedConversationStore } from '../../stores/importedConversationStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { GENERAL_PROJECT_ID, type Project, useProjectStore } from '../../stores/projectStore';
@@ -75,6 +77,22 @@ function useExternalByProject() {
       byProject.set(session.projectId, [...(byProject.get(session.projectId) ?? []), session]);
     return byProject;
   }, [sessions]);
+}
+
+/** A project's imported conversations not yet continued in Jackalope, newest first. */
+function useImportedByProject() {
+  const conversations = useImportedConversationStore((state) => state.conversations);
+  return useMemo(() => {
+    const byProject = new Map<string, ((typeof conversations)[number] & { key: string })[]>();
+    for (const conversation of conversations) {
+      if (conversation.continuedIn) continue;
+      byProject.set(conversation.projectId, [
+        ...(byProject.get(conversation.projectId) ?? []),
+        { ...conversation, key: conversation.id },
+      ]);
+    }
+    return byProject;
+  }, [conversations]);
 }
 
 /** Finished rows shown per project before the rest are left to the Work page. */
@@ -768,6 +786,8 @@ export function WorkSidebar({
   const selectedManaged = useManagedTaskStore((state) => state.selectedId);
   const selectedExternal = useExternalSessionStore((state) => state.selectedKey);
   const external = useExternalByProject();
+  const selectedImported = useImportedConversationStore((state) => state.selectedId);
+  const imported = useImportedByProject();
   const signals = useWorkSignals();
   const openKey = useOpenSignalKey();
   const stats = useChangeStats(
@@ -777,7 +797,7 @@ export function WorkSidebar({
       .map((item) => item.run),
   );
   const somethingOpen = Boolean(
-    selectedRun || selectedSession || selectedManaged || selectedExternal,
+    selectedRun || selectedSession || selectedManaged || selectedExternal || selectedImported,
   );
   const projectView = workspaceView(activeTab).group === 'project';
   const allWork = useWorkspaceWork();
@@ -816,6 +836,7 @@ export function WorkSidebar({
   const projectGroup = (project: Project) => {
     const live = byProject.get(project.id) ?? [];
     const outside = external.get(project.id) ?? [];
+    const brought = imported.get(project.id) ?? [];
     const expanded = !collapsed[project.id];
     const attention = live.filter((item) => ['attention', 'review'].includes(item.stage)).length;
     const running = live.filter((item) => item.stage === 'working').length;
@@ -981,6 +1002,18 @@ export function WorkSidebar({
         )}
         {expanded && (
           <ExternalSessionRows
+            heading="Imported"
+            sessions={brought}
+            selectedKey={selectedImported}
+            onOpen={(conversation) => {
+              openImportedConversation(conversation.id, conversation.projectId);
+              onOpen();
+            }}
+          />
+        )}
+        {expanded && (
+          <ExternalSessionRows
+            heading="Outside Jackalope"
             sessions={outside}
             selectedKey={selectedExternal}
             onOpen={(session) => {

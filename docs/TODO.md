@@ -25,6 +25,9 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept importing Claude Code and Codex history in an installed app on each platform:
+  the onboarding offer, a real import, updating a conversation that grew, and continuing an
+  imported conversation through its CLI.
 - [ ] Extend agents on a computer: automatic routing that does not require the CLI here.
 - [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
   local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and
@@ -38,7 +41,8 @@ release dates.
   wake, spend), bridge tools, on-demand connections, stdio connections running on the
   computer (npx and uvx servers, the uv install, Claude Code's approval hook and Codex's
   `mcp_servers` overrides), `execute_tool` approvals and project
-  secrets through the relay, Jackalope context (cloud resources manifest and pasted
+  secrets through the relay, Keep API keys on this device with Claude Code and Codex
+  streaming from Anthropic and OpenAI, Jackalope context (cloud resources manifest and pasted
   images) reaching the agent there, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.

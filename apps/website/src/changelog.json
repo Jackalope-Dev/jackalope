@@ -1,5 +1,25 @@
 [
   {
+    "id": "bring-your-claude-code-and-codex-history",
+    "date": "2026-11-24",
+    "title": "Bring your Claude Code and Codex history.",
+    "description": "Import past conversations into Jackalope, grouped by project, and continue them where they ran.",
+    "items": [
+      "Choose conversations by project and date; the import runs in the background and can be canceled.",
+      "Importing again updates conversations that grew since last time."
+    ]
+  },
+  {
+    "id": "keep-api-keys-off-agent-computers",
+    "date": "2026-11-24",
+    "title": "Keep API keys off agent computers.",
+    "description": "Agents on a computer can now reach Anthropic and OpenAI through Jackalope, so your saved API key never leaves this device.",
+    "items": [
+      "Turn on Keep API keys on this device in Settings → Computers. Each attempt gets its own token, which stops working when the attempt ends.",
+      "Responses still stream to the agent as they arrive. Claude Code sign-in tokens go to the computer as before."
+    ]
+  },
+  {
     "id": "see-where-a-task-s-time-went",
     "date": "2026-11-24",
     "title": "See where a task's time went.",

@@ -15,6 +15,7 @@
 
 mod claude;
 pub(in crate::commands) mod codex;
+mod import;
 mod index;
 mod read;
 #[cfg(test)]
@@ -219,6 +220,18 @@ struct Scope<'a> {
     pub data_directory: &'a Path,
 }
 
+/// Whether a session is Jackalope's own work rather than the person's: an attempt or
+/// conversation that recorded it, or one that ran in a worktree or data folder of Jackalope's.
+fn own_work(summary: &Summary, location: &Location, scope: &Scope) -> bool {
+    let cwd = Path::new(&summary.cwd);
+    let resolved = location.canonical.as_deref().unwrap_or(cwd);
+    scope.recorded.contains(&summary.session_id)
+        || jackalope_worktree(cwd, summary.branch.as_deref())
+        || cwd.starts_with(scope.data_directory)
+        || dunce::canonicalize(scope.data_directory)
+            .is_ok_and(|data_directory| resolved.starts_with(data_directory))
+}
+
 /// The listed sessions, newest first. `account` says why a session cannot continue
 /// under the account directory it was saved in, when it cannot.
 fn list(
@@ -226,8 +239,6 @@ fn list(
     scope: &Scope,
     account: &dyn Fn(&ExternalSession) -> Option<String>,
 ) -> Vec<ExternalSession> {
-    let data_directory =
-        dunce::canonicalize(scope.data_directory).unwrap_or_else(|_| scope.data_directory.into());
     let mut locations: HashMap<&str, Location> = HashMap::new();
     let mut newest: HashMap<(Source, &str), (u64, ExternalSession)> = HashMap::new();
     for (path, entry) in &index.files {
@@ -237,18 +248,11 @@ fn list(
         let Some(title) = &summary.title else {
             continue;
         };
-        if scope.recorded.contains(&summary.session_id) {
-            continue;
-        }
         let cwd = Path::new(&summary.cwd);
-        if jackalope_worktree(cwd, summary.branch.as_deref()) {
-            continue;
-        }
         let location = locations
             .entry(summary.cwd.as_str())
             .or_insert_with(|| Location::of(cwd));
-        let resolved = location.canonical.as_deref().unwrap_or(cwd);
-        if resolved.starts_with(&data_directory) || cwd.starts_with(scope.data_directory) {
+        if own_work(summary, location, scope) {
             continue;
         }
         let Some(project) = project_for(scope.projects, cwd, location) else {
@@ -421,6 +425,7 @@ struct Listing {
 struct Shared {
     runtime: TaskRuntime,
     conversations: LiveSessions,
+    imports: import::Imports,
     settings_path: PathBuf,
     index_path: PathBuf,
     state: Mutex<Listing>,
@@ -474,6 +479,7 @@ impl ExternalSessions {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or_default();
         Self(Arc::new(Shared {
+            imports: import::Imports::new(runtime.data_directory().join("imported-conversations")),
             index_path: runtime
                 .data_directory()
                 .join("external-sessions")
@@ -579,6 +585,8 @@ impl ExternalSessions {
             .collect();
         let mut recorded = shared.runtime.recorded_sessions();
         recorded.extend(shared.conversations.continued_sessions());
+        // Imported conversations are listed with Jackalope's own.
+        recorded.extend(shared.imports.session_ids());
         let sessions = list(
             &index,
             &Scope {
@@ -720,13 +728,28 @@ impl ExternalSessions {
         if let Some(reason) = &session.unavailable {
             return Err(reason.clone());
         }
+        let id = self.start_continuing(&session, conversation_id, message)?;
+        if let Ok(mut state) = self.0.state.lock() {
+            state.sessions.retain(|listed| listed.key != session.key);
+        }
+        self.changed();
+        Ok(id)
+    }
+
+    /// Starts a conversation whose first attempt resumes `session` in the folder it ran in.
+    fn start_continuing(
+        &self,
+        session: &ExternalSession,
+        conversation_id: String,
+        message: FirstMessage,
+    ) -> Result<String, String> {
         let runtime = &self.0.runtime;
         let project = super::project_registry::list(runtime)
             .into_iter()
             .find(|project| project.id == session.project_id)
             .ok_or(super::project_registry::NOT_REGISTERED)?;
         let accounts = Accounts::load(runtime);
-        if let Some(reason) = accounts.unavailable(&session) {
+        if let Some(reason) = accounts.unavailable(session) {
             return Err(reason);
         }
         let binding = accounts.binding(session.source, &session.home)?;
@@ -748,7 +771,7 @@ impl ExternalSessions {
                 String::new(),
             )
         };
-        let id = self.0.conversations.create_continuing(
+        self.0.conversations.create_continuing(
             conversation_id,
             session.title.clone(),
             request,
@@ -759,13 +782,148 @@ impl ExternalSessions {
                 workspace: workspace.to_string_lossy().into_owned(),
                 home: binding.directory.clone(),
             },
-        )?;
-        if let Ok(mut state) = self.0.state.lock() {
-            state.sessions.retain(|listed| listed.key != session.key);
-        }
-        self.changed();
-        Ok(id)
+        )
     }
+
+    fn projects(&self) -> Vec<ProjectFolder> {
+        super::project_registry::list(&self.0.runtime)
+            .iter()
+            .map(|project| ProjectFolder::new(&project.id, &project.path))
+            .collect()
+    }
+
+    fn imports_changed(&self) {
+        if let Some(app) = self.0.app.get() {
+            let _ = app.emit("imported-conversations-changed", ());
+        }
+    }
+
+    fn import_scan(&self) -> Result<import::ImportScan, String> {
+        let runtime = &self.0.runtime;
+        let accounts = Accounts::load(runtime);
+        let homes = import::homes(&accounts);
+        let projects = self.projects();
+        let mut recorded = runtime.recorded_sessions();
+        recorded.extend(self.0.conversations.continued_sessions());
+        let mut scan = self.0.imports.scan(
+            &homes,
+            &projects,
+            &Scope {
+                projects: &projects,
+                recorded: &recorded,
+                data_directory: runtime.data_directory(),
+            },
+        )?;
+        if scan.error.is_none() {
+            scan.error = accounts
+                .bindings
+                .values()
+                .find_map(|bindings| bindings.as_ref().err().cloned());
+        }
+        Ok(scan)
+    }
+
+    /// Imports `keys` from the last scan in the background.
+    fn import_start(&self, keys: Vec<String>) -> Result<(), String> {
+        if keys.is_empty() {
+            return Err("Choose at least one conversation to import.".into());
+        }
+        self.0.imports.begin(keys.len())?;
+        self.imports_changed();
+        let service = self.clone();
+        std::thread::spawn(move || {
+            let projects = service.projects();
+            let last = std::cell::Cell::new(None::<Instant>);
+            service.0.imports.run(keys, &projects, &|| {
+                // Progress is announced at most a few times a second.
+                if last
+                    .get()
+                    .is_none_or(|last| last.elapsed() >= Duration::from_millis(250))
+                {
+                    last.set(Some(Instant::now()));
+                    service.imports_changed();
+                }
+            });
+            service.imports_changed();
+            // Imported sessions leave the Outside Jackalope list.
+            service.refresh();
+        });
+        Ok(())
+    }
+
+    fn imported_list(&self) -> Result<ImportedView, String> {
+        let records = self.0.imports.store.records();
+        let (records, error) = match records {
+            Ok(records) => (records, None),
+            Err(error) => (Vec::new(), Some(error)),
+        };
+        let accounts = Accounts::load(&self.0.runtime);
+        Ok(ImportedView {
+            conversations: import::describe(records, &self.projects(), &|session| {
+                accounts.unavailable(session)
+            }),
+            progress: self.0.imports.progress(),
+            error,
+        })
+    }
+
+    fn imported_conversation(&self, id: &str) -> Result<import::ImportedConversation, String> {
+        let record = self
+            .0
+            .imports
+            .store
+            .record(id)?
+            .ok_or("This imported conversation is no longer saved.")?;
+        let accounts = Accounts::load(&self.0.runtime);
+        import::describe(vec![record], &self.projects(), &|session| {
+            accounts.unavailable(session)
+        })
+        .pop()
+        .ok_or_else(|| "This imported conversation is no longer saved.".into())
+    }
+
+    fn imported_transcript(&self, id: &str) -> Result<ImportedTranscript, String> {
+        let conversation = self.imported_conversation(id)?;
+        let entries = self.0.imports.store.transcript(id)?;
+        Ok(ImportedTranscript {
+            conversation,
+            entries,
+        })
+    }
+
+    fn imported_continue(
+        &self,
+        id: &str,
+        conversation_id: String,
+        message: FirstMessage,
+    ) -> Result<String, String> {
+        let conversation = self.imported_conversation(id)?;
+        if let Some(reason) = conversation.unavailable {
+            return Err(reason);
+        }
+        let session = import::as_session(&conversation.record, &conversation.record.project_id)
+            .ok_or("Jackalope cannot continue this conversation.")?;
+        let started = self.start_continuing(&session, conversation_id, message)?;
+        let marked = self.0.imports.store.mark_continued(id, &started);
+        self.imports_changed();
+        marked.map_err(|error| format!("The conversation continued, but its import could not be marked as continued: {error}"))?;
+        Ok(started)
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedView {
+    pub conversations: Vec<import::ImportedConversation>,
+    pub progress: import::ImportProgress,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedTranscript {
+    pub conversation: import::ImportedConversation,
+    pub entries: Vec<TranscriptEntry>,
 }
 
 const GONE: &str =
@@ -778,6 +936,12 @@ macro_rules! tauri_commands {
             commands::external_sessions::external_sessions_set_enabled,
             commands::external_sessions::external_session_transcript,
             commands::external_sessions::external_session_continue,
+            commands::external_sessions::session_import_scan,
+            commands::external_sessions::session_import_start,
+            commands::external_sessions::session_import_cancel,
+            commands::external_sessions::imported_conversations_list,
+            commands::external_sessions::imported_conversation_transcript,
+            commands::external_sessions::imported_conversation_continue,
         ] $($rest)*)
     };
 }
@@ -827,6 +991,77 @@ pub async fn external_session_continue(
     tauri::async_runtime::spawn_blocking(move || {
         service.continue_session(
             &key,
+            conversation_id,
+            FirstMessage {
+                id: message_id,
+                text,
+                origin: None,
+            },
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn session_import_scan(
+    service: State<'_, ExternalSessions>,
+) -> Result<import::ImportScan, String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || service.import_scan())
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn session_import_start(
+    service: State<'_, ExternalSessions>,
+    keys: Vec<String>,
+) -> Result<(), String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || service.import_start(keys))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub fn session_import_cancel(service: State<'_, ExternalSessions>) {
+    service.0.imports.cancel();
+}
+
+#[tauri::command]
+pub async fn imported_conversations_list(
+    service: State<'_, ExternalSessions>,
+) -> Result<ImportedView, String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || service.imported_list())
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn imported_conversation_transcript(
+    service: State<'_, ExternalSessions>,
+    id: String,
+) -> Result<ImportedTranscript, String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || service.imported_transcript(&id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn imported_conversation_continue(
+    service: State<'_, ExternalSessions>,
+    id: String,
+    conversation_id: String,
+    message_id: String,
+    text: String,
+) -> Result<String, String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        service.imported_continue(
+            &id,
             conversation_id,
             FirstMessage {
                 id: message_id,

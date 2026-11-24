@@ -23,21 +23,79 @@ pub(super) fn is_session(name: &str) -> bool {
 }
 
 /// The text of a `response_item` message from `role`, without the blocks Codex adds
-/// to the person's turn itself (environment, instructions).
-fn message(line: &Value, role: &str) -> Option<String> {
+/// to the person's turn itself (environment, instructions), and references to the files
+/// and images the person attached.
+fn message(line: &Value, role: &str) -> Option<(String, Vec<String>)> {
     let item = &line["payload"];
     if line["type"] != "response_item" || item["type"] != "message" || item["role"] != role {
         return None;
     }
-    let text = item["content"]
-        .as_array()?
-        .iter()
-        .filter(|block| matches!(block["type"].as_str(), Some("input_text" | "output_text")))
-        .filter_map(|block| read::text(&block["text"]))
-        .filter(|text| !read::generated(text))
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    (!text.is_empty()).then_some(text)
+    let mut texts = Vec::new();
+    let mut attachments = Vec::new();
+    // Codex wraps a pasted image in `<image name=… path="…">` and `</image>` blocks.
+    let mut image_path = None;
+    for block in item["content"].as_array()? {
+        match block["type"].as_str() {
+            Some("input_text" | "output_text") => {
+                let Some(text) = read::text(&block["text"]) else {
+                    continue;
+                };
+                if let Some(files) = text.strip_prefix(FILES_HEADING) {
+                    attachments.extend(
+                        files
+                            .lines()
+                            .filter_map(|line| line.strip_prefix("## "))
+                            .filter_map(|line| read::summary(line.rsplit(": ").next()?)),
+                    );
+                } else if read::generated(text) {
+                    image_path = text
+                        .strip_prefix("<image ")
+                        .and_then(|tag| tag.split("path=\"").nth(1))
+                        .and_then(|path| path.split('"').next())
+                        .and_then(read::summary);
+                } else {
+                    texts.push(text);
+                }
+            }
+            Some("input_image") => match image_path.take() {
+                Some(path) => {
+                    attachments.retain(|listed| *listed != path);
+                    attachments.push(format!("Image ({path})"));
+                }
+                None => attachments.push("Image".to_string()),
+            },
+            _ => {}
+        }
+    }
+    attachments.dedup();
+    let text = texts.join("\n\n");
+    (!text.is_empty() || !attachments.is_empty()).then_some((text, attachments))
+}
+
+/// How Codex lists the files a person mentioned, ahead of their prompt.
+const FILES_HEADING: &str = "# Files mentioned by the user:";
+
+/// What a call was given: its arguments (a JSON string), or the files a patch changes.
+fn call_summary(item: &Value) -> Option<String> {
+    if let Some(arguments) = item["arguments"].as_str() {
+        return serde_json::from_str::<Value>(arguments)
+            .ok()
+            .and_then(|arguments| read::tool_input(&arguments));
+    }
+    let input = item["input"].as_str()?;
+    let files: Vec<_> = input
+        .lines()
+        .filter_map(|line| {
+            ["*** Update File: ", "*** Add File: ", "*** Delete File: "]
+                .iter()
+                .find_map(|prefix| line.strip_prefix(prefix))
+        })
+        .collect();
+    if files.is_empty() {
+        input.lines().find_map(read::summary)
+    } else {
+        read::summary(&files.join(", "))
+    }
 }
 
 pub(super) fn summarize(mut lines: impl Iterator<Item = Value>) -> Option<Summary> {
@@ -53,8 +111,8 @@ pub(super) fn summarize(mut lines: impl Iterator<Item = Value>) -> Option<Summar
     let id = meta["id"].as_str().filter(|id| super::valid_session(id))?;
     let cwd = read::text(&meta["cwd"]).filter(|cwd| Path::new(cwd).is_absolute())?;
     let title = lines
-        .find_map(|line| message(&line, "user"))
-        .and_then(|text| read::title(&text));
+        .find_map(|line| message(&line, "user").filter(|(text, _)| !text.is_empty()))
+        .and_then(|(text, _)| read::title(&text));
     Some(Summary {
         session_id: id.to_string(),
         cwd: cwd.to_string(),
@@ -66,20 +124,24 @@ pub(super) fn summarize(mut lines: impl Iterator<Item = Value>) -> Option<Summar
 
 pub(super) fn transcript(line: &Value, transcript: &mut Transcript) {
     let at = line["timestamp"].as_str();
-    if let Some(text) = message(line, "user") {
-        transcript.user(&text, at);
-    } else if let Some(text) = message(line, "assistant") {
+    if let Some((text, attachments)) = message(line, "user") {
+        transcript.user_with(&text, attachments, at);
+    } else if let Some((text, _)) = message(line, "assistant") {
         transcript.assistant(&text, at);
     } else if line["type"] == "response_item" {
         let item = &line["payload"];
         match item["type"].as_str() {
             Some("function_call" | "custom_tool_call") => {
                 if let Some(name) = read::text(&item["name"]) {
-                    transcript.tool(name, at);
+                    transcript.tool(name, call_summary(item), at);
                 }
             }
-            Some("local_shell_call") => transcript.tool("shell", at),
-            Some("web_search_call") => transcript.tool("web_search", at),
+            Some("local_shell_call") => {
+                transcript.tool("shell", read::tool_input(&item["action"]), at)
+            }
+            Some("web_search_call") => {
+                transcript.tool("web_search", read::tool_input(&item["action"]), at)
+            }
             _ => {}
         }
     }

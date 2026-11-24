@@ -25,24 +25,65 @@ fn sidechain(line: &Value) -> bool {
     line["isSidechain"].as_bool() == Some(true)
 }
 
-/// What the person typed in a `user` line: its text, or its text blocks. Tool results,
-/// CLI-generated turns (`isMeta`) and command records are not prompts.
-fn prompt(line: &Value) -> Option<String> {
+/// What the person typed in a `user` line: its text, or its text blocks, and what they
+/// attached. Tool results, CLI-generated turns (`isMeta`) and command records are not
+/// prompts.
+fn message(line: &Value) -> Option<(String, Vec<String>)> {
     if line["type"] != "user" || line["isMeta"].as_bool() == Some(true) || sidechain(line) {
         return None;
     }
     let content = &line["message"]["content"];
-    let text = match content {
-        Value::String(text) => text.trim().to_string(),
-        Value::Array(blocks) => blocks
-            .iter()
-            .filter(|block| block["type"] == "text")
-            .filter_map(|block| read::text(&block["text"]))
-            .collect::<Vec<_>>()
-            .join("\n\n"),
+    let (text, attachments) = match content {
+        Value::String(text) => (text.trim().to_string(), Vec::new()),
+        Value::Array(blocks) => {
+            let text = blocks
+                .iter()
+                .filter(|block| block["type"] == "text")
+                .filter_map(|block| read::text(&block["text"]))
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            (text, blocks.iter().filter_map(attachment).collect())
+        }
         _ => return None,
     };
-    (!text.is_empty() && !read::generated(&text)).then_some(text)
+    if read::generated(&text) || (text.is_empty() && attachments.is_empty()) {
+        return None;
+    }
+    Some((text, attachments))
+}
+
+/// An image or document block the person attached, named by its kind and type.
+fn attachment(block: &Value) -> Option<String> {
+    let kind = match block["type"].as_str()? {
+        "image" => "Image",
+        "document" => "Document",
+        _ => return None,
+    };
+    let named = read::text(&block["title"]).or_else(|| read::text(&block["source"]["media_type"]));
+    Some(match named {
+        Some(name) => format!("{kind} ({name})"),
+        None => kind.to_string(),
+    })
+}
+
+/// A prompt the person typed while Claude Code was working, which it records only as a
+/// queued command.
+fn queued(line: &Value) -> Option<&str> {
+    let attachment = &line["attachment"];
+    (line["type"] == "attachment"
+        && attachment["type"] == "queued_command"
+        && attachment["commandMode"] == "prompt"
+        && !sidechain(line))
+    .then(|| read::text(&attachment["prompt"]))
+    .flatten()
+    .filter(|text| !read::generated(text))
+}
+
+fn prompt(line: &Value) -> Option<String> {
+    message(line)
+        .map(|(text, _)| text)
+        .filter(|text| !text.is_empty())
+        .or_else(|| queued(line).map(str::to_owned))
 }
 
 pub(super) fn summarize(lines: impl Iterator<Item = Value>) -> Option<Summary> {
@@ -93,8 +134,12 @@ pub(super) fn transcript(line: &Value, transcript: &mut Transcript) {
         return;
     }
     let at = line["timestamp"].as_str();
-    if let Some(text) = prompt(line) {
-        transcript.user(&text, at);
+    if let Some((text, attachments)) = message(line) {
+        transcript.user_with(&text, attachments, at);
+        return;
+    }
+    if let Some(text) = queued(line) {
+        transcript.user(text, at);
         return;
     }
     if line["type"] != "assistant" {
@@ -110,9 +155,9 @@ pub(super) fn transcript(line: &Value, transcript: &mut Transcript) {
                             transcript.assistant(text, at);
                         }
                     }
-                    Some("tool_use") => {
+                    Some("tool_use" | "server_tool_use") => {
                         if let Some(name) = read::text(&block["name"]) {
-                            transcript.tool(name, at);
+                            transcript.tool(name, read::tool_input(&block["input"]), at);
                         }
                     }
                     _ => {}

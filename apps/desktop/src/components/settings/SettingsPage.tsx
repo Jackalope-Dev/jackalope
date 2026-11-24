@@ -30,6 +30,7 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
+import { HistoryImportSetting } from './HistoryImportSetting';
 import { JackalopeAccount } from './JackalopeAccount';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationSettings } from './NotificationSettings';
@@ -316,6 +317,7 @@ export function SettingsPage({
                         </SettingRow>
                       </SettingGroup>
                       <ArchivedHistory />
+                      {isTauriEnvironment() && <HistoryImportSetting />}
                       <SettingGroup
                         tone="danger"
                         title="Reset Jackalope"

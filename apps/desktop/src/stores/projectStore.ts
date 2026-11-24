@@ -518,6 +518,14 @@ function mirrorProjects(projects: Project[]) {
       if (requestedMirror === encoded) requestedMirror = null;
     });
 }
+/** Waits until the native mirror has the current project list, for work that reads it there. */
+export async function projectMirrorSaved() {
+  mirrorProjects(useProjectStore.getState().projects);
+  await mirrorSync;
+  if (isTauriEnvironment() && requestedMirror !== mirrored)
+    throw new Error('Jackalope could not save the project list. Try again.');
+}
+
 // Subscribing rather than writing from each mutator means a future action
 // cannot forget to mirror.
 useProjectStore.subscribe((state) => mirrorProjects(state.projects));
