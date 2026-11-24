@@ -1068,6 +1068,7 @@ pub async fn imported_conversation_continue(
                 id: message_id,
                 text,
                 origin: None,
+                reasoning_effort: None,
             },
         )
     })

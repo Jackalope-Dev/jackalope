@@ -1009,6 +1009,7 @@ impl LiveSessions {
             session.messages.push(SessionMessage {
                 id: Uuid::new_v4().to_string(),
                 text: RESUME_MESSAGE.into(),
+                reasoning_effort: None,
                 created_at: created_at.clone(),
                 run_id: None,
                 canceled: false,
