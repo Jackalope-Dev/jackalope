@@ -64,6 +64,7 @@ export function ImportedConversationView({ conversation }: { conversation: Impor
   ].filter((note): note is string => !!note);
   return (
     <ProviderTranscript
+      title={conversation.title}
       agent={conversation.agent}
       agentName={conversation.agentName}
       entries={transcript?.entries ?? []}

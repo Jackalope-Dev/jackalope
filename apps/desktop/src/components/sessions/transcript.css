@@ -33,16 +33,7 @@
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
-::highlight(transcript-match) {
-  background-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
-  color: var(--color-text-primary);
-}
-/* The current match inverts against the page and is underlined, so it reads without color. */
-::highlight(transcript-match-current) {
-  background-color: var(--color-warning);
-  color: var(--color-surface);
-  text-decoration: underline 2px;
-}
+/* Find highlights are styled per transcript in Transcript.tsx, under names of its own. */
 
 .transcript-find {
   position: absolute;

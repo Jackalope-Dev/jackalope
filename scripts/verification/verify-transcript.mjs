@@ -27,6 +27,7 @@ import {applyThemeTokens,DEFAULT_THEME} from '@jackalope/brand/theme';
 import {LiveSessionView} from '../../src/components/sessions/LiveSessionView';
 import {useLiveSessionStore} from '../../src/stores/liveSessionStore';
 import {useProjectStore} from '../../src/stores/projectStore';
+import {expandCompactRuns} from '../../src/lib/session-replies';
 import '../../src/index.css';
 const params=new URLSearchParams(location.search);
 const count=Number(params.get('count')??2000);
@@ -37,13 +38,15 @@ const at=i=>new Date(Date.UTC(2026,8,1)+i*60000).toISOString();
 const base={taskId:'task',liveSessionId:'session',projectId:'atlas',projectName:'Atlas',projectPath:'/fixture/atlas',workspace:'/fixture/atlas-session',branch:'session/atlas',targetBranch:'main',baseHead:'base',agent:'codex',account:'Personal',prompt:'Fixture',sessionId:'provider',activity:[],diagnostics:[],prompts:[],error:null,persistenceError:null,exitCode:0,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:false}};
 // As the native snapshot sends them: the newest 40 replies in full, older ones left out.
 const full=new Map(Array.from({length:count},(_,i)=>['r'+i,reply(i)]));
-const runs=Array.from({length:count},(_,i)=>({...base,id:'r'+i,status:'review',startedAt:at(i),endedAt:at(i),...(i<count-40?{result:'',resultOmitted:true,resultChars:reply(i).length}:{result:reply(i)})}));
+// Older runs arrive trimmed, as compactRuns, and are filled out by the store.
+const runs=Array.from({length:count},(_,i)=>i<count-40?expandCompactRuns([{id:'r'+i,taskId:'task',liveSessionId:'session',projectId:'atlas',agent:'codex',status:'review',startedAt:at(i),endedAt:at(i),resultOmitted:true,resultChars:reply(i).length,usage:base.usage}])[0]:({...base,id:'r'+i,status:'review',startedAt:at(i),endedAt:at(i),result:reply(i)}));
 const messages=Array.from({length:count},(_,i)=>({id:'m'+i,text:'Message '+i+': please look at '+(i%7===0?'the zebra list and ':'')+'item '+i+'.',createdAt:at(i),runId:'r'+i,canceled:false}));
 const batches=runs.map((run,i)=>({runId:run.id,messageIds:['m'+i],previousRunId:i?'r'+(i-1):null,error:null,settled:true}));
 const session={id:'session',title:'Long transcript',request:{projectId:'atlas',projectName:'Atlas',projectPath:'/fixture/atlas',agent:'codex'},createdAt:at(0),updatedAt:at(count),paused:false,closed:false,pinned:false,draft:{text:'',revision:0},error:null,messages,batches};
 const f=window.transcriptFixture={calls:[],longTasks:[]};
 new PerformanceObserver(list=>f.longTasks.push(...list.getEntries().map(entry=>({start:entry.startTime,duration:entry.duration})))).observe({type:'longtask',buffered:true});
 f.storeRuns=()=>useLiveSessionStore.getState().runs;
+f.unload=()=>useLiveSessionStore.setState(s=>({runs:s.runs.map((run,i)=>i<count-40&&run.result?{...run,result:'',resultOmitted:true,resultChars:run.result.length}:run)}));
 f.session=changes=>useLiveSessionStore.setState(s=>({sessions:s.sessions.map(item=>({...item,...changes(item)}))}));
 f.runs=changes=>useLiveSessionStore.setState(s=>({runs:changes(s.runs)}));
 f.startReply=()=>{const i=useLiveSessionStore.getState().sessions[0].messages.length;f.session(s=>({messages:[...s.messages,{id:'m'+i,text:'Message '+i+': stream a reply.',createdAt:at(i),runId:'r'+i,canceled:false}],batches:[...s.batches,{runId:'r'+i,messageIds:['m'+i],previousRunId:null,error:null,settled:false}]}));f.runs(r=>[...r,{...base,id:'r'+i,status:'running',startedAt:at(i),endedAt:null,result:'Starting'}]);return 'r'+i;};
@@ -53,7 +56,7 @@ window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
 window.__TAURI_INTERNALS__={transformCallback:()=>0,metadata:{currentWindow:{label:'main'},currentWebview:{label:'main'}},invoke:async(command,args={})=>{
 f.calls.push({command,args});
 if(command==='live_session_send'){const s=useLiveSessionStore.getState().sessions[0];f.session(item=>({messages:[...item.messages,{id:args.messageId,text:args.text,createdAt:new Date().toISOString(),runId:null,canceled:false}],draft:{text:'',revision:item.draft.revision+1}}));return {text:'',revision:s.draft.revision+1};}
-if(command==='live_session_results'){f.pages=(f.pages??0)+1;return args.runIds.filter(id=>full.has(id)).slice(0,100).map(id=>({id,result:full.get(id)}));}
+if(command==='live_session_results'){if(f.failResults)throw new Error('The saved reply could not be read.');f.pages=(f.pages??0)+1;return args.runIds.filter(id=>full.has(id)).slice(0,100).map(id=>({id,result:full.get(id)}));}
 if(command==='live_session_search'){const q=args.query.trim().toLowerCase();const counts={};for(const [id,text] of full){const n=text.toLowerCase().split(q).length-1;if(n)counts[id]=n;}return counts;}
 if(command==='live_session_draft'){const s=useLiveSessionStore.getState().sessions[0];return {text:args.text,revision:s.draft.revision+1};}
 if(command==='desktop_attach_support')return {drag:false,pick:false,badge:false};
@@ -164,7 +167,8 @@ async function checkBehavior(page) {
   await page.keyboard.press(`${modifier}+F`);
   const field = page.getByRole('searchbox', { name: 'Find in conversation' });
   await field.waitFor();
-  assert.equal(await field.evaluate((node) => node === document.activeElement), true);
+  // The field takes focus on the frame after it opens.
+  await page.waitForFunction(() => document.activeElement?.getAttribute('type') === 'search');
   assert.equal(await page.locator('[data-index="1234"]').count(), 0, 'row 1234 starts unrendered');
   await field.fill('needle-1234');
   const status = page.locator('.transcript-find-count');
@@ -172,7 +176,10 @@ async function checkBehavior(page) {
     () => document.querySelector('.transcript-find-count')?.textContent === '1 of 1',
   );
   await page.waitForFunction(() => {
-    const current = CSS.highlights.get('transcript-match-current');
+    const name = [...CSS.highlights.keys()].find((key) =>
+      key.startsWith('transcript-match-current-'),
+    );
+    const current = name && CSS.highlights.get(name);
     if (!current?.size) return false;
     const [range] = current;
     const box = range.getBoundingClientRect();
@@ -185,7 +192,14 @@ async function checkBehavior(page) {
   await page.waitForFunction(() =>
     /of 291$/.test(document.querySelector('.transcript-find-count')?.textContent ?? ''),
   );
-  const first = await status.textContent();
+  // Counts for unloaded replies arrive after the local ones; wait for the start to settle.
+  let first = await status.textContent();
+  for (let read = 0; read < 20; read++) {
+    await page.waitForTimeout(100);
+    const next = await status.textContent();
+    if (next === first) break;
+    first = next;
+  }
   await field.press('Enter');
   await page.waitForFunction(
     (first) => document.querySelector('.transcript-find-count')?.textContent !== first,
@@ -211,7 +225,9 @@ async function checkBehavior(page) {
     true,
     'focus returns to where find opened',
   );
-  await page.waitForFunction(() => !CSS.highlights.has('transcript-match'));
+  await page.waitForFunction(
+    () => ![...CSS.highlights.keys()].some((key) => key.startsWith('transcript-match')),
+  );
 
   // Mod+F stays with the view in front when the conversation is hidden.
   await page.getByRole('button', { name: 'Review', exact: true }).click();
@@ -256,6 +272,25 @@ async function checkBehavior(page) {
   assert.equal(await page.locator(`[data-index="${selected.index}"]`).count(), 1);
   assert.equal(await page.evaluate(() => getSelection().toString()), selected.text);
   await page.evaluate(() => getSelection().removeAllRanges());
+
+  // A reply that fails to load offers Retry on its row and in the banner.
+  await page.evaluate(() => {
+    window.transcriptFixture.failResults = true;
+    window.transcriptFixture.unload();
+    const node = document.querySelector('.live-transcript');
+    node.scrollTop = node.scrollHeight / 2;
+  });
+  const failed = page.locator('.live-reply-failed').first();
+  await failed.waitFor();
+  await page.getByText('The saved reply could not be read.').waitFor();
+  await page.getByRole('button', { name: 'Retry loading replies' }).waitFor();
+  await page.evaluate(() => {
+    window.transcriptFixture.failResults = false;
+  });
+  await failed.getByRole('button', { name: 'Retry' }).click();
+  await page.getByRole('button', { name: 'Retry loading replies' }).click();
+  await page.waitForFunction(() => !document.querySelector('.live-reply-failed'));
+  await page.getByText('The saved reply could not be read.').waitFor({ state: 'detached' });
 
   // Copy as Markdown loads every reply the snapshot left out first.
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -376,6 +411,46 @@ try {
       atBottom: node.scrollHeight - node.scrollTop - node.clientHeight < 2,
     };
   });
+  // Read back from the end with the wheel: the first row in view should move by exactly
+  // the wheel distance while rows above it load, format and measure.
+  const anchor = () =>
+    page.evaluate(() => {
+      const node = document.querySelector('.live-transcript');
+      const view = node.getBoundingClientRect();
+      // The first row starting inside the view: what the person is reading.
+      const rows = [...node.querySelectorAll('.transcript-row')];
+      const row =
+        rows.find((item) => {
+          const box = item.getBoundingClientRect();
+          return box.top >= view.top && box.top < view.bottom;
+        }) ?? rows.find((item) => item.getBoundingClientRect().bottom > view.top + 1);
+      return { index: row.dataset.index, top: row.getBoundingClientRect().top, at: node.scrollTop };
+    });
+  const rowTop = (index) =>
+    page.evaluate(
+      (index) =>
+        document.querySelector(`.live-transcript [data-index="${index}"]`)?.getBoundingClientRect()
+          .top ?? null,
+      index,
+    );
+  await transcript.hover();
+  const jumps = [];
+  for (let step = 0; step < 150; step++) {
+    const before = await anchor();
+    if (before.at < 400) break;
+    await page.mouse.wheel(0, -200);
+    await page.waitForTimeout(120);
+    const after = await rowTop(before.index);
+    const moved = after === null ? null : after - before.top;
+    if (moved === null || Math.abs(moved - 200) > 2)
+      jumps.push(moved === null ? null : Math.round(moved - 200));
+  }
+  const reading = { steps: 150, jumps: jumps.length, offsets: jumps };
+  await page.evaluate(() => {
+    const node = document.querySelector('.live-transcript');
+    node.scrollTop = node.scrollHeight;
+  });
+  await page.waitForTimeout(300);
   // Scroll from the bottom to the top at 300px per frame, as a fast wheel would.
   const scroll = await page.evaluate(
     () =>
@@ -448,6 +523,7 @@ try {
     label,
     messages: count,
     initial,
+    reading,
     scroll: frames(scroll),
     stream: { ...frames(stream.intervals), atBottom: stream.atBottom, maxDrift: stream.maxDrift },
   };
@@ -461,6 +537,7 @@ try {
     assert.ok(initial.transcriptNodes < 3000, 'renders only rows near the viewport');
     assert.equal(stream.atBottom, true, 'follows a streaming reply');
     assert.equal(stream.maxDrift, 0, 'never shows a frame away from the end while following');
+    assert.ok(reading.jumps <= 1, `reading back moved the text ${reading.jumps} times`);
     await checkBehavior(page);
     for (const [theme, width, height] of [
       ['light', 960, 640],
@@ -478,7 +555,7 @@ try {
     }
     assert.deepEqual(errors, []);
     console.log(
-      'Transcript browser fixtures passed: bounded rendering, following, Jump to latest, send returns to the end, find across unrendered and unloaded replies, selection retention, copying with replies loaded on demand, reduced motion and light/dark at three widths. No native execution.',
+      'Transcript browser fixtures passed: bounded rendering, following, Jump to latest, send returns to the end, find across unrendered and unloaded replies, selection retention, copying with replies loaded on demand, retrying failed reply loads, reduced motion and light/dark at three widths. No native execution.',
     );
   }
 } finally {

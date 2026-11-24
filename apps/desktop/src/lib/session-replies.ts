@@ -71,3 +71,46 @@ export function keepLoadedReplies(
       : run;
   });
 }
+
+/**
+ * Runs a windowed snapshot trimmed, filled out to complete runs so every reader keeps its
+ * shape: missing lists are empty and missing text is blank. They carry `summaryOmitted`.
+ */
+export function expandCompactRuns(compact: readonly (Partial<TaskRun> & { id: string })[]) {
+  return compact.map(
+    (run): TaskRun => ({
+      taskId: '',
+      projectId: '',
+      projectName: '',
+      projectPath: '',
+      workspace: '',
+      branch: '',
+      baseHead: '',
+      agent: '',
+      account: '',
+      model: null,
+      prompt: '',
+      status: 'review',
+      startedAt: '',
+      endedAt: null,
+      sessionId: null,
+      error: null,
+      persistenceError: null,
+      exitCode: null,
+      activity: [],
+      diagnostics: [],
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        reported: false,
+        estimatedCostUsd: null,
+      },
+      ...run,
+      result: run.result ?? '',
+      detailsOmitted: true,
+      summaryOmitted: true,
+    }),
+  );
+}

@@ -21,36 +21,92 @@ fn fingerprint(value: &impl Serialize) -> Result<String, String> {
     )
 }
 
-/// Leaves the text of all but the newest `replies` finished replies in conversation `id`
-/// out of the snapshot, recording each one's length instead. Active runs keep their text.
-pub(super) fn window_replies(
-    mut snapshot: SessionSnapshot,
-    id: &str,
-    replies: usize,
-) -> SessionSnapshot {
-    let Some(session) = snapshot.sessions.iter().find(|session| session.id == id) else {
-        return snapshot;
+/// What a windowed snapshot keeps of a run outside its window: enough for the transcript
+/// row, conversation status, cost and attention. The task list's own snapshot still holds
+/// the full summary of every run, which readers of other fields use.
+const COMPACT_FIELDS: &[&str] = &[
+    "id",
+    "taskId",
+    "liveSessionId",
+    "projectId",
+    "projectName",
+    "agent",
+    "account",
+    "model",
+    "status",
+    "startedAt",
+    "endedAt",
+    "error",
+    "persistenceError",
+    "verificationError",
+    "verification",
+    "exitCode",
+    "usage",
+    "decisions",
+    "archivedAt",
+    "resultOmitted",
+    "resultChars",
+];
+
+fn compact(run: &TaskRun) -> Result<serde_json::Value, String> {
+    let serde_json::Value::Object(fields) = serde_json::to_value(run).map_err(|e| e.to_string())?
+    else {
+        return Err("A run did not serialize as an object.".into());
     };
-    let kept: std::collections::HashSet<String> = session
-        .batches
-        .iter()
-        .rev()
-        .take(replies)
-        .map(|batch| batch.run_id.clone())
-        .collect();
-    for run in &mut snapshot.runs {
-        if run.live_session_id.as_deref() != Some(id)
-            || run.result.is_empty()
-            || run.status.is_active()
-            || kept.contains(&run.id)
-        {
+    Ok(serde_json::Value::Object(
+        fields
+            .into_iter()
+            .filter(|(key, value)| {
+                COMPACT_FIELDS.contains(&key.as_str())
+                    && !value.is_null()
+                    && value.as_array().is_none_or(|items| !items.is_empty())
+            })
+            .collect(),
+    ))
+}
+
+/// Bounds a snapshot to what the open conversation shows. Its newest `replies` finished
+/// replies and every active run stay whole; older replies leave their text out, recording
+/// each one's length. Every other conversation keeps its newest run whole. All other runs
+/// move to `compact_runs`, trimmed to `COMPACT_FIELDS`.
+pub(super) fn window_runs(
+    mut snapshot: SessionSnapshot,
+    focused: Option<&str>,
+    replies: usize,
+) -> Result<SessionSnapshot, String> {
+    let mut whole = std::collections::HashSet::new();
+    let mut owned = std::collections::HashSet::new();
+    for session in &snapshot.sessions {
+        let keep = if Some(session.id.as_str()) == focused {
+            replies
+        } else {
+            1
+        };
+        owned.insert(session.id.clone());
+        whole.extend(
+            session
+                .batches
+                .iter()
+                .rev()
+                .take(keep)
+                .map(|batch| batch.run_id.clone()),
+        );
+    }
+    let runs = std::mem::take(&mut snapshot.runs);
+    for mut run in runs {
+        let session = run.live_session_id.clone().unwrap_or_default();
+        if run.status.is_active() || whole.contains(&run.id) || !owned.contains(&session) {
+            snapshot.runs.push(run);
             continue;
         }
-        run.result_chars = Some(run.result.chars().count());
+        if Some(session.as_str()) == focused && !run.result.is_empty() {
+            run.result_chars = Some(run.result.chars().count());
+            run.result_omitted = true;
+        }
         run.result.clear();
-        run.result_omitted = true;
+        snapshot.compact_runs.push(compact(&run)?);
     }
-    snapshot
+    Ok(snapshot)
 }
 
 #[derive(Serialize)]
@@ -116,6 +172,10 @@ pub(super) fn search_replies(runs: &[TaskRun], id: &str, query: &str) -> BTreeMa
     }
     counts
 }
+fn compact_id(run: &serde_json::Value) -> &str {
+    run.get("id").and_then(|id| id.as_str()).unwrap_or_default()
+}
+
 pub(super) fn changed_snapshot(
     mut snapshot: SessionSnapshot,
     known: &BTreeMap<String, String>,
@@ -134,12 +194,19 @@ pub(super) fn changed_snapshot(
     for run in &snapshot.runs {
         revisions.insert(format!("run:{}", run.id), fingerprint(run)?);
     }
+    for run in &snapshot.compact_runs {
+        revisions.insert(format!("run:{}", compact_id(run)), fingerprint(run)?);
+    }
     snapshot.sessions.retain(|session| {
         let key = format!("session:{}", session.id);
         known.get(&key) != revisions.get(&key)
     });
     snapshot.runs.retain(|run| {
         let key = format!("run:{}", run.id);
+        known.get(&key) != revisions.get(&key)
+    });
+    snapshot.compact_runs.retain(|run| {
+        let key = format!("run:{}", compact_id(run));
         known.get(&key) != revisions.get(&key)
     });
     snapshot.revisions = Some(revisions);
@@ -153,6 +220,7 @@ mod tests {
     fn unchanged_history_transfers_revisions_instead_of_transcripts() {
         let snapshot = || SessionSnapshot {
             revisions: None,
+            compact_runs: vec![],
             sessions: vec![],
             runs: (0..500)
                 .map(|index| TaskRun {
@@ -197,13 +265,25 @@ mod tests {
         .unwrap();
         let runs = (0..MESSAGES)
             .map(|index| {
+                // As the snapshot carries them: summaries of runs with real paths and prompts.
                 let mut run = TaskRun {
                     id: format!("run-{index}"),
+                    task_id: format!("task-{index}"),
                     live_session_id: Some("long".into()),
-                    result: format!("{:<20}", format!("Reply {index} needle"))
-                        .repeat(REPLY_CHARS / 20),
+                    project_id: "fixture".into(),
+                    project_name: "Fixture".into(),
+                    project_path: "/Users/someone/Code/fixture".into(),
+                    workspace: "/Users/someone/Code/fixture/.worktrees/long".into(),
+                    branch: "session/long".into(),
+                    agent: "codex".into(),
+                    prompt: "Live session: Long\n".repeat(40),
+                    started_at: "2026-01-01T00:00:00Z".into(),
+                    ended_at: Some("2026-01-01T00:01:00Z".into()),
                     ..Default::default()
-                };
+                }
+                .summary();
+                run.result =
+                    format!("{:<20}", format!("Reply {index} needle")).repeat(REPLY_CHARS / 20);
                 run.status = if index + 1 == MESSAGES {
                     serde_json::from_value(serde_json::json!("running")).unwrap()
                 } else {
@@ -216,6 +296,7 @@ mod tests {
             revisions: None,
             sessions: vec![session],
             runs,
+            compact_runs: vec![],
             error: None,
         }
     }
@@ -224,42 +305,47 @@ mod tests {
         serde_json::to_vec(snapshot).unwrap().len()
     }
 
+    fn windowed(snapshot: SessionSnapshot) -> SessionSnapshot {
+        window_runs(snapshot, Some("long"), WINDOW).unwrap()
+    }
+
+    /// The first open of a 2,000-message conversation stays near a fixed budget: the
+    /// conversation's own messages (about 0.66 MB here), whole records for the newest
+    /// replies, a few hundred bytes per older run and no older reply text.
+    const OPEN_BUDGET: usize = 1_600_000;
+
     #[test]
     fn conversation_snapshots_stay_within_their_transfer_budget() {
-        let mut without_text = long_conversation();
-        for run in &mut without_text.runs {
-            run.result.clear();
-        }
-        let structure = bytes(&changed_snapshot(without_text, &BTreeMap::new()).unwrap());
-        // Opening the conversation: its records plus the newest replies, not every reply.
-        let opened = changed_snapshot(
-            window_replies(long_conversation(), "long", WINDOW),
-            &BTreeMap::new(),
-        )
-        .unwrap();
-        let reply_budget = WINDOW * (REPLY_CHARS + 64) + MESSAGES * 48;
-        assert!(
-            bytes(&opened) <= structure + reply_budget,
-            "opening sent {} bytes, budget {}",
-            bytes(&opened),
-            structure + reply_budget
-        );
-        // Reply text no longer scales with the conversation; run records still do.
         let full = bytes(&changed_snapshot(long_conversation(), &BTreeMap::new()).unwrap());
-        assert!(full - structure >= MESSAGES * REPLY_CHARS);
-        let omitted = opened.runs.iter().filter(|run| run.result_omitted).count();
-        assert_eq!(omitted, MESSAGES - WINDOW);
-        assert!(opened
-            .runs
+        let opened = changed_snapshot(windowed(long_conversation()), &BTreeMap::new()).unwrap();
+        assert!(
+            bytes(&opened) <= OPEN_BUDGET,
+            "opening sent {} bytes (unwindowed {full}), budget {OPEN_BUDGET}",
+            bytes(&opened),
+        );
+        assert!(full > bytes(&opened) * 5);
+        assert_eq!(opened.runs.len(), WINDOW);
+        assert_eq!(opened.compact_runs.len(), MESSAGES - WINDOW);
+        // Older runs carry no reply text and only the compact fields, a few hundred bytes each.
+        let per_compact = opened
+            .compact_runs
             .iter()
-            .filter(|run| run.result_omitted)
-            .all(|run| run.result.is_empty() && run.result_chars == Some(REPLY_CHARS)));
+            .map(|run| serde_json::to_vec(run).unwrap().len())
+            .max()
+            .unwrap();
+        assert!(per_compact <= 400, "a compact run took {per_compact} bytes");
+        assert!(opened.compact_runs.iter().all(|run| {
+            run["resultOmitted"] == true
+                && run["resultChars"] == REPLY_CHARS
+                && run.get("result").is_none()
+                && run.get("prompt").is_none()
+        }));
 
         // A refresh with nothing changed sends only the revision inventory.
         let known = opened.revisions.clone().unwrap();
-        let idle =
-            changed_snapshot(window_replies(long_conversation(), "long", WINDOW), &known).unwrap();
-        assert!(idle.sessions.is_empty() && idle.runs.is_empty());
+        assert_eq!(known.len(), MESSAGES + 1);
+        let idle = changed_snapshot(windowed(long_conversation()), &known).unwrap();
+        assert!(idle.sessions.is_empty() && idle.runs.is_empty() && idle.compact_runs.is_empty());
         let per_record = 48;
         assert!(
             bytes(&idle) <= known.len() * per_record + 256,
@@ -276,33 +362,68 @@ mod tests {
             .unwrap()
             .result
             .push_str(" more streamed text");
-        let update = changed_snapshot(window_replies(streamed, "long", WINDOW), &known).unwrap();
+        let update = changed_snapshot(windowed(streamed), &known).unwrap();
         assert_eq!(update.runs.len(), 1);
-        assert!(update.sessions.is_empty());
+        assert!(update.sessions.is_empty() && update.compact_runs.is_empty());
         assert!(bytes(&update) <= known.len() * per_record + REPLY_CHARS + 4096);
     }
 
     #[test]
-    fn windowing_keeps_active_and_newest_replies_and_other_conversations() {
+    fn windowing_keeps_active_and_newest_runs_whole_in_every_conversation() {
         let mut snapshot = long_conversation();
+        let mut other: LiveSession = serde_json::from_value(serde_json::json!({
+            "id": "other", "title": "Other", "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z", "paused": false, "closed": false,
+            "draft": {"text": "", "revision": 0}, "error": null,
+            "request": {"id": "request", "projectId": "fixture", "projectName": "Fixture",
+                "projectPath": "/fixture", "agent": "codex", "model": null, "prompt": "Other",
+                "isolated": true, "previousRunId": null},
+            "messages": [], "batches": [],
+        }))
+        .unwrap();
+        for id in ["old", "new"] {
+            other.batches.push(
+                serde_json::from_value(serde_json::json!({
+                    "runId": id, "messageIds": [], "prompt": "", "previousRunId": null,
+                    "error": null, "settled": true,
+                }))
+                .unwrap(),
+            );
+            snapshot.runs.push(TaskRun {
+                id: id.into(),
+                live_session_id: Some("other".into()),
+                ..Default::default()
+            });
+        }
         snapshot.runs.push(TaskRun {
-            id: "elsewhere".into(),
-            live_session_id: Some("other".into()),
-            result: "kept".into(),
+            id: "unowned".into(),
+            live_session_id: Some("gone".into()),
             ..Default::default()
         });
-        let windowed = window_replies(snapshot, "long", 2);
-        let result = |id: &str| windowed.runs.iter().find(|run| run.id == id).unwrap();
-        assert!(!result("run-1999").result.is_empty());
-        assert!(!result("run-1998").result.is_empty());
-        assert!(result("run-1997").result_omitted);
-        assert_eq!(result("elsewhere").result, "kept");
-        // Unknown conversations are left whole, as are callers that do not window.
-        let whole = window_replies(long_conversation(), "missing", 2);
-        assert!(whole.runs.iter().all(|run| !run.result_omitted));
-        // Older readers see the fields only when something was left out.
-        let json = serde_json::to_value(&result("run-1999")).unwrap();
+        snapshot.sessions.push(other);
+        let windowed = window_runs(snapshot, Some("long"), 2).unwrap();
+        let whole = |id: &str| windowed.runs.iter().find(|run| run.id == id);
+        let compacted = |id: &str| windowed.compact_runs.iter().any(|run| run["id"] == id);
+        assert!(!whole("run-1999").unwrap().result.is_empty());
+        assert!(!whole("run-1998").unwrap().result.is_empty());
+        assert!(compacted("run-1997"));
+        assert!(whole("new").is_some() && compacted("old"));
+        assert!(whole("unowned").is_some());
+        // Without a focused conversation every conversation keeps only its newest run whole.
+        let unfocused = window_runs(long_conversation(), None, 40).unwrap();
+        assert_eq!(unfocused.runs.len(), 1);
+        assert!(unfocused
+            .compact_runs
+            .iter()
+            .all(|run| run.get("resultOmitted").is_none()));
+        // Older readers see the new fields only when something was left out.
+        let json = serde_json::to_value(whole("run-1999").unwrap()).unwrap();
         assert!(json.get("resultOmitted").is_none() && json.get("resultChars").is_none());
+        let plain = changed_snapshot(long_conversation(), &BTreeMap::new()).unwrap();
+        assert!(serde_json::to_value(&plain)
+            .unwrap()
+            .get("compactRuns")
+            .is_none());
     }
 
     #[test]
@@ -346,6 +467,7 @@ mod tests {
                 revisions: None,
                 sessions: vec![],
                 runs: vec![],
+                compact_runs: vec![],
                 error: None,
             },
             &BTreeMap::from([("session:removed".into(), "old".into())]),

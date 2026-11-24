@@ -8,6 +8,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -57,8 +58,21 @@ export interface TranscriptHandle {
 
 /** Rows a text selection keeps rendered, so selecting across a long stretch stays intact. */
 const SELECTION_ROWS = 400;
-const MATCHES = 'transcript-match';
-const CURRENT = 'transcript-match-current';
+/**
+ * Styles for one transcript's find highlights. Highlight names are global, so each
+ * transcript registers its own and two on screen never replace each other's. The current
+ * match inverts against the page and is underlined, so it reads without color.
+ */
+const highlightStyles = (matches: string, current: string) => `
+::highlight(${matches}) {
+  background-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+  color: var(--color-text-primary);
+}
+::highlight(${current}) {
+  background-color: var(--color-warning);
+  color: var(--color-surface);
+  text-decoration: underline 2px;
+}`;
 const highlights = () =>
   typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined'
     ? CSS.highlights
@@ -85,6 +99,7 @@ export function Transcript({
   label,
   handle,
   searchUnloaded,
+  title,
 }: {
   rows: readonly TranscriptRow[];
   renderRow: (index: number) => ReactNode;
@@ -102,10 +117,16 @@ export function Transcript({
   /** What the transcript holds, as in "Find in conversation". */
   label: string;
   handle?: Ref<TranscriptHandle>;
+  /** The scroller's accessible name when it is the whole page, such as the conversation's title. */
+  title?: string;
   /** Occurrences of a query in each row's unloaded text, by row key. */
   searchUnloaded?: (query: string) => Promise<ReadonlyMap<string, number>>;
 }) {
   const root = useRef<HTMLDivElement>(null);
+  const instance = useId().replace(/[^\w-]/g, '');
+  const MATCHES = `transcript-match-${instance}`;
+  const CURRENT = `transcript-match-current-${instance}`;
+  const names = useRef({ MATCHES, CURRENT });
   const scroller = useRef<HTMLElement>(null);
   const trailing = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -161,18 +182,41 @@ export function Transcript({
     initialOffset: () => rows.reduce((total, row) => total + row.estimate, 0),
     rangeExtractor,
   });
-  // A row wholly above the view that changes size moves the offset with it in either
-  // direction; the library's default skips that while scrolling up, which is when older
-  // replies load and format above the text being read. A first measurement corrects any
-  // row starting above the view, as the default does.
-  virtualizer.shouldAdjustScrollPositionOnItemSizeChange ??= (item, _delta, instance) => {
-    const offset = instance.scrollOffset ?? 0;
-    return instance.itemSizeCache.has(item.key) ? item.end <= offset : item.start < offset;
-  };
   useLayoutEffect(() => {
     const top = list.current?.offsetTop ?? 0;
     if (top !== margin) setMargin(top);
   });
+
+  // While reading back, the anchor row keeps its place in the view: a row before it that
+  // renders, measures, formats or loads moves the scroll offset by its change in size, in
+  // either scroll direction, in the same frame. The anchor is the first row starting
+  // inside the view, so a row cut off at the top grows upward out of sight; a row taller
+  // than the view anchors itself. While following, the end holds instead.
+  const anchor = useRef<string | null>(null);
+  const indexOf = useRef(new Map<string, number>());
+  indexOf.current = useMemo(() => new Map(rows.map((row, index) => [row.key, index])), [rows]);
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item) => {
+    const key = anchor.current;
+    return !following.current && key !== null && item.index < (indexOf.current.get(key) ?? -1);
+  };
+  const captureAnchor = useCallback(() => {
+    const node = scroller.current;
+    const container = list.current;
+    anchor.current = null;
+    if (!node || !container || following.current) return;
+    const view = node.getBoundingClientRect();
+    let spanning: HTMLElement | undefined;
+    for (const row of container.children as HTMLCollectionOf<HTMLElement>) {
+      const box = row.getBoundingClientRect();
+      if (box.bottom <= view.top + 1) continue;
+      spanning ??= row;
+      if (box.top >= view.top - 0.5 && box.top < view.bottom) {
+        spanning = row;
+        break;
+      }
+    }
+    if (spanning) anchor.current = spanning.dataset.key ?? null;
+  }, []);
 
   // Follow a resized viewport and what follows the rows growing on its own, and come back
   // to the same place after being hidden. Rows are not observed here: their growth
@@ -285,6 +329,7 @@ export function Transcript({
   const paint = useCallback(() => {
     frame.current = 0;
     const registry = highlights();
+    const { MATCHES, CURRENT } = names.current;
     const container = list.current;
     const node = scroller.current;
     const { found, current, searched } = paintState.current;
@@ -349,8 +394,8 @@ export function Transcript({
   useEffect(
     () => () => {
       cancelAnimationFrame(frame.current);
-      highlights()?.delete(MATCHES);
-      highlights()?.delete(CURRENT);
+      highlights()?.delete(names.current.MATCHES);
+      highlights()?.delete(names.current.CURRENT);
     },
     [],
   );
@@ -434,6 +479,7 @@ export function Transcript({
   return (
     <MarkdownHighlighterContext.Provider value={shared}>
       <div ref={root} className="transcript">
+        {findOpen && <style>{highlightStyles(MATCHES, CURRENT)}</style>}
         {findOpen && (
           // biome-ignore lint/a11y/useSemanticElements: a search landmark around a find bar, not a form that submits
           <div className="transcript-find" role="search" aria-label={`Find in ${label}`}>
@@ -478,7 +524,7 @@ export function Transcript({
         <section
           ref={scroller}
           className={`transcript-scroll${className ? ` ${className}` : ''}`}
-          aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)}`}
+          aria-label={title ?? `${label.charAt(0).toUpperCase()}${label.slice(1)}`}
           tabIndex={-1}
           onScroll={(event) => {
             const node = event.currentTarget;
@@ -487,6 +533,7 @@ export function Transcript({
             follow(followAfterScroll(following.current, lastScroll.current, sample));
             lastScroll.current = sample;
             readingTop.current = sample.top;
+            captureAnchor();
           }}
           onWheel={(event) => {
             pending.current = null;
@@ -515,6 +562,7 @@ export function Transcript({
                 key={item.key}
                 ref={virtualizer.measureElement}
                 data-index={item.index}
+                data-key={item.key}
                 className="transcript-row"
                 style={{ transform: `translateY(${item.start - margin}px)` }}
               >

@@ -237,6 +237,9 @@ pub struct SessionSnapshot {
     pub revisions: Option<std::collections::BTreeMap<String, String>>,
     pub sessions: Vec<LiveSession>,
     pub runs: Vec<TaskRun>,
+    /// Runs outside a windowed snapshot's window, trimmed; see `changes::window_runs`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub compact_runs: Vec<serde_json::Value>,
     pub error: Option<String>,
 }
 
@@ -386,6 +389,7 @@ impl LiveSessions {
             revisions: None,
             sessions,
             runs,
+            compact_runs: Vec::new(),
             error,
         })
     }
@@ -1562,9 +1566,10 @@ macro_rules! tauri_commands {
 }
 pub(crate) use tauri_commands;
 
-/// `replies` bounds the focused conversation's reply text to its newest replies; older
-/// ones arrive with `resultOmitted` and are read with `live_session_results`. Callers
-/// that leave it out receive every reply in full, as before.
+/// `replies` bounds the snapshot: the focused conversation keeps its newest replies whole,
+/// older ones arrive with `resultOmitted` (read them with `live_session_results`), and
+/// runs outside the window arrive trimmed in `compactRuns`. Callers that leave it out
+/// receive every run and reply in full, as before.
 #[tauri::command]
 pub async fn live_session_snapshot(
     service: State<'_, LiveSessions>,
@@ -1575,9 +1580,12 @@ pub async fn live_session_snapshot(
     let service = service.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut snapshot = service.snapshot(id.as_deref())?;
-        if let (Some(id), Some(replies)) = (id.as_deref(), replies) {
-            snapshot =
-                changes::window_replies(snapshot, id, replies.min(changes::MAX_WINDOW_REPLIES));
+        if let Some(replies) = replies {
+            snapshot = changes::window_runs(
+                snapshot,
+                id.as_deref(),
+                replies.min(changes::MAX_WINDOW_REPLIES),
+            )?;
         }
         match known {
             Some(known) => changes::changed_snapshot(snapshot, &known),

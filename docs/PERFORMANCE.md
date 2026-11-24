@@ -61,10 +61,12 @@ mock native commands; it does not prove installed shell or window behavior.
   by default; earlier replies format as they near the viewport.
 - Conversation transcripts, including Jackalope conversations, the tasks they own and
   read-only conversations from other CLIs, render only rows near the viewport
-  (`components/sessions/Transcript.tsx`, TanStack Virtual). Rows measure as they render;
-  rows above the reading position correct the offset, so the view holds while they
-  measure or format. A selection or focused control keeps its rows rendered. Replies in
-  one transcript share one code-highlighting worker.
+  (`components/sessions/Transcript.tsx`, TanStack Virtual). Rows measure as they render.
+  While reading back, the first row starting inside the view is the anchor: rows before
+  it that render, measure, format or load move the offset by their change in size, in
+  either scroll direction, so the text being read holds still. A selection or focused
+  control keeps its rows rendered. Replies in one transcript share one code-highlighting
+  worker, and each transcript registers its own find highlight names.
 - A transcript follows new content only while the person is at its end. Scrolling up
   stops following and shows Jump to latest with a count of new messages and replies;
   reaching the end, jumping or sending follows again.
@@ -76,11 +78,17 @@ mock native commands; it does not prove installed shell or window behavior.
 - The renderer asks for the open conversation with `replies: 40`; older finished replies
   arrive with `resultOmitted` and `resultChars` instead of `result`, load in pages of at
   most 500 replies and about 512K characters (`live_session_results`) as their rows
-  render, and Copy as Markdown loads every reply first. Callers that omit `replies`,
-  such as the terminal-command host, still receive every reply. Active runs always keep
-  their text, and the omission never reaches saved history. Revision fingerprints are 64
-  bits, so an idle refresh costs about 48 bytes per record. Run summaries are not
-  bounded yet and dominate a long conversation's first snapshot.
+  render, and Copy as Markdown loads every reply first. A failed load offers Retry on
+  the row and in the conversation's notice, and tries again when the row next renders.
+  Runs outside the window (older runs of the open conversation and all but the newest
+  run of every other one) arrive in `compactRuns`, trimmed to the fields transcript
+  rows, status, cost and attention read; the store fills them out with empty lists and
+  marks them `summaryOmitted`, and merged run lists use the task list's full summary for
+  them. Callers that omit `replies`, such as the terminal-command host, still receive
+  every run and reply in full. Active runs always stay whole, and the omission never
+  reaches saved history. Revision fingerprints are 64 bits, so an idle refresh costs
+  about 48 bytes per record. The budget test in `live_sessions/changes.rs` holds the
+  first open of a 2,000-message conversation under 1.6 MB, most of it the messages.
 - Usage & quota offers opt-in timing capture for the current window. At most 2,000
   samples stay in memory; exports contain metric names and aggregate timings, never
   command arguments or content. Event Timing covers events at least 16 ms, and long-task

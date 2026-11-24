@@ -60,7 +60,10 @@ export function ProviderTranscript({
   notes,
   before,
   footer,
+  title,
 }: {
+  /** The page's accessible name. */
+  title: string;
   agent: string;
   agentName: string;
   entries: TranscriptEntry[];
@@ -139,6 +142,7 @@ export function ProviderTranscript({
     <Transcript
       className="workspace-page-layout external-session"
       label="conversation"
+      title={title}
       rows={rows}
       items={entries.length}
       renderRow={renderRow}

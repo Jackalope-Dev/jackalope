@@ -218,7 +218,9 @@ export function LiveSessionView({
   // Replies already formatted render formatted again when they scroll back into view.
   const formatted = useRef(new Set<string>());
   // Older replies the snapshot left out load together as their rows render.
-  const [replyError, setReplyError] = useState('');
+  // A failed load keeps its rows' ids, so the row and the banner can retry, and a row
+  // that renders again tries once more on its own.
+  const [replyFailure, setReplyFailure] = useState<{ error: string; ids: string[] } | null>(null);
   const requested = useRef(new Set<string>());
   const requestReply = (runId: string) => {
     const batch = requested.current;
@@ -231,11 +233,23 @@ export function LiveSessionView({
         .getState()
         .loadReplies(session.id, ids)
         .then(
-          () => setReplyError(''),
-          (cause) => setReplyError(describeError(cause)),
+          () =>
+            setReplyFailure((failure) => {
+              const left = failure?.ids.filter((id) => !ids.includes(id)) ?? [];
+              return failure && left.length ? { ...failure, ids: left } : null;
+            }),
+          (cause) =>
+            setReplyFailure((failure) => ({
+              error: describeError(cause),
+              ids: [...new Set([...(failure?.ids ?? []), ...ids])],
+            })),
         );
     });
   };
+  const retryReplies = () => {
+    for (const id of replyFailure?.ids ?? []) requestReply(id);
+  };
+  const replyError = replyFailure?.error ?? '';
   const searchUnloaded = async (query: string) =>
     new Map(
       Object.entries(await useLiveSessionStore.getState().searchReplies(session.id, query)).flatMap(
@@ -668,7 +682,7 @@ export function LiveSessionView({
             <InlineNotice
               tone="error"
               action={
-                retryable && (
+                retryable && !error && !workspace.error && !session.error && !replyError ? (
                   <Button
                     variant="outline"
                     disabled={busy}
@@ -678,6 +692,15 @@ export function LiveSessionView({
                   >
                     Retry launch
                   </Button>
+                ) : (
+                  !error &&
+                  !workspace.error &&
+                  !session.error &&
+                  replyError && (
+                    <Button variant="outline" onClick={retryReplies}>
+                      Retry loading replies
+                    </Button>
+                  )
                 )
               }
             >
@@ -829,6 +852,7 @@ export function LiveSessionView({
                             {replyOmitted(run) ? (
                               <OmittedReply
                                 chars={run.resultChars ?? 0}
+                                failed={!!replyFailure?.ids.includes(run.id)}
                                 onLoad={() => requestReply(run.id)}
                               />
                             ) : (
@@ -1117,17 +1141,29 @@ function MessageTime({ at }: { at: string }) {
 }
 
 /** A reply the snapshot left out: holds its expected height and loads once rendered. */
-function OmittedReply({ chars, onLoad }: { chars: number; onLoad: () => void }) {
+function OmittedReply({
+  chars,
+  failed,
+  onLoad,
+}: {
+  chars: number;
+  failed: boolean;
+  onLoad: () => void;
+}) {
   const load = useRef(onLoad);
   load.current = onLoad;
   useEffect(() => load.current(), []);
-  return (
+  const height = Math.min(2000, Math.ceil(chars / 90) * 22);
+  return failed ? (
+    <p className="live-muted live-reply-failed" style={{ minHeight: height }}>
+      <span>This reply could not be loaded.</span>
+      <Button variant="outline" size="sm" onClick={() => load.current()}>
+        Retry
+      </Button>
+    </p>
+  ) : (
     // Not a live region: every older reply scrolling past would be announced.
-    <p
-      className="live-muted"
-      aria-busy="true"
-      style={{ minHeight: Math.min(2000, Math.ceil(chars / 90) * 22) }}
-    >
+    <p className="live-muted" aria-busy="true" style={{ minHeight: height }}>
       Loading reply…
     </p>
   );

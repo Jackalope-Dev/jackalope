@@ -6,6 +6,7 @@ import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { knownSessionRevisions, mergeSessionChanges } from '../lib/session-changes';
 import {
+  expandCompactRuns,
   keepLoadedReplies,
   loadReplyPages,
   REPLY_WINDOW,
@@ -49,10 +50,14 @@ export const useLiveSessionStore = create<SessionsState>((set, get) => ({
     refresh = sessionCommand<SessionSnapshot>('snapshot', {
       id,
       known: knownSessionRevisions(get().revisions),
-      // Older replies of the open conversation load as they are read.
-      ...(id ? { replies: REPLY_WINDOW } : {}),
+      // Older replies of the open conversation load as they are read, and runs outside
+      // the window arrive trimmed.
+      replies: REPLY_WINDOW,
     })
-      .then((snapshot) => {
+      .then(({ compactRuns, ...received }) => {
+        const snapshot = compactRuns?.length
+          ? { ...received, runs: [...received.runs, ...expandCompactRuns(compactRuns)] }
+          : received;
         const current = get();
         const merged = mergeSessionChanges(current, snapshot);
         const next = {

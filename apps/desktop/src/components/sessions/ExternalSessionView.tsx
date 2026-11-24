@@ -42,6 +42,7 @@ export function ExternalSessionView({ session }: { session: ExternalSession }) {
   };
   return (
     <ProviderTranscript
+      title={session.title}
       agent={session.agent}
       agentName={session.agentName}
       entries={transcript?.entries ?? []}

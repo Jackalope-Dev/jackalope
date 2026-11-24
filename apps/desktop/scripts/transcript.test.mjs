@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  expandCompactRuns,
   keepLoadedReplies,
   loadReplyPages,
   replyOmitted,
@@ -164,4 +165,23 @@ test('a reply resent without its text keeps the text already loaded while its le
   // Nothing resent without text leaves the runs as they are.
   const next = [loaded, other];
   assert.equal(keepLoadedReplies(previous, next, [other]), next);
+});
+
+test('trimmed runs fill out to complete runs that every reader can use', () => {
+  const [run] = expandCompactRuns([
+    { id: 'old', status: 'failed', error: 'Exited', resultOmitted: true, resultChars: 9 },
+  ]);
+  assert.equal(run.id, 'old');
+  assert.equal(run.status, 'failed');
+  assert.equal(run.error, 'Exited');
+  assert.equal(run.result, '');
+  assert.deepEqual(run.activity, []);
+  assert.deepEqual(run.diagnostics, []);
+  assert.equal(run.usage.input, 0);
+  assert.equal(run.summaryOmitted, true);
+  assert.equal(replyOmitted(run), true);
+  // A loaded reply survives the run arriving trimmed again with the same length.
+  const loaded = { ...run, result: 'nine char', resultOmitted: false };
+  const [kept] = keepLoadedReplies([loaded], [run], [run]);
+  assert.equal(kept.result, 'nine char');
 });

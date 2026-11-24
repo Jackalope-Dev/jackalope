@@ -91,9 +91,28 @@ export function openConversation(sessionId: string) {
   if (session) useProjectStore.getState().selectProject(session.request.projectId);
 }
 
-/** Task runs and conversation turns live in separate stores; a run in both is listed once. */
+/**
+ * Task runs and conversation turns live in separate stores; a run in both is listed once.
+ * The conversation's copy wins, except one it trimmed, where the task list's full
+ * summary keeps every field and only the reply comes from the conversation.
+ */
 function mergeRuns(runs: TaskRun[], sessionRuns: TaskRun[]) {
-  return [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()];
+  const byId = new Map(runs.map((run) => [run.id, run]));
+  for (const run of sessionRuns) {
+    const task = byId.get(run.id);
+    byId.set(
+      run.id,
+      run.summaryOmitted && task
+        ? {
+            ...task,
+            result: run.result,
+            resultOmitted: run.resultOmitted,
+            resultChars: run.resultChars,
+          }
+        : run,
+    );
+  }
+  return [...byId.values()];
 }
 
 function allRuns() {
