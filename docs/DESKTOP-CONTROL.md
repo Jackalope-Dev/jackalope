@@ -60,18 +60,40 @@ element that has an Accessibility or UI Automation action, `type` with an elemen
 text is appended through the control's value; password and read-only controls are
 refused), and `scroll` with an element (its scroll area moves through Accessibility or
 UI Automation). `focus` with an element works in the background on macOS and waits on
-Windows, where UI Automation focus would raise the window. Coordinate clicks,
-`double_click`, `right_click`, `drag`, `scroll` and `type` without an element, `press`,
-`focus` without an element, `switch_window`, `open_app`, and element actions that fall
-back to pointer or keyboard input need the window in front. Calls that need it wait for
-it like paused calls; any that still find it behind return `{"status":"background"}`
-with an instruction to use element refs or call again.
+Windows, where UI Automation focus would raise the window.
+
+Pointer and keyboard input also reach a window in the background while the person
+works in another app: coordinate and element clicks, `double_click`, `right_click`,
+`drag`, `scroll` and `type` without an element, `press`, and element actions that fall
+back to pointer or keyboard input. The helper sends them to the window's own app
+instead of through the system's input stream, so the person's pointer, keyboard focus
+and front app stay as they are, and keys or buttons the person holds don't block or
+reach it. On macOS each event goes to the app's process and names its window, with the
+point inside the window that AppKit reads. On Windows it is a message posted to the
+control under the point, or to the control with keyboard focus on the window's thread,
+in the window's own DPI coordinates. Agents click a field before typing into it.
+Results report `focusChanged: false` and say the input went to the background window;
+input sent this way is not confirmed, so agents take a new snapshot to check it landed.
+Typing into password controls is refused, as in front.
+
+Some windows ignore input sent this way and keep waiting for the window to come
+forward: Safari's and the Firefox family's (Firefox, Zen, LibreWolf, Waterfox, Floorp,
+Tor Browser) web content, and UWP or WinUI windows on Windows. On Windows key chords
+with modifiers also wait, because a posted key can't carry modifiers the app reads from
+the person's keyboard. Calls that need the window in front wait for it like paused
+calls; any that still find it behind return `{"status":"background"}` with an
+instruction to use element refs or call again. While the window's app is the one in
+front, input goes through the system as before.
 
 Nothing brings a window or app in front of the person's work. A window grant never
-changes focus. An app grant switches between its app's windows only while that app is
-already in front. A desktop grant is never in the background, so it may bring a granted
-window forward, and the result reports it. On Windows the helper checks that the window
-is in front before any UI Automation call that would move focus.
+changes focus. An app grant's `switch_window` selects another window of its app where
+it is while the person works in another app, and switches focus between its windows
+only while the app is already in front. On macOS an app grant's `open_app` opens the app
+without bringing it forward; on Windows it waits for the app to be in front. `focus`
+without an element always waits for the window to be in front. A desktop grant is never
+in the background and sends input through the system, so it may bring a granted window
+forward, and the result reports it. On Windows the helper checks that the window is in
+front before any UI Automation call that would move focus.
 
 ### Attaching a window from a conversation
 
@@ -146,9 +168,10 @@ On Windows, an opaque black bar sits flush with the top of the granted window's 
 (the primary monitor for desktop grants), centered above a wide glow in the current
 desktop accent color. Desktop grants glow on every monitor; app grants follow the
 app's active window. The bar says whether Jackalope is working here, on your computer
-or in the background, or that control is paused and why. While the granted window or
-app is in the background the glow hides, so it never draws over the person's work. The
-bar and glow are excluded from Jackalope's own monitor captures. Its rounded lower
+or in the background, or that control is paused and why. While the agent works in a
+window in the background, the glow outlines that window instead and sits just above it
+in the stacking order, so the person's windows in front still cover it. The bar and
+glow are excluded from Jackalope's own monitor captures. Its rounded lower
 corners, shared logo, display-scaled type and real Pause/Resume and Cancel buttons
 keep the status and Escape hint readable. The center of the screen stays clear.
 The overlay has no taskbar entry, does not activate on arrival and uses no animation.
@@ -176,14 +199,16 @@ instruction to ask the person to click Resume. Waiting holds no operation lock, 
 Screen view and Stop stay responsive.
 
 macOS and X11 use a native bar. Grants start paused; click Resume to activate the
-granted window or app and begin. On macOS the bar carries the Jackalope mark, the
-status and Pause/Resume, Stop, Open in Jackalope and fold buttons, takes the app's
-theme colors and folds to a small chip until the pointer leaves it. While the granted
-window or app is in the background the bar stays a chip until hovered. A thin accent
-frame sits just inside the granted window, or the screens for app and desktop grants,
-with an inner accent glow while control is active; paused control turns it neutral. A
-window's frame sits just above that window, so windows in front of it cover the frame
-too. The bar and frames are excluded from screen capture. macOS uses a listening
+granted window or app and begin. A window that takes input in the background stays
+where it is on Resume, on macOS and Windows; other windows come forward. On macOS the
+bar carries the Jackalope mark, the status and Pause/Resume, Stop, Open in Jackalope
+and fold buttons, takes the app's theme colors and folds to a small chip until the
+pointer leaves it. It stays full while the agent works in the background, so the person
+can see what it is doing and stop it. A thin accent frame sits just inside the granted
+window, or the screens for app and desktop grants, with an inner accent glow while
+control is active; paused control turns it neutral. In the background an app grant's
+frame outlines its window instead of the screen. A window's frame sits just above that
+window, so windows in front of it cover the frame too. The bar and frames are excluded from screen capture. macOS uses a listening
 Core Graphics event tap; X11 listens to XInput2 raw device events and excludes the
 XTEST virtual devices used for its own input. Other programs using XTEST share
 that exemption; this remains an interaction guard, not an input-security boundary.
@@ -237,13 +262,13 @@ accessibility actions; there refs resolve to the recorded center and `invoke` be
 a click. Portal desktops run AT-SPI actions and have no coordinate fallback for refs.
 
 Agents should prefer element-ref actions: they leave the pointer and focus alone and
-keep working while the window is in the background. Pointer input, key presses and
-typing without an element wait for the window to come forward (see
-[Working in the background](#working-in-the-background)).
+are confirmed by the app. Pointer input, key presses and typing without an element go
+to a background window where it is when the app allows it, and otherwise wait for the
+window to come forward (see [Working in the background](#working-in-the-background)).
 
 Input requires `snapshot_id` from the latest snapshot, screenshot or `wait_for`. It
 expires after 60 seconds and is consumed even if input fails. A moved/resized window or
-changed current window requires inspection again. Keyboard modifiers or mouse buttons held by the user block
+changed current window requires inspection again. For input through the system, keyboard modifiers or mouse buttons held by the user block
 input. Chords that switch apps or desktops, open system UI or quit apps (Alt+Tab,
 Primary+Tab, Control/Alt/Primary+Escape, Alt+F4, Primary+q, Primary+Space,
 Control+Alt+Delete) and paste (Primary/Control+v) are rejected. Arbitrary scripts,
@@ -304,7 +329,14 @@ sequence, portal grant state and restore-token storage on every OS. The opt-in
 form, starts a real indicator and drives the resident helper through snapshots, stable
 refs, accessibility value and invoke actions, typing, chords, captures, thumbnails and
 rejected input, printing per-action latency. The fixture closes itself after two
-minutes and is contained in a job object. Run it only on an interactive test desktop.
+minutes and is contained in a job object. It also brings a second fixture forward and
+clicks and types into the first one behind it. Run it only on an interactive test
+desktop. On every Windows run, `the_windows_helper_compiles_and_lists_windows` starts
+the resident helper, which compiles its C# source. On macOS the opt-in
+`native_desktop_background_trial -- --ignored --nocapture` builds a disposable app that
+never activates, starts a real indicator that resumes without raising it, and clicks,
+types and presses Enter in it through the bundled helper while another app stays in
+front. It needs Jackalope's desktop-control permissions for the terminal running it.
 This trial does not establish installed-agent, installed-package or arbitrary-app
 acceptance; those remain separate [native release checks](SELF-DEVELOPMENT.md).
 

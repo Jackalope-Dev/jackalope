@@ -31,7 +31,7 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct DesktopRequest {
     #[schemars(
-        description = "request_access (scope window, app or desktop), snapshot, screenshot, wait_for, focus, list_windows, switch_window, open_app, click, double_click, right_click, drag, type, set_value, press, scroll, invoke, select, clipboard_read, clipboard_write, or release. Ask for the narrowest scope that fits. Escape/Stop/release revokes access. While control is paused (a new grant, or the person clicked or typed in the window), calls wait for the person to click Resume on the bar and return status paused if it takes longer: call again instead of asking in the conversation. The person may keep working in other apps while you work. A granted window in the background still answers snapshot, screenshot, wait_for, invoke, select and set_value; click with an element presses it, type with an element appends to the control's value, and scroll with an element moves its scroll area (all through Accessibility on macOS and UI Automation on Windows). Use set_value to replace text. Coordinate clicks, double and right clicks, drags, key presses, scroll or type without an element, focus, switch_window and open_app need the window in front: they wait and return status background without taking focus. Prefer element refs."
+        description = "request_access (scope window, app or desktop), snapshot, screenshot, wait_for, focus, list_windows, switch_window, open_app, click, double_click, right_click, drag, type, set_value, press, scroll, invoke, select, clipboard_read, clipboard_write, or release. Ask for the narrowest scope that fits. Escape/Stop/release revokes access. While control is paused (a new grant, or the person clicked or typed in the window), calls wait for the person to click Resume on the bar and return status paused if it takes longer: call again instead of asking in the conversation. The person may keep working in other apps while you work. A granted window in the background still answers every action without coming forward: element actions go through Accessibility on macOS and UI Automation on Windows, and clicks, drags, scrolling, typing and keys go to the window where it is, so the person's pointer and keyboard stay theirs. Click a field before typing into it. An app grant's switch_window selects a background window without raising it. Safari and Firefox-family windows (and key chords on Windows) take only element actions in the background; other input waits for the window to come forward and returns status background. focus always waits for the window to be in front. Take a snapshot after input to confirm it landed. Prefer element refs."
     )]
     pub action: String,
     #[schemars(
@@ -926,6 +926,7 @@ impl Call<'_> {
             "surface": if self.access.target.is_some() { "window" } else { "screen" },
             "deny": self.denied(),
             "browser": self.browser(),
+            "background": background_allowed(self.access),
             "guard": self.access.indicator.as_ref().unwrap().guard(state_epoch),
         })
     }
@@ -1246,8 +1247,11 @@ impl Call<'_> {
                 let mut payload = self.base(epoch, "focus");
                 payload["window"] = json!(window);
                 payload["surface"] = json!("window");
+                payload["background"] = json!(grant::background_input(&window));
                 let value = self.session.call(payload, TIMEOUT)?;
                 self.access.target = Some(window.clone());
+                // A window of an app the person isn't using is selected where it is.
+                let raised = value["status"] != "selected";
                 self.record(DesktopActionRecord {
                     at: chrono::Utc::now().to_rfc3339(),
                     action: action.into(),
@@ -1255,7 +1259,7 @@ impl Call<'_> {
                         "switched to \u{201c}{}\u{201d}",
                         window.title.chars().take(80).collect::<String>()
                     ),
-                    focus_changed: true,
+                    focus_changed: raised,
                     ..Default::default()
                 })?;
                 value
@@ -1282,7 +1286,8 @@ impl Call<'_> {
                         )
                     }
                 };
-                platform::open_app(&name)?;
+                // An app grant opens its app behind the person's work where the platform can.
+                platform::open_app(&name, grant.scope == Scope::App)?;
                 self.record(DesktopActionRecord {
                     at: chrono::Utc::now().to_rfc3339(),
                     action: action.into(),
@@ -1412,17 +1417,36 @@ pub(crate) enum Gate {
     Ended,
 }
 
-/// Actions that need the window in front: raw pointer and keyboard input with no element to
-/// act on through Accessibility or UI Automation, and anything that raises or opens a
-/// window. While the person works in another app these wait rather than take focus.
-/// Element actions go to the helper, which uses an accessibility path in the background
-/// and refuses (status background) when there is none.
-pub(crate) fn needs_focus(request: &DesktopRequest) -> bool {
+/// Actions that need the window in front while the person works in another app; they wait
+/// rather than take focus. Focusing a window always raises it. Where the window takes input
+/// in the background (`background`), the helpers send pointer and keyboard input to it where
+/// it is, switch to an app's other window without raising it and, on macOS, open the app
+/// behind the person's work; key chords still wait on Windows, where a posted key can't
+/// carry modifiers. Otherwise raw input needs the window in front, while element actions go
+/// to the helper, which uses an accessibility path and refuses (status background) when
+/// there is none.
+pub(crate) fn needs_focus(request: &DesktopRequest, background: bool) -> bool {
     match request.action.as_str() {
-        "click" | "type" | "scroll" | "focus" => request.element.is_none(),
-        "double_click" | "right_click" | "press" | "drag" | "switch_window" | "open_app" => true,
+        "focus" => request.element.is_none(),
+        "click" | "type" | "scroll" => request.element.is_none() && !background,
+        "double_click" | "right_click" | "drag" | "switch_window" => !background,
+        "press" => {
+            !background
+                || (cfg!(windows) && request.key.as_deref().is_some_and(|key| key.contains('+')))
+        }
+        "open_app" => !background || cfg!(windows),
         _ => false,
     }
+}
+
+/// Whether the grant's current window takes pointer and keyboard input where it is.
+/// A desktop grant may bring windows forward, so its input always goes through the system.
+fn background_allowed(access: &Access) -> bool {
+    access
+        .grant
+        .as_ref()
+        .is_some_and(|grant| grant.scope != Scope::Desktop)
+        && access.target.as_ref().is_some_and(grant::background_input)
 }
 
 /// Reads where the grant stands without waiting on an in-flight operation.
@@ -1478,7 +1502,7 @@ fn paused_reply(waits: u32, reason: &str) -> Result<Value, String> {
 }
 
 fn background_reply() -> Value {
-    json!({"status":BACKGROUND,"instruction":"The window is in the background while the person works elsewhere. Snapshots, screenshots, wait_for and element actions by ref still work: use invoke, select, set_value, or click and type with an element. Coordinate input, drags, scrolling and key presses wait until the person brings the window back; call again to keep waiting. Never switch windows to get around this."})
+    json!({"status":BACKGROUND,"instruction":"The window is in the background while the person works elsewhere, and this input needs it in front (this app ignores input sent to it in the background, or a key chord on Windows). Snapshots, screenshots, wait_for and element actions by ref still work: use invoke, select, set_value, or click and type with an element. Call again to keep waiting. Never switch windows to get around this."})
 }
 
 pub async fn execute(
@@ -1503,7 +1527,11 @@ pub async fn execute(
     let id = run.id.clone();
     // Wait for Resume, or for a backgrounded window to come forward, before taking the
     // operation lock, so the Screen view and Stop stay responsive while waiting.
-    let focus = needs_focus(&request);
+    let background = owned
+        .access
+        .try_lock()
+        .is_ok_and(|access| background_allowed(&access));
+    let focus = needs_focus(&request, background);
     if !wait.is_zero() {
         let (waiting, check_runtime, check_id) = (owned.clone(), runtime.clone(), run.id.clone());
         wait_for_gate(Instant::now() + wait, WAIT_POLL, move || {

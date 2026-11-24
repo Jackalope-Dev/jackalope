@@ -855,8 +855,11 @@ to new work before Send, by dragging its agent onto it (Windows and macOS) or pi
 from a list, choosing see-only or see-and-control; the agent's next window request uses it
 without asking. On Windows and macOS the window wears a badge and edge while it waits, and a
 turn that ends while its grant is paused leaves a Resume button there that continues the
-conversation. The cross-app drag, badge and background control have unit and
-browser-fixture coverage only. Worktrees separate Git changes; agent processes and
+conversation. Pointer and keyboard input reach a granted window in the background on
+Windows and macOS, except Safari, Firefox-family and UWP/WinUI windows and, on Windows,
+key chords. The cross-app drag, badge and background control have unit and
+browser-fixture coverage, plus an opt-in macOS native trial of background input; the
+Windows background path has no native run yet. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,

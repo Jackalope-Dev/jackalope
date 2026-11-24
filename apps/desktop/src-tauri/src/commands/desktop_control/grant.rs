@@ -471,6 +471,43 @@ pub fn is_browser(app: &str) -> bool {
     BROWSERS.contains(&app.to_lowercase().as_str())
 }
 
+/// Apps whose windows ignore pointer and keyboard input sent to them where they are:
+/// Safari's and the Firefox family's web content, by bundle ID on macOS and image name on
+/// Windows. Their raw input waits for the window to come forward.
+const NO_BACKGROUND_INPUT: &[&str] = &[
+    "com.apple.safari",
+    "com.apple.safaritechnologypreview",
+    "org.mozilla.firefox",
+    "org.mozilla.firefoxdeveloperedition",
+    "org.mozilla.nightly",
+    "app.zen-browser.zen",
+    "io.gitlab.librewolf-community",
+    "net.waterfox.waterfox",
+    "one.ablaze.floorp",
+    "org.torproject.torbrowser",
+    "firefox",
+    "zen",
+    "librewolf",
+    "waterfox",
+    "floorp",
+];
+
+/// Window classes of UWP and WinUI apps, which read input only from the system's queue.
+const NO_BACKGROUND_INPUT_CLASSES: &[&str] = &[
+    "applicationframewindow",
+    "windows.ui.core.corewindow",
+    "winuidesktopwin32windowclass",
+];
+
+/// Whether pointer and keyboard input can reach this window while it stays behind the
+/// person's work. The helpers still send it through the system when the window's app is
+/// the one in front.
+pub fn background_input(window: &Window) -> bool {
+    cfg!(any(windows, target_os = "macos"))
+        && !NO_BACKGROUND_INPUT.contains(&app_key(window).as_str())
+        && !NO_BACKGROUND_INPUT_CLASSES.contains(&window.class.to_lowercase().as_str())
+}
+
 /// The host a site decision applies to, from a URL or bare address-bar text.
 /// Internal pages (about:, chrome://) and unreadable addresses return None.
 pub fn site_host(url: &str) -> Option<String> {
