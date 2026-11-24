@@ -6,6 +6,7 @@ import {
   type TrackedPullRequest,
 } from './pull-requests.ts';
 import type { TaskRun } from './run-types.ts';
+import { hostTerms } from './source-control.ts';
 import type { WorkItem } from './task-collection.ts';
 
 /** When an item last produced something: a finished attempt, a reply or its date. */
@@ -128,11 +129,12 @@ export function projectSummaries({
 
 /** What a finished item ended as, in a few words. */
 export function finishedOutcome(item: WorkItem, mergedRunIds: string[]) {
-  if (item.pullRequest?.phase === 'merged') return 'Pull request merged';
+  if (item.pullRequest?.phase === 'merged')
+    return `${hostTerms(item.pullRequest.provider).Noun} merged`;
   if (item.run && mergedRunIds.includes(item.run.id)) return 'Merged';
   if (item.session?.integratedRunId) return 'Merged';
   if (item.stage === 'inReview' && item.pullRequest)
-    return pullRequestPhaseView(item.pullRequest.phase).label;
+    return pullRequestPhaseView(item.pullRequest.phase, item.pullRequest.provider).label;
   if (item.stage === 'review') return 'Ready to review';
   return 'Finished';
 }

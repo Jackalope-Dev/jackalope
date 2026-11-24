@@ -96,7 +96,7 @@ function ProjectCard({ summary, now }: { summary: ProjectSummary; now: number })
   const { project, lastCheck } = summary;
   const facts: ReactNode[] = [];
   for (const { pullRequest, item } of summary.pullRequests) {
-    const phase = pullRequestPhaseView(pullRequest.phase);
+    const phase = pullRequestPhaseView(pullRequest.phase, pullRequest.provider);
     const detail =
       pullRequest.phase === 'failing' && pullRequest.failing.length
         ? pullRequest.failing.slice(0, 2).join(', ')
