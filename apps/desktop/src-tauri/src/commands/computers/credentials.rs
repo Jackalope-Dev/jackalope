@@ -101,14 +101,20 @@ pub(crate) fn set(root: &Path, id: &str, value: Option<&str>) -> Result<(), Stri
 
 /// The environment for `adapter` on a computer, from its first saved credential.
 pub(crate) fn environment(root: &Path, adapter: &str) -> Result<Vec<(String, String)>, String> {
+    let (kind, value) = chosen(root, adapter)?;
+    Ok(kind
+        .variables
+        .iter()
+        .map(|name| ((*name).to_string(), value.clone()))
+        .collect())
+}
+
+/// The credential `adapter` uses on a computer, its first saved one.
+pub(crate) fn chosen(root: &Path, adapter: &str) -> Result<(&'static Kind, String), String> {
     let saved = load(root)?;
     for kind in KINDS.iter().filter(|kind| kind.adapter == adapter) {
         if let Some(value) = saved.values.get(kind.id) {
-            return Ok(kind
-                .variables
-                .iter()
-                .map(|name| ((*name).to_string(), value.clone()))
-                .collect());
+            return Ok((kind, value.clone()));
         }
     }
     let options: Vec<&str> = KINDS

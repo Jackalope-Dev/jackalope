@@ -18,15 +18,22 @@
 //! have run on the computer. The bridge leaves unavailable tools out of
 //! `tools/list` itself, from the attempt's attached placement
 //! ([`super::runner::attach`]).
+//!
+//! Model provider requests from a run with the provider proxy arrive the same
+//! way and go to [`super::provider_proxy`], whose answers come back in pieces.
 
 use super::protocol::protocol;
+use super::provider_proxy::{self, Grant};
 pub(crate) use super::runner::Access;
 use super::runner::Where;
 use base64::Engine;
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -38,12 +45,25 @@ pub(crate) const LARGE_ANSWER_LIMIT: usize = 16 * 1024 * 1024;
 const ANSWER_TOO_LARGE: &str = "The answer is larger than 512 KB, so it cannot reach this computer. The call itself ran: do not repeat a change. Ask for less, for example with output.jsonPointers, output.rows or output.maxChars, or page a captured result with read_tool_result.";
 
 /// One answer to a bridge request.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Answer {
     pub call: String,
     pub status: u16,
     pub content_type: String,
     pub body: Vec<u8>,
+    /// Set for a streamed provider answer, which arrives in pieces.
+    pub piece: Option<Piece>,
+}
+
+/// Where a piece of a streamed answer belongs.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct Piece {
+    /// Bytes of the answer before this piece; the runner appends each piece
+    /// only at its offset, so one sent twice is harmless.
+    pub offset: u64,
+    pub last: bool,
+    /// Provider response headers, sent with the first piece.
+    pub headers: Vec<(String, String)>,
 }
 
 impl Answer {
@@ -53,6 +73,7 @@ impl Answer {
             status,
             content_type: "application/json".into(),
             body: body.to_string().into_bytes(),
+            piece: None,
         }
     }
 
@@ -85,6 +106,11 @@ pub(crate) struct Relay {
     ready: Vec<Answer>,
     sender: Sender<Answer>,
     receiver: Receiver<Answer>,
+    /// The run's provider proxy grant, when it has one.
+    proxy: Option<Arc<Grant>>,
+    /// Provider calls still streaming.
+    streams: HashSet<String>,
+    gone: provider_proxy::Gone,
 }
 
 impl Relay {
@@ -99,7 +125,21 @@ impl Relay {
             ready: Vec::new(),
             sender,
             receiver,
+            proxy: None,
+            streams: HashSet::new(),
+            gone: Default::default(),
         }
+    }
+
+    /// Forwards the run's provider requests with `grant`.
+    pub fn with_provider_proxy(mut self, grant: Option<Arc<Grant>>) -> Self {
+        self.proxy = grant;
+        self
+    }
+
+    /// Whether a provider answer is streaming, so reads should come sooner.
+    pub fn streaming(&self) -> bool {
+        !self.streams.is_empty()
     }
 
     /// Accepts answers up to `limit` bytes, for a runner that receives those
@@ -117,6 +157,10 @@ impl Relay {
                 continue;
             };
             if !self.in_flight.insert(id.clone()) {
+                continue;
+            }
+            if provider_proxy::is_provider_call(call) {
+                self.accept_provider(id, call);
                 continue;
             }
             if let Some(answer) = screen(&id, call, &self.access) {
@@ -146,22 +190,99 @@ impl Relay {
         }
     }
 
-    /// Answers ready to send.
+    fn accept_provider(&mut self, id: String, call: &Value) {
+        let Some(grant) = self.proxy.clone() else {
+            self.ready.push(Answer::refused(
+                &id,
+                None,
+                404,
+                "Jackalope's provider proxy is not on for this run.",
+            ));
+            return;
+        };
+        if self.in_flight.len() > protocol().relay.pending_limit {
+            self.ready.push(Answer::refused(
+                &id,
+                None,
+                503,
+                "Too many requests are waiting for Jackalope. Try again shortly.",
+            ));
+            return;
+        }
+        self.streams.insert(id.clone());
+        let (sender, gone, call) = (self.sender.clone(), self.gone.clone(), call.clone());
+        std::thread::spawn(move || {
+            super::remote::block(provider_proxy::forward(grant, id, call, sender, gone));
+        });
+    }
+
+    /// Answers ready to send, with consecutive pieces of one stream joined.
     pub fn answers(&mut self) -> Vec<Answer> {
         while let Ok(answer) = self.receiver.try_recv() {
-            self.ready.push(answer);
+            if !self.gone_call(&answer.call) {
+                self.ready.push(answer);
+            }
         }
-        std::mem::take(&mut self.ready)
+        coalesce(
+            std::mem::take(&mut self.ready),
+            protocol().provider_proxy.piece_limit,
+        )
+    }
+
+    fn gone_call(&self, call: &str) -> bool {
+        self.gone.lock().map_or(false, |gone| gone.contains(call))
     }
 
     /// Marks an answer delivered, or keeps it to send again.
     pub fn delivered(&mut self, answer: Answer, sent: bool) {
-        if sent {
-            self.in_flight.remove(&answer.call);
-        } else {
+        if !sent {
             self.ready.push(answer);
+        } else if answer.piece.as_ref().map_or(true, |piece| piece.last) {
+            self.in_flight.remove(&answer.call);
+            self.streams.remove(&answer.call);
         }
     }
+
+    /// Stops a stream whose agent is no longer waiting for it.
+    pub fn abandon(&mut self, call: &str) {
+        if let Ok(mut gone) = self.gone.lock() {
+            gone.insert(call.to_string());
+        }
+        self.ready.retain(|answer| answer.call != call);
+        self.in_flight.remove(call);
+        self.streams.remove(call);
+    }
+}
+
+/// Joins each piece to the earlier piece of the same stream it continues,
+/// up to `limit` bytes, so a stream of small events costs fewer requests.
+fn coalesce(answers: Vec<Answer>, limit: usize) -> Vec<Answer> {
+    let mut joined: Vec<Answer> = Vec::with_capacity(answers.len());
+    for answer in answers {
+        if let Some(piece) = &answer.piece {
+            let earlier = joined
+                .iter_mut()
+                .rev()
+                .find(|earlier| earlier.call == answer.call);
+            if let Some(Answer {
+                body,
+                piece: Some(previous),
+                ..
+            }) = earlier
+            {
+                if !previous.last
+                    && previous.offset + body.len() as u64 == piece.offset
+                    && body.len() + answer.body.len() <= limit
+                {
+                    body.extend_from_slice(&answer.body);
+                    previous.last = piece.last;
+                    continue;
+                }
+            }
+        }
+        joined.push(answer);
+    }
+    joined
 }
 
 fn decoded(call: &Value) -> Vec<u8> {
@@ -285,6 +406,7 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, limit: usi
         status,
         content_type,
         body,
+        piece: None,
     }
 }
 
