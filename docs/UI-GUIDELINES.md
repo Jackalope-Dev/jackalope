@@ -345,6 +345,12 @@ and selections; right-click actions use ContextMenu and repeat a visible options
 buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
 
+Add app-level shortcuts as actions in lib/keybindings.ts rather than window key listeners, so
+Settings, the ? sheet and command search show the person's keys. Contexts keep a focused
+terminal's keys, typing keys in text fields and `data-own-find` views' own find. Composer
+forms carry `data-composer` and register their actions with `useComposerKeybindings`.
+Pickers opened from the keyboard start on the current choice and move with the arrow keys.
+
 Use the standalone gallery with `pnpm ui:dev` at http://127.0.0.1:5190 to inspect
 shared controls without a native bridge or account service. `pnpm ui:build` checks
 the package and builds the gallery; `pnpm ui:test` exercises form semantics,

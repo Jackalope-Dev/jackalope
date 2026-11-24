@@ -1,72 +1,59 @@
 import { DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useResolvedKeybindings } from '../../hooks/useKeybindings';
 import { useAppEvent } from '../../lib/app-events';
+import {
+  displayBinding,
+  KEYBINDING_ACTIONS,
+  KEYBINDING_GROUPS,
+  type KeybindingId,
+} from '../../lib/keybindings';
 import { primaryModifier } from '../../lib/platform-shortcuts';
-import { displayShortcut, resolveShortcuts, shortcutNames } from '../../lib/shortcuts';
-import { useSettingsStore } from '../../stores/settingsStore';
-import { COMMANDS } from './commands';
 
-function typing(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
-}
+const TABS = Array.from({ length: 9 }, (_, index) => `tab${index + 1}` as KeybindingId);
 
-/** Lists keyboard shortcuts. Opens with ? outside text fields or from command search. */
+/** Keys that are not rebindable, listed after the groups they belong with. */
+const FIXED: Record<string, [string, string][]> = {
+  Composer: [
+    ['Send a message', 'Enter'],
+    ['New line', 'Shift+Enter'],
+    ['Earlier messages', '↑ · ↓'],
+    ['Move through an open picker', 'Arrow keys'],
+    ['Attach an image or file', 'Paste · Drop'],
+  ],
+  Anywhere: [['Close a dialog or menu', 'Esc']],
+};
+
+/**
+ * Lists keyboard shortcuts with the person's own bindings. Opens with its shortcut (`?`
+ * by default) or from command search.
+ */
 export function ShortcutSheet() {
   const [open, setOpen] = useState(false);
-  const saved = useSettingsStore((state) => state.shortcuts);
+  const bindings = useResolvedKeybindings();
   useAppEvent('open-shortcuts', () => setOpen(true));
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (typing(event.target) || document.querySelector('[role="dialog"]')) return;
-      event.preventDefault();
-      setOpen(true);
-    };
-    window.addEventListener('keydown', key);
-    return () => {
-      window.removeEventListener('keydown', key);
-    };
-  }, []);
-  const bindings = resolveShortcuts(saved);
+  // Nine Mod+digit tabs read as one row while they keep their defaults.
   const mod = primaryModifier();
-  const groups: { title: string; rows: [string, string][] }[] = [
-    {
-      title: 'Workspace',
-      rows: COMMANDS.flatMap(({ shortcut }) =>
-        shortcut
-          ? [[shortcutNames[shortcut], displayShortcut(bindings[shortcut])] as [string, string]]
-          : [],
-      ),
-    },
-    {
-      title: 'Open work',
+  const tabsAsRange = TABS.every((id, index) => bindings[id] === `Mod+${index + 1}`);
+  const groups = [
+    ...KEYBINDING_GROUPS.map((group) => ({
+      title: group,
       rows: [
-        ['Go to tab 1–9', `${mod}+1…9`],
-        ['Next tab', 'Ctrl+Tab'],
-        ['Previous tab', 'Ctrl+Shift+Tab'],
+        ...KEYBINDING_ACTIONS.filter(
+          (action) =>
+            action.group === group &&
+            bindings[action.id] &&
+            !(tabsAsRange && TABS.includes(action.id)),
+        ).map((action): [string, string] => [action.label, displayBinding(bindings[action.id])]),
+        ...(group === 'Open work' && tabsAsRange
+          ? [['Go to tab 1–9', `${mod}+1…9`] as [string, string]]
+          : []),
+        ...(FIXED[group] ?? []),
       ],
-    },
-    {
-      title: 'Writing',
-      rows: [
-        ['Send a message', 'Enter'],
-        ['New line', 'Shift+Enter'],
-        ['Continue a task from its follow-up', `${mod}+Enter`],
-        ['Attach an image or file', 'Paste · Drop'],
-      ],
-    },
-    {
-      title: 'Anywhere',
-      rows: [
-        ['Close a dialog or menu', 'Esc'],
-        ['Show these shortcuts', '?'],
-      ],
-    },
-  ];
+    })),
+    { title: 'Anywhere', rows: FIXED.Anywhere },
+  ].filter((group) => group.rows.length);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <DialogContent className="shortcut-sheet" aria-describedby={undefined}>
@@ -89,9 +76,7 @@ export function ShortcutSheet() {
             </section>
           ))}
         </div>
-        <p className="task-muted text-xs">
-          Change workspace shortcuts in Settings → Keyboard shortcuts.
-        </p>
+        <p className="task-muted text-xs">Change shortcuts in Settings → Keyboard shortcuts.</p>
       </DialogContent>
     </Dialog.Root>
   );

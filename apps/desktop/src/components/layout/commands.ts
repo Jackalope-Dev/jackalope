@@ -21,9 +21,9 @@ import {
 } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { DISCORD_URL } from '../../lib/community';
+import type { KeybindingId } from '../../lib/keybindings';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { openHelp } from '../../lib/navigation';
-import type { ShortcutAction } from '../../lib/shortcuts';
 import type { Project } from '../../stores/projectStore';
 
 /** What commands act on; Shell provides it. */
@@ -40,22 +40,13 @@ export interface CommandContext {
 }
 
 export interface Command {
-  id:
-    | ShortcutAction
-    | 'shortcuts'
-    | 'help'
-    | 'feedback'
-    | 'discord'
-    | 'importHistory'
-    | 'findProjects';
+  id: KeybindingId | 'help' | 'feedback' | 'discord' | 'importHistory' | 'findProjects';
   /** The label in command search. */
   label: (ctx: CommandContext) => string;
   icon: LucideIcon;
   keywords: string;
-  /** The configurable keyboard shortcut that runs it. */
-  shortcut?: ShortcutAction;
-  /** A fixed key shown beside it. */
-  key?: string;
+  /** The keyboard shortcut action that runs it. */
+  shortcut?: KeybindingId;
   /** Left out of command search (the search itself, sidebar layout). */
   hidden?: boolean;
   available?: (ctx: CommandContext) => boolean;
@@ -143,8 +134,8 @@ export const COMMANDS: readonly Command[] = [
     id: 'shortcuts',
     label: () => 'Keyboard shortcuts',
     icon: Keyboard,
-    keywords: 'keyboard shortcuts keys hotkeys',
-    key: '?',
+    keywords: 'keyboard shortcuts keys hotkeys keybindings',
+    shortcut: 'shortcuts',
     run: () => {
       requestAnimationFrame(openShortcuts);
     },

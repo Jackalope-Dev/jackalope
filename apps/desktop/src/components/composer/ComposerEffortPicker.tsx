@@ -1,9 +1,10 @@
 import { Button, Choice, Popover } from '@jackalope/ui';
 import { ChevronDown, Gauge } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { effortLabel, type ReasoningEffort } from '../../lib/reasoning-effort';
+import { movePickerFocus, pickerStart } from './pickerKeys';
 import './composer.css';
 
 /**
@@ -69,6 +70,7 @@ export function ComposerEffortPicker({
   useEffect(() => {
     if (loaded && value && !levels.includes(value)) onChange(null);
   }, [loaded, levels, value, onChange]);
+  const options = useRef<HTMLFieldSetElement>(null);
   if (!levels.length) return null;
   const label = value ? effortLabel(value) : 'Default';
   return (
@@ -86,8 +88,22 @@ export function ComposerEffortPicker({
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className="composer-effort" align="end" sideOffset={8}>
-          <fieldset className="composer-effort-options">
+        <Popover.Content
+          className="composer-effort"
+          align="end"
+          sideOffset={8}
+          onOpenAutoFocus={(event) => {
+            const start = pickerStart(options.current);
+            if (!start) return;
+            event.preventDefault();
+            start.focus();
+          }}
+        >
+          <fieldset
+            ref={options}
+            className="composer-effort-options"
+            onKeyDown={(event) => movePickerFocus(event, event.currentTarget)}
+          >
             <legend className="sr-only">Effort</legend>
             <Choice
               selected={!value}

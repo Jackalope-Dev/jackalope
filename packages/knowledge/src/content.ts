@@ -223,6 +223,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'keyboard',
+        question: 'Which keyboard shortcuts can I use?',
+        paragraphs: [
+          'Press ? outside a text field to see every shortcut with your own keys. These use Cmd on macOS; use Ctrl on Windows and Linux.',
+          'In the new-work composer, Cmd+Shift+M opens the agent and model picker and Cmd+Shift+P turns plan mode on or off. Cmd+Shift+E opens the effort picker wherever the agent offers effort levels, Cmd+I puts the cursor in the composer and Cmd+Enter sends from any composer. Cmd+Shift+G opens the branch menu. In an open picker the arrow keys move, Enter chooses and Escape closes; in the agent picker, Left and Right move between the agents and their models.',
+          'Change a shortcut in Settings → Keyboard shortcuts: record new keys, clear it or reset it. Keys another action already uses are named, with the option to swap. Copy as JSON and Import move your shortcuts to another computer.',
+        ],
+      },
+      {
         id: 'favorites-and-folders',
         question: 'How do I keep important work close?',
         paragraphs: [

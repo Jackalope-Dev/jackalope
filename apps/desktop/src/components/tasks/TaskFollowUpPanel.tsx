@@ -6,7 +6,7 @@ import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { useProviderSkills } from '../../hooks/useProviderSkills';
 import { agentAdapter, getAgentMetadata } from '../../lib/agent-catalog';
 import { emitAppEvent } from '../../lib/app-events';
-import { type ComposerCommand, composingKey } from '../../lib/composer-commands';
+import type { ComposerCommand } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { isReasoningEffort, type ReasoningEffort } from '../../lib/reasoning-effort';
@@ -20,6 +20,7 @@ import { ContextMeter } from '../composer/ContextMeter';
 import { PastedTextChips } from '../composer/PastedTextChips';
 import { SideQuestion } from '../composer/SideQuestion';
 import { useComposerAssist } from '../composer/useComposerAssist';
+import { useComposerKeybindings } from '../composer/useComposerKeybindings';
 import { ActionError } from '../ui/ActionError';
 import { DismissButton } from '../ui/DismissButton';
 import { VoiceButton } from '../voice/VoiceButton';
@@ -129,6 +130,15 @@ export function TaskFollowUpPanel({
     assist.sent();
     onSend();
   };
+  useComposerKeybindings(form, {
+    focus: () => replyField.current?.focus(),
+    send,
+    effortPicker: () => {
+      if (submitting || acting || !efforts.levels.length) return false;
+      setEffortOpen(!effortOpen);
+      if (effortOpen) replyField.current?.focus();
+    },
+  });
   return (
     <div className="task-next">
       <h2 className="task-followup-heading">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
@@ -172,6 +182,7 @@ export function TaskFollowUpPanel({
         // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer convenience; the field and buttons stay reachable by keyboard
         <form
           ref={form}
+          data-composer
           className="task-followup-form"
           data-dragging={attachments.dragging || undefined}
           onClick={(event) => {
@@ -211,15 +222,7 @@ export function TaskFollowUpPanel({
             placeholder="Tell Jackalope what to do next, / for commands, @ for files…"
             maxLength={PROMPT_MAX_CHARS}
             onKeyDown={(event) => {
-              if (assist.onKeyDown(event)) return;
-              if (
-                (event.ctrlKey || event.metaKey) &&
-                event.key === 'Enter' &&
-                !composingKey(event.nativeEvent)
-              ) {
-                event.preventDefault();
-                send();
-              }
+              assist.onKeyDown(event);
             }}
           />
           {attachments.error && (

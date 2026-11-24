@@ -3,8 +3,10 @@ import { Button, CopyButton, InlineNotice, Input, Popover, SearchField } from '@
 import { Check, ChevronDown, GitBranch, Plus } from 'lucide-react';
 import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useKeybindingHandlers, useResolvedKeybindings } from '../../hooks/useKeybindings';
 import { navigateWorkspace } from '../../lib/app-events';
 import { type BranchList, listBranches, switchBranch } from '../../lib/git-branches';
+import { withShortcut } from '../../lib/keybindings';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
 import { openWork, selectWork, useWorkspaceWork } from '../../lib/work-selection';
@@ -319,6 +321,14 @@ export function BranchIndicator() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const search = useRef<HTMLInputElement>(null);
+  const shortcuts = useResolvedKeybindings();
+  useKeybindingHandlers({
+    branchMenu: () => {
+      if (!project || host) return false;
+      setOpen(!open);
+      if (open) setCreating(null);
+    },
+  });
   if (!project || host) return null;
   const branch = run
     ? run.branch ||
@@ -342,7 +352,7 @@ export function BranchIndicator() {
         <button
           type="button"
           className="chrome-branch"
-          title={`${project.name} · Branch: ${branch}`}
+          title={withShortcut(`${project.name} · Branch: ${branch}`, shortcuts.branchMenu)}
           aria-label={`${project.name}, branch ${branch}`}
         >
           <GitBranch size={14} aria-hidden="true" />

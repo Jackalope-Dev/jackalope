@@ -46,6 +46,7 @@ import { useTaskStore } from '../../stores/taskStore';
 import { ComposerEffortPicker, useEffortLevels } from '../composer/ComposerEffortPicker';
 import { PastedTextChips } from '../composer/PastedTextChips';
 import { useComposerAssist } from '../composer/useComposerAssist';
+import { useComposerKeybindings } from '../composer/useComposerKeybindings';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
@@ -534,6 +535,27 @@ ${incoming}`
   };
   const sendRef = useRef(send);
   sendRef.current = send;
+  // Opening one picker closes the other without moving focus back to the message.
+  useComposerKeybindings(composer, {
+    focus: () => input.current?.focus(),
+    send: () => void send(),
+    agentPicker: () => {
+      if (busy) return false;
+      setEffortOpen(false);
+      setAgentPickerOpen(!agentPickerOpen);
+      if (agentPickerOpen) input.current?.focus();
+    },
+    effortPicker: () => {
+      if (busy || comparing || !efforts.levels.length) return false;
+      setAgentPickerOpen(false);
+      setEffortOpen(!effortOpen);
+      if (effortOpen) input.current?.focus();
+    },
+    planMode: () => {
+      if (busy || !commands.plan) return false;
+      setPlanning((current) => !current);
+    },
+  });
   return (
     <div className={`live-start${embedded ? ' live-start-embedded' : ''}`}>
       {!embedded && (
@@ -551,6 +573,7 @@ ${incoming}`
       {project ? (
         <form
           ref={composer}
+          data-composer
           className="live-start-composer"
           data-dragging={attachments.dragging || undefined}
           onSubmit={(event) => {

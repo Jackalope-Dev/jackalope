@@ -48,7 +48,11 @@ lib/navigation.ts (label, group, icon, telemetry feature, search keywords) with
 their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
 read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
 command search and the shortcut sheet live in layout/commands.ts; the tray and macOS
-menu items name their command in layout/menu-actions.json, which the native menus read. Work is read through
+menu items name their command in layout/menu-actions.json, which the native menus read.
+Every app-level keyboard shortcut is an action in lib/keybindings.ts with its default
+binding, group, label and context; `settings.shortcuts` keeps only the person's changes.
+Components run actions through `useKeybindingHandlers` (hooks/useKeybindings.ts), whose
+single window listener resolves bindings at key time, so Settings changes apply at once. Work is read through
 lib/work-selection.ts (`useWorkspaceWork`, `useAllRuns`) and opened with `openWork`,
 `openRun` or `openConversation`, which clear the other selections and focus the
 project. Zustand stores keep
