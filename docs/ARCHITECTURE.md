@@ -104,6 +104,7 @@ changes must preserve both sides and old saved records.
 | mcp.rs, mcp_broker.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped questions |
 | bridge.rs, bridge/ | The attempt bridge: one table defines every tool (input, description, hints, placement, HTTP route, optional group, who is offered it, handler); the MCP server, HTTP routes and help, runner placement, Codex approvals and deferred loading are derived from it, and each handler serves both transports after one authorization |
 | agent_decider.rs, question_risk.rs | Autonomy policy, question classification and read-only decider attempts that answer plan questions, rounds and deviations for the person |
+| turn_advisor.rs, turn_advisor/ | The opt-in turn advisor: a tool-free helper turn from another model family that grades notes on finished task attempts and routes concerns and blockers back to the working agent |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |

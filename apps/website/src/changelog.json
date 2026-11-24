@@ -1,5 +1,17 @@
 [
   {
+    "id": "a-second-opinion-on-every-turn",
+    "date": "2026-11-24",
+    "title": "A second opinion on every turn.",
+    "description": "Turn on the Turn advisor in Project settings and another agent reads each finished task turn, then leaves a few graded notes.",
+    "items": [
+      "Jackalope prefers an advisor from a different model family. It reads the request, reply, changes and checks, and never runs tools.",
+      "Concerns and blockers go back to the working agent as a follow-up it can push back on. Asides are only shown to you.",
+      "Notes appear under each reply in the task's Result tab, marked as sent to the agent or kept for you."
+    ],
+    "note": "The advisor uses its own agent account's quota. It skips turns when that quota is low, when every execution slot is busy, or once a task reaches its review limit."
+  },
+  {
     "id": "pick-up-quota-stopped-work-where-it-left-off",
     "date": "2026-11-20",
     "title": "Pick up quota-stopped work where it left off.",

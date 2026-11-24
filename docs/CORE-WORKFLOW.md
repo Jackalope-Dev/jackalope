@@ -172,6 +172,39 @@ must still exist. **Send to the author** adds the selected findings, with their
 commands, output and the reviewer's workspace path, to the follow-up draft; it
 never sends.
 
+## Turn advisor
+
+**Turn advisor** in Project settings (off by default, stored as `advisor` in the project's
+plan settings) has another agent read every task attempt that ends with a result
+(`commands/turn_advisor.rs`). Conversations, planning and decider attempts, agent and
+Challenge reviewers, archived attempts and attempts already loaded from history when
+Jackalope starts are never advised. The advisor is chosen like the Autonomy decider's
+Automatic choice, preferring an installed agent from another model family, and uses
+the account that project would bind for it. It runs as a one-shot helper turn with tools
+off and shares the three decider slots. Its brief holds the task's first request, this
+turn's instruction, the reply, the project check and agent-recorded checks, and the
+workspace diff since the task base (bounded), plus the notes the previous review sent
+the agent.
+
+The advisor returns up to `maxNotes` (default 3, 1–5) notes graded aside, concern or
+blocker. Jackalope drops unknown grades, empty or content-free notes ("looks good",
+"no issues") and duplicates, and keeps the most serious first. Asides are shown only to
+the person. Concerns and blockers go to the working agent as a queued follow-up starting
+`Advisor notes from <agent>`, which tells it the notes are another agent's opinion and
+asks it to explain any it disagrees with; when the task has already moved on they arrive
+as a direct message instead. They stay with the person when the task was stopped or
+archived, after two advisor follow-ups in a row, or when they repeat notes the previous
+advisor follow-up already carried.
+
+A turn is not advised, and the attempt records why, after `maxReviews` (default 10, 1–50)
+reviews on that task, when the attempt hit its account's usage limit, when the
+advisor's account has under 15% of any quota window left, when every execution slot is
+busy, when no installed agent can advise, or when no decider slot frees within a minute.
+The review, its notes, delivery, reason and the advisor turn's own usage are saved on the
+attempt as `advisor`; a review interrupted by a restart is marked failed. The task's
+Result tab shows the notes under each attempt's reply, separating those sent to the
+agent from those only for the person.
+
 ## Preparation and verification
 
 A project's optional preparation command authorizes a bounded, cancellable command
