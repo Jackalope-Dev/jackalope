@@ -63,7 +63,7 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
         &["commit", "-m", "Evaluation fixture"],
         Policy::Inherited,
     )?;
-    let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
+    let runtime = TaskRuntime::new(root.join("profile/history"))?;
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
     let cleanup = EvaluationOwner {
         runtime: runtime.clone(),

@@ -125,7 +125,6 @@ fn store_key(
     name: String,
     value: String,
 ) -> Result<(), String> {
-    runtime.access.ensure()?;
     if !valid_value(value.trim()) {
         return Err("Choose a supported provider and enter a valid API key.".into());
     }

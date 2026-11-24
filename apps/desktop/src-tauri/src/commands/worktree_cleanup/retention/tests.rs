@@ -290,7 +290,7 @@ impl Project {
             )
             .unwrap();
         }
-        TaskRuntime::with_test_access(history).unwrap()
+        TaskRuntime::new(history).unwrap()
     }
 }
 

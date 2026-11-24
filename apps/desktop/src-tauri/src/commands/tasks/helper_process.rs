@@ -23,7 +23,6 @@ pub(in crate::commands) fn run(
     canceled: &AtomicBool,
     timeout: Duration,
 ) -> Result<TaskRun, String> {
-    runtime.access.ensure()?;
     let policy = runtime.policy()?;
     let (adapter, executable) = policy.resolve(agent)?;
     let model = policy.model_for_account(&runtime.profiles_root(), agent, model, binding)?;

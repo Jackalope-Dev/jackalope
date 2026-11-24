@@ -391,7 +391,6 @@ pub(crate) fn assess(
     intent: String,
     operation_id: String,
 ) -> Result<Assessment, String> {
-    runtime.access.ensure()?;
     if uuid::Uuid::parse_str(&operation_id).is_err()
         || request.prompt.trim().is_empty()
         || request.prompt.len() > 100_000
@@ -755,7 +754,7 @@ mod tests {
         }
         std::fs::create_dir_all(repo.join("src/a")).unwrap();
         std::fs::create_dir_all(repo.join("src/b")).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let request: RunRequest = serde_json::from_value(serde_json::json!({"id":uuid::Uuid::new_v4().to_string(),"projectId":"project","projectName":"Project","projectPath":repo.to_str().unwrap(),"agent":"codex","prompt":"Work in parallel on src/a and src/b","isolated":true,"autoVerify":true,"verifyCommand":"echo fixture","targetBranch":"main"})).unwrap();
         let first = assess(
             &runtime,

@@ -49,6 +49,7 @@ pub enum OutcomeKind {
     Reserved,
     Started,
     FailedToStart,
+    /// Saved by builds that required a Jackalope account to start work; no longer produced.
     SignedOut,
     Overlap,
     Busy,
@@ -807,9 +808,7 @@ impl Scheduler {
         let capacity_busy = runs.iter().filter(|r| r.status.is_live()).count() >= 3;
         let missed =
             matches!(trigger, Trigger::Due { late: true, .. }) && saved.definition.missed == "skip";
-        let skip = if self.coordinator.runtime.access.ensure().is_err() {
-            Some(Outcome::SignedOut)
-        } else if overlap {
+        let skip = if overlap {
             Some(Outcome::Overlap)
         } else if capacity_busy {
             Some(Outcome::Busy)
@@ -919,7 +918,6 @@ enum Outcome {
     Reserved,
     Started,
     FailedToStart(String),
-    SignedOut,
     Overlap,
     Busy,
     Missed,
@@ -942,7 +940,6 @@ impl Outcome {
             Self::Reserved => "Reserved".into(),
             Self::Started => "Started".into(),
             Self::FailedToStart(error) => format!("Failed to start: {error}"),
-            Self::SignedOut => "Skipped: sign in to Jackalope to start new work".into(),
             Self::Overlap => "Skipped: earlier run is active or interrupted".into(),
             Self::Busy => "Skipped: three tasks already active or interrupted".into(),
             Self::Missed => "Skipped: missed while unavailable".into(),
@@ -962,7 +959,6 @@ impl Outcome {
             Self::Reserved => OutcomeKind::Reserved,
             Self::Started => OutcomeKind::Started,
             Self::FailedToStart(_) => OutcomeKind::FailedToStart,
-            Self::SignedOut => OutcomeKind::SignedOut,
             Self::Overlap => OutcomeKind::Overlap,
             Self::Busy => OutcomeKind::Busy,
             Self::Missed => OutcomeKind::Missed,
@@ -1071,6 +1067,7 @@ mod monitor_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
     use crate::commands::tasks::RunStatus;
     #[test]
     fn a_webhook_request_needs_a_schedule_id_and_bearer_token() {
@@ -1088,8 +1085,7 @@ mod tests {
     pub(super) fn fixture(missed: &str) -> (PathBuf, Scheduler) {
         let directory =
             std::env::temp_dir().join(format!("jackalope-schedule-{}", uuid::Uuid::new_v4()));
-        let runtime =
-            super::super::tasks::TaskRuntime::with_test_access(directory.clone()).unwrap();
+        let runtime = super::super::tasks::TaskRuntime::new(directory.clone()).unwrap();
         let coordinator = Coordinator::new(directory.join("coordination"), runtime).unwrap();
         let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator);
         let definition: ScheduleDefinition = serde_json::from_value(serde_json::json!({
@@ -1118,10 +1114,9 @@ mod tests {
         (directory, scheduler)
     }
     #[test]
-    fn a_webhook_call_passes_the_same_checks_as_a_due_schedule() {
-        let (directory, mut scheduler) = fixture("once");
-        scheduler.coordinator.runtime.access =
-            Arc::new(super::super::execution_access::ExecutionAccess::new());
+    fn a_webhook_call_dispatches_without_a_jackalope_account() {
+        // The fixture runtime has no account; scheduled work is local and still dispatches.
+        let (directory, scheduler) = fixture("once");
         scheduler.ledger.lock().unwrap().schedules[0].webhook = Some(ScheduleWebhook {
             token_hash: token_hash("fixture-token"),
             created_at: Utc::now().to_rfc3339(),
@@ -1130,13 +1125,13 @@ mod tests {
             .definition
             .id
             .clone();
-        assert_eq!(
-            scheduler.trigger_webhook(&id, "fixture-token").unwrap(),
-            Outcome::SignedOut
+        let outcome = scheduler.trigger_webhook(&id, "fixture-token").unwrap();
+        assert!(
+            matches!(outcome, Outcome::Started | Outcome::FailedToStart(_)),
+            "{outcome:?}"
         );
         let ledger = scheduler.ledger.lock().unwrap().clone();
-        assert!(ledger.schedules[0].history[0].run_id.is_none());
-        assert!(ledger.schedules[0].last_run_id.is_none());
+        assert!(!ledger.schedules[0].history[0].outcome.contains("Jackalope"));
         drop(scheduler);
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -1164,27 +1159,30 @@ mod tests {
     }
 
     #[test]
-    fn execution_access_denial_skips_the_occurrence_without_creating_a_run() {
-        let (directory, mut scheduler) = fixture("once");
-        scheduler.coordinator.runtime.access =
-            Arc::new(super::super::execution_access::ExecutionAccess::new());
+    fn a_due_schedule_dispatches_without_a_jackalope_account() {
+        let (directory, scheduler) = fixture("once");
         let now = Utc::now();
         scheduler.ledger.lock().unwrap().schedules[0].next_at = now;
         scheduler.tick(now).unwrap();
         let ledger = scheduler.ledger.lock().unwrap().clone();
         let schedule = &ledger.schedules[0];
-        assert!(schedule.history[0].outcome.contains("sign in to Jackalope"));
-        assert!(schedule.history[0].run_id.is_none());
-        assert!(schedule.last_run_id.is_none());
+        assert!(
+            !schedule.history[0].outcome.starts_with("Skipped"),
+            "{}",
+            schedule.history[0].outcome
+        );
+        assert_ne!(schedule.history[0].kind, Some(OutcomeKind::SignedOut));
         assert!(schedule.next_at > now);
-        assert!(scheduler
-            .coordinator
-            .runtime
-            .integration_runs()
-            .unwrap()
-            .is_empty());
         drop(scheduler);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn occurrences_skipped_by_older_account_gated_builds_still_load() {
+        assert_eq!(
+            OutcomeKind::from_saved_text("Skipped: sign in to Jackalope to start new work"),
+            Some(OutcomeKind::SignedOut)
+        );
     }
     #[test]
     #[cfg(windows)]

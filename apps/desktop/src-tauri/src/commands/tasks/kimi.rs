@@ -1418,7 +1418,7 @@ setInterval(()=>{},1000);
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
             path
         };
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "kimi-fixture".into(),
@@ -1547,7 +1547,7 @@ require('readline').createInterface({input:process.stdin}).on('line', line => {
 });
 setInterval(()=>{},1000);
 "#).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "kimi-fixture".into(),

@@ -172,7 +172,7 @@ impl Fixture {
             }
             path
         };
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.default_meta_agent = "claude-fixture".into();
         policy.custom_agents.push(CustomAgent {
@@ -607,7 +607,7 @@ process.stdin.on('end', () => {
 #[test]
 fn partial_text_accumulates_and_clears_when_the_message_completes() {
     let folder = std::env::temp_dir().join(format!("jackalope-partials-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let run = super::super::tests::sample("claude");
     let id = run.id.clone();
     runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
@@ -760,7 +760,7 @@ fn the_context_hook_delivers_selected_context_once() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-context-hook-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let entry: crate::commands::knowledge::KnowledgeEntry = serde_json::from_value(json!({
         "id":"lesson-1","projectId":"context-project","projectPath":folder.to_string_lossy(),
         "kind":"memory","title":"Run the linter","content":"Use pnpm lint before finishing.",
@@ -1017,7 +1017,7 @@ fn a_session_from_outside_jackalope_that_is_gone_never_starts_over() {
 fn the_answers_hook_delivers_a_late_answer_once() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-answers-hook-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut run = super::super::tests::sample("claude");
     run.id = "answers-run".into();
     runtime

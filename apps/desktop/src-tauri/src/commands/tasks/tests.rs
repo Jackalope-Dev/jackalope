@@ -1,6 +1,7 @@
 use super::*;
 mod agent_matrix;
 mod decision_trail;
+mod without_account;
 mod workbench;
 mod workspace_modes;
 
@@ -483,7 +484,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
     let repo = trial_repository(&root);
     let history = root.join("history");
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     let selected_agent = if let Some(executable) = executable {
         let mut policy = super::super::agent_policy::AgentPolicy::default();
         policy
@@ -680,7 +681,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     assert_eq!(settled(&runtime, &stop.id).status, RunStatus::Stopped);
     std::thread::sleep(Duration::from_millis(300));
     drop(runtime);
-    let restored = TaskRuntime::with_test_access(history).unwrap();
+    let restored = TaskRuntime::new(history).unwrap();
     assert_eq!(
         restored.inner.lock().unwrap().runs[&second.id].result,
         second.result
@@ -718,7 +719,7 @@ fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
     )
     .unwrap();
 
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let mut failed = sample("codex");
     failed.status = RunStatus::Failed;
     failed.project_path = repo_path.clone();
@@ -834,7 +835,7 @@ fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
 #[test]
 fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
     let folder = std::env::temp_dir().join(format!("jackalope-answer-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let run = sample("codex");
     runtime
         .inner
@@ -1043,14 +1044,14 @@ fn an_unattributed_context_window_is_kept_only_when_every_model_agrees() {
 #[test]
 fn an_attempt_interrupted_by_closing_keeps_its_observed_usage_after_reload() {
     let folder = std::env::temp_dir().join(format!("jackalope-usage-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("claude");
     for event in CLAUDE_CALLS {
         consume_event(&mut run, event);
     }
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     let restored = loaded.inner.lock().unwrap().runs[&run.id].clone();
     drop(loaded);
     std::fs::remove_dir_all(folder).unwrap();
@@ -1145,7 +1146,7 @@ process.stdin.on('end', () => {
     )
     .unwrap();
     std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "custom-fixture".into();
     policy.custom_agents.push(CustomAgent {
@@ -1281,7 +1282,7 @@ process.stdin.on('end', () => {
     // npm installs Claude Code behind a .cmd shim, which re-parses arguments through cmd.exe.
     let executable = folder.join("claude-fixture.cmd");
     std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "claude-fixture".into();
     policy.custom_agents.push(CustomAgent {
@@ -1377,7 +1378,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
         std::process::id(),
         Utc::now().timestamp_nanos_opt().unwrap()
     ));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     consume_event(
         &mut run,
@@ -1389,7 +1390,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
     );
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     let inner = loaded.inner.lock().unwrap();
     let restored = &inner.runs[&run.id];
     assert_eq!(restored.status, RunStatus::Interrupted);
@@ -1404,7 +1405,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
 #[test]
 fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() {
     let folder = std::env::temp_dir().join(format!("jackalope-release-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     consume_event(
         &mut run,
@@ -1412,7 +1413,7 @@ fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() 
     );
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     let mut newer = sample("codex");
     newer.id = "newer-attempt".into();
     newer.task_id = run.task_id.clone();
@@ -1437,7 +1438,7 @@ fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() 
         .unwrap_err()
         .contains("Only an interrupted attempt"));
     drop(loaded);
-    let reloaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let reloaded = TaskRuntime::new(folder.clone()).unwrap();
     let restored = reloaded.inner.lock().unwrap().runs[&run.id].clone();
     assert_eq!(restored.status, RunStatus::Stopped);
     assert_eq!(restored.session_id.as_deref(), Some("session-1"));
@@ -1458,7 +1459,7 @@ fn journal_identifiers_cannot_escape_the_storage_directory() {
 fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let folder = std::env::temp_dir().join(format!("jackalope-retry-{}", uuid::Uuid::new_v4()));
     let directory = folder.join("history");
-    let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
+    let runtime = TaskRuntime::new(directory.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Review;
     run.result = "last saved output".into();
@@ -1496,7 +1497,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     runtime.update_checked(&run.id, |_| {}).unwrap();
     runtime.ensure_history_saved().unwrap();
     drop(runtime);
-    let restarted = TaskRuntime::with_test_access(directory).unwrap();
+    let restarted = TaskRuntime::new(directory).unwrap();
     let saved = restarted.integration_runs().unwrap().pop().unwrap();
     assert_eq!(saved.result, "latest unsaved output");
     assert!(saved.persistence_error.is_none());
@@ -1510,7 +1511,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
 fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_written() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-startup-save-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.process_contained = true;
     runtime.save(&run).unwrap();
@@ -1520,7 +1521,7 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
     let mut readonly = original.clone();
     readonly.set_readonly(true);
     std::fs::set_permissions(&path, readonly).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.clone())
+    let runtime = TaskRuntime::new(folder.clone())
         .expect("a failed checkpoint must not prevent reading other history");
     let recovered = runtime.integration_runs().unwrap().pop().unwrap();
     assert_eq!(recovered.status, RunStatus::Stopped);
@@ -1545,7 +1546,7 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
 fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-history-id-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut good = sample("codex");
     good.status = RunStatus::Review;
     good.result = "keep this result".into();
@@ -1557,7 +1558,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
     let unfinished = folder.join(format!("{}.tmp", good.id));
     std::fs::write(&unfinished, b"partial JSON").unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     assert_eq!(loaded.integration_runs().unwrap().len(), 1);
     assert_eq!(
         loaded.integration_runs().unwrap()[0].result,
@@ -1574,7 +1575,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
 fn oversized_or_summary_records_do_not_overwrite_complete_history() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-history-limit-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     runtime.save(&run).unwrap();
     let path = folder.join(format!("{}.json", run.id));
@@ -1613,7 +1614,7 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
     )
     .unwrap();
 
-    let runtime = TaskRuntime::with_test_access(folder.clone())
+    let runtime = TaskRuntime::new(folder.clone())
         .expect("a corrupted or invalid history entry must not prevent app startup");
     let inner = runtime.inner.lock().unwrap();
     assert_eq!(inner.runs.len(), 1, "only the valid entry should load");
@@ -1632,7 +1633,7 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
     assert!(folder.join("bad-id-file.json.corrupt").exists());
     assert!(!folder.join("bad-id-file.json").exists());
 
-    let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restarted = TaskRuntime::new(folder.clone()).unwrap();
     let inner = restarted.inner.lock().unwrap();
     assert_eq!(inner.runs.len(), 1);
     assert_eq!(
@@ -1672,7 +1673,7 @@ fn agent_and_automatic_verification_reuse_only_an_unchanged_checked_snapshot_and
         ],
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("profile")).unwrap();
+    let runtime = TaskRuntime::new(root.join("profile")).unwrap();
     let mut run = sample("codex");
     run.project_path = path.into();
     run.workspace = path.into();
@@ -1795,7 +1796,7 @@ fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
 fn manual_archive_preserves_history_and_restores_after_restart() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-manual-archive-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Reviewed;
     run.result = "Keep this result".into();
@@ -1809,14 +1810,14 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
     runtime.set_archived(&run.id, true).unwrap();
     assert!(runtime.snapshot(None)[0].archived_at.is_some());
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let saved = runtime.snapshot(Some(&run.id));
     assert!(saved[0].archived_at.is_some());
     assert_eq!(saved[0].result, run.result);
     assert_eq!(saved[0].status, RunStatus::Reviewed);
     runtime.set_archived(&run.id, false).unwrap();
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     assert!(runtime.snapshot(None)[0].archived_at.is_none());
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
@@ -1826,7 +1827,7 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
 fn manual_archive_rejects_unfinished_unsaved_session_and_stale_attempts() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-archive-guards-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     for status in ["starting", "running", "stopping", "interrupted"] {
         run.status = status.into();
@@ -1885,7 +1886,7 @@ fn manual_archive_failed_save_keeps_task_visible() {
         "jackalope-archive-failure-{}",
         uuid::Uuid::new_v4()
     ));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Failed;
     runtime
@@ -1910,7 +1911,7 @@ fn manual_archive_failed_save_keeps_task_visible() {
 #[test]
 fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let folder = std::env::temp_dir().join(format!("jackalope-retention-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut session_run = sample("codex");
     session_run.id = "keep-live-session".into();
     session_run.live_session_id = Some("live-session".into());
@@ -1933,7 +1934,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     }
     drop(runtime);
 
-    let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restarted = TaskRuntime::new(folder.clone()).unwrap();
     let loaded = restarted.integration_runs().unwrap();
     assert_eq!(
         loaded
@@ -1979,7 +1980,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
 #[test]
 fn recovery_exports_import_once_and_never_shadow_a_present_task() {
     let folder = std::env::temp_dir().join(format!("jackalope-import-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.id = "imported-attempt-01".into();
     run.status = RunStatus::Review;
@@ -2302,7 +2303,7 @@ fn resume_at_reset_is_saved_with_the_attempt_and_taken_once() {
         )
         .unwrap();
     }
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     assert!(runtime
         .schedule_limit_resume(&unreported.id, true)
         .unwrap_err()
@@ -2312,7 +2313,7 @@ fn resume_at_reset_is_saved_with_the_attempt_and_taken_once() {
     drop(runtime);
 
     // The schedule survives a restart and is handed out once, after the grace period.
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     let saved = runtime
         .run_snapshot(&run.id)
         .unwrap()
@@ -2346,7 +2347,7 @@ fn resume_at_reset_is_saved_with_the_attempt_and_taken_once() {
         serde_json::to_vec(&newer).unwrap(),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
     assert!(runtime
         .run_snapshot(&run.id)

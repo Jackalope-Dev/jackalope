@@ -245,7 +245,7 @@ pub async fn app_lesson_sync(
         _ => {
             return match action {
                 Action::Status => Ok(view),
-                _ => Err("Sign in to Jackalope to sync learned lessons.".into()),
+                _ => Err(AccountFeature::LessonSync.connect_message()),
             }
         }
     };
@@ -255,8 +255,8 @@ pub async fn app_lesson_sync(
             _ => Err("Lesson sync is not available in this build.".into()),
         };
     };
-    bound(&record, &api)?;
-    let owner = account_key(&record).ok_or("Sign in to Jackalope to sync learned lessons.")?;
+    let record = state.admit(Some(record), &api, AccountFeature::LessonSync)?;
+    let owner = account_key(&record).ok_or_else(|| AccountFeature::LessonSync.connect_message())?;
     let store = &runtime.knowledge;
     let mut sync = store.sync_state();
     view.available = true;

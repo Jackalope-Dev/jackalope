@@ -436,7 +436,6 @@ pub async fn worktree_retention_run(
     }
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        runtime.access.ensure()?;
         let report = run_pass(
             &runtime,
             &project_path,

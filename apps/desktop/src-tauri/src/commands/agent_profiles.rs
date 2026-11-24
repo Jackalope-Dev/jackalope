@@ -207,7 +207,6 @@ pub fn agent_profile_complete_provider(
     model: String,
     activate: bool,
 ) -> Result<(), String> {
-    runtime.access.ensure()?;
     complete_provider(&runtime.profiles_root(), &id, &model, activate)
 }
 

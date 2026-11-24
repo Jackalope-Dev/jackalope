@@ -52,14 +52,7 @@ pub async fn app_account_beta(
     action: BetaAction,
 ) -> Result<BetaView, String> {
     let _guard = state.operation.lock().await;
-    let (api, _) = endpoints(&app)?;
-    let record = state
-        .read()?
-        .ok_or("Connect your Jackalope account to manage beta access.")?;
-    bound(&record, &api)?;
-    if record.email.is_none() || record.waitlist.is_some() {
-        return Err("Beta access is available once your Jackalope account is approved.".into());
-    }
+    let (api, _, record) = state.require(&app, AccountFeature::BetaProgram)?;
     let (method, body) = match action {
         BetaAction::Status => (reqwest::Method::GET, None),
         BetaAction::Request { kind, store_email } => {
@@ -80,7 +73,7 @@ pub async fn app_account_beta(
     let (code, data) =
         request(&api, "/v1/desktop/beta", method, Some(&record.secret), body).await?;
     if code == 401 {
-        state.access.revoke();
+        state.lease.revoke();
         account_storage::remove(&state.path)?;
         return Err("Your account connection expired. Connect again to manage beta access.".into());
     }

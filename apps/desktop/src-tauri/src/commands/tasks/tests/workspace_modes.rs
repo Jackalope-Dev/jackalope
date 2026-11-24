@@ -42,7 +42,7 @@ fn in_place_modes_hold_the_checkout_and_never_discard_changes() {
     let root = std::env::temp_dir().join(format!("jackalope-modes-{}", uuid::Uuid::new_v4()));
     let repo = repository(&root);
     let readme = Path::new(&repo).join("README.md");
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
 
     // New branch: the checkout switches to the task's own branch.
     running(&runtime, "branch-task", &repo);
@@ -140,7 +140,7 @@ fn in_place_modes_hold_the_checkout_and_never_discard_changes() {
 fn ask_each_time_waits_for_the_person_and_honors_the_choice() {
     let root = std::env::temp_dir().join(format!("jackalope-ask-{}", uuid::Uuid::new_v4()));
     let repo = repository(&root);
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     running(&runtime, "asked-task", &repo);
     let answering = runtime.clone();
     let answer = std::thread::spawn(move || {
@@ -225,7 +225,7 @@ fn non_code(id: &str, path: &str) -> RunRequest {
 fn non_code_work_reads_the_checkout_without_a_worktree_or_preparation() {
     let root = std::env::temp_dir().join(format!("jackalope-noncode-{}", uuid::Uuid::new_v4()));
     let repo = repository(&root);
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     // The person is on another branch with their own edits; neither matters to it.
     git(&repo, &["checkout", "-b", "feature"]).unwrap();
     std::fs::write(Path::new(&repo).join("README.md"), "edited by the person").unwrap();

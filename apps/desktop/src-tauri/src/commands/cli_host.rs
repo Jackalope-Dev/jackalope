@@ -2,8 +2,7 @@
 //!
 //! Only one process may hold a profile — `TaskRuntime` and `Coordinator` each
 //! take an exclusive file lock — so the CLI never opens the profile itself. It
-//! connects here instead, which also means CLI clients inherit the host's
-//! approved-account lease rather than needing their own.
+//! connects here instead. Like the app, it runs work without a Jackalope account.
 
 use crate::cli_protocol as protocol;
 use crate::cli_protocol::{

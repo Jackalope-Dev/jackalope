@@ -42,7 +42,6 @@ pub struct PlanDelivery {
 
 impl Coordinator {
     pub(crate) fn launch_plan(&self, launch: PlanLaunch) -> Result<String, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let request = launch.request;
         if Uuid::parse_str(&request.id).is_err() {

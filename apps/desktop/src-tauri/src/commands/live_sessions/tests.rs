@@ -58,7 +58,7 @@ fn fixture() -> (PathBuf, LiveSessions, String) {
             .status
             .success());
     }
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let coordinator = Coordinator::new(root.join("coordination"), runtime.clone()).unwrap();
     let service = LiveSessions::new(root.join("sessions/sessions.json"), runtime, coordinator);
     let request: RunRequest = serde_json::from_value(serde_json::json!({"id": Uuid::new_v4().to_string(), "projectId":"fixture", "projectName":"Fixture", "projectPath":repo.to_string_lossy(), "agent":"codex", "model":null, "prompt":"Session", "isolated":true, "previousRunId":null})).unwrap();
@@ -356,7 +356,7 @@ fn attach_run(root: &std::path::Path, service: &mut LiveSessions, id: &str, run:
         serde_json::to_vec(&run).unwrap(),
     )
     .unwrap();
-    service.runtime = TaskRuntime::with_test_access(history).unwrap();
+    service.runtime = TaskRuntime::new(history).unwrap();
     service.coordinator = Coordinator::new(
         root.join(format!("coordination-{}", Uuid::new_v4())),
         service.runtime.clone(),
@@ -953,4 +953,121 @@ fn non_code_conversations_are_saved_as_such_and_told_to_leave_files_alone() {
     let code = saved.sessions.iter().find(|s| s.id == existing).unwrap();
     assert!(!code.request.non_code);
     assert!(!batch_prompt(code, &[]).contains("not code work"));
+}
+
+/// The `jackalope` command and a headless host start a conversation exactly
+/// like this: `create_with_limits` with the first message. It runs with no
+/// current Jackalope account, whichever state the account is in.
+#[test]
+fn a_conversation_runs_without_a_current_jackalope_account() {
+    use crate::commands::account::fixture::{Account, FEATURES, STATES};
+    use crate::commands::agent_policy::{AgentPolicy, CustomAgent};
+    let (root, service, _) = fixture();
+    std::fs::write(
+        root.join("fixture.cjs"),
+        r#"
+process.stdin.resume();
+process.stdin.on('end',()=>{
+ console.log(JSON.stringify({type:'thread.started',thread_id:'no-account-session'}));
+ console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Answered locally'}}));
+});
+"#,
+    )
+    .unwrap();
+    let executable = root.join(if cfg!(windows) {
+        "fixture.cmd"
+    } else {
+        "fixture"
+    });
+    #[cfg(windows)]
+    std::fs::write(&executable, "@echo off\r\nnode \"%~dp0fixture.cjs\"\r\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(
+            &executable,
+            "#!/bin/sh\nexec node \"$(dirname \"$0\")/fixture.cjs\" \"$@\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let mut policy = AgentPolicy::default();
+    policy.custom_agents.push(CustomAgent {
+        id: "no-account-fixture".into(),
+        name: "No account fixture".into(),
+        command: executable.to_string_lossy().into_owned(),
+        adapter: Some("codex".into()),
+        args: Vec::new(),
+    });
+    std::fs::create_dir_all(service.runtime.policy_path().parent().unwrap()).unwrap();
+    std::fs::write(
+        service.runtime.policy_path(),
+        serde_json::to_vec(&policy).unwrap(),
+    )
+    .unwrap();
+    let mut request = service.snapshot(None).unwrap().sessions[0].request.clone();
+    request.agent = "no-account-fixture".into();
+    service.coordinator.launch();
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while !service.coordinator.bridge_ready() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Coordinator did not start"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    for state in STATES {
+        let account = Account::new(state);
+        assert!(FEATURES
+            .iter()
+            .all(|feature| account.admit(*feature).is_err()));
+        let id = Uuid::new_v4().to_string();
+        request.id = Uuid::new_v4().to_string();
+        service
+            .create_with_limits(
+                id.clone(),
+                "Terminal session".into(),
+                request.clone(),
+                Some(FirstMessage {
+                    id: Uuid::new_v4().to_string(),
+                    text: "Answer from this computer".into(),
+                    origin: None,
+                    reasoning_effort: None,
+                }),
+                SessionLimits {
+                    max_batches: None,
+                    pause_at_estimated_usd: None,
+                },
+            )
+            .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            service.tick().unwrap();
+            let snapshot = service.snapshot(Some(&id)).unwrap();
+            let session = snapshot.sessions.iter().find(|s| s.id == id).unwrap();
+            if let Some(error) = &session.error {
+                service.runtime.stop_all();
+                service.coordinator.shutdown();
+                panic!("{state:?}: {error}");
+            }
+            if !session.batches.is_empty() && session.batches.iter().all(|batch| batch.settled) {
+                let run = snapshot
+                    .runs
+                    .iter()
+                    .find(|run| run.live_session_id.as_deref() == Some(id.as_str()))
+                    .unwrap();
+                assert_eq!(run.status, RunStatus::Review, "{state:?}: {:?}", run.error);
+                assert_eq!(run.result, "Answered locally");
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                service.runtime.stop_all();
+                service.coordinator.shutdown();
+                panic!("{state:?}: the conversation did not finish");
+            }
+            std::thread::sleep(Duration::from_millis(40));
+        }
+    }
+    service.coordinator.shutdown();
+    let _ = std::fs::remove_dir_all(root);
 }

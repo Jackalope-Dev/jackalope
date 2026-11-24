@@ -1194,7 +1194,7 @@ mod tests {
         let repo = super::super::agreement_tests::Repo::new();
         let history = repo.root.join("history");
         std::fs::create_dir(&history).unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         let (mut ledger, mut runs) = fixture();
         let mut final_run = runs[0].clone();
@@ -1318,7 +1318,7 @@ mod tests {
         }
         ledger.managed_tasks[0].run_ids = runs.iter().map(|run| run.id.clone()).collect();
         ledger.managed_tasks[0].delivery.as_mut().unwrap().ready_at = Some("now".into());
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         {
             let mut inner = service.state();
@@ -1404,7 +1404,7 @@ mod tests {
         let repo = super::super::agreement_tests::Repo::new();
         let history = repo.root.join("history");
         std::fs::create_dir(&history).unwrap();
-        let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+        let runtime = TaskRuntime::new(history.clone()).unwrap();
         let directory = repo.root.join("queue");
         let service = Coordinator::new(directory.clone(), runtime).unwrap();
         let (mut ledger, mut runs) = fixture();
@@ -1430,8 +1430,7 @@ mod tests {
         drop(guard);
         drop(inner);
         drop(service);
-        let restarted =
-            Coordinator::new(directory, TaskRuntime::with_test_access(history).unwrap()).unwrap();
+        let restarted = Coordinator::new(directory, TaskRuntime::new(history).unwrap()).unwrap();
         let inner = restarted.state();
         assert!(inner.enabled.is_empty());
         assert!(inner.ledger.managed_tasks[0].error.is_some());

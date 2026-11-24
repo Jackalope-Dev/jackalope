@@ -210,7 +210,6 @@ fn start_preview(
     command: String,
     port: u16,
 ) -> Result<PreviewView, String> {
-    runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     if command.trim().is_empty()
         || command.len() > 4000
@@ -381,7 +380,6 @@ async fn inspect_preview(
     narrow: bool,
 ) -> Result<PreviewInspection, String> {
     use super::harness::{BrowserConfigureRequest, BrowserInspectRequest, BrowserSnapshotRequest};
-    runtime.access.ensure()?;
     uuid::Uuid::parse_str(&request_id).map_err(|_| "Invalid preview inspection")?;
     if !path.starts_with('/')
         || path.starts_with("//")
@@ -624,7 +622,7 @@ mod tests {
             serde_json::to_vec(&record).unwrap(),
         )
         .unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         (runtime, root, id)
     }
 

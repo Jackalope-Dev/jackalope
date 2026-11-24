@@ -13,7 +13,7 @@ async fn installed_grok_and_claude_negotiate_ownership_and_interfaces() {
         std::env::var("JACKALOPE_AGREEMENT_TRIAL_PROFILE").expect("Use a new isolated profile"),
     );
     assert!(repo.is_absolute() && profile.is_absolute() && !profile.exists());
-    let runtime = TaskRuntime::with_test_access(profile.join("history")).unwrap();
+    let runtime = TaskRuntime::new(profile.join("history")).unwrap();
     let coordinator = Coordinator::new(profile.join("coordination"), runtime.clone()).unwrap();
     coordinator.launch();
     for _ in 0..100 {
