@@ -14,7 +14,6 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { ProviderMark } from '../agents/ProviderMark';
 import { ActionError } from '../ui/ActionError';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import { WorkspacePage } from '../ui/WorkspacePage';
 import { ContinueComposer, ProviderTranscript, when } from './ProviderTranscript';
 import './live-session.css';
 
@@ -42,49 +41,53 @@ export function ExternalSessionView({ session }: { session: ExternalSession }) {
     openConversation(id);
   };
   return (
-    <WorkspacePage className="external-session" aria-label={session.title}>
-      <WorkspaceHeading
-        title={session.title}
-        description={
-          <span className="external-session-meta">
-            <ProviderMark provider={session.agent} size={14} />
-            <span>{session.agentName} outside Jackalope</span>
-            {session.branch && <span>· {session.branch}</span>}
-            {updated && (
-              <time dateTime={session.updatedAt} title={updated.toLocaleString()}>
-                · {updated.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-              </time>
-            )}
-            <span className="external-session-path" title={session.cwd}>
-              · {session.cwd}
-            </span>
-            {session.protectedFolder && <span>· {PROTECTED_FOLDER_NOTE}</span>}
-          </span>
-        }
-        action={
-          session.unavailable ? undefined : (
-            <Button onClick={() => input.current?.focus()}>Continue in Jackalope</Button>
-          )
-        }
-      />
-      <ActionError error={load.error} />
-      {load.busy && !transcript && <LoadingState label="Reading the conversation…" />}
-      {transcript && (
-        <ProviderTranscript
-          agent={session.agent}
+    <ProviderTranscript
+      agent={session.agent}
+      agentName={session.agentName}
+      entries={transcript?.entries ?? []}
+      loaded={!!transcript}
+      earlier={transcript?.earlier ?? 0}
+      notes={transcript?.subagentLines ? ['Subagent work is not shown.'] : undefined}
+      before={
+        <>
+          <WorkspaceHeading
+            title={session.title}
+            description={
+              <span className="external-session-meta">
+                <ProviderMark provider={session.agent} size={14} />
+                <span>{session.agentName} outside Jackalope</span>
+                {session.branch && <span>· {session.branch}</span>}
+                {updated && (
+                  <time dateTime={session.updatedAt} title={updated.toLocaleString()}>
+                    ·{' '}
+                    {updated.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                  </time>
+                )}
+                <span className="external-session-path" title={session.cwd}>
+                  · {session.cwd}
+                </span>
+                {session.protectedFolder && <span>· {PROTECTED_FOLDER_NOTE}</span>}
+              </span>
+            }
+            action={
+              session.unavailable ? undefined : (
+                <Button onClick={() => input.current?.focus()}>Continue in Jackalope</Button>
+              )
+            }
+          />
+          <ActionError error={load.error} />
+          {load.busy && !transcript && <LoadingState label="Reading the conversation…" />}
+        </>
+      }
+      footer={
+        <ContinueComposer
           agentName={session.agentName}
-          entries={transcript.entries}
-          earlier={transcript.earlier}
-          notes={transcript.subagentLines > 0 ? ['Subagent work is not shown.'] : undefined}
+          cwd={session.cwd}
+          unavailable={session.unavailable}
+          inputRef={input}
+          onContinue={continueHere}
         />
-      )}
-      <ContinueComposer
-        agentName={session.agentName}
-        cwd={session.cwd}
-        unavailable={session.unavailable}
-        inputRef={input}
-        onContinue={continueHere}
-      />
-    </WorkspacePage>
+      }
+    />
   );
 }

@@ -22,14 +22,12 @@ import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
   type LiveSession,
   type MessageOrigin,
-  type SessionMessage,
   type SessionReview,
   sessionCommand,
   sessionRunNeedsAttention,
   sessionWork,
 } from '../../lib/live-session';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
-import { groupRewound, isRewound } from '../../lib/rewind';
 import type { TaskRun } from '../../lib/run-types';
 import { sessionMarkdown } from '../../lib/session-export';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
@@ -49,7 +47,6 @@ import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
 import { DecisionTrail } from '../tasks/DecisionTrail';
 import { DesktopPermissionNotice } from '../tasks/DesktopPermissionNotice';
-import { EditFromHereButton, RewindUndoNotice, RewoundTurns } from '../tasks/EditFromHere';
 import { MergeReview } from '../tasks/MergeReview';
 import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
@@ -66,6 +63,7 @@ import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
 import { SessionTopics } from './SessionTopics';
+import { Transcript, type TranscriptHandle, type TranscriptRow } from './Transcript';
 import { TranscriptResult } from './TranscriptResult';
 import { WindowGlob } from './WindowGlob';
 import './live-session.css';
@@ -115,6 +113,25 @@ export function LiveSessionView({
     () => new Set(session.batches.slice(-20).map((batch) => batch.runId)),
     [session.batches],
   );
+  // One row per message, carrying the reply that finished its batch.
+  const { rows, items } = useMemo(() => {
+    let items = 0;
+    const rows: TranscriptRow[] = session.messages.map((message) => {
+      const run = message.runId ? runById.get(message.runId) : undefined;
+      const batch = message.runId ? batchById.get(message.runId) : undefined;
+      const reply = batch?.messageIds.at(-1) === message.id ? (run?.result ?? '') : '';
+      items += reply ? 2 : 1;
+      return {
+        key: message.id,
+        text: [message.text, reply],
+        estimate:
+          70 +
+          Math.ceil(message.text.length / 70) * 22 +
+          (reply ? 90 + Math.ceil(reply.length / 90) * 22 : 0),
+      };
+    });
+    return { rows, items };
+  }, [session.messages, runById, batchById]);
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === session.request.projectId),
   );
@@ -192,29 +209,15 @@ export function LiveSessionView({
   const { run: act, busy, error, setError } = useAction(() => refresh());
   const [review, setReview] = useState<SessionReview | null>(null);
   const reviewAttempt = useRef('');
-  const transcript = useRef<HTMLDivElement>(null);
-  const follow = useRef(true);
+  const transcript = useRef<TranscriptHandle>(null);
+  // Replies already formatted render formatted again when they scroll back into view.
+  const formatted = useRef(new Set<string>());
   const mascotRef = useRef<HTMLSpanElement>(null);
   const mascotGaze = useAgentGaze(mascotRef);
   const refresh = () => useLiveSessionStore.getState().refresh(session.id);
   const tooled = !detached && !simple;
   useWorkSeen(tooled ? latest : undefined);
   const workspace = useWorkspaceActions(tooled ? latest : undefined);
-  useEffect(() => {
-    const node = transcript.current;
-    if (collapsed || !node) return;
-    const scroll = () => {
-      if (follow.current) node.scrollTop = node.scrollHeight;
-    };
-    const observer = new MutationObserver(scroll);
-    observer.observe(node, { childList: true, subtree: true, characterData: true });
-    scroll();
-    return () => observer.disconnect();
-  }, [collapsed]);
-  useEffect(() => {
-    const node = transcript.current;
-    if (tab === 'conversation' && node && follow.current) node.scrollTop = node.scrollHeight;
-  }, [tab]);
   useEffect(() => {
     const attempt = `${latest?.id}:${latest?.status}:${session.paused}`;
     if (reviewAttempt.current !== attempt) {
@@ -462,140 +465,10 @@ export function LiveSessionView({
         )}
     </>
   );
-  /** After a rewind: the turn's messages go back into the composer, below any draft. */
-  const rewound = async ({ prompt }: { prompt: string }) => {
-    await refresh();
-    await append(prompt);
-  };
-  const renderMessage = (message: SessionMessage) => {
-    const batch = message.runId ? batchById.get(message.runId) : undefined;
-    const run = message.runId ? runById.get(message.runId) : undefined;
-    const lastInBatch = batch?.messageIds.at(-1) === message.id;
-    const origin = message.origin;
-    const incoming = origin && origin.kind !== 'card';
-    return (
-      <div key={message.id}>
-        <article
-          className={`live-message ${incoming ? 'live-incoming' : 'live-sent'}`}
-          data-origin={origin?.kind}
-          data-canceled={message.canceled || undefined}
-        >
-          {incoming ? (
-            <MessageOriginLabel origin={origin} onOpenSession={onOpenSession} />
-          ) : (
-            <span className={`live-author${origin ? '' : ' sr-only'}`}>
-              {origin ? `You answered “${origin.label}”` : 'You'}
-            </span>
-          )}
-          <p>{message.text}</p>
-          <div className="live-receipt">
-            {message.canceled
-              ? 'Canceled'
-              : run
-                ? isActive(run)
-                  ? 'Working'
-                  : sessionRunNeedsAttention(run)
-                    ? 'Needs attention'
-                    : ''
-                : batch?.error
-                  ? 'Needs attention'
-                  : 'Queued'}
-            {!message.runId && !message.canceled && (
-              <button
-                type="button"
-                aria-label="Cancel queued message"
-                onClick={() =>
-                  void act(() =>
-                    sessionCommand('action', {
-                      id: session.id,
-                      action: 'cancel-message',
-                      messageId: message.id,
-                    }),
-                  )
-                }
-              >
-                <X size={12} aria-hidden="true" />
-              </button>
-            )}
-            <MessageTime at={message.createdAt} />
-            <CopyButton className="live-copy" size="sm" text={message.text} label="Copy" />
-            {run && batch?.messageIds[0] === message.id && !integrated && !session.closed && (
-              <EditFromHereButton runs={runs} run={run} onRewound={rewound} />
-            )}
-          </div>
-        </article>
-        {lastInBatch && run?.result && (
-          <article className="live-message live-reply">
-            <span className="live-mascot">
-              <AgentCharacter
-                provider={character(run.agent)}
-                state={isActive(run) ? 'working' : 'idle'}
-              />
-            </span>
-            <div>
-              <span className="live-author">
-                {session.persona?.name ?? (run.agent === 'auto' ? 'Jackalope' : run.agent)}
-              </span>
-              <Suspense fallback={<p>{run.result}</p>}>
-                <TranscriptResult
-                  recent={recentBatches.has(run.id)}
-                  content={run.result}
-                  active={isActive(run)}
-                  onOpenLink={(url) => void act(() => openExternalUrl(url))}
-                />
-              </Suspense>
-              {!isActive(run) && (
-                <div className="live-receipt">
-                  {run.endedAt && <MessageTime at={run.endedAt} />}
-                  <CopyButton
-                    className="live-copy"
-                    size="sm"
-                    text={run.result}
-                    label="Copy reply"
-                  />
-                  <ReadAloudButton className="live-copy" text={run.result} />
-                </div>
-              )}
-            </div>
-          </article>
-        )}
-        {lastInBatch && run && !!run.decisions?.length && (
-          <div className="live-card live-trail">
-            <DecisionTrail attempts={[run]} />
-          </div>
-        )}
-        {lastInBatch &&
-          run &&
-          cardsByRun.get(run.id)?.map((card) => (
-            <div key={card.id} className="live-card">
-              <BotCardView card={card} />
-            </div>
-          ))}
-        {simple &&
-          lastInBatch &&
-          run?.id === latest?.id &&
-          run &&
-          !isActive(run) &&
-          !integrated &&
-          !!latestChanges?.files && (
-            <div className="live-review-cta">
-              <span>
-                Changed {latestChanges.files} {latestChanges.files === 1 ? 'file' : 'files'}
-                <small>
-                  +{latestChanges.added} −{latestChanges.removed}
-                </small>
-              </span>
-              <Button disabled={busy} onClick={showReview}>
-                Review changes
-              </Button>
-            </div>
-          )}
-      </div>
-    );
-  };
   return (
     <section
       className={`live-session${detached ? ' live-session-detached' : ''}`}
+      data-transcript-scope
       aria-label={session.title}
       style={botColor ? ({ '--agent-color': botColor } as CSSProperties) : undefined}
     >
@@ -772,14 +645,6 @@ export function LiveSessionView({
           </div>
         )
       )}
-      {latest && !integrated && (
-        <RewindUndoNotice
-          className="live-notice"
-          runs={runs}
-          taskId={latest.taskId}
-          onChanged={refresh}
-        />
-      )}
       {!simple && <WorkSourceLink prompts={session.messages.map((message) => message.text)} />}
       {tooled && (
         <SessionTopics
@@ -835,81 +700,208 @@ export function LiveSessionView({
       <div className="live-columns">
         <div className="live-conversation" hidden={tab !== 'conversation'}>
           {!collapsed && (
-            <div
+            <Transcript
+              handle={transcript}
               className="live-transcript"
-              ref={transcript}
-              onScroll={(event) => {
-                const node = event.currentTarget;
-                follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
+              label="conversation"
+              rows={rows}
+              items={items}
+              renderRow={(index) => {
+                const message = session.messages[index];
+                const batch = message.runId ? batchById.get(message.runId) : undefined;
+                const run = message.runId ? runById.get(message.runId) : undefined;
+                const lastInBatch = batch?.messageIds.at(-1) === message.id;
+                const origin = message.origin;
+                const incoming = origin && origin.kind !== 'card';
+                return (
+                  <>
+                    <article
+                      className={`live-message ${incoming ? 'live-incoming' : 'live-sent'}`}
+                      data-origin={origin?.kind}
+                      data-canceled={message.canceled || undefined}
+                    >
+                      {incoming ? (
+                        <MessageOriginLabel origin={origin} onOpenSession={onOpenSession} />
+                      ) : (
+                        <span className={`live-author${origin ? '' : ' sr-only'}`}>
+                          {origin ? `You answered “${origin.label}”` : 'You'}
+                        </span>
+                      )}
+                      <p data-find-part="0">{message.text}</p>
+                      <div className="live-receipt">
+                        {message.canceled
+                          ? 'Canceled'
+                          : run
+                            ? isActive(run)
+                              ? 'Working'
+                              : sessionRunNeedsAttention(run)
+                                ? 'Needs attention'
+                                : ''
+                            : batch?.error
+                              ? 'Needs attention'
+                              : 'Queued'}
+                        {!message.runId && !message.canceled && (
+                          <button
+                            type="button"
+                            aria-label="Cancel queued message"
+                            onClick={() =>
+                              void act(() =>
+                                sessionCommand('action', {
+                                  id: session.id,
+                                  action: 'cancel-message',
+                                  messageId: message.id,
+                                }),
+                              )
+                            }
+                          >
+                            <X size={12} aria-hidden="true" />
+                          </button>
+                        )}
+                        <MessageTime at={message.createdAt} />
+                        <CopyButton
+                          className="live-copy"
+                          size="sm"
+                          text={message.text}
+                          label="Copy"
+                        />
+                      </div>
+                    </article>
+                    {lastInBatch && run?.result && (
+                      <article className="live-message live-reply">
+                        <span className="live-mascot">
+                          <AgentCharacter
+                            provider={character(run.agent)}
+                            state={isActive(run) ? 'working' : 'idle'}
+                          />
+                        </span>
+                        <div>
+                          <span className="live-author">
+                            {session.persona?.name ??
+                              (run.agent === 'auto' ? 'Jackalope' : run.agent)}
+                          </span>
+                          <div data-find-part="1">
+                            <Suspense fallback={<p>{run.result}</p>}>
+                              <TranscriptResult
+                                recent={recentBatches.has(run.id) || formatted.current.has(run.id)}
+                                onFormatted={() => formatted.current.add(run.id)}
+                                content={run.result}
+                                active={isActive(run)}
+                                onOpenLink={(url) => void act(() => openExternalUrl(url))}
+                              />
+                            </Suspense>
+                          </div>
+                          {!isActive(run) && (
+                            <div className="live-receipt">
+                              {run.endedAt && <MessageTime at={run.endedAt} />}
+                              <CopyButton
+                                className="live-copy"
+                                size="sm"
+                                text={run.result}
+                                label="Copy reply"
+                              />
+                              <ReadAloudButton className="live-copy" text={run.result} />
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    )}
+                    {lastInBatch && run && !!run.decisions?.length && (
+                      <div className="live-card live-trail">
+                        <DecisionTrail attempts={[run]} />
+                      </div>
+                    )}
+                    {lastInBatch &&
+                      run &&
+                      cardsByRun.get(run.id)?.map((card) => (
+                        <div key={card.id} className="live-card">
+                          <BotCardView card={card} />
+                        </div>
+                      ))}
+                    {simple &&
+                      lastInBatch &&
+                      run?.id === latest?.id &&
+                      run &&
+                      !isActive(run) &&
+                      !integrated &&
+                      !!latestChanges?.files && (
+                        <div className="live-review-cta">
+                          <span>
+                            Changed {latestChanges.files}{' '}
+                            {latestChanges.files === 1 ? 'file' : 'files'}
+                            <small>
+                              +{latestChanges.added} −{latestChanges.removed}
+                            </small>
+                          </span>
+                          <Button disabled={busy} onClick={showReview}>
+                            Review changes
+                          </Button>
+                        </div>
+                      )}
+                  </>
+                );
               }}
-            >
-              {!session.messages.length && (
-                <div className="live-empty">
-                  <span className="live-mascot">
-                    <AgentCharacter provider={provider} />
-                  </span>
-                </div>
-              )}
-              {groupRewound(session.messages, (message) =>
-                isRewound(message.runId ? runById.get(message.runId) : undefined),
-              ).map((group) =>
-                group.rewound ? (
-                  <RewoundTurns
-                    key={`rewound:${group.items[0].id}`}
-                    count={new Set(group.items.map((message) => message.runId)).size}
-                  >
-                    {group.items.map(renderMessage)}
-                  </RewoundTurns>
-                ) : (
-                  group.items.map(renderMessage)
-                ),
-              )}
-              {active && (
-                <div className="live-working">
-                  <span className="live-mascot">
-                    <AgentCharacter
-                      provider={character(active.agent)}
-                      state={questions.length ? 'waiting' : 'working'}
+              before={
+                !session.messages.length && (
+                  <div className="live-empty">
+                    <span className="live-mascot">
+                      <AgentCharacter provider={provider} />
+                    </span>
+                  </div>
+                )
+              }
+              after={
+                <>
+                  {active && (
+                    <div className="live-working">
+                      <span className="live-mascot">
+                        <AgentCharacter
+                          provider={character(active.agent)}
+                          state={questions.length ? 'waiting' : 'working'}
+                        />
+                      </span>
+                      <TaskLiveActivity run={active} />
+                    </div>
+                  )}
+                  {integrated && latest && !detached && (
+                    <div className="live-review-cta">
+                      <span>These changes are merged.</span>
+                      <Button
+                        onClick={() => {
+                          try {
+                            nextChat(deliveryHandoff(latest, true, 'the next change'));
+                          } catch (cause) {
+                            setError(describeError(cause));
+                          }
+                        }}
+                      >
+                        Continue in a new chat
+                      </Button>
+                    </div>
+                  )}
+                  {latest && <DesktopPermissionNotice key={latest.id} run={latest} />}
+                  {questions.map((prompt) => (
+                    <AgentQuestion
+                      key={prompt.id}
+                      prompt={prompt}
+                      active
+                      onAnswer={async (answer) => {
+                        if (!active) throw new Error('This attempt is no longer running.');
+                        await respondToPrompt(active.id, prompt.id, answer);
+                        await refresh();
+                      }}
                     />
-                  </span>
-                  <TaskLiveActivity run={active} />
-                </div>
-              )}
-              {integrated && latest && !detached && (
-                <div className="live-review-cta">
-                  <span>These changes are merged.</span>
-                  <Button
-                    onClick={() => {
-                      try {
-                        nextChat(deliveryHandoff(latest, true, 'the next change'));
-                      } catch (cause) {
-                        setError(describeError(cause));
-                      }
-                    }}
-                  >
-                    Continue in a new chat
-                  </Button>
-                </div>
-              )}
-              {latest && <DesktopPermissionNotice key={latest.id} run={latest} />}
-              {questions.map((prompt) => (
-                <AgentQuestion
-                  key={prompt.id}
-                  prompt={prompt}
-                  active
-                  onAnswer={async (answer) => {
-                    if (!active) throw new Error('This attempt is no longer running.');
-                    await respondToPrompt(active.id, prompt.id, answer);
-                    await refresh();
-                  }}
-                />
-              ))}
-            </div>
+                  ))}
+                </>
+              }
+            />
           )}
           <SessionComposer
             key={session.id}
             session={session}
-            onSent={refresh}
+            onSent={() => {
+              transcript.current?.scrollToLatest();
+              return refresh();
+            }}
             active={active}
             latestRun={latest}
             addition={addition}

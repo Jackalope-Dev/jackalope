@@ -35,6 +35,13 @@ switches. Production checks require a successful worker highlight, bounded rende
 line counts and keyboard access to the final line; a main-thread fallback cannot
 silently satisfy worker acceptance. The isolated preview selects an available port.
 
+Run `node scripts/verification/verify-transcript.mjs` for a 2,000-message conversation
+fixture. It starts its own Vite server, reports DOM size, initial render time and frame
+timings while scrolling and streaming (`--measure-only` skips the behavior checks), and
+checks following, Jump to latest, sending, find across unrendered rows, selection
+retention, reduced motion and light/dark at three widths. Metrics go under
+`output/playwright/transcript/`; they are diagnostic, not installed-app acceptance.
+
 Run `node scripts/verification/verify-workbench.mjs` for isolated browser checks of
 the workspace sidebar, terminal focus and reconnect, topic selection in large conversations,
 detached-window drafts and feedback recovery. It starts its own Vite server and uses
@@ -51,7 +58,21 @@ mock native commands; it does not prove installed shell or window behavior.
   records omitted from the request are transferred again rather than dropped.
 - Hidden windows coalesce native notifications until visible, retaining their periodic
   fallback. Session lookups use indexes, and only the latest 20 replies format richly
-  by default. Earlier text remains searchable and can be formatted explicitly.
+  by default; earlier replies format as they near the viewport.
+- Conversation transcripts, including Jackalope conversations, the tasks they own and
+  read-only conversations from other CLIs, render only rows near the viewport
+  (`components/sessions/Transcript.tsx`, TanStack Virtual). Rows measure as they render;
+  rows above the reading position correct the offset, so the view holds while they
+  measure or format. A selection or focused control keeps its rows rendered. Replies in
+  one transcript share one code-highlighting worker.
+- A transcript follows new content only while the person is at its end. Scrolling up
+  stops following and shows Jump to latest with a count of new messages and replies;
+  reaching the end, jumping or sending follows again.
+- Find in conversation (Mod+F, configurable) searches the message and reply data, so
+  unrendered and unformatted rows match, then scrolls to the match and highlights
+  rendered matches with the CSS highlight API. Matches stop counting at 5,000. It stays
+  out of hidden conversations, dialogs and the terminal. Native snapshots still send the
+  focused conversation's full messages and reply text.
 - Usage & quota offers opt-in timing capture for the current window. At most 2,000
   samples stay in memory; exports contain metric names and aggregate timings, never
   command arguments or content. Event Timing covers events at least 16 ms, and long-task
