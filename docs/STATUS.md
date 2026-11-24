@@ -165,7 +165,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   The composer shows its agent choice beside Send: Automatic, one agent, or up to four
   agents that each receive the prompt as a separate isolated task. Compared tasks link to
   each other and show status, time, check, changed lines and reported tokens side by side;
-  keeping one archives the other finished attempts. Composers accept pasted images, dropped
+  keeping one archives the other finished attempts. Composers (new work, conversations and
+  follow-ups) offer `/` commands (/model, /effort, /plan, /clear, /btw and Claude skills),
+  `@` file mentions, prompt history, large pastes saved as text attachments, a per-send
+  effort picker limited to levels the run uses, and a context meter shown only when the
+  provider reports its window. `/btw` asks a read-only, unsaved fork of a Claude Code or
+  Codex session without touching the main conversation. Real-provider and installed
+  acceptance remain open. Composers accept pasted images, dropped
   files and picked files as editable path lines. Pasted images are saved under the
   project's Git-excluded `.jackalope/attachments` and copied into each task workspace that
   names them, worktree or computer alike; project files are referenced relative to the

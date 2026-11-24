@@ -25,6 +25,9 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept composer side questions (Claude fork-session, `codex exec fork`) and per-send
+  effort with real providers in an installed app; move the Codex side question to the
+  app-server's thread fork.
 - [ ] Accept importing Claude Code and Codex history in an installed app on each platform:
   the onboarding offer, a real import, updating a conversation that grew, and continuing an
   imported conversation through its CLI.
