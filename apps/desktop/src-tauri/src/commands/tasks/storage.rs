@@ -59,6 +59,9 @@ impl TaskRuntime {
             claude_sessions: Default::default(),
             _owner: owner,
         };
+        // Holding the history lock means no attempt of this profile is running,
+        // so any secret files left by a crash belong to no one.
+        super::super::project_secrets::sweep(&runtime.secret_files_root());
         let paths: Vec<_> = std::fs::read_dir(&runtime.directory)
             .map_err(|e| e.to_string())?
             .map(|entry| entry.map(|entry| entry.path()).map_err(|e| e.to_string()))
