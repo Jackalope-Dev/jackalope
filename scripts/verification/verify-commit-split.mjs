@@ -44,12 +44,13 @@ const proposed = [
 let plans = [];
 let proposals = 0;
 let applies = 0;
+let prepared = 0;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 window.fixtureCalls = [];
 window.__TAURI_INTERNALS__ = {invoke: async (command,args={}) => {
   window.fixtureCalls.push({command,args});
   if(command==='integration_plans')return plans;
-  if(command==='integration_prepare'){const plan={id:'plan-1',projectPath:project.path,masterHead:'abcdef123',targetBranch:'main',integrationHead:'review123',runIds:[run.id],files,patch,conflicts:[],status:'ready',createdAt:'2026-09-09T12:00:00Z',appliedAt:null,commitMessage:args.commitMessage||'Add keyboard search',commitPolicy:policy,commits:[]};plans=[plan];return plan;}
+  if(command==='integration_prepare'){prepared+=1;const plan={id:'plan-'+prepared,projectPath:project.path,masterHead:'abcdef123',targetBranch:'main',integrationHead:'review123',runIds:[run.id],files,patch,conflicts:[],status:'ready',createdAt:'2026-09-09T12:00:00Z',appliedAt:null,commitMessage:args.commitMessage||'Add keyboard search',commitPolicy:policy,commits:[]};plans=[plan];return plan;}
   if(command==='integration_split_propose'){
     proposals += 1;
     await wait(400);
@@ -61,7 +62,8 @@ window.__TAURI_INTERNALS__ = {invoke: async (command,args={}) => {
   if(command==='integration_split_apply'){
     applies += 1;
     await wait(200);
-    if(applies===1)throw new Error('The split commits do not add up to the reviewed files.');
+    if(applies===1)throw {message:'The split commits do not add up to the reviewed files.',code:'treeMismatch'};
+    if(applies===2)throw {message:'The integration reference changed. Prepare a fresh review.',code:'reviewStale'};
     const commits = args.commits.map((c,i)=>({...c,commit:['1111111aaaa','2222222bbbb','3333333cccc'][i]}));
     plans=[{...plans[0],integrationHead:'split-tip',commits}];
     return plans[0];
@@ -193,6 +195,23 @@ try {
       );
       await page.waitForFunction(() => !document.querySelector('.merge-approval button')?.disabled);
 
+      // A review whose reference moved points to a fresh review, not a new split.
+      await start.click();
+      await review.getByRole('button', { name: 'Use 3 commits' }).click();
+      await review
+        .getByRole('alert')
+        .filter({ hasText: 'The integration reference changed. Prepare a fresh review.' })
+        .waitFor();
+      assert.equal(await review.getByRole('button', { name: 'Propose again' }).count(), 0);
+      await review.getByRole('button', { name: 'Prepare a fresh review' }).click();
+      await page.getByText('One commit with all 4 files.').waitFor();
+      assert.equal(
+        await page.evaluate(
+          () => window.fixtureCalls.filter((call) => call.command === 'integration_prepare').length,
+        ),
+        2,
+      );
+
       // An approved split replaces the commit, and the merge copy follows it.
       await start.click();
       await review.getByRole('button', { name: 'Use 3 commits' }).click();
@@ -236,7 +255,7 @@ try {
     await context.close();
   }
   console.log(
-    'Browser fixtures passed: split fallback, helper failure, refused split, keyboard editing, dismissal, applied split, merge receipt, themes and narrow layout.',
+    'Browser fixtures passed: split fallback, helper failure, refused split, stale review recovery, keyboard editing, dismissal, applied split, merge receipt, themes and narrow layout.',
   );
 } finally {
   await browser.close();

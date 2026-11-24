@@ -286,8 +286,10 @@ separate reconciliation worktree, including diff3 conflict markers (each block's
 base and theirs text) where Git reports them. Reconciliation attempts, and only they, get
 the `conflicts` and `resolve_conflicts` bridge tools: the first lists each conflicted file's
 blocks and content hash, and the second resolves every block of one file in a single call as
-ours, theirs, base, both or custom text. A resolution is refused, and nothing is written, when
-the file changed since it was listed or the result would still contain marker lines.
+ours, theirs, base, both or custom text. A lone `=======` line outside a block is ordinary text.
+A file that is not UTF-8 or is over 4 MB is listed with its own error for editing directly. A
+resolution is refused, and nothing is written, when the file changed since it was listed or the
+result would still contain a conflict block or stray marker.
 Source worktrees and the target stay unchanged while the worker resolves conflicts,
 removes duplicate implementation and records its decisions. The worker must publish
 a completion report with no remaining work for the current snapshot and pass the

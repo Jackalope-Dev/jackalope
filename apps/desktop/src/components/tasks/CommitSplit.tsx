@@ -1,4 +1,3 @@
-import { describeError } from '@jackalope/contracts/errors';
 import { Button, IconButton, InlineNotice, Textarea } from '@jackalope/ui';
 import { GitCommitVertical, Pencil, Split, X } from 'lucide-react';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
@@ -13,6 +12,7 @@ import {
   type PlannedCommit,
   proposeSplit,
   type SplitProposal,
+  type SplitRecovery,
   type SplitUnit,
   splitFailure,
 } from '../../lib/commit-split';
@@ -150,12 +150,15 @@ export function CommitSplit({
   disabled,
   onBusyChange,
   onApplied,
+  onRefresh,
 }: {
   plan: IntegrationPlan;
   disabled?: boolean;
   /** True while merging should wait for the split. */
   onBusyChange?: (busy: boolean) => void;
   onApplied: (plan: IntegrationPlan) => Promise<void> | void;
+  /** Prepares a fresh review when this one is out of date. */
+  onRefresh?: () => void;
 }) {
   const headingId = useId();
   const [drafting, setDrafting] = useState(false);
@@ -163,8 +166,9 @@ export function CommitSplit({
   const [proposal, setProposal] = useState<SplitProposal | null>(null);
   const [commits, setCommits] = useState<PlannedCommit[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
-  const [error, setError] = useState('');
-  const [applyError, setApplyError] = useState('');
+  type Failure = { message: string; recovery: SplitRecovery } | null;
+  const [error, setError] = useState<Failure>(null);
+  const [applyError, setApplyError] = useState<Failure>(null);
   const startRef = useRef<HTMLButtonElement>(null);
   const reviewRef = useRef<HTMLElement>(null);
   const busy = drafting || applying;
@@ -187,14 +191,14 @@ export function CommitSplit({
     setProposal(null);
     setCommits([]);
     setEditing(null);
-    setError('');
-    setApplyError('');
+    setError(null);
+    setApplyError(null);
     requestAnimationFrame(() => startRef.current?.focus());
   };
   const propose = async () => {
     setDrafting(true);
-    setError('');
-    setApplyError('');
+    setError(null);
+    setApplyError(null);
     setEditing(null);
     setProposal(null);
     try {
@@ -204,7 +208,7 @@ export function CommitSplit({
       // The start button gives way to the review, so keep keyboard focus with it.
       if (next.commits.length) requestAnimationFrame(() => reviewRef.current?.focus());
     } catch (error) {
-      setError(describeError(error));
+      setError(splitFailure(error));
     } finally {
       setDrafting(false);
     }
@@ -212,18 +216,28 @@ export function CommitSplit({
   const apply = async () => {
     if (!proposal) return;
     setApplying(true);
-    setApplyError('');
+    setApplyError(null);
     setEditing(null);
     try {
       const next = await applySplit(proposal.planId, proposal.integrationHead, commits);
       await onApplied(next);
     } catch (error) {
-      setApplyError(splitFailure(describeError(error)));
+      setApplyError(splitFailure(error));
     } finally {
       setApplying(false);
     }
   };
 
+  const recoveryAction = (recovery: SplitRecovery) =>
+    recovery === 'propose' ? (
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => void propose()}>
+        Propose again
+      </Button>
+    ) : recovery === 'refresh' && onRefresh ? (
+      <Button variant="outline" size="sm" disabled={busy || disabled} onClick={onRefresh}>
+        Prepare a fresh review
+      </Button>
+    ) : null;
   const fileCount = plan.files.length;
   const summary = applied
     ? `Merged as ${commitCount(existing.length)}.`
@@ -268,12 +282,15 @@ export function CommitSplit({
         <InlineNotice
           tone="error"
           action={
-            <IconButton label="Dismiss" onClick={dismiss}>
-              <X size={16} />
-            </IconButton>
+            <>
+              {recoveryAction(error.recovery)}
+              <IconButton label="Dismiss" onClick={dismiss}>
+                <X size={16} />
+              </IconButton>
+            </>
           }
         >
-          Could not propose a split: {error}
+          Could not propose a split: {error.message}
         </InlineNotice>
       )}
       {proposal?.fallback && (
@@ -314,15 +331,10 @@ export function CommitSplit({
             }
           />
           {applyError && (
-            <InlineNotice
-              tone="error"
-              action={
-                <Button variant="outline" size="sm" disabled={busy} onClick={() => void propose()}>
-                  Propose again
-                </Button>
-              }
-            >
-              {applyError}
+            <InlineNotice tone="error" action={recoveryAction(applyError.recovery)}>
+              {applyError.recovery
+                ? applyError.message
+                : `The split was not applied: ${applyError.message}`}
             </InlineNotice>
           )}
           <div className="commit-split-actions">

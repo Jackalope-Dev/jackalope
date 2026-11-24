@@ -1,3 +1,4 @@
+import { describeError, errorCode } from '@jackalope/contracts/errors';
 import { invokeNative } from './native/transport.ts';
 import type { IntegrationPlan } from './queue.ts';
 
@@ -94,15 +95,35 @@ export function dependencyLabel(dependsOn: number[] | undefined) {
   return `Needs ${listed}`;
 }
 
-/** Why an approved split was not applied, and what to do next. */
-export function splitFailure(error: string) {
-  if (/do not add up to the reviewed files/i.test(error))
-    return 'Jackalope refused this split because its commits do not add up to the reviewed files exactly. The integration keeps its current commits. Propose a new split or merge as it is.';
-  if (/changed since these commits were proposed|reference changed/i.test(error))
-    return 'The integration changed after this split was proposed. Propose a new split.';
-  if (/commit settings changed/i.test(error))
-    return 'Project commit settings changed. Refresh the merge, then propose a new split.';
-  return `The split was not applied: ${error}`;
+/** What a split failure asks the person to do next. */
+export type SplitRecovery = 'propose' | 'refresh' | null;
+
+/**
+ * A split command's failure in the person's terms, from the `code` the native
+ * `SplitError` attaches: `proposalStale` (propose again), `reviewStale` (prepare
+ * a fresh review) or `treeMismatch` (the commits missed the reviewed files).
+ */
+export function splitFailure(cause: unknown): { message: string; recovery: SplitRecovery } {
+  switch (errorCode(cause)) {
+    case 'treeMismatch':
+      return {
+        message:
+          'Jackalope refused this split because its commits do not add up to the reviewed files exactly. The integration keeps its current commits. Propose a new split or merge as it is.',
+        recovery: 'propose',
+      };
+    case 'proposalStale':
+      return {
+        message: 'The integration changed after this split was proposed. Propose a new split.',
+        recovery: 'propose',
+      };
+    case 'reviewStale':
+      return {
+        message: describeError(cause),
+        recovery: 'refresh',
+      };
+    default:
+      return { message: describeError(cause), recovery: null };
+  }
 }
 
 /** "one commit" or "3 commits". */

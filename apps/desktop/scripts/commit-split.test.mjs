@@ -69,23 +69,28 @@ test('dependencies read as one-based commit numbers', () => {
   assert.equal(dependencyLabel([3, 0, 1]), 'Needs 1, 2 and 4');
 });
 
-test('a refused split explains that the integration is unchanged', () => {
-  assert.match(
-    splitFailure('The split commits do not add up to the reviewed files.'),
-    /refused this split.*keeps its current commits/,
+test('split failures follow the native error code, not its wording', () => {
+  const coded = (code, message) => Object.assign(new Error(message), { code });
+  const mismatch = splitFailure(coded('treeMismatch', 'anything'));
+  assert.equal(mismatch.recovery, 'propose');
+  assert.match(mismatch.message, /refused this split.*keeps its current commits/);
+  assert.deepEqual(splitFailure(coded('proposalStale', 'anything')), {
+    message: 'The integration changed after this split was proposed. Propose a new split.',
+    recovery: 'propose',
+  });
+  // A reference that moved without its saved plan needs a fresh review, not a new split.
+  assert.deepEqual(
+    splitFailure({
+      code: 'reviewStale',
+      message: 'The integration reference changed. Prepare a fresh review.',
+    }),
+    { message: 'The integration reference changed. Prepare a fresh review.', recovery: 'refresh' },
   );
-  assert.match(
-    splitFailure('The integration changed since these commits were proposed. Split it again.'),
-    /Propose a new split/,
-  );
-  assert.match(
-    splitFailure('Project commit settings changed. Prepare a fresh review.'),
-    /Refresh the merge/,
-  );
-  assert.equal(
-    splitFailure('Commit 2 did not apply'),
-    'The split was not applied: Commit 2 did not apply',
-  );
+  assert.deepEqual(splitFailure(new Error('Commit 2 did not apply')), {
+    message: 'Commit 2 did not apply',
+    recovery: null,
+  });
+  assert.deepEqual(splitFailure('plain text'), { message: 'plain text', recovery: null });
   assert.equal(commitCount(1), 'one commit');
   assert.equal(commitCount(4), '4 commits');
 });

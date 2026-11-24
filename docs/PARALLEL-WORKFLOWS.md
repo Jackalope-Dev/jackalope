@@ -352,8 +352,10 @@ or resolve with ordinary Git tools and prepare a new review. There is no conflic
 
 A ready review can be split into ordered commits before it is applied. **Split into commits**
 asks the default agent, without tools, to group the change: each hunk of a modified text file is
-one unit, while new, deleted, binary, mode-changing and single-hunk files move whole. The agent
-returns at most 12 commits with messages and the earlier commits each one needs. Jackalope
+one unit, while new, deleted, binary, mode-changing, single-hunk files and a file replaced by a
+link (or the reverse) move whole. The diff format is fixed regardless of the person's Git diff
+settings. The agent returns at most 12 commits with messages and the earlier commits each one
+needs; any `Signed-off-by:` line it writes is dropped, since only the person can sign off. Jackalope
 rejects a grouping that omits, repeats or invents a hunk, or whose dependencies form a cycle;
 orders commits by dependency, then source before tests, docs and configuration; and places
 each lock file with the commit that changes its manifest. A single change, more than 400 hunks
@@ -363,7 +365,9 @@ Merging waits until the person approves or dismisses it. Approval rebuilds the c
 the captured target through a private index, with project attribution on each, and moves the
 review's reference only when the last commit's tree equals the reviewed tree exactly; a
 mismatch, a review that changed since the proposal or changed commit settings leave it
-untouched. Apply then fast-forwards the target through the commits as usual. With the
+untouched. The review offers to propose again when the proposal is stale and to prepare a fresh
+review when the review itself is, including after an interruption between moving the reference
+and saving the review. Apply then fast-forwards the target through the commits as usual. With the
 desktop development server running, `node scripts/verification/verify-commit-split.mjs`
 exercises this review against native-service fixtures.
 

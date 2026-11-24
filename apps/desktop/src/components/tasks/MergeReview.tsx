@@ -444,6 +444,7 @@ export function MergeReview({
               plan={plan}
               disabled={busy}
               onBusyChange={setSplitting}
+              onRefresh={chosen.length ? () => void prepare() : undefined}
               onApplied={async (next) => {
                 setPlan(next);
                 await load().catch(() => undefined);
