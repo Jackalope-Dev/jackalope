@@ -210,8 +210,9 @@ async fn request(
         }
         inner.config.clone()
     };
+    let name = action.action.clone();
     match tauri::async_runtime::spawn_blocking(move || dispatch(&service, &config, action)).await {
-        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Ok(value)) => Json(shared(&name, value)).into_response(),
         Ok(Err(error)) => failure(StatusCode::BAD_REQUEST, &error),
         Err(_) => failure(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -248,6 +249,14 @@ pub(super) fn invite_phone(inner: &mut Inner, device: &Device) -> Result<Value, 
     )?;
     reply["computer"] = json!(host);
     Ok(reply)
+}
+/// A response as it leaves this host, with credentials masked. Project icons
+/// are images; every other response may carry what an agent wrote.
+fn shared(action: &str, mut value: Value) -> Value {
+    if action != "projectIcons" {
+        crate::commands::redaction::outbound_value(&mut value);
+    }
+    value
 }
 fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<Value, String> {
     let runs = service.runtime.snapshot(if action.action == "detail" {
@@ -785,6 +794,27 @@ mod tests {
             task(&crowded, true)["prompts"].as_array().unwrap().len(),
             LISTED_PROMPTS + 3
         );
+    }
+    #[test]
+    fn responses_mask_credentials_but_not_icons_or_identifiers() {
+        let token = format!("ghp_{}", "a1B2c3D4e5".repeat(4));
+        let run = TaskRun {
+            id: token.clone(),
+            result: format!("Pushed with {token}"),
+            activity: vec![format!(
+                "git remote set-url https://x:{token}@github.com/o/r"
+            )],
+            ..Default::default()
+        };
+        let detail = shared("detail", task(&run, true));
+        assert_eq!(detail["id"], token);
+        assert_eq!(detail["result"], "Pushed with [redacted GitHub token]");
+        assert_eq!(
+            detail["activity"][0],
+            "git remote set-url https://x:[redacted GitHub token]@github.com/o/r"
+        );
+        let icons = json!({"icons":{"allowed":token}});
+        assert_eq!(shared("projectIcons", icons.clone()), icons);
     }
     #[test]
     fn rejects_rebinding_and_cross_origin_requests() {

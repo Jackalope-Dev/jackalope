@@ -438,8 +438,9 @@ pub struct FeedbackRequest {
 #[tauri::command]
 pub async fn app_submit_feedback(
     app: AppHandle,
-    request: FeedbackRequest,
+    mut request: FeedbackRequest,
 ) -> Result<String, String> {
+    request.message = crate::commands::redaction::outbound(&request.message).into_owned();
     if !valid_id(&request.id)
         || request.message.trim().is_empty()
         || request.message.encode_utf16().count() > 8000

@@ -543,6 +543,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   save times. Their values and managed keys given to an agent are redacted from the
   attempt's saved and displayed record; the agent itself can still use or send them.
   See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
+- Feedback reports, companion responses, Jev requests and exported plans mask known
+  secret values and common credential shapes before they leave the app; local
+  history and agent input are unchanged. See [SECURITY.md](../SECURITY.md).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People

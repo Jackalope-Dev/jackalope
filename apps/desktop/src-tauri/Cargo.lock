@@ -3329,6 +3329,7 @@ dependencies = [
  "portable-pty",
  "qrcode",
  "ratatui",
+ "regex",
  "reqwest",
  "rmcp",
  "ruzstd",
