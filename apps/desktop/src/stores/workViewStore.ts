@@ -25,6 +25,9 @@ interface WorkViewState {
   /** Projects folded in the sidebar tree; absent projects are expanded. */
   collapsedProjects: Record<string, boolean>;
   toggleProject: (id: string) => void;
+  /** Projects whose starting points the person hid from below their work list. */
+  hiddenLaunchpads: Record<string, boolean>;
+  setLaunchpadHidden: (id: string, hidden: boolean) => void;
   /** Panel sizes the user dragged, in pixels, by panel; absent panels use their default. */
   sizes: Record<string, number>;
   setSize: (id: string, size: number | null) => void;
@@ -60,6 +63,14 @@ export const useWorkViewStore = create<WorkViewState>()(
           if (collapsedProjects[id]) delete collapsedProjects[id];
           else collapsedProjects[id] = true;
           return { collapsedProjects };
+        }),
+      hiddenLaunchpads: {},
+      setLaunchpadHidden: (id, hidden) =>
+        set((state) => {
+          const hiddenLaunchpads = { ...state.hiddenLaunchpads };
+          if (hidden) hiddenLaunchpads[id] = true;
+          else delete hiddenLaunchpads[id];
+          return { hiddenLaunchpads };
         }),
       sizes: {},
       setSize: (id, size) =>
@@ -105,6 +116,7 @@ export const useWorkViewStore = create<WorkViewState>()(
         split,
         navCollapsed,
         collapsedProjects,
+        hiddenLaunchpads,
         sizes,
       }) => ({
         scope,
@@ -114,6 +126,7 @@ export const useWorkViewStore = create<WorkViewState>()(
         split,
         navCollapsed,
         collapsedProjects,
+        hiddenLaunchpads,
         sizes,
       }),
     },

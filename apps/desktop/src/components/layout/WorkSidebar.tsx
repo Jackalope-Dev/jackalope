@@ -1,4 +1,4 @@
-import { ContextMenu, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
+import { ContextMenu, cn, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
 import {
   ChevronRight,
   Code2,
@@ -832,6 +832,199 @@ export function WorkSidebar({
       onOpen();
     },
   };
+  const general = projects.find((project) => project.id === GENERAL_PROJECT_ID);
+  const projectGroup = (project: Project) => {
+    const live = byProject.get(project.id) ?? [];
+    const outside = external.get(project.id) ?? [];
+    const brought = imported.get(project.id) ?? [];
+    const expanded = !collapsed[project.id];
+    const attention = live.filter((item) => ['attention', 'review'].includes(item.stage)).length;
+    const running = live.filter((item) => item.stage === 'working').length;
+    const all = allByProject.get(project.id) ?? [];
+    const folderList = folders[project.id] ?? [];
+    const folderIds = new Set(folderList.map((folder) => folder.id));
+    // Pinned work and work in folders always shows, in its own place above the rest.
+    const pinned = pinnedWork.flatMap((id) => all.find((item) => item.id === id) ?? []);
+    const pinnedIds = new Set(pinned.map((item) => item.id));
+    const inFolder = (folderId: string) =>
+      all.filter((item) => placement[item.id] === folderId && !pinnedIds.has(item.id));
+    const items = live.filter(
+      (item) => !pinnedIds.has(item.id) && !folderIds.has(placement[item.id] ?? ''),
+    );
+    // The tree keeps only live work: rows that need the person, are running, are unread or
+    // are open. The rest stays one click away on the project's Work page.
+    const rest = items.filter(
+      (item) =>
+        ['attention', 'review', 'working'].includes(item.stage) ||
+        isUnread(item, signals, openKey) ||
+        row.selected(item),
+    );
+    const more = items.length - rest.length;
+    // The project row is "where you are" when its page or its unfiltered work list is open.
+    const current =
+      project.id === activeProject &&
+      (projectView || (activeTab === 'kanban' && !somethingOpen && scope === 'project'));
+    const listId = `project-tree-${project.id}`;
+    return (
+      <section
+        key={project.id}
+        className={cn(
+          'project-tree-group',
+          project.id === GENERAL_PROJECT_ID && 'project-tree-general',
+        )}
+      >
+        <ProjectContextMenu project={project} onSetIcon={setIconFor} {...actions}>
+          <div
+            className="project-tree-head"
+            data-active={project.id === activeProject || undefined}
+          >
+            {live.length || outside.length || pinned.length || folderList.length ? (
+              <button
+                type="button"
+                className="project-tree-toggle"
+                aria-label={`${expanded ? 'Collapse' : 'Expand'} ${project.name}`}
+                aria-expanded={expanded}
+                aria-controls={expanded ? listId : undefined}
+                onClick={() => useWorkViewStore.getState().toggleProject(project.id)}
+              >
+                <ChevronRight size={14} aria-hidden="true" className="project-tree-chevron" />
+              </button>
+            ) : (
+              <span className="project-tree-toggle" aria-hidden="true" />
+            )}
+            <button
+              type="button"
+              className="project-tree-name"
+              aria-current={current ? 'page' : undefined}
+              onClick={() => actions.onOpenProject(project.id, 'kanban')}
+              title={project.path}
+            >
+              <ProjectMark project={project} />
+              <span className="project-tree-label">{project.name}</span>
+              {hints.has(project.id) && (
+                <span className="project-tree-hint">{hints.get(project.id)}</span>
+              )}
+              {!expanded && (attention > 0 || running > 0) && (
+                <span className="project-tree-counts">
+                  {attention > 0 && (
+                    <span className="project-tree-count" data-tone="attention">
+                      {attention}
+                      <span className="sr-only"> need you</span>
+                    </span>
+                  )}
+                  {running > 0 && (
+                    <span className="project-tree-count">
+                      {running}
+                      <span className="sr-only"> running</span>
+                    </span>
+                  )}
+                </span>
+              )}
+            </button>
+            <span className="project-tree-head-actions">
+              <Tooltip side="right" content={`New work in ${project.name}`}>
+                <button
+                  type="button"
+                  className="project-tree-action"
+                  aria-label={`New work in ${project.name}`}
+                  onClick={() => actions.onNewWork(project.id)}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                </button>
+              </Tooltip>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <button
+                    type="button"
+                    className="project-tree-action"
+                    aria-label={`${project.name} options`}
+                  >
+                    <Ellipsis size={14} aria-hidden="true" />
+                  </button>
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Content
+                    className="workspace-menu min-w-52"
+                    side="right"
+                    align="start"
+                    collisionPadding={12}
+                    onCloseAutoFocus={keepRenameFocus}
+                  >
+                    <ProjectMenuItems
+                      menu={Menu}
+                      project={project}
+                      onSetIcon={setIconFor}
+                      {...actions}
+                    />
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu.Root>
+            </span>
+          </div>
+        </ProjectContextMenu>
+        {expanded && (pinned.length > 0 || folderList.length > 0 || items.length > 0) && (
+          <ul id={listId} className="project-tree-items">
+            {pinned.map((item) => (
+              <WorkRow key={item.id} item={item} row={row} folders={folderList} pinned />
+            ))}
+            {folderList.map((folder) => (
+              <FolderGroup
+                key={folder.id}
+                projectId={project.id}
+                folder={folder}
+                items={inFolder(folder.id)}
+                row={row}
+                folders={folderList}
+              />
+            ))}
+            {(pinned.length > 0 || folderList.length > 0) && (rest.length > 0 || more > 0) && (
+              <li className="work-sidebar-divider" aria-hidden="true" />
+            )}
+            {rest.map((item) => (
+              <WorkRow key={item.id} item={item} row={row} folders={folderList} closable />
+            ))}
+            {more > 0 && (
+              <li className="work-sidebar-row">
+                <button
+                  type="button"
+                  className="work-sidebar-item work-sidebar-more"
+                  title={`Open all of ${project.name}'s work`}
+                  onClick={() => actions.onOpenProject(project.id, 'kanban')}
+                >
+                  <span className="work-sidebar-title">
+                    {more} more
+                    <span className="sr-only"> in {project.name}</span>
+                  </span>
+                </button>
+              </li>
+            )}
+          </ul>
+        )}
+        {expanded && (
+          <ExternalSessionRows
+            heading="Imported"
+            sessions={brought}
+            selectedKey={selectedImported}
+            onOpen={(conversation) => {
+              openImportedConversation(conversation.id, conversation.projectId);
+              onOpen();
+            }}
+          />
+        )}
+        {expanded && (
+          <ExternalSessionRows
+            heading="Outside Jackalope"
+            sessions={outside}
+            selectedKey={selectedExternal}
+            onOpen={(session) => {
+              openExternalSession(session.key, session.projectId);
+              onOpen();
+            }}
+          />
+        )}
+      </section>
+    );
+  };
   return (
     <nav className="project-tree" aria-label="Projects">
       <FavoriteTiles
@@ -844,210 +1037,12 @@ export function WorkSidebar({
         actions={actions}
         onSetIcon={setIconFor}
       />
-      <div className="project-tree-heading">
-        <h2>Projects</h2>
-        <Tooltip side="right" content="Add a project">
-          <button
-            type="button"
-            className="project-tree-action"
-            aria-label="Add a project"
-            onClick={onAddProject}
-          >
-            <Plus size={14} aria-hidden="true" />
-          </button>
-        </Tooltip>
-      </div>
-      {projects.map((project) => {
-        const live = byProject.get(project.id) ?? [];
-        const outside = external.get(project.id) ?? [];
-        const brought = imported.get(project.id) ?? [];
-        const expanded = !collapsed[project.id];
-        const attention = live.filter((item) =>
-          ['attention', 'review'].includes(item.stage),
-        ).length;
-        const running = live.filter((item) => item.stage === 'working').length;
-        const all = allByProject.get(project.id) ?? [];
-        const folderList = folders[project.id] ?? [];
-        const folderIds = new Set(folderList.map((folder) => folder.id));
-        // Pinned work and work in folders always shows, in its own place above the rest.
-        const pinned = pinnedWork.flatMap((id) => all.find((item) => item.id === id) ?? []);
-        const pinnedIds = new Set(pinned.map((item) => item.id));
-        const inFolder = (folderId: string) =>
-          all.filter((item) => placement[item.id] === folderId && !pinnedIds.has(item.id));
-        const items = live.filter(
-          (item) => !pinnedIds.has(item.id) && !folderIds.has(placement[item.id] ?? ''),
-        );
-        // The tree keeps only live work: rows that need the person, are running, are unread or
-        // are open. The rest stays one click away on the project's Work page.
-        const rest = items.filter(
-          (item) =>
-            ['attention', 'review', 'working'].includes(item.stage) ||
-            isUnread(item, signals, openKey) ||
-            row.selected(item),
-        );
-        const more = items.length - rest.length;
-        // The project row is "where you are" when its page or its unfiltered work list is open.
-        const current =
-          project.id === activeProject &&
-          (projectView || (activeTab === 'kanban' && !somethingOpen && scope === 'project'));
-        const listId = `project-tree-${project.id}`;
-        return (
-          <section key={project.id} className="project-tree-group">
-            <ProjectContextMenu project={project} onSetIcon={setIconFor} {...actions}>
-              <div
-                className="project-tree-head"
-                data-active={project.id === activeProject || undefined}
-              >
-                {live.length || outside.length || pinned.length || folderList.length ? (
-                  <button
-                    type="button"
-                    className="project-tree-toggle"
-                    aria-label={`${expanded ? 'Collapse' : 'Expand'} ${project.name}`}
-                    aria-expanded={expanded}
-                    aria-controls={expanded ? listId : undefined}
-                    onClick={() => useWorkViewStore.getState().toggleProject(project.id)}
-                  >
-                    <ChevronRight size={14} aria-hidden="true" className="project-tree-chevron" />
-                  </button>
-                ) : (
-                  <span className="project-tree-toggle" aria-hidden="true" />
-                )}
-                <button
-                  type="button"
-                  className="project-tree-name"
-                  aria-current={current ? 'page' : undefined}
-                  onClick={() => actions.onOpenProject(project.id, 'kanban')}
-                  title={project.path}
-                >
-                  <ProjectMark project={project} />
-                  <span className="project-tree-label">{project.name}</span>
-                  {hints.has(project.id) && (
-                    <span className="project-tree-hint">{hints.get(project.id)}</span>
-                  )}
-                  {!expanded && (attention > 0 || running > 0) && (
-                    <span className="project-tree-counts">
-                      {attention > 0 && (
-                        <span className="project-tree-count" data-tone="attention">
-                          {attention}
-                          <span className="sr-only"> need you</span>
-                        </span>
-                      )}
-                      {running > 0 && (
-                        <span className="project-tree-count">
-                          {running}
-                          <span className="sr-only"> running</span>
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </button>
-                <span className="project-tree-head-actions">
-                  <Tooltip side="right" content={`New work in ${project.name}`}>
-                    <button
-                      type="button"
-                      className="project-tree-action"
-                      aria-label={`New work in ${project.name}`}
-                      onClick={() => actions.onNewWork(project.id)}
-                    >
-                      <Plus size={14} aria-hidden="true" />
-                    </button>
-                  </Tooltip>
-                  <Menu.Root>
-                    <Menu.Trigger asChild>
-                      <button
-                        type="button"
-                        className="project-tree-action"
-                        aria-label={`${project.name} options`}
-                      >
-                        <Ellipsis size={14} aria-hidden="true" />
-                      </button>
-                    </Menu.Trigger>
-                    <Menu.Portal>
-                      <Menu.Content
-                        className="workspace-menu min-w-52"
-                        side="right"
-                        align="start"
-                        collisionPadding={12}
-                        onCloseAutoFocus={keepRenameFocus}
-                      >
-                        <ProjectMenuItems
-                          menu={Menu}
-                          project={project}
-                          onSetIcon={setIconFor}
-                          {...actions}
-                        />
-                      </Menu.Content>
-                    </Menu.Portal>
-                  </Menu.Root>
-                </span>
-              </div>
-            </ProjectContextMenu>
-            {expanded && (pinned.length > 0 || folderList.length > 0 || items.length > 0) && (
-              <ul id={listId} className="project-tree-items">
-                {pinned.map((item) => (
-                  <WorkRow key={item.id} item={item} row={row} folders={folderList} pinned />
-                ))}
-                {folderList.map((folder) => (
-                  <FolderGroup
-                    key={folder.id}
-                    projectId={project.id}
-                    folder={folder}
-                    items={inFolder(folder.id)}
-                    row={row}
-                    folders={folderList}
-                  />
-                ))}
-                {(pinned.length > 0 || folderList.length > 0) && (rest.length > 0 || more > 0) && (
-                  <li className="work-sidebar-divider" aria-hidden="true" />
-                )}
-                {rest.map((item) => (
-                  <WorkRow key={item.id} item={item} row={row} folders={folderList} closable />
-                ))}
-                {more > 0 && (
-                  <li className="work-sidebar-row">
-                    <button
-                      type="button"
-                      className="work-sidebar-item work-sidebar-more"
-                      title={`Open all of ${project.name}'s work`}
-                      onClick={() => actions.onOpenProject(project.id, 'kanban')}
-                    >
-                      <span className="work-sidebar-title">
-                        {more} more
-                        <span className="sr-only"> in {project.name}</span>
-                      </span>
-                    </button>
-                  </li>
-                )}
-              </ul>
-            )}
-            {expanded && (
-              <ExternalSessionRows
-                heading="Imported"
-                sessions={brought}
-                selectedKey={selectedImported}
-                onOpen={(conversation) => {
-                  openImportedConversation(conversation.id, conversation.projectId);
-                  onOpen();
-                }}
-              />
-            )}
-            {expanded && (
-              <ExternalSessionRows
-                heading="Outside Jackalope"
-                sessions={outside}
-                selectedKey={selectedExternal}
-                onOpen={(session) => {
-                  openExternalSession(session.key, session.projectId);
-                  onOpen();
-                }}
-              />
-            )}
-          </section>
-        );
-      })}
-      {/* General lists like any project once added; until then this row adds it. */}
-      {!projects.some((project) => project.id === GENERAL_PROJECT_ID) && (
-        <section className="project-tree-group">
+      {/* General holds work without a project, so it leads the tree; until it is added,
+          this row adds it. */}
+      {general ? (
+        projectGroup(general)
+      ) : (
+        <section className="project-tree-group project-tree-general">
           <div className="project-tree-head">
             <span className="project-tree-toggle" aria-hidden="true" />
             <button
@@ -1062,6 +1057,20 @@ export function WorkSidebar({
           </div>
         </section>
       )}
+      <div className="project-tree-heading">
+        <h2>Projects</h2>
+        <Tooltip side="right" content="Add a project">
+          <button
+            type="button"
+            className="project-tree-action"
+            aria-label="Add a project"
+            onClick={onAddProject}
+          >
+            <Plus size={14} aria-hidden="true" />
+          </button>
+        </Tooltip>
+      </div>
+      {projects.filter((project) => project.id !== GENERAL_PROJECT_ID).map(projectGroup)}
       <ProjectIconDialog project={iconFor} onOpenChange={(next) => !next && setIconFor(null)} />
     </nav>
   );
@@ -1077,7 +1086,11 @@ export function CollapsedProjects(actions: ProjectActions) {
   const hints = useMemo(() => projectNameHints(projects), [projects]);
   return (
     <nav className="project-rail" aria-label="Projects">
-      {projects.map((project) => {
+      {/* General leads here too, as it does in the full tree. */}
+      {[
+        ...projects.filter((project) => project.id === GENERAL_PROJECT_ID),
+        ...projects.filter((project) => project.id !== GENERAL_PROJECT_ID),
+      ].map((project) => {
         const attention = (byProject.get(project.id) ?? []).filter((item) =>
           ['attention', 'review'].includes(item.stage),
         ).length;
