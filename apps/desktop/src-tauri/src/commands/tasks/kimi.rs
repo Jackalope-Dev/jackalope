@@ -501,6 +501,10 @@ fn remember_call(calls: &mut std::collections::HashMap<String, Value>, update: &
     if calls.len() >= KNOWN_CALLS && !calls.contains_key(id) {
         calls.clear();
     }
+    // A `tool_call` starts a call; a reused ID must not keep an earlier call's arguments.
+    if update["sessionUpdate"] == "tool_call" {
+        calls.remove(id);
+    }
     let known = calls.entry(id.to_string()).or_insert_with(|| json!({}));
     for key in ["kind", "title", "rawInput", "locations"] {
         if !update[key].is_null() {
@@ -1201,6 +1205,110 @@ mod tests {
             .collect();
         assert_eq!(routine, ["turn/4", "turn/5", "turn/6"], "{verdicts:?}");
         assert_eq!(verdicts.len(), 9);
+    }
+
+    /// The whole path: the driver merges the streamed arguments and
+    /// [`permission`] gives that merged call to the risk check.
+    #[test]
+    fn kimi_auto_approval_asks_for_a_destructive_command_streamed_before_its_request() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-kimi-risk-{}", uuid::Uuid::new_v4()));
+        let workspace = folder.join("work");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let mut run = super::super::tests::sample("kimi");
+        run.id = "kimi-risk".into();
+        run.project_id = "fixture".into();
+        run.workspace = workspace.to_string_lossy().into_owned();
+        runtime.insert_for_test(run);
+        let update = |value: Value| json!({"method":"session/update","params":{"sessionId":"new","update":value}});
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        let ask = |id: &str, title: &str| json!({"id":id,"method":"session/request_permission","params":{"sessionId":"new","toolCall":{"toolCallId":id,"title":title,"content":text("Requesting approval")},"options":[{"optionId":"approve","name":"Approve once","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}});
+        let mut outcomes = Vec::new();
+        let error = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/1","title":"Shell: pnpm test","content":text("{\"command\": \"pnpm test\"}")})),
+                ask("turn/1", "Shell: pnpm test"),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/2","title":"Shell: rm -rf ~","content":text("{\"command\": \"rm -rf ~\"}")})),
+                ask("turn/2", "Shell: rm -rf ~"),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut Vec::new(),
+            &workspace.to_string_lossy(),
+            None,
+            None,
+            "Task",
+            |_| {},
+            |params| {
+                let outcome = permission(&runtime, "kimi-risk", params);
+                outcomes.push(outcome.clone());
+                outcome
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("declined or unanswered"), "{error}");
+        // With no process to ask through, the question goes unanswered.
+        assert_eq!(
+            outcomes,
+            [
+                json!({"outcome":"selected","optionId":"approve"}),
+                json!({"outcome":"cancelled"})
+            ]
+        );
+        let run = runtime.run_snapshot("kimi-risk").unwrap();
+        assert!(
+            run.activity
+                .iter()
+                .any(|line| line == "Auto-approved Shell: pnpm test"),
+            "{:?}",
+            run.activity
+        );
+        assert!(
+            run.activity
+                .iter()
+                .any(|line| line.starts_with("Asking: ") && line.ends_with("(Shell: rm -rf ~)")),
+            "{:?}",
+            run.activity
+        );
+        assert!(run.prompts[0].question.contains("rm -rf ~"));
+        drop(runtime);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn a_reused_call_id_never_keeps_the_earlier_call_s_arguments() {
+        let mut calls = std::collections::HashMap::new();
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        remember_call(
+            &mut calls,
+            &json!({"sessionUpdate":"tool_call","toolCallId":"Shell:0","title":"Shell","content":text("{\"command\": \"pnpm test\"}")}),
+        );
+        remember_call(
+            &mut calls,
+            &json!({"sessionUpdate":"tool_call_update","toolCallId":"Shell:0","content":text("not json")}),
+        );
+        let request = json!({"toolCallId":"Shell:0","title":"Shell: pnpm test"});
+        assert_eq!(
+            known_call(&calls, &request)["rawInput"],
+            json!({"command": "pnpm test"})
+        );
+        // A new call with the same ID whose arguments never parse.
+        remember_call(
+            &mut calls,
+            &json!({"sessionUpdate":"tool_call","toolCallId":"Shell:0","title":"Shell","content":text("{\"command\": \"rm -rf")}),
+        );
+        let request = json!({"toolCallId":"Shell:0","title":"Shell: rm -rf ~"});
+        let call = known_call(&calls, &request);
+        assert!(call["rawInput"].is_null(), "{call}");
+        assert_ne!(
+            crate::commands::permission_risk::assess_acp(
+                &call,
+                &crate::commands::permission_risk::Scope::new(std::path::Path::new("/work"))
+            ),
+            crate::commands::permission_risk::Verdict::Routine
+        );
     }
 
     #[test]

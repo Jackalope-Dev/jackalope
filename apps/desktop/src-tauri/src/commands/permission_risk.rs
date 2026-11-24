@@ -190,10 +190,17 @@ pub fn assess(tool: &str, input: &Value, scope: &Scope) -> Verdict {
 /// custom ACP agents), merged with what earlier updates reported about it.
 /// Shell commands and file changes are read as tool rules read them, because
 /// some agents (Kimi) send neither `kind` nor `rawInput` with the request. A
-/// request with no kind and no readable input asks.
+/// command argument is checked whatever `kind` claims. A request with no kind
+/// and no readable input asks.
 pub fn assess_acp(tool_call: &Value, scope: &Scope) -> Verdict {
-    use super::knowledge::tool_rules::{self, ToolCall, ToolKind};
     let context = Context::new(scope);
+    command_text(&tool_call["rawInput"])
+        .map_or(Routine, |command| context.command(&command, 0, false))
+        .or(|| assess_acp_kind(&context, tool_call, scope))
+}
+
+fn assess_acp_kind(context: &Context, tool_call: &Value, scope: &Scope) -> Verdict {
+    use super::knowledge::tool_rules::{self, ToolCall, ToolKind};
     let raw = &tool_call["rawInput"];
     if let Some(kind) = tool_rules::acp_kind(tool_call) {
         let call = ToolCall::acp(tool_call, &scope.workspace.to_string_lossy());
@@ -230,7 +237,25 @@ pub fn assess_acp(tool_call: &Value, scope: &Scope) -> Verdict {
             first_risk(input_paths(raw).iter().map(|path| context.read_path(path)))
         }
         _ if !raw.is_object() => risky("the request could not be read"),
-        _ => context.tool(tool_rules::acp_tool(tool_call), raw),
+        // Kimi names MCP tools without an `mcp__` prefix (`deploy_site`).
+        _ => {
+            let tool = tool_rules::acp_tool(tool_call);
+            context.tool(tool, raw).or(|| external_action(tool))
+        }
+    }
+}
+
+/// Risky when a connected tool's name says it deletes, deploys or publishes.
+fn external_action(tool: &str) -> Verdict {
+    const EXTERNAL: [&str; 8] = [
+        "delete", "drop", "destroy", "deploy", "publish", "release", "push", "merge",
+    ];
+    let name = tool.to_ascii_lowercase();
+    let action = name.rsplit("__").next().unwrap_or(&name);
+    if EXTERNAL.iter().any(|verb| action.contains(verb)) {
+        risky("the connected tool can delete, deploy or publish")
+    } else {
+        Routine
     }
 }
 
@@ -390,13 +415,7 @@ impl Context {
             }
         }
         if name.starts_with("mcp__") {
-            let action = name.rsplit("__").next().unwrap_or(&name);
-            const EXTERNAL: [&str; 8] = [
-                "delete", "drop", "destroy", "deploy", "publish", "release", "push", "merge",
-            ];
-            if EXTERNAL.iter().any(|verb| action.contains(verb)) {
-                return risky("the connected tool can delete, deploy or publish");
-            }
+            return external_action(&name);
         }
         Routine
     }
@@ -3050,6 +3069,48 @@ mod tests {
             acp(json!({"kind": "other", "title": "x"})),
             "other without input",
         );
+    }
+
+    #[test]
+    fn acp_commands_are_checked_whatever_kind_the_request_claims() {
+        let workspace = &Scope::new(Path::new("/work/repo"));
+        for kind in [
+            "read",
+            "search",
+            "fetch",
+            "think",
+            "switch_mode",
+            "other",
+            "edit",
+        ] {
+            let call = json!({"kind": kind, "title": "x", "rawInput": {"command": "rm -rf ~", "path": "/work/repo/a.ts"}});
+            asks(assess_acp(&call, workspace), kind);
+        }
+        let call = json!({"kind": "read", "title": "x", "rawInput": {"command": "ls src", "path": "/work/repo/a.ts"}});
+        routine(assess_acp(&call, workspace), "routine command on a read");
+    }
+
+    /// Kimi names MCP tools as their server does, with no `mcp__` prefix.
+    #[test]
+    fn acp_connected_tools_that_deploy_or_delete_ask_without_an_mcp_prefix() {
+        let workspace = &Scope::new(Path::new("/work/repo"));
+        let kimi = |title: &str| {
+            assess_acp(
+                &json!({"title": title, "rawInput": {"site": "docs"}}),
+                workspace,
+            )
+        };
+        for title in [
+            "deploy_site",
+            "DeleteBranch",
+            "publish_package: docs",
+            "mcp__web__push",
+        ] {
+            asks(kimi(title), title);
+        }
+        for title in ["lookup_docs", "SearchWeb: rust", "list_sites"] {
+            routine(kimi(title), title);
+        }
     }
 
     #[test]

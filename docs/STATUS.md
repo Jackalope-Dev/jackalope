@@ -715,8 +715,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   files with their edit tools so each edit is checked, and `record_decision` replies
   flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the
   task's activity. ACP requests are read the way tool rules read them: Kimi's carry no kind or
-  input, so its earlier streamed arguments stand in, and a request that still cannot be
-  read asks. Saved always-allow rules still apply; a chained command (`&&`,
+  input, so its earlier streamed arguments stand in. A command argument is checked
+  whatever kind the request claims, and connected tools named for deleting, deploying or
+  publishing ask with or without an `mcp__` prefix. A shell request with no readable
+  command, a file change with no readable path, and a request with neither a kind nor
+  any input ask. Saved always-allow rules still apply; a chained command (`&&`,
   `;`, `|`) is allowed when every command in it has a rule, and choosing always
   allow saves one for each, except chains through shells, interpreters or `sudo`. Codex keeps its workspace-write sandbox; Gemini
   CLI, Grok and Antigravity follow their own CLI approval policies.
