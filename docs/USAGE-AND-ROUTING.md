@@ -246,6 +246,29 @@ reconstructed. Connected capacity remains a separate account-wide view
 that may include other applications. Opening Usage and reading capacity do not
 send model prompts. Unreadable task history hides summaries until reload succeeds.
 
+Where agent time goes shows, for attempts that measured it, the agents' working time
+by activity: thinking and writing, reading the code, tests and builds, trying the app
+and other work, compared across agents, with the slowest tools by measured time. It
+follows the project, account, agent and period filters and says how many attempts
+in scope ran before activity was timed.
+
+### Agent working time
+
+Each attempt's `efficiency.activity` splits the agent's working time by kind, from
+tool start and finish events as they arrive. `tool_activity::activity_kind` names the
+kind from the tool and, for shell commands, the command: `ask` (waiting on the person),
+`check` (tests, builds, linters, type checks and saved checks), `app` (browser and
+desktop use), `command`, `helper`, `web`, `edit`, `read`, `search`, `plan` and `tool`.
+`think` is time with no tool running, when the model reads results, plans and writes.
+The clock starts with the execution stage and advances on every event, so the kinds
+add up to the time from launch to the agent's last event. A moment with several calls
+running goes to one kind, in the order listed above, and a helper agent's own calls
+stay inside its parent call. `efficiency.toolTime` keeps each tool's total and
+longest measured call, in which overlapping calls each count in full; both maps keep
+at most 100 tool names. Codex, Claude Code, Grok, OpenCode, Gemini CLI and Antigravity
+are timed. ACP agents and attempts recorded earlier have tool counts at most. Timing
+starts again from the next event after Jackalope restarts mid-attempt.
+
 Task assessments have a separate project/period-scoped ledger, including calls that
 never launched work and failed calls with unavailable reports. Immutable receipt IDs
 deduplicate reused assessments. They are excluded from worker and routing totals and

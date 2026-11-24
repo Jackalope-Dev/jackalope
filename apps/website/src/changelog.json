@@ -1,5 +1,16 @@
 [
   {
+    "id": "see-where-a-task-s-time-went",
+    "date": "2026-11-24",
+    "title": "See where a task's time went.",
+    "description": "Finished tasks now have a Report tab that shows how long the agent spent thinking, reading code, running tests and trying the app.",
+    "items": [
+      "The report covers every attempt: total time, checks, setup, time waiting on you, tokens, cost and changed files, plus each tool's calls and time.",
+      "Usage & quota compares where agent time goes across agents and lists the slowest tools."
+    ],
+    "note": "Activity is timed for tasks started from this version. ACP agents show tool counts only."
+  },
+  {
     "id": "split-a-merge-into-smaller-commits",
     "date": "2026-11-24",
     "title": "Split a merge into smaller commits.",

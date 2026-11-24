@@ -459,6 +459,127 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
     format!("Using {name}")
 }
 
+/// What a tool call spends the agent's time on, for the task report: `ask` (waiting on
+/// the person), `check` (tests, builds, linters, saved checks), `app` (browser and
+/// desktop use), `command`, `helper` (subagents), `web`, `edit`, `read`, `search`,
+/// `plan` (plans, notes, tool discovery) or `tool` (anything else).
+pub(super) fn activity_kind(name: &str, input: &Value) -> &'static str {
+    let name = name.to_ascii_lowercase();
+    let base = name
+        .strip_prefix("mcp__jackalope__")
+        .or_else(|| name.strip_prefix("jackalope:"))
+        .unwrap_or(&name);
+    match base {
+        "ask_user"
+        | "askuserquestion"
+        | "request_human_action"
+        | "ask_question"
+        | "ask_permission"
+        | "ask_custom_permission" => "ask",
+        "computer_verify" | "verification_output" => "check",
+        "desktop_control" => "app",
+        "read" | "read_file" | "readfile" | "read_many_files" | "view" | "notebookread"
+        | "read_context" => "read",
+        "grep" | "glob" | "search" | "search_files" | "grep_search" | "list_directory" | "ls"
+        | "list" | "find" | "codebase_search" => "search",
+        "edit" | "edit_file" | "multiedit" | "replace" | "str_replace" | "str_replace_editor"
+        | "write" | "write_file" | "writefile" | "file_change" | "apply_patch" | "patch"
+        | "notebookedit" => "edit",
+        "bash" | "powershell" | "shell" | "execute" | "command_execution" | "run_shell_command"
+        | "exec_command" | "computer_exec" => command_kind(&input["command"]),
+        "websearch" | "web_search" | "webfetch" | "web_fetch" | "google_web_search" | "fetch" => {
+            "web"
+        }
+        "task" | "agent" | "collab_tool_call" | "spawn_agent" => "helper",
+        "todowrite"
+        | "update_plan"
+        | "toolsearch"
+        | "record_decision"
+        | "restate_goal"
+        | "record_validation_step"
+        | "tools_search"
+        | "tools_read" => "plan",
+        _ if base.starts_with("browser_")
+            || ["playwright", "puppeteer", "chrome", "browser"]
+                .iter()
+                .any(|word| base.contains(word)) =>
+        {
+            "app"
+        }
+        _ => "tool",
+    }
+}
+
+/// Programs and package scripts that test, build, lint or type-check a project.
+const CHECK_WORDS: &[&str] = &[
+    "test",
+    "tests",
+    "vitest",
+    "jest",
+    "pytest",
+    "mocha",
+    "rspec",
+    "phpunit",
+    "nextest",
+    "ctest",
+    "tsc",
+    "typecheck",
+    "lint",
+    "eslint",
+    "biome",
+    "clippy",
+    "build",
+    "verify",
+    "check",
+    "ruff",
+    "mypy",
+    "pyright",
+    "xcodebuild",
+    "knip",
+];
+
+/// A shell command's kind: Jackalope bridge calls by route, then project checks by any
+/// word that names one (`pnpm verify:quick`, `cargo test`), then browser automation.
+fn command_kind(command: &Value) -> &'static str {
+    let script = match command {
+        Value::String(text) => text.to_ascii_lowercase(),
+        Value::Array(parts) => parts
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase(),
+        _ => return "command",
+    };
+    if script.contains("/v1/user-prompt") || script.contains("/v1/human-action") {
+        return "ask";
+    }
+    if script.contains("/v1/computer/verify") || script.contains("/v1/computer/output") {
+        return "check";
+    }
+    if script.contains("/v1/browser/") || script.contains("/v1/desktop/") {
+        return "app";
+    }
+    let words = script
+        .split(|ch: char| {
+            ch.is_whitespace() || matches!(ch, ';' | '&' | '|' | '(' | ')' | '"' | '\'')
+        })
+        .map(base_name);
+    let mut app = false;
+    for word in words {
+        let stem = word.split(':').next().unwrap_or(word);
+        if CHECK_WORDS.contains(&word) || (word.len() > stem.len() && CHECK_WORDS.contains(&stem)) {
+            return "check";
+        }
+        app |= matches!(word, "agent-browser" | "playwright-cli" | "screencapture");
+    }
+    if app {
+        "app"
+    } else {
+        "command"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -651,5 +772,47 @@ mod tests {
             label("mcp__linear__create_issue", &json!({}), ""),
             "Using create issue (linear)"
         );
+    }
+
+    #[test]
+    fn activity_kind_names_what_a_call_spends_time_on() {
+        use super::activity_kind;
+        let command = |text: &str| activity_kind("Bash", &json!({"command": text}));
+        assert_eq!(command("pnpm verify:quick"), "check");
+        assert_eq!(command("cd apps/web && cargo test -p core"), "check");
+        assert_eq!(command("bash -lc 'npx vitest run'"), "check");
+        assert_eq!(command("git checkout -b fix"), "command");
+        assert_eq!(command("git check-ignore -v dist"), "command");
+        assert_eq!(command("agent-browser open http://localhost:5173"), "app");
+        assert_eq!(
+            command("curl -X POST $JACKALOPE_BRIDGE/v1/user-prompt"),
+            "ask"
+        );
+        assert_eq!(command("ls src"), "command");
+        assert_eq!(
+            activity_kind(
+                "command_execution",
+                &json!({"command": ["bash", "-lc", "pytest -q"]})
+            ),
+            "check"
+        );
+        assert_eq!(
+            activity_kind("mcp__jackalope__computer_verify", &json!({})),
+            "check"
+        );
+        assert_eq!(
+            activity_kind("mcp__jackalope__browser_screenshot", &json!({})),
+            "app"
+        );
+        assert_eq!(activity_kind("jackalope:ask_user", &json!({})), "ask");
+        assert_eq!(
+            activity_kind("mcp__playwright__browser_click", &json!({})),
+            "app"
+        );
+        assert_eq!(activity_kind("MultiEdit", &json!({})), "edit");
+        assert_eq!(activity_kind("Glob", &json!({})), "search");
+        assert_eq!(activity_kind("Task", &json!({})), "helper");
+        assert_eq!(activity_kind("TodoWrite", &json!({})), "plan");
+        assert_eq!(activity_kind("mcp__linear__get_issue", &json!({})), "tool");
     }
 }

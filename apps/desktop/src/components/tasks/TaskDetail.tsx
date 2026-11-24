@@ -99,6 +99,10 @@ const TaskTerminal = lazy(() =>
 // The tools panel pulls in the agent, connection and project editors; load it
 // only when the user opens it.
 const TaskTools = lazy(() => import('./TaskTools').then((m) => ({ default: m.TaskTools })));
+const TaskReport = lazy(() => import('./TaskReport').then((m) => ({ default: m.TaskReport })));
+const TaskReportLink = lazy(() =>
+  import('./TaskReport').then((m) => ({ default: m.TaskReportLink })),
+);
 
 export function TaskDetail({
   run,
@@ -222,6 +226,11 @@ export function TaskDetail({
     run.workspace.replaceAll('\\', '/').toLowerCase() !==
       run.projectPath.replaceAll('\\', '/').toLowerCase();
   const finished = !active && isDone(run);
+  // The report covers every attempt, so it waits until the task's latest attempt ends.
+  const reported = !active && isLatest && !!run.endedAt;
+  useEffect(() => {
+    if (tab === 'report' && !reported) setTab('result');
+  }, [tab, reported]);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
   const changes = useChangeStats([run])[run.id]?.value;
   const changedFiles = changes?.files;
@@ -733,6 +742,7 @@ export function TaskDetail({
               { value: 'terminal', label: 'Terminal' },
               { value: 'screen', label: 'Screen' },
               { value: 'activity', label: 'Activity' },
+              ...(reported ? [{ value: 'report', label: 'Report' }] : []),
             ].map(({ value, label }) => (
               <Tabs.Trigger key={value} value={value}>
                 {label}
@@ -814,6 +824,11 @@ export function TaskDetail({
               </p>
             )}
             <TurnAdvisorNotes review={run.advisor} />
+            {reported && (
+              <Suspense fallback={null}>
+                <TaskReportLink attempts={attempts} onOpen={() => setTab('report')} />
+              </Suspense>
+            )}
           </Tabs.Content>
           {((!active && run.workspace) || tab === 'changes') && (
             <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
@@ -864,6 +879,19 @@ export function TaskDetail({
                   )
                 }
               />
+            </Tabs.Content>
+          )}
+          {reported && (
+            <Tabs.Content value="report">
+              <Suspense
+                fallback={
+                  <p role="status" className="task-muted">
+                    Opening report…
+                  </p>
+                }
+              >
+                <TaskReport attempts={attempts} changes={changes} />
+              </Suspense>
             </Tabs.Content>
           )}
           <Tabs.Content value="activity">

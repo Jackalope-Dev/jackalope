@@ -79,6 +79,7 @@ impl Stream {
             run.error.get_or_insert(UNTYPED.into());
             return;
         };
+        run.efficiency.observe(&event, "gemini", &run.workspace);
         let startup_error = !self.initialized
             && (kind == "error" || (kind == "result" && event["status"] == "error"));
         if kind != "init" && ((!self.initialized && !startup_error) || self.completed) {
@@ -105,7 +106,6 @@ impl Stream {
             "tool_use" => {
                 // A tool can end the turn without another assistant message.
                 run.result.clear();
-                run.efficiency.observe(&event, "gemini", &run.workspace);
                 let tool = event["tool_name"].as_str().unwrap_or("tool");
                 let label = super::tool_activity::label(tool, &event["parameters"], &run.workspace);
                 activity(run, &label);

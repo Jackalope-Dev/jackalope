@@ -89,6 +89,18 @@ journal, included in recovery exports and summarized in recovery handoffs. Older
 attempts have no trail and show nothing. `decision_trail.rs` owns the entry contract,
 validation and pointer checks.
 
+## See where the time went
+
+Once a task's latest attempt ends, the task page adds a Report tab, and the result
+links to it with the total time and a small breakdown. The report covers every
+attempt: start-to-finish time, the agent's session, saved checks, setup, time spent
+waiting for the person's answers, tokens, reported cost and changed files. Its time
+breakdown shows the agent's working time by activity with the longest single call of
+each kind, and its tool table lists each tool's calls and measured time. A short note
+names an activity that dominated, such as slow checks, when one did. Attempts recorded
+before activity was timed show stages and tool counts only. See
+[agent working time](USAGE-AND-ROUTING.md#agent-working-time) for how it is measured.
+
 ## Repeat a process with approval gates
 
 Project knowledge workflows can define required inputs, ordered steps and final
