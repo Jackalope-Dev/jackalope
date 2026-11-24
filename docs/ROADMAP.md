@@ -58,6 +58,10 @@ representative benefit and installed-platform acceptance remain open.
   and provider delegation with sequential fallback.
 - Recurring schedules, local change monitors, project lessons, codebase maps, MCP
   connections with curated discovery and guided setup, browser tools and Ask Jackalope.
+- Skill Sync: a Skills page lists personal and project agent skills, and the ones a
+  person chooses sync through their account to the same folders on their other
+  computers without being committed. Changes on two computers become a conflict to
+  resolve. Installed two-desktop acceptance remains open.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
 - Free signup with email confirmation and Turnstile protection, desktop account
@@ -199,5 +203,7 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 Jackalope Cloud, an always-on host that keeps coordinating work while the laptop is away so
 phones and other computers stay useful, comes first in this direction. Managed hosting
 (including hosted Artifacts repositories), agent-native repository workflows, shared
-workspaces and team collaboration depend on validated individual remote workflows. These remain exploratory directions.
+workspaces and team collaboration depend on validated individual remote workflows. A
+skills directory for browsing and submitting shared skills is also under consideration;
+today a skill is shared by exporting its folder. These remain exploratory directions.
 See [BACKEND.md](BACKEND.md).

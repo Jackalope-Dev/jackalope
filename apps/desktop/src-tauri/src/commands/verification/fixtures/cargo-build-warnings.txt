@@ -1,0 +1,23 @@
+    Updating crates.io index
+  Downloaded itoa v1.0.11
+  Downloaded ryu v1.0.18
+  Downloaded serde_json v1.0.122
+  Downloaded 3 crates (241.6 KB) in 0.42s
+   Compiling serde v1.0.204
+   Compiling itoa v1.0.11
+   Compiling ryu v1.0.18
+   Compiling serde_json v1.0.122
+   Compiling ledger v0.3.1 (/home/dev/ledger)
+warning: field `created_at` is never read
+  --> src/account.rs:12:5
+   |
+9  | pub struct Account {
+   |            ------- field in this struct
+...
+12 |     created_at: u64,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `ledger` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 22.07s

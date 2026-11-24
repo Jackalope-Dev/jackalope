@@ -27,6 +27,51 @@ fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
 }
+#[test]
+fn queue_concurrency_defaults_to_automatic_and_keeps_a_saved_choice() {
+    let folder = std::env::temp_dir().join(format!("jackalope-queue-limit-{}", Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let queue = folder.join("coordination");
+    let recommended = device_slots::recommended();
+    // A queue saved before the setting existed follows the device.
+    std::fs::create_dir_all(&queue).unwrap();
+    std::fs::write(queue.join("queue.json"), br#"{"items":[],"messages":[]}"#).unwrap();
+    let service = Coordinator::new(queue.clone(), runtime.clone()).unwrap();
+    let view = service.view().unwrap();
+    assert!(view.automatic_concurrency);
+    assert_eq!(view.concurrency, recommended);
+    assert_eq!(view.recommended_concurrency, recommended);
+    assert_eq!(view.max_concurrency, device_slots::MAX_CONCURRENCY);
+    let choose = |agents| serde_json::from_value::<ConcurrencyChoice>(agents).unwrap();
+    assert!(service
+        .dispatch("p".into(), false, Some(choose(serde_json::json!(17))), None)
+        .is_err());
+    service
+        .dispatch("p".into(), false, Some(choose(serde_json::json!(12))), None)
+        .unwrap();
+    assert_eq!(service.state().concurrency, 12);
+    // Pausing or resuming without a choice keeps it.
+    service.dispatch("p".into(), false, None, Some(4)).unwrap();
+    drop(service);
+    let restored = Coordinator::new(queue.clone(), runtime.clone()).unwrap();
+    let view = restored.view().unwrap();
+    assert!(!view.automatic_concurrency);
+    assert_eq!(view.concurrency, 12);
+    restored
+        .dispatch(
+            "p".into(),
+            false,
+            Some(choose(serde_json::json!("automatic"))),
+            None,
+        )
+        .unwrap();
+    assert_eq!(restored.state().concurrency, recommended);
+    let saved = std::fs::read_to_string(queue.join("queue.json")).unwrap();
+    assert!(!saved.contains("concurrency"));
+    drop(restored);
+    drop(runtime);
+    std::fs::remove_dir_all(folder).unwrap();
+}
 fn entry(key: &str, dependencies: &[&str]) -> PlanEntry {
     PlanEntry {
         context_selection: Default::default(),

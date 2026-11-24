@@ -25,6 +25,7 @@ import { observeNotifications } from './stores/notificationStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';
 import { observeSettingsSync } from './stores/settingsSyncStore';
+import { observeSkillSync } from './stores/skillSyncStore';
 import { bootstrapWindow } from './window-bootstrap';
 import './components/tasks/task-workspace.css';
 import '@jackalope/ui/styles.css';
@@ -35,6 +36,7 @@ export default function App() {
   useEffect(observeNotifications, []);
   useEffect(observeSettingsSync, []);
   useEffect(observeLessonSync, []);
+  useEffect(observeSkillSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   useEffect(() => bootstrapWindow({ community: false }), []);

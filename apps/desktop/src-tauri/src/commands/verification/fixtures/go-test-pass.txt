@@ -1,0 +1,27 @@
+=== RUN   TestParseAmount
+=== RUN   TestParseAmount/whole_units
+=== RUN   TestParseAmount/cents
+=== RUN   TestParseAmount/negative
+--- PASS: TestParseAmount (0.00s)
+    --- PASS: TestParseAmount/whole_units (0.00s)
+    --- PASS: TestParseAmount/cents (0.00s)
+    --- PASS: TestParseAmount/negative (0.00s)
+=== RUN   TestTransfer
+=== PAUSE TestTransfer
+=== RUN   TestReconcile
+    ledger_test.go:58: reconciling 1200 entries against fixture snapshot
+--- PASS: TestReconcile (0.04s)
+=== CONT  TestTransfer
+--- PASS: TestTransfer (0.01s)
+=== RUN   TestExportCSV
+    export_test.go:21: skipping: CSV fixtures require LEDGER_FIXTURES
+--- SKIP: TestExportCSV (0.00s)
+PASS
+ok  	example.com/ledger	0.123s	coverage: 84.2% of statements
+?   	example.com/ledger/cmd/ledgerctl	[no test files]
+=== RUN   TestFormatCurrency
+--- PASS: TestFormatCurrency (0.00s)
+=== RUN   TestGroupByMonth
+--- PASS: TestGroupByMonth (0.00s)
+PASS
+ok  	example.com/ledger/report	(cached)

@@ -3,13 +3,20 @@
 The website collects signups in D1. The `OPEN_SIGNUP` setting chooses how a signup
 becomes an approved member:
 
-- Open signup (`true`, the tracked production setting): confirming the signup email
+- Open signup (`true`, the tracked production and staging setting): confirming the signup email
   approves the member and starts a member sign-in session, so the person can pair a
   desktop without a second email.
-- Waitlist mode (`false`, the tracked staging and local setting): confirming the
+- Waitlist mode (`false`, the tracked local setting): confirming the
   email verifies a waitlist session and any newsletter request bound to that link,
   but cannot grant membership or download access. An owner approves members from
   `https://api.jackalope.dev/admin/access`, behind Cloudflare Access.
+
+Signup accepts addresses at reserved test domains (`example.com`, `example.net`,
+`example.org`, `.test`, `.invalid`, `.example`, `.localhost`, `.local`) and at
+throwaway inbox domains, including their subdomains, with the same response as a
+real signup but stores nothing and sends no email, like the honeypot field. The
+throwaway list lives in `apps/server/src/access/signup-domains.ts`; add domains
+there when bot signups show up in the email history.
 
 See [waitlist referrals and passes](WAITLIST-REFERRALS.md) for ranked waitlists,
 separate status sessions and Instant Access Pass presentation in waitlist mode.
@@ -59,7 +66,7 @@ older mail remains readable without a delivery lookup reference.
 | Setting | Value / purpose |
 | --- | --- |
 | `EARLY_ACCESS_ENABLED` | `true` after migration, email and owner policy setup |
-| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch. CI deploys take it from `PRODUCTION_OPEN_SIGNUP` / `STAGING_OPEN_SIGNUP` or the `COMMUNITY_CONFIG` JSON; otherwise the tracked value applies (`true` in production, `false` elsewhere) |
+| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch. CI deploys take it from `PRODUCTION_OPEN_SIGNUP` / `STAGING_OPEN_SIGNUP` or the `COMMUNITY_CONFIG` JSON; otherwise the tracked value applies (`true` in production and staging, `false` locally). Staging sends real email, so keep it on unless waitlist copy is wanted there |
 | `ACCESS_WEB_ORIGIN` | Exact HTTPS marketing origin, normally `https://jackalope.dev` |
 | `ACCESS_EMAIL_FROM` | Verified Sequenzy sender, `Jackalope <hello@hello.jackalope.dev>` |
 | `ACCESS_EMAIL_REPLY_TO` | `contact@jackalope.dev` |
@@ -70,7 +77,7 @@ older mail remains readable without a delivery lookup reference.
 | `ACCESS_SECRET` | Worker secret, independent random 32+ characters for each environment |
 | `SEQUENZY_API_KEY` | Worker secret with `transactional:send`; verify minimum permission for email-send lookups before enabling admin delivery checks |
 | `VITE_ACCESS_API` | Website build variable, `https://api.jackalope.dev` |
-| `VITE_TURNSTILE_SITE_KEY` | Website build variable: the public key of a managed Turnstile widget for the website's hostname. Unset shows no challenge |
+| `VITE_TURNSTILE_SITE_KEY` | Website build variable: the public key of a managed Turnstile widget for the website's hostname. Unset, production builds use jackalope.dev's widget (`apps/website/src/Turnstile.tsx`); set it to an empty string to show no challenge, or to your own key for another hostname |
 | `TURNSTILE_SECRET` | Optional Worker secret for that widget. When set, signup requires a Siteverify-confirmed token for the `signup` action from the `ACCESS_WEB_ORIGIN` hostname and fails closed otherwise. Set the site key and secret together |
 
 The shared deployment helper reads individual `STAGING_` / `PRODUCTION_` settings

@@ -1,3 +1,4 @@
+pub(in crate::commands) mod combined_check;
 pub(in crate::commands) mod conflicts;
 pub(in crate::commands) mod dependencies;
 pub(in crate::commands) mod split;

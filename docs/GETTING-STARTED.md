@@ -78,14 +78,14 @@ caps. Missing cost reports pause later batches when a cost threshold is set.
   contents, describe what happened, then copy it. Share it only through the
   support channel supplied with your release; the app does not send it for you.
 
-App updates appear in the same Settings category when a trusted release source
+App updates appear in Settings → Updates when a trusted release source
 is configured. Finish active tasks before installing. Local trial builds may
 have no update service configured.
 
 ## Keeping Jackalope up to date
 
 Published builds check for updates after startup and every hour while open, and
-download a found update in the background. Open **Settings → Help & community** to
+download a found update in the background. Open **Settings → Updates** to
 turn off automatic checking or background downloads, or to check now. The update
 notice offers **Download and install**, or **Restart to update** once the download
 is ready; open the details to read the release notes first. Dismissing the notice

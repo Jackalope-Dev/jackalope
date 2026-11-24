@@ -154,7 +154,7 @@ Give each task a clean starting point and a separate worktree. Record the base c
 git rev-parse HEAD
 ```
 
-That gives you a reference for reviewing the task's changes, rather than reconstructing which edits predated it. The [Git worktrees setup and cleanup guide](https://jackalope.dev/blog/git-worktrees-for-ai-coding-agents/) covers the mechanics.
+That gives you a reference for reviewing the task's changes, rather than reconstructing which edits predated it. The [Git worktrees setup and cleanup guide](https://jackalope.dev/git-worktrees-for-ai-agents/) covers the mechanics.
 
 Jackalope gives each task its own Git worktree, lets you choose the agent and work or personal account per project, and brings finished work back with checks and evidence for review. That separation helps contain a rejected task's file changes. It doesn't make external actions reversible.
 

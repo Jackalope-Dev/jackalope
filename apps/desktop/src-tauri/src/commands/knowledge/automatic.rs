@@ -4,6 +4,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::Path;
 
+mod rules;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LearningSource {
@@ -450,6 +452,11 @@ fn repository_candidates(project_id: &str, path: &str) -> Result<Vec<KnowledgeEn
     Ok(entries)
 }
 
+/// Lessons read from repository files, paused when their file disappears.
+fn from_files(kind: &str) -> bool {
+    matches!(kind, "repository" | "rules")
+}
+
 impl KnowledgeStore {
     pub(super) fn learn(
         &self,
@@ -463,11 +470,12 @@ impl KnowledgeStore {
         let mut entries = self.read()?;
         let mut candidates = repository_candidates(project_id, &path)?;
         candidates.extend(test_conventions(project_id, &path));
+        candidates.extend(rules::candidates(project_id, &path));
         candidates.extend(task_candidates(project_id, &path, runs));
         candidates.extend(verified_checks(project_id, &path, runs));
         let repo_ids: HashSet<_> = candidates
             .iter()
-            .filter(|e| e.automatic.as_ref().is_some_and(|a| a.kind == "repository"))
+            .filter(|e| e.automatic.as_ref().is_some_and(|a| from_files(&a.kind)))
             .map(|e| e.id.clone())
             .collect();
         let mut merged: BTreeMap<String, KnowledgeEntry> = BTreeMap::new();
@@ -493,7 +501,7 @@ impl KnowledgeStore {
                 && old
                     .automatic
                     .as_ref()
-                    .is_some_and(|a| a.kind == "repository" && a.managed)
+                    .is_some_and(|a| from_files(&a.kind) && a.managed)
                 && !repo_ids.contains(&old.id)
                 && old.enabled
             {

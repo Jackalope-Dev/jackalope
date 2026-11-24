@@ -84,6 +84,9 @@ const ConnectedApps = lazy(() =>
 const McpWorkspace = lazy(() =>
   import('../mcp/McpWorkspace').then((m) => ({ default: m.McpWorkspace })),
 );
+const SkillsPage = lazy(() =>
+  import('../skills/SkillsPage').then((m) => ({ default: m.SkillsPage })),
+);
 const ProjectContext = lazy(() =>
   import('../projects/ProjectContext').then((m) => ({ default: m.ProjectContext })),
 );
@@ -162,6 +165,7 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
   mcps: (ctx) => mcpWorkspace(ctx, 'configured'),
   'mcp-marketplace': (ctx) => mcpWorkspace(ctx, 'marketplace'),
   'connected-apps': () => <ConnectedApps />,
+  skills: () => <SkillsPage />,
   usage: (ctx) => <UsageDashboard onTask={() => ctx.open('kanban')} />,
   browser: (ctx) => (
     <BrowserHarness onOpenProject={ctx.openProjectSetup} onTask={(id) => openTask(ctx, id)} />
