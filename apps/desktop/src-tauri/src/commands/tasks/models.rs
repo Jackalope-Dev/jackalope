@@ -423,6 +423,15 @@ pub struct CoordinationContext {
     pub instructions: String,
 }
 
+/// Where one attempt of a task stands, without its record.
+#[derive(Clone, Debug)]
+pub struct AttemptState {
+    pub id: String,
+    pub started_at: String,
+    pub status: RunStatus,
+    pub archived: bool,
+}
+
 /// Lightweight summary of a run that retention moved out of the loaded history
 /// into the `archive/` folder. Enough to recognise and restore it; the full
 /// record stays on disk until restored.

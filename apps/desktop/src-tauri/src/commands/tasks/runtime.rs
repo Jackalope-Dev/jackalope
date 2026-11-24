@@ -1922,6 +1922,27 @@ impl TaskRuntime {
             },
         )
     }
+    /// One task's loaded attempts, oldest first, without copying the records.
+    pub(in crate::commands) fn task_attempts(&self, task_id: &str) -> Vec<AttemptState> {
+        let mut attempts: Vec<AttemptState> = self.inner.lock().map_or_else(
+            |_| Vec::new(),
+            |inner| {
+                inner
+                    .runs
+                    .values()
+                    .filter(|run| run.task_id == task_id)
+                    .map(|run| AttemptState {
+                        id: run.id.clone(),
+                        started_at: run.started_at.clone(),
+                        status: run.status.clone(),
+                        archived: run.archived_at.is_some(),
+                    })
+                    .collect()
+            },
+        );
+        attempts.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+        attempts
+    }
     pub(in crate::commands) fn has_run(&self, id: &str) -> Result<bool, String> {
         Ok(self
             .inner

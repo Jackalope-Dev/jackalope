@@ -718,7 +718,13 @@ impl Coordinator {
 
     pub fn shutdown(&self) {
         self.alive.store(false, Ordering::Relaxed);
+        crate::commands::turn_advisor::cancel_all();
         self.state().enabled.clear();
+    }
+
+    /// Whether the coordinator has not been shut down or reset.
+    pub(in crate::commands) fn running(&self) -> bool {
+        self.alive.load(Ordering::Relaxed)
     }
 
     /// The grant a bridge token was issued for: its task and attempt.

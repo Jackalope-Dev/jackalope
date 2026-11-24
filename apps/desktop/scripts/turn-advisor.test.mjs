@@ -33,6 +33,13 @@ test('notes that never reached the agent are all kept, with the reason they stay
   assert.equal(advisorStatus(chained, 'Codex'), chained.reason);
   const asides = review({ notes: [note('aside', 'A'), note('aside', 'B')] });
   assert.equal(advisorStatus(asides, 'Codex'), 'Codex left 2 notes for you.');
+  const undelivered = review({
+    notes: [concern],
+    reason:
+      'The notes could not be queued for the agent (This task was merged), so they are shown to you only.',
+  });
+  assert.deepEqual(advisorNotes(undelivered), { sent: [], kept: [concern] });
+  assert.equal(advisorStatus(undelivered, 'Codex'), undelivered.reason);
   // A review still reading, or one that failed, never counts its notes as sent.
   const reading = review({ status: 'reviewing', notes: [concern], delivery: 'followUp' });
   assert.deepEqual(advisorNotes(reading).sent, []);

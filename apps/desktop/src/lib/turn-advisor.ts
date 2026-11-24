@@ -23,6 +23,8 @@ export interface AdvisorReview {
   delivery?: 'followUp' | 'message' | null;
   /** Why the review was skipped or failed, or why its notes stayed with the person. */
   reason?: string | null;
+  /** The advisor's turn returned a reply; only those reviews count toward the task's limit. */
+  ran?: boolean;
   usage?: RunUsage;
   startedAt: string;
   finishedAt?: string | null;
