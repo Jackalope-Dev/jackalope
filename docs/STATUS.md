@@ -436,7 +436,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   lesson, especially one agents keep missing, into an architecture, type, lint or test
   check proven against a past instance; accepting it marks the lesson enforced and
   retires learned lessons, and a check that later disappears restores or flags the
-  lesson. On by default per project: agent
+  lesson. A person can give a lesson a **tool rule** (a regular expression over a shell
+  command or written text and/or a path glob) that warns or blocks: Claude Code
+  persistent sessions check shell commands, writes and edits through `PreToolUse`, and
+  OpenCode and ACP permission requests are refused on a block; every match is recorded
+  in the attempt's activity. Codex calls are not checked. On by default per project: agent
   reflection with the default agent after work ends (bounded to 4 an hour and 20 a
   day, on that account's quota, through the same gate). Off by default: mirroring
   active lessons into a marked `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,

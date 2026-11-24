@@ -444,6 +444,7 @@ fn apply_lesson(
         }),
         stale: None,
         enforced: None,
+        tool_rule: None,
         source_run_id: None,
         source_head: None,
         revision: remote.revision,

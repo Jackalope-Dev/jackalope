@@ -648,6 +648,7 @@ fn apply(
                 }),
                 stale: None,
                 enforced: None,
+                tool_rule: None,
                 source_run_id: lesson.run_id.clone(),
                 source_head: None,
                 revision: 1,

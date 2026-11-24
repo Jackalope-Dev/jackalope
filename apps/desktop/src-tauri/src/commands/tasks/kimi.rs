@@ -128,7 +128,10 @@ pub(super) fn drive_with_servers(
                     && expected == 3
                     && event["params"]["sessionId"].as_str() == session.as_deref()
                 {
-                    let outcome = permission(&event["params"]);
+                    let mut outcome = permission(&event["params"]);
+                    let reason = outcome
+                        .as_object_mut()
+                        .and_then(|outcome| outcome.remove(REASON));
                     let denied = outcome["outcome"] != "selected"
                         || event["params"]["options"]
                             .as_array()
@@ -144,6 +147,9 @@ pub(super) fn drive_with_servers(
                         input,
                         &json!({"jsonrpc":"2.0","id":id,"result":{"outcome":outcome}}),
                     )?;
+                    if let Some(reason) = reason.as_ref().and_then(Value::as_str) {
+                        return Err(format!("{reason}\nThe agent ends its turn when a request is declined. Change the task or the rule before continuing."));
+                    }
                     if denied {
                         return Err("Kimi permission was declined or unanswered. Review the task before continuing.".into());
                     }
@@ -449,6 +455,9 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
     }
 }
 
+/// Where [`permission`] puts a tool rule's denial reason in its outcome.
+const REASON: &str = "jackalopeRuleReason";
+
 pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) -> Value {
     if params["mode"] == "form" {
         return questions::answer(params, |question, options, multiple| {
@@ -487,6 +496,32 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         return json!({"outcome":"cancelled"});
     }
     let tool_call = &params["toolCall"];
+    let label = format!(
+        "{}: {}",
+        tool_call["title"].as_str().unwrap_or("Tool"),
+        crate::commands::permission_risk::label("", &tool_call["rawInput"])
+            .trim_start_matches(": ")
+    );
+    // ACP has no field for a reason, so the agent sees a rejection; the reason
+    // rides along under `REASON` for the attempt's error and is removed before sending.
+    if let Some(reason) =
+        crate::commands::knowledge::rules::check_request(runtime, run_id, &label, |workspace| {
+            crate::commands::knowledge::rules::ToolCall::acp(tool_call, workspace)
+        })
+    {
+        let mut outcome = params["options"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|option| option["kind"] == "reject_once")
+            .and_then(|option| option["optionId"].as_str())
+            .map_or_else(
+                || json!({"outcome":"cancelled"}),
+                |reject| json!({"outcome":"selected","optionId":reject}),
+            );
+        outcome[REASON] = json!(reason);
+        return outcome;
+    }
     let allow_once = params["options"]
         .as_array()
         .into_iter()
@@ -495,12 +530,6 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         .and_then(|option| option["optionId"].as_str());
     let mut escalation = None;
     if let Some(allow_once) = allow_once {
-        let label = format!(
-            "{}: {}",
-            tool_call["title"].as_str().unwrap_or("Tool"),
-            crate::commands::permission_risk::label("", &tool_call["rawInput"])
-                .trim_start_matches(": ")
-        );
         match crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
             crate::commands::permission_risk::assess_acp(tool_call, scope)
         }) {
@@ -889,6 +918,37 @@ mod tests {
                 if allowed { "yes" } else { "no" }
             );
         }
+    }
+
+    #[test]
+    fn a_tool_rule_denial_is_sent_as_a_rejection_and_stops_with_its_reason() {
+        let mut sent = Vec::new();
+        let error = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                json!({"id":"permission-8","method":"session/request_permission","params":{"sessionId":"new","options":[{"optionId":"yes","kind":"allow_once"},{"optionId":"no","kind":"reject_once"}]}}),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut sent,
+            "C:/workspace",
+            None,
+            None,
+            "Task",
+            |_| {},
+            |_| json!({"outcome":"selected","optionId":"no",REASON:"Project rule \"Use pnpm\": No npm."}),
+        )
+        .unwrap_err();
+        assert!(
+            error.starts_with("Project rule \"Use pnpm\": No npm."),
+            "{error}"
+        );
+        let sent = String::from_utf8(sent).unwrap();
+        let reply: Value = serde_json::from_str(sent.lines().last().unwrap()).unwrap();
+        assert_eq!(
+            reply["result"]["outcome"],
+            json!({"outcome":"selected","optionId":"no"})
+        );
     }
 
     #[test]

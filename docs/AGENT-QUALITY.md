@@ -692,7 +692,11 @@ when the process started remain registered for later turns, which answer with no
 decision when a check does not apply. Edit checks run the project's `editCheck`
 command (`{file}` becomes the quoted workspace path; paths needing more escaping skip
 the check) for up to 60 seconds; set it as **Check after each edit** in the
-project's checks settings. On bridged tasks an always-registered `PostToolUse` callback
+project's checks settings. A `PreToolUse` callback for Bash, PowerShell, Write, Edit,
+MultiEdit and NotebookEdit is always registered and checks the project's
+[tool rules](PROJECT-KNOWLEDGE.md#tool-rules): a block answers `permissionDecision:
+"deny"`, a warning returns `additionalContext` with no decision, and a call no rule
+matches gets `{}`. On bridged tasks an always-registered `PostToolUse` callback
 delivers answers to questions that returned pending, once, as `additionalContext`; an
 answer `user_response` already returned is not repeated.
 

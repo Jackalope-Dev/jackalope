@@ -10,6 +10,7 @@
 
 use super::agent_process::{self, AgentProcess};
 use super::*;
+use crate::commands::knowledge::rules::{self, ToolCall, ToolRules};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::process::ChildStdin;
@@ -38,6 +39,8 @@ pub(super) struct Hooks {
     pub timing: bool,
     /// Delivers answers that arrived after the agent's ask returned pending.
     pub answers: bool,
+    /// Checks shell commands, writes and edits against the project's tool rules.
+    pub tool_rules: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -69,6 +72,7 @@ impl Settings {
                 permission: hook(Experiment::ClaudePermissionHook),
                 timing: hook(Experiment::ClaudeToolTiming),
                 answers: true,
+                tool_rules: true,
             },
         }
     }
@@ -154,11 +158,17 @@ pub(super) fn fallback_model(model: Option<&str>) -> Option<&'static str> {
 /// The hook registrations sent in the session's `initialize` control request.
 pub(super) fn registrations(hooks: &Hooks) -> Value {
     let mut events = serde_json::Map::new();
+    let mut pre = Vec::new();
     if hooks.permission {
-        events.insert(
-            "PreToolUse".into(),
-            json!([{"matcher":"Bash|PowerShell|WebFetch|WebSearch","hookCallbackIds":["permission"],"timeout":30}]),
-        );
+        pre.push(json!({"matcher":"Bash|PowerShell|WebFetch|WebSearch","hookCallbackIds":["permission"],"timeout":30}));
+    }
+    // Registered whether or not the project has rules yet, so a rule saved
+    // during a conversation applies to its warm process.
+    if hooks.tool_rules {
+        pre.push(json!({"matcher":"Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit","hookCallbackIds":["tool_rules"],"timeout":10}));
+    }
+    if !pre.is_empty() {
+        events.insert("PreToolUse".into(), Value::Array(pre));
     }
     let mut post = Vec::new();
     if hooks.edit_check {
@@ -511,12 +521,46 @@ pub(super) struct Turn {
     context: Option<RunRequest>,
     delivered: AtomicBool,
     rounds: AtomicU32,
+    rules: RuleCache,
+}
+
+/// The project's compiled tool rules, rebuilt when saved knowledge changes.
+pub(super) struct RuleCache {
+    project_path: String,
+    compiled: Mutex<Option<(u64, Arc<ToolRules>)>>,
+}
+
+impl RuleCache {
+    pub(super) fn new(project_path: &str) -> Self {
+        Self {
+            project_path: project_path.into(),
+            compiled: Mutex::new(None),
+        }
+    }
+
+    fn get(&self, runtime: &TaskRuntime, project_id: &str) -> Arc<ToolRules> {
+        let changes = runtime.knowledge.changes();
+        let mut compiled = self.compiled.lock().unwrap();
+        if let Some((seen, rules)) = compiled.as_ref() {
+            if *seen == changes {
+                return rules.clone();
+            }
+        }
+        let rules = Arc::new(ToolRules::for_project(
+            runtime,
+            project_id,
+            &self.project_path,
+        ));
+        *compiled = Some((changes, rules.clone()));
+        rules
+    }
 }
 
 impl Turn {
     pub(super) fn answer(&self, callback: &str, input: &Value) -> Value {
         match callback {
             "permission" if self.hooks.permission => self.permission(input),
+            "tool_rules" if self.hooks.tool_rules => self.tool_rules(input),
             "edit_check" if self.hooks.edit_check => self.edit_check(input),
             "timing" if self.hooks.timing => self.timing(input),
             "stop" if self.hooks.stop_check => self.stop(),
@@ -567,6 +611,44 @@ impl Turn {
                     "permissionDecisionReason":format!("Jackalope needs the person to approve this because {reason}, and this task has no way to ask. Continue without it or report what is blocked.")}})
             }
         }
+    }
+
+    /// Denies a call a project rule blocks, with the rules' messages as the reason, and
+    /// shows warnings as context while the call goes on to the usual permission flow.
+    fn tool_rules(&self, input: &Value) -> Value {
+        let tool = input["tool_name"].as_str().unwrap_or_default();
+        let tool_input = &input["tool_input"];
+        let Some(call) = ToolCall::claude(tool, tool_input, &self.workspace) else {
+            return json!({});
+        };
+        let rules = self.rules.get(&self.runtime, &self.project_id);
+        if rules.is_empty() {
+            return json!({});
+        }
+        let matches = rules.check(&call);
+        if matches.is_empty() {
+            return json!({});
+        }
+        let label: String = crate::commands::permission_risk::label(tool, tool_input)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(160)
+            .collect();
+        for found in &matches {
+            self.activity(&rules::activity_line(found, &label));
+        }
+        let (denied, warned) = rules::feedback(call.kind, &matches);
+        let mut output = json!({"hookEventName":"PreToolUse"});
+        if let Some(reason) = denied {
+            output["permissionDecision"] = json!("deny");
+            output["permissionDecisionReason"] = json!(reason);
+        }
+        if let Some(context) = warned {
+            output["additionalContext"] = json!(context);
+        }
+        json!({ "hookSpecificOutput": output })
     }
 
     fn edit_check(&self, input: &Value) -> Value {
@@ -884,6 +966,7 @@ impl TaskRuntime {
             context: context_by_hook.then(|| request.clone()),
             delivered: AtomicBool::new(false),
             rounds: AtomicU32::new(0),
+            rules: RuleCache::new(&request.project_path),
         });
         let mut state = TurnState {
             partials: Partials::new(started),
