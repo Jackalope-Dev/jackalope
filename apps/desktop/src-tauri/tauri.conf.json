@@ -30,7 +30,12 @@
     }
   },
   "bundle": {
-    "resources": ["resources/agent-browser/", "resources/desktop-control/", "resources/computer/"],
+    "resources": [
+      "resources/agent-browser/",
+      "resources/desktop-control/",
+      "resources/computer/",
+      "resources/simulator-driver/"
+    ],
     "active": true,
     "targets": "all",
     "linux": {

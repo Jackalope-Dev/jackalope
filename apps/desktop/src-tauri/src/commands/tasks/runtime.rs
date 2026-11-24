@@ -134,6 +134,7 @@ impl TaskRuntime {
         self.mcp_broker.close(id);
         crate::commands::browser::close(id);
         crate::commands::desktop_control::close(id);
+        crate::commands::simulator::attempt_ended(id);
         crate::commands::computers::release_run(id);
         if let Some(process) = process {
             process.terminate();
@@ -1450,7 +1451,7 @@ impl TaskRuntime {
                     "--permission-prompt-tool",
                     "mcp__jackalope__permission_prompt",
                     "--allowedTools",
-                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__conflicts,mcp__jackalope__resolve_conflicts,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__record_decision,mcp__jackalope__restate_goal,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
+                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__conflicts,mcp__jackalope__resolve_conflicts,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__simulator_app,mcp__jackalope__simulator_snapshot,mcp__jackalope__simulator_interact,mcp__jackalope__simulator_screenshot,mcp__jackalope__simulator_configure,mcp__jackalope__simulator_logs,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__record_decision,mcp__jackalope__restate_goal,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
                 ]);
             }
         }
@@ -2602,6 +2603,7 @@ impl TaskRuntime {
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
             crate::commands::desktop_control::attempt_ended(&request.id);
+            crate::commands::simulator::attempt_ended(&request.id);
             crate::commands::computers::release_run(&request.id);
         });
         Ok(id)

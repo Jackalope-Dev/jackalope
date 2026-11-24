@@ -5,7 +5,7 @@ use crate::commands::{
     coordination::Coordinator, desktop_integration::DesktopIntegration,
     external_sessions::ExternalSessions, helper::Helper, live_sessions::LiveSessions,
     notifications::Notifications, previews, remote, remote::RemoteAccess, schedules::Scheduler,
-    tasks::TaskRuntime, work_terminal,
+    simulator, tasks::TaskRuntime, work_terminal,
 };
 use tauri::{AppHandle, Manager};
 
@@ -26,6 +26,10 @@ fn close_tunnels(_: &AppHandle) {
 
 fn close_browsers(_: &AppHandle) {
     browser::close_all();
+}
+
+fn close_simulator_drivers(_: &AppHandle) {
+    simulator::close_all();
 }
 
 fn close_previews(_: &AppHandle) {
@@ -57,6 +61,7 @@ const SHUTDOWN: &[fn(&AppHandle)] = &[
     stop::<Notifications>,
     stop::<LiveSessions>,
     close_browsers,
+    close_simulator_drivers,
     close_previews,
     close_terminals,
     stop::<Coordinator>,
