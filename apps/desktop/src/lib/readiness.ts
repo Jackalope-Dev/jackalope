@@ -11,6 +11,8 @@ export interface Readiness {
   previewCommand: string | null;
   dependenciesMissing: boolean;
   missingConfiguration: string[];
+  /** Why the project's toolchain is unavailable, such as an Xcode project without Xcode. */
+  toolchainIssue: string | null;
   notes: string[];
 }
 

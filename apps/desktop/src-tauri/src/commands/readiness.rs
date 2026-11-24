@@ -16,6 +16,9 @@ pub struct Readiness {
     pub preview_command: Option<String>,
     pub dependencies_missing: bool,
     pub missing_configuration: Vec<String>,
+    /// Why this project's toolchain is unavailable, such as an Xcode project
+    /// on a Mac with only the Command Line Tools.
+    pub toolchain_issue: Option<String>,
     pub notes: Vec<String>,
 }
 
@@ -92,6 +95,7 @@ pub fn inspect(path: &str) -> Result<Readiness, String> {
         preview_command: None,
         dependencies_missing: false,
         missing_configuration: vec![],
+        toolchain_issue: super::xcode::readiness_issue(&root),
         notes: vec![],
     };
     let defaults = defaults::detect(&root);
@@ -117,6 +121,7 @@ pub fn inspect(path: &str) -> Result<Readiness, String> {
             .filter(|name| !configured.contains(name) && std::env::var_os(name).is_none())
             .collect();
     }
+    result.notes.extend(super::xcode::readiness_note(&root));
     result.notes.push("Configuration checks compare variable names only; present values may still be invalid. Package scripts have not been executed.".into());
     Ok(result)
 }
