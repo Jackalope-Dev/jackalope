@@ -53,4 +53,45 @@ mod tests {
             assert!(project(rejected).is_null());
         }
     }
+
+    #[test]
+    fn failing_runs_are_returned_unchanged_even_after_a_zero_exit() {
+        let padding = (0..100)
+            .map(|n| format!("setup: prepared fixture {n}\n"))
+            .collect::<String>();
+        let mixed = format!(
+            "{}{}",
+            include_str!("fixtures/vitest-pass.txt"),
+            include_str!("fixtures/tsc-errors.txt")
+        );
+        for (name, text) in super::super::test_report::tests::FAILING
+            .iter()
+            .copied()
+            .chain([("vitest with type errors", mixed.as_str())])
+        {
+            let output = format!("{padding}{text}");
+            assert!(output.len() > 2000);
+            let input = Input {
+                output,
+                exit_code: 0,
+                truncated: false,
+            };
+            assert!(project(input).is_null(), "{name}");
+        }
+    }
+
+    #[test]
+    fn recognized_build_and_test_output_reports_what_was_omitted() {
+        let output = include_str!("fixtures/cargo-test-pass.txt").repeat(3);
+        let projected = project(Input {
+            output: output.clone(),
+            exit_code: 0,
+            truncated: false,
+        });
+        assert_eq!(projected["omitted_lines"], 54);
+        let text = projected["output"].as_str().unwrap();
+        assert!(text.len() + 512 < output.len());
+        assert!(text.contains("warning: unused import: `std::collections::HashMap`"));
+        assert_eq!(text.matches("test result: ok.").count(), 6);
+    }
 }

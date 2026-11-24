@@ -132,6 +132,15 @@ export function TaskRunDetails({
           <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
         </Disclosure>
       )}
+      {run.handoffContext && (
+        <Disclosure className="my-4">
+          <DisclosureSummary>Handoff context</DisclosureSummary>
+          <p className="task-muted">
+            Sent with the instruction so a new conversation could pick up earlier progress.
+          </p>
+          <pre className="task-output">{run.handoffContext}</pre>
+        </Disclosure>
+      )}
       {routing && (
         <Disclosure className="my-4">
           <DisclosureSummary>Agent selection and handoffs</DisclosureSummary>

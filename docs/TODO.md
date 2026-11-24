@@ -74,12 +74,16 @@ release dates.
 
 - [ ] Enforce Keep and combine worktree retention in native cleanup and integration (it is
   enforced only in Project worktrees today).
-- [ ] Tighten the merge gate: run the saved check on the combined integration tree in a
-  temporary worktree before apply; launch a fresh plan review after the reviewer fixes
+- [ ] Tighten the merge gate: launch a fresh plan review after the reviewer fixes
   gaps itself instead of continuing the same attempt; with a saved check, require a
   recorded passing plan review (with a relaunch path so plans are not stranded) bound
   to the tree it saw; optionally let a docs-only or identical-patch change keep an
   earlier verdict.
+- [ ] Accept the combined check before automatic merging in the installed app: a
+  failing and a passing combination, a target that moves during the check, quitting
+  mid-check, and a long check beside running agents. Show the running check in the
+  task and under Automatic coordination, and decide whether the manual Merge button
+  runs it too.
 - [ ] Measure automatic subtasks on representative requests: planning overhead versus
   single-lead time, how often plans return one assignment, validation failures, and
   combined-result quality. Tune the local-rules size threshold from those results.
@@ -138,6 +142,15 @@ release dates.
 - [ ] Use Learning activity to calibrate background learning's cadence, probation,
   archive, miss and curator thresholds against real use, and measure whether learned
   lessons reduce repeated corrections before claiming it.
+- [ ] Accept skill sync on two installed desktops on Windows and macOS: a personal and a
+  project skill synced from one and written on the other, the project skill added to the
+  local exclude file, an edit on each side shown as a conflict and resolved both ways, a
+  tracked target refused, Stop syncing, Delete synced skills turning sync off on the other
+  desktop, and settings sync turned off mid-sync.
+- [ ] Design a skills directory for browsing and submitting shared skills, replacing the
+  Coming later section on the Skills page. Today sharing means exporting a folder.
+- [ ] Decide whether synced free text (learned lessons and skills) should be end-to-end
+  encrypted, and how a new computer would get the key.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
 - [ ] Improve provider reporting, model inventory, capacity and monetary budgets.
   Keep reported, estimated, stale and unavailable data distinct.
@@ -154,8 +167,9 @@ release dates.
   the task's agent without a click, follow pull requests opened from the terminal command
   and the phone, and show the state in the phone companion.
 - [ ] Run each known ACP agent preset (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
-  Auggie, Kiro, Hermes Agent, Command Code) through a task with permissions, a question and
-  a continuation, on Windows and macOS, and remove or correct any whose command differs.
+  Auggie, Kiro, Hermes Agent, Command Code, Oh My Pi) through a task with permissions, a
+  question and a continuation, on Windows and macOS, and remove or correct any whose
+  command differs.
   Give custom ACP agents their model list from the session and a product mark.
 - [ ] Tune swarm assignment and subtask limits from installed swarm trials: how often
   agents use peers, peer_adopt and propose_subtask, duplicate implementations avoided,

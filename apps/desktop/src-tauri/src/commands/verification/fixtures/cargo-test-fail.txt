@@ -1,0 +1,28 @@
+   Compiling ledger v0.3.1 (/home/dev/ledger)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.10s
+     Running unittests src/lib.rs (target/debug/deps/ledger-4f1c2a9e8b7d6c5a)
+
+running 5 tests
+test account::tests::opens_with_zero_balance ... ok
+test account::tests::rejects_negative_deposit ... ok
+test ledger::tests::balances_after_transfer ... FAILED
+test ledger::tests::rejects_overdraft ... ok
+test report::tests::formats_currency ... ok
+
+failures:
+
+---- ledger::tests::balances_after_transfer stdout ----
+
+thread 'ledger::tests::balances_after_transfer' panicked at src/ledger.rs:88:9:
+assertion `left == right` failed
+  left: 4200
+ right: 4250
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ledger::tests::balances_after_transfer
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--lib`

@@ -12,6 +12,7 @@ pub mod codebase;
 pub mod codebase_watch;
 pub mod commit_graph;
 pub mod coordination;
+mod dependency_clone;
 pub mod desktop_integration;
 pub mod dictation;
 pub mod external_sessions;
@@ -82,6 +83,7 @@ pub mod readiness;
 pub mod resources;
 pub mod schedules;
 mod site_gate;
+pub mod skills;
 
 pub mod agent_screen;
 pub mod browser;

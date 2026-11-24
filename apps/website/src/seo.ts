@@ -2,6 +2,7 @@ import { guideMarkdown, guidePath, knowledgeFiles, knowledgeGuides } from '@jack
 import { type Author, authorPath, authors, findAuthor } from './authors.ts';
 import benchmarks from './benchmark-summary.json' with { type: 'json' };
 import { blogImageSize, serializeBlogPost } from './blog-types.ts';
+import { GITHUB_URL } from './community.ts';
 import {
   changelogReleases,
   company,
@@ -24,11 +25,18 @@ const escapeHtml = (value: string) =>
       character,
   );
 /** The share image; bump the version when the image changes so link previews refetch it. */
-const SOCIAL_IMAGE = '/social-preview.png?v=2';
+const SOCIAL_IMAGE = '/social-preview.png?v=3';
 const SOCIAL_IMAGE_ALT =
   'Jackalope: Run your agents side by side. Codex, Claude Code, Gemini CLI and more, each in its own Git worktree.';
 
 export const routes = pages.map((page) => page.path);
+
+/** Retired URLs and the page that absorbed their content; each answers with a 301. */
+export const movedPages: Record<string, string> = {
+  '/blog/git-worktrees-for-ai-coding-agents/': '/git-worktrees-for-ai-agents/',
+  '/blog/claude-code-and-codex-together/': '/guides/run-codex-and-claude-code-in-parallel/',
+  '/guides/review-ai-generated-code/': '/blog/review-ai-generated-code-checklist/',
+};
 
 function personSchema(author: Author, origin: string) {
   return {
@@ -71,7 +79,16 @@ function lastModified(path: string) {
   return post?.updated ?? post?.date;
 }
 
-export function pageHtml(html: string, path: string, origin = siteOrigin) {
+/**
+ * `env` carries the build's download variables so structured data names only the
+ * platforms the download page offers.
+ */
+export function pageHtml(
+  html: string,
+  path: string,
+  origin = siteOrigin,
+  env: Record<string, string | undefined> = {},
+) {
   const normalized = normalizePath(path);
   const page = pages.find((item) => item.path === normalized);
   const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
@@ -97,17 +114,23 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       '@type': 'Organization',
       '@id': `${origin}/#organization`,
       name: 'Jackalope',
-      url: origin,
+      url: `${origin}/`,
       description: pages[0].description,
-      logo: `${origin}/icon-256.png`,
-      sameAs: ['https://x.com/JackalopeDotDev'],
+      logo: { '@type': 'ImageObject', url: `${origin}/icon-256.png`, width: 256, height: 256 },
+      sameAs: [
+        GITHUB_URL,
+        'https://x.com/JackalopeDotDev',
+        'https://www.reddit.com/r/JackalopeDev/',
+      ],
       parentOrganization: { '@type': 'Organization', name: company.name, url: company.url },
     },
     {
       '@type': 'WebSite',
       '@id': `${origin}/#website`,
       name: 'Jackalope',
-      url: origin,
+      alternateName: new URL(origin).hostname,
+      url: `${origin}/`,
+      inLanguage: 'en',
       publisher: { '@id': `${origin}/#organization` },
     },
     {
@@ -189,8 +212,17 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       '@type': 'SoftwareApplication',
       '@id': `${origin}/#application`,
       name: 'Jackalope',
-      url: origin,
+      url: `${origin}/`,
       applicationCategory: 'DeveloperApplication',
+      // macOS and Linux always have public release builds; Windows is listed once configured.
+      operatingSystem: platformDownloads(env)
+        .filter((platform) => platform.url || platform.id !== 'windows')
+        .map((platform) => platform.name)
+        .join(', '),
+      downloadUrl: `${origin}/download/`,
+      // The account is free and the app is not sold; model access is the user's own.
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      sameAs: [GITHUB_URL],
       description,
       image: `${origin}${SOCIAL_IMAGE}`,
       featureList: [
@@ -354,6 +386,9 @@ function marketingPageText(page: MarketingPage, origin: string) {
           row.map((cell, index) => `${section.table?.columns[index]}: ${cell}`).join('\n'),
         ) || []),
         ...(section.bullets?.map((item) => `- ${item}`) || []),
+        ...(section.code
+          ? [`${section.code.label}\n\`\`\`${section.code.language}\n${section.code.value}\n\`\`\``]
+          : []),
         ...(section.links?.map((link) => `[${link.label}](${link.href})`) || []),
       ].join('\n\n'),
     )
@@ -371,6 +406,25 @@ function marketingPageText(page: MarketingPage, origin: string) {
       ].join('\n\n')
     : '';
   return `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${body}\n\n${details}`;
+}
+
+/**
+ * Markdown mirrors and llms*.txt files stay public for language models but out of
+ * search results: each one is served with noindex and a canonical Link to the
+ * HTML page it mirrors (its directory's page, so /knowledge/x/index.md -> /knowledge/x/).
+ * Agent discovery files under .well-known/ (agent-discovery.ts) mirror no page.
+ */
+export function mirrorHeaderRules(fileNames: string[], origin = siteOrigin) {
+  return fileNames
+    .filter((name) => !name.startsWith('.well-known/'))
+    .filter((name) => name.endsWith('.md') || /(^|\/)llms(-full)?\.txt$/.test(name))
+    .sort()
+    .map((name) => {
+      const page = `/${name}`.replace(/[^/]*$/, '');
+      if (!routes.includes(page)) throw new Error(`${name} mirrors ${page}, which is not a page.`);
+      return `/${name}\n  X-Robots-Tag: noindex\n  Link: <${origin}${page}>; rel="canonical"\n`;
+    })
+    .join('\n');
 }
 
 export function discoveryFiles(
@@ -399,7 +453,7 @@ export function discoveryFiles(
     'knowledge/llms.txt': `# Jackalope knowledgebase\n\n> Official help for Jackalope and its local agent tools.\n\n## Guides\n\n${knowledgeGuides.map((guide) => `- [${guide.title}](${origin}/knowledge/${guide.slug}/index.md): ${guide.description}`).join('\n')}\n`,
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
     'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${lastModified(page.path) ? `<lastmod>${lastModified(page.path)}</lastmod>` : ''}</url>`).join('')}</urlset>`,
-    'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Gemini CLI, and Antigravity. Direct project MCP connections support Codex, Claude Code, OpenCode, and Kimi Code; all seven adapters support on-demand discovery. Kimi supports named accounts, model selection, structured questions, task tokens, membership quota, routing, and Ask Jackalope. Antigravity is worker-only; its current model and subscription quota use read-only CLI commands. Named profiles use Gemini API keys with separate billing, while subscription login is shared. Gemini CLI runs worker tasks with session continuation and file-edit approval; shell and HTTP tools follow its own permission policy. Its quota is unknown, and it does not coordinate routing or Ask Jackalope. Installed-provider acceptance remains open. Provider access and reported usage vary by adapter. See ${origin}/agents/ for coverage and limits and ${origin}/agents/kimi-code/ for Kimi setup.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
+    'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Gemini CLI, and Antigravity. Direct project MCP connections support Codex, Claude Code, OpenCode, and Kimi Code; all seven adapters support on-demand discovery. Kimi supports named accounts, model selection, structured questions, task tokens, membership quota, routing, and Ask Jackalope. Antigravity is worker-only; its current model and subscription quota use read-only CLI commands. Named profiles use Gemini API keys with separate billing, while subscription login is shared. Gemini CLI runs worker tasks with session continuation and file-edit approval; shell and HTTP tools follow its own permission policy. Its quota is unknown, and it does not coordinate routing or Ask Jackalope. Installed-provider acceptance remains open. Provider access and reported usage vary by adapter. See ${origin}/agents/ for coverage and limits and ${origin}/agents/kimi-code/ for Kimi setup.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Agent interfaces\n\n- [Website MCP server](${origin}/api/mcp): read-only MCP server (Streamable HTTP, no authentication) to search pages, read pages as Markdown, list help guides and read the changelog. Card: ${origin}/.well-known/mcp/server-card.json\n- [Website A2A agent](${origin}/api/a2a): read-only A2A agent over the same tools. Card: ${origin}/.well-known/agent-card.json\n- [Agent skills](${origin}/.well-known/agent-skills/index.json): how to read this site, install Jackalope and use its terminal command\n\nThese serve the public website content only; Jackalope's own MCP connections are local to each desktop installation.\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
     'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# ${tour.title}\n${origin}/tour/\n\n${tour.description}\n\nTranscript: ${tour.transcript}\n\n# Agent performance benchmarks\n${origin}/benchmarks/\n\nMeasured ${benchmarks.date} across ${benchmarks.agentTrials} agent trials. ${benchmarks.environment.scope}.\n\n${[...benchmarks.comparisons, ...benchmarks.experiments].map((entry) => `## ${entry.title}\n\n${entry.detail}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${findAuthor(post.author)?.name ?? company.name}.${post.updated ? ` Updated ${post.updated}.` : ''}\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n${origin}/changelog/\n\n${updatesWith(
       releases,
     )

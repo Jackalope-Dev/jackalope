@@ -159,7 +159,7 @@ export const growthPages: MarketingPage[] = [
             label: 'A worked parallel plan',
           },
           {
-            href: '/guides/review-ai-generated-code/',
+            href: '/blog/review-ai-generated-code-checklist/',
             label: 'What to inspect in the result',
           },
         ],
@@ -257,16 +257,16 @@ export const growthPages: MarketingPage[] = [
     ],
     related: [
       { href: '/compare/', label: 'Compare coding-agent workspaces' },
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
+      { href: '/blog/review-ai-generated-code-checklist/', label: 'Review agent-generated code' },
       { href: '/git-worktrees-for-ai-agents/', label: 'Understand Git worktrees' },
     ],
   },
   {
     path: '/features/browser-automation-for-coding-agents/',
     kind: 'Product guide',
-    title: 'Browser automation for coding agents | Jackalope',
+    title: 'Browser automation for coding agents: screenshots & a11y',
     description:
-      'Keep browser sessions, screenshots, and accessibility findings attached to coding-agent tasks in Jackalope.',
+      'Let Claude Code, Codex and other agents drive a browser: fill forms, capture screenshots at each size, and keep accessibility findings with the task.',
     headline: 'Give browser work a place in the task.',
     lede: 'A UI change needs more than a confident summary. Jackalope gives agent tasks owned browser sessions and recorded evidence you can return to during review.',
     image: 'review',
@@ -327,7 +327,10 @@ export const growthPages: MarketingPage[] = [
       },
     ],
     related: [
-      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated changes' },
+      {
+        href: '/blog/review-ai-generated-code-checklist/',
+        label: 'Review agent-generated changes',
+      },
       { href: '/tour/', label: 'Watch the interface tour' },
       { href: '/features/project-context-for-coding-agents/', label: 'Project context and tools' },
     ],

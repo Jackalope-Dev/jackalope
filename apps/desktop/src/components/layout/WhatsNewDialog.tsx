@@ -8,7 +8,7 @@ import {
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MessageSquare } from 'lucide-react';
-import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { type ReleaseNotes, shouldShowReleaseNotes } from '../../lib/release-notes';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -40,21 +40,24 @@ function markSeen(version: string) {
   }
 }
 
-/** Renders `code` spans in a release note line. */
-function inline(text: string): ReactNode {
-  let offset = 0;
-  return text
-    .split(/(`[^`]+`)/)
-    .filter(Boolean)
-    .map((part) => {
-      const key = `${offset}`;
-      offset += part.length;
-      return part.startsWith('`') && part.endsWith('`') ? (
-        <code key={key}>{part.slice(1, -1)}</code>
-      ) : (
-        <Fragment key={key}>{part}</Fragment>
-      );
-    });
+const Markdown = lazy(() => import('react-markdown'));
+
+/** Renders one release note line's inline Markdown; links stay text in the dialog. */
+function NoteItem({ text }: { text: string }) {
+  return (
+    <Suspense fallback={text}>
+      <Markdown
+        skipHtml
+        disallowedElements={['img']}
+        components={{
+          p: ({ children }) => <Fragment>{children}</Fragment>,
+          a: ({ children }) => <span>{children}</span>,
+        }}
+      >
+        {text}
+      </Markdown>
+    </Suspense>
+  );
 }
 
 /** Once per update: what changed in this version, with a way to send feedback. */
@@ -121,7 +124,9 @@ export function WhatsNewDialog() {
                   <h3>{section.title}</h3>
                   <ul>
                     {section.items.map((item) => (
-                      <li key={item}>{inline(item)}</li>
+                      <li key={item}>
+                        <NoteItem text={item} />
+                      </li>
                     ))}
                   </ul>
                 </section>

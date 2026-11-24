@@ -52,6 +52,10 @@
   flex-wrap: wrap;
   gap: 12px 24px;
 }
+.queue-limit-note {
+  align-self: center;
+  margin: 0;
+}
 .queue-flow {
   display: flex;
   gap: 3px;

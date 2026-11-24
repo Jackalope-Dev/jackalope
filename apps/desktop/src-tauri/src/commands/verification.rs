@@ -1,5 +1,6 @@
 use super::{
     process_control,
+    repo::{self, Policy},
     tasks::{
         events::activity,
         preparation::{self, PreparationRecord, StepProgress},
@@ -7,7 +8,11 @@ use super::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{path::Path, process::Command, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
+};
 use tauri::State;
 mod leases;
 pub(super) mod native_output;
@@ -22,6 +27,53 @@ pub(in crate::commands) struct WorkspaceLease(#[allow(dead_code)] leases::Lease)
 /// Call under the execution guard, as for a check.
 pub(in crate::commands) fn reserve_workspace(workspace: &str) -> Result<WorkspaceLease, String> {
     leases::reserve(workspace).map(WorkspaceLease)
+}
+
+/// A detached worktree of one commit for a command Jackalope runs itself, removed
+/// however that run ends. Create and drop it under the execution guard.
+pub(in crate::commands) struct DisposableWorktree {
+    project: PathBuf,
+    path: PathBuf,
+}
+
+impl DisposableWorktree {
+    pub(in crate::commands) fn add(
+        project: &Path,
+        path: PathBuf,
+        commit: &str,
+    ) -> Result<Self, String> {
+        let workspace = path.to_string_lossy().into_owned();
+        repo::git(
+            project,
+            &["worktree", "add", "--detach", &workspace, commit],
+            Policy::Isolated,
+        )?;
+        Ok(Self {
+            project: project.to_path_buf(),
+            path,
+        })
+    }
+
+    /// Takes over a worktree an interrupted run left behind, so dropping it removes it.
+    pub(in crate::commands) fn existing(project: &Path, path: PathBuf) -> Self {
+        Self {
+            project: project.to_path_buf(),
+            path,
+        }
+    }
+}
+
+impl Drop for DisposableWorktree {
+    fn drop(&mut self) {
+        let path = self.path.to_string_lossy().into_owned();
+        let _ = repo::git(
+            &self.project,
+            &["worktree", "remove", "--force", &path],
+            Policy::Isolated,
+        );
+        let _ = std::fs::remove_dir_all(&self.path);
+        let _ = repo::git(&self.project, &["worktree", "prune"], Policy::Isolated);
+    }
 }
 
 /// Ceiling on a single check or setup command. Commands are cut off for going quiet

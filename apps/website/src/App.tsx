@@ -47,6 +47,10 @@ const faqs = [
     'Jackalope is a desktop workspace for AI coding agents, including Codex, Claude Code, Gemini CLI, Grok, OpenCode, Kimi Code and Antigravity. Run tasks in parallel, each in its own Git worktree, keep their project context together, and review the changes in one place.',
   ],
   [
+    'Who makes Jackalope?',
+    'Jackalope is made by Jackalope Digital LLC, a software company based in Colorado, United States. It is an independent product: you bring your own agent CLIs and provider accounts, and Jackalope is not affiliated with the companies behind them.',
+  ],
+  [
     'How do I get access?',
     'Sign up with your email and confirm the link we send. Your account is ready as soon as you confirm; then sign in to the desktop app with the same address. No payment is needed.',
   ],
@@ -189,7 +193,7 @@ export function App({ path = '/' }: { path?: string }) {
                     ['Parallel coding agents', '/parallel-coding-agents/'],
                     ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],
                     ['Supported agents', '/agents/'],
-                    ['Review AI-generated code', '/guides/review-ai-generated-code/'],
+                    ['Review AI-generated code', '/blog/review-ai-generated-code-checklist/'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
                     ['Roadmap', '/roadmap/'],

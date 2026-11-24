@@ -172,12 +172,20 @@ attempts sharing the account or an identified quota pool. Reservations are conse
 percentage estimates, not provider-enforced budgets or guarantees against external use.
 
 Quota errors require provider error events, including Claude rejected rate-limit
-events; assistant prose and warning-only events do not trigger handoff. The exhausted
-account/pool is excluded (only an explicitly model-scoped error permits another model
-in that pool). Handoffs retain the owned workspace, original task and progress context.
-They cannot increase project permissions or tools. If the default is also exhausted,
-a saved ranking can select the next currently eligible option; without one, work
-stops with an actionable error. Explicit tasks and continuing sessions are pinned.
+events; assistant prose and warning-only events do not trigger handoff. A provider
+refusal of the content (usage policy, content filter, safety block) is not lost capacity:
+it never hands off and is reported as a refusal, unless a quota error code accompanies
+it. The exhausted account/pool is excluded (only an explicitly model-scoped error permits
+another model in that pool). Handoffs retain the owned workspace, original task and
+progress context. They cannot increase project permissions or tools. If the default is
+also exhausted, a saved ranking can select the next currently eligible option; without
+one, work stops with an actionable error. Explicit tasks and continuing sessions are pinned.
+Exclusions belong to the attempt that handed off; new work and retries route from fresh
+capacity, so a preferred or default account is chosen again once its reported window
+resets. Retrying an attempt the quota stopped continues in its worktree with its
+uncommitted changes and the same progress context, led by an optional focus line from
+the person. The progress context last sent (quota handoff, lost session or such a retry)
+is kept on the attempt under Task details.
 Codex, Claude, Grok, OpenCode and Kimi can coordinate; Antigravity and Gemini CLI are worker-only.
 Automatic quota handoff can be enabled or disabled in the Defaults section of the Agents page with All projects selected.
 

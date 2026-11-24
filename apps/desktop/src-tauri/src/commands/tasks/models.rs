@@ -102,6 +102,11 @@ pub struct TaskRun {
     /// once more as a new conversation, unless it continues a session from outside Jackalope.
     #[serde(skip)]
     pub session_refused: Option<String>,
+    /// The earlier progress Jackalope last gave this attempt's agent in place of a
+    /// conversation it could not continue: a quota handoff, a lost session or a retry that
+    /// picks up preserved work. Kept as sent, including the person's focus line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_context: Option<String>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     /// The agent's own restatement of the task, reported once at the start.
@@ -278,6 +283,7 @@ impl TaskRun {
             .chain(&mut self.error)
             .chain(&mut self.verification_error)
             .chain(&mut self.checkpoint_error)
+            .chain(&mut self.handoff_context)
         {
             secrets.text(text);
         }
@@ -351,6 +357,10 @@ pub struct RunRequest {
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
     #[serde(default)]
     pub retry_of: Option<String>,
+    /// What the person wants the next agent to focus on when it picks up earlier progress
+    /// (a quota handoff, a lost session or a retry of preserved work). Ignored otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_focus: Option<String>,
     /// A first attempt that resumes a session from outside Jackalope where it ran.
     #[serde(skip)]
     pub continues: Option<ContinuedSession>,
@@ -397,6 +407,7 @@ impl RunRequest {
             workspace_mode: None,
             previous_run_id: None,
             retry_of: None,
+            handoff_focus: None,
             continues: None,
             connection_ids: None,
             coordination: None,
@@ -483,6 +494,7 @@ impl TaskRun {
             failure_kind: self.failure_kind,
             provider_error: None,
             session_refused: None,
+            handoff_context: None,
             contract: self.contract.clone(),
             understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
