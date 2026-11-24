@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::State;
 
+pub mod retention;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CleanupStatus {
     pub target_branch: Option<String>,
@@ -52,6 +54,8 @@ const ARCHIVE_MAX_FILES: usize = 20_000;
 /// recoverable and archiving still applies its own limits.
 const CONTENT_CHECK_MAX_BYTES: u64 = 64 * 1024 * 1024;
 const CONTENT_CHECK_MAX_FILES: usize = 5_000;
+/// Largest ignored file compared with the project checkout's copy.
+const COPY_CHECK_MAX_BYTES: u64 = 16 * 1024 * 1024;
 
 fn canonical(path: &str) -> Result<PathBuf, String> {
     std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
@@ -285,13 +289,50 @@ fn sensitive_name(filename: &str) -> bool {
         .any(|suffix| filename.ends_with(suffix))
 }
 
+/// Whether `path`, a regular file inside the worktree `root`, is byte for byte the file at the
+/// same place in the project checkout `original`, as the copies `.worktreeinclude` and setup
+/// files make are until someone edits them. Removing such a copy loses nothing.
+fn unchanged_copy(original: Option<&Path>, root: &Path, path: &Path) -> bool {
+    let Some(original) = original else {
+        return false;
+    };
+    let Ok(relative) = path.strip_prefix(root) else {
+        return false;
+    };
+    let Ok(source) = super::workspace_setup::no_links(original, relative) else {
+        return false;
+    };
+    let (Ok(copy), Ok(source_metadata)) = (
+        std::fs::symlink_metadata(path),
+        std::fs::symlink_metadata(&source),
+    ) else {
+        return false;
+    };
+    if !copy.is_file()
+        || !source_metadata.is_file()
+        || copy.len() != source_metadata.len()
+        || copy.len() > COPY_CHECK_MAX_BYTES
+    {
+        return false;
+    }
+    matches!(
+        (
+            super::history::read_bounded(path, COPY_CHECK_MAX_BYTES),
+            super::history::read_bounded(&source, COPY_CHECK_MAX_BYTES),
+        ),
+        (Ok(copy), Ok(source)) if copy == source
+    )
+}
+
 /// Walk one ignored path for content that must be preserved, returning the first
 /// offending path relative to the worktree root. Links are never followed: they are
-/// removed as links, so nothing outside the worktree is inspected or deleted.
+/// removed as links, so nothing outside the worktree is inspected or deleted. With the
+/// project checkout as `original`, an unchanged copy of one of its files is not preserved.
 fn preserved_content(
     root: &Path,
     start: &Path,
     budget: &mut usize,
+    original: Option<&Path>,
 ) -> Result<Option<String>, String> {
     let relative = |path: &Path| -> Result<String, String> {
         Ok(path
@@ -317,7 +358,7 @@ fn preserved_content(
         return Ok(None);
     }
     if !metadata.is_dir() {
-        return if sensitive_name(&name) {
+        return if sensitive_name(&name) && !unchanged_copy(original, root, start) {
             Ok(Some(relative(start)?))
         } else {
             Ok(None)
@@ -337,11 +378,13 @@ fn preserved_content(
             if regenerable_tree(&name) {
                 continue;
             }
-            if sensitive_name(&name) {
-                return Ok(Some(relative(&entry.path())?));
-            }
             // Dependency links are removed as links; never follow them outside the worktree.
             let metadata = std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+            if sensitive_name(&name)
+                && (metadata.is_dir() || !unchanged_copy(original, root, &entry.path()))
+            {
+                return Ok(Some(relative(&entry.path())?));
+            }
             if metadata.is_dir() && !is_link(&metadata) {
                 directories.push(entry.path());
             }
@@ -350,7 +393,7 @@ fn preserved_content(
     Ok(None)
 }
 
-fn local_content(path: &Path) -> Result<LocalContent, String> {
+fn local_content(path: &Path, original: Option<&Path>) -> Result<LocalContent, String> {
     let status = repo::git_exact(
         path,
         &[
@@ -389,7 +432,7 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
             content.preserved_path = Some(name.to_owned());
             break;
         };
-        match preserved_content(path, &location, &mut budget)? {
+        match preserved_content(path, &location, &mut budget, original)? {
             Some(preserved) => {
                 content.preserved_path = Some(preserved);
                 break;
@@ -505,6 +548,7 @@ fn inspect_entries(
     let repo = canonical(repo_path)?;
     let mut entries = list_worktrees(repo_path)?;
     let target = target(&repo, requested);
+    let original = entries.first().and_then(|main| canonical(&main.path).ok());
     for index in 0..entries.len() {
         if only.is_some_and(|path| entries[index].path != path) {
             continue;
@@ -542,7 +586,9 @@ fn inspect_entries(
         }
         match hard_block(&repo, &entries, index, runs) {
             Err(reason) => status.blocked_reason = Some(reason),
-            Ok(()) => match canonical(&entries[index].path).and_then(|path| local_content(&path)) {
+            Ok(()) => match canonical(&entries[index].path)
+                .and_then(|path| local_content(&path, original.as_deref()))
+            {
                 Ok(content) => {
                     status.discarded_paths = content.discarded_paths;
                     if let Some(name) = content.preserved_path {
@@ -939,7 +985,8 @@ fn archive(
     )
     .map_err(|e| e.to_string())?;
 
-    if let Some(name) = local_content(path)?.preserved_path {
+    let original = entries.first().and_then(|main| canonical(&main.path).ok());
+    if let Some(name) = local_content(path, original.as_deref())?.preserved_path {
         return Err(abandon(
             &archive_root,
             &format!("local ignored content appeared: {name}"),
@@ -1008,7 +1055,7 @@ fn orphans(repo_path: &str, runs: &[TaskRun]) -> Result<Vec<OrphanFolder>, Strin
         }
         if blocked.is_none() {
             let mut budget = 200_000usize;
-            blocked = preserved_content(&parent, &path, &mut budget)?
+            blocked = preserved_content(&parent, &path, &mut budget, None)?
                 .map(|found| format!("Holds secrets or local data: {found}. Move it out first."));
         }
         found.push(OrphanFolder {
@@ -1058,6 +1105,8 @@ macro_rules! tauri_commands {
             commands::worktree_cleanup::git_prune_worktrees,
             commands::worktree_cleanup::git_list_worktree_orphans,
             commands::worktree_cleanup::git_remove_worktree_orphan,
+            commands::worktree_cleanup::retention::worktree_retention_run,
+            commands::worktree_cleanup::retention::worktree_retention_log,
         ] $($rest)*)
     };
 }
@@ -1463,6 +1512,40 @@ mod tests {
             );
             assert_eq!(fs::read_to_string(file).unwrap(), "local data");
         }
+    }
+
+    #[test]
+    fn unchanged_copies_of_checkout_secrets_are_discarded_but_edited_ones_keep_the_worktree() {
+        let f = Fixture::new("main");
+        f.commit(&f.worktree, "merged\n");
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
+        fs::write(f.repo.join(".env"), "TOKEN=checkout").unwrap();
+        fs::create_dir_all(f.repo.join("ignored")).unwrap();
+        fs::write(f.repo.join("ignored/local.env"), "A=1").unwrap();
+        fs::write(f.worktree.join(".env"), "TOKEN=checkout").unwrap();
+        fs::create_dir_all(f.worktree.join("ignored")).unwrap();
+        fs::write(f.worktree.join("ignored/local.env"), "A=2").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(
+            status
+                .blocked_reason
+                .as_ref()
+                .unwrap()
+                .contains("ignored/local.env"),
+            "an edited copy is the task's own data: {status:?}"
+        );
+        fs::write(f.worktree.join("ignored/local.env"), "A=1").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert_eq!(status.blocked_reason, None);
+        assert!(status.discarded_paths.contains(&".env".to_string()));
+        f.remove(&entry, &[]).unwrap();
+        assert!(!f.worktree.exists());
+        assert_eq!(
+            fs::read_to_string(f.repo.join(".env")).unwrap(),
+            "TOKEN=checkout"
+        );
     }
 
     #[test]

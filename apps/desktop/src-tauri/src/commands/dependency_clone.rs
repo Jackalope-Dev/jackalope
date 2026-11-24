@@ -108,7 +108,7 @@ pub(super) fn clone_dependencies(project: &str, workspace: &str, command: &str) 
 /// Checks a cloned tree in its new place: every relative link must resolve inside the
 /// workspace (so a workspace package link reaches the workspace's own copy), no absolute link
 /// may point into the project checkout, and no directory may record its original location.
-fn relocatable(project: &[&Path], workspace: &Path, tree: &Path) -> Result<(), String> {
+pub(super) fn relocatable(project: &[&Path], workspace: &Path, tree: &Path) -> Result<(), String> {
     let mut pending = vec![tree.to_path_buf()];
     let mut entries = 0usize;
     while let Some(directory) = pending.pop() {
@@ -161,7 +161,7 @@ fn display(workspace: &Path, path: &Path) -> String {
 }
 
 /// Resolves `.` and `..` without touching the filesystem; `None` if it climbs above the root.
-fn normalize(path: &Path) -> Option<PathBuf> {
+pub(super) fn normalize(path: &Path) -> Option<PathBuf> {
     let mut resolved = PathBuf::new();
     for component in path.components() {
         match component {
@@ -179,7 +179,7 @@ fn normalize(path: &Path) -> Option<PathBuf> {
 
 /// Whether `error` from [`clone_tree`] means the volume or platform cannot clone, rather
 /// than an I/O failure a byte copy would hit too.
-fn is_unsupported(error: &io::Error) -> bool {
+pub(super) fn is_unsupported(error: &io::Error) -> bool {
     if error.kind() == io::ErrorKind::Unsupported {
         return true;
     }
@@ -206,10 +206,21 @@ fn is_unsupported(error: &io::Error) -> bool {
 
 /// Makes `destination`, which must not exist, a copy-on-write clone of the directory
 /// `source`, keeping links as links. On failure nothing is left at `destination`.
-fn clone_tree(source: &Path, destination: &Path) -> io::Result<()> {
+pub(super) fn clone_tree(source: &Path, destination: &Path) -> io::Result<()> {
     let result = imp::clone_tree(source, destination);
     if result.is_err() && std::fs::symlink_metadata(destination).is_ok() {
         let _ = std::fs::remove_dir_all(destination);
+    }
+    result
+}
+
+/// Makes `destination`, which must not exist, a copy-on-write clone of the regular file
+/// `source`. [`is_unsupported`] tells a volume that cannot clone from a real failure; on any
+/// failure nothing is left at `destination`.
+pub(super) fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
+    let result = imp::clone_file(source, destination);
+    if result.is_err() && std::fs::symlink_metadata(destination).is_ok_and(|m| m.is_file()) {
+        let _ = std::fs::remove_file(destination);
     }
     result
 }
@@ -232,6 +243,11 @@ mod imp {
         } else {
             Err(io::Error::last_os_error())
         }
+    }
+
+    /// `clonefile` takes a single file the same way, and refuses an existing destination.
+    pub fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
+        clone_tree(source, destination)
     }
 }
 
@@ -268,20 +284,25 @@ mod imp {
             } else if kind.is_symlink() {
                 std::os::unix::fs::symlink(fs::read_link(&from)?, &to)?;
             } else if kind.is_file() {
-                let input = File::open(&from)?;
-                let metadata = input.metadata()?;
-                let output = fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .mode(metadata.permissions().mode() & 0o7777)
-                    .open(&to)?;
-                // SAFETY: both descriptors belong to files open for the call; the kernel keeps neither.
-                if metadata.len() > 0
-                    && unsafe { libc::ioctl(output.as_raw_fd(), FICLONE, input.as_raw_fd()) } != 0
-                {
-                    return Err(io::Error::last_os_error());
-                }
+                clone_file(&from, &to)?;
             }
+        }
+        Ok(())
+    }
+
+    pub fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
+        let input = File::open(source)?;
+        let metadata = input.metadata()?;
+        let output = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(metadata.permissions().mode() & 0o7777)
+            .open(destination)?;
+        // SAFETY: both descriptors belong to files open for the call; the kernel keeps neither.
+        if metadata.len() > 0
+            && unsafe { libc::ioctl(output.as_raw_fd(), FICLONE, input.as_raw_fd()) } != 0
+        {
+            return Err(io::Error::last_os_error());
         }
         Ok(())
     }
@@ -295,6 +316,13 @@ mod imp {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "copy-on-write folder clones are not available on this platform",
+        ))
+    }
+
+    pub fn clone_file(_source: &Path, _destination: &Path) -> io::Result<()> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "copy-on-write file clones are not available on this platform",
         ))
     }
 }

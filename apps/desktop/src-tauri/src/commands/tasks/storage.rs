@@ -281,7 +281,12 @@ impl TaskRuntime {
             return Err(error);
         }
         updated.persistence_error = None;
+        let task = updated.task_id.clone();
         inner.runs.insert(id.to_string(), updated);
+        drop(inner);
+        if archived {
+            crate::commands::work_terminal::stop_when_finished([task.as_str()]);
+        }
         Ok(())
     }
 

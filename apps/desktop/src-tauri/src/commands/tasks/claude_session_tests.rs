@@ -1117,3 +1117,93 @@ fn non_code_work_starts_in_the_checkout_and_never_prepares_or_checks() {
         "master"
     );
 }
+
+#[test]
+fn a_new_worktree_copies_included_files_then_runs_worktree_commands() {
+    use crate::commands::project_registry::{ProjectRecord, WorktreeCommand};
+    let project = "claude-session-worktree-setup";
+    let fixture = Fixture::new(project, persistent());
+    std::fs::write(
+        fixture.folder.join("mark.cjs"),
+        "require('node:fs').writeFileSync(process.argv[2], 'ran');",
+    )
+    .unwrap();
+    std::fs::write(
+        fixture.folder.join("fail.cjs"),
+        "console.error('install broke'); process.exit(3);",
+    )
+    .unwrap();
+    std::fs::write(fixture.folder.join("local.json"), "{\"local\":true}").unwrap();
+    std::fs::write(
+        fixture.folder.join(".worktreeinclude"),
+        "*.cjs\nlocal.json\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(fixture.runtime.preferences_directory()).unwrap();
+    let register = |command: &str| {
+        crate::commands::project_registry::save(
+            &fixture.runtime,
+            vec![ProjectRecord {
+                id: project.into(),
+                name: "Fixture".into(),
+                path: fixture.root.clone(),
+                worktree_commands: vec![WorktreeCommand {
+                    name: "Install".into(),
+                    command: command.into(),
+                }],
+                ..Default::default()
+            }],
+        )
+        .unwrap();
+    };
+    let isolated = |id: &str, prompt: &str| {
+        let mut request = fixture.request(project, id, prompt, None);
+        request.isolated = true;
+        request.workspace_mode = Some(crate::cli_protocol::WorkspaceMode::Worktree);
+        request
+    };
+
+    register("node mark.cjs installed.json");
+    let run = fixture.finish(isolated("claude-worktree-setup", "Say hello"));
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
+    let workspace = Path::new(&run.workspace);
+    assert!(dunce::canonicalize(workspace).unwrap().starts_with(
+        dunce::canonicalize(&fixture.folder)
+            .unwrap()
+            .join(".worktrees")
+    ));
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("installed.json")).unwrap(),
+        "ran",
+        "the command ran in the new worktree, after the include copied its script"
+    );
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("local.json")).unwrap(),
+        "{\"local\":true}"
+    );
+    assert!(
+        run.activity
+            .iter()
+            .any(|line| line.contains(".worktreeinclude") && line.contains("local.json")),
+        "{:?}",
+        run.activity
+    );
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line.starts_with("Running Install")));
+
+    register("node fail.cjs");
+    let run = fixture.finish(isolated("claude-worktree-setup-fails", "Say goodbye"));
+    assert_eq!(run.status, RunStatus::Failed);
+    let error = run.error.unwrap();
+    assert!(
+        error.contains("Install") && error.contains("exit code 3"),
+        "{error}"
+    );
+    assert!(run
+        .preparation
+        .unwrap()
+        .output_tail
+        .contains("install broke"));
+}
