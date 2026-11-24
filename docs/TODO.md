@@ -7,6 +7,8 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Check the new default shortcuts (Mod+Shift+M/E/P/G, Mod+I) in installed WebView2,
+  WKWebView and WebKitGTK, including IBus on Linux.
 - [ ] Accept the optional account in installed builds: continue without an account on a clean
   profile, run a real task, connect later, and check that expiry and revocation only turn off
   account features. Update the Microsoft Store listing to say the account is optional.

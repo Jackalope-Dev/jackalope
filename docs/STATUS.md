@@ -73,7 +73,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   theme in Jackalope Violet, which follows the system's light or dark setting. Native macOS acceptance remains
   open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
-  font size, HTTP links and editable search, new-work and settings shortcuts. Saved
+  font size and HTTP links. Every app shortcut, including tabs, Back/Forward, `?` and the
+  composer's agent, effort, plan and branch pickers, is a named action that can be searched,
+  recorded (including two-key chords), cleared, reset, swapped on a clash, and imported or
+  exported as JSON in Settings → Keyboard shortcuts; the `?` sheet and command search show
+  the person's keys. Saved
   prompts and commands can apply to all projects or one project; commands require an
   explicit Run action. Voice to text inserts editable text at the cursor and never sends
   the task automatically. It transcribes on the computer with a downloaded Whisper model

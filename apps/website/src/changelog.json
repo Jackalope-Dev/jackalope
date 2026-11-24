@@ -1,5 +1,16 @@
 [
   {
+    "id": "every-shortcut-is-yours-to-change",
+    "date": "2026-11-24",
+    "title": "Every shortcut is yours to change.",
+    "description": "All keyboard shortcuts can now be rebound, and the composer works from the keyboard.",
+    "items": [
+      "Record any shortcut, including two-key chords, in Settings; clashes are caught and can be swapped.",
+      "Open the agent, model and effort pickers, plan mode and the branch menu without the mouse.",
+      "Import and export your shortcuts as JSON."
+    ]
+  },
+  {
     "id": "start-without-an-account",
     "date": "2026-11-24",
     "title": "Start without an account.",
