@@ -22,6 +22,14 @@ Only enable trusted agent CLIs and MCP servers. Tool descriptions and generated
 content are untrusted input; approval and task scope still apply. Remote MCP
 connections require HTTPS, and result images require an explicit opening action.
 
+Feedback reports, phone and web companion responses, Jev requests and exported
+plans are masked before they leave the app: secret values Jackalope gave an agent
+this session, secret-named variables and connection-URL passwords in its own
+environment, and common credential shapes (GitHub, GitLab, OpenAI, Anthropic, AWS,
+Google, Slack, npm, Stripe, Hugging Face, SendGrid, JWTs, bearer headers and PEM
+private keys). Masking is one-way and best effort. It does not change local history
+or what agents receive, and an agent can still send what it reads.
+
 The desktop account check controls the supported application's access flow.
 Someone who builds modified source can change that local check. Hosted services
 must independently authenticate and authorize every protected operation; they

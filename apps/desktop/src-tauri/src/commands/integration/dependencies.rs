@@ -240,9 +240,17 @@ pub(in crate::commands) fn reconciliation_input(
             &[&run.base_head],
             "Jackalope reconciliation input",
         )?;
+        // diff3 markers give the resolving agent each block's common ancestor too.
         let output = repo::output(
             &project,
-            &["merge-tree", "--write-tree", &combined, &commit],
+            &[
+                "-c",
+                "merge.conflictStyle=diff3",
+                "merge-tree",
+                "--write-tree",
+                &combined,
+                &commit,
+            ],
             Snapshot,
         )?;
         if !output.status.success() && output.status.code() != Some(1) {

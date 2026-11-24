@@ -65,3 +65,32 @@
   min-height: 44px;
   font-size: var(--text-sm);
 }
+.knowledge-rule {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.knowledge-rule-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-sm);
+}
+.knowledge-rule-tools > legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+.knowledge-rule-tools > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}

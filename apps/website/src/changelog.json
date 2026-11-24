@@ -11,6 +11,52 @@
     "note": "Activity is timed for tasks started from this version. ACP agents show tool counts only."
   },
   {
+    "id": "split-a-merge-into-smaller-commits",
+    "date": "2026-11-24",
+    "title": "Split a merge into smaller commits.",
+    "description": "A ready merge review can now land as a short series of ordered commits instead of one large one.",
+    "items": [
+      "Choose Split into commits and your default agent proposes up to 12 commits, with lock files kept beside their manifests.",
+      "Review each commit's files, hunks, dependencies and message, then approve or keep one commit.",
+      "Jackalope applies a split only when its commits add up to exactly the reviewed files.",
+      "Agents reconciling overlapping work resolve conflicts block by block instead of editing marker text."
+    ]
+  },
+  {
+    "id": "credentials-stay-out-of-what-leaves-the-app",
+    "date": "2026-11-24",
+    "title": "Credentials stay out of what leaves the app.",
+    "description": "Feedback reports, phone companion responses, Jev requests and exported plans now mask API keys, tokens and passwords before they are sent or written.",
+    "items": [
+      "Common token formats, private keys and connection-string passwords are replaced with a labeled placeholder.",
+      "Secret values Jackalope gave an agent are masked too; local history and agent input are unchanged."
+    ]
+  },
+  {
+    "id": "lessons-that-steer-agents-as-they-work",
+    "date": "2026-11-24",
+    "title": "Lessons that steer agents as they work.",
+    "description": "Turn a project lesson into a tool rule that warns about or blocks matching shell commands and file changes while an agent works.",
+    "items": [
+      "Match a command or the text being written with a pattern, a file path, or both.",
+      "Warnings let the call run and show the agent your message; blocks refuse it and tell the agent why.",
+      "Every match is recorded in the task's activity."
+    ],
+    "note": "Rules apply to Claude Code on this device and to permission requests from OpenCode and ACP agents. Codex, Claude Code with persistent sessions turned off, and agents running on a computer are not checked yet."
+  },
+  {
+    "id": "a-second-opinion-on-every-turn",
+    "date": "2026-11-24",
+    "title": "A second opinion on every turn.",
+    "description": "Turn on the Turn advisor in Project settings and another agent reads each finished task turn, then leaves a few graded notes.",
+    "items": [
+      "Jackalope prefers an advisor from a different model family. It reads the request, reply, changes and checks, and never runs tools.",
+      "Concerns and blockers go back to the working agent as a follow-up it can push back on. Asides are only shown to you.",
+      "Notes appear under each reply in the task's Result tab, marked as sent to the agent or kept for you."
+    ],
+    "note": "The advisor uses its own agent account's quota. It skips turns when that quota is low, when every execution slot is busy, or once a task reaches its review limit."
+  },
+  {
     "id": "agents-work-in-windows-behind-yours",
     "date": "2026-11-24",
     "title": "Agents work in windows behind yours.",

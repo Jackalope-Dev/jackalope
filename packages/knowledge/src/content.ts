@@ -566,6 +566,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What happens after a local merge?',
         paragraphs: [
           'Inspect the target branch, combined patch, checks, and proposed commit message before applying the merge. A successful local merge puts the reviewed change on that branch. Workspace cleanup is explicit. If cleanup fails, retain the receipt and retry cleanup; do not assume the merge itself failed.',
+          'To land a large change as smaller commits, choose Split into commits before merging. Your default agent proposes up to 12 ordered commits; review their files and messages, then approve them or keep one commit. Jackalope applies a split only when its commits add up to exactly the reviewed files.',
           'A local merge does not push a branch, create a pull request, or deploy. Delivery can read local Git and optional GitHub PR and CI state through your authenticated CLI and prepare an editable next-step draft. Review its destination and effects before starting publication work.',
         ],
         links: [

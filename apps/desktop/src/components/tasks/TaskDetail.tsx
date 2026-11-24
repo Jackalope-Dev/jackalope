@@ -76,6 +76,7 @@ import { TaskProgress } from './TaskProgress';
 import { TaskQuestions } from './TaskQuestions';
 import { TaskRunDetails } from './TaskRunDetails';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
+import { TurnAdvisorNotes } from './TurnAdvisorNotes';
 import { UnderstoodAs } from './UnderstoodAs';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
@@ -769,6 +770,7 @@ export function TaskDetail({
                       onOpenLink={openLink}
                     />
                   </Suspense>
+                  <TurnAdvisorNotes review={attempt.advisor} />
                 </Disclosure>
               ))}
             {attempts.length > 1 && (
@@ -821,6 +823,7 @@ export function TaskDetail({
                   : 'No final output recorded. Review the workspace or activity to see where this attempt ended.'}
               </p>
             )}
+            <TurnAdvisorNotes review={run.advisor} />
             {reported && (
               <Suspense fallback={null}>
                 <TaskReportLink attempts={attempts} onOpen={() => setTab('report')} />
