@@ -12,6 +12,17 @@
     ]
   },
   {
+    "id": "agents-work-in-windows-behind-yours",
+    "date": "2026-11-24",
+    "title": "Agents work in windows behind yours.",
+    "description": "On Windows and macOS, an agent controlling a window clicks, types, presses keys and scrolls in it while it stays behind your work, without moving your pointer or taking your keyboard.",
+    "items": [
+      "A glow outlines the window it is working in and the bar stays at the top of the screen, so you can see it and stop it.",
+      "Resuming control leaves the window where it is, and an app grant can switch to its app's other windows or, on macOS, open the app without bringing it forward.",
+      "Safari, Firefox-based browsers and Windows Store apps still take only button presses and field edits in the background."
+    ]
+  },
+  {
     "id": "pick-up-quota-stopped-work-where-it-left-off",
     "date": "2026-11-20",
     "title": "Pick up quota-stopped work where it left off.",

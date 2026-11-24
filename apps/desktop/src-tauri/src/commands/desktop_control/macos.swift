@@ -190,14 +190,41 @@ struct Guard {
         event.setIntegerValueField(.eventSourceUserData, value: tag)
         event.post(tap: .cghidEventTap)
     }
+    /// Sends the agent's input to one app only, leaving the system input stream alone.
+    func post(_ event: CGEvent, to pid: pid_t) throws {
+        try check()
+        event.setIntegerValueField(.eventSourceUserData, value: tag)
+        event.postToPid(pid)
+    }
+    func release(_ event: CGEvent, to pid: pid_t) {
+        event.setIntegerValueField(.eventSourceUserData, value: tag)
+        event.postToPid(pid)
+    }
+}
+
+/// Input for a window that stays behind the person's work. Events go to its app instead of
+/// through the system input stream, so the pointer, keyboard focus and the front app stay as
+/// they are. AppKit routes an event like this only when it names its window and, for the
+/// pointer, carries the point inside that window, which the window server fills in only for
+/// input it routes itself. Safari's and Firefox's web content ignore it; Jackalope never asks
+/// for background input there.
+enum BackgroundInput {
+    /// The undocumented event field that names the window an event belongs to.
+    static let windowField = CGEventField(rawValue: 51)!
+    typealias SetWindowLocation = @convention(c) (CGEvent, CGPoint) -> Void
+    static let setWindowLocation: SetWindowLocation? = dlsym(dlopen(nil, RTLD_NOW), "CGEventSetWindowLocation")
+        .map { unsafeBitCast($0, to: SetWindowLocation.self) }
+    static var available: Bool { setWindowLocation != nil }
 }
 
 func secure(_ element: AXUIElement) -> Bool {
     (attribute(element, kAXSubroleAttribute) as? String) == kAXSecureTextFieldSubrole
 }
 
-func focusedElement(_ window: SelectedWindow, _ rect: CGRect) throws -> AXUIElement {
-    _ = try window.foreground(rect)
+/// The control keys would reach: in the selected window, which must be in front unless the
+/// keys go to it in the background.
+func focusedElement(_ window: SelectedWindow, _ rect: CGRect, behind: Bool = false) throws -> AXUIElement {
+    if !behind { _ = try window.foreground(rect) }
     guard let focused = elementAttribute(AXUIElementCreateApplication(window.pid), kAXFocusedUIElementAttribute),
           let owner = elementAttribute(focused, kAXWindowAttribute),
           CFEqual(owner, try window.accessible(rect)) else {
@@ -479,10 +506,16 @@ struct Target {
     let deny: Set<pid_t>
     let guardState: Guard
     let source: CGEventSource
+    /// The window that takes pointer and keyboard input where it is, behind the person's
+    /// work; nil when input goes through the system to the window in front.
+    let behind: SelectedWindow?
 
     /// Brings the target window forward for mouse or keyboard input. Window
-    /// grants never change focus; app and desktop grants may, and report it.
+    /// grants never change focus; app and desktop grants may, and report it. A window
+    /// taking input in the background stays where it is, and keys the person holds in
+    /// another app don't reach it.
     func ensureForeground() throws -> Bool {
+        if behind != nil { return false }
         try require(!heldInput(), "Release keyboard keys and mouse buttons before input.")
         guard let window = window else {
             let front = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
@@ -504,6 +537,8 @@ struct Target {
     func absolute(_ x: Double, _ y: Double) throws -> CGPoint {
         try require(x >= 0 && y >= 0 && x < rect.width && y < rect.height, "Point lies outside the captured area.")
         let point = CGPoint(x: rect.minX + x, y: rect.minY + y)
+        // Input for a background window goes to it directly, whatever covers it.
+        if behind != nil { return point }
         let hit = visibleWindows().first { window in
             guard (window[kCGWindowAlpha as String] as? Double ?? 1) > 0,
                   let dictionary = window[kCGWindowBounds as String] as? [String: Any],
@@ -532,6 +567,29 @@ struct Target {
         return try absolute(x, y)
     }
 
+    /// Posts one event of the agent's: to the background window's app, or through the
+    /// system to whatever is in front. `point` is where a pointer event lands.
+    func send(_ event: CGEvent, at point: CGPoint? = nil) throws {
+        guard let behind = behind else { return try guardState.post(event) }
+        stamp(event, behind, point)
+        try guardState.post(event, to: behind.pid)
+    }
+
+    /// Ends a press the agent began, without the checks that could leave it held.
+    func release(_ event: CGEvent, at point: CGPoint? = nil) {
+        guard let behind = behind else { return guardState.release(event) }
+        stamp(event, behind, point)
+        guardState.release(event, to: behind.pid)
+    }
+
+    private func stamp(_ event: CGEvent, _ window: SelectedWindow, _ point: CGPoint?) {
+        event.setIntegerValueField(BackgroundInput.windowField, value: Int64(window.id))
+        guard let point = point else { return }
+        event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.id))
+        event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.id))
+        BackgroundInput.setWindowLocation?(event, CGPoint(x: point.x - rect.minX, y: point.y - rect.minY))
+    }
+
     func mouse(_ point: CGPoint, right: Bool, count: Int) throws {
         let types: (CGEventType, CGEventType) = right ? (.rightMouseDown, .rightMouseUp) : (.leftMouseDown, .leftMouseUp)
         for click in 1...max(1, count) {
@@ -541,8 +599,8 @@ struct Target {
             }
             down.setIntegerValueField(.mouseEventClickState, value: Int64(click))
             up.setIntegerValueField(.mouseEventClickState, value: Int64(click))
-            try guardState.post(down)
-            guardState.release(up)
+            try send(down, at: point)
+            release(up, at: point)
         }
     }
 
@@ -550,8 +608,8 @@ struct Target {
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else { throw ControlError("Cannot create keyboard input.") }
         down.flags = flags; up.flags = flags
-        try guardState.post(down)
-        guardState.release(up)
+        try send(down)
+        release(up)
     }
 
     func typeText(_ text: String) throws {
@@ -565,7 +623,7 @@ struct Target {
             if let window = window {
                 let current = try window.bounds()
                 try require(sameBounds(rect, current), "Window moved or resized during typing. Inspect before continuing.")
-                _ = try focusedElement(window, current)
+                _ = try focusedElement(window, current, behind: behind != nil)
             }
             guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
                   let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else { throw ControlError("Cannot create keyboard input.") }
@@ -573,8 +631,8 @@ struct Target {
                 down.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress!)
                 up.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress!)
             }
-            try guardState.post(down)
-            guardState.release(up)
+            try send(down)
+            release(up)
         }
     }
 }
@@ -628,7 +686,7 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
         let changed = try target.ensureForeground()
         let point = try target.point(request, "element", "x", "y")
         try target.mouse(point, right: action == "right_click", count: action == "double_click" ? 2 : 1)
-        return sent("pointer", changed, "Sent mouse input at the target point.")
+        return sent("pointer", changed, target.behind != nil ? backgroundNote : "Sent mouse input at the target point.")
     case "select":
         let element = try referenced(request, "element")
         if let option = request["text"] as? String, !option.isEmpty {
@@ -657,39 +715,40 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
         try target.keys(0, .maskCommand)
         if !text.isEmpty { try target.typeText(text) }
         _ = changed
-        return sent("keyboard", true, "The control has no writable value, so Jackalope focused it, selected all and typed.")
+        return sent("keyboard", target.behind == nil, "The control has no writable value, so Jackalope focused it, selected all and typed\(target.behind != nil ? " in the background" : "").")
     case "scroll":
         guard let count = request["wheel"] as? Int32, count != 0, abs(count) <= 10 else { throw ControlError("Invalid scroll input.") }
         // In the background, move the nearest scroll bar through Accessibility instead of
         // sending a wheel event that would reach whatever is under the pointer.
-        if let window = target.window, request["element"] is String, target.scope != "desktop", !window.isForeground(target.rect) {
-            let bar = try scrollBar(try referenced(request, "element"))
+        if let window = target.window, request["element"] is String, target.scope != "desktop", !window.isForeground(target.rect),
+           let bar = try? scrollBar(try referenced(request, "element")) {
             let current = (attribute(bar, kAXValueAttribute) as? NSNumber)?.doubleValue ?? 0
             let next = min(1, max(0, current - Double(count) * 0.05))
-            try require(AXUIElementSetAttributeValue(bar, kAXValueAttribute as CFString, NSNumber(value: next)) == .success, backgroundRefusal)
-            return sent("accessibility", false, "Scrolled through Accessibility; the window stayed in the background.")
+            if AXUIElementSetAttributeValue(bar, kAXValueAttribute as CFString, NSNumber(value: next)) == .success {
+                return sent("accessibility", false, "Scrolled through Accessibility; the window stayed in the background.")
+            }
         }
         let changed = try target.ensureForeground()
         let point = try target.point(request, "element", "x", "y")
         guard let event = CGEvent(scrollWheelEvent2Source: target.source, units: .line, wheelCount: 1, wheel1: count, wheel2: 0, wheel3: 0) else { throw ControlError("Invalid scroll input.") }
         event.location = point
-        try target.guardState.post(event)
-        return sent("pointer", changed, "Sent wheel input at the target point.")
+        try target.send(event, at: point)
+        return sent("pointer", changed, target.behind != nil ? backgroundNote : "Sent wheel input at the target point.")
     case "drag":
         let changed = try target.ensureForeground()
         let from = try target.point(request, "element", "x", "y")
         let to = try target.point(request, "to_element", "to_x", "to_y")
         guard let down = CGEvent(mouseEventSource: target.source, mouseType: .leftMouseDown, mouseCursorPosition: from, mouseButton: .left),
               let up = CGEvent(mouseEventSource: target.source, mouseType: .leftMouseUp, mouseCursorPosition: to, mouseButton: .left) else { throw ControlError("Cannot create mouse input.") }
-        try target.guardState.post(down)
-        defer { target.guardState.release(up) }
+        try target.send(down, at: from)
+        defer { target.release(up, at: to) }
         for step in 1...10 {
             let point = CGPoint(x: from.x + (to.x - from.x) * CGFloat(step) / 10, y: from.y + (to.y - from.y) * CGFloat(step) / 10)
             guard let move = CGEvent(mouseEventSource: target.source, mouseType: .leftMouseDragged, mouseCursorPosition: point, mouseButton: .left) else { continue }
-            try target.guardState.post(move)
+            try target.send(move, at: point)
             Thread.sleep(forTimeInterval: 0.015)
         }
-        return sent("pointer", changed, "Dragged with the mouse; the pointer moved.")
+        return sent("pointer", changed, target.behind != nil ? backgroundNote : "Dragged with the mouse; the pointer moved.")
     case "type":
         guard let text = request["text"] as? String, !text.isEmpty, text.unicodeScalars.count <= 1000,
               !text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw ControlError("Invalid literal text.") }
@@ -700,22 +759,24 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
             // the control's value instead when it has one.
             if let window = target.window, !window.isForeground(target.rect), target.scope != "desktop" {
                 try require(!secure(element), "Password controls are protected. Enter secrets yourself.")
-                try require(settable(element, kAXValueAttribute), backgroundRefusal)
+                if settable(element, kAXValueAttribute) {
+                    let current = attribute(element, kAXValueAttribute) as? String ?? ""
+                    try require(AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, (current + text) as CFString) == .success,
+                                "The app refused the new value.")
+                    return sent("accessibility", false, "Added the text through Accessibility; the window stayed in the background.")
+                }
+                try require(target.behind != nil, backgroundRefusal)
                 _ = window
-                let current = attribute(element, kAXValueAttribute) as? String ?? ""
-                try require(AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, (current + text) as CFString) == .success,
-                            "The app refused the new value.")
-                return sent("accessibility", false, "Added the text through Accessibility; the window stayed in the background.")
             }
             _ = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
             changed = true
         }
         changed = try target.ensureForeground() || changed
         try target.typeText(text)
-        return sent("keyboard", changed, "Typed literal text with keyboard input.")
+        return sent("keyboard", changed && target.behind == nil, target.behind != nil ? backgroundNote : "Typed literal text with keyboard input.")
     case "press":
         let changed = try target.ensureForeground()
-        if let window = target.window { _ = try focusedElement(window, target.rect) }
+        if let window = target.window { _ = try focusedElement(window, target.rect, behind: target.behind != nil) }
         var name = ""
         var flags: CGEventFlags = []
         if let chord = request["chord"] as? [String: Any], let key = chord["key"] as? String {
@@ -735,7 +796,7 @@ func input(_ action: String, _ request: [String: Any], _ target: Target) throws 
         }
         guard let code = keyCodes[name] else { throw ControlError("Unsupported key.") }
         try target.keys(code, flags)
-        return sent("keyboard", changed, "Sent the key chord to the focused control.")
+        return sent("keyboard", changed, target.behind != nil ? backgroundNote : "Sent the key chord to the focused control.")
     default:
         throw ControlError("Unsupported desktop action.")
     }
@@ -928,6 +989,10 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
         // Raising a window would pull it in front of the person's work; only a desktop grant
         // may, or an app grant whose app is already in front.
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        // Switching to a window of an app the person isn't using selects it where it is.
+        if scope == "app", request["background"] as? Bool == true, BackgroundInput.available, front != window.pid {
+            return ["status": "selected", "bounds": boundsJSON(rect)]
+        }
         try require(scope == "desktop" || window.isForeground(rect) || (scope == "app" && front == window.pid), backgroundRefusal)
         try window.focus()
         return ["status": "focused", "bounds": boundsJSON(rect)]
@@ -936,7 +1001,12 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     }
     guard let source = CGEventSource(stateID: .privateState) else { throw ControlError("Cannot create input source.") }
     try guardState.check()
-    let target = Target(window: window, rect: rect, scope: scope, deny: deny.union([guardState.indicator]), guardState: guardState, source: source)
+    // Pointer and keyboard input go to the window where it is while the person works in
+    // another app, when Jackalope allows it for this app; otherwise they need it in front.
+    let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+    let behind = request["background"] as? Bool == true && scope != "desktop" && BackgroundInput.available
+        ? window.flatMap { $0.pid == front ? nil : $0 } : nil
+    let target = Target(window: window, rect: rect, scope: scope, deny: deny.union([guardState.indicator]), guardState: guardState, source: source, behind: behind)
     return try input(action, request, target)
 }
 
@@ -991,9 +1061,12 @@ func minimized(_ window: SelectedWindow) -> Bool {
 
 /// How the helper refuses input that a background window can't take without focus.
 let backgroundRefusal = "The window is in the background. Use element actions by ref, or wait until the person brings it back."
+let backgroundNote = "Sent to the window in the background; the person's pointer, keyboard focus and front app did not change. Take a new snapshot to confirm it landed."
 
 final class Indicator: NSObject {
     let selected: SelectedWindow?
+    /// The window takes the agent's input where it is, so resuming never raises it.
+    let inPlace: Bool
     let scope: String
     let app: String
     let name: String
@@ -1071,6 +1144,7 @@ final class Indicator: NSObject {
         lookFile = (request["look"] as? String).map { URL(fileURLWithPath: $0) }
         logoFile = (request["logo"] as? String).map { URL(fileURLWithPath: $0) }
         resumeAtStart = request["resume"] as? Bool == true
+        inPlace = request["background"] as? Bool == true && BackgroundInput.available
         super.init()
         readTheme()
     }
@@ -1117,8 +1191,9 @@ final class Indicator: NSObject {
     /// Lays the pill out folded (a small chip) or sized to its content, keeping it centred
     /// where it was. Text never runs under the buttons; only a long pause reason shortens.
     func layoutPill() {
-        // In the background the bar keeps to a small chip, out of the person's way.
-        let showFull = (!folded && !(background && status == "active")) || (hovering && !holdFold)
+        // The bar stays readable while the agent works in the background, so the person can
+        // see what it is doing and stop it.
+        let showFull = !folded || (hovering && !holdFold)
         let height = Indicator.height
         let pad: CGFloat = 12, gap: CGFloat = 8, button: CGFloat = 28, buttonGap: CGFloat = 2
         let buttons = [toggle, stop, open, fold]
@@ -1231,7 +1306,9 @@ final class Indicator: NSObject {
         let room = Indicator.frameRoom
         if status == "active" || status == "paused" {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
-            if scope == "window", let rect = try? selected?.bounds(), !(selected.map { minimized($0) } ?? false) {
+            // In the background an app grant outlines its window too, rather than the screen
+            // the person is working on.
+            if scope == "window" || (scope == "app" && background), let rect = try? selected?.bounds(), !(selected.map { minimized($0) } ?? false) {
                 areas = [NSRect(x: rect.minX - room, y: top - rect.maxY - room,
                                 width: rect.width + room * 2, height: rect.height + room * 2)]
             } else if scope == "desktop" {
@@ -1277,10 +1354,11 @@ final class Indicator: NSObject {
             }
             // A window frame sits just above its window, so other apps in front cover it
             // too; it never draws over the person's foreground work.
-            if scope == "window", let selected = selected {
+            if scope == "window" || (scope == "app" && background), let selected = selected {
                 frame.level = .normal
                 frame.order(.above, relativeTo: Int(selected.id))
             } else {
+                frame.level = .statusBar
                 frame.orderFrontRegardless()
             }
         }
@@ -1499,6 +1577,8 @@ final class Indicator: NSObject {
     }
 
     func activateGrant() throws {
+        // A window that takes input where it is stays behind the person's work.
+        if inPlace { return }
         if scope == "window" { try selected?.focus(); return }
         if scope == "app" && !frontmostAllowed() {
             let running = NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier?.lowercased() == app }
@@ -1509,8 +1589,10 @@ final class Indicator: NSObject {
     func verifyGrant() throws {
         if scope == "window", let selected = selected {
             let bounds = try selected.bounds()
-            _ = try selected.foreground(bounds)
+            if !inPlace { _ = try selected.foreground(bounds) }
             previousBounds = bounds
+        } else if inPlace {
+            return
         } else if scope == "app" {
             try require(frontmostAllowed(), "Bring \(name) forward, then resume")
         }
