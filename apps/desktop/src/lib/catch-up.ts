@@ -8,6 +8,7 @@ import type { ScreenshotArtifact, TaskRun } from './run-types.ts';
 import type { WorkItem } from './task-collection.ts';
 import { requirementAssessment } from './task-outcomes.ts';
 import { looksLikePlan, taskDecision } from './task-workflow.ts';
+import { limitHeadline, usageLimitOf } from './usage-limit.ts';
 import { signalKey } from './work-signals.ts';
 
 /** How long without input or focus before a return counts as coming back. */
@@ -292,6 +293,23 @@ function decisionFor(
     !!item.session?.error ||
     !!managed?.error ||
     item.statusLabel === 'Needs attention';
+  const limit = usageLimitOf(run);
+  if (stopped && item.stage === 'attention' && limit) {
+    const message = firstLine(limit.message);
+    return {
+      kind: 'stopped',
+      decision: `${limitHeadline(limit, Date.now())}. ${
+        limit.kind === 'billing'
+          ? 'Add credit or switch to another account.'
+          : 'Resume it at the reset, switch account or set it aside.'
+      }`,
+      changes: 'Resuming or switching continues in the same workspace with the work so far.',
+      evidence: [...(message ? [`Provider: ${message}`] : []), ...evidenceFor(run, changedFiles)],
+      risk: inProjectFolder(run)
+        ? { level: 'medium', reason: 'It may have left partial changes in your project folder.' }
+        : { level: 'low', reason: 'Nothing was merged into your project.' },
+    };
+  }
   if (stopped && item.stage === 'attention') {
     const error = firstLine(item.session?.error ?? managed?.error ?? run?.error);
     return {
@@ -400,6 +418,8 @@ function eventFor(
     return { ...base, outcome: 'Interrupted before finishing', tone: 'warning' };
   if (run?.status === 'stopped')
     return { ...base, outcome: 'Stopped before finishing', tone: 'warning' };
+  const limit = usageLimitOf(run);
+  if (limit) return { ...base, outcome: limitHeadline(limit, Date.now()), tone: 'warning' };
   const error = firstLine(item.session?.error ?? item.managed?.error ?? run?.error);
   if (error || run?.status === 'failed' || item.statusLabel === 'Needs attention')
     return {

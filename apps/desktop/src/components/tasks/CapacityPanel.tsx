@@ -6,7 +6,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowName } from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { countdown, limitName, observedLimits, resetTime } from '../../lib/usage-limit';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 import { ProviderMark } from '../agents/ProviderMark';
@@ -85,6 +87,8 @@ export function CapacityPanel() {
     })),
   );
   const [now, setNow] = useState(Date.now());
+  const runs = useExecutionStore((state) => state.runs);
+  const limited = observedLimits(runs, now);
   const nextRefresh = lastFetched ? lastFetched + 60_000 : 0;
   const refresh = () => void fetch(true);
   useEffect(() => {
@@ -226,6 +230,28 @@ export function CapacityPanel() {
               </Panel>
             );
           })}
+        </div>
+      )}
+      {limited.length > 0 && (
+        <div className="capacity-limited">
+          <h3 className="text-sm">Limited by recent work</h3>
+          <ul>
+            {limited.map((limit) => (
+              <li key={`${limit.agent}:${limit.profileId ?? limit.account}`}>
+                <ProviderMark provider={limit.agent} size={20} />
+                <span className="capacity-limited-name">
+                  {agentName(limit.agent)}
+                  {limit.account ? ` · ${limit.account}` : ''}
+                </span>
+                <Badge variant="warning">{limitName(limit.kind)}</Badge>
+                <span className="capacity-limited-reset">
+                  {limit.resetsAt
+                    ? `Limited until ${resetTime(limit.resetsAt, now)} · in ${countdown(limit.resetsAt, now)}`
+                    : `Reset time not reported · hit at ${resetTime(limit.observedAt, now)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {nextRefresh > now && !loading && (

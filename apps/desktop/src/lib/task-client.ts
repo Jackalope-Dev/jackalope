@@ -7,9 +7,23 @@ export const stopTask = (id: string) => invokeNative<void>('task_stop', { id });
 export const markReviewed = (id: string) => invokeNative<void>('task_mark_reviewed', { id });
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });
 /** Start a fresh attempt at a task whose last attempt did not finish. */
-/** `focus` leads the progress context when the retry picks up a quota-stopped attempt's work. */
-export const retryTask = (id: string, focus?: string) =>
-  invokeNative<string>('task_retry', { id, focus: focus?.trim() || null });
+/**
+ * `focus` leads the progress context when the retry picks up a quota-stopped attempt's work;
+ * `switchTo` moves work a usage limit stopped to another agent or account.
+ */
+export const retryTask = (
+  id: string,
+  focus?: string,
+  switchTo?: { agent: string; profileId: string | null },
+) =>
+  invokeNative<string>('task_retry', {
+    id,
+    focus: focus?.trim() || null,
+    switchTo: switchTo ?? null,
+  });
+/** Retries a usage-limited attempt once its reported reset passes, or cancels that. */
+export const resumeAtReset = (id: string, schedule: boolean) =>
+  invokeNative<void>('task_resume_at_reset', { id, schedule });
 /** Marks an interrupted attempt stopped once the person confirmed nothing from it still runs. */
 export const releaseInterrupted = (id: string) =>
   invokeNative<TaskRun>('task_release_interrupted', { id });

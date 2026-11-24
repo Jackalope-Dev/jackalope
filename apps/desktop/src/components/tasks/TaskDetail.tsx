@@ -28,7 +28,7 @@ import {
   Square,
   SquareArrowOutUpRight,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { listMcpServers, type McpServerConfig } from '../../lib/mcp-client';
 import { projectConnections } from '../../lib/mcp-connection';
@@ -39,6 +39,7 @@ import { PROMPT_MAX_CHARS, type TaskRun } from '../../lib/run-types';
 import {
   markReviewed,
   releaseInterrupted,
+  resumeAtReset,
   retryTask,
   stopAndSettle,
   stopPreview as stopPreviewTask,
@@ -46,6 +47,7 @@ import {
 } from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt, pullRequestDecision, taskDecision } from '../../lib/task-workflow';
+import { usageLimitOf } from '../../lib/usage-limit';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { usePullRequestStore } from '../../stores/pullRequestStore';
@@ -78,7 +80,9 @@ import { TaskRunDetails } from './TaskRunDetails';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { TurnAdvisorNotes } from './TurnAdvisorNotes';
 import { UnderstoodAs } from './UnderstoodAs';
+import { limitBannerDismissed, UsageLimitBanner } from './UsageLimitBanner';
 import { UserPromptCard } from './UserPromptCard';
+import { useLimitSwitchOptions } from './useLimitSwitch';
 import { useManagedPreview } from './useManagedPreview';
 import { useTaskFollowUps } from './useTaskFollowUps';
 import { ValidationJourney } from './ValidationJourney';
@@ -201,6 +205,8 @@ export function TaskDetail({
     .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
   const latest = latestAttempt(runs, run.taskId);
   const isLatest = latest?.id === run.id;
+  /** Resuming and switching start a new attempt, so only the latest unmerged task attempt offers them. */
+  const limitActions = isLatest && isRetryable(run) && !integrated && !run.liveSessionId;
   const sourceIdea = useTaskStore((state) =>
     state.tasks.find(
       (idea) =>
@@ -208,6 +214,10 @@ export function TaskDetail({
     ),
   );
   const currentProject = useProjectStore((s) => s.projects.find((p) => p.id === run.projectId));
+  const limit = useMemo(() => usageLimitOf(run), [run]);
+  const [limitHidden, setLimitHidden] = useState(() => limitBannerDismissed(run.id));
+  useEffect(() => setLimitHidden(limitBannerDismissed(run.id)), [run.id]);
+  const switchOptions = useLimitSwitchOptions(limit, currentProject);
   const title = taskTitle(
     sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt,
     sourceIdea?.title,
@@ -321,12 +331,12 @@ export function TaskDetail({
     await refresh();
     useExecutionStore.getState().select(id);
   };
-  const retry = async (focus?: string) => {
+  const retry = async (focus?: string, switchTo?: { agent: string; profileId: string | null }) => {
     if (retrying || submitting) return;
     setRetrying(true);
     setError('');
     try {
-      const id = await retryTask(run.id, focus);
+      const id = await retryTask(run.id, focus, switchTo);
       await refresh();
       useExecutionStore.getState().select(id);
     } catch (cause) {
@@ -697,20 +707,43 @@ export function TaskDetail({
           continuing or integrating.
         </InlineNotice>
       )}
-      {run.error && (
-        <TaskFailure
-          message={run.error}
-          kind={run.failureKind}
-          preparation={run.preparation}
-          retrying={retrying}
-          onRetry={
-            isLatest && isRetryable(run) && !integrated ? (focus) => void retry(focus) : undefined
+      {run.error && limit && !limitHidden ? (
+        <UsageLimitBanner
+          runId={run.id}
+          limit={limit}
+          scheduledAt={run.resumeAtReset ? run.resumeAtReset.at * 1000 : null}
+          scheduleError={run.resumeAtReset?.error}
+          onResumeAtReset={
+            limitActions ? () => void act(() => resumeAtReset(run.id, true)) : undefined
           }
-          continuesProgress={
-            !!run.quotaFailure && !!run.workspace && run.workspace !== run.projectPath
+          onCancelResume={
+            run.resumeAtReset ? () => void act(() => resumeAtReset(run.id, false)) : undefined
           }
-          onInspect={() => setTab('activity')}
+          accounts={limitActions ? switchOptions.accounts : []}
+          agents={limitActions ? switchOptions.agents : []}
+          onSwitch={(option) =>
+            void retry(undefined, { agent: option.agent, profileId: option.profileId })
+          }
+          onRetry={limitActions && !run.resumeAtReset ? () => void retry() : undefined}
+          onDismiss={() => setLimitHidden(true)}
+          busy={acting || retrying}
         />
+      ) : (
+        run.error && (
+          <TaskFailure
+            message={run.error}
+            kind={run.failureKind}
+            preparation={run.preparation}
+            retrying={retrying}
+            onRetry={
+              isLatest && isRetryable(run) && !integrated ? (focus) => void retry(focus) : undefined
+            }
+            continuesProgress={
+              !!run.quotaFailure && !!run.workspace && run.workspace !== run.projectPath
+            }
+            onInspect={() => setTab('activity')}
+          />
+        )
       )}
       <DesktopPermissionNotice key={run.id} run={run} />
       {!!pending.length && (

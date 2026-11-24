@@ -189,6 +189,39 @@ is kept on the attempt under Task details.
 Codex, Claude, Grok, OpenCode and Kimi can coordinate; Antigravity and Gemini CLI are worker-only.
 Automatic quota handoff can be enabled or disabled in the Defaults section of the Agents page with All projects selected.
 
+### Usage limits on stopped work
+
+`tasks/usage_limit.rs` and `tasks/failure.rs` type a failed attempt's limit as a used-up
+allowance (`quota_exhausted`), a short rate window (`rate_limited`) or a billing or credit
+limit (`billing`), separately from sign-in failures. The quota record keeps the provider's
+own message and, only when the provider states it, the reset (`resetsAt`, Unix seconds):
+Claude Code's rejected `rate_limit_event` `resetsAt`, `usage limit reached|<epoch>` and
+"resets 3pm (Zone)" wording, Codex's "try again at 4:12 PM" text, `resets_at` and
+`resets_in_seconds` error bodies and used-up `rate_limits` snapshots, and Gemini's
+"reset after 2h3m" and `retryDelay`. A time without a named zone is read in this
+computer's zone, which is where a local CLI prints it. Billing limits never carry a reset.
+Jackalope does not retry rate limits itself; the agent CLIs retry transient ones.
+
+A task or conversation stopped this way shows a banner naming the provider and account,
+the reset as a local time with a live countdown (or that it was not reported) and the
+provider's message under a toggle. **Resume at reset** is offered when a reset was
+reported: a task retries its latest attempt (continuing its workspace like any quota
+retry) and a conversation resumes its queue, adding a short "continue" message when
+nothing is queued. Both start a minute after the reset, are saved with the attempt or
+conversation so they survive a restart, can be cancelled, and are dropped by any pause,
+resume or finish the person chooses or by a newer attempt. A task resume that cannot
+start keeps its reason on the attempt. **Switch account** and **Switch agent** retry a
+task's latest attempt on another account or agent the project allows, with the same
+progress context as a quota handoff; conversations stay pinned to their agent and
+account, so they offer resuming only. Notifications and Inbox read "Usage limit — resets
+3:40 PM" instead of a generic failure. Usage & quota lists accounts recent work found
+limited until the reported reset; without one, until later work uses the account or
+twelve hours pass. That list is local observation, and routing still reads capacity
+from the providers' readers. With the desktop Vite server running,
+`node scripts/verification/verify-usage-limit.mjs` checks the task banner's countdown,
+keyboard scheduling and cancelling, switching, dismissal, themes and a 960 by 640 window
+with fake IPC; it does not prove a real provider limit or a native resume.
+
 Routing attempts and failed worker legs retain separate provider usage with
 agent/model/account attribution. Decision copies are explanatory and excluded from
 usage totals. Missing reports stay unavailable. New continuations do not duplicate

@@ -12,7 +12,7 @@ export interface SessionMessage {
   origin?: MessageOrigin;
 }
 export interface MessageOrigin {
-  kind: 'wake' | 'bot' | 'reply' | 'card';
+  kind: 'wake' | 'bot' | 'reply' | 'card' | 'resume';
   label: string;
   botId?: string;
   botName?: string;
@@ -48,6 +48,8 @@ export interface LiveSession {
   createdAt: string;
   updatedAt: string;
   paused: boolean;
+  /** A resume the person scheduled for when the usage limit that paused it resets. */
+  resumeAtReset?: { at: number; runId: string } | null;
   closed: boolean;
   pinned: boolean;
   messages: SessionMessage[];

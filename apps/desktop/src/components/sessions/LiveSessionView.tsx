@@ -32,6 +32,7 @@ import type { TaskRun } from '../../lib/run-types';
 import { sessionMarkdown } from '../../lib/session-export';
 import { respondToPrompt, stopTask } from '../../lib/task-client';
 import { taskDecision } from '../../lib/task-workflow';
+import { usageLimitOf } from '../../lib/usage-limit';
 import { openImportedConversation, selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useImportedConversationStore } from '../../stores/importedConversationStore';
@@ -51,6 +52,7 @@ import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskLiveActivity } from '../tasks/TaskLiveActivity';
 import { TaskPreview } from '../tasks/TaskPreview';
+import { limitBannerDismissed, UsageLimitBanner } from '../tasks/UsageLimitBanner';
 import { useWorkSeen, WorkContextDetails } from '../tasks/WorkContext';
 import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
@@ -271,6 +273,15 @@ export function LiveSessionView({
       await stopTask(active.id);
     });
   const retryable = !active && !!session.batches.at(-1)?.error;
+  // A usage limit that paused the conversation gets its own banner, until the person
+  // resumes it, sends it on or dismisses the banner.
+  const latestLimit = useMemo(() => usageLimitOf(latest), [latest]);
+  const sessionLimit =
+    latestLimit && latest && session.paused && !session.closed && !active && !integrated
+      ? { limit: latestLimit, runId: latest.id }
+      : null;
+  const [limitHidden, setLimitHidden] = useState(false);
+  useEffect(() => setLimitHidden(!!latest && limitBannerDismissed(latest.id)), [latest]);
   const tools = (
     <>
       {(!detached || (!integrated && !simple)) && (
@@ -572,6 +583,36 @@ export function LiveSessionView({
             started without you. Review what it did, then let it continue for up to{' '}
             {BOT_BATCH_ALLOWANCE} more.
           </InlineNotice>
+        </div>
+      ) : sessionLimit && !limitHidden ? (
+        <div className="live-notice">
+          <UsageLimitBanner
+            runId={sessionLimit.runId}
+            limit={sessionLimit.limit}
+            scheduledAt={session.resumeAtReset ? session.resumeAtReset.at * 1000 : null}
+            onResumeAtReset={
+              detached
+                ? undefined
+                : () =>
+                    void act(() =>
+                      sessionCommand('action', { id: session.id, action: 'resume-at-reset' }),
+                    )
+            }
+            onCancelResume={
+              session.resumeAtReset
+                ? () =>
+                    void act(() =>
+                      sessionCommand('action', {
+                        id: session.id,
+                        action: 'cancel-resume-at-reset',
+                      }),
+                    )
+                : undefined
+            }
+            onDismiss={() => setLimitHidden(true)}
+            busy={busy}
+            error={error}
+          />
         </div>
       ) : (
         (error || workspace.error || session.error || retryable) && (
@@ -959,13 +1000,13 @@ function MessageOriginLabel({
   const sender = useBotStore((state) => state.bots.find((bot) => bot.id === origin.botId));
   return (
     <span className="live-author live-origin">
-      {origin.kind === 'wake' ? (
+      {origin.kind === 'wake' || origin.kind === 'resume' ? (
         <AlarmClock size={14} aria-hidden="true" />
       ) : (
         <BotAvatar appearance={sender?.appearance} agent={sender?.agent} />
       )}
       <span>{origin.kind === 'wake' ? `Woke up · ${origin.label}` : origin.label}</span>
-      {origin.sessionId && onOpenSession && origin.kind !== 'wake' && (
+      {origin.sessionId && onOpenSession && origin.kind === 'bot' && (
         <button
           type="button"
           className="live-origin-link"
