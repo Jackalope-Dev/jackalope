@@ -20,9 +20,11 @@ import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
+import { CommitSplit } from './CommitSplit';
 import './project-queue.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { isDone } from '@jackalope/contracts/runs';
+import { commitCount } from '../../lib/commit-split';
 import { ActionError } from '../ui/ActionError';
 export function MergeReview({
   project,
@@ -62,6 +64,7 @@ export function MergeReview({
   const [preparedMessage, setPreparedMessage] = useState(managedTitle ?? '');
   const [applying, setApplying] = useState(false);
   const [cleanup, setCleanup] = useState(true);
+  const [splitting, setSplitting] = useState(false);
   const preparedSelection = useRef('');
   const normalizePath = (path: string) =>
     path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
@@ -167,6 +170,8 @@ export function MergeReview({
   });
 
   const applied = plan?.status === 'applied';
+  const split = (plan?.commits?.length ?? 0) > 0;
+  const localCommits = split ? `${plan?.commits?.length} local commits` : 'one local commit';
   const previousPlans = plans.filter(
     (previous) =>
       normalizePath(previous.projectPath) === normalizePath(project.path) &&
@@ -330,10 +335,14 @@ export function MergeReview({
           )}
           {plan.commitMessage && !managedTitle && !onlyRunId && (
             <div className="my-4">
-              <p className="task-label">Commit preview</p>
-              <pre className="whitespace-pre-wrap break-words task-muted mt-2">
-                {plan.commitMessage}
-              </pre>
+              {!split && (
+                <>
+                  <p className="task-label">Commit preview</p>
+                  <pre className="whitespace-pre-wrap break-words task-muted mt-2">
+                    {plan.commitMessage}
+                  </pre>
+                </>
+              )}
               <p className="task-muted mt-2">
                 Attribution:{' '}
                 {plan.commitPolicy?.attribution === 'agent'
@@ -409,7 +418,7 @@ export function MergeReview({
                     />
                   </FormField>
                 )}
-                {plan.commitMessage && (applied || message === preparedMessage) && (
+                {plan.commitMessage && !split && (applied || message === preparedMessage) && (
                   <div>
                     <p className="task-muted">Commit preview</p>
                     <pre className="whitespace-pre-wrap break-words task-muted mt-2">
@@ -429,14 +438,26 @@ export function MergeReview({
               </DisclosureBody>
             </Disclosure>
           )}
+          {planEligible && (plan.status === 'ready' || (applied && split)) && (
+            <CommitSplit
+              key={`${plan.id}:${plan.integrationHead}:${plan.status}`}
+              plan={plan}
+              disabled={busy}
+              onBusyChange={setSplitting}
+              onApplied={async (next) => {
+                setPlan(next);
+                await load().catch(() => undefined);
+              }}
+            />
+          )}
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">
               <p className="task-muted">
                 {onlyRunId
-                  ? `${plan.files.length} ${plan.files.length === 1 ? 'file' : 'files'} · one local commit on ${plan.targetBranch}. Nothing is published.`
+                  ? `${plan.files.length} ${plan.files.length === 1 ? 'file' : 'files'} · ${localCommits} on ${plan.targetBranch}. Nothing is published.`
                   : managedTitle
-                    ? `Creates one local commit on ${plan.targetBranch}. Nothing is published.`
-                    : `Creates one commit on ${plan.targetBranch}. That checkout must be clean, and the reviewed files must still match. Publishing remains a separate step.`}
+                    ? `Creates ${localCommits} on ${plan.targetBranch}. Nothing is published.`
+                    : `Creates ${split ? commitCount(plan.commits?.length ?? 0) : 'one commit'} on ${plan.targetBranch}. That checkout must be clean, and the reviewed files must still match. Publishing remains a separate step.`}
               </p>
               <label className="flex items-center gap-3 min-h-11">
                 <Checkbox
@@ -449,7 +470,7 @@ export function MergeReview({
                   : 'Remove this workspace after merging'}
               </label>
               <Button
-                disabled={busy}
+                disabled={busy || splitting}
                 onClick={() => void apply()}
                 loading={busy}
                 loadingLabel={managedTitle ? 'Applying…' : 'Merging…'}
