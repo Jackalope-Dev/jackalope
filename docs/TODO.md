@@ -7,6 +7,9 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept the optional account in installed builds: continue without an account on a clean
+  profile, run a real task, connect later, and check that expiry and revocation only turn off
+  account features. Update the Microsoft Store listing to say the account is optional.
 - [ ] Accept the Overview page in an installed app with real running work, previews and
   pull requests, and load Cloudflare swarm state app-wide so swarms appear as one item.
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs

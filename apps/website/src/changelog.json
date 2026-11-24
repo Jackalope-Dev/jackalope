@@ -1,5 +1,15 @@
 [
   {
+    "id": "start-without-an-account",
+    "date": "2026-11-24",
+    "title": "Start without an account.",
+    "description": "Jackalope no longer requires an account to run your agents.",
+    "items": [
+      "Choose Continue without an account to run tasks, conversations and terminals with the agents you already have.",
+      "Connect a free account any time for settings, lesson and skill sync, invitations and the Microsoft Store beta."
+    ]
+  },
+  {
     "id": "work-with-gitlab-and-bitbucket",
     "date": "2026-11-24",
     "title": "Work with GitLab and Bitbucket.",
