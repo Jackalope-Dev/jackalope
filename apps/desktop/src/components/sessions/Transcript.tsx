@@ -11,9 +11,11 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { useKeybindingHandlers } from '../../hooks/useKeybindings';
 import { useReducedMotionPreference } from '../../hooks/useReducedMotionPreference';
 import {
@@ -134,6 +136,7 @@ export function Transcript({
   // reads the position, so its first range is the end.
   useLayoutEffect(() => stick());
 
+  const [, redraw] = useReducer((count: number) => count + 1, 0);
   const [margin, setMargin] = useState(0);
   const [selected, setSelected] = useState<readonly [number, number] | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
@@ -172,10 +175,12 @@ export function Transcript({
     if (!node || !tail) return;
     let shown = node.clientHeight > 0;
     const observer = new ResizeObserver(() => {
-      if (node.clientHeight > 0 && !shown && !following.current)
-        node.scrollTop = readingTop.current;
+      const appeared = node.clientHeight > 0 && !shown;
+      if (appeared && !following.current) node.scrollTop = readingTop.current;
       shown = node.clientHeight > 0;
       stick();
+      // Render the rows for the new viewport before this frame paints, not after it.
+      if (appeared) flushSync(redraw);
     });
     observer.observe(node);
     observer.observe(tail);

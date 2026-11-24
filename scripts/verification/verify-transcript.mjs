@@ -152,7 +152,7 @@ async function checkBehavior(page) {
     .first()
     .fill('Back to the end please');
   await page.keyboard.press('Enter');
-  await page.getByText('Back to the end please').waitFor();
+  await page.locator('.transcript-rows').getByText('Back to the end please').waitFor();
   await page.waitForFunction(() => {
     const node = document.querySelector('.live-transcript');
     return node.scrollHeight - node.scrollTop - node.clientHeight < 2;
@@ -217,8 +217,26 @@ async function checkBehavior(page) {
   await page.getByRole('button', { name: 'Review', exact: true }).click();
   await page.keyboard.press(`${modifier}+F`);
   assert.equal(await page.getByRole('search').count(), 0);
+  await page.evaluate(() => {
+    window.transcriptFixture.frames = [];
+    // Sampled after each frame paints: what the person saw.
+    const sample = () =>
+      setTimeout(() => {
+        const node = document.querySelector('.live-transcript');
+        const rows = `${node?.querySelectorAll('.transcript-row').length}:${node?.clientHeight}`;
+        window.transcriptFixture.frames.push(rows);
+        if (window.transcriptFixture.frames.length < 30) requestAnimationFrame(sample);
+      });
+    requestAnimationFrame(sample);
+  });
   await page.getByRole('button', { name: 'Conversation', exact: true }).click();
   await transcript.waitFor();
+  await page.waitForTimeout(600);
+  const shown = await page.evaluate(() => window.transcriptFixture.frames);
+  assert.ok(
+    !shown.some((frame) => frame.startsWith('0:') && !frame.endsWith(':0')),
+    `no frame shows the conversation without its rows: ${shown.join(' ')}`,
+  );
 
   // A selection keeps its rows rendered while they scroll out of view.
   const selected = await page.evaluate(() => {
