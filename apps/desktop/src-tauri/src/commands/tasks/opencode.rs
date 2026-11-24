@@ -471,6 +471,32 @@ impl Api<'_> {
             let permission = request["permission"].as_str().unwrap_or_default();
             let patterns: Vec<String> = scopes.iter().map(|(_, pattern)| pattern.clone()).collect();
             let label = format!("OpenCode {permission}: {}", patterns.join(", "));
+            // OpenCode returns a rejection's message to the model as feedback.
+            if let Some(reason) = crate::commands::knowledge::tool_rules::check_request(
+                runtime,
+                run_id,
+                &label,
+                |workspace| {
+                    crate::commands::knowledge::tool_rules::ToolCall::opencode(
+                        permission,
+                        &patterns,
+                        &request["metadata"],
+                        workspace,
+                    )
+                },
+            ) {
+                self.json(
+                    Method::POST,
+                    &format!("/permission/{id}/reply"),
+                    Some(json!({"reply":"reject","message":reason})),
+                )
+                .await?;
+                denials.count += 1;
+                if denials.count >= 8 {
+                    return Err("OpenCode reached the limit of denied actions for this attempt. Review the saved requests before continuing.".into());
+                }
+                return Ok(());
+            }
             let decision = if scopes.iter().any(|scope| denials.scopes.contains(scope)) {
                 crate::commands::permission_risk::Decision::Ask(None)
             } else {

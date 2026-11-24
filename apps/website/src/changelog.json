@@ -1,5 +1,17 @@
 [
   {
+    "id": "lessons-that-steer-agents-as-they-work",
+    "date": "2026-11-24",
+    "title": "Lessons that steer agents as they work.",
+    "description": "Turn a project lesson into a tool rule that warns about or blocks matching shell commands and file changes while an agent works.",
+    "items": [
+      "Match a command or the text being written with a pattern, a file path, or both.",
+      "Warnings let the call run and show the agent your message; blocks refuse it and tell the agent why.",
+      "Every match is recorded in the task's activity."
+    ],
+    "note": "Rules apply to Claude Code on this device and to permission requests from OpenCode and ACP agents. Codex, Claude Code with persistent sessions turned off, and agents running on a computer are not checked yet."
+  },
+  {
     "id": "agents-work-in-windows-behind-yours",
     "date": "2026-11-24",
     "title": "Agents work in windows behind yours.",

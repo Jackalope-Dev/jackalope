@@ -8,13 +8,15 @@ import {
   FieldCheck,
   FormField,
   Input,
+  Select,
+  SelectItem,
   Textarea,
   useDialogFocus,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
-import type { KnowledgeEntry } from '../../lib/knowledge-types';
+import type { KnowledgeEntry, ToolRule } from '../../lib/knowledge-types';
 import { invokeNative } from '../../lib/native/transport';
 import { OutcomeEditor } from '../tasks/OutcomeEditor';
 import { ActionError } from '../ui/ActionError';
@@ -42,6 +44,9 @@ export function KnowledgeEditor({
     .map((s) => s.trim())
     .filter(Boolean);
   const process = value.process ?? { inputs: [], steps: [], outcomes: [] };
+  const rule = value.toolRule;
+  const setRule = (change: Partial<ToolRule>) =>
+    rule && setValue({ ...value, toolRule: { ...rule, ...change } });
   return (
     <Dialog.Root
       open
@@ -181,6 +186,95 @@ export function KnowledgeEditor({
               )}
             </div>
           )}
+          {memory && (
+            <fieldset className="knowledge-rule">
+              <legend className="ui-sr-only">Tool rule</legend>
+              <label className="knowledge-editor-enabled">
+                <Checkbox
+                  checked={!!rule}
+                  onChange={(e) =>
+                    setValue({ ...value, toolRule: e.target.checked ? newToolRule(value) : null })
+                  }
+                />
+                Check agents' tool calls against this lesson
+              </label>
+              {rule && (
+                <>
+                  <fieldset className="knowledge-rule-tools">
+                    <legend>Applies to</legend>
+                    {TOOL_KINDS.map(([kind, label]) => (
+                      <label key={kind}>
+                        <Checkbox
+                          checked={rule.tools.includes(kind)}
+                          onChange={(e) =>
+                            setRule({
+                              tools: e.target.checked
+                                ? [...rule.tools, kind]
+                                : rule.tools.filter((tool) => tool !== kind),
+                            })
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </fieldset>
+                  <FormField
+                    label="Command or text pattern"
+                    description="A regular expression searched in the command or the text written. Start with (?i) to ignore case."
+                  >
+                    <Input
+                      id="knowledge-rule-pattern"
+                      className="font-mono"
+                      maxLength={500}
+                      spellCheck={false}
+                      value={rule.pattern ?? ''}
+                      onChange={(e) => setRule({ pattern: e.target.value })}
+                      placeholder="\bnpm\s+install\b"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Files"
+                    description="A glob in the workspace, such as src/**/*.ts. Without a slash it matches the file name in any folder. Shell commands have no file, so a rule with files checks only writes and edits."
+                  >
+                    <Input
+                      id="knowledge-rule-path"
+                      className="font-mono"
+                      maxLength={240}
+                      spellCheck={false}
+                      value={rule.path ?? ''}
+                      onChange={(e) => setRule({ path: e.target.value })}
+                      placeholder="*.lock"
+                    />
+                  </FormField>
+                  <FormField label="When it matches">
+                    <Select
+                      id="knowledge-rule-action"
+                      value={rule.action}
+                      onValueChange={(action) => setRule({ action: action as ToolRule['action'] })}
+                    >
+                      <SelectItem value="warn">Let it run and warn the agent</SelectItem>
+                      <SelectItem value="deny">Block it and tell the agent why</SelectItem>
+                    </Select>
+                  </FormField>
+                  <FormField label="Message to the agent">
+                    <Textarea
+                      id="knowledge-rule-message"
+                      required
+                      rows={2}
+                      maxLength={800}
+                      value={rule.message}
+                      onChange={(e) => setRule({ message: e.target.value })}
+                    />
+                  </FormField>
+                  <p className="task-muted">
+                    Checked on Claude Code shell commands, writes and edits, and on permission
+                    requests from OpenCode and ACP agents. Every match is recorded in the task's
+                    activity.
+                  </p>
+                </>
+              )}
+            </fieldset>
+          )}
           <label className="knowledge-editor-enabled">
             <Checkbox
               checked={value.enabled}
@@ -201,6 +295,33 @@ export function KnowledgeEditor({
       </DialogContent>
     </Dialog.Root>
   );
+}
+
+const TOOL_KINDS: [ToolRule['tools'][number], string][] = [
+  ['shell', 'Shell commands'],
+  ['write', 'File writes'],
+  ['edit', 'File edits'],
+];
+
+/** A starting rule for a lesson, with the lesson as the message. */
+export function newToolRule(entry: KnowledgeEntry): ToolRule {
+  return {
+    tools: ['shell'],
+    pattern: '',
+    path: '',
+    action: 'warn',
+    message: entry.content.slice(0, 800),
+  };
+}
+
+/** What a rule does, such as "blocks shell commands and file writes". */
+export function toolRuleSummary(rule: ToolRule): string {
+  const kinds = TOOL_KINDS.filter(([kind]) => rule.tools.includes(kind)).map(([, label]) =>
+    label.toLowerCase(),
+  );
+  const list =
+    kinds.length > 1 ? `${kinds.slice(0, -1).join(', ')} and ${kinds[kinds.length - 1]}` : kinds[0];
+  return `${rule.action === 'deny' ? 'blocks' : 'warns on'} ${list ?? 'tool calls'}`;
 }
 
 export function newKnowledge(
