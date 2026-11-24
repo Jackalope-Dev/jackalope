@@ -118,7 +118,12 @@ fn lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
 
 /// The change from `base` to `head`, cut into units in path and hunk order.
 fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
-    let options = ["--no-ext-diff", "--no-textconv", "--no-color", "--no-renames"];
+    let options = [
+        "--no-ext-diff",
+        "--no-textconv",
+        "--no-color",
+        "--no-renames",
+    ];
     let mut names = vec!["diff", "--name-only", "-z"];
     names.extend(options);
     names.extend([base, head, "--"]);
@@ -183,11 +188,7 @@ fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
             }
             (added, removed)
         };
-        let pieces = if whole {
-            vec![hunks.concat()]
-        } else {
-            hunks
-        };
+        let pieces = if whole { vec![hunks.concat()] } else { hunks };
         for body in pieces {
             let (added, removed) = count(&body);
             units.push(Unit {
@@ -214,6 +215,9 @@ pub struct PlannedCommit {
     pub hunks: Vec<String>,
     #[serde(default)]
     pub files: Vec<String>,
+    /// Positions of earlier commits in this split that this one needs.
+    #[serde(default)]
+    pub depends_on: Vec<usize>,
     /// The commit once built into the plan's integration commits.
     #[serde(default)]
     pub commit: Option<String>,
@@ -227,10 +231,24 @@ pub struct SplitProposal {
     pub integration_head: String,
     pub commits: Vec<PlannedCommit>,
     pub hunks: usize,
+    /// Every unit the commits name, so a reviewer can see each commit's share of a file.
+    pub units: Vec<SplitUnit>,
     /// Whole-file units only, when no file could be split by hunk.
     pub file_level: bool,
     /// Why the plan keeps its single commit; `commits` is empty then.
     pub fallback: Option<String>,
+}
+
+/// A unit as the review shows it.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitUnit {
+    pub id: String,
+    pub path: String,
+    pub added: u64,
+    pub removed: u64,
+    pub whole: bool,
+    pub lock: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -355,11 +373,17 @@ fn place_lock_files(units: &[Unit], groups: &mut [Vec<usize>]) {
     }
 }
 
-fn planned(units: &[Unit], groups: Vec<Vec<usize>>, messages: Vec<String>) -> Vec<PlannedCommit> {
+fn planned(
+    units: &[Unit],
+    groups: Vec<Vec<usize>>,
+    messages: Vec<String>,
+    depends: Vec<Vec<usize>>,
+) -> Vec<PlannedCommit> {
     groups
         .into_iter()
         .zip(messages)
-        .map(|(group, message)| {
+        .zip(depends)
+        .map(|((group, message), depends_on)| {
             let mut files = vec![];
             for &unit in &group {
                 if !files.contains(&units[unit].path) {
@@ -370,6 +394,7 @@ fn planned(units: &[Unit], groups: Vec<Vec<usize>>, messages: Vec<String>) -> Ve
                 message,
                 hunks: group.iter().map(|&unit| units[unit].id.clone()).collect(),
                 files,
+                depends_on,
                 commit: None,
             }
         })
@@ -426,7 +451,12 @@ fn assign<'a>(
             "The split leaves out {} {}: {}.",
             missing.len(),
             if missing.len() == 1 { "hunk" } else { "hunks" },
-            missing.iter().take(8).copied().collect::<Vec<_>>().join(", ")
+            missing
+                .iter()
+                .take(8)
+                .copied()
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     Ok(groups)
@@ -466,16 +496,34 @@ fn validate(units: &[Unit], response: Response) -> Result<Vec<PlannedCommit>, St
         .collect::<Result<Vec<_>, _>>()?;
     let ranks: Vec<u8> = groups
         .iter()
-        .map(|group| group.iter().map(|&unit| rank(&units[unit].path)).min().unwrap_or(0))
+        .map(|group| {
+            group
+                .iter()
+                .map(|&unit| rank(&units[unit].path))
+                .min()
+                .unwrap_or(0)
+        })
         .collect();
     let order = order(&depends, &ranks)?;
+    let mut position = vec![0; order.len()];
+    for (at, &index) in order.iter().enumerate() {
+        position[index] = at;
+    }
     let mut ordered: Vec<Vec<usize>> = order.iter().map(|&index| groups[index].clone()).collect();
     let messages = order
         .iter()
         .map(|&index| response.commits[index].message.trim().to_string())
         .collect();
+    let needs = order
+        .iter()
+        .map(|&index| {
+            let mut needs: Vec<usize> = depends[index].iter().map(|&need| position[need]).collect();
+            needs.sort_unstable();
+            needs
+        })
+        .collect();
     place_lock_files(units, &mut ordered);
-    Ok(planned(units, ordered, messages))
+    Ok(planned(units, ordered, messages, needs))
 }
 
 /// The approved commits in their given order, lock files placed again so
@@ -488,8 +536,24 @@ fn approved(units: &[Unit], commits: &[PlannedCommit]) -> Result<Vec<PlannedComm
             .map(|c| (c.message.as_str(), c.hunks.as_slice())),
     )?;
     place_lock_files(units, &mut groups);
-    let messages = commits.iter().map(|c| c.message.trim().to_string()).collect();
-    Ok(planned(units, groups, messages))
+    let messages = commits
+        .iter()
+        .map(|c| c.message.trim().to_string())
+        .collect();
+    let needs = commits
+        .iter()
+        .enumerate()
+        .map(|(index, commit)| {
+            let needs: BTreeSet<usize> = commit
+                .depends_on
+                .iter()
+                .copied()
+                .filter(|&need| need < index)
+                .collect();
+            needs.into_iter().collect()
+        })
+        .collect();
+    Ok(planned(units, groups, messages, needs))
 }
 
 /// The patch of `ids` in diff order: each file's header once, then its hunks.
@@ -552,7 +616,12 @@ fn build(
             commit.commit = Some(parent.clone());
             built.push(commit);
         }
-        if repo::git(project, &["rev-parse", &format!("{parent}^{{tree}}")], Snapshot)? != tree {
+        if repo::git(
+            project,
+            &["rev-parse", &format!("{parent}^{{tree}}")],
+            Snapshot,
+        )? != tree
+        {
             return Err("The split commits do not add up to the reviewed files.".into());
         }
         Ok(built)
@@ -571,13 +640,20 @@ fn splittable(plan: &IntegrationPlan) -> Result<(PathBuf, String, String), Strin
     let project = canonical(&plan.project_path)?;
     if repo::git(
         &project,
-        &["rev-parse", &format!("refs/jackalope/integrations/{}", plan.id)],
+        &[
+            "rev-parse",
+            &format!("refs/jackalope/integrations/{}", plan.id),
+        ],
         Snapshot,
     )? != head
     {
         return Err("The integration reference changed. Prepare a fresh review.".into());
     }
-    let tree = repo::git(&project, &["rev-parse", &format!("{head}^{{tree}}")], Snapshot)?;
+    let tree = repo::git(
+        &project,
+        &["rev-parse", &format!("{head}^{{tree}}")],
+        Snapshot,
+    )?;
     Ok((project, head, tree))
 }
 
@@ -592,9 +668,16 @@ fn agents(runs: &[TaskRun], plan: &IntegrationPlan) -> Vec<String> {
     agents
 }
 
-fn policy(plan: &IntegrationPlan, project: &Path) -> Result<super::super::project_git::CommitPolicy, String> {
+fn policy(
+    plan: &IntegrationPlan,
+    project: &Path,
+) -> Result<super::super::project_git::CommitPolicy, String> {
     let current = super::super::project_git::read(project)?;
-    if plan.commit_policy.as_ref().is_some_and(|saved| saved != &current) {
+    if plan
+        .commit_policy
+        .as_ref()
+        .is_some_and(|saved| saved != &current)
+    {
         return Err("Project commit settings changed. Prepare a fresh review.".into());
     }
     Ok(current)
@@ -626,6 +709,17 @@ pub(in crate::commands) fn propose(
         integration_head: head.clone(),
         commits: vec![],
         hunks: units.len(),
+        units: units
+            .iter()
+            .map(|unit| SplitUnit {
+                id: unit.id.clone(),
+                path: unit.path.clone(),
+                added: unit.added,
+                removed: unit.removed,
+                whole: unit.whole,
+                lock: unit.lock,
+            })
+            .collect(),
         file_level: units.iter().all(|unit| unit.whole),
         fallback: None,
     };
@@ -690,7 +784,9 @@ pub(in crate::commands) fn apply_split(
     let mut plan = load(directory, plan_id)?;
     let (project, head, tree) = splittable(&plan)?;
     if head != integration_head {
-        return Err("The integration changed since these commits were proposed. Split it again.".into());
+        return Err(
+            "The integration changed since these commits were proposed. Split it again.".into(),
+        );
     }
     let units = units(&project, &plan.master_head, &head)?;
     let commits = approved(&units, commits)?;
@@ -756,12 +852,21 @@ mod tests {
         let workspace = PathBuf::from(&run.workspace);
         fs::write(
             workspace.join("long.txt"),
-            long.replace("line 2\n", "line two\n").replace("line 28\n", "line twenty-eight\n"),
+            long.replace("line 2\n", "line two\n")
+                .replace("line 28\n", "line twenty-eight\n"),
         )
         .unwrap();
         fs::create_dir_all(workspace.join("tests")).unwrap();
-        fs::write(workspace.join("tests/feature.rs"), "#[test] fn works() {}\n").unwrap();
-        fs::write(workspace.join("package.json"), "{\"name\":\"a\",\"dep\":1}\n").unwrap();
+        fs::write(
+            workspace.join("tests/feature.rs"),
+            "#[test] fn works() {}\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.join("package.json"),
+            "{\"name\":\"a\",\"dep\":1}\n",
+        )
+        .unwrap();
         fs::write(workspace.join("pnpm-lock.yaml"), "lock: 2\n").unwrap();
         verified(&f, &mut run);
         let plan = prepare(&f.plans, &[run.clone()], &[run.id.clone()]).unwrap();
@@ -788,9 +893,16 @@ mod tests {
     #[test]
     fn units_split_modified_files_by_hunk_and_keep_new_files_whole() {
         let (f, _, plan) = prepared();
-        let units = units(&f.project, &plan.master_head, plan.integration_head.as_ref().unwrap())
-            .unwrap();
-        let paths: Vec<_> = units.iter().map(|u| (u.path.as_str(), u.whole, u.lock)).collect();
+        let units = units(
+            &f.project,
+            &plan.master_head,
+            plan.integration_head.as_ref().unwrap(),
+        )
+        .unwrap();
+        let paths: Vec<_> = units
+            .iter()
+            .map(|u| (u.path.as_str(), u.whole, u.lock))
+            .collect();
         assert_eq!(
             paths,
             [
@@ -812,8 +924,12 @@ mod tests {
     #[test]
     fn validation_rejects_gaps_duplicates_unknown_hunks_and_cycles() {
         let (f, _, plan) = prepared();
-        let units = units(&f.project, &plan.master_head, plan.integration_head.as_ref().unwrap())
-            .unwrap();
+        let units = units(
+            &f.project,
+            &plan.master_head,
+            plan.integration_head.as_ref().unwrap(),
+        )
+        .unwrap();
         let id = ids(&units);
         let all_but = |skip: &str| -> Vec<String> {
             ["long.txt#2", "package.json", "src.rs", "tests/feature.rs"]
@@ -872,7 +988,9 @@ mod tests {
         everything.extend(all_but(""));
         let error = validate(
             &units,
-            response(serde_json::json!({"commits":[{"id":"a","message":"All","hunks":everything}]})),
+            response(
+                serde_json::json!({"commits":[{"id":"a","message":"All","hunks":everything}]}),
+            ),
         )
         .unwrap_err();
         assert!(error.contains("one logical commit"), "{error}");
@@ -896,7 +1014,12 @@ mod tests {
         )
         .unwrap();
         let order: Vec<_> = commits.iter().map(|c| c.message.as_str()).collect();
-        assert_eq!(order, ["Add the feature", "Test the feature", "Add a dependency"]);
+        assert_eq!(
+            order,
+            ["Add the feature", "Test the feature", "Add a dependency"]
+        );
+        let needs: Vec<_> = commits.iter().map(|c| c.depends_on.clone()).collect();
+        assert_eq!(needs, [vec![], vec![0], vec![]]);
         assert_eq!(
             commits[2].files,
             ["long.txt", "package.json", "pnpm-lock.yaml"],
@@ -912,16 +1035,32 @@ mod tests {
         let applied = apply_split(&f.plans, &runs, &plan.id, &head, &moved).unwrap();
         assert_eq!(applied.commits.len(), 3);
         assert_eq!(applied.commits[2].files, commits[2].files);
+        assert_eq!(applied.commits[1].depends_on, [0]);
         let tip = applied.integration_head.clone().unwrap();
         assert_ne!(tip, head);
         let tree = |rev: &str| {
-            repo::git(&f.project, &["rev-parse", &format!("{rev}^{{tree}}")], Snapshot).unwrap()
+            repo::git(
+                &f.project,
+                &["rev-parse", &format!("{rev}^{{tree}}")],
+                Snapshot,
+            )
+            .unwrap()
         };
         assert_eq!(tree(&tip), tree(&head));
-        let subjects =
-            repo::git(&f.project, &["log", "--format=%s", &format!("{}..{tip}", plan.master_head)], Snapshot)
-                .unwrap();
-        assert_eq!(subjects, "Add a dependency\nTest the feature\nAdd the feature");
+        let subjects = repo::git(
+            &f.project,
+            &[
+                "log",
+                "--format=%s",
+                &format!("{}..{tip}", plan.master_head),
+            ],
+            Snapshot,
+        )
+        .unwrap();
+        assert_eq!(
+            subjects,
+            "Add a dependency\nTest the feature\nAdd the feature"
+        );
         let first = applied.commits[0].commit.clone().unwrap();
         let files = repo::git(
             &f.project,
@@ -930,7 +1069,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(files, "long.txt\nsrc.rs");
-        let partial = repo::git(&f.project, &["show", &format!("{first}:long.txt")], Snapshot).unwrap();
+        let partial = repo::git(
+            &f.project,
+            &["show", &format!("{first}:long.txt")],
+            Snapshot,
+        )
+        .unwrap();
         assert!(partial.contains("line two") && partial.contains("line 28\n"));
         // The project checkout never changed while splitting.
         assert!(!repo::is_dirty(&f.project, Untracked::All, Snapshot).unwrap());

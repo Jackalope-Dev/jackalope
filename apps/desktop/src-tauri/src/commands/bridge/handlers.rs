@@ -73,7 +73,9 @@ pub(super) async fn read_context(
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ConflictsInput {
-    #[schemars(description = "A workspace-relative file to read; omit to list every conflicted file.")]
+    #[schemars(
+        description = "A workspace-relative file to read; omit to list every conflicted file."
+    )]
     #[serde(default)]
     path: Option<String>,
 }

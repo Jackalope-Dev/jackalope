@@ -144,7 +144,8 @@ fn parse(text: &str) -> Result<Vec<Segment>, String> {
 }
 
 fn has_markers(text: &str) -> bool {
-    text.split_inclusive('\n').any(|line| marker(line).is_some())
+    text.split_inclusive('\n')
+        .any(|line| marker(line).is_some())
 }
 
 fn hash(bytes: &[u8]) -> String {
@@ -233,10 +234,7 @@ fn resolve(text: &str, resolutions: &[Resolution]) -> Result<(String, usize), St
                 output.push_str(&block.theirs);
             }
             Choice::Base => output.push_str(block.base.as_deref().ok_or_else(|| {
-                format!(
-                    "Block {} has no base text to choose.",
-                    resolution.block
-                )
+                format!("Block {} has no base text to choose.", resolution.block)
             })?),
             Choice::Custom => {
                 let text = resolution.text.as_deref().unwrap_or_default();
@@ -267,15 +265,18 @@ fn inside(workspace: &Path, path: &str) -> Result<PathBuf, String> {
     {
         return Err("Give a path relative to the workspace, without '..'.".into());
     }
-    let root = fs::canonicalize(workspace).map_err(|e| format!("Cannot open the workspace: {e}"))?;
+    let root =
+        fs::canonicalize(workspace).map_err(|e| format!("Cannot open the workspace: {e}"))?;
     let file = root.join(relative);
-    let metadata =
-        fs::symlink_metadata(&file).map_err(|_| format!("{path} does not exist in the workspace."))?;
+    let metadata = fs::symlink_metadata(&file)
+        .map_err(|_| format!("{path} does not exist in the workspace."))?;
     if !metadata.is_file() {
         return Err(format!("{path} is not a regular file."));
     }
     if metadata.len() > FILE_BYTES {
-        return Err(format!("{path} is too large to resolve here; edit it directly."));
+        return Err(format!(
+            "{path} is too large to resolve here; edit it directly."
+        ));
     }
     let real = fs::canonicalize(&file).map_err(|e| e.to_string())?;
     if !real.starts_with(&root) {
@@ -287,8 +288,8 @@ fn inside(workspace: &Path, path: &str) -> Result<PathBuf, String> {
 fn read_text(file: &Path, path: &str) -> Result<(String, String), String> {
     let bytes = fs::read(file).map_err(|e| format!("Cannot read {path}: {e}"))?;
     let digest = hash(&bytes);
-    let text =
-        String::from_utf8(bytes).map_err(|_| format!("{path} is not UTF-8 text; edit it directly."))?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| format!("{path} is not UTF-8 text; edit it directly."))?;
     Ok((text, digest))
 }
 
@@ -476,31 +477,63 @@ mod tests {
         fs::create_dir_all(&project).unwrap();
         git(&project, &["init", "--initial-branch=main"]);
         git(&project, &["config", "user.name", "Fixture"]);
-        git(&project, &["config", "user.email", "fixture@example.invalid"]);
+        git(
+            &project,
+            &["config", "user.email", "fixture@example.invalid"],
+        );
         git(&project, &["config", "core.autocrlf", "false"]);
-        fs::write(project.join("app.txt"), "top\nvalue = 1\nmiddle\n\n\n\n\nlimit = 5\nend\n").unwrap();
+        fs::write(
+            project.join("app.txt"),
+            "top\nvalue = 1\nmiddle\n\n\n\n\nlimit = 5\nend\n",
+        )
+        .unwrap();
         fs::write(project.join("clean.txt"), "untouched\n").unwrap();
         git(&project, &["add", "."]);
         git(&project, &["commit", "-m", "base"]);
         git(&project, &["checkout", "-b", "theirs"]);
-        fs::write(project.join("app.txt"), "top\nvalue = 3\nmiddle\n\n\n\n\nlimit = 9\nend\n").unwrap();
+        fs::write(
+            project.join("app.txt"),
+            "top\nvalue = 3\nmiddle\n\n\n\n\nlimit = 9\nend\n",
+        )
+        .unwrap();
         git(&project, &["commit", "-am", "theirs"]);
         git(&project, &["checkout", "main"]);
-        fs::write(project.join("app.txt"), "top\nvalue = 2\nmiddle\n\n\n\n\nlimit = 7\nend\n").unwrap();
+        fs::write(
+            project.join("app.txt"),
+            "top\nvalue = 2\nmiddle\n\n\n\n\nlimit = 7\nend\n",
+        )
+        .unwrap();
         git(&project, &["commit", "-am", "ours"]);
         let output = repo::output(
             &project,
-            &["-c", "merge.conflictStyle=diff3", "merge-tree", "--write-tree", "main", "theirs"],
+            &[
+                "-c",
+                "merge.conflictStyle=diff3",
+                "merge-tree",
+                "--write-tree",
+                "main",
+                "theirs",
+            ],
             Snapshot,
         )
         .unwrap();
         assert_eq!(output.status.code(), Some(1));
-        let tree = String::from_utf8_lossy(&output.stdout).lines().next().unwrap().to_string();
+        let tree = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .next()
+            .unwrap()
+            .to_string();
         let commit = git(&project, &["commit-tree", &tree, "-m", "combined"]);
         let workspace = root.join("workspace");
         git(
             &project,
-            &["worktree", "add", "--detach", workspace.to_str().unwrap(), &commit],
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                workspace.to_str().unwrap(),
+                &commit,
+            ],
         );
         (root, workspace)
     }
