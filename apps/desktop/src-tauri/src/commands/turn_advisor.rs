@@ -810,10 +810,7 @@ pub fn send(
     if matches!(decision, Delivery::FollowUp) {
         match enqueue() {
             Ok(()) => return Ok("followUp"),
-            Err(error) if !newer_running => return Err(format!(
-                "The notes could not be queued for the agent ({}), so they are shown to you only.",
-                error.trim_end_matches('.')
-            )),
+            Err(error) if !newer_running => return Err(not_queued(&error)),
             Err(_) => {}
         }
     }
@@ -826,6 +823,11 @@ pub fn send(
     tell()
         .map(|()| "message")
         .map_err(|error| format!("The notes could not reach the agent: {error}"))
+}
+
+fn not_queued(error: &str) -> String {
+    let error = error.trim_end_matches('.');
+    format!("The notes could not be queued for the agent ({error}), so they are shown to you only.")
 }
 
 /// The task's attempts, oldest first.
