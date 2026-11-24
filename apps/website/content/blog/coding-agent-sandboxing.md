@@ -131,7 +131,7 @@ Record the configuration alongside the results. Repeat these checks after changi
 
 ## Keep Worktrees Outside Your Security Assumptions
 
-A separate checkout solves file coordination, not process containment. The [Git worktree guide](https://jackalope.dev/blog/git-worktrees-for-ai-coding-agents/) covers that distinction and the underlying checkout setup.
+A separate checkout solves file coordination, not process containment. The [Git worktree guide](https://jackalope.dev/git-worktrees-for-ai-agents/) covers that distinction and the underlying checkout setup.
 
 When you put a task directory inside a sandbox, avoid widening access to your whole development folder simply to make Git metadata available. Prefer a self-contained disposable checkout when that keeps the boundary easier to understand.
 
