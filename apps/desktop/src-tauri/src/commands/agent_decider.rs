@@ -32,7 +32,7 @@ use uuid::Uuid;
 pub const CONFIDENCE: f64 = 0.7;
 /// How long a decider attempt may take before the item goes to the person.
 pub const TIMEOUT: Duration = Duration::from_secs(180);
-/// Decider attempts running at once across all plans.
+/// Decider attempts and advisor turns running at once across all plans and tasks.
 const MAX_PARALLEL: usize = 3;
 const MAX_ENTRIES: usize = 500;
 const MAX_REPLY_BYTES: usize = 24_000;
@@ -173,7 +173,7 @@ pub fn pick(choice: &str, asking: &str, available: &[String]) -> Option<String> 
 }
 
 /// Built-in agents enabled for the project whose CLI is installed here.
-fn available_agents(coordinator: &Coordinator, project_id: &str) -> Vec<String> {
+pub(super) fn available_agents(coordinator: &Coordinator, project_id: &str) -> Vec<String> {
     let Ok(policy) = coordinator.runtime.policy() else {
         return vec![];
     };
@@ -183,7 +183,7 @@ fn available_agents(coordinator: &Coordinator, project_id: &str) -> Vec<String> 
         .collect()
 }
 
-fn adapter_of(coordinator: &Coordinator, agent: &str) -> String {
+pub(super) fn adapter_of(coordinator: &Coordinator, agent: &str) -> String {
     coordinator
         .runtime
         .policy()
@@ -417,8 +417,8 @@ impl Launcher for Attempts {
 
 static SLOTS: Mutex<usize> = Mutex::new(0);
 
-/// Waits for one of the shared decider slots until `deadline`.
-fn acquire(deadline: Instant) -> Option<SlotGuard> {
+/// Waits for one of the slots deciders and the turn advisor share until `deadline`.
+pub(super) fn acquire(deadline: Instant) -> Option<SlotGuard> {
     loop {
         {
             let mut used = SLOTS.lock().unwrap_or_else(|error| error.into_inner());
@@ -434,7 +434,7 @@ fn acquire(deadline: Instant) -> Option<SlotGuard> {
     }
 }
 
-struct SlotGuard;
+pub(super) struct SlotGuard;
 impl Drop for SlotGuard {
     fn drop(&mut self) {
         let mut used = SLOTS.lock().unwrap_or_else(|error| error.into_inner());

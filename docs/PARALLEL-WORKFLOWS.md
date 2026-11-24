@@ -350,6 +350,27 @@ The app retains a reference and durable review receipt. A conflict produces a bl
 review with the conflicting paths; it does not touch the target branch. Reiterate an affected task,
 or resolve with ordinary Git tools and prepare a new review. There is no conflict editor yet.
 
+A ready review can be split into ordered commits before it is applied. **Split into commits**
+asks the default agent, without tools, to group the change: each hunk of a modified text file is
+one unit, while new, deleted, binary, mode-changing, single-hunk files and a file replaced by a
+link (or the reverse) move whole. The diff format is fixed regardless of the person's Git diff
+settings. The agent returns at most 12 commits with messages and the earlier commits each one
+needs; any `Signed-off-by:` line it writes is dropped, since only the person can sign off. Jackalope
+rejects a grouping that omits, repeats or invents a hunk, or whose dependencies form a cycle;
+orders commits by dependency, then source before tests, docs and configuration; and places
+each lock file with the commit that changes its manifest. A single change, more than 400 hunks
+or an unusable answer keeps one commit and says why. The proposal lists each commit's files,
+its share of each file's hunks and the commits it needs, and its messages stay editable.
+Merging waits until the person approves or dismisses it. Approval rebuilds the commits on
+the captured target through a private index, with project attribution on each, and moves the
+review's reference only when the last commit's tree equals the reviewed tree exactly; a
+mismatch, a review that changed since the proposal or changed commit settings leave it
+untouched. The review offers to propose again when the proposal is stale and to prepare a fresh
+review when the review itself is, including after an interruption between moving the reference
+and saving the review. Apply then fast-forwards the target through the commits as usual. With the
+desktop development server running, `node scripts/verification/verify-commit-split.mjs`
+exercises this review against native-service fixtures.
+
 Apply rechecks the selected sources' HEAD, content tree and index/worktree state, the current
 target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
 performs a fast-forward only, with automatic stash and ignored-file overwrite disabled.
@@ -385,7 +406,8 @@ settings can disable automatic checkpoints. Agents receive consistent handoff
 instructions and Git identity environment values; the native writer owns checkpoint
 and final-merge metadata. This is not a sandbox against a CLI deliberately issuing
 its own Git commands. Review squashes the selected snapshots to one target commit,
-so intermediate commits do not clutter main/master history. Users may edit the
+so intermediate commits do not clutter main/master history, unless the reviewer approves
+a split into ordered commits. Users may edit the
 suggested message before preparing the final review.
 
 Cleanup uses ancestry for clean merged branches and exact no-op Git three-way

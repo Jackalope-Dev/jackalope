@@ -5,6 +5,7 @@ import type { ReviewCaptures } from './review-captures.ts';
 import type { DesktopPermission } from './system-info.ts';
 import type { TaskEffort } from './task-effort.ts';
 import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
+import type { AdvisorReview } from './turn-advisor.ts';
 
 /** The longest instruction the composer accepts for a task, follow-up or schedule. */
 export const PROMPT_MAX_CHARS = 24_000;
@@ -273,6 +274,8 @@ export interface TaskRun {
     /** Absent on reviewers saved before agent reviews existed, which are Challenges. */
     kind?: 'challenge' | 'review';
   } | null;
+  /** The turn advisor's review of this attempt, when the project has the advisor on. */
+  advisor?: AdvisorReview | null;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {

@@ -25,6 +25,11 @@ Compaction of passing test and build output adapts runner recognition from
 oh-my-pi (crates/shell minimizer filters): MIT. See oh-my-pi.txt.
 Upstream: https://github.com/can1357/oh-my-pi
 
+Splitting an integration into commits follows oh-my-pi's split commits for lock-file
+placement, dependency ordering and source-before-tests ranking, and reconciliation
+conflict resolution follows its per-block conflict resolutions: MIT. See oh-my-pi.txt.
+Upstream: https://github.com/can1357/oh-my-pi
+
 Credential masking in outbound text adapts token patterns and the secret-named
 environment rule from oh-my-pi: MIT. See oh-my-pi.txt.
 Upstream: https://github.com/can1357/oh-my-pi
