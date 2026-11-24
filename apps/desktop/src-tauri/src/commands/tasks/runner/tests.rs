@@ -845,3 +845,58 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     drop(runtime);
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn xcode_projects_never_run_on_a_computer_that_cannot_build_them() {
+    let folder = std::env::temp_dir().join(format!("jackalope-xcode-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(folder.join("App.xcodeproj")).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let mut computer = fixture_computer(&format!("mac{}", uuid::Uuid::new_v4().simple()));
+    computer.machine_id = Some("m1".into());
+    save_computer(&runtime, &computer);
+    let root = runtime.computers_root();
+    let machine = |os: &str| {
+        std::fs::write(
+            root.join("machines.json"),
+            serde_json::to_vec(&json!({"machines": [{
+                "id": "m1", "name": "Box", "url": "https://box.example.com",
+                "createdAt": "2026-01-01T00:00:00Z", "os": os,
+                "xcode": (os == "macos").then(|| json!({"version": "27.2"})),
+            }]}))
+            .unwrap(),
+        )
+        .unwrap();
+    };
+
+    // A Linux computer refuses the attempt and says how to fix it.
+    machine("linux");
+    let linux = placed_on(&runtime, &folder, &computer);
+    let error = runtime
+        .placed_target(&linux, &request(&linux, &folder), "codex", None)
+        .unwrap_err();
+    assert!(
+        error.contains("builds with Xcode (it has the Xcode project App.xcodeproj)")
+            && error.contains("Box is a Linux computer")
+            && error.contains("Agents run on"),
+        "{error}"
+    );
+    let run = runtime.run_snapshot(&linux).unwrap();
+    assert_eq!(run.host.unwrap().id, computer.id);
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line == &format!("Placement: {error}")));
+
+    // A Mac with Xcode takes it.
+    machine("macos");
+    let mac = placed_on(&runtime, &folder, &computer);
+    let target = runtime
+        .placed_target(&mac, &request(&mac, &folder), "codex", None)
+        .unwrap();
+    assert_eq!(
+        target.map(|computer| computer.id),
+        Some(computer.id.clone())
+    );
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
+}

@@ -10,6 +10,7 @@ fn computer(id: &str, limit: usize, running: usize) -> Host {
         running,
         lost: None,
         browser: None,
+        xcode: false,
     }
 }
 
@@ -320,6 +321,7 @@ fn the_pool_lists_hosts_for_each_kind_of_work() {
         )]
         .into(),
         needs: HashMap::new(),
+        device_xcode: false,
     };
     let limits = Limits {
         device: 3,
@@ -506,4 +508,144 @@ fn finds_variable_names_in_instructions() {
     let names = named_variables("Use STRIPE_KEY (not stripe_key) and $DEPLOY_TOKEN; AC-1 ok");
     assert!(names.contains("STRIPE_KEY") && names.contains("DEPLOY_TOKEN"));
     assert!(!names.contains("stripe_key"));
+}
+
+#[test]
+fn xcode_work_stays_off_computers_without_xcode() {
+    let xcode = Needs {
+        xcode: Some("it has the Xcode project App.xcodeproj".into()),
+        ..Default::default()
+    };
+    let mac = Host {
+        xcode: true,
+        ..computer("Mac mini", 2, 0)
+    };
+    let mac_device = Host {
+        xcode: true,
+        ..Host::device(4, 0)
+    };
+    // A project pinning a Linux computer runs Xcode work on this Mac instead.
+    let host = placed(place(
+        SwarmHosts::Anywhere,
+        &[mac_device.clone(), pinned(8, 0)],
+        &xcode,
+        8,
+        None,
+    ));
+    assert!(host.is_device());
+    assert!(host
+        .reason
+        .starts_with("Needs Xcode: it has the Xcode project App.xcodeproj."));
+    // An added Mac with Xcode takes it when this device has none.
+    let host = placed(place(
+        SwarmHosts::Anywhere,
+        &[Host::device(4, 0), pinned(8, 0), mac.clone()],
+        &xcode,
+        8,
+        None,
+    ));
+    assert_eq!(host.id, "Mac mini");
+    // A pinned Mac with Xcode is the home host as usual.
+    let pinned_mac = Host {
+        xcode: true,
+        ..pinned(8, 1)
+    };
+    let host = placed(place(
+        SwarmHosts::Computers,
+        &[mac_device, pinned_mac],
+        &xcode,
+        8,
+        None,
+    ));
+    assert_eq!(host.id, "Box");
+    // With no host that has Xcode, it falls back to this device, never to a
+    // Linux computer.
+    let host = placed(place(
+        SwarmHosts::Anywhere,
+        &[Host::device(4, 0), pinned(8, 0)],
+        &xcode,
+        8,
+        None,
+    ));
+    assert!(host.is_device());
+    assert!(host.reason.contains("No host it may use has Xcode"));
+    // Under Computers only, Linux computers refuse it with the fix.
+    let Decision::Refuse(reason) = place(
+        SwarmHosts::Computers,
+        &[Host::device(4, 0), pinned(8, 0)],
+        &xcode,
+        8,
+        None,
+    ) else {
+        panic!("expected a refusal");
+    };
+    assert!(reason.contains("none of the computers it may use is a Mac with Xcode"));
+    // Work without the need ignores Xcode.
+    let host = placed(place(
+        SwarmHosts::Anywhere,
+        &[Host::device(4, 0), pinned(8, 0)],
+        &Needs::default(),
+        8,
+        None,
+    ));
+    assert_eq!(host.id, "Box");
+    // A full Mac makes the work wait rather than spill onto Linux.
+    let full = Host {
+        xcode: true,
+        ..computer("Mac mini", 1, 1)
+    };
+    assert!(matches!(
+        place(
+            SwarmHosts::Computers,
+            &[Host::device(4, 0), computer("Linux", 4, 0), full],
+            &xcode,
+            8,
+            None,
+        ),
+        Decision::Wait(_)
+    ));
+}
+
+#[test]
+fn the_pool_reports_which_hosts_build_xcode() {
+    let pool = Pool {
+        loaded: true,
+        computers: vec![
+            PoolComputer {
+                id: "mac".into(),
+                name: "Mac".into(),
+                pinned_by: Some("p".into()),
+                health: PoolHealth {
+                    xcode: true,
+                    ..Default::default()
+                },
+            },
+            PoolComputer {
+                id: "linux".into(),
+                name: "Linux".into(),
+                pinned_by: None,
+                health: Default::default(),
+            },
+        ],
+        projects: [(
+            "p".to_string(),
+            ProjectHosts {
+                swarm_hosts: None,
+                computers: vec!["linux".into()],
+            },
+        )]
+        .into(),
+        needs: HashMap::new(),
+        device_xcode: true,
+    };
+    let limits = Limits {
+        device: 2,
+        remote: 4,
+    };
+    let hosts = pool.hosts("p", true, false, limits, &HashMap::new());
+    let xcode: Vec<_> = hosts
+        .iter()
+        .map(|host| (host.id.as_str(), host.xcode))
+        .collect();
+    assert_eq!(xcode, [("device", true), ("mac", true), ("linux", false)]);
 }

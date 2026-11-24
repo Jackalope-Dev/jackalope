@@ -4,6 +4,7 @@
 //! creates, starts or deletes the machine itself; deleting the computer only
 //! forgets the pairing. The secret is kept in protected storage.
 
+use super::platform::HostPlatform;
 use super::{AgentError, Computer, MachineState, Provider, Transport};
 use crate::commands::{account_storage, http};
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,10 @@ pub struct Machine {
     #[serde(default)]
     pub viewer_url: Option<String>,
     pub created_at: String,
+    /// What its agent last reported in `hello`; Linux for records saved
+    /// before agents reported it.
+    #[serde(default, flatten)]
+    pub platform: HostPlatform,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -128,6 +133,8 @@ pub struct MachineHealth {
     pub reachable: bool,
     pub screen: Option<[u32; 2]>,
     pub message: Option<String>,
+    /// What the agent reported, when it answered.
+    pub platform: Option<HostPlatform>,
 }
 
 pub(crate) async fn hello(url: &str, token: &str) -> Result<Value, String> {
@@ -173,11 +180,13 @@ pub(crate) async fn health(url: &str, token: &str) -> MachineHealth {
             reachable: true,
             screen: serde_json::from_value(result["screen"].clone()).ok(),
             message: None,
+            platform: Some(HostPlatform::from_hello(&result)),
         },
         Err(message) => MachineHealth {
             reachable: false,
             screen: None,
             message: Some(message),
+            platform: None,
         },
     }
 }
@@ -195,7 +204,7 @@ pub(crate) async fn add(
         .filter(|viewer| !viewer.trim().is_empty())
         .map(|viewer| normalize_url(&viewer))
         .transpose()?;
-    hello(&url, secret.trim()).await?;
+    let answer = hello(&url, secret.trim()).await?;
     let name: String = name.trim().chars().take(80).collect();
     let machine = Machine {
         id: uuid::Uuid::new_v4().simple().to_string(),
@@ -207,6 +216,7 @@ pub(crate) async fn add(
         url,
         viewer_url,
         created_at: chrono::Utc::now().to_rfc3339(),
+        platform: HostPlatform::from_hello(&answer),
     };
     std::fs::create_dir_all(root.join("machines")).map_err(|e| e.to_string())?;
     account_storage::write_json(
@@ -220,6 +230,29 @@ pub(crate) async fn add(
     saved.machines.push(machine.clone());
     write(root, &saved)?;
     Ok(machine)
+}
+
+/// Saves what a paired machine's agent reported, when it changed (its Mac
+/// got Xcode, or the machine behind the address was replaced).
+pub(crate) fn learn(root: &Path, id: &str, platform: &HostPlatform) -> Result<(), String> {
+    let _guard = lock().lock().map_err(|e| e.to_string())?;
+    let mut saved = read(root)?;
+    let Some(machine) = saved.machines.iter_mut().find(|machine| machine.id == id) else {
+        return Ok(());
+    };
+    if &machine.platform == platform {
+        return Ok(());
+    }
+    machine.platform = platform.clone();
+    write(root, &saved)
+}
+
+/// Saves the system from an answered `hello`; a failure to save is only logged,
+/// since the answer itself succeeded.
+fn learn_from(root: &Path, id: &str, answer: &Value) {
+    if let Err(error) = learn(root, id, &HostPlatform::from_hello(answer)) {
+        eprintln!("A cloud machine's system could not be saved: {error}");
+    }
 }
 
 pub(crate) fn remove(root: &Path, id: &str) -> Result<(), String> {
@@ -261,7 +294,10 @@ impl Provider for RemoteMachine {
     fn state(&self, root: &Path, computer: &Computer) -> Result<MachineState, String> {
         let (machine, token) = paired(root, computer)?;
         Ok(match block(hello(&machine.url, &token)) {
-            Ok(_) => MachineState::Running,
+            Ok(answer) => {
+                learn_from(root, &machine.id, &answer);
+                MachineState::Running
+            }
             Err(_) => MachineState::Stopped,
         })
     }
@@ -275,7 +311,7 @@ impl Provider for RemoteMachine {
         let (machine, token) = paired(root, computer)?;
         progress("Connecting to the machine");
         block(hello(&machine.url, &token))
-            .map(|_| ())
+            .map(|answer| learn_from(root, &machine.id, &answer))
             .map_err(|error| {
                 format!("{error} Start the machine and its agent where it runs, then try again.")
             })

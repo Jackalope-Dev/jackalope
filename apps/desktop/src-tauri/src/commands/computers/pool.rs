@@ -370,6 +370,8 @@ pub(crate) struct Host {
     pub lost: Option<String>,
     /// Whether it has the browser tools, when known.
     pub browser: Option<bool>,
+    /// Whether Xcode projects build there: a Mac with Xcode.
+    pub xcode: bool,
 }
 
 impl Host {
@@ -383,6 +385,7 @@ impl Host {
             running,
             lost: None,
             browser: Some(true),
+            xcode: false,
         }
     }
 
@@ -413,6 +416,8 @@ pub(crate) struct Needs {
     /// Why it can only run on a computer.
     pub computer_only: Option<String>,
     pub browser: bool,
+    /// Why it needs a host with Xcode: the project builds with it.
+    pub xcode: Option<String>,
 }
 
 /// Where an attempt runs and why, saved on the attempt.
@@ -494,8 +499,11 @@ pub(crate) enum Decision {
 /// Picks a host for one fork.
 ///
 /// 1. Hard boundaries first: the project's choice of hosts, a fork that can
-///    only run on this device or only on a computer, the browser tools, and
-///    `exclude` (the host a retry leaves). None left refuses the fork.
+///    only run on this device or only on a computer, the browser tools, Xcode
+///    and `exclude` (the host a retry leaves). None left refuses the fork,
+///    except that work needing Xcode that no allowed host has falls back to
+///    this device, where it ran before hosts reported Xcode; a computer
+///    without Xcode never takes it.
 /// 2. Hosts out of contact are skipped; if that leaves none, the fork waits.
 /// 3. The home host takes it while it has a free slot: the project's
 ///    computer when it pins one, otherwise this device.
@@ -515,7 +523,7 @@ pub(crate) fn place(
     remote_free: usize,
     exclude: Option<&str>,
 ) -> Decision {
-    let fits = |host: &&Host| {
+    let fits_otherwise = |host: &&Host| {
         policy.allows(host.device)
             && (needs.device_only.is_none() || host.device)
             && (needs.computer_only.is_none() || !host.device)
@@ -524,7 +532,27 @@ pub(crate) fn place(
                 || (host.pinned && host.browser.is_none()))
             && Some(host.id.as_str()) != exclude
     };
-    let candidates: Vec<&Host> = hosts.iter().filter(fits).collect();
+    let mut candidates: Vec<&Host> = hosts
+        .iter()
+        .filter(fits_otherwise)
+        .filter(|host| needs.xcode.is_none() || host.xcode)
+        .collect();
+    let mut no_xcode = String::new();
+    if let (true, Some(why)) = (candidates.is_empty(), &needs.xcode) {
+        if !hosts.iter().any(|host| fits_otherwise(&host)) {
+            return Decision::Refuse(refusal(policy, hosts, needs, exclude));
+        }
+        candidates = hosts
+            .iter()
+            .filter(fits_otherwise)
+            .filter(|host| host.device)
+            .collect();
+        if candidates.is_empty() {
+            return Decision::Refuse(format!("This work needs Xcode ({why}), and none of the computers it may use is a Mac with Xcode. Pair a Mac with Xcode as a computer and add it under Swarms run on, or let swarms run on this device."));
+        }
+        no_xcode =
+            "No host it may use has Xcode, so it runs on this device without building. ".into();
+    }
     if candidates.is_empty() {
         return Decision::Refuse(refusal(policy, hosts, needs, exclude));
     }
@@ -541,7 +569,7 @@ pub(crate) fn place(
         ));
     }
     let free = |host: &Host| host.free() > 0 && (host.device || remote_free > 0);
-    let note = needs_note(needs);
+    let note = format!("{}{no_xcode}", needs_note(needs));
     let home = healthy
         .iter()
         .copied()
@@ -638,6 +666,9 @@ fn needs_note(needs: &Needs) -> String {
     if needs.browser && needs.device_only.is_none() {
         note.push_str("Needs the browser tools. ");
     }
+    if let Some(why) = &needs.xcode {
+        note.push_str(&format!("Needs Xcode: {why}. "));
+    }
     note
 }
 
@@ -686,6 +717,8 @@ pub(crate) struct PoolHealth {
     pub lost: Option<String>,
     pub browser: Option<bool>,
     pub slots: Option<usize>,
+    /// A Mac whose agent reported Xcode.
+    pub xcode: bool,
 }
 
 /// The pool for every project, refreshed each dispatch tick. Empty until the
@@ -698,6 +731,8 @@ pub(crate) struct Pool {
     pub projects: HashMap<String, ProjectHosts>,
     /// What each waiting planned fork needs, by queue item id.
     pub needs: HashMap<String, Needs>,
+    /// Whether this device builds Xcode projects.
+    pub device_xcode: bool,
 }
 
 impl Pool {
@@ -708,6 +743,7 @@ impl Pool {
             .filter(super::runs::supports_runs)
             .map(|computer| {
                 let health = health(&computer.id);
+                let xcode = super::platform::of(root, &computer).builds_xcode();
                 PoolComputer {
                     pinned_by: (computer.owner_kind == super::PROJECT)
                         .then(|| computer.owner_id.clone()),
@@ -717,6 +753,7 @@ impl Pool {
                         lost: health.unavailable().then(|| health.lost.clone()).flatten(),
                         browser: health.browser,
                         slots: health.slots,
+                        xcode,
                     },
                 }
             })
@@ -726,6 +763,7 @@ impl Pool {
             computers,
             projects: all_settings(root),
             needs: HashMap::new(),
+            device_xcode: crate::commands::xcode::toolchain().is_some(),
         }
     }
 
@@ -761,7 +799,10 @@ impl Pool {
         load: &HashMap<String, usize>,
     ) -> Vec<Host> {
         let running = |id: &str| load.get(id).copied().unwrap_or(0);
-        let mut hosts = vec![Host::device(limits.device, running(DEVICE))];
+        let mut hosts = vec![Host {
+            xcode: self.device_xcode,
+            ..Host::device(limits.device, running(DEVICE))
+        }];
         if let Some((id, name)) = self.pinned(project, legacy_remote) {
             let computer = self.computers.iter().find(|computer| computer.id == id);
             hosts.push(Host {
@@ -771,6 +812,7 @@ impl Pool {
                 running: running(&id),
                 lost: computer.and_then(|computer| computer.health.lost.clone()),
                 browser: computer.and_then(|computer| computer.health.browser),
+                xcode: computer.is_some_and(|computer| computer.health.xcode),
                 id,
                 name,
                 device: false,
@@ -795,6 +837,7 @@ impl Pool {
                     running: running(&computer.id),
                     lost: computer.health.lost.clone(),
                     browser: computer.health.browser,
+                    xcode: computer.health.xcode,
                 });
             }
         }
