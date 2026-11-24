@@ -1216,7 +1216,7 @@ mod tests {
             std::env::temp_dir().join(format!("jackalope-kimi-risk-{}", uuid::Uuid::new_v4()));
         let workspace = folder.join("work");
         std::fs::create_dir_all(&workspace).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut run = super::super::tests::sample("kimi");
         run.id = "kimi-risk".into();
         run.project_id = "fixture".into();
