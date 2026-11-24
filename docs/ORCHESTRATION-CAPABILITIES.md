@@ -282,7 +282,12 @@ restart still pauses dispatch. Reconciliation uses the default agent, its config
 account and allowance, and existing global concurrency limits.
 
 The native coordinator captures current verified source snapshots and creates a
-separate reconciliation worktree, including conflict markers where Git reports them.
+separate reconciliation worktree, including diff3 conflict markers (each block's ours,
+base and theirs text) where Git reports them. Reconciliation attempts, and only they, get
+the `conflicts` and `resolve_conflicts` bridge tools: the first lists each conflicted file's
+blocks and content hash, and the second resolves every block of one file in a single call as
+ours, theirs, base, both or custom text. A resolution is refused, and nothing is written, when
+the file changed since it was listed or the result would still contain marker lines.
 Source worktrees and the target stay unchanged while the worker resolves conflicts,
 removes duplicate implementation and records its decisions. The worker must publish
 a completion report with no remaining work for the current snapshot and pass the
