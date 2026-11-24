@@ -41,9 +41,10 @@ const ANSWER_LIMIT: u64 = 64 * 1024 * 1024;
 /// device's memory.
 pub(crate) const STREAM_BUFFER: usize = 1024 * 1024;
 /// Provider requests one attempt may have streaming at once; more are refused
-/// with 429 until one ends. With [`STREAM_BUFFER`] this bounds what an attempt
-/// can hold here.
-pub(crate) const STREAMS: usize = 8;
+/// with 429 and `retry-after` until one ends. Room for Claude Code's main
+/// conversation, several parallel subagents and its small side requests. With
+/// [`STREAM_BUFFER`] this bounds what an attempt can hold here (16 MB).
+pub(crate) const STREAMS: usize = 16;
 /// OpenAI request features refused for a token: background responses keep
 /// running, and billing, after the token is revoked, and hosted MCP and code
 /// interpreter tools reach other services from the provider.
@@ -114,6 +115,7 @@ impl Provider {
     fn error(self, status: u16, message: &str) -> Vec<u8> {
         let kind = match status {
             401 => "authentication_error",
+            429 => "rate_limit_error",
             404 => "not_found_error",
             413 => "request_too_large",
             _ => "api_error",
@@ -548,7 +550,7 @@ fn screen(grant: &Grant, id: &str, call: &Value) -> Result<Upstream, Answer> {
             "This run's provider token is not valid or has expired.",
         ));
     }
-    let body = decoded(call).ok_or_else(|| refuse(400, "The request body is unreadable."))?;
+    let mut body = decoded(call).ok_or_else(|| refuse(400, "The request body is unreadable."))?;
     if body.len() > shape.request_limit {
         return Err(refuse(
             413,
@@ -569,10 +571,8 @@ fn screen(grant: &Grant, id: &str, call: &Value) -> Result<Upstream, Answer> {
             "Jackalope forwards only uncompressed requests to the provider.",
         ));
     }
-    if provider == Provider::OpenAi {
-        if let Some(reason) = openai_refusal(route, &body) {
-            return Err(refuse(400, reason));
-        }
+    if provider == Provider::OpenAi && route.starts_with("/v1/responses") {
+        body = checked_responses(&body).map_err(|reason| refuse(400, reason))?;
     }
     let mut forwarded: Vec<(String, String)> = headers
         .iter()
@@ -680,18 +680,18 @@ fn allowed_betas(value: &str) -> Option<String> {
     (!kept.is_empty()).then(|| kept.join(","))
 }
 
-/// Why an OpenAI Responses request is refused: a background response, or a
-/// hosted tool in [`OPENAI_REFUSED_TOOLS`]. A body that is not JSON cannot be
-/// checked, so it is refused too.
-fn openai_refusal(route: &str, body: &[u8]) -> Option<&'static str> {
-    if !route.starts_with("/v1/responses") {
-        return None;
-    }
+/// An OpenAI Responses request as checked, serialized again from the parsed
+/// value, or why it is refused: a background response, or a hosted tool in
+/// [`OPENAI_REFUSED_TOOLS`]. The provider receives exactly what was checked,
+/// so a duplicate key (the parser keeps the last, another may keep the
+/// first) cannot slip past. A body that is not JSON cannot be checked, so it
+/// is refused too.
+fn checked_responses(body: &[u8]) -> Result<Vec<u8>, &'static str> {
     let Ok(request) = serde_json::from_slice::<Value>(body) else {
-        return Some("Jackalope can only forward a JSON Responses request.");
+        return Err("Jackalope can only forward a JSON Responses request.");
     };
     if request["background"] == true {
-        return Some("Background responses are not forwarded: they would keep running after this run's token stops working.");
+        return Err("Background responses are not forwarded: they would keep running after this run's token stops working.");
     }
     let hosted = request["tools"]
         .as_array()
@@ -702,8 +702,29 @@ fn openai_refusal(route: &str, body: &[u8]) -> Option<&'static str> {
                 .as_str()
                 .is_some_and(|kind| OPENAI_REFUSED_TOOLS.contains(&kind))
         });
-    hosted
-        .then_some("Hosted MCP and code interpreter tools are not forwarded with this run's token.")
+    if hosted {
+        return Err(
+            "Hosted MCP and code interpreter tools are not forwarded with this run's token.",
+        );
+    }
+    serde_json::to_vec(&request).map_err(|_| "Jackalope can only forward a JSON Responses request.")
+}
+
+/// The answer to a provider request beyond [`STREAMS`]: a 429 shaped like the
+/// provider's own, with `retry-after`, so the agent CLI waits and retries.
+pub(crate) fn busy(grant: &Grant, id: &str) -> Answer {
+    let mut answer = whole(
+        id,
+        429,
+        grant.provider.error(
+            429,
+            "Too many requests to the provider are streaming for this run. Try again shortly.",
+        ),
+    );
+    if let Some(piece) = answer.piece.as_mut() {
+        piece.headers.push(("retry-after".into(), "1".into()));
+    }
+    answer
 }
 
 /// Forwards one provider call and streams its answer back as pieces, each
@@ -1708,6 +1729,50 @@ mod tests {
                 &json!({"model": "m"})
             ),
             None
+        );
+    }
+
+    #[test]
+    fn the_provider_receives_exactly_the_responses_request_that_was_checked() {
+        let grant = Grant::new(
+            Provider::OpenAi,
+            "sk-openai-real-0123456789".into(),
+            "https://api.openai.com",
+            LIFETIME,
+        );
+        let headers = json!({"authorization": format!("Bearer {}", grant.token)});
+        let responses = "/provider/openai/v1/responses";
+        // Whichever duplicate a provider keeps, it is the one that was checked.
+        let duplicate = br#"{"model":"m","background":true,"background":false,"tools":[{"type":"mcp","type":"function"}]}"#;
+        let upstream = screen(&grant, "c", &call(responses, headers.clone(), duplicate)).unwrap();
+        let sent = String::from_utf8(upstream.body.clone()).unwrap();
+        assert_eq!(sent.matches("background").count(), 1, "{sent}");
+        assert_eq!(sent.matches("\"type\"").count(), 1, "{sent}");
+        let forwarded: Value = serde_json::from_slice(&upstream.body).unwrap();
+        assert_eq!(forwarded["background"], false);
+        assert_eq!(forwarded["tools"][0]["type"], "function");
+        let refused = br#"{"background":false,"background":true}"#;
+        assert_eq!(
+            screen(&grant, "c", &call(responses, headers.clone(), refused))
+                .unwrap_err()
+                .status,
+            400
+        );
+        // Chat Completions bodies pass as sent.
+        let chat = br#"{"model":"m",  "stream":true}"#;
+        let upstream = screen(
+            &grant,
+            "c",
+            &call("/provider/openai/v1/chat/completions", headers, chat),
+        )
+        .unwrap();
+        assert_eq!(upstream.body, chat);
+        // The 429 for too many streams tells the agent when to retry.
+        let answer = busy(&grant, "c");
+        assert_eq!(answer.status, 429);
+        assert_eq!(
+            answer.piece.unwrap().headers,
+            [("retry-after".to_string(), "1".to_string())]
         );
     }
 }

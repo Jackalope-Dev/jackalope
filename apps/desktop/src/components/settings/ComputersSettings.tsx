@@ -54,6 +54,7 @@ export function ComputersSettings() {
   // The latest preferences, including changes still saving, and the save queue:
   // each save sends every preference as last chosen, one after another.
   const latestPreferences = useRef<ComputerPreferences | null>(null);
+  const savedPreferences = useRef<ComputerPreferences | null>(null);
   const savingPreferences = useRef<Promise<void>>(Promise.resolve());
   const [health, setHealth] = useState<Record<string, string>>({});
   const [pairing, setPairing] = useState(false);
@@ -69,6 +70,7 @@ export function ComputersSettings() {
       computerPreferences(),
     ]);
     latestPreferences.current = nextPreferences;
+    savedPreferences.current = nextPreferences;
     setPreferences(nextPreferences);
     setDocker(nextDocker);
     setMachines(nextMachines.machines);
@@ -100,12 +102,20 @@ export function ComputersSettings() {
     savingPreferences.current = savingPreferences.current.then(() =>
       setComputerPreferences(next).then(
         (saved) => {
+          savedPreferences.current = saved;
           if (latestPreferences.current === next) {
             latestPreferences.current = saved;
             setPreferences(saved);
           }
         },
-        (cause) => setError(describeError(cause)),
+        (cause) => {
+          setError(describeError(cause));
+          // Show what is actually saved, unless a later change is on its way.
+          if (latestPreferences.current === next) {
+            latestPreferences.current = savedPreferences.current;
+            setPreferences(savedPreferences.current);
+          }
+        },
       ),
     );
   };

@@ -83,12 +83,13 @@ pub(crate) fn set(root: &Path, id: &str, value: Option<&str>) -> Result<(), Stri
         .iter()
         .find(|kind| kind.id == id)
         .ok_or("Choose a supported sign-in.")?;
+    let value = value.map(str::trim);
+    if let Some(value) = value {
+        check(kind, value)?;
+    }
     let mut saved = load(root)?;
-    match value.map(str::trim) {
+    match value {
         Some(value) => {
-            if value.len() < 20 || value.len() > 4000 || value.chars().any(char::is_whitespace) {
-                return Err(format!("That does not look like a {}.", kind.label));
-            }
             saved.values.insert(id.into(), value.into());
         }
         None => {
@@ -97,6 +98,25 @@ pub(crate) fn set(root: &Path, id: &str, value: Option<&str>) -> Result<(), Stri
     }
     std::fs::create_dir_all(root.join("secrets")).map_err(|e| e.to_string())?;
     account_storage::write_json(&path(root), &saved)
+}
+
+/// Whether `value` can be saved as `kind`. An Anthropic API key pasted as the
+/// Claude Code sign-in token, or the reverse, is refused: as a sign-in token
+/// it would reach the computer even with Keep API keys on this device on.
+fn check(kind: &Kind, value: &str) -> Result<(), String> {
+    if value.len() < 20 || value.len() > 4000 || value.chars().any(char::is_whitespace) {
+        return Err(format!("That does not look like a {}.", kind.label));
+    }
+    let other = match kind.id {
+        "claude-token" if value.starts_with("sk-ant-api") => "anthropic-key",
+        "anthropic-key" if value.starts_with("sk-ant-oat") => "claude-token",
+        _ => return Ok(()),
+    };
+    let label = KINDS
+        .iter()
+        .find(|other_kind| other_kind.id == other)
+        .map_or("", |other_kind| other_kind.label);
+    Err(format!("That looks like a {label}. Save it there instead."))
 }
 
 /// The environment for `adapter` on a computer, from its first saved credential.
@@ -136,4 +156,27 @@ pub(crate) fn chosen(root: &Path, adapter: &str) -> Result<(&'static Kind, Strin
         "Add a {} in Settings → Computers so {adapter} can run on a computer.",
         options.join(" or ")
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keys_pasted_into_the_other_field_are_refused() {
+        let kind = |id: &str| KINDS.iter().find(|kind| kind.id == id).unwrap();
+        let api_key = "sk-ant-api03-0123456789abcdefghij";
+        let token = "sk-ant-oat01-0123456789abcdefghij";
+        let error = check(kind("claude-token"), api_key).unwrap_err();
+        assert!(error.contains("Anthropic API key"), "{error}");
+        let error = check(kind("anthropic-key"), token).unwrap_err();
+        assert!(error.contains("Claude Code sign-in token"), "{error}");
+        assert!(check(kind("claude-token"), token).is_ok());
+        assert!(check(kind("anthropic-key"), api_key).is_ok());
+        assert!(check(kind("openai-key"), "sk-proj-0123456789abcdefghij").is_ok());
+        // Refused before anything is read or written.
+        let root = std::env::temp_dir().join(format!("jackalope-cred-{}", uuid::Uuid::new_v4()));
+        assert!(set(&root, "claude-token", Some(api_key)).is_err());
+        assert!(!root.exists());
+    }
 }

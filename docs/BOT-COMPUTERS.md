@@ -447,7 +447,8 @@ for computers** in Settings → Computers: a Claude Code token from `claude setu
 (`CLAUDE_CODE_OAUTH_TOKEN`), an Anthropic API key (`ANTHROPIC_API_KEY`) or an OpenAI
 API key (`CODEX_API_KEY` and `OPENAI_API_KEY`). They are stored in protected storage
 (`computers/secrets/agent-credentials.bin`), shown only as saved or not, and passed to
-the run's environment only. A missing sign-in fails the attempt with where to add it.
+the run's environment only. A missing sign-in fails the attempt with where to add it,
+and an Anthropic API key saved as the Claude Code token (or the reverse) is refused.
 
 With **Keep API keys on this device** on (Settings → Computers, beta, off by default), an
 agent whose sign-in for computers is an Anthropic or OpenAI API key never receives the
@@ -471,13 +472,15 @@ such as the MCP connector, code execution, the Files API, Skills and web fetch a
 dropped; a request that needs a dropped beta fails at the provider, and a family a new
 Claude Code version needs is added to that list. OpenAI Responses requests with
 `background: true` (which would keep running and billing after the token is revoked)
-or hosted `mcp` or `code_interpreter` tools are refused. The saved key is the only
+or hosted `mcp` or `code_interpreter` tools are refused, and the provider receives the
+checked request serialized again, so a duplicate key cannot carry a different value past
+the check. The saved key is the only
 credential the provider receives, and the answer streams back in `run_answer` pieces of
 up to 256 KB at byte offsets, the first carrying the listed response headers; the runner
 writes each piece once, in order, and streams it to the agent as it arrives. At most
 1 MB of one stream waits for the runner: the provider's answer is read further only as
-the runner takes pieces, and an attempt streams at most eight requests at once (others
-get 429). A piece the runner refuses ends that stream only. An error answer is read
+the runner takes pieces, and an attempt streams at most 16 requests at once (others
+get 429 with `retry-after: 1`). A piece the runner refuses ends that stream only. An error answer is read
 whole and sent without the key or token. The token stops working when the attempt ends
 (at most seven hours), a stream stops when the agent hangs up or the run ends, the key
 and token are redacted from the attempt's record, and the attempt's activity counts the

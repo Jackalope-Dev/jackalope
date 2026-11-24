@@ -226,12 +226,7 @@ impl Relay {
             return;
         }
         if self.streams.len() >= provider_proxy::STREAMS {
-            self.ready.push(Answer::refused(
-                &id,
-                None,
-                429,
-                "Too many requests to the provider are streaming for this run. Try again shortly.",
-            ));
+            self.ready.push(provider_proxy::busy(&grant, &id));
             return;
         }
         let flow = Flow::default();
@@ -972,7 +967,12 @@ connection: close
         let refused: Vec<&Answer> = relay.ready.iter().collect();
         assert_eq!(refused.len(), 1);
         assert_eq!(refused[0].status, 429);
-        assert!(refused[0].piece.is_none());
+        let busy = refused[0].piece.as_ref().unwrap();
+        assert!(busy.last);
+        assert_eq!(
+            busy.headers,
+            [("retry-after".to_string(), "1".to_string())]
+        );
 
         // Delivered pieces free their stream's buffer.
         let (call, flow) = relay
