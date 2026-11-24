@@ -116,24 +116,64 @@ fn lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
     bytes.split_inclusive(|byte| *byte == b'\n')
 }
 
+/// Diff options that fix the patch format whatever the person's Git config sets
+/// (`diff.noprefix`, `diff.mnemonicPrefix`, `diff.context`, `diff.relative`,
+/// `diff.submodule`, `diff.renames`, external tools, colour), so `git apply`
+/// reads back exactly what was cut.
+const DIFF_FORMAT: &[&str] = &[
+    "--no-ext-diff",
+    "--no-textconv",
+    "--no-color",
+    "--no-renames",
+    "--no-relative",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "-U3",
+    "--inter-hunk-context=0",
+    "--submodule=short",
+    "--ignore-submodules=none",
+];
+
+/// Config the patch options above cannot override.
+const DIFF_CONFIG: &[&str] = &["-c", "diff.suppressBlankEmpty=false"];
+
 /// The change from `base` to `head`, cut into units in path and hunk order.
 fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
-    let options = [
-        "--no-ext-diff",
-        "--no-textconv",
+    let mut raw = DIFF_CONFIG.to_vec();
+    // Not the patch options: `-U` would add a patch to the listing.
+    raw.extend([
+        "diff",
+        "--raw",
+        "-z",
+        "--no-abbrev",
         "--no-color",
+        "--no-ext-diff",
         "--no-renames",
-    ];
-    let mut names = vec!["diff", "--name-only", "-z"];
-    names.extend(options);
-    names.extend([base, head, "--"]);
-    let paths: Vec<String> = repo::git_exact(project, &names, Snapshot)?
+        "--no-relative",
+        "--ignore-submodules=none",
+    ]);
+    raw.extend([base, head, "--"]);
+    // `--raw -z` alternates a status field and a path; with renames off there
+    // is one path per entry. A type change (`T`) between a link and a file is
+    // written as two diff sections for the one path.
+    let fields: Vec<String> = repo::git_exact(project, &raw, Snapshot)?
         .split('\0')
-        .filter(|path| !path.is_empty())
+        .filter(|field| !field.is_empty())
         .map(str::to_string)
         .collect();
-    let mut args = vec!["diff", "--binary", "--full-index"];
-    args.extend(options);
+    if fields.len() % 2 != 0 {
+        return Err("Git listed the changed files in an unexpected form.".into());
+    }
+    let entries: Vec<(String, usize)> = fields
+        .chunks(2)
+        .map(|entry| {
+            let sections = if entry[0].ends_with('T') { 2 } else { 1 };
+            (entry[1].clone(), sections)
+        })
+        .collect();
+    let mut args = DIFF_CONFIG.to_vec();
+    args.extend(["diff", "--binary", "--full-index"]);
+    args.extend(DIFF_FORMAT);
     args.extend([base, head, "--"]);
     let output = repo::output(project, &args, Snapshot)?;
     if !output.status.success() {
@@ -149,14 +189,25 @@ fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
             .ok_or("Git wrote an unexpected diff.")?
             .extend_from_slice(line);
     }
-    if chunks.len() != paths.len() {
+    if chunks.len() != entries.iter().map(|(_, sections)| sections).sum::<usize>() {
         return Err("Git listed the changed files differently from their diff.".into());
     }
-    let mut units = vec![];
-    for (path, chunk) in paths.into_iter().zip(chunks) {
+    let count = |body: &[u8]| {
+        let (mut added, mut removed) = (0, 0);
+        for line in lines(body).filter(|line| !line.starts_with(b"@@ ")) {
+            match line.first() {
+                Some(b'+') => added += 1,
+                Some(b'-') => removed += 1,
+                _ => {}
+            }
+        }
+        (added, removed)
+    };
+    // A section's file header, through the `+++` line, and its hunks.
+    let split = |chunk: &[u8]| {
         let mut header = vec![];
         let mut hunks: Vec<Vec<u8>> = vec![];
-        for line in lines(&chunk) {
+        for line in lines(chunk) {
             if line.starts_with(b"@@ ") {
                 hunks.push(vec![]);
             }
@@ -165,6 +216,36 @@ fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
                 None => header.extend_from_slice(line),
             }
         }
+        (header, hunks)
+    };
+    let mut chunks = chunks.into_iter();
+    let mut units = vec![];
+    for (path, sections) in entries {
+        let lock = manifests(&path).is_some();
+        if sections == 2 {
+            // Both sections move together as one whole unit with no shared header.
+            let (mut body, mut added, mut removed) = (vec![], 0, 0);
+            for chunk in chunks.by_ref().take(2) {
+                let (_, hunks) = split(&chunk);
+                let (plus, minus) = count(&hunks.concat());
+                added += plus;
+                removed += minus;
+                body.extend_from_slice(&chunk);
+            }
+            units.push(Unit {
+                id: format!("h{}", units.len() + 1),
+                path,
+                header: vec![],
+                body,
+                whole: true,
+                added,
+                removed,
+                lock,
+            });
+            continue;
+        }
+        let chunk = chunks.next().ok_or("Git wrote an unexpected diff.")?;
+        let (header, hunks) = split(&chunk);
         let text = String::from_utf8_lossy(&header);
         let whole = hunks.len() < 2
             || [
@@ -176,18 +257,6 @@ fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
             ]
             .iter()
             .any(|marker| text.contains(marker));
-        let lock = manifests(&path).is_some();
-        let count = |body: &[u8]| {
-            let (mut added, mut removed) = (0, 0);
-            for line in lines(body).filter(|line| !line.starts_with(b"@@ ")) {
-                match line.first() {
-                    Some(b'+') => added += 1,
-                    Some(b'-') => removed += 1,
-                    _ => {}
-                }
-            }
-            (added, removed)
-        };
         let pieces = if whole { vec![hunks.concat()] } else { hunks };
         for body in pieces {
             let (added, removed) = count(&body);
@@ -238,6 +307,43 @@ pub struct SplitProposal {
     /// Why the plan keeps its single commit; `commits` is empty then.
     pub fallback: Option<String>,
 }
+
+/// A split command's failure. The review reacts to `code` and shows `message`:
+/// `proposalStale` when the integration moved since the proposal (propose
+/// again), `reviewStale` when the review itself is out of date (prepare a fresh
+/// review), and `treeMismatch` when the built commits miss the reviewed tree.
+#[derive(Debug, Serialize)]
+pub struct SplitError {
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<&'static str>,
+}
+
+impl SplitError {
+    fn coded(code: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            code: Some(code),
+        }
+    }
+}
+
+impl From<String> for SplitError {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            code: None,
+        }
+    }
+}
+
+impl From<&str> for SplitError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+const TREE_MISMATCH: &str = "The split commits do not add up to the reviewed files.";
 
 /// A unit as the review shows it.
 #[derive(Debug, Serialize)]
@@ -462,8 +568,28 @@ fn assign<'a>(
     Ok(groups)
 }
 
+/// A helper message without `Signed-off-by:` lines: a sign-off certifies the
+/// person's own work, so an agent never adds one. A person may still type one.
+fn without_sign_off(message: &str) -> String {
+    message
+        .lines()
+        .filter(|line| {
+            !line
+                .trim()
+                .to_ascii_lowercase()
+                .starts_with("signed-off-by:")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
 /// The helper's grouping, checked and ordered, with lock files placed.
-fn validate(units: &[Unit], response: Response) -> Result<Vec<PlannedCommit>, String> {
+fn validate(units: &[Unit], mut response: Response) -> Result<Vec<PlannedCommit>, String> {
+    for commit in &mut response.commits {
+        commit.message = without_sign_off(&commit.message);
+    }
     let ids: Vec<&str> = response.commits.iter().map(|c| c.id.as_str()).collect();
     if ids.iter().any(|id| id.trim().is_empty())
         || ids.iter().collect::<BTreeSet<_>>().len() != ids.len()
@@ -581,7 +707,7 @@ fn build(
     commits: Vec<PlannedCommit>,
     policy: &super::super::project_git::CommitPolicy,
     agents: &[String],
-) -> Result<Vec<PlannedCommit>, String> {
+) -> Result<Vec<PlannedCommit>, SplitError> {
     let scratch = directory.join("split");
     repo::with_temp_index(project, &scratch, Seed::Empty, Snapshot, |index| {
         index.git(&["read-tree", base])?;
@@ -622,16 +748,26 @@ fn build(
             Snapshot,
         )? != tree
         {
-            return Err("The split commits do not add up to the reviewed files.".into());
+            return Err(TREE_MISMATCH.into());
         }
         Ok(built)
+    })
+    .map_err(|error| {
+        if error == TREE_MISMATCH {
+            SplitError::coded("treeMismatch", error)
+        } else {
+            error.into()
+        }
     })
 }
 
 /// A plan that can still be split, its project and its single reviewed tree.
-fn splittable(plan: &IntegrationPlan) -> Result<(PathBuf, String, String), String> {
+fn splittable(plan: &IntegrationPlan) -> Result<(PathBuf, String, String), SplitError> {
     if plan.status != "ready" {
-        return Err("Only a ready, unmerged integration can be split into commits.".into());
+        return Err(SplitError::coded(
+            "reviewStale",
+            "Only a ready, unmerged integration can be split into commits.",
+        ));
     }
     let head = plan
         .integration_head
@@ -647,7 +783,10 @@ fn splittable(plan: &IntegrationPlan) -> Result<(PathBuf, String, String), Strin
         Snapshot,
     )? != head
     {
-        return Err("The integration reference changed. Prepare a fresh review.".into());
+        return Err(SplitError::coded(
+            "reviewStale",
+            "The integration reference changed. Prepare a fresh review.",
+        ));
     }
     let tree = repo::git(
         &project,
@@ -671,14 +810,17 @@ fn agents(runs: &[TaskRun], plan: &IntegrationPlan) -> Vec<String> {
 fn policy(
     plan: &IntegrationPlan,
     project: &Path,
-) -> Result<super::super::project_git::CommitPolicy, String> {
+) -> Result<super::super::project_git::CommitPolicy, SplitError> {
     let current = super::super::project_git::read(project)?;
     if plan
         .commit_policy
         .as_ref()
         .is_some_and(|saved| saved != &current)
     {
-        return Err("Project commit settings changed. Prepare a fresh review.".into());
+        return Err(SplitError::coded(
+            "reviewStale",
+            "Project commit settings changed. Prepare a fresh review.",
+        ));
     }
     Ok(current)
 }
@@ -689,7 +831,7 @@ pub(in crate::commands) fn propose(
     helper: &Helper,
     runtime: &TaskRuntime,
     plan_id: &str,
-) -> Result<SplitProposal, String> {
+) -> Result<SplitProposal, SplitError> {
     let directory = runtime.integration_directory();
     let (plan, project, head, units, recent) = {
         let _guard = execution_guard()?;
@@ -740,11 +882,12 @@ pub(in crate::commands) fn propose(
         .and_then(|commits| {
             let _guard = execution_guard()?;
             let plan = load(&directory, plan_id)?;
-            let (_, now, tree) = splittable(&plan)?;
+            let (_, now, tree) = splittable(&plan).map_err(|error| error.message)?;
             if now != head {
                 return Err("The integration changed while the split was drafted.".into());
             }
             let runs = runtime.integration_runs()?;
+            let policy = policy(&plan, &project).map_err(|error| error.message)?;
             build(
                 &project,
                 &directory,
@@ -752,9 +895,10 @@ pub(in crate::commands) fn propose(
                 &tree,
                 &units,
                 commits,
-                &policy(&plan, &project)?,
+                &policy,
                 &agents(&runs, &plan),
             )
+            .map_err(|error| error.message)
         });
     match checked {
         Ok(commits) => {
@@ -780,13 +924,14 @@ pub(in crate::commands) fn apply_split(
     plan_id: &str,
     integration_head: &str,
     commits: &[PlannedCommit],
-) -> Result<IntegrationPlan, String> {
+) -> Result<IntegrationPlan, SplitError> {
     let mut plan = load(directory, plan_id)?;
     let (project, head, tree) = splittable(&plan)?;
     if head != integration_head {
-        return Err(
-            "The integration changed since these commits were proposed. Split it again.".into(),
-        );
+        return Err(SplitError::coded(
+            "proposalStale",
+            "The integration changed since these commits were proposed. Split it again.",
+        ));
     }
     let units = units(&project, &plan.master_head, &head)?;
     let commits = approved(&units, commits)?;
@@ -984,6 +1129,18 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("attribution"), "{error}");
+        let signed = validate(
+            &units,
+            response(serde_json::json!({"commits":[
+                {"id":"a","message":"First\n\nWhy.\n\nSigned-off-by: Agent <a@example.invalid>","hunks":first},
+                {"id":"b","message":"Second","hunks":all_but("")}
+            ]})),
+        )
+        .unwrap();
+        assert!(
+            signed.iter().any(|c| c.message == "First\n\nWhy."),
+            "{signed:?}"
+        );
         let mut everything = first.clone();
         everything.extend(all_but(""));
         let error = validate(
@@ -1080,12 +1237,142 @@ mod tests {
         assert!(!repo::is_dirty(&f.project, Untracked::All, Snapshot).unwrap());
 
         // A stale proposal is refused, and the split plan merges as usual.
-        assert!(apply_split(&f.plans, &runs, &plan.id, &head, &moved).is_err());
+        let stale = apply_split(&f.plans, &runs, &plan.id, &head, &moved).unwrap_err();
+        assert_eq!(stale.code, Some("proposalStale"));
+        // A reference moved without its saved plan, as after a crash between the
+        // two, is a stale review rather than a stale proposal.
+        let reference = format!("refs/jackalope/integrations/{}", plan.id);
+        let update =
+            |to: &str| repo::git(&f.project, &["update-ref", &reference, to], Snapshot).unwrap();
+        update(&head);
+        let stale = apply_split(&f.plans, &runs, &plan.id, &tip, &moved).unwrap_err();
+        assert_eq!(stale.code, Some("reviewStale"));
+        update(&tip);
         let merged = apply(&f.plans, &runs, &plan.id).unwrap();
         assert_eq!(merged.status, "applied");
         assert_eq!(
             repo::git(&f.project, &["rev-parse", "HEAD"], Snapshot).unwrap(),
             tip
         );
+    }
+
+    #[test]
+    fn a_hostile_diff_config_still_splits_into_the_reviewed_tree() {
+        let (f, run, plan) = prepared();
+        for (key, value) in [
+            ("diff.noprefix", "true"),
+            ("diff.mnemonicPrefix", "true"),
+            ("diff.context", "0"),
+            ("diff.interHunkContext", "40"),
+            ("diff.relative", "true"),
+            ("diff.submodule", "log"),
+            ("diff.renames", "copies"),
+            ("diff.suppressBlankEmpty", "true"),
+            ("diff.external", "false"),
+            ("color.ui", "always"),
+            ("color.diff", "always"),
+        ] {
+            repo::git(&f.project, &["config", key, value], Snapshot).unwrap();
+        }
+        let head = plan.integration_head.clone().unwrap();
+        let units = units(&f.project, &plan.master_head, &head).unwrap();
+        let id = ids(&units);
+        assert_eq!(id.len(), 6, "long.txt still has two hunks");
+        let all_but_first: Vec<String> = units
+            .iter()
+            .map(|unit| unit.id.clone())
+            .filter(|unit| unit != &id["long.txt#1"])
+            .collect();
+        let commits = vec![
+            PlannedCommit {
+                message: "First hunk".into(),
+                hunks: vec![id["long.txt#1"].clone()],
+                files: vec![],
+                depends_on: vec![],
+                commit: None,
+            },
+            PlannedCommit {
+                message: "The rest".into(),
+                hunks: all_but_first,
+                files: vec![],
+                depends_on: vec![0],
+                commit: None,
+            },
+        ];
+        let applied = apply_split(&f.plans, &[run], &plan.id, &head, &commits).unwrap();
+        let tree = |rev: &str| {
+            repo::git(
+                &f.project,
+                &["rev-parse", &format!("{rev}^{{tree}}")],
+                Snapshot,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            tree(applied.integration_head.as_deref().unwrap()),
+            tree(&head)
+        );
+        assert_eq!(applied.commits.len(), 2);
+    }
+
+    #[test]
+    fn a_link_replacing_a_file_moves_as_one_whole_unit() {
+        let f = Fixture::new();
+        let git = |args: &[&str]| repo::git(&f.project, args, Snapshot).unwrap();
+        fs::write(f.project.join("entry"), "a regular file\n").unwrap();
+        fs::write(f.project.join("notes.txt"), "one\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-m", "base"]);
+        let base = git(&["rev-parse", "HEAD"]);
+        let blob = |name: &str, content: &str| {
+            let file = f.root.join(name);
+            fs::write(&file, content).unwrap();
+            git(&["hash-object", "-w", file.to_str().unwrap()])
+        };
+        let link = blob("link-target", "shared.txt");
+        let notes = blob("notes", "two\n");
+        let scratch = f.root.join("scratch");
+        // Built in an index so the test needs no symlink support on disk.
+        let head = repo::with_temp_index(&f.project, &scratch, Seed::Empty, Snapshot, |index| {
+            index.git(&["read-tree", &base])?;
+            index.git(&[
+                "update-index",
+                "--cacheinfo",
+                &format!("120000,{link},entry"),
+            ])?;
+            index.git(&[
+                "update-index",
+                "--cacheinfo",
+                &format!("100644,{notes},notes.txt"),
+            ])?;
+            let tree = index.git(&["write-tree"])?;
+            index.git(&["commit-tree", &tree, "-p", &base, "-m", "link"])
+        })
+        .unwrap();
+        let units = units(&f.project, &base, &head).unwrap();
+        let entry: Vec<_> = units.iter().filter(|unit| unit.path == "entry").collect();
+        assert_eq!(entry.len(), 1);
+        assert!(entry[0].whole);
+        let body = String::from_utf8_lossy(&entry[0].body);
+        assert_eq!(body.matches("diff --git ").count(), 2, "{body}");
+        assert!(body.contains("new file mode 120000"), "{body}");
+        // Each unit applies on its own, and together they reach the head tree.
+        for ids in [
+            vec![entry[0].id.clone()],
+            units.iter().map(|unit| unit.id.clone()).collect(),
+        ] {
+            let tree =
+                repo::with_temp_index(&f.project, &scratch, Seed::Empty, Snapshot, |index| {
+                    index.git(&["read-tree", &base])?;
+                    let file = index.file().with_extension("patch");
+                    fs::write(&file, patch(&units, &ids)).map_err(|e| e.to_string())?;
+                    index.git(&["apply", "--cached", file.to_str().unwrap()])?;
+                    index.git(&["write-tree"])
+                })
+                .unwrap();
+            if ids.len() == units.len() {
+                assert_eq!(tree, git(&["rev-parse", &format!("{head}^{{tree}}")]));
+            }
+        }
     }
 }

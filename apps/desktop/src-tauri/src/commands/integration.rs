@@ -1231,12 +1231,12 @@ pub async fn integration_split_propose(
     helper: State<'_, super::helper::Helper>,
     state: State<'_, TaskRuntime>,
     plan_id: String,
-) -> Result<split::SplitProposal, String> {
+) -> Result<split::SplitProposal, split::SplitError> {
     let helper = helper.inner().clone();
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || split::propose(&helper, &runtime, &plan_id))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| split::SplitError::from(e.to_string()))?
 }
 
 #[tauri::command]
@@ -1245,7 +1245,7 @@ pub async fn integration_split_apply(
     plan_id: String,
     integration_head: String,
     commits: Vec<split::PlannedCommit>,
-) -> Result<IntegrationPlan, String> {
+) -> Result<IntegrationPlan, split::SplitError> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = execution_guard()?;
@@ -1259,7 +1259,7 @@ pub async fn integration_split_apply(
         )
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| split::SplitError::from(e.to_string()))?
 }
 
 #[cfg(test)]

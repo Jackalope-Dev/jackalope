@@ -31,16 +31,20 @@ enum Marker {
 }
 
 /// The marker a line is, as Git writes them: seven characters, then a space
-/// and a label or the end of the line.
+/// and a label or the end of the line. Compares bytes, so a line whose seventh
+/// byte falls inside a multi-byte character is simply not a marker.
 fn marker(line: &str) -> Option<Marker> {
-    let line = line.trim_end_matches(['\n', '\r']);
-    let (head, rest) = line.split_at(line.len().min(7));
-    let labelled = rest.is_empty() || rest.starts_with(' ');
+    let line = line.trim_end_matches(['\n', '\r']).as_bytes();
+    if line.len() < 7 {
+        return None;
+    }
+    let (head, rest) = line.split_at(7);
+    let labelled = rest.is_empty() || rest.starts_with(b" ");
     match head {
-        "<<<<<<<" if labelled => Some(Marker::Start),
-        "|||||||" if labelled => Some(Marker::Base),
-        "=======" if rest.is_empty() => Some(Marker::Separator),
-        ">>>>>>>" if labelled => Some(Marker::End),
+        b"<<<<<<<" if labelled => Some(Marker::Start),
+        b"|||||||" if labelled => Some(Marker::Base),
+        b"=======" if rest.is_empty() => Some(Marker::Separator),
+        b">>>>>>>" if labelled => Some(Marker::End),
         _ => None,
     }
 }
@@ -69,7 +73,8 @@ fn label(line: &str) -> String {
 }
 
 /// Splits `text` into plain text and conflict blocks. Nested, unterminated or
-/// stray markers are refused rather than guessed.
+/// stray markers are refused rather than guessed, except a lone `=======` outside
+/// a block, which is ordinary text such as a heading underline.
 fn parse(text: &str) -> Result<Vec<Segment>, String> {
     #[derive(Clone, Copy)]
     enum Part {
@@ -101,12 +106,12 @@ fn parse(text: &str) -> Result<Vec<Segment>, String> {
                         Part::Ours,
                     ));
                 }
-                Some(_) => {
+                Some(Marker::Base | Marker::End) => {
                     return Err(format!(
                         "Line {number} has a conflict marker outside a conflict."
                     ))
                 }
-                None => plain.push_str(line),
+                Some(Marker::Separator) | None => plain.push_str(line),
             }
             continue;
         };
@@ -143,9 +148,13 @@ fn parse(text: &str) -> Result<Vec<Segment>, String> {
     Ok(segments)
 }
 
+/// Whether `text` still holds a conflict block or a stray start, base or end marker.
 fn has_markers(text: &str) -> bool {
-    text.split_inclusive('\n')
-        .any(|line| marker(line).is_some())
+    parse(text).map_or(true, |segments| {
+        segments
+            .iter()
+            .any(|segment| matches!(segment, Segment::Block(_)))
+    })
 }
 
 fn hash(bytes: &[u8]) -> String {
@@ -409,10 +418,17 @@ pub(in crate::commands) fn list(workspace: &Path, only: Option<&str>) -> Result<
     };
     let more = paths.len().saturating_sub(FILE_LIMIT);
     let mut files = vec![];
+    // One unreadable file is reported on its own entry, not for the whole listing.
     for path in paths.into_iter().take(FILE_LIMIT) {
-        let file = inside(workspace, &path)?;
-        let (text, digest) = read_text(&file, &path)?;
-        files.push(view(path, &text, digest));
+        match inside(workspace, &path).and_then(|file| read_text(&file, &path)) {
+            Ok((text, digest)) => files.push(view(path, &text, digest)),
+            Err(error) => files.push(FileView {
+                path,
+                hash: String::new(),
+                blocks: vec![],
+                error: Some(error),
+            }),
+        }
     }
     Ok(Listing { files, more })
 }
@@ -630,10 +646,83 @@ mod tests {
         assert!(resolve(text, &[choose(0, Choice::Base)])
             .unwrap_err()
             .contains("no base"));
-        assert!(parse("a\n=======\nb\n").is_err());
+        assert!(parse("a\n>>>>>>> stray\nb\n").is_err());
         assert!(parse("<<<<<<< a\nx\n=======\ny\n").is_err());
         assert!(parse("<<<<<<< a\n<<<<<<< b\n").is_err());
         // Seven equals signs followed by text are content, not a separator.
         assert_eq!(parse("======= heading\n").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_lone_separator_outside_a_block_is_text() {
+        let text = "Title\n=======\n<<<<<<< ours\nx\n=======\ny\n>>>>>>> theirs\nend\n";
+        let segments = parse(text).unwrap();
+        assert_eq!(segments.len(), 3);
+        let (output, count) = resolve(text, &[choose(0, Choice::Theirs)]).unwrap();
+        assert_eq!((output.as_str(), count), ("Title\n=======\ny\nend\n", 1));
+        // Custom text may underline a heading too, but never reopen a block.
+        let (output, _) = resolve(
+            text,
+            &[Resolution {
+                block: 0,
+                choice: Choice::Custom,
+                text: Some("Sub\n=======\n".into()),
+            }],
+        )
+        .unwrap();
+        assert_eq!(output, "Title\n=======\nSub\n=======\nend\n");
+        assert!(resolve(
+            text,
+            &[Resolution {
+                block: 0,
+                choice: Choice::Custom,
+                text: Some(">>>>>>> theirs\n".into()),
+            }],
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn non_ascii_lines_are_never_mistaken_for_markers() {
+        for line in [
+            "    \"→ x\"\n",
+            "数据数据数据\n",
+            "<<<<<<→\n",
+            "======é\n",
+            "→\n",
+        ] {
+            assert_eq!(marker(line), None, "{line}");
+        }
+        let text = "    \"→ x\"\n<<<<<<< ours\n数据 → 1\n=======\n数据 → 2\n>>>>>>> theirs\n";
+        let (output, count) = resolve(text, &[choose(0, Choice::Ours)]).unwrap();
+        assert_eq!((output.as_str(), count), ("    \"→ x\"\n数据 → 1\n", 1));
+    }
+
+    #[test]
+    fn an_unreadable_file_is_reported_on_its_own_entry() {
+        let (root, workspace) = conflicted();
+        let mut binary = b"<<<<<<< ours\n".to_vec();
+        binary.extend_from_slice(&[0xff, 0xfe, b'\n']);
+        binary.extend_from_slice(b"=======\nb\n>>>>>>> theirs\n");
+        fs::write(workspace.join("latin1.txt"), &binary).unwrap();
+        let mut large = String::from("<<<<<<< ours\na\n=======\nb\n>>>>>>> theirs\n");
+        large.push_str(&"x".repeat(FILE_BYTES as usize));
+        fs::write(workspace.join("large.txt"), &large).unwrap();
+        let listing = list(&workspace, None).unwrap();
+        let entry = |path: &str| listing.files.iter().find(|file| file.path == path).unwrap();
+        assert_eq!(listing.files.len(), 3);
+        assert_eq!(entry("app.txt").blocks.len(), 2);
+        assert!(entry("latin1.txt")
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("UTF-8"));
+        assert!(entry("large.txt")
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("too large"));
+        assert!(entry("large.txt").blocks.is_empty());
+        fs::remove_dir_all(root).unwrap();
     }
 }
