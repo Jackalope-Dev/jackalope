@@ -357,7 +357,11 @@ pub fn newest_product(derived: &Path) -> Option<PathBuf> {
 pub fn derived_folders(workspace: &Path, own: &Path, xcode_root: Option<&Path>) -> Vec<PathBuf> {
     let mut folders = vec![own.to_path_buf()];
     let workspace = dunce::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf());
-    for local in ["build", "DerivedData"] {
+    for local in [
+        "build",
+        "DerivedData",
+        crate::commands::source_packages::DERIVED_DATA,
+    ] {
         folders.push(workspace.join(local));
     }
     let Some(root) = xcode_root else {

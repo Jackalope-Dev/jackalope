@@ -609,14 +609,16 @@ impl TaskRuntime {
                     )
                 });
             }
-            if let Some(command) = req
+            let command = req
                 .prepare_command
                 .as_deref()
-                .filter(|command| !command.trim().is_empty())
-            {
-                if fresh_worktree {
-                    self.clone_dependencies(id, &root, &workspace, command)?;
-                }
+                .filter(|command| !command.trim().is_empty());
+            if fresh_worktree {
+                self.clone_dependencies(id, &root, &workspace, command)?;
+            }
+            // Xcode builds write `.jackalope/DerivedData` through `JACKALOPE_DERIVED_DATA`.
+            crate::commands::tasks::preparation::exclude_marker(Path::new(&workspace));
+            if let Some(command) = command {
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
                     self.mark_stopped(id);
@@ -632,12 +634,14 @@ impl TaskRuntime {
 
     /// Seeds a new worktree with the checkout's installed dependency folders before the setup
     /// command, which still runs so anything that drifted since the checkout installed is fixed.
+    /// Swift package checkouts for Xcode projects are seeded with or without a setup command:
+    /// they are matched to the worktree's own `Package.resolved` pins.
     fn clone_dependencies(
         &self,
         id: &str,
         root: &str,
         workspace: &str,
-        command: &str,
+        command: Option<&str>,
     ) -> Result<(), String> {
         self.update(id, |run| {
             run.progress = Some(StepProgress::new(
@@ -646,12 +650,31 @@ impl TaskRuntime {
                 1,
             ))
         });
-        let outcome = self.timed(id, "dependencyClone", || {
-            Ok(crate::commands::dependency_clone::clone_dependencies(
-                root, workspace, command,
-            ))
+        let (outcome, packages) = self.timed(id, "dependencyClone", || {
+            let packages = crate::commands::source_packages::restore(
+                self.data_directory(),
+                Path::new(root),
+                Path::new(workspace),
+            );
+            let outcome = command
+                .map(|command| {
+                    crate::commands::dependency_clone::clone_dependencies(root, workspace, command)
+                })
+                .unwrap_or_default();
+            Ok((outcome, packages))
         })?;
         self.update(id, |run| {
+            match &packages {
+                crate::commands::source_packages::Restore::Restored => activity(
+                    run,
+                    "Reused Swift package checkouts resolved for the same Package.resolved (copy-on-write).",
+                ),
+                crate::commands::source_packages::Restore::Failed(reason) => activity(
+                    run,
+                    &format!("Did not reuse saved Swift package checkouts: {reason}."),
+                ),
+                _ => {}
+            }
             if !outcome.cloned.is_empty() {
                 activity(
                     run,
@@ -667,10 +690,12 @@ impl TaskRuntime {
                     &format!("Did not reuse the project checkout's {folder}: {reason}."),
                 );
             }
-            if outcome.unsupported {
+            if outcome.unsupported
+                || packages == crate::commands::source_packages::Restore::Unsupported
+            {
                 activity(
                     run,
-                    "This volume cannot make copy-on-write copies, so the setup command installs dependencies in full.",
+                    "This volume cannot make copy-on-write copies, so dependencies install in full.",
                 );
             }
         });
@@ -947,6 +972,11 @@ impl TaskRuntime {
             (adapter == "claude").then(|| super::claude_session::settings(self, &req.project_id));
         let persistent = claude.is_some_and(|settings| settings.persistent) && remote.is_none();
         let mut cmd = command(executable);
+        if remote.is_none() && !workspace.is_empty() {
+            cmd.envs(crate::commands::source_packages::environment(Path::new(
+                &workspace,
+            )));
+        }
         let mut opencode_connection = None;
         let mut opencode_config = None;
         if let Some(binding) = &req.account_binding {
@@ -2530,6 +2560,8 @@ impl TaskRuntime {
                 host,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
+                time_limits: crate::commands::project_registry::record(self, &request.project_id)
+                    .and_then(|project| project.time_limits),
                 setup_files: request.setup_files.clone(),
                 auto_verify: request.auto_verify,
                 non_code: request.non_code,

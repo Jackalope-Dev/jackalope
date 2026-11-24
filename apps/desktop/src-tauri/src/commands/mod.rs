@@ -30,6 +30,7 @@ pub mod project_registry;
 pub mod project_secrets;
 pub mod pty;
 pub mod repo_todos;
+mod source_packages;
 pub mod system;
 pub mod task_strategy;
 pub mod tasks;

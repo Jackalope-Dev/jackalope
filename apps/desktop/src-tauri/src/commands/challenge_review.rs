@@ -301,14 +301,17 @@ pub(super) fn rerun(
     let lease = verification::reserve_workspace(&workspace)?;
     drop(guard);
     super::workspace_setup::copy_files(&run.project_path, &workspace, &run.setup_files)?;
+    let limits = run.time_limits.unwrap_or_default();
     let preparation = run
         .prepare_command
         .as_deref()
         .filter(|setup| !setup.trim().is_empty())
-        .map(|setup| verification::run_disposable(setup, &workspace, true))
+        .map(|setup| verification::run_disposable(setup, &workspace, true, &limits))
         .transpose()?;
     let result = if preparation.as_ref().map_or(true, |setup| setup.success) {
-        Some(verification::run_disposable(command, &workspace, false)?)
+        Some(verification::run_disposable(
+            command, &workspace, false, &limits,
+        )?)
     } else {
         None
     };

@@ -145,6 +145,10 @@ pub struct TaskRun {
     pub verify_command: Option<String>,
     #[serde(default)]
     pub prepare_command: Option<String>,
+    /// The project's setup and check time limits when the attempt started. Absent means
+    /// the defaults.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limits: Option<crate::commands::verification::TimeLimits>,
     #[serde(default)]
     pub setup_files: Vec<String>,
     #[serde(default)]
@@ -526,6 +530,7 @@ impl TaskRun {
             host: self.host.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
+            time_limits: self.time_limits,
             setup_files: self.setup_files.clone(),
             auto_verify: self.auto_verify.clone(),
             non_code: self.non_code,
