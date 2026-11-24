@@ -167,6 +167,15 @@ pub(super) fn parse_state(text: &str, now: i64) -> Result<State, String> {
 
 /// The window the indicator follows. Desktop grants have none, which the
 /// helpers receive as handle 0.
+/// Whether the granted window takes input where it is, so resuming leaves it there.
+fn in_place(grant: &super::grant::Grant) -> bool {
+    grant.scope != super::grant::Scope::Desktop
+        && grant
+            .window
+            .as_ref()
+            .is_some_and(super::grant::background_input)
+}
+
 fn indicator_window(grant: &super::grant::Grant) -> Value {
     grant.window.as_ref().map_or_else(
         || json!({"handle":"0","pid":0,"started":"0","title":"","class":""}),
@@ -186,13 +195,13 @@ impl Indicator {
             include_bytes!("../../../icons/32x32.png"),
         )
         .map_err(|e| e.to_string())?;
-        let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo,[string]$r.scope,[string]$r.app,[string]$r.label)",include_str!("indicator.cs"));
+        let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo,[string]$r.scope,[string]$r.app,[string]$r.label,[bool]$r.background)",include_str!("indicator.cs"));
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::platform::native_command(
             &script,
             Some(
-                json!({"window":indicator_window(grant),"scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
+                json!({"window":indicator_window(grant),"scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png"),"background":in_place(grant)}),
             ),
         )?;
         command
@@ -251,7 +260,7 @@ impl Indicator {
             "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
             "file":directory.join("state"),"theme":directory.join("theme"),
             "look":directory.join("look"),"logo":directory.join("logo.png"),"agent":grant.agent,
-            "resume":grant.resume}),
+            "resume":grant.resume,"background":in_place(grant)}),
         )?;
         command
             .stdin(Stdio::null())

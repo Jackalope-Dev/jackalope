@@ -31,6 +31,8 @@ public sealed class JackalopeWindowIndicator : Form {
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr handle,uint flags);
     [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr handle,uint command);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr handle,int attribute,out Rect value,int size);
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern bool SetWindowDisplayAffinity(IntPtr window,uint affinity);
@@ -69,6 +71,8 @@ public sealed class JackalopeWindowIndicator : Form {
         }
     }
     readonly IntPtr target;
+    // The window takes the agent's input where it is, so resuming never raises it.
+    readonly bool inPlace;
     readonly int processId;
     readonly long processStarted;
     readonly string stateFile,themeFile;
@@ -94,7 +98,8 @@ public sealed class JackalopeWindowIndicator : Form {
 
     protected override bool ShowWithoutActivation { get { return true; } }
     protected override void OnHandleCreated(EventArgs args) { base.OnHandleCreated(args); ExcludeFromCapture(Handle); }
-    public JackalopeWindowIndicator(long handle,int pid,long started,string file,string theme,string logo,string grantScope,string grantApp,string grantLabel) {
+    public JackalopeWindowIndicator(long handle,int pid,long started,string file,string theme,string logo,string grantScope,string grantApp,string grantLabel,bool inPlace) {
+        this.inPlace=inPlace;
         target=new IntPtr(handle); processId=pid; processStarted=started; stateFile=file; themeFile=theme;
         scope=String.IsNullOrEmpty(grantScope) ? "window" : grantScope; app=(grantApp??"").ToLowerInvariant(); label=grantLabel??"";
         gate=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.ManualReset,"Local\\JackalopeDesktop-"+Path.GetFileName(Path.GetDirectoryName(file)));
@@ -152,9 +157,11 @@ public sealed class JackalopeWindowIndicator : Form {
         if(!TargetValid()) { Console.Error.WriteLine("Selected window identity changed before resuming."); Cancel(); return; }
         if(scope=="window") {
             if(IsIconic(target) || !IsWindowVisible(target)) { Pause("Restore the selected window"); return; }
-            SetForegroundWindow(target);
-            if(GetForegroundWindow()!=target) { Pause("Focus the window, then resume"); return; }
-        } else if(scope=="app" && !ForegroundAllowed()) {
+            if(!inPlace) {
+                SetForegroundWindow(target);
+                if(GetForegroundWindow()!=target) { Pause("Focus the window, then resume"); return; }
+            }
+        } else if(scope=="app" && !inPlace && !ForegroundAllowed()) {
             if(IsWindow(target) && !IsIconic(target)) SetForegroundWindow(target);
             if(!ForegroundAllowed()) { Pause("Bring "+label+" forward, then resume"); return; }
         }
@@ -275,17 +282,35 @@ public sealed class JackalopeWindowIndicator : Form {
             prior=rect;
         } else if(scope=="app") SetBackground(!ForegroundAllowed());
         var areas=new System.Collections.Generic.List<Rectangle>();
+        // While the agent works in the background the glow outlines its window and sits just
+        // above it, so the person's windows in front still cover it.
+        bool behind=background && state=="active" && scope!="desktop";
         if(scope=="desktop") foreach(var each in Screen.AllScreens) areas.Add(each.Bounds);
+        else if(behind) { if(!IsIconic(AnchorWindow())) areas.Add(WindowArea(AnchorWindow())); }
         else areas.Add(Screen.FromHandle(AnchorWindow()).Bounds);
         LayoutBar();
         Color accent=Color.FromArgb(139,92,246);
         try { string hex=File.ReadAllText(themeFile).Trim(); if(System.Text.RegularExpressions.Regex.IsMatch(hex,"^#[0-9a-fA-F]{6}$")) accent=ColorTranslator.FromHtml(hex); } catch { }
         while(glows.Count<areas.Count) glows.Add(new Glow());
         while(glows.Count>areas.Count) { glows[glows.Count-1].Dispose(); glows.RemoveAt(glows.Count-1); }
-        // In the background the glow would draw over the person's work, so it waits.
-        for(int i=0;i<areas.Count;i++) { if(background && state=="active") glows[i].Hide(); else { glows[i].Show(); glows[i].Render(areas[i],accent); } }
+        for(int i=0;i<areas.Count;i++) {
+            if(glows[i].TopMost==behind) glows[i].TopMost=!behind;
+            glows[i].Show(); glows[i].Render(areas[i],accent);
+            if(behind) StackAbove(glows[i].Handle,AnchorWindow());
+        }
         SetWindowPos(Handle,new IntPtr(-1),0,0,0,0,0x13);
         WriteState();
+    }
+    // The window's visible frame, without its invisible resize borders.
+    static Rectangle WindowArea(IntPtr window) {
+        Rect rect;
+        if(DwmGetWindowAttribute(window,9,out rect,Marshal.SizeOf(typeof(Rect)))!=0) GetWindowRect(window,out rect);
+        return Rectangle.FromLTRB(rect.Left,rect.Top,rect.Right,rect.Bottom);
+    }
+    // Places an overlay directly above a window in the stacking order, without activating it.
+    static void StackAbove(IntPtr overlay,IntPtr window) {
+        IntPtr above=GetWindow(window,3);
+        if(above!=overlay) SetWindowPos(overlay,above,0,0,0,0,0x13);
     }
     bool WriteState() {
         try {
@@ -305,11 +330,11 @@ public sealed class JackalopeWindowIndicator : Form {
         logoImage.Dispose();
         gate.Dispose();
     }
-    public static void Run(long handle,int pid,string started,string file,string theme,string logo,string scope,string app,string label) {
+    public static void Run(long handle,int pid,string started,string file,string theme,string logo,string scope,string app,string label,bool inPlace) {
         SetProcessDpiAwarenessContext(new IntPtr(-4)); SetThreadDpiAwarenessContext(new IntPtr(-4));
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.EnableVisualStyles();
-        using(var form=new JackalopeWindowIndicator(handle,pid,long.Parse(started),file,theme,logo,scope,app,label)) {
+        using(var form=new JackalopeWindowIndicator(handle,pid,long.Parse(started),file,theme,logo,scope,app,label,inPlace)) {
             try { Application.Run(form); } finally { form.Cleanup(); }
         }
     }
