@@ -1,6 +1,7 @@
 import { Button, InlineNotice, LoadingState } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useAction } from '../../hooks/useAction';
+import { PROTECTED_FOLDER_NOTE } from '../../lib/external-sessions';
 import {
   continueImportedConversation,
   type ImportedConversation,
@@ -79,6 +80,7 @@ export function ImportedConversationView({ conversation }: { conversation: Impor
             <span className="external-session-path" title={conversation.cwd}>
               · {conversation.cwd}
             </span>
+            {conversation.protectedFolder && <span>· {PROTECTED_FOLDER_NOTE}</span>}
           </span>
         }
         action={

@@ -301,6 +301,8 @@ pub struct ImportGroup {
     pub project_id: Option<String>,
     pub exists: bool,
     pub repository: bool,
+    /// False for a folder in a protected location, which is listed without being looked at.
+    pub checked: bool,
     pub sessions: Vec<ImportCandidate>,
 }
 
@@ -428,7 +430,7 @@ impl Imports {
             let counted = state.counts.get(&found.path);
             let location = locations
                 .entry(summary.cwd.clone())
-                .or_insert_with(|| Location::of(Path::new(&summary.cwd)));
+                .or_insert_with(|| Location::of_session(Path::new(&summary.cwd)));
             let cwd = Path::new(&summary.cwd);
             let project = project_for(projects, cwd, location);
             let path = match project {
@@ -441,8 +443,9 @@ impl Imports {
             let group = groups.entry(path.clone()).or_insert_with(|| ImportGroup {
                 path,
                 project_id: project.map(|project| project.id.clone()),
-                exists: location.canonical.is_some(),
+                exists: location.canonical.is_some() || location.protected,
                 repository: location.top.is_some(),
+                checked: !location.protected,
                 sessions: Vec::new(),
             });
             let status = match imported.get(key.as_str()) {
@@ -693,7 +696,7 @@ impl Imports {
         let summary = &found.summary;
         let location = locations
             .entry(summary.cwd.clone())
-            .or_insert_with(|| Location::of(Path::new(&summary.cwd)));
+            .or_insert_with(|| Location::of_session(Path::new(&summary.cwd)));
         let project =
             project_for(projects, Path::new(&summary.cwd), location).ok_or_else(|| {
                 format!(
@@ -835,7 +838,7 @@ fn sessions(
         if !imported.contains_key(key.as_str()) {
             let location = locations
                 .entry(summary.cwd.as_str())
-                .or_insert_with(|| Location::of(Path::new(&summary.cwd)));
+                .or_insert_with(|| Location::of_session(Path::new(&summary.cwd)));
             if super::own_work(summary, location, scope) {
                 continue;
             }
@@ -925,6 +928,8 @@ pub struct ImportedConversation {
     pub unavailable: Option<String>,
     /// Whether its CLI has written to it since it was imported.
     pub changed: bool,
+    /// Its folder was not checked, because looking could ask for macOS permission.
+    pub protected_folder: bool,
 }
 
 /// The session behind an imported conversation, as continuing it needs to see it.
@@ -942,6 +947,7 @@ pub(super) fn as_session(record: &ImportedRecord, project_id: &str) -> Option<Ex
         started_at: record.started_at.clone(),
         updated_at: record.last_at.clone().unwrap_or_default(),
         unavailable: None,
+        protected_folder: false,
         source,
         path: record.source_path.clone(),
         home: record.source_home.clone(),
@@ -961,13 +967,27 @@ pub(super) fn describe(
         .map(|mut record| {
             let location = locations
                 .entry(record.cwd.clone())
-                .or_insert_with(|| Location::of(Path::new(&record.cwd)));
+                .or_insert_with(|| Location::of_session(Path::new(&record.cwd)));
             let project = project_for(projects, Path::new(&record.cwd), location);
             if let Some(project) = project {
                 record.project_id = project.id.clone();
             }
             let unavailable = if record.continued_in.is_some() {
                 Some("It was continued in Jackalope.".to_string())
+            } else if location.protected {
+                match project {
+                    None => Some(format!(
+                        "{} is not in a Jackalope project. Add it as a project to continue this conversation here.",
+                        record.cwd
+                    )),
+                    Some(_) => match as_session(&record, &record.project_id) {
+                        Some(session) => account(&session),
+                        None => Some(format!(
+                            "Jackalope cannot continue {} conversations.",
+                            record.agent
+                        )),
+                    },
+                }
             } else {
                 match (&location.canonical, &location.top, project) {
                     (None, _, _) => Some(format!("{} no longer exists.", record.cwd)),
@@ -992,6 +1012,7 @@ pub(super) fn describe(
                 && file_state(&record.source_path)
                     .is_some_and(|state| !unchanged(&record, &record.source_path, state));
             ImportedConversation {
+                protected_folder: location.protected,
                 agent_name: super::super::agents::name(&record.agent).into(),
                 record,
                 unavailable,

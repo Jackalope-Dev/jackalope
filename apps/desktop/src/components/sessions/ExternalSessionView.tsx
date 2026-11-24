@@ -6,6 +6,7 @@ import {
   type ExternalSession,
   type ExternalTranscript,
   externalSessionTranscript,
+  PROTECTED_FOLDER_NOTE,
 } from '../../lib/external-sessions';
 import { openConversation } from '../../lib/work-selection';
 import { useExternalSessionStore } from '../../stores/externalSessionStore';
@@ -57,6 +58,7 @@ export function ExternalSessionView({ session }: { session: ExternalSession }) {
             <span className="external-session-path" title={session.cwd}>
               · {session.cwd}
             </span>
+            {session.protectedFolder && <span>· {PROTECTED_FOLDER_NOTE}</span>}
           </span>
         }
         action={

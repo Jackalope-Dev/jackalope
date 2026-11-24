@@ -2,6 +2,51 @@ use std::path::{Path, PathBuf};
 
 pub use crate::cli_protocol::profile::home_dir;
 
+/// Home folders macOS guards with a permission prompt. `Library` holds iCloud Drive
+/// (`Mobile Documents`) and other apps' data.
+const PROTECTED_FOLDERS: [&str; 8] = [
+    "Desktop",
+    "Documents",
+    "Downloads",
+    "Library",
+    "Pictures",
+    "Movies",
+    "Music",
+    "Public",
+];
+
+/// Whether looking inside `path` could make macOS ask the person for permission: a guarded
+/// home folder, iCloud Drive or a mounted volume. Decided from the path text alone, so a
+/// caller can skip the folder without touching it. Relative paths count as protected,
+/// since where they point is unknown.
+pub(crate) fn protected_location_in(path: &Path, home: &Path) -> bool {
+    if !path.is_absolute()
+        || path.starts_with("/Volumes")
+        || path.starts_with("/System")
+        || path
+            .components()
+            .any(|part| part.as_os_str() == "Mobile Documents")
+    {
+        return true;
+    }
+    let Some(first) = path
+        .strip_prefix(home)
+        .ok()
+        .and_then(|inside| inside.components().next())
+    else {
+        return false;
+    };
+    let first = first.as_os_str().to_string_lossy();
+    PROTECTED_FOLDERS
+        .iter()
+        .any(|folder| first.eq_ignore_ascii_case(folder))
+}
+
+/// [`protected_location_in`] for this computer's home folder.
+pub(crate) fn protected_location(path: &Path) -> bool {
+    protected_location_in(path, &home_dir().unwrap_or_default())
+}
+
 /// Reads `path` when it holds at most `limit` bytes, without reading further.
 /// `None` when it does not exist; an `InvalidData` error when it is larger.
 pub(crate) fn read_capped(path: &Path, limit: u64) -> std::io::Result<Option<Vec<u8>>> {

@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAction } from '../../hooks/useAction';
 import { useAppEvent } from '../../lib/app-events';
+import { PROTECTED_FOLDER_NOTE } from '../../lib/external-sessions';
 import {
   activeIn,
   cancelSessionImport,
@@ -282,6 +283,9 @@ function ImportHistoryDialog({
                         </Button>
                       )}
                     </header>
+                    {group.checked === false && (
+                      <p className="history-import-hint">{PROTECTED_FOLDER_NOTE}</p>
+                    )}
                     {!group.projectId && (
                       <p className="history-import-hint">
                         Add this {group.repository ? 'repository' : 'folder'} as a project to import

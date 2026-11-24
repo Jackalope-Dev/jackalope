@@ -15,7 +15,12 @@ export interface ExternalSession {
   updatedAt: string;
   /** Why it cannot be continued in Jackalope, when it cannot. */
   unavailable?: string | null;
+  /** Its folder was not looked at, because that could ask for macOS permission. */
+  protectedFolder?: boolean;
 }
+
+/** Shown beside a conversation whose folder Jackalope did not look at. */
+export const PROTECTED_FOLDER_NOTE = 'Folder not checked (protected location)';
 
 export interface ExternalSessionsView {
   enabled: boolean;

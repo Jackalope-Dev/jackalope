@@ -368,7 +368,12 @@ repository, in a read-only Outside Jackalope group. Its own attempts are left ou
 session IDs they recorded, by its data folder and by the `.worktrees/<name>` folders on
 `jackalope/<name>` branches it creates. A background index keyed by file path, modification
 time and size reads only new and changed files and skips lines and files it does not
-recognize; a file watch and periodic refresh keep it current. Opening one shows its
+recognize; a file watch and periodic refresh keep it current. A session that ran under Desktop,
+Documents, Downloads, `~/Library` (including iCloud Drive), Pictures, Movies, Music, Public
+or a mounted volume is matched to a project by its path text alone and marked **Folder not
+checked (protected location)**, because looking there would make macOS ask for permission;
+the folder is checked only when the person continues the conversation or adds it as a
+project. The history import and project discovery follow the same rule. Opening one shows its
 transcript with tool names; subagent work is not shown. Reading is local and nothing is
 uploaded; Settings → Privacy turns it off and deletes the index.
 

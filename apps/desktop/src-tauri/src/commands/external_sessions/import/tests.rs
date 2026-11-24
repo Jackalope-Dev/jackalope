@@ -922,3 +922,54 @@ fn trial_project_discovery_with_local_sessions() {
         );
     }
 }
+
+#[test]
+fn protected_session_folders_are_grouped_and_described_without_being_opened() {
+    let fixture = Fixture::new();
+    let home = crate::commands::platform::home_dir().expect("a home directory");
+    let guarded = home.join("Desktop/jackalope-import-fixture-never-created");
+    fixture.session(
+        &format!("claude/projects/-guarded/{CLAUDE_SESSION}.jsonl"),
+        CLAUDE_FIXTURE,
+        &guarded,
+    );
+    let imports = Imports::new(fixture.path("imported-conversations"));
+    let homes = vec![(Source::Claude, fixture.path("claude"))];
+    let recorded = Default::default();
+    let data = fixture.path("data");
+    let scan_with = |projects: &[ProjectFolder]| {
+        imports
+            .scan(
+                &homes,
+                projects,
+                &Scope {
+                    projects,
+                    recorded: &recorded,
+                    data_directory: &data,
+                },
+            )
+            .unwrap()
+    };
+    // Outside a project it is listed by its path, not called gone.
+    let scan = scan_with(&[]);
+    assert_eq!(scan.groups.len(), 1);
+    let group = &scan.groups[0];
+    assert_eq!(group.path, guarded.to_string_lossy());
+    assert!(group.exists && !group.checked && group.project_id.is_none());
+
+    // A project registered there matches by path text, and the session imports.
+    let projects = vec![ProjectFolder::new("guarded", guarded.to_str().unwrap())];
+    let scan = scan_with(&projects);
+    assert_eq!(scan.groups[0].project_id.as_deref(), Some("guarded"));
+    imports.begin(1).unwrap();
+    let progress = imports.run(vec![format!("claude:{CLAUDE_SESSION}")], &projects, &|| {});
+    assert_eq!(progress.imported, 1, "{progress:?}");
+    let described = describe(imports.store.records().unwrap(), &projects, &|_| None);
+    assert!(described[0].protected_folder);
+    assert_eq!(described[0].unavailable, None);
+    let described = describe(imports.store.records().unwrap(), &[], &|_| None);
+    assert!(described[0]
+        .unavailable
+        .as_deref()
+        .is_some_and(|reason| reason.contains("Add it as a project")));
+}

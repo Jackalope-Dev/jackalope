@@ -25,6 +25,8 @@ export interface ImportGroup {
   projectId?: string | null;
   exists: boolean;
   repository: boolean;
+  /** False for a folder in a protected location, listed without being looked at. */
+  checked?: boolean;
   sessions: ImportCandidate[];
 }
 
@@ -81,6 +83,8 @@ export interface ImportedConversation {
   unavailable?: string | null;
   /** Whether its CLI wrote to it after it was imported. */
   changed: boolean;
+  /** Its folder was not looked at, because that could ask for macOS permission. */
+  protectedFolder?: boolean;
 }
 
 export interface ImportedView {

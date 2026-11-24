@@ -21,7 +21,7 @@ import {applyThemeTokens,DEFAULT_THEME} from '/node_modules/@jackalope/brand/src
 import '/src/index.css';
 import '/src/components/layout/workspace-shell.css';
 const session=(n,extra={})=>({key:'claude:5f0e1d2c-0000-4000-8000-00000000000'+n,agent:n%2?'claude':'codex',agentName:n%2?'Claude Code':'Codex',sessionId:'5f0e1d2c-0000-4000-8000-00000000000'+n,projectId:'atlas',title:'Fixture conversation '+n+' about keyboard search in the command palette',cwd:'/Projects/atlas/.worktrees/search',branch:'search',startedAt:'2026-11-10T09:00:00Z',updatedAt:'2026-11-1'+n+'T10:00:00Z',unavailable:null,...extra});
-const sessions=[session(1),session(2),session(3),session(4,{unavailable:'Claude Code saved this conversation in /Users/fixture/.claude-work, which is not one of your Claude Code accounts in Jackalope. Add that folder as an account in Agents to continue it here.'}),session(5)];
+const sessions=[session(1),session(2),session(3),session(4,{unavailable:'Claude Code saved this conversation in /Users/fixture/.claude-work, which is not one of your Claude Code accounts in Jackalope. Add that folder as an account in Agents to continue it here.'}),session(5,{protectedFolder:true,cwd:'/Users/fixture/Documents/atlas'})];
 useProjectStore.setState({projects:[{id:'atlas',name:'Atlas',path:'/Projects/atlas',gitBranch:'main',worktrees:[],agentProvider:'codex'}],activeProjectId:'atlas',loadWorktreesForActiveProject:async()=>{}});
 useExecutionStore.setState({runs:[],selectedId:null,loading:false,refresh:async()=>{}});
 useLiveSessionStore.setState({sessions:[],runs:[],loading:false,refresh:async()=>{}});
@@ -115,6 +115,11 @@ try {
   );
   assert.equal(call.key, 'claude:5f0e1d2c-0000-4000-8000-000000000001');
   assert.equal(call.text, 'Also support Home and End');
+
+  // One in a protected location is listed by its path without its folder being checked.
+  await group.getByRole('button', { name: /Fixture conversation 5/ }).click();
+  await page.getByText('Folder not checked (protected location)').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Continue in Jackalope' }).count(), 1);
 
   // One that cannot continue says why instead of offering the composer.
   const blocked = group.getByRole('button', { name: /Fixture conversation 4/ });

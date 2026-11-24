@@ -47,18 +47,6 @@ const CODE_FOLDERS: [&str; 15] = [
     "Source/Repos",
 ];
 
-/// Home folders macOS guards with a permission prompt, and that Jackalope never opens.
-const PROTECTED: [&str; 8] = [
-    "Desktop",
-    "Documents",
-    "Downloads",
-    "Library",
-    "Pictures",
-    "Movies",
-    "Music",
-    "Public",
-];
-
 /// Editors whose recently opened folders are read from their `storage.json`.
 const EDITORS: [&str; 5] = ["Code", "Code - Insiders", "Cursor", "Windsurf", "VSCodium"];
 
@@ -149,22 +137,8 @@ impl Inputs {
     }
 }
 
-/// Whether opening `path` could ask the person for permission, or reaches outside the
-/// places a scan may look. Decided from the path alone.
 fn protected(path: &Path, home: &Path) -> bool {
-    if !path.is_absolute() || path.starts_with("/Volumes") || path.starts_with("/System") {
-        return true;
-    }
-    let Ok(inside) = path.strip_prefix(home) else {
-        return false;
-    };
-    let Some(first) = inside.components().next() else {
-        return false;
-    };
-    let first = first.as_os_str().to_string_lossy();
-    PROTECTED
-        .iter()
-        .any(|folder| first.eq_ignore_ascii_case(folder))
+    super::platform::protected_location_in(path, home)
 }
 
 /// Folders an editor's `storage.json` lists as open or recently open.

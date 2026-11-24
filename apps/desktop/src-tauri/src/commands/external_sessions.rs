@@ -93,6 +93,9 @@ pub struct ExternalSession {
     pub updated_at: String,
     /// Why it cannot be continued in Jackalope, when it cannot.
     pub unavailable: Option<String>,
+    /// Its folder was not checked, because looking could ask for macOS permission. Whether
+    /// it can continue there is found out when the person continues it.
+    pub protected_folder: bool,
     #[serde(skip)]
     source: Source,
     #[serde(skip)]
@@ -130,9 +133,23 @@ struct Location {
     pub canonical: Option<PathBuf>,
     pub top: Option<PathBuf>,
     pub common: Option<PathBuf>,
+    /// Not looked at, because it is somewhere macOS guards with a permission prompt.
+    pub protected: bool,
 }
 
 impl Location {
+    /// Where a session ran, without touching a folder in a protected location: sessions
+    /// are listed on their own, and only the person continuing one may cause a prompt.
+    pub fn of_session(path: &Path) -> Self {
+        if super::platform::protected_location(path) {
+            return Self {
+                protected: true,
+                ..Self::default()
+            };
+        }
+        Self::of(path)
+    }
+
     pub fn of(path: &Path) -> Self {
         let Ok(canonical) = dunce::canonicalize(path) else {
             return Self::default();
@@ -150,6 +167,7 @@ impl Location {
                 top: Some(folder.to_path_buf()),
                 common,
                 canonical: Some(canonical.clone()),
+                protected: false,
             };
         }
         Self {
@@ -257,7 +275,7 @@ fn list(
         let cwd = Path::new(&summary.cwd);
         let location = locations
             .entry(summary.cwd.as_str())
-            .or_insert_with(|| Location::of(cwd));
+            .or_insert_with(|| Location::of_session(cwd));
         if own_work(summary, location, scope) {
             continue;
         }
@@ -265,6 +283,7 @@ fn list(
             continue;
         };
         let unavailable = match (&location.canonical, &location.top) {
+            _ if location.protected => None,
             (None, _) => Some(format!("{} no longer exists.", summary.cwd)),
             (Some(folder), Some(top)) if folder != top => Some(SUBFOLDER.into()),
             (Some(folder), None) if folder != project.root() => Some(SUBFOLDER.into()),
@@ -286,6 +305,7 @@ fn list(
             started_at: summary.started_at.clone(),
             updated_at,
             unavailable,
+            protected_folder: location.protected,
             source: entry.source,
             path: path.clone(),
             home: entry.home.clone(),
@@ -759,9 +779,18 @@ impl ExternalSessions {
             return Err(reason);
         }
         let binding = accounts.binding(session.source, &session.home)?;
-        let workspace = Location::of(Path::new(&session.cwd))
+        // The listing did not look at a folder in a protected location; continuing does.
+        let location = Location::of(Path::new(&session.cwd));
+        let workspace = location
             .canonical
+            .clone()
             .ok_or_else(|| format!("{} no longer exists.", session.cwd))?;
+        let root = location
+            .top
+            .or_else(|| dunce::canonicalize(&project.path).ok());
+        if root.is_some_and(|root| root != workspace) {
+            return Err(SUBFOLDER.into());
+        }
         let request = RunRequest {
             agent_profile_id: Some(
                 binding

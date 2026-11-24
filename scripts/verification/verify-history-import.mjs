@@ -29,7 +29,7 @@ const now=Date.now(), day=86400000;
 const at=(days)=>new Date(now-days*day).toISOString();
 const candidate=(n,agent,days,status,extra={})=>({key:agent+':5f0e1d2c-0000-4000-8000-00000000000'+n,agent,agentName:agent==='claude'?'Claude Code':'Codex',sessionId:'5f0e1d2c-0000-4000-8000-00000000000'+n,title:'Fixture conversation '+n+' about the command palette keyboard search',cwd:'/Projects/atlas',branch:'main',startedAt:at(days),lastAt:at(days),messages:n*7,status,...extra});
 const atlas={path:'/Projects/atlas',projectId:'atlas',exists:true,repository:true,sessions:[candidate(1,'claude',1,'new'),candidate(2,'codex',3,'changed'),candidate(3,'claude',10,'imported'),candidate(4,'codex',120,'new')]};
-const beacon={path:'/Projects/beacon',projectId:null,exists:true,repository:true,sessions:[candidate(5,'claude',2,'new',{cwd:'/Projects/beacon'})]};
+const beacon={path:'/Projects/beacon',projectId:null,exists:true,repository:true,checked:false,sessions:[candidate(5,'claude',2,'new',{cwd:'/Projects/beacon'})]};
 const gone={path:'/tmp/scratch',projectId:null,exists:false,repository:false,sessions:[candidate(6,'claude',4,'new',{cwd:'/tmp/scratch'})]};
 let scan={groups:[atlas,beacon,gone],stores:['/Users/fixture/.claude','/Users/fixture/.codex'],error:null};
 const imported=(n,extra={})=>({id:'claude:5f0e1d2c-0000-4000-8000-00000000000'+n,agent:'claude',agentName:'Claude Code',sessionId:'5f0e1d2c-0000-4000-8000-00000000000'+n,projectId:'atlas',title:'Imported fixture conversation '+n,cwd:'/Projects/atlas',branch:'main',startedAt:at(5),lastAt:at(5),importedAt:at(0),messages:12,earlier:0,skippedLines:0,subagentLines:0,sourcePath:'/Users/fixture/.claude/projects/-atlas/x.jsonl',continuedIn:null,unavailable:null,changed:false,...extra});
@@ -119,6 +119,7 @@ try {
   // A repository that is not a project offers to add it.
   await dialog.getByRole('button', { name: 'Add project' }).waitFor();
   await dialog.getByText(/Add this repository as a project/).waitFor();
+  await dialog.getByText('Folder not checked (protected location)').waitFor();
 
   for (const width of [1280, 960, 680]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
