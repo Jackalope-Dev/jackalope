@@ -1,4 +1,6 @@
+pub(in crate::commands) mod conflicts;
 pub(in crate::commands) mod dependencies;
+pub(in crate::commands) mod split;
 use super::repo::{self, Identity, Policy::Snapshot, Seed, Untracked};
 use super::tasks::{TaskRun, TaskRuntime};
 use chrono::Utc;
@@ -71,6 +73,9 @@ pub struct IntegrationPlan {
     pub cleanup_requested: bool,
     #[serde(default)]
     pub cleanup_results: Vec<CleanupResult>,
+    /// The approved split of the change, oldest first; empty for one commit.
+    #[serde(default)]
+    pub commits: Vec<split::PlannedCommit>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -342,6 +347,24 @@ fn require_verification(run: &TaskRun, tree: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Refuses a commit message Git or the project's attribution would mishandle.
+fn check_message(message: &str) -> Result<(), String> {
+    if message.trim().is_empty() {
+        return Err("Every commit needs a message.".into());
+    }
+    if message.len() > 4000
+        || message.contains('\0')
+        || message.lines().any(|line| {
+            line.trim()
+                .to_ascii_lowercase()
+                .starts_with("co-authored-by:")
+        })
+    {
+        return Err("Use a commit message under 4,000 bytes without attribution trailers; project settings add those automatically.".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<IntegrationPlan, String> {
     prepare_with_message(directory, runs, ids, None)
@@ -411,16 +434,7 @@ pub(in crate::commands) fn prepare_with_message(
                 )
             }
         });
-    if message.len() > 4000
-        || message.contains('\0')
-        || message.lines().any(|line| {
-            line.trim()
-                .to_ascii_lowercase()
-                .starts_with("co-authored-by:")
-        })
-    {
-        return Err("Use a commit message under 4,000 bytes without attribution trailers; project settings add those automatically.".into());
-    }
+    check_message(&message)?;
     let mut agents: Vec<_> = selected
         .iter()
         .flat_map(super::project_git::contributors)
@@ -446,6 +460,7 @@ pub(in crate::commands) fn prepare_with_message(
         commit_policy: Some(policy.clone()),
         cleanup_requested: false,
         cleanup_results: vec![],
+        commits: vec![],
     };
     let mut combined = master.clone();
     let mut preview_target = master;
@@ -480,7 +495,7 @@ pub(in crate::commands) fn prepare_with_message(
                         "-n",
                         "-I",
                         "-E",
-                        "^(<<<<<<< |=======$|>>>>>>> )",
+                        "^(<<<<<<< |\\|\\|\\|\\|\\|\\|\\| |=======$|>>>>>>> )",
                         &source.tree,
                         "--",
                     ],
@@ -1095,6 +1110,8 @@ macro_rules! tauri_commands {
             commands::integration::integration_prepare,
             commands::integration::integration_apply,
             commands::integration::integration_plans,
+            commands::integration::integration_split_propose,
+            commands::integration::integration_split_apply,
         ] $($rest)*)
     };
 }
@@ -1206,20 +1223,58 @@ pub async fn integration_plans(
     .map_err(|e| e.to_string())?
 }
 
+/// Drafts a split of a ready integration into ordered commits for the person to
+/// approve. Nothing changes until `integration_split_apply`.
+#[tauri::command]
+pub async fn integration_split_propose(
+    helper: State<'_, super::helper::Helper>,
+    state: State<'_, TaskRuntime>,
+    plan_id: String,
+) -> Result<split::SplitProposal, String> {
+    let helper = helper.inner().clone();
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || split::propose(&helper, &runtime, &plan_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn integration_split_apply(
+    state: State<'_, TaskRuntime>,
+    plan_id: String,
+    integration_head: String,
+    commits: Vec<split::PlannedCommit>,
+) -> Result<IntegrationPlan, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        split::apply_split(
+            &runtime.integration_directory(),
+            &runs,
+            &plan_id,
+            &integration_head,
+            &commits,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::commands::tasks::RunStatus;
 
-    struct Fixture {
-        root: PathBuf,
-        project: PathBuf,
-        plans: PathBuf,
-        base: String,
+    pub(super) struct Fixture {
+        pub root: PathBuf,
+        pub project: PathBuf,
+        pub plans: PathBuf,
+        pub base: String,
     }
 
     impl Fixture {
-        fn new() -> Self {
+        pub fn new() -> Self {
             let root = std::env::temp_dir().join(format!("jackalope-integration-{}", unique_id()));
             let project = root.join("project");
             let plans = root.join("plans");
@@ -1250,7 +1305,7 @@ mod tests {
             }
         }
 
-        fn run(&self, number: u32, filename: &str, content: &str) -> TaskRun {
+        pub fn run(&self, number: u32, filename: &str, content: &str) -> TaskRun {
             let workspace = self.root.join(format!("task-{number}"));
             repo::git(
                 &self.project,
