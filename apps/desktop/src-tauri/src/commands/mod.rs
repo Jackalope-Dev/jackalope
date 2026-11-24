@@ -100,6 +100,7 @@ pub mod issues;
 pub mod remote;
 pub mod review_progress;
 pub mod workflow_feedback;
+pub mod xcode;
 
 mod resolver_fs;
 

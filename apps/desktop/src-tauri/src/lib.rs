@@ -90,6 +90,7 @@ macro_rules! with_commands {
             commands::live_sessions,
             commands::local_ai,
             commands::local_detection,
+            commands::xcode,
             commands::managed_runtime,
             commands::mcp,
             commands::notifications,
