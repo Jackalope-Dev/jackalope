@@ -52,10 +52,21 @@ fn history_keeps_worktrees_that_running_work_reservations_or_recovery_need() {
     let path = canonical(&path.to_string_lossy()).unwrap();
     let none = HashSet::new();
     let keep = |runs: &[TaskRun], plans: &[IntegrationPlan], retained: &[PathBuf]| {
-        history(&path, runs, &none, plans, retained).unwrap_err()
+        let keys = retained
+            .iter()
+            .map(|path| path_key(&path.to_string_lossy()))
+            .collect();
+        history(&path, runs, &none, plans, &keys).unwrap_err()
     };
     let owner = run("r1", "t1", &path, "base");
-    assert!(history(&path, std::slice::from_ref(&owner), &none, &[], &[]).is_ok());
+    assert!(history(
+        &path,
+        std::slice::from_ref(&owner),
+        &none,
+        &[],
+        &HashSet::new()
+    )
+    .is_ok());
 
     assert!(keep(&[], &[], &[]).contains("No task"));
     assert!(keep(&[owner.clone()], &[], std::slice::from_ref(&path)).contains("combine"));
@@ -99,7 +110,7 @@ fn history_keeps_worktrees_that_running_work_reservations_or_recovery_need() {
         std::slice::from_ref(&owner),
         &none,
         &[plan("conflicted", &["r1"], None)],
-        &[]
+        &HashSet::new()
     )
     .is_ok());
     let _ = fs::remove_dir_all(path);
@@ -113,21 +124,28 @@ fn history_reports_what_finished_the_task_and_when() {
     let owner = run("r1", "t1", &path, "base");
     let none = HashSet::new();
 
-    let open = history(&path, std::slice::from_ref(&owner), &none, &[], &[]).unwrap();
+    let open = history(
+        &path,
+        std::slice::from_ref(&owner),
+        &none,
+        &[],
+        &HashSet::new(),
+    )
+    .unwrap();
     assert_eq!(open.finished, None);
     assert_eq!(open.since, time("2026-09-02T00:00:00Z"));
     assert_eq!(open.base_heads, ["base"]);
 
     let mut archived = owner.clone();
     archived.archived_at = Some("2026-09-05T00:00:00Z".into());
-    let settled = history(&path, &[archived.clone()], &none, &[], &[]).unwrap();
+    let settled = history(&path, &[archived.clone()], &none, &[], &HashSet::new()).unwrap();
     assert_eq!(settled.finished, Some("its task was archived"));
     assert_eq!(settled.since, time("2026-09-05T00:00:00Z"));
 
     // A newer attempt of the same task, anywhere, brings the task back from the archive.
     let mut newer = run("r2", "t1", Path::new("/elsewhere"), "base");
     newer.started_at = "2026-09-06T00:00:00Z".into();
-    let reopened = history(&path, &[archived, newer], &none, &[], &[]).unwrap();
+    let reopened = history(&path, &[archived, newer], &none, &[], &HashSet::new()).unwrap();
     assert_eq!(reopened.finished, None);
 
     let applied: HashSet<String> = ["r1".to_string()].into();
@@ -136,7 +154,7 @@ fn history_reports_what_finished_the_task_and_when() {
         std::slice::from_ref(&owner),
         &applied,
         &[plan("applied", &["r1"], Some("2026-09-08T00:00:00Z"))],
-        &[],
+        &HashSet::new(),
     )
     .unwrap();
     assert_eq!(merged.finished, Some("its task was merged by Jackalope"));
@@ -347,7 +365,7 @@ fn a_pass_removes_only_finished_clean_worktrees_past_retention_and_logs_why() {
         &runtime,
         project.repo.to_str().unwrap(),
         Duration::days(7),
-        &[combined.to_string_lossy().into_owned()],
+        &[format!("{}/", combined.to_string_lossy().to_lowercase())],
         time("2026-09-10T00:00:00Z"),
     )
     .unwrap();

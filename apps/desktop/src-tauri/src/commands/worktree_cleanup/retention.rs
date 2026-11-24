@@ -46,21 +46,28 @@ fn parse_time(value: Option<&str>) -> Option<DateTime<Utc>> {
         .map(|time| time.with_timezone(&Utc))
 }
 
+/// How the app compares workspace paths: `/` separators, no trailing one, lower case. Matching
+/// case-insensitively can only keep more worktrees, never fewer.
+pub(super) fn path_key(path: &str) -> String {
+    path.replace('\\', "/").trim_end_matches('/').to_lowercase()
+}
+
 fn same_workspace(run: &TaskRun, path: &Path) -> bool {
     !run.workspace.is_empty()
         && task_workspace(Path::new(&run.workspace)).is_ok_and(|workspace| workspace == path)
 }
 
 /// The reason task history needs `path` kept, or what finished its task and when. `path` is
-/// canonical; `retained` holds canonical paths the app keeps for a combine follow-up.
+/// canonical; `retained` holds [`path_key`]s of the worktrees the app keeps for a combine
+/// follow-up.
 pub(super) fn history(
     path: &Path,
     runs: &[TaskRun],
     applied: &HashSet<String>,
     plans: &[IntegrationPlan],
-    retained: &[PathBuf],
+    retained: &HashSet<String>,
 ) -> Result<Settled, String> {
-    if retained.iter().any(|kept| kept == path) {
+    if retained.contains(&path_key(&path.to_string_lossy())) {
         return Err("A combine follow-up still reads it.".into());
     }
     let owners: Vec<&TaskRun> = runs
@@ -221,9 +228,14 @@ pub(super) fn run_pass(
     if !parent.starts_with(&project) {
         return Err("The .worktrees directory resolves outside this project.".into());
     }
-    let retained: Vec<PathBuf> = retained
+    let retained: HashSet<String> = retained
         .iter()
-        .filter_map(|path| task_workspace(Path::new(path)).ok())
+        .flat_map(|path| {
+            let resolved = task_workspace(Path::new(path))
+                .ok()
+                .map(|resolved| path_key(&resolved.to_string_lossy()));
+            std::iter::once(path_key(path)).chain(resolved)
+        })
         .collect();
     let entry = |worktree: &WorktreeEntry, outcome: &str, reason: String| RetentionEntry {
         project: project_path.to_string(),
@@ -248,6 +260,14 @@ pub(super) fn run_pass(
             continue;
         };
         if path.parent() != Some(parent.as_path()) {
+            continue;
+        }
+        if retained.contains(&path_key(&worktree.path)) {
+            report.push(entry(
+                worktree,
+                "kept",
+                "A combine follow-up still reads it.".into(),
+            ));
             continue;
         }
         let screened = history(&path, &runs, &applied, &plans, &retained)
