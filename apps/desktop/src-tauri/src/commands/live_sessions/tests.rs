@@ -616,6 +616,80 @@ fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
 }
 
 #[test]
+fn a_usage_limit_pause_resumes_once_at_its_reset_unless_the_person_acts() {
+    let (root, mut service, id) = fixture();
+    let resets = Utc::now().timestamp() + 3_600;
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: RunStatus::Failed,
+        error: Some("You've hit your limit · resets 3:40pm".into()),
+        failure_kind: Some(crate::commands::tasks::failure::FailureKind::QuotaExhausted),
+        quota_failure: serde_json::from_value(serde_json::json!({
+            "modelOnly": false,
+            "message": "You've hit your limit · resets 3:40pm",
+            "resetsAt": resets,
+        }))
+        .unwrap(),
+        ..Default::default()
+    };
+    let run_id = run.id.clone();
+    attach_run(&root, &mut service, &id, run);
+    // Not yet paused by the limit, so there is nothing to schedule.
+    assert!(service.action(&id, "resume-at-reset", None).is_err());
+    assert!(service.tick().unwrap());
+    service.action(&id, "resume-at-reset", None).unwrap();
+    let session = service.snapshot(Some(&id)).unwrap().sessions.remove(0);
+    assert_eq!(
+        session.resume_at_reset,
+        Some(SessionResume {
+            at: resets,
+            run_id: run_id.clone()
+        })
+    );
+
+    // A pause the person chooses cancels the scheduled resume.
+    service.action(&id, "pause", None).unwrap();
+    let mut session = service.snapshot(Some(&id)).unwrap().sessions.remove(0);
+    assert!(session.resume_at_reset.is_none());
+
+    // Before its reset nothing changes; after it the conversation continues once.
+    session.resume_at_reset = Some(SessionResume {
+        at: resets,
+        run_id: run_id.clone(),
+    });
+    assert!(!LiveSessions::resume_due(&mut session, resets));
+    assert!(session.paused);
+    assert!(LiveSessions::resume_due(&mut session, resets + 61));
+    assert!(!session.paused && session.error.is_none() && session.resume_at_reset.is_none());
+    let continued = session.messages.last().unwrap();
+    assert_eq!(continued.origin.as_ref().unwrap().kind, "resume");
+    assert!(continued.run_id.is_none());
+    assert!(!LiveSessions::resume_due(&mut session, resets + 120));
+
+    // A schedule for an attempt that is no longer the latest is dropped, not applied.
+    session.paused = true;
+    session.resume_at_reset = Some(SessionResume {
+        at: resets,
+        run_id: "older".into(),
+    });
+    assert!(LiveSessions::resume_due(&mut session, resets + 61));
+    assert!(session.paused && session.resume_at_reset.is_none());
+
+    // Billing limits do not reset by waiting.
+    let mut session = service.snapshot(Some(&id)).unwrap().sessions.remove(0);
+    session.paused = true;
+    session.error = Some("Insufficient balance".into());
+    let billing = TaskRun {
+        id: run_id,
+        status: RunStatus::Failed,
+        failure_kind: Some(crate::commands::tasks::failure::FailureKind::Billing),
+        ..Default::default()
+    };
+    assert!(LiveSessions::limit_resume(&session, &[billing]).is_err());
+}
+
+#[test]
 #[cfg(windows)]
 fn queued_messages_execute_once_in_the_same_uncommitted_workspace() {
     use crate::commands::agent_policy::{AgentPolicy, CustomAgent};

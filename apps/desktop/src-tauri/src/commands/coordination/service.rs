@@ -513,6 +513,7 @@ impl Coordinator {
                 if let Err(error) = service.dispatch_followups() {
                     service.state().error = Some(error);
                 }
+                service.resume_limited();
                 if let Err(error) = service.tick() {
                     let mut inner = service.state();
                     inner.error = Some(error);

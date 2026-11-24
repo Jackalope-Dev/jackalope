@@ -34,6 +34,7 @@ mod storage;
 mod tests;
 pub(super) mod timing;
 pub(in crate::commands) mod tool_activity;
+pub(in crate::commands) mod usage_limit;
 mod warm_opencode;
 pub(in crate::commands) mod workspace_processes;
 
@@ -257,6 +258,7 @@ macro_rules! tauri_commands {
             commands::tasks::snapshots::task_changes,
             commands::tasks::task_history_recovery,
             commands::tasks::task_retry,
+            commands::tasks::task_resume_at_reset,
             commands::tasks::task_retry_save,
             commands::tasks::task_export_recovery,
             commands::tasks::task_archived_runs,
@@ -568,10 +570,15 @@ pub async fn task_respond_prompt(
 /// Start a fresh attempt at a task whose last attempt did not finish, reusing that
 /// attempt's prepared workspace when it is safe to. `focus` leads the progress context
 /// when the retry picks up preserved work.
+///
+/// `switch_to` moves an attempt a usage limit stopped to another agent or account: the
+/// retry continues its workspace with the same progress context as a quota handoff, and
+/// project policy still decides whether that agent and account may run.
 #[tauri::command]
 pub async fn task_retry(
     id: String,
     focus: Option<String>,
+    switch_to: Option<AgentSwitch>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
 ) -> Result<String, String> {
@@ -580,10 +587,62 @@ pub async fn task_retry(
     tauri::async_runtime::spawn_blocking(move || {
         let mut request = runtime.retry_request(&id)?;
         request.handoff_focus = focus.filter(|focus| !focus.trim().is_empty());
+        if let Some(switch) = switch_to {
+            let old = runtime.run_snapshot(&id).ok_or("Attempt not found")?;
+            switch.apply(&old, &mut request)?;
+        }
         coordinator.start_manual(request)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Another agent or account for work a usage limit stopped.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSwitch {
+    pub agent: String,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+}
+
+impl AgentSwitch {
+    /// Points `request`, which continues `old`, at this agent and account.
+    pub(super) fn apply(&self, old: &TaskRun, request: &mut RunRequest) -> Result<(), String> {
+        if old.quota_failure.is_none() {
+            return Err("Switching is available after a usage limit stops the work.".into());
+        }
+        let old_profile = old
+            .account_binding
+            .as_ref()
+            .and_then(|binding| binding.profile_id.clone());
+        if self.agent == old.agent && self.profile_id == old_profile {
+            return Err(
+                "Choose a different agent or account than the one that hit the limit.".into(),
+            );
+        }
+        if self.agent != old.agent {
+            request.model = None;
+        }
+        request.agent = self.agent.clone();
+        request.agent_profile_id = self.profile_id.clone();
+        request.account_binding = None;
+        Ok(())
+    }
+}
+
+/// Retries attempt `id` once the usage limit that stopped it resets, or with `schedule`
+/// false cancels that. The schedule is kept with the attempt, so it survives a restart.
+#[tauri::command]
+pub async fn task_resume_at_reset(
+    id: String,
+    schedule: bool,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || runtime.schedule_limit_resume(&id, schedule))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

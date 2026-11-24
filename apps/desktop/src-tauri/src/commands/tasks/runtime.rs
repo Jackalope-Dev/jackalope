@@ -1976,6 +1976,16 @@ impl TaskRuntime {
                         source.kind == crate::commands::challenge_review::ReviewKind::Review
                     })
                     .map(|source| source.run_id.clone()),
+                limit: run
+                    .failure_kind
+                    .filter(|kind| kind.is_limit() && run.status == RunStatus::Failed)
+                    .map(|kind| {
+                        super::usage_limit::headline(
+                            kind,
+                            run.quota_failure.as_ref().and_then(|f| f.resets_at),
+                            chrono::Utc::now(),
+                        )
+                    }),
             })
             .collect()
     }
@@ -2500,6 +2510,8 @@ impl TaskRuntime {
                 quota_failure: None,
                 failure_kind: None,
                 provider_error: None,
+                limit_snapshot_reset: None,
+                resume_at_reset: None,
                 session_refused: None,
                 handoff_context: None,
                 contract,

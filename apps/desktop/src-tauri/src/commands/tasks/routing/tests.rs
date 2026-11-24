@@ -119,6 +119,7 @@ fn routing_excludes_shared_exhausted_accounts_but_preserves_other_model_pools() 
         failure: QuotaFailure {
             model_only: false,
             message: "Quota".into(),
+            ..Default::default()
         },
         recorded_at: Utc::now().to_rfc3339(),
     };
@@ -186,6 +187,7 @@ fn new_work_returns_to_the_preferred_account_once_its_quota_resets() {
         failure: QuotaFailure {
             model_only: false,
             message: "Claude's five-hour usage limit is used up.".into(),
+            ..Default::default()
         },
         recorded_at: Utc::now().to_rfc3339(),
     };

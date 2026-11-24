@@ -53,13 +53,15 @@ pub struct Snapshot {
     pub questions: Vec<String>,
     /// The attempt an agent reviewer reviewed; its notice opens that attempt.
     pub review_of: Option<String>,
+    /// How a provider limit that stopped the attempt reads, such as "Usage limit — resets 3:40 PM".
+    pub limit: Option<String>,
 }
 
 #[derive(Clone)]
 struct Notice {
     key: String,
     run_id: String,
-    title: &'static str,
+    title: String,
     attention: bool,
 }
 
@@ -72,7 +74,7 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
                 reviews.push(Notice {
                     key: format!("{}:review", run.id),
                     run_id: author.clone(),
-                    title: "An agent review is ready",
+                    title: "An agent review is ready".into(),
                     attention: false,
                 });
             }
@@ -93,15 +95,16 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
                     .map(|id| Notice {
                         key: format!("{}:question:{id}", run.id),
                         run_id: run.id.clone(),
-                        title: "Your answer is needed",
+                        title: "Your answer is needed".into(),
                         attention: true,
                     })
                     .collect::<Vec<_>>();
             }
-            let title = match run.status {
-                RunStatus::Failed => "A task needs attention",
-                RunStatus::Interrupted => "A task was interrupted",
-                RunStatus::Review => "A task is ready for review",
+            let title = match (&run.status, &run.limit) {
+                (RunStatus::Failed, Some(limit)) => limit.clone(),
+                (RunStatus::Failed, None) => "A task needs attention".into(),
+                (RunStatus::Interrupted, _) => "A task was interrupted".into(),
+                (RunStatus::Review, _) => "A task is ready for review".into(),
                 _ => return vec![],
             };
             vec![Notice {
@@ -138,7 +141,7 @@ fn plan_notices() -> Vec<Notice> {
         .map(|(plan, deviation)| Notice {
             key: format!("plan:{plan}:{deviation}"),
             run_id: format!("plan:{plan}"),
-            title: "A plan needs your decision",
+            title: "A plan needs your decision".into(),
             attention: true,
         })
         .collect()
@@ -157,7 +160,8 @@ fn bot_notices() -> Vec<Notice> {
                 "A bot suggested a new bot"
             } else {
                 "A bot needs your decision"
-            },
+            }
+            .into(),
             attention: !waiting.suggestion,
         })
         .collect()
@@ -243,7 +247,7 @@ pub fn launch(app: tauri::AppHandle) {
             let preferences = service.preferences.lock().unwrap().clone();
             for notice in &current {
                 if seen.insert(notice.key.clone()) && permitted(&preferences, notice, focused) {
-                    let _ = show(&app, notice.title, Some(notice.run_id.clone())).await;
+                    let _ = show(&app, &notice.title, Some(notice.run_id.clone())).await;
                 }
             }
             // Resolved questions cannot become pending again; retired attempts never replay.
@@ -400,7 +404,7 @@ pub async fn notification_pull_request(
     let notice = Notice {
         key: String::new(),
         run_id,
-        title,
+        title: title.into(),
         attention,
     };
     let focused = app.get_webview_window("main").is_some_and(|window| {
@@ -413,7 +417,7 @@ pub async fn notification_pull_request(
         .unwrap()
         .clone();
     if permitted(&preferences, &notice, focused) {
-        show(&app, notice.title, Some(notice.run_id)).await?;
+        show(&app, &notice.title, Some(notice.run_id)).await?;
     }
     Ok(())
 }
@@ -435,6 +439,7 @@ mod tests {
             status: status.into(),
             questions: vec![],
             review_of: None,
+            limit: None,
         }
     }
     #[test]
@@ -471,6 +476,11 @@ mod tests {
         assert!(!permitted(&preferences, &review, false));
         assert!(permitted(&preferences, &failure, false));
         assert!(!permitted(&preferences, &failure, true));
+        let mut limited = run("2", "failed");
+        limited.limit = Some("Usage limit — resets 3:40 PM".into());
+        let limited = notices(&[limited]).remove(0);
+        assert_eq!(limited.title, "Usage limit — resets 3:40 PM");
+        assert!(permitted(&preferences, &limited, false));
         preferences.level = "none".into();
         assert!(!permitted(&preferences, &failure, false));
         preferences.level = "all".into();

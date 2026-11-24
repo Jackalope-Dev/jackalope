@@ -128,7 +128,7 @@ impl Stream {
                 activity(run, message);
                 if event["severity"] != "warning" {
                     if let Some(failure) = quota_failure(message) {
-                        run.quota_failure = Some(failure);
+                        super::usage_limit::record(run, failure);
                     }
                     let message: String = message.chars().take(6000).collect();
                     run.error.get_or_insert(message);
@@ -170,7 +170,7 @@ impl Stream {
                 event["error"]["type"].as_str().unwrap_or("")
             );
             if let Some(failure) = quota_failure(&described) {
-                run.quota_failure = Some(failure);
+                super::usage_limit::record(run, failure);
             }
             if permission_denied(&described) {
                 mark_permission_denied(run);
@@ -230,6 +230,7 @@ pub(super) fn quota_failure(message: &str) -> Option<super::routing::QuotaFailur
         return Some(super::routing::QuotaFailure {
             model_only: false,
             message: message.chars().take(2000).collect(),
+            resets_at: super::usage_limit::reset_at(message),
         });
     }
     super::routing::quota_failure(&serde_json::json!({"type":"error","message":message}))
@@ -265,6 +266,6 @@ pub(super) fn diagnostic(run: &mut TaskRun, line: &str) {
     if let Some(failure) = quota_failure(line) {
         let message = format!("Gemini CLI quota: {}", failure.message);
         run.error.get_or_insert(message);
-        run.quota_failure = Some(failure);
+        super::usage_limit::record(run, failure);
     }
 }

@@ -99,6 +99,10 @@ pub struct LiveSession {
     /// The session from outside Jackalope its first batch resumes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continues: Option<super::tasks::ContinuedSession>,
+    /// A resume the person scheduled for when the usage limit that paused the
+    /// conversation resets. Any other pause, resume or finish cancels it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_at_reset: Option<SessionResume>,
     pub id: String,
     pub title: String,
     pub request: RunRequest,
@@ -111,6 +115,18 @@ pub struct LiveSession {
     pub draft: SessionDraft,
     pub error: Option<String>,
 }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionResume {
+    /// The reported reset, in Unix seconds.
+    pub at: i64,
+    /// The attempt the limit stopped; the resume applies only while it is the latest.
+    pub run_id: String,
+}
+
+/// What the conversation says when it resumes after a usage limit with nothing queued.
+const RESUME_MESSAGE: &str = "Continue where you left off. A usage limit stopped the last reply before it finished, and it has now reset.";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -554,6 +570,7 @@ impl LiveSessions {
                 created_at: now.clone(),
                 updated_at: now,
                 paused: false,
+                resume_at_reset: None,
                 closed: false,
                 messages,
                 batches: vec![],
@@ -866,7 +883,15 @@ impl LiveSessions {
             if matches!(action, "resume" | "retry") {
                 Self::ensure_unintegrated(session, &integrated)?;
             }
+            // A choice the person makes here replaces any resume scheduled for a reset.
+            if matches!(action, "pause" | "resume" | "finish" | "retry" | "cancel-resume-at-reset") {
+                session.resume_at_reset = None;
+            }
             match action {
+                "resume-at-reset" => {
+                    session.resume_at_reset = Some(Self::limit_resume(session, &runs)?);
+                }
+                "cancel-resume-at-reset" => {}
                 "pause" => session.paused = true,
                 "resume" => {
                     if session.batches.last().is_some_and(|batch| batch.error.is_some() && !runs.iter().any(|run| run.id == batch.run_id)) {
@@ -897,16 +922,114 @@ impl LiveSessions {
         })
     }
 
+    /// The resume to schedule for `session`, which a usage limit paused: its latest attempt
+    /// failed at a limit that resets, and the provider said when.
+    fn limit_resume(session: &LiveSession, runs: &[TaskRun]) -> Result<SessionResume, String> {
+        let batch = session
+            .batches
+            .last()
+            .filter(|batch| batch.settled)
+            .ok_or("Nothing in this conversation is waiting on a usage limit.")?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == batch.run_id)
+            .ok_or("Nothing in this conversation is waiting on a usage limit.")?;
+        if session.closed || !session.paused || session.error.is_none() {
+            return Err("Only a conversation a usage limit paused can resume at its reset.".into());
+        }
+        if run.failure_kind.is_none_or(|kind| !kind.is_limit())
+            || run.failure_kind == Some(super::tasks::failure::FailureKind::Billing)
+        {
+            return Err("This conversation did not stop at a usage limit that resets.".into());
+        }
+        let at = run
+            .quota_failure
+            .as_ref()
+            .and_then(|failure| failure.resets_at)
+            .ok_or("The provider did not report when this limit resets.")?;
+        Ok(SessionResume {
+            at,
+            run_id: run.id.clone(),
+        })
+    }
+
+    /// Resumes a conversation whose scheduled reset has passed, adding a message asking the
+    /// agent to continue when nothing else is queued. A schedule whose attempt is no longer
+    /// the latest is dropped instead.
+    fn resume_due(session: &mut LiveSession, now: i64) -> bool {
+        let Some(resume) = session
+            .resume_at_reset
+            .clone()
+            .filter(|resume| resume.at + super::tasks::usage_limit::RESUME_GRACE_SECONDS <= now)
+        else {
+            return false;
+        };
+        session.resume_at_reset = None;
+        if session.closed
+            || !session.paused
+            || session
+                .batches
+                .last()
+                .is_none_or(|batch| batch.run_id != resume.run_id)
+        {
+            return true;
+        }
+        session.paused = false;
+        session.error = None;
+        if !session
+            .messages
+            .iter()
+            .any(|message| message.run_id.is_none() && !message.canceled)
+        {
+            let created_at = Utc::now().to_rfc3339();
+            session.messages.push(SessionMessage {
+                id: Uuid::new_v4().to_string(),
+                text: RESUME_MESSAGE.into(),
+                created_at: created_at.clone(),
+                run_id: None,
+                canceled: false,
+                origin: Some(MessageOrigin {
+                    kind: "resume".into(),
+                    label: "Usage limit reset".into(),
+                    bot_id: None,
+                    bot_name: None,
+                    session_id: None,
+                }),
+            });
+            session.updated_at = created_at;
+        }
+        true
+    }
+
     fn tick(&self) -> Result<bool, String> {
+        let now = Utc::now().timestamp();
         {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;
-            if inner.error.is_some()
-                || !inner.ledger.sessions.iter().any(|session| {
-                    !session.closed
-                        && (!session.paused
-                            || session.batches.last().is_some_and(|batch| !batch.settled))
+            if inner.error.is_some() {
+                return Ok(false);
+            }
+            let due = inner.ledger.sessions.iter().any(|session| {
+                session.resume_at_reset.as_ref().is_some_and(|resume| {
+                    resume.at + super::tasks::usage_limit::RESUME_GRACE_SECONDS <= now
                 })
-            {
+            });
+            drop(inner);
+            if due {
+                let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+                self.update(|ledger| {
+                    for session in &mut ledger.sessions {
+                        Self::resume_due(session, now);
+                    }
+                    Ok(())
+                })?;
+                return Ok(true);
+            }
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if !inner.ledger.sessions.iter().any(|session| {
+                !session.closed
+                    && (!session.paused
+                        || session.batches.last().is_some_and(|batch| !batch.settled))
+            }) {
                 return Ok(false);
             }
         }
@@ -1247,6 +1370,7 @@ fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory
             None => "User message".to_owned(),
             Some(origin) => match origin.kind.as_str() {
                 "wake" => format!("Wake-up ({})", origin.label),
+                "resume" => format!("Jackalope ({})", origin.label),
                 "bot" => format!(
                     "Message from bot {} (a teammate's request, not the user's approval)",
                     origin.bot_name.as_deref().unwrap_or("unknown")

@@ -26,6 +26,8 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         quota_failure: None,
         failure_kind: None,
         provider_error: None,
+        limit_snapshot_reset: None,
+        resume_at_reset: None,
         session_refused: None,
         handoff_context: None,
         contract: Default::default(),
@@ -769,6 +771,7 @@ fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
         run.quota_failure = Some(super::routing::QuotaFailure {
             model_only: false,
             message: "usage limit reached".into(),
+            ..Default::default()
         })
     });
     assert!(runtime.reusable_workspace(&failed_id).unwrap().3);
@@ -2153,4 +2156,136 @@ fn reported_input_includes_cache_once_for_every_adapter() {
         (30, 20)
     );
     assert_eq!(fresh(&antigravity.usage), 10);
+}
+
+#[test]
+fn a_usage_limit_keeps_the_reset_its_first_event_reported() {
+    let resets = Utc::now().timestamp() + 3_600;
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        &format!(
+            r#"{{"type":"rate_limit_event","rate_limit_info":{{"status":"rejected","rateLimitType":"five_hour","resetsAt":{resets}}}}}"#
+        ),
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit"}"#,
+    );
+    let failure = run.quota_failure.as_ref().unwrap();
+    assert!(failure.message.ends_with("You've hit your limit"));
+    assert_eq!(failure.resets_at, Some(resets));
+
+    // Codex reports the used-up window in a snapshot, before or after the error.
+    let mut run = sample("codex");
+    consume_event(
+        &mut run,
+        r#"{"type":"turn.failed","error":{"message":"You've hit your usage limit."}}"#,
+    );
+    assert_eq!(run.quota_failure.as_ref().unwrap().resets_at, None);
+    consume_event(
+        &mut run,
+        &format!(
+            r#"{{"id":"0","msg":{{"type":"token_count","rate_limits":{{"primary":{{"used_percent":100.0,"resets_at":{resets}}}}}}}}}"#
+        ),
+    );
+    assert_eq!(run.quota_failure.as_ref().unwrap().resets_at, Some(resets));
+}
+
+#[test]
+fn resume_at_reset_is_saved_with_the_attempt_and_taken_once() {
+    let history =
+        std::env::temp_dir().join(format!("jackalope-limit-resume-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&history).unwrap();
+    let resets = Utc::now().timestamp() + 600;
+    let mut run = sample("claude");
+    run.status = RunStatus::Failed;
+    run.error = Some("You've hit your limit".into());
+    run.failure_kind = Some(super::failure::FailureKind::QuotaExhausted);
+    run.quota_failure = Some(super::routing::QuotaFailure {
+        message: "You've hit your limit".into(),
+        resets_at: Some(resets),
+        ..Default::default()
+    });
+    let mut unreported = sample("codex");
+    unreported.id = "unreported-attempt".into();
+    unreported.task_id = "unreported-task".into();
+    unreported.status = RunStatus::Failed;
+    unreported.failure_kind = Some(super::failure::FailureKind::QuotaExhausted);
+    for run in [&run, &unreported] {
+        std::fs::write(
+            history.join(format!("{}.json", run.id)),
+            serde_json::to_vec(run).unwrap(),
+        )
+        .unwrap();
+    }
+    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    assert!(runtime
+        .schedule_limit_resume(&unreported.id, true)
+        .unwrap_err()
+        .contains("did not report"));
+    runtime.schedule_limit_resume(&run.id, true).unwrap();
+    assert!(runtime.take_due_limit_resumes(resets).is_empty());
+    drop(runtime);
+
+    // The schedule survives a restart and is handed out once, after the grace period.
+    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let saved = runtime
+        .run_snapshot(&run.id)
+        .unwrap()
+        .resume_at_reset
+        .unwrap();
+    assert_eq!(saved.at, resets);
+    let due = runtime.take_due_limit_resumes(resets + super::usage_limit::RESUME_GRACE_SECONDS);
+    assert_eq!(due, vec![(run.id.clone(), resets)]);
+    assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+
+    // Cancelling clears it; a failed start keeps the reason and is not retried.
+    runtime.schedule_limit_resume(&run.id, true).unwrap();
+    runtime.schedule_limit_resume(&run.id, false).unwrap();
+    assert!(runtime
+        .run_snapshot(&run.id)
+        .unwrap()
+        .resume_at_reset
+        .is_none());
+    runtime.limit_resume_failed(&run.id, resets, "No account".into());
+    assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+}
+
+#[test]
+fn switching_after_a_usage_limit_needs_a_different_agent_or_account() {
+    let mut old = sample("claude");
+    old.model = Some("claude-opus".into());
+    old.account_binding = Some(crate::commands::agent_profiles::AccountBinding {
+        adapter: "claude".into(),
+        profile_id: Some("work".into()),
+        directory: std::env::temp_dir(),
+        label: "Work".into(),
+    });
+    let mut request: RunRequest = serde_json::from_value(serde_json::json!({"id":"retry","projectId":"p","projectName":"P","projectPath":"/tmp/p","agent":"claude","model":"claude-opus","prompt":"Do it","isolated":true,"previousRunId":null,"agentProfileId":"work"})).unwrap();
+    let to = |agent: &str, profile: Option<&str>| super::AgentSwitch {
+        agent: agent.into(),
+        profile_id: profile.map(str::to_string),
+    };
+    assert!(to("claude", Some("personal"))
+        .apply(&old, &mut request.clone())
+        .unwrap_err()
+        .contains("after a usage limit"));
+    old.quota_failure = Some(super::routing::QuotaFailure {
+        message: "You've hit your limit".into(),
+        ..Default::default()
+    });
+    assert!(to("claude", Some("work"))
+        .apply(&old, &mut request.clone())
+        .is_err());
+    let mut account = request.clone();
+    to("claude", Some("personal"))
+        .apply(&old, &mut account)
+        .unwrap();
+    assert_eq!(account.agent_profile_id.as_deref(), Some("personal"));
+    assert_eq!(account.model.as_deref(), Some("claude-opus"));
+    to("codex", None).apply(&old, &mut request).unwrap();
+    assert_eq!(request.agent, "codex");
+    assert_eq!(request.model, None);
+    assert_eq!(request.agent_profile_id, None);
 }

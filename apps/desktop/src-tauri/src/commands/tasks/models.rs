@@ -98,6 +98,14 @@ pub struct TaskRun {
     /// A provider error the agent printed as assistant text, used if the turn ends unanswered.
     #[serde(skip)]
     pub provider_error: Option<String>,
+    /// The reset of the account's used-up window in the agent's latest rate-limit
+    /// snapshot, for a quota error that does not state its own.
+    #[serde(skip)]
+    pub limit_snapshot_reset: Option<i64>,
+    /// When this attempt, stopped by a usage limit, is to be retried, in Unix seconds.
+    /// Set and cancelled by the person; see `coordination::limit_resume`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_at_reset: Option<super::usage_limit::ResumeAtReset>,
     /// The CLI's own refusal to resume a session it no longer has. The attempt then starts
     /// once more as a new conversation, unless it continues a session from outside Jackalope.
     #[serde(skip)]
@@ -502,6 +510,8 @@ impl TaskRun {
             quota_failure: self.quota_failure.clone(),
             failure_kind: self.failure_kind,
             provider_error: None,
+            limit_snapshot_reset: None,
+            resume_at_reset: self.resume_at_reset.clone(),
             session_refused: None,
             handoff_context: None,
             contract: self.contract.clone(),

@@ -438,7 +438,7 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
         }
         "jackalope_error" => {
             if let Some(failure) = super::routing::quota_failure(update) {
-                run.quota_failure = Some(failure);
+                super::usage_limit::record(run, failure);
             }
         }
         "jackalope_session" => run.session_id = update["sessionId"].as_str().map(str::to_string),

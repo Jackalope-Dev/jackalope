@@ -70,8 +70,9 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
     run.efficiency.observe(&event, adapter, &run.workspace);
     let kind = event["type"].as_str().unwrap_or("");
     if let Some(failure) = super::routing::quota_failure(&event) {
-        run.quota_failure = Some(failure);
+        super::usage_limit::record(run, failure);
     }
+    super::usage_limit::observe_snapshot(run, &event);
     let protocol = crate::commands::agents::find(adapter).map(|agent| agent.protocol);
     if protocol == Some(Protocol::Opencode) {
         consume_opencode_event(run, &event, kind);
