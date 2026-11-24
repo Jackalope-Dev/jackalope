@@ -573,8 +573,9 @@ pub(crate) fn launcher() -> Option<super::helper::Launcher> {
 
 /// Opens an app by program or app name outside every Jackalope process tree,
 /// so it keeps running after the grant ends. Names are validated beforehand
-/// to contain no paths, arguments or shell syntax.
-pub(super) fn open_app(name: &str) -> Result<(), String> {
+/// to contain no paths, arguments or shell syntax. On macOS `background` opens it
+/// without bringing it in front of the person's work.
+pub(super) fn open_app(name: &str, background: bool) -> Result<(), String> {
     if name.is_empty()
         || !name
             .chars()
@@ -586,6 +587,7 @@ pub(super) fn open_app(name: &str) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
+        let _ = background;
         if name.contains(' ') {
             return Err("Use the program name without spaces, such as notepad or msedge.".into());
         }
@@ -606,6 +608,9 @@ pub(super) fn open_app(name: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let mut command = std::process::Command::new("/usr/bin/open");
+        if background {
+            command.arg("-g");
+        }
         if name.contains('.') && !name.contains(' ') {
             command.args(["-b", name]);
         } else {
@@ -619,7 +624,10 @@ pub(super) fn open_app(name: &str) -> Result<(), String> {
         };
     }
     #[cfg(not(any(windows, target_os = "macos")))]
-    return Err("Opening apps is not available on this desktop.".into());
+    {
+        let _ = background;
+        Err("Opening apps is not available on this desktop.".into())
+    }
 }
 
 #[cfg(all(test, unix))]
