@@ -164,35 +164,12 @@ impl ToolCall {
     }
 
     /// An ACP `session/request_permission` tool call (Kimi Code and custom ACP
-    /// agents), merged with what earlier `tool_call` updates reported about it.
-    /// Agents that send no `kind` are recognized by the tool name before `:` in
-    /// the title (Kimi's `Shell`, `WriteFile` and `StrReplaceFile`). An edit that
-    /// only supplies new content counts as a write.
+    /// agents), merged with what earlier `tool_call` updates reported about it;
+    /// see [`acp_kind`]. `None` for other tools and for a shell command that
+    /// cannot be read. The automatic risk check reads requests through this too.
     pub fn acp(tool_call: &Value, workspace: &str) -> Option<Self> {
         let raw = &tool_call["rawInput"];
-        let tool = tool_call["title"]
-            .as_str()
-            .unwrap_or_default()
-            .split(':')
-            .next()
-            .unwrap_or_default()
-            .trim();
-        let kind = match (tool_call["kind"].as_str(), tool) {
-            (Some("execute"), _) | (None, "Shell") => ToolKind::Shell,
-            (None, "WriteFile") => ToolKind::Write,
-            (None, "StrReplaceFile") => ToolKind::Edit,
-            (Some("edit"), _) => {
-                let old = ["old_string", "oldText", "old_text", "edit", "edits"]
-                    .iter()
-                    .any(|key| !raw[*key].is_null());
-                if old || !raw["content"].is_string() {
-                    ToolKind::Edit
-                } else {
-                    ToolKind::Write
-                }
-            }
-            _ => return None,
-        };
+        let kind = acp_kind(tool_call)?;
         if kind == ToolKind::Shell {
             return Some(Self {
                 kinds: vec![kind],
@@ -307,6 +284,42 @@ impl ToolCall {
             _ => "file change",
         }
     }
+}
+
+/// The tool an ACP call's title names before any `:`, such as Kimi's `Shell`
+/// in `Shell: pnpm test`.
+pub fn acp_tool(tool_call: &Value) -> &str {
+    tool_call["title"]
+        .as_str()
+        .unwrap_or_default()
+        .split(':')
+        .next()
+        .unwrap_or_default()
+        .trim()
+}
+
+/// Whether an ACP tool call runs a shell command, writes or edits a file.
+/// Agents that send no `kind` are recognized by [`acp_tool`] (Kimi's `Shell`,
+/// `WriteFile` and `StrReplaceFile`). An edit that only supplies new content
+/// counts as a write.
+pub fn acp_kind(tool_call: &Value) -> Option<ToolKind> {
+    let raw = &tool_call["rawInput"];
+    Some(match (tool_call["kind"].as_str(), acp_tool(tool_call)) {
+        (Some("execute"), _) | (None, "Shell") => ToolKind::Shell,
+        (None, "WriteFile") => ToolKind::Write,
+        (None, "StrReplaceFile") => ToolKind::Edit,
+        (Some("edit"), _) => {
+            let old = ["old_string", "oldText", "old_text", "edit", "edits"]
+                .iter()
+                .any(|key| !raw[*key].is_null());
+            if old || !raw["content"].is_string() {
+                ToolKind::Edit
+            } else {
+                ToolKind::Write
+            }
+        }
+        _ => return None,
+    })
 }
 
 fn command_text(input: &Value) -> Option<String> {

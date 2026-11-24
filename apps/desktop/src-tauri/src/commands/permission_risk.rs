@@ -187,17 +187,38 @@ pub fn assess(tool: &str, input: &Value, scope: &Scope) -> Verdict {
 }
 
 /// Classifies an ACP `session/request_permission` tool call (Kimi Code and
-/// custom ACP agents).
+/// custom ACP agents), merged with what earlier updates reported about it.
+/// Shell commands and file changes are read as tool rules read them, because
+/// some agents (Kimi) send neither `kind` nor `rawInput` with the request. A
+/// command argument is checked whatever `kind` claims. A request with no kind
+/// and no readable input asks.
 pub fn assess_acp(tool_call: &Value, scope: &Scope) -> Verdict {
     let context = Context::new(scope);
+    command_text(&tool_call["rawInput"])
+        .map_or(Routine, |command| context.command(&command, 0, false))
+        .or(|| assess_acp_kind(&context, tool_call, scope))
+}
+
+fn assess_acp_kind(context: &Context, tool_call: &Value, scope: &Scope) -> Verdict {
+    use super::knowledge::tool_rules::{self, ToolCall, ToolKind};
     let raw = &tool_call["rawInput"];
-    let title = tool_call["title"].as_str().unwrap_or("Tool");
+    if let Some(kind) = tool_rules::acp_kind(tool_call) {
+        let call = ToolCall::acp(tool_call, &scope.workspace.to_string_lossy());
+        if kind == ToolKind::Shell {
+            return match call {
+                Some(call) => context.command(&call.text, 0, false),
+                None => risky("the command could not be read"),
+            };
+        }
+        let mut paths = input_paths(raw);
+        paths.extend(call.into_iter().flat_map(|call| call.paths));
+        if paths.is_empty() {
+            return risky("the affected files could not be read");
+        }
+        return first_risk(paths.iter().map(|path| context.write_path(path)));
+    }
     match tool_call["kind"].as_str().unwrap_or("other") {
-        "execute" => match command_text(raw) {
-            Some(command) => context.command(&command, 0, false),
-            None => risky("the command could not be read"),
-        },
-        kind @ ("edit" | "delete" | "move") => {
+        kind @ ("delete" | "move") => {
             let paths = input_paths(raw);
             if paths.is_empty() {
                 return risky("the affected files could not be read");
@@ -215,7 +236,26 @@ pub fn assess_acp(tool_call: &Value, scope: &Scope) -> Verdict {
         "read" | "search" | "fetch" | "think" | "switch_mode" => {
             first_risk(input_paths(raw).iter().map(|path| context.read_path(path)))
         }
-        _ => context.tool(title, raw),
+        _ if !raw.is_object() => risky("the request could not be read"),
+        // Kimi names MCP tools without an `mcp__` prefix (`deploy_site`).
+        _ => {
+            let tool = tool_rules::acp_tool(tool_call);
+            context.tool(tool, raw).or(|| external_action(tool))
+        }
+    }
+}
+
+/// Risky when a connected tool's name says it deletes, deploys or publishes.
+fn external_action(tool: &str) -> Verdict {
+    const EXTERNAL: [&str; 8] = [
+        "delete", "drop", "destroy", "deploy", "publish", "release", "push", "merge",
+    ];
+    let name = tool.to_ascii_lowercase();
+    let action = name.rsplit("__").next().unwrap_or(&name);
+    if EXTERNAL.iter().any(|verb| action.contains(verb)) {
+        risky("the connected tool can delete, deploy or publish")
+    } else {
+        Routine
     }
 }
 
@@ -375,13 +415,7 @@ impl Context {
             }
         }
         if name.starts_with("mcp__") {
-            let action = name.rsplit("__").next().unwrap_or(&name);
-            const EXTERNAL: [&str; 8] = [
-                "delete", "drop", "destroy", "deploy", "publish", "release", "push", "merge",
-            ];
-            if EXTERNAL.iter().any(|verb| action.contains(verb)) {
-                return risky("the connected tool can delete, deploy or publish");
-            }
+            return external_action(&name);
         }
         Routine
     }
@@ -2967,6 +3001,116 @@ mod tests {
         assert_ne!(open("doom_loop", &["x"]), Routine);
         assert_ne!(open("unknown_permission", &["x"]), Routine);
         assert_eq!(open("webfetch", &["https://x"]), Routine);
+    }
+
+    /// Kimi sends no `kind` or `rawInput`; its driver fills `rawInput` from
+    /// the arguments streamed before the request.
+    #[test]
+    fn acp_requests_without_a_kind_are_read_as_tool_rules_read_them() {
+        let workspace = &Scope::new(Path::new("/work/repo"));
+        let acp = |call: Value| assess_acp(&call, workspace);
+        let kimi = |title: &str, raw: Value| acp(json!({"title": title, "rawInput": raw}));
+        asks(
+            kimi("Shell: rm -rf ~", json!({"command": "rm -rf ~"})),
+            "destructive shell",
+        );
+        routine(
+            kimi("Shell: pnpm test", json!({"command": "pnpm test"})),
+            "routine shell",
+        );
+        asks(
+            kimi(
+                "WriteFile: /srv/other/a.ts",
+                json!({"path": "/srv/other/a.ts", "content": "x"}),
+            ),
+            "write outside the project",
+        );
+        asks(
+            kimi(
+                "StrReplaceFile: ../other/a.ts",
+                json!({"path": "../other/a.ts", "edit": {"old": "a", "new": "b"}}),
+            ),
+            "edit outside the project",
+        );
+        routine(
+            kimi(
+                "StrReplaceFile: src/a.ts",
+                json!({"path": "/work/repo/src/a.ts", "edit": [{"old": "a", "new": "b"}]}),
+            ),
+            "edit inside the project",
+        );
+        routine(
+            kimi("ReadFile: src/a.ts", json!({"path": "/work/repo/src/a.ts"})),
+            "routine read",
+        );
+        asks(
+            kimi("ReadFile: .env", json!({"path": "/work/repo/.env"})),
+            "secret read",
+        );
+        // A diff names the file when no arguments arrived.
+        let diff = |path: &str| {
+            acp(
+                json!({"title": "WriteFile: a.ts", "content": [{"type": "diff", "path": path, "oldText": "", "newText": "x"}]}),
+            )
+        };
+        asks(diff("/srv/other/a.ts"), "diff outside the project");
+        routine(diff("/work/repo/a.ts"), "diff inside the project");
+        // Nothing to read: ask rather than approve.
+        for title in [
+            "Shell: rm -rf ~",
+            "WriteFile: a.ts",
+            "StrReplaceFile: a.ts",
+            "deploy_site",
+            "",
+        ] {
+            asks(acp(json!({"title": title})), title);
+        }
+        asks(
+            acp(json!({"kind": "other", "title": "x"})),
+            "other without input",
+        );
+    }
+
+    #[test]
+    fn acp_commands_are_checked_whatever_kind_the_request_claims() {
+        let workspace = &Scope::new(Path::new("/work/repo"));
+        for kind in [
+            "read",
+            "search",
+            "fetch",
+            "think",
+            "switch_mode",
+            "other",
+            "edit",
+        ] {
+            let call = json!({"kind": kind, "title": "x", "rawInput": {"command": "rm -rf ~", "path": "/work/repo/a.ts"}});
+            asks(assess_acp(&call, workspace), kind);
+        }
+        let call = json!({"kind": "read", "title": "x", "rawInput": {"command": "ls src", "path": "/work/repo/a.ts"}});
+        routine(assess_acp(&call, workspace), "routine command on a read");
+    }
+
+    /// Kimi names MCP tools as their server does, with no `mcp__` prefix.
+    #[test]
+    fn acp_connected_tools_that_deploy_or_delete_ask_without_an_mcp_prefix() {
+        let workspace = &Scope::new(Path::new("/work/repo"));
+        let kimi = |title: &str| {
+            assess_acp(
+                &json!({"title": title, "rawInput": {"site": "docs"}}),
+                workspace,
+            )
+        };
+        for title in [
+            "deploy_site",
+            "DeleteBranch",
+            "publish_package: docs",
+            "mcp__web__push",
+        ] {
+            asks(kimi(title), title);
+        }
+        for title in ["lookup_docs", "SearchWeb: rust", "list_sites"] {
+            routine(kimi(title), title);
+        }
     }
 
     #[test]
