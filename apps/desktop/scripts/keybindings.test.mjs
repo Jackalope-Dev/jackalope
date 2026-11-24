@@ -162,6 +162,10 @@ test('bindings normalize, and editing, window and typing keys are refused', () =
     assert.notEqual(bindingProblem(value, MAC), '', value);
   assert.notEqual(bindingProblem('Alt+E', MAC), '');
   assert.equal(bindingProblem('Alt+E', WIN), '');
+  // macOS window menu keys are free elsewhere, so a saved Ctrl+H keeps working there.
+  assert.equal(bindingProblem('Mod+H', WIN), '');
+  assert.equal(resolveKeybindings({ search: 'Mod+H' }, WIN).search, 'Mod+H');
+  assert.equal(normalizeBinding(`Mod+${' '.repeat(200)}K`), null);
   for (const value of ['Mod+Shift+P', 'Mod+Enter', 'F5', 'G', '?', 'Mod+K M', 'Alt+ArrowLeft'])
     assert.equal(bindingProblem(value, MAC), '', value);
 });
@@ -251,7 +255,10 @@ test('contexts keep terminals, text fields and finds that belong to a view', () 
   assert.equal(contextApplies('outsideText', '?', env()), true);
   assert.equal(contextApplies('anywhere', 'G', env({ editable: true })), false);
   assert.equal(contextApplies('anywhere', 'G', env({ terminal: true })), false);
-  assert.equal(contextApplies('composer', 'G', env({ editable: true, composer: true })), true);
+  assert.equal(contextApplies('composer', 'G', env({ editable: true, composer: true })), false);
+  assert.equal(contextApplies('composer', 'G', env()), true);
+  assert.equal(contextApplies('composer', 'F5', env({ editable: true, composer: true })), true);
+  assert.equal(contextApplies('anywhere', 'F5', env({ terminal: true })), false);
   assert.equal(contextApplies('conversation', 'Mod+F', env()), true);
   assert.equal(contextApplies('conversation', 'Mod+F', env({ ownFind: true })), false);
   assert.equal(contextApplies('conversation', 'Mod+F', env({ terminal: true })), false);
@@ -309,6 +316,13 @@ test('export holds the changes and import replaces them after checking every ent
     /Search and commands: .*reserved/,
   );
   assert.match(importKeybindings('{"search":"Hyper+K"}', MAC).error, /is not a shortcut/);
+  // Oversized text is refused before parsing, so a crafted file cannot stall the window.
+  const started = Date.now();
+  assert.match(
+    importKeybindings(JSON.stringify({ search: `Mod${' '.repeat(200_000)}K` }), MAC).error,
+    /too long/,
+  );
+  assert.ok(Date.now() - started < 1000);
   assert.match(
     importKeybindings('{"search":"Mod+J","terminal":"Mod+J"}', MAC).error,
     /Search and commands and Open terminal use the same shortcut/,

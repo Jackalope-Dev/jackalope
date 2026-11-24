@@ -323,7 +323,11 @@ function parseStroke(value: string): Stroke | null {
   return stroke;
 }
 
+/** Longer than any real binding; bounds parsing of imported or hand-edited text. */
+const MAX_BINDING_LENGTH = 100;
+
 function parseBinding(binding: string): Stroke[] | null {
+  if (binding.length > MAX_BINDING_LENGTH) return null;
   const strokes = binding
     .trim()
     .replace(/\s*\+\s*/g, '+')
@@ -366,6 +370,11 @@ function plain(stroke: Stroke) {
   return !stroke.mod && !stroke.ctrl && !stroke.alt;
 }
 
+/** A plain stroke other than a function key, which a text field would take as typing. */
+function types(stroke: Stroke) {
+  return plain(stroke) && !/^F\d+$/.test(stroke.key);
+}
+
 const RESERVED_LETTERS = new Set(['C', 'V', 'X', 'A', 'Z', 'Q', 'W', 'R', 'L', 'T']);
 /** macOS app menu items the system handles before the window sees the keys. */
 const MAC_MENU = new Set(['Mod+H', 'Mod+M', 'Mod+Alt+H', 'Mod+Ctrl+F']);
@@ -398,7 +407,8 @@ export function bindingProblem(binding: string, platform = currentPlatform()): s
   const [first] = strokes;
   if ((first.mod || first.ctrl) && RESERVED_LETTERS.has(first.key))
     return 'That combination is reserved for editing or the window.';
-  if (MAC_MENU.has(formatStroke(first))) return 'macOS uses that combination for the window.';
+  if (isMacPlatform(platform) && MAC_MENU.has(formatStroke(first)))
+    return 'macOS uses that combination for the window.';
   if (plain(first) && MOVEMENT.has(first.key))
     return 'That key types or moves around. Add a modifier such as Ctrl or Alt.';
   if (
@@ -554,6 +564,8 @@ export function importKeybindings(
       continue;
     }
     if (typeof value !== 'string') return { error: `${action.label}: the shortcut must be text.` };
+    if (value.length > MAX_BINDING_LENGTH)
+      return { error: `${action.label}: the shortcut is too long.` };
     const binding = value.trim() ? normalizeBinding(value) : '';
     if (binding === null) return { error: `${action.label}: “${value}” is not a shortcut.` };
     const problem = binding && bindingProblem(binding, platform);
@@ -740,7 +752,7 @@ export interface KeyEnvironment {
 
 /**
  * Whether an action in `context` takes `binding` here. Keys that type or move (no Mod,
- * Ctrl or Alt) never leave a text field or terminal, except to a composer's own actions.
+ * Ctrl or Alt) never leave a text field or terminal; function keys leave text fields.
  */
 export function contextApplies(
   context: KeybindingContext,
@@ -750,7 +762,7 @@ export function contextApplies(
   const strokes = parseBinding(binding);
   if (strokes && plain(strokes[0])) {
     if (env.terminal) return false;
-    if (env.editable && !(env.composer && context.startsWith('composer'))) return false;
+    if (env.editable && types(strokes[0])) return false;
   }
   if (env.terminal && context !== 'anywhere') return false;
   switch (context) {

@@ -1,4 +1,5 @@
 import { type RefObject, useEffect, useMemo, useRef } from 'react';
+import { composingKey } from '../lib/composer-commands';
 import {
   contextApplies,
   KEYBINDING_ACTIONS,
@@ -125,7 +126,7 @@ function dispatch(event: KeyboardEvent, previous: KeyboardEvent | null) {
 
 function onKeyDown(event: KeyboardEvent) {
   // A terminal, the shortcut recorder or a field's own handling already used these keys.
-  if (event.defaultPrevented || event.isComposing) return clearPending();
+  if (event.defaultPrevented || composingKey(event)) return clearPending();
   if (['Meta', 'Control', 'Shift', 'Alt'].includes(event.key)) return;
   const previous = pending?.event ?? null;
   clearPending();
