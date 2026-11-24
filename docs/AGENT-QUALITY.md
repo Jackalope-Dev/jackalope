@@ -663,6 +663,7 @@ user setting or proof of a faster workflow.
 | `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |
 | `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
 | `JACKALOPE_JEV_ASSISTANCE=shadow` | Records configured relevance/review assessments without changing selected context or suppressing monitors. Source candidate ranking is shadow-only. Existing Jev settings and credentials are required. |
+| `JACKALOPE_CODEX_TRANSPORT=exec` | Runs every Codex turn as `codex exec --json` with `approval_policy="never"`. `app-server` (default) runs local Codex turns in one warm `codex app-server` per live conversation; see [Codex app-server sessions](#codex-app-server-sessions). Agents on a computer always use `exec`. |
 | `JACKALOPE_CLAUDE_SESSION=oneshot` | Starts a Claude Code process per message and continues with `--resume`. `persistent` (default) runs Claude Code over the stream-json control protocol and keeps one warm process per live conversation; see [Claude Code sessions and hooks](#claude-code-sessions-and-hooks). |
 | `JACKALOPE_CLAUDE_ISOLATION=on` | Adds `--strict-mcp-config --setting-sources project,local` to Claude Code tasks, so personal settings, plugins, hooks and global MCP servers do not load. A project's **Use my Claude Code setup** choice overrides this default either way. |
 | `JACKALOPE_CLAUDE_PARTIALS=off` | Disables the default `--include-partial-messages`. Streamed text is held in memory for the terminal view and records `firstTokenMs`; saved results and activity are unchanged. |
@@ -733,6 +734,50 @@ Compare one control at a time, for example `--before-claude-stop-check=off`, so
 both arms share the persistent transport, and turn off `claude-fallback` when
 comparing models. Fixture tests use a protocol stand-in and do not establish
 installed Claude Code behavior.
+
+### Codex app-server sessions
+
+A local Codex turn starts `codex app-server --listen stdio://` with the same program,
+environment and `-c` overrides `codex exec` would get, except the settings a turn passes
+through the protocol: `initialize`, then `thread/start` (or `thread/resume` with the saved
+thread ID, which is the ID `codex exec` reports) with the workspace, sandbox
+(`workspace-write`, or `read-only` for plan sessions) and approval policy (`on-request`,
+or `never` for plan sessions), then `turn/start` with the turn's model, reasoning effort
+and service tier. Standard speed sends the `default` tier; Fast keeps
+`features.fast_mode=true` on the process. Notifications of the turn are translated into
+the `codex exec --json` events the transcript already reads (agent, command, file change,
+MCP, web search and reasoning items, `turn.completed` usage summed from the turn's
+`thread/tokenUsage/updated` notifications, `error` and `turn.failed` with Codex's error
+kind as `code`); agent message deltas stream like Claude's partial messages.
+
+Approval requests (`item/commandExecution/requestApproval`,
+`item/fileChange/requestApproval`, `item/permissions/requestApproval` and confirmation-only
+`mcpServer/elicitation/request`) go through the project's saved permission rules, its
+auto-approval setting and then a question on the attempt. A command is assessed as the
+script inside Codex's shell wrapper; a file change by the paths its item reported. Plan
+sessions deny every request, and forms Jackalope cannot fill are declined. A question
+Codex settles itself (`serverRequest/resolved`) closes without an answer, and a declined
+command shows as declined, with Codex's reason when it gave one. Each model call's input
+tokens and Codex's `modelContextWindow` are recorded as the run's `context`.
+
+Processes are parked like Claude Code's: keyed by thread ID and a fingerprint of the
+command, environment, plan mode and which of model, effort and tier the turn sets (Codex
+keeps those for later turns of a loaded thread). A stop sends `turn/interrupt` and ends the
+process tree if the turn has not settled within five seconds; a cleanly interrupted
+process stays warm. Quitting kills it at once. While a turn runs, `TaskRun.steerable` is
+set and a live conversation's **Send now** adds the message with `turn/steer`; when the
+turn cannot take it the message is sent after stopping the turn, as before. Rolling back or
+forking a thread reserves it and its workspace under the runtime lock, so no turn can
+start there until the change finishes.
+
+A turn that cannot start in the app-server (a process that exits, an `initialize`,
+`thread/start` or `turn/start` error, or an `unknown variant` for a method an older Codex
+lacks) runs as `codex exec` and says why in activity; `efficiency.codexTransport` is then
+`exec`, otherwise `started`, `resumed` or `reused`. `thread/resume` refusing an unknown
+thread (`no rollout found`) starts the conversation over once, as other refusals do.
+Protocol details were recorded from Codex 0.156.1 (`codex app-server generate-json-schema
+--out <dir>` prints the schema of the installed version); the tests replay those
+recordings and a stand-in process, which do not establish installed-app behavior.
 
 `node scripts/evaluation/assistance.mjs receipts.json labels.json report.json`
 compares retained decision receipts with independent labels containing `recordId`,

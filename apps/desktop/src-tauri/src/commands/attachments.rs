@@ -1,5 +1,5 @@
 //! Files a user attaches to a prompt. Existing files are referenced by path;
-//! pasted images have no path, so they are written under the project's
+//! pasted images and large pasted text have no path, so they are written under the project's
 //! `.jackalope/attachments` folder, which Git ignores through info/exclude.
 //! `agent_context` copies the ones a prompt names into its task workspace.
 
@@ -10,17 +10,31 @@ use tauri_plugin_dialog::DialogExt;
 const FOLDER: &str = ".jackalope/attachments";
 const MAX_BYTES: usize = 20 * 1024 * 1024;
 const IMAGE_TYPES: [&str; 5] = ["png", "jpg", "jpeg", "gif", "webp"];
+/// Pasted text too large for the draft, saved as a file the prompt names.
+const TEXT_TYPE: &str = "txt";
 
 fn save_image(project: &Path, extension: &str, bytes: &[u8]) -> Result<PathBuf, String> {
     let extension = extension.trim_start_matches('.').to_ascii_lowercase();
-    if !IMAGE_TYPES.contains(&extension.as_str()) {
-        return Err("Only PNG, JPEG, GIF and WebP images can be pasted".into());
+    let text = extension == TEXT_TYPE;
+    if !text && !IMAGE_TYPES.contains(&extension.as_str()) {
+        return Err("Only PNG, JPEG, GIF and WebP images or text can be pasted".into());
     }
     if bytes.is_empty() {
-        return Err("The pasted image is empty".into());
+        return Err(if text {
+            "The pasted text is empty".into()
+        } else {
+            "The pasted image is empty".into()
+        });
     }
     if bytes.len() > MAX_BYTES {
-        return Err("Pasted images can be up to 20 MB".into());
+        return Err(if text {
+            "Pasted text can be up to about 20 million characters".into()
+        } else {
+            "Pasted images can be up to 20 MB".into()
+        });
+    }
+    if text && std::str::from_utf8(bytes).is_err() {
+        return Err("The pasted text is not valid UTF-8".into());
     }
     if !project.is_dir() {
         return Err("The project folder is no longer available".into());
@@ -43,7 +57,8 @@ macro_rules! tauri_commands {
 }
 pub(crate) use tauri_commands;
 
-/// Saves a pasted image for the given project and returns its absolute path.
+/// Saves a pasted image, or pasted text as a `.txt` file, for the given project and
+/// returns its absolute path.
 #[tauri::command]
 pub async fn prompt_attachment_save(
     project_path: String,
@@ -106,6 +121,15 @@ mod tests {
         assert!(save_image(&project, "png", &vec![0; MAX_BYTES + 1])
             .unwrap_err()
             .contains("20 MB"));
+        let text = save_image(&project, "txt", "pasted 😀".as_bytes()).unwrap();
+        assert_eq!(text.extension().unwrap(), "txt");
+        assert!(text.starts_with(project.join(FOLDER)));
+        assert!(save_image(&project, "txt", &[0xff, 0xfe])
+            .unwrap_err()
+            .contains("UTF-8"));
+        assert!(save_image(&project, "txt", b"")
+            .unwrap_err()
+            .contains("text is empty"));
         assert!(save_image(&project.join("missing"), "png", b"x")
             .unwrap_err()
             .contains("no longer"));

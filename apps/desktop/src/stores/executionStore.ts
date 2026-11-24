@@ -29,6 +29,8 @@ interface TaskDraft {
   readOnly?: boolean;
   skills?: string[];
   connectionIds?: string[];
+  /** A provider effort level chosen in a follow-up composer (`lib/reasoning-effort.ts`). */
+  reasoningEffort?: string | null;
 }
 const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true };
 interface ExecutionState {

@@ -47,6 +47,7 @@ experiments! {
     WarmOpencode = "warm-opencode",
     WarmApiHelpers = "warm-api-helpers",
     ClaudeSession = "claude-session",
+    CodexTransport = "codex-transport",
     ClaudeIsolation = "claude-isolation",
     ClaudePartials = "claude-partials",
     ClaudeFallback = "claude-fallback",

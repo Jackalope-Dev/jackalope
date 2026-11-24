@@ -10,6 +10,8 @@ export interface SessionMessage {
   canceled: boolean;
   /** Set when the message came from a wake-up, another bot or a card answer rather than typing. */
   origin?: MessageOrigin;
+  /** The provider effort level chosen in the composer for this message. */
+  reasoningEffort?: string | null;
 }
 export interface MessageOrigin {
   kind: 'wake' | 'bot' | 'reply' | 'card' | 'resume';

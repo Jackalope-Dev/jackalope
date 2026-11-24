@@ -1,6 +1,6 @@
 import { Badge, Button, Choice, LoadingState, Popover, Tabs, Tooltip } from '@jackalope/ui';
 import { ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { agentAdapter } from '../../lib/agent-catalog';
 import { useAgentModels } from '../../lib/agent-models';
@@ -59,6 +59,8 @@ export function ComposerAgentPicker({
   onModelChange,
   disabled,
   allowCompare = true,
+  open: requestedOpen,
+  onOpenChange,
 }: {
   project: Project;
   value: string[];
@@ -68,6 +70,9 @@ export function ComposerAgentPicker({
   onModelChange?: (model: ComposerModel | null) => void;
   disabled?: boolean;
   allowCompare?: boolean;
+  /** Opens the picker from outside, such as the /model command. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const roster = useRosterAgents(project);
   const agents = roster.filter((agent) => !agent.unavailable);
@@ -75,8 +80,18 @@ export function ComposerAgentPicker({
   const comparing = selected.length > 1;
   const single = selected.length === 1 ? agents.find((agent) => agent.id === selected[0]) : null;
   const current = comparing ? 'compare' : (single?.id ?? 'auto');
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = requestedOpen ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const [rail, setRail] = useState(current);
+  // Opened from outside, the rail starts at the current choice as a click would.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when opened from outside
+  useEffect(() => {
+    if (requestedOpen) setRail(current);
+  }, [requestedOpen]);
   const modelLabel = single && model ? ` · ${model.name}` : '';
   const label = comparing
     ? `Compare ${selected.length} agents`

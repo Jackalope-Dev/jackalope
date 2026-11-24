@@ -996,6 +996,7 @@ pub async fn external_session_continue(
                 id: message_id,
                 text,
                 origin: None,
+                reasoning_effort: None,
             },
         )
     })
@@ -1067,6 +1068,7 @@ pub async fn imported_conversation_continue(
                 id: message_id,
                 text,
                 origin: None,
+                reasoning_effort: None,
             },
         )
     })

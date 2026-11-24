@@ -165,7 +165,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   The composer shows its agent choice beside Send: Automatic, one agent, or up to four
   agents that each receive the prompt as a separate isolated task. Compared tasks link to
   each other and show status, time, check, changed lines and reported tokens side by side;
-  keeping one archives the other finished attempts. Composers accept pasted images, dropped
+  keeping one archives the other finished attempts. Composers (new work, conversations and
+  follow-ups) offer `/` commands (/model, /effort, /plan, /clear, /btw and Claude skills),
+  `@` file mentions, prompt history, large pastes saved as text attachments, a per-send
+  effort picker limited to levels the run uses, and a context meter shown only when the
+  provider reports its window. `/btw` asks a read-only, unsaved fork of a Claude Code or
+  Codex session without touching the main conversation. Real-provider and installed
+  acceptance remain open. Composers accept pasted images, dropped
   files and picked files as editable path lines. Pasted images are saved under the
   project's Git-excluded `.jackalope/attachments` and copied into each task workspace that
   names them, worktree or computer alike; project files are referenced relative to the
@@ -317,6 +323,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   starts once as a new conversation in the same workspace with the earlier progress (Codex
   and Grok before launch, Claude Code, Kimi, ACP agents and OpenCode's server after they
   refuse it). Continuations of sessions from outside Jackalope fail instead.
+  Local Codex conversations run in one warm `codex app-server` session (falling back to
+  `codex exec` with the reason shown). Requests to leave its sandbox follow the project's
+  permission settings, Stop interrupts the turn, and Send now adds a message to a running
+  Codex turn. A real smoke run passed; installed acceptance on each platform is open.
 - Project-scoped agent lists, task defaults and account choices; app-wide limits
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded

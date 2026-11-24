@@ -70,6 +70,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         session_id: None,
         result: String::new(),
         streaming: String::new(),
+        steerable: false,
         pending_tools: Default::default(),
         details_omitted: false,
         activity: vec![],
@@ -80,6 +81,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         usage: Usage::default(),
         mcp_usage: None,
         usage_observations: vec![],
+        context: None,
         prompts: vec![],
         awaiting_answers: Vec::new(),
         validation_steps: vec![],
@@ -428,6 +430,7 @@ pub(super) fn trial_request(
     RunRequest {
         retry_of: None,
         handoff_focus: None,
+        reasoning_effort: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -960,6 +963,84 @@ fn a_reported_result_wins_over_observed_calls() {
 }
 
 #[test]
+fn context_follows_the_latest_top_level_call_and_the_window_claude_reports() {
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    // The subagent's call (m3) does not fill the parent's context.
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 135,
+            window: None
+        })
+    );
+    run.model = Some("claude-opus-5-5".into());
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","usage":{"input_tokens":1,"output_tokens":1},"modelUsage":{"claude-haiku-5-5":{"contextWindow":100000},"claude-opus-5-5":{"contextWindow":200000}}}"#,
+    );
+    assert_eq!(run.context.as_ref().unwrap().window, Some(200_000));
+    consume_event(&mut run, CLAUDE_CALLS[0]);
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 130,
+            window: Some(200_000)
+        })
+    );
+
+    // Codex's exec stream reports totals only, so it reports no context.
+    let mut codex = sample("codex");
+    consume_event(
+        &mut codex,
+        r#"{"type":"turn.completed","usage":{"input_tokens":120,"cached_input_tokens":80,"output_tokens":15}}"#,
+    );
+    assert_eq!(codex.context, None);
+    assert!(!serde_json::to_string(&codex)
+        .unwrap()
+        .contains("\"context\""));
+}
+
+/// Claude Code 2.1.282's result names models by their dated IDs and, on a resumed
+/// session, also lists the models earlier turns used.
+#[test]
+fn the_context_window_comes_from_the_served_model_in_a_real_claude_result() {
+    let mut run = sample("claude");
+    for event in [
+        r#"{"type":"system","subtype":"init","session_id":"s-1","model":"claude-haiku-4-5-20251001","permissionMode":"default"}"#,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":8,"cache_read_input_tokens":26007,"cache_creation_input_tokens":4276,"output_tokens":37}}}"#,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"OK","session_id":"s-1","usage":{"input_tokens":18,"cache_creation_input_tokens":16223,"cache_read_input_tokens":40067,"output_tokens":295},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":18,"outputTokens":295,"cacheReadInputTokens":40067,"cacheCreationInputTokens":16223,"costUSD":0.0379457,"contextWindow":200000,"maxOutputTokens":32000},"claude-sonnet-5":{"inputTokens":8,"outputTokens":1119,"contextWindow":1000000,"maxOutputTokens":64000}}}"#,
+    ] {
+        consume_event(&mut run, event);
+    }
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 30_291,
+            window: Some(200_000)
+        })
+    );
+}
+
+#[test]
+fn an_unattributed_context_window_is_kept_only_when_every_model_agrees() {
+    let mut run = sample("claude");
+    consume_event(&mut run, CLAUDE_CALLS[2]);
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","modelUsage":{"a":{"contextWindow":100000},"b":{"contextWindow":200000}}}"#,
+    );
+    assert_eq!(run.context.as_ref().unwrap().window, None);
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","modelUsage":{"a":{"contextWindow":100000}}}"#,
+    );
+    assert_eq!(run.context.as_ref().unwrap().window, Some(100_000));
+}
+
+#[test]
 fn an_attempt_interrupted_by_closing_keeps_its_observed_usage_after_reload() {
     let folder = std::env::temp_dir().join(format!("jackalope-usage-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
@@ -1087,6 +1168,7 @@ process.stdin.on('end', () => {
     let request = RunRequest {
         retry_of: None,
         handoff_focus: None,
+        reasoning_effort: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -1217,6 +1299,7 @@ process.stdin.on('end', () => {
         .start(RunRequest {
             retry_of: None,
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             live_session_id: None,
             effort: None,

@@ -101,6 +101,11 @@
       "default": "persistent",
       "environment": "JACKALOPE_CLAUDE_SESSION"
     },
+    "codex-transport": {
+      "values": ["exec", "app-server"],
+      "default": "app-server",
+      "environment": "JACKALOPE_CODEX_TRANSPORT"
+    },
     "claude-isolation": {
       "values": ["off", "on"],
       "default": "off",

@@ -657,6 +657,7 @@ impl BotHub {
                 id: message.clone(),
                 text: clip(text, 12_000),
                 origin: Some(origin),
+                reasoning_effort: None,
             }),
             SessionLimits {
                 max_batches: Some(AUTONOMOUS_BATCHES),

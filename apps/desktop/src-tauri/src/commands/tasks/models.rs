@@ -30,6 +30,16 @@ pub struct UsageObservation {
     pub cache_write: u64,
 }
 
+/// How full the agent's context was after its latest top-level model call, as the
+/// provider reported it. `window` is set only when the provider states its limit.
+#[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextUsage {
+    pub used: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<u64>,
+}
+
 /// Where an attempt's agent ran when a project computer ran it.
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -190,6 +200,14 @@ pub struct TaskRun {
     /// cleared when the message completes into activity or `result`.
     #[serde(skip)]
     pub streaming: String,
+    /// The agent's running turn takes new messages (Codex's turn/steer). Live state only:
+    /// never read back from a saved record.
+    #[serde(
+        default,
+        skip_deserializing,
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub steerable: bool,
     /// Labels of tool calls still waiting for their result, by call id, so a failed
     /// result can name the step. Kept in memory only.
     #[serde(skip)]
@@ -207,6 +225,8 @@ pub struct TaskRun {
     pub mcp_usage: Option<crate::commands::mcp_broker::BrokerUsage>,
     #[serde(default)]
     pub usage_observations: Vec<UsageObservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<ContextUsage>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
     /// Questions whose ask returned to the agent unanswered and whose answer has
@@ -369,6 +389,10 @@ pub struct RunRequest {
     /// (a quota handoff, a lost session or a retry of preserved work). Ignored otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff_focus: Option<String>,
+    /// A provider effort level the person chose for this send (one of
+    /// `effort::CHOOSABLE`); it wins over the task approach's level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
     /// A first attempt that resumes a session from outside Jackalope where it ran.
     #[serde(skip)]
     pub continues: Option<ContinuedSession>,
@@ -416,6 +440,7 @@ impl RunRequest {
             previous_run_id: None,
             retry_of: None,
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             connection_ids: None,
             coordination: None,
@@ -554,6 +579,7 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             streaming: String::new(),
+            steerable: self.steerable,
             pending_tools: Default::default(),
             details_omitted: true,
             activity: if self.status.is_active() {
@@ -574,6 +600,7 @@ impl TaskRun {
             usage: self.usage.clone(),
             mcp_usage: self.mcp_usage.clone(),
             usage_observations: self.usage_observations.clone(),
+            context: self.context.clone(),
             prompts: self.prompts.clone(),
             awaiting_answers: self.awaiting_answers.clone(),
             validation_steps: self.validation_steps.clone(),

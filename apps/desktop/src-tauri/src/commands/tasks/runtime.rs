@@ -101,6 +101,7 @@ impl TaskRuntime {
     pub fn stop_all(&self) {
         self.warm_helpers.clear();
         self.claude_sessions.clear();
+        self.codex_sessions.clear();
         let ids: Vec<_> = self
             .inner
             .lock()
@@ -111,11 +112,19 @@ impl TaskRuntime {
             .map(|r| r.id.clone())
             .collect();
         for id in ids {
-            let _ = self.stop(&id);
+            let _ = self.stop_attempt(&id, false);
         }
     }
 
     pub(in crate::commands) fn stop(&self, id: &str) -> Result<(), String> {
+        self.stop_attempt(id, true)
+    }
+
+    /// Stops attempt `id`. A `graceful` stop of a Codex app-server turn asks Codex to
+    /// interrupt it first, so the conversation records the interruption and its process
+    /// stays ready for the next message; the process tree still ends if the turn does not
+    /// settle in time. Quitting stops at once.
+    fn stop_attempt(&self, id: &str, graceful: bool) -> Result<(), String> {
         let process = {
             let mut inner = self.inner.lock().unwrap();
             let run = inner.runs.get_mut(id).ok_or("Attempt not found")?;
@@ -136,7 +145,11 @@ impl TaskRuntime {
         crate::commands::desktop_control::close(id);
         crate::commands::computers::release_run(id);
         if let Some(process) = process {
-            process.terminate();
+            if graceful && self.codex_sessions.interrupt(id) {
+                super::codex_session::terminate_later(self, id, process);
+            } else {
+                process.terminate();
+            }
         }
         Ok(())
     }
@@ -319,6 +332,7 @@ impl TaskRuntime {
             run.model_reported = false;
             run.usage = Usage::default();
             run.usage_observations.clear();
+            run.context = None;
             run.exit_code = None;
             run.ended_at = None;
             run.status = RunStatus::Starting;
@@ -1093,9 +1107,23 @@ impl TaskRuntime {
         } else {
             return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
-        let reasoning_effort =
-            super::effort::configure(&mut cmd, &adapter, selected_model.as_deref(), req.effort);
+        let reasoning_effort = super::effort::configure_requested(
+            &mut cmd,
+            &adapter,
+            selected_model.as_deref(),
+            req.effort,
+            req.reasoning_effort.as_deref(),
+        );
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
+        let codex = (adapter == "codex"
+            && remote.is_none()
+            && super::codex_session::enabled(&req.project_id))
+        .then(|| super::codex_session::Settings {
+            read_only,
+            model: selected_model.clone(),
+            effort: reasoning_effort.clone(),
+            service_tier: tier.clone(),
+        });
         self.update_checked(id, |run| {
             run.reasoning_effort = reasoning_effort;
             run.requested_service_tier = tier;
@@ -1563,6 +1591,7 @@ impl TaskRuntime {
                     settings: claude.unwrap_or_default(),
                     final_check,
                 }),
+                codex,
                 runner_lease,
             )),
         };
@@ -2142,6 +2171,7 @@ impl TaskRuntime {
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
@@ -2560,6 +2590,7 @@ impl TaskRuntime {
                 session_id: None,
                 result: String::new(),
                 streaming: String::new(),
+                steerable: false,
                 pending_tools: Default::default(),
                 details_omitted: false,
                 activity: notes,
@@ -2570,6 +2601,7 @@ impl TaskRuntime {
                 usage: Usage::default(),
                 mcp_usage: None,
                 usage_observations: vec![],
+                context: None,
                 prompts: vec![],
                 awaiting_answers: Vec::new(),
                 validation_steps: vec![],

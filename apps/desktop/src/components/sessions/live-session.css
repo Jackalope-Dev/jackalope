@@ -277,6 +277,7 @@
 }
 /* The card is the field, like the new-work composer: no second box around the draft. */
 .live-composer {
+  position: relative;
   padding: 10px 10px 8px 14px;
   margin: 12px max(20px, (100% - 56rem) / 2) 20px;
   border: 1px solid var(--color-border);

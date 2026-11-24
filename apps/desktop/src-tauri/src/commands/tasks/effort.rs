@@ -20,7 +20,14 @@ impl TaskEffort {
 }
 
 /// Provider levels from least to most thinking.
-const LEVELS: [&str; 6] = ["none", "minimal", "low", "medium", "high", "xhigh"];
+const LEVELS: [&str; 7] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+/// Levels a person can choose in the composer, the same set Decisions records per model.
+pub const CHOOSABLE: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+/// Levels each CLI's effort flag takes.
+const CLAUDE_FLAG: &[&str] = &["low", "medium", "high", "xhigh", "max"];
+const CODEX_FLAG: &[&str] = &["none", "minimal", "low", "medium", "high", "xhigh"];
+/// What an unmeasured model is offered: the levels Jackalope already sends for task approaches.
+const UNMEASURED: &[&str] = &["low", "medium", "high"];
 const ANY: &[&str] = &["none", "low", "medium", "high", "xhigh"];
 const ALWAYS_ON: &[&str] = &["low", "medium", "high", "xhigh"];
 
@@ -128,6 +135,67 @@ fn nearest(asked: &'static str, have: &[&'static str]) -> Option<&'static str> {
         .min_by_key(|level| (rank(level).abs_diff(rank(asked)), rank(level)))
 }
 
+/// The levels the composer offers for `model` through `adapter`, least thinking first:
+/// the levels Decisions records for that model that the measured table also accepts (all
+/// measured levels when none overlap), otherwise the measured ones, otherwise the recorded
+/// ones, otherwise low to high. Empty when the agent or model takes no effort level.
+pub(in crate::commands) fn choosable(
+    adapter: &str,
+    model: Option<&str>,
+    recorded: &[String],
+) -> Vec<&'static str> {
+    let flag = match adapter {
+        "claude" => CLAUDE_FLAG,
+        "codex" => CODEX_FLAG,
+        _ => return Vec::new(),
+    };
+    let measured: Option<Vec<&'static str>> =
+        model
+            .and_then(|model| accepted(adapter, model))
+            .map(|have| {
+                CHOOSABLE
+                    .into_iter()
+                    .filter(|level| have.contains(level))
+                    .collect()
+            });
+    let recorded: Vec<&'static str> = CHOOSABLE
+        .into_iter()
+        .filter(|level| recorded.iter().any(|r| r == level))
+        .collect();
+    // A recorded level the measured model lacks would be clamped at launch, so only
+    // levels the run actually sends are offered.
+    let offered = match (measured, recorded.is_empty()) {
+        (Some(measured), false) => {
+            let both: Vec<_> = recorded
+                .into_iter()
+                .filter(|level| measured.contains(level))
+                .collect();
+            if both.is_empty() {
+                measured
+            } else {
+                both
+            }
+        }
+        (Some(measured), true) => measured,
+        (None, false) => recorded,
+        (None, true) => UNMEASURED.to_vec(),
+    };
+    offered
+        .into_iter()
+        .filter(|level| flag.contains(level))
+        .collect()
+}
+
+/// A level the person chose, checked against the levels the composer offers.
+pub(in crate::commands) fn chosen(level: Option<String>) -> Result<Option<String>, String> {
+    match level {
+        Some(level) if !CHOOSABLE.contains(&level.as_str()) => Err(format!(
+            "Unknown effort level \"{level}\". Choose low, medium, high, xhigh or max."
+        )),
+        level => Ok(level),
+    }
+}
+
 /// Adds the effort flag for `model` and returns the level sent, or `None`
 /// when the agent keeps its own default.
 pub(in crate::commands) fn configure(
@@ -136,13 +204,39 @@ pub(in crate::commands) fn configure(
     model: Option<&str>,
     effort: Option<TaskEffort>,
 ) -> Option<String> {
+    configure_requested(command, adapter, model, effort, None)
+}
+
+/// Like `configure`, with a level the person chose for this send, which wins over the
+/// task approach's level. A level the model lacks clamps to the nearest it accepts.
+pub(in crate::commands) fn configure_requested(
+    command: &mut Command,
+    adapter: &str,
+    model: Option<&str>,
+    effort: Option<TaskEffort>,
+    requested: Option<&str>,
+) -> Option<String> {
     if !matches!(adapter, "codex" | "claude") {
         return None;
     }
-    let asked = effort?.level();
+    let chosen = requested.and_then(|level| CHOOSABLE.into_iter().find(|l| *l == level));
+    let asked = match chosen {
+        Some(level) => level,
+        None => effort?.level(),
+    };
     let level = match model.and_then(|model| accepted(adapter, model)) {
         Some(have) => nearest(asked, have)?,
         None => asked,
+    };
+    let flag = if adapter == "codex" {
+        CODEX_FLAG
+    } else {
+        CLAUDE_FLAG
+    };
+    let level = if flag.contains(&level) {
+        level
+    } else {
+        nearest(level, flag)?
     };
     if adapter == "codex" {
         command.args(["-c", &format!("model_reasoning_effort=\"{level}\"")]);
@@ -150,6 +244,36 @@ pub(in crate::commands) fn configure(
         command.args(["--effort", level]);
     }
     Some(level.into())
+}
+
+/// The effort levels the composer offers for `agent` and its `model` (the agent's
+/// default model when none is chosen). Automatic offers low to high, which the routed
+/// agent's model then clamps; agents without an effort flag get none.
+#[tauri::command]
+pub fn task_effort_levels(
+    runtime: tauri::State<'_, super::TaskRuntime>,
+    project_id: Option<String>,
+    agent: String,
+    model: Option<String>,
+) -> Result<Vec<String>, String> {
+    if agent == "auto" {
+        return Ok(UNMEASURED.iter().map(|level| level.to_string()).collect());
+    }
+    let policy = runtime.policy()?;
+    let adapter = policy.adapter(&agent)?;
+    let model = policy.model(&agent, model.as_deref()).unwrap_or(model);
+    let options = crate::commands::decisions::options::options(
+        &runtime,
+        project_id.as_deref().unwrap_or_default(),
+    )?;
+    let recorded = options
+        .model(&adapter, model.as_deref())
+        .map(|evidence| evidence.efforts.clone())
+        .unwrap_or_default();
+    Ok(choosable(&adapter, model.as_deref(), &recorded)
+        .into_iter()
+        .map(str::to_string)
+        .collect())
 }
 
 #[cfg(test)]
@@ -236,6 +360,86 @@ mod tests {
                     Some(effort.level()),
                     "{model}"
                 );
+            }
+        }
+    }
+
+    fn requested(adapter: &str, model: Option<&str>, level: &str) -> Option<String> {
+        let mut command = Command::new("fixture");
+        configure_requested(
+            &mut command,
+            adapter,
+            model,
+            Some(TaskEffort::Quick),
+            Some(level),
+        )
+    }
+
+    #[test]
+    fn a_chosen_level_wins_over_the_task_approach_and_clamps_to_what_the_model_takes() {
+        assert_eq!(requested("claude", None, "max").as_deref(), Some("max"));
+        assert_eq!(
+            requested("claude", Some("claude-opus-5-5"), "xhigh").as_deref(),
+            Some("xhigh")
+        );
+        // Measured Claude models stop at xhigh; Codex's flag has no max.
+        assert_eq!(
+            requested("claude", Some("claude-opus-5-5"), "max").as_deref(),
+            Some("xhigh")
+        );
+        assert_eq!(requested("codex", None, "max").as_deref(), Some("xhigh"));
+        assert_eq!(requested("claude", Some("claude-haiku-4-5"), "high"), None);
+        assert_eq!(requested("gemini", None, "high"), None);
+        // An unknown level falls back to the task approach.
+        assert_eq!(requested("codex", None, "turbo").as_deref(), Some("low"));
+    }
+
+    #[test]
+    fn the_composer_offers_recorded_then_measured_levels_the_flag_takes() {
+        let recorded = vec!["max".to_string(), "low".to_string()];
+        // Measured Claude models stop at xhigh, so a recorded max is never offered.
+        assert_eq!(
+            choosable("claude", Some("claude-opus-5-5"), &recorded),
+            ["low"]
+        );
+        assert_eq!(
+            choosable("claude", Some("claude-opus-5-5"), &["max".to_string()]),
+            ["low", "medium", "high", "xhigh"]
+        );
+        // An unmeasured model takes what Decisions records, up to the flag's levels.
+        assert_eq!(choosable("claude", Some("opus"), &recorded), ["low", "max"]);
+        assert_eq!(choosable("codex", Some("gpt-6.1-sol"), &recorded), ["low"]);
+        assert_eq!(
+            choosable("claude", Some("claude-opus-5-5"), &[]),
+            ["low", "medium", "high", "xhigh"]
+        );
+        assert_eq!(
+            choosable("claude", Some("opus"), &[]),
+            ["low", "medium", "high"]
+        );
+        assert!(choosable("claude", Some("claude-haiku-4-5"), &[]).is_empty());
+        assert!(choosable("gemini", None, &recorded).is_empty());
+    }
+
+    #[test]
+    fn every_offered_level_is_the_level_the_run_sends() {
+        let recorded: Vec<String> = CHOOSABLE.iter().map(|level| level.to_string()).collect();
+        for (adapter, model) in [
+            ("claude", "claude-opus-5-5"),
+            ("claude", "claude-fable-5"),
+            ("claude", "opus"),
+            ("codex", "gpt-6.1-sol"),
+            ("codex", "gpt-5.4"),
+            ("codex", "gpt-6.1-terra"),
+        ] {
+            for offered in [&recorded[..], &[]] {
+                for level in choosable(adapter, Some(model), offered) {
+                    assert_eq!(
+                        requested(adapter, Some(model), level).as_deref(),
+                        Some(level),
+                        "{adapter} {model}"
+                    );
+                }
             }
         }
     }

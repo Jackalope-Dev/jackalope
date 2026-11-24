@@ -289,6 +289,12 @@ export function Shell({
   useAppEvent('helper-draft', (key) => {
     if (useExecutionStore.getState().drafts[key]) openInComposer({ draftKey: key });
   });
+  useAppEvent('new-work', (projectId) => {
+    const projects = useProjectStore.getState();
+    if (projectId !== projects.activeProjectId && projects.projects.some((p) => p.id === projectId))
+      projects.selectProject(projectId);
+    focusComposer();
+  });
   const { projects, activeProjectId, selectProject } = useProjectStore(
     useShallow((s) => ({
       projects: s.projects,

@@ -175,6 +175,17 @@ impl Turn<'_> {
         self.answer(runtime, cmd, configuration.input, canceled, started)
     }
 
+    /// Runs a command the caller built in full, with the prompt on stdin, in the turn's
+    /// directory. Used where an agent needs a subcommand the tool-free flags rule out.
+    pub(super) fn run_command(
+        self,
+        runtime: &TaskRuntime,
+        cmd: Command,
+        canceled: &dyn Fn() -> bool,
+    ) -> Result<Answer, String> {
+        self.answer(runtime, cmd, Input::Stdin, canceled, |_| Ok(()))
+    }
+
     fn answer(
         &self,
         runtime: &TaskRuntime,

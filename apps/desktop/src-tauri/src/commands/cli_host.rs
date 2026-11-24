@@ -358,6 +358,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 id: uuid::Uuid::new_v4().to_string(),
                 text,
                 origin: None,
+                reasoning_effort: None,
             };
             sessions.create_with_limits(
                 session_id.clone(),

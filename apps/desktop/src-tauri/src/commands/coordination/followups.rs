@@ -20,6 +20,9 @@ pub struct FollowUp {
     pub error: Option<String>,
     pub allow_failure: Option<String>,
     pub interrupt: bool,
+    /// A provider effort level chosen in the composer for this follow-up.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 fn latest<'a>(runs: &'a [TaskRun], task_id: &str) -> Result<&'a TaskRun, String> {
@@ -65,6 +68,19 @@ impl Coordinator {
         connection_ids: Option<Vec<String>>,
         interrupt: bool,
     ) -> Result<(), String> {
+        self.enqueue_followup_with_effort(id, run_id, prompt, connection_ids, interrupt, None)
+    }
+
+    pub(in crate::commands) fn enqueue_followup_with_effort(
+        &self,
+        id: String,
+        run_id: &str,
+        prompt: String,
+        connection_ids: Option<Vec<String>>,
+        interrupt: bool,
+        reasoning_effort: Option<String>,
+    ) -> Result<(), String> {
+        let reasoning_effort = crate::commands::tasks::effort::chosen(reasoning_effort)?;
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         Uuid::parse_str(&id).map_err(|_| "Invalid follow-up identifier")?;
@@ -79,6 +95,7 @@ impl Coordinator {
                     || existing.previous_run_id != run_id
                     || existing.connection_ids != connection_ids
                     || existing.interrupt != interrupt
+                    || existing.reasoning_effort != reasoning_effort
                 {
                     return Err(
                         "This follow-up was already saved with different instructions.".into(),
@@ -137,6 +154,7 @@ impl Coordinator {
                         error: None,
                         allow_failure: interrupt.then(|| run.id.clone()),
                         interrupt,
+                        reasoning_effort,
                     },
                 );
                 Ok::<_, String>(())
@@ -311,6 +329,7 @@ impl Coordinator {
                 isolated: false,
                 previous_run_id: Some(run.id.clone()),
                 connection_ids: item.connection_ids.clone(),
+                reasoning_effort: item.reasoning_effort.clone(),
                 ..RunRequest::new(
                     &run.project_id,
                     &run.project_name,
@@ -387,10 +406,18 @@ pub async fn task_followup_queue(
     prompt: String,
     connection_ids: Option<Vec<String>>,
     interrupt: bool,
+    reasoning_effort: Option<String>,
 ) -> Result<(), String> {
     let service = service.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        service.enqueue_followup(id, &run_id, prompt, connection_ids, interrupt)
+        service.enqueue_followup_with_effort(
+            id,
+            &run_id,
+            prompt,
+            connection_ids,
+            interrupt,
+            reasoning_effort,
+        )
     })
     .await
     .map_err(|error| error.to_string())?

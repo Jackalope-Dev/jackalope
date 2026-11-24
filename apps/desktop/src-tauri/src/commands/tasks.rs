@@ -1,9 +1,10 @@
 mod agent_process;
 pub(super) mod antigravity;
 mod claude_session;
+mod codex_session;
 mod delegation;
 mod efficiency;
-pub(super) mod effort;
+pub(crate) mod effort;
 pub(in crate::commands) mod events;
 pub(super) mod failure;
 mod gemini;
@@ -27,6 +28,7 @@ mod runtime;
 #[cfg(test)]
 mod secret_canary_tests;
 pub(super) mod served_model;
+pub(crate) mod side_chat;
 pub(crate) mod snapshots;
 pub(super) mod speed;
 mod storage;
@@ -36,9 +38,12 @@ pub(super) mod timing;
 pub(in crate::commands) mod tool_activity;
 pub(in crate::commands) mod usage_limit;
 mod warm_opencode;
+mod warm_session;
 pub(in crate::commands) mod workspace_processes;
 
 pub(in crate::commands) use claude_session::bridge_token;
+#[allow(unused_imports)]
+pub(in crate::commands) use codex_session::CodexThread;
 pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
@@ -85,6 +90,7 @@ pub struct TaskRuntime {
     writer: journal::Writer,
     warm_helpers: Arc<warm_opencode::Pool>,
     claude_sessions: Arc<claude_session::Pool>,
+    codex_sessions: Arc<codex_session::Sessions>,
     _owner: Arc<super::file_lock::FileLock>,
 }
 
@@ -102,6 +108,7 @@ impl TaskRuntime {
     pub(super) fn invalidate_account_helpers(&self, directory: &Path) {
         self.warm_helpers.invalidate_account(directory);
         self.claude_sessions.invalidate_account(directory);
+        self.codex_sessions.invalidate_account(directory);
     }
 
     /// The agent sessions loaded attempts ran or continued, without cloning run records.
@@ -273,6 +280,9 @@ macro_rules! tauri_commands {
             commands::tasks::task_mark_reviewed,
             commands::tasks::task_review,
             commands::tasks::task_respond_prompt,
+            commands::tasks::effort::task_effort_levels,
+            commands::tasks::side_chat::task_side_question,
+            commands::tasks::side_chat::task_side_question_cancel,
         ] $($rest)*)
     };
 }

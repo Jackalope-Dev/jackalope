@@ -94,6 +94,50 @@ fn messages_are_durable_idempotent_and_keep_order() {
 }
 
 #[test]
+fn a_chosen_effort_is_saved_per_message_and_batches_never_mix_levels() {
+    let (_root, service, id) = fixture();
+    let send = |text: &str, effort: Option<&str>| {
+        service.send_with_effort(
+            &id,
+            Uuid::new_v4().to_string(),
+            text.into(),
+            None,
+            effort.map(str::to_string),
+        )
+    };
+    send("One", None).unwrap();
+    send("Two", None).unwrap();
+    send("Three", Some("high")).unwrap();
+    send("Four", Some("high")).unwrap();
+    assert!(send("Five", Some("turbo"))
+        .err()
+        .is_some_and(|error| error.contains("Unknown effort level")));
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    let mut messages = saved.sessions[0].messages.clone();
+    assert_eq!(messages[2].reasoning_effort.as_deref(), Some("high"));
+    let first: Vec<_> = next_batch(&messages)
+        .iter()
+        .map(|m| m.text.clone())
+        .collect();
+    assert_eq!(first, ["One", "Two"]);
+    for message in &mut messages[..2] {
+        message.run_id = Some("batch-1".into());
+    }
+    let second: Vec<_> = next_batch(&messages)
+        .iter()
+        .map(|m| m.text.clone())
+        .collect();
+    assert_eq!(second, ["Three", "Four"]);
+    // Messages saved before effort levels existed load with none.
+    let old = r#"{"id":"m","text":"Old","createdAt":"2026-01-01T00:00:00Z","runId":null,"canceled":false}"#;
+    let old: SessionMessage = serde_json::from_str(old).unwrap();
+    assert_eq!(old.reasoning_effort, None);
+    assert!(!serde_json::to_string(&old)
+        .unwrap()
+        .contains("reasoningEffort"));
+}
+
+#[test]
 fn first_message_starts_and_names_the_session_atomically() {
     let (_root, service, existing) = fixture();
     let request = service.snapshot(None).unwrap().sessions[0].request.clone();
@@ -109,6 +153,7 @@ fn first_message_starts_and_names_the_session_atomically() {
                     id: message_id.clone(),
                     text: "  Fix the search\n spacing  ".into(),
                     origin: None,
+                    reasoning_effort: None,
                 }),
             )
             .unwrap();
@@ -136,6 +181,7 @@ fn first_message_starts_and_names_the_session_atomically() {
                 id: message_id,
                 text: " ".into(),
                 origin: None,
+                reasoning_effort: None,
             })
         )
         .is_err());
@@ -202,6 +248,7 @@ fn missing_attempts_require_recovery_instead_of_silent_replay() {
                     previous_run_id: None,
                     error: None,
                     settled: false,
+                    reasoning_effort: None,
                 });
             Ok(())
         })
@@ -326,6 +373,7 @@ fn attach_run(root: &std::path::Path, service: &mut LiveSessions, id: &str, run:
                 previous_run_id: None,
                 error: None,
                 settled: false,
+                reasoning_effort: None,
             });
             Ok(())
         })
@@ -569,6 +617,7 @@ fn limits_pause_new_batches_and_do_not_infer_missing_cost() {
         previous_run_id: None,
         error: None,
         settled: true,
+        reasoning_effort: None,
     });
     let mut run = TaskRun {
         id: "run".into(),
@@ -594,6 +643,33 @@ fn limits_pause_new_batches_and_do_not_infer_missing_cost() {
     }
     .validate()
     .is_err());
+}
+
+#[test]
+fn a_message_for_a_turn_that_cannot_take_it_is_left_to_stop_and_send() {
+    let (root, mut service, id) = fixture();
+    // A saved run never reads back as steerable, so a reloaded running turn takes nothing.
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: RunStatus::Running,
+        steerable: true,
+        ..Default::default()
+    };
+    attach_run(&root, &mut service, &id, run);
+    let message = Uuid::new_v4().to_string();
+    assert!(service
+        .steer(&id, message.clone(), "Also this".into(), None)
+        .unwrap()
+        .is_none());
+    let snapshot = service.snapshot(Some(&id)).unwrap();
+    assert!(!snapshot.sessions[0]
+        .messages
+        .iter()
+        .any(|m| m.id == message));
+    assert!(service
+        .steer(&id, "not-a-uuid".into(), "x".into(), None)
+        .is_err());
 }
 
 #[test]
@@ -817,6 +893,7 @@ fn bot_persona_is_repeated_in_every_batch_and_stays_out_of_the_transcript() {
                 id: Uuid::new_v4().to_string(),
                 text: "Check the lockfile".into(),
                 origin: None,
+                reasoning_effort: None,
             }),
             SessionLimits::default(),
             Some(persona.clone()),
@@ -864,6 +941,7 @@ fn non_code_conversations_are_saved_as_such_and_told_to_leave_files_alone() {
                 id: Uuid::new_v4().to_string(),
                 text: "Check that the website's signup page loads".into(),
                 origin: None,
+                reasoning_effort: None,
             }),
         )
         .unwrap();

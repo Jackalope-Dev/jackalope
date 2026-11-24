@@ -17,6 +17,47 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
+### Composer commands, mentions and history
+
+The new-work, conversation and task follow-up composers share these keyboard aids
+(`components/composer/useComposerAssist.tsx`):
+
+- `/` at the start of the draft opens a command menu (arrows, Enter or Tab, Escape).
+  Commands appear only where they work: `/model` (new work) opens the agent and model
+  picker, `/effort` the effort picker when the agent's model takes a level, `/plan`
+  (new work, not General) toggles plan mode so Send starts **Plan with me**, or plans
+  `/plan <goal>` at once, `/clear` (conversations and follow-ups in the main window)
+  opens new work in the same project and keeps the current work, and `/btw <question>`
+  asks a side question. For Claude Code, personal and project skills under
+  `.claude/skills` on this computer are listed and inserted as `/name`. Any other text
+  that starts with `/`, `/compact` included, is sent to the agent unchanged; Jackalope
+  offers no compaction command because it cannot confirm the CLI applies one in the
+  print-mode turns it runs.
+- `@` after whitespace searches the project's Git-listed files (`project_files_list`,
+  which honours `.gitignore`) and inserts `@path` plus the same `Attached file:` line a
+  picked file adds. Tab picks the highlighted file; Enter picks it only after moving
+  through the list or when a file or folder name starts with what was typed, and
+  otherwise sends. A word-like `@name` with no such match shows no list. Mentions are
+  unavailable through a remote host or outside Git.
+- ArrowUp on the first line (or in an empty field) recalls earlier prompts of that
+  conversation, task or project's new work, newest first; ArrowDown goes forward and
+  past the newest returns the draft, with any edits kept while browsing.
+- Pasting text of 32 KiB or more, or more than the draft can still hold, saves it as a
+  `.txt` file under `.jackalope/attachments` and adds its attachment line, with a chip
+  whose Undo puts the text back where the line was. If saving fails, the error shows and
+  the text goes into the draft instead.
+
+A side question (`/btw`) runs a read-only fork of the attempt's saved agent session
+(`tasks/side_chat.rs`): Claude Code with `--resume --fork-session
+--no-session-persistence` in plan mode with only Read, Grep and Glob (Bash, edits,
+subagents and skills refused by name), Codex with `codex exec fork
+--ephemeral` in its read-only sandbox, both without MCP servers, in the attempt's folder
+and account. It takes no coordinator lock or execution guard and claims no workspace, so
+it neither waits for nor interrupts running work, and its answer never enters the
+transcript or queue; it can be copied or added to the draft. Other agents, work on a
+computer and attempts without a saved session say why they cannot answer. A fork sees
+only what the running session has saved so far.
+
 New work is non-code when it is in General, when a window is attached and the request
 names no code, or when a short request only reads or operates something outside the
 repository (a web page, a connection, email) and mentions no code or changes. Non-code
@@ -302,7 +343,7 @@ transcript with tool names; subagent work is not shown. Reading is local and not
 uploaded; Settings → Privacy turns it off and deletes the index.
 
 Continue in Jackalope starts a conversation whose first attempt resumes the CLI's own
-session (`codex exec resume`, `claude --resume`) under the account directory it was saved
+session (Codex's thread by ID, `claude --resume`) under the account directory it was saved
 in, directly in the checkout or worktree it ran in, reserving that folder like in-place
 work. It is unavailable, with the reason shown, when that directory is not one of
 Jackalope's accounts for the CLI, the account or agent is turned off for the project, the

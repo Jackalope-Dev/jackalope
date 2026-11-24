@@ -735,7 +735,7 @@ public static class JackalopeDesktop {
     const uint WM_MOUSEMOVE = 0x200, WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203,
         WM_RBUTTONDOWN = 0x204, WM_RBUTTONUP = 0x205, WM_MOUSEWHEEL = 0x20A, WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
 
-    static IntPtr Coordinates(Point point) { return new IntPtr((int)(((uint)(ushort)point.Y << 16) | (ushort)point.X)); }
+    static IntPtr Coordinates(Point point) { return new IntPtr(unchecked((int)(((uint)(ushort)point.Y << 16) | (uint)(ushort)point.X))); }
 
     // Where a screen point falls for a window that may be DPI-scaled: the window's own
     // screen and client coordinates, which posted messages carry unscaled.
@@ -811,9 +811,9 @@ public static class JackalopeDesktop {
 
     static void PostKey(Context context, ushort key, bool extended) {
         IntPtr focus = FocusWindow(context);
-        int flags = extended ? 1 << 24 : 0;
-        Post(focus, WM_KEYDOWN, new IntPtr(key), new IntPtr(1 | flags));
-        Post(focus, WM_KEYUP, new IntPtr(key), new IntPtr(unchecked((int)(1 | flags | 0xC0000000))));
+        uint flags = extended ? 1u << 24 : 0u;
+        Post(focus, WM_KEYDOWN, new IntPtr(key), new IntPtr((int)(1u | flags)));
+        Post(focus, WM_KEYUP, new IntPtr(key), new IntPtr(unchecked((int)(1u | flags | 0xC0000000u))));
     }
 
     static readonly Dictionary<string, ushort> Named = new Dictionary<string, ushort> {
