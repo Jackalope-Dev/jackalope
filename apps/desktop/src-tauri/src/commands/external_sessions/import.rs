@@ -40,6 +40,9 @@ const TRANSCRIPT_BYTES: usize = 64 * 1024 * 1024;
 const INDEX_BYTES: u64 = 32 * 1024 * 1024;
 /// Conversations imported between saves of the index.
 const COMMIT_EVERY: usize = 25;
+/// Saved transcript bytes held before the index is saved, so a batch of long
+/// conversations is not all in memory at once.
+const COMMIT_BYTES: usize = TRANSCRIPT_BYTES;
 /// Files whose messages one scan counts at a time.
 const READERS: usize = 4;
 
@@ -509,6 +512,7 @@ impl Imports {
             changed();
         };
         let mut pending = Vec::new();
+        let mut pending_bytes = 0;
         let mut counts = (0, 0);
         let mut locations: HashMap<String, Location> = HashMap::new();
         let commit = |pending: &mut Vec<(ImportedRecord, Vec<TranscriptEntry>, bool)>,
@@ -545,8 +549,9 @@ impl Imports {
                 })
                 .and_then(|found| self.prepare(key, found, projects, &mut locations));
             match outcome {
-                Ok(Some((record, entries, replacing))) => {
-                    pending.push((record, entries, replacing))
+                Ok(Some((record, entries, replacing, size))) => {
+                    pending.push((record, entries, replacing));
+                    pending_bytes += size;
                 }
                 Ok(None) => update(&|progress| progress.unchanged += 1),
                 Err(reason) => update(&|progress| {
@@ -557,7 +562,8 @@ impl Imports {
                     })
                 }),
             }
-            if pending.len() >= COMMIT_EVERY {
+            if pending.len() >= COMMIT_EVERY || pending_bytes >= COMMIT_BYTES {
+                pending_bytes = 0;
                 if let Err(failure) = commit(&mut pending, &mut counts) {
                     error = Some(failure);
                     break;
@@ -605,15 +611,14 @@ impl Imports {
         }
     }
 
-    /// The record and transcript to save for one session, or None when the saved copy is
-    /// current.
+    /// What to save for one session, or None when the saved copy is current.
     fn prepare(
         &self,
         key: &str,
         found: &Found,
         projects: &[ProjectFolder],
         locations: &mut HashMap<String, Location>,
-    ) -> Result<Option<(ImportedRecord, Vec<TranscriptEntry>, bool)>, String> {
+    ) -> Result<Option<Prepared>, String> {
         let existing = self.store.record(key)?;
         if existing
             .as_ref()
@@ -648,7 +653,7 @@ impl Imports {
             .ok_or_else(|| format!("{} could not be read.", found.path.display()))?;
         let mut earlier = transcript.earlier;
         let mut entries: Vec<_> = transcript.entries.into();
-        fit(&mut entries, &mut earlier);
+        let size = fit(&mut entries, &mut earlier);
         let record = ImportedRecord {
             id: key.to_string(),
             agent: found.source.adapter().into(),
@@ -672,33 +677,44 @@ impl Imports {
             source_modified_ms: state.modified_ms,
             continued_in: None,
         };
-        Ok(Some((record, entries, existing.is_some())))
+        Ok(Some((record, entries, existing.is_some(), size)))
     }
 }
 
-/// Drops the oldest entries until the saved transcript fits.
-fn fit(entries: &mut Vec<TranscriptEntry>, earlier: &mut usize) {
-    loop {
-        let size: usize = entries
-            .iter()
-            .map(|entry| {
-                entry.text.len()
-                    + entry
-                        .tools
-                        .iter()
-                        .map(|tool| tool.name.len() + tool.summary.as_ref().map_or(0, String::len))
-                        .sum::<usize>()
-                    + entry.attachments.iter().map(String::len).sum::<usize>()
-                    + 128
-            })
-            .sum();
-        if size <= TRANSCRIPT_BYTES || entries.is_empty() {
-            return;
-        }
-        let drop = entries.len().div_ceil(10);
-        entries.drain(..drop);
-        *earlier += drop;
+/// A record and transcript to save, whether it replaces an earlier copy, and the
+/// transcript's saved size.
+type Prepared = (ImportedRecord, Vec<TranscriptEntry>, bool, usize);
+
+/// Drops the oldest entries until the saved transcript fits, measured as the JSON it is
+/// saved as, since escaping can make that several times longer than the text. Returns
+/// the saved size of the entries kept.
+fn fit(entries: &mut Vec<TranscriptEntry>, earlier: &mut usize) -> usize {
+    let sizes: Vec<usize> = entries.iter().map(|entry| saved_size(entry) + 1).collect();
+    let mut size: usize = sizes.iter().sum();
+    let mut drop = 0;
+    while size > TRANSCRIPT_BYTES && drop < sizes.len() {
+        size -= sizes[drop];
+        drop += 1;
     }
+    entries.drain(..drop);
+    *earlier += drop;
+    size
+}
+
+fn saved_size(entry: &TranscriptEntry) -> usize {
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 += bytes.len();
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count(0);
+    let _ = serde_json::to_writer(&mut count, entry);
+    count.0
 }
 
 fn unchanged(record: &ImportedRecord, path: &Path, state: FileState) -> bool {

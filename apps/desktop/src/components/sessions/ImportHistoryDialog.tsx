@@ -162,6 +162,12 @@ function ImportHistoryDialog({
       await startSessionImport(chosen.map((session) => session.key));
       setStarted(true);
       await refreshImported();
+      // A short import can finish before the store ever sees it running, so the effect
+      // that rescans when one ends would not run.
+      if (!useImportedConversationStore.getState().progress?.running) {
+        setSelected(new Set());
+        await rescan(false);
+      }
     });
 
   const projectName = (group: ImportGroup) =>

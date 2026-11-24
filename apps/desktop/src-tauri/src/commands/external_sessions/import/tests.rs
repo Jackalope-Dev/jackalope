@@ -807,3 +807,49 @@ fn trial_against_local_session_stores() {
         println!("  {} (grew: {grew})", left.0.display());
     }
 }
+
+#[test]
+fn transcripts_that_escape_heavily_still_fit_and_read_back() {
+    let fixture = Fixture::new();
+    let store = Store::new(fixture.path("imported-conversations"));
+    // Each control character is saved as six bytes, so the text alone underestimates the
+    // file by far more than the reader's margin.
+    let mut entries: Vec<_> = (0..1_000)
+        .map(|index| TranscriptEntry {
+            role: Role::Assistant,
+            text: format!("{index} {}", "\u{1}".repeat(12_000)),
+            tools: Vec::new(),
+            attachments: Vec::new(),
+            at: None,
+        })
+        .collect();
+    let mut earlier = 0;
+    let size = fit(&mut entries, &mut earlier);
+    assert!(size <= TRANSCRIPT_BYTES);
+    assert!(earlier > 0 && entries.last().unwrap().text.starts_with("999 "));
+    let id = format!("claude:{CLAUDE_SESSION}");
+    let record = ImportedRecord {
+        id: id.clone(),
+        agent: "claude".into(),
+        session_id: CLAUDE_SESSION.into(),
+        project_id: "project-1".into(),
+        title: "Escaped".into(),
+        cwd: fixture.root.to_string_lossy().into_owned(),
+        branch: None,
+        started_at: None,
+        last_at: None,
+        imported_at: String::new(),
+        messages: 1_000,
+        earlier,
+        skipped_lines: 0,
+        subagent_lines: 0,
+        source_path: PathBuf::new(),
+        source_home: PathBuf::new(),
+        source_size: 0,
+        source_modified_ms: 0,
+        continued_in: None,
+    };
+    let kept = entries.len();
+    store.commit(vec![(record, entries)]).unwrap();
+    assert_eq!(store.transcript(&id).unwrap().len(), kept);
+}
