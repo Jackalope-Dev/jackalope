@@ -26,6 +26,8 @@ interface AppEvents {
   'open-feedback': undefined;
   /** Opens the dialog that imports Claude Code and Codex conversations. */
   'open-history-import': undefined;
+  /** Opens the dialog that adds repositories found on this computer as projects. */
+  'open-project-discovery': undefined;
   /** Adds attachment lines to the open new-work composer. */
   'attach-to-composer': string[];
   /** Opens the new-work composer for this project, leaving the open work as it is. */
@@ -80,3 +82,5 @@ export const openShortcuts = () => emitAppEvent('open-shortcuts');
 export const openFeedback = () => emitAppEvent('open-feedback');
 
 export const openHistoryImport = () => emitAppEvent('open-history-import');
+
+export const openProjectDiscovery = () => emitAppEvent('open-project-discovery');

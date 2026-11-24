@@ -163,3 +163,12 @@ export function worthOffering(scan: ImportScan) {
     (group) => group.exists && group.sessions.some((session) => session.status === 'new'),
   );
 }
+
+/**
+ * Which quarter of a running import is done, so screen readers hear its progress at a few
+ * milestones rather than with every conversation.
+ */
+export function importMilestone(progress: Pick<ImportProgress, 'done' | 'total'>) {
+  if (progress.total <= 0) return 0;
+  return Math.min(4, Math.floor((progress.done * 4) / progress.total));
+}

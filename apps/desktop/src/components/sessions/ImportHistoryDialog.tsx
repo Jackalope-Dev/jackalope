@@ -29,6 +29,7 @@ import {
   type ImportProgress,
   type ImportScan,
   importable,
+  importMilestone,
   initialSelection,
   scanSessionsToImport,
   startSessionImport,
@@ -124,6 +125,18 @@ function ImportHistoryDialog({
     wasRunning.current = running;
   }, [running]);
 
+  // Announced at the start and each quarter; the visible line updates with every conversation.
+  const milestone = running && progress ? importMilestone(progress) : -1;
+  const [announcement, setAnnouncement] = useState('');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: announce only when the milestone changes
+  useEffect(() => {
+    if (!progress || milestone < 0) return;
+    setAnnouncement(
+      milestone === 0
+        ? `Importing ${count(progress.total, 'conversation', 'conversations')}.`
+        : `Imported ${progress.done.toLocaleString()} of ${progress.total.toLocaleString()}.`,
+    );
+  }, [milestone]);
   const groups = useMemo(() => activeIn(scan?.groups ?? [], period), [scan, period]);
   const present = groups.filter((group) => group.exists);
   const gone = groups.filter((group) => !group.exists);
@@ -334,7 +347,10 @@ function ImportHistoryDialog({
             <div className="history-import-progress">
               {running ? (
                 <>
-                  <p role="status">
+                  <p className="sr-only" role="status">
+                    {announcement}
+                  </p>
+                  <p>
                     Importing {Math.min(progress.done + 1, progress.total).toLocaleString()} of{' '}
                     {progress.total.toLocaleString()}
                     {progress.current ? ` · ${progress.current}` : ''}

@@ -176,6 +176,12 @@ fn linked_common_dir(file: &Path) -> Option<PathBuf> {
     dunce::canonicalize(common).ok()
 }
 
+/// The main checkout of the repository `path` is in: the folder holding the shared `.git`
+/// of a worktree, or the top of the checkout. None outside a repository.
+pub(in crate::commands) fn main_checkout(path: &Path) -> Option<PathBuf> {
+    import::repository_root(&Location::of(path))
+}
+
 /// The project a session that ran in `cwd` belongs to: the deepest project folder it is
 /// inside, in the same repository, or else a project whose repository it is a worktree of.
 fn project_for<'a>(
@@ -792,6 +798,18 @@ impl ExternalSessions {
             .collect()
     }
 
+    /// Where the person's Claude Code and Codex sessions ran, and when each was last
+    /// written, from the same stores the import reads. The folders are not touched.
+    pub(in crate::commands) fn session_folders(&self) -> Vec<(String, u64)> {
+        let runtime = &self.0.runtime;
+        let homes = import::homes(&Accounts::load(runtime));
+        let mut recorded = runtime.recorded_sessions();
+        recorded.extend(self.0.conversations.continued_sessions());
+        self.0
+            .imports
+            .folders(&homes, &recorded, runtime.data_directory())
+    }
+
     fn imports_changed(&self) {
         if let Some(app) = self.0.app.get() {
             let _ = app.emit("imported-conversations-changed", ());
@@ -832,18 +850,20 @@ impl ExternalSessions {
         self.imports_changed();
         let service = self.clone();
         std::thread::spawn(move || {
-            let projects = service.projects();
             let last = std::cell::Cell::new(None::<Instant>);
-            service.0.imports.run(keys, &projects, &|| {
-                // Progress is announced at most a few times a second.
-                if last
-                    .get()
-                    .is_none_or(|last| last.elapsed() >= Duration::from_millis(250))
-                {
-                    last.set(Some(Instant::now()));
-                    service.imports_changed();
-                }
-            });
+            service
+                .0
+                .imports
+                .run_guarded(keys, &|| service.projects(), &|| {
+                    // Progress is announced at most a few times a second.
+                    if last
+                        .get()
+                        .is_none_or(|last| last.elapsed() >= Duration::from_millis(250))
+                    {
+                        last.set(Some(Instant::now()));
+                        service.imports_changed();
+                    }
+                });
             service.imports_changed();
             // Imported sessions leave the Outside Jackalope list.
             service.refresh();

@@ -2,6 +2,7 @@ import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
 import { missingProjectDefaults } from './context/project-defaults';
 import { invokeNative } from './native/transport';
+import { projectReadiness } from './readiness';
 
 /** A folder the native side checked: its resolved path, name and Git state. */
 export interface ProjectInfo {
@@ -79,5 +80,24 @@ export function commitProjectSetup(pending: Project): Project {
     .getState()
     .refreshMemory(project)
     .catch(() => {});
+  return project;
+}
+
+/**
+ * Adds a folder as a project the way setup does, then fills unset preparation, check and
+ * preview commands from what the folder holds. Detection failing leaves the project added.
+ */
+export async function addDetectedProject(path: string) {
+  const project = await openProject(path);
+  try {
+    const defaults = missingProjectDefaults(
+      project.preferences,
+      await projectReadiness(project.path),
+    );
+    if (Object.keys(defaults).length)
+      useProjectStore.getState().updateProjectPreferences(project.id, defaults);
+  } catch {
+    // Commands can be set later in Project settings.
+  }
   return project;
 }

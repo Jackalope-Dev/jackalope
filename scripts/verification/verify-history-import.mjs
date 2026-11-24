@@ -149,6 +149,15 @@ try {
   // Import runs in the background with progress and can be canceled.
   await dialog.getByRole('button', { name: 'Import 2 conversations' }).click();
   await dialog.getByText(/Importing 2 of 2/).waitFor();
+  // Screen readers hear milestones from a separate status, not every visible update.
+  assert.equal(await dialog.getByRole('status').filter({ hasText: 'Imported 1 of 2.' }).count(), 1);
+  assert.equal(
+    await dialog
+      .getByRole('status')
+      .filter({ hasText: /of 2 ·/ })
+      .count(),
+    0,
+  );
   await dialog.getByRole('progressbar', { name: 'Import progress' }).waitFor();
   await dialog.getByRole('button', { name: 'Cancel import' }).click();
   await page.waitForFunction(() =>

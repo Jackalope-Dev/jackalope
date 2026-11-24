@@ -1,4 +1,5 @@
 import {
+  FolderSearch,
   History,
   Keyboard,
   LayoutDashboard,
@@ -12,7 +13,12 @@ import {
   Settings2,
   SquareTerminal,
 } from 'lucide-react';
-import { openFeedback, openHistoryImport, openShortcuts } from '../../lib/app-events';
+import {
+  openFeedback,
+  openHistoryImport,
+  openProjectDiscovery,
+  openShortcuts,
+} from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { DISCORD_URL } from '../../lib/community';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
@@ -34,7 +40,14 @@ export interface CommandContext {
 }
 
 export interface Command {
-  id: ShortcutAction | 'shortcuts' | 'help' | 'feedback' | 'discord' | 'importHistory';
+  id:
+    | ShortcutAction
+    | 'shortcuts'
+    | 'help'
+    | 'feedback'
+    | 'discord'
+    | 'importHistory'
+    | 'findProjects';
   /** The label in command search. */
   label: (ctx: CommandContext) => string;
   icon: LucideIcon;
@@ -109,6 +122,14 @@ export const COMMANDS: readonly Command[] = [
     shortcut: 'sidebar',
     hidden: true,
     run: (ctx) => ctx.toggleSidebar(),
+  },
+  {
+    id: 'findProjects',
+    label: () => 'Find projects on this computer',
+    icon: FolderSearch,
+    keywords: 'find detect discover add projects repositories repos folders git',
+    available: () => isTauriEnvironment(),
+    run: () => openProjectDiscovery(),
   },
   {
     id: 'importHistory',

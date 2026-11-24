@@ -87,6 +87,7 @@ import {
   type SettingsCategory,
 } from '../../lib/settings-categories';
 import { CompanionSources } from '../mascot/CompanionSources';
+import { FindProjectsHost } from '../projects/FindProjectsDialog';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import { HistoryImportHost } from '../sessions/ImportHistoryDialog';
 import type { ComposerSeed } from '../sessions/SessionStart';
@@ -846,6 +847,7 @@ export function Shell({
       </Suspense>
       <WelcomeDialog onClose={() => setWelcomed(true)} />
       <HistoryImportHost ready={welcomed} />
+      <FindProjectsHost />
       <WhatsNewDialog />
       <ShortcutSheet />
     </div>

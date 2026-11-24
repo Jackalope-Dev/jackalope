@@ -25,6 +25,7 @@ pub mod live_sessions;
 pub mod mcp;
 pub mod mcp_broker;
 pub mod platform;
+pub mod project_discovery;
 pub mod project_files;
 pub mod project_registry;
 pub mod project_secrets;

@@ -12,6 +12,20 @@ Running tasks also needs a free Jackalope account. The welcome screen opens the
 website in your browser to sign up or sign in, then you confirm the code shown in
 the app to connect this desktop. See [desktop account connection](DESKTOP-ACCOUNT.md).
 
+First-run setup starts by looking for repositories on this computer: the folders your
+Claude Code and Codex conversations ran in, Git repositories one or two levels inside common
+code folders in your home (such as `~/Code`, `~/Developer`, `~/Projects`, `~/src` and
+`~/source/repos`), and folders VS Code, Cursor and Windsurf list as open or recently open
+in their `storage.json`. Worktrees count as their main checkout, and repositories that are
+already projects are left out. It reads only directory entries and Git metadata (current
+commit time and the default remote's host), never file contents, and it never opens
+Desktop, Documents, Downloads, the media folders, `~/Library` (including iCloud Drive) or
+mounted volumes, so macOS does not ask for permission. The scan stops after a few seconds
+with what it found. The few with recent agent conversations or commits start chosen; **Add
+another folder…** adds one you pick, and **Skip** goes to choosing a folder instead. Each
+chosen repository is added with its commands detected, and the first continues through
+setup. Command search's **Find projects on this computer** runs the same scan later.
+
 1. Open a Git repository with at least one commit (Project settings → Integrations →
    Cloudflare Artifacts can make the first one). Choose the agent you want.
    Project setup asks for the project, its agents and an optional first-task

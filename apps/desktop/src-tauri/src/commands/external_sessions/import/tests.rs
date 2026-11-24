@@ -853,3 +853,72 @@ fn transcripts_that_escape_heavily_still_fit_and_read_back() {
     store.commit(vec![(record, entries)]).unwrap();
     assert_eq!(store.transcript(&id).unwrap().len(), kept);
 }
+
+#[test]
+fn a_panicking_import_ends_with_its_message() {
+    let world = World::new();
+    world.scan();
+    world.imports.begin(1).unwrap();
+    world.imports.run_guarded(
+        vec![format!("claude:{CLAUDE_SESSION}")],
+        &|| {
+            vec![ProjectFolder::new(
+                "project-1",
+                world.repo.to_str().unwrap(),
+            )]
+        },
+        &|| panic!("fixture failure"),
+    );
+    let progress = world.imports.progress();
+    assert!(!progress.running);
+    assert!(progress
+        .error
+        .as_deref()
+        .is_some_and(|error| error.contains("fixture failure")));
+    // The next import can start.
+    world.imports.begin(1).unwrap();
+}
+
+/// Project discovery with this computer's own session folders, read-only. Prints what it
+/// found; no project or profile is changed.
+#[test]
+#[ignore = "Reads the local session stores, code folders and Git metadata"]
+fn trial_project_discovery_with_local_sessions() {
+    use crate::commands::project_discovery::{discover, Inputs};
+    let home = crate::commands::platform::home_dir().expect("a home directory");
+    let homes: Vec<_> = Source::ALL
+        .into_iter()
+        .map(|source| {
+            let directory = crate::commands::agents::find(source.adapter())
+                .unwrap()
+                .default_directory(&home);
+            (source, directory)
+        })
+        .filter(|(_, directory)| directory.is_dir())
+        .collect();
+    let fixture = Fixture::new();
+    let imports = Imports::new(fixture.path("imported-conversations"));
+    let started = std::time::Instant::now();
+    let folders = imports.folders(&homes, &Default::default(), &fixture.path("data"));
+    let read = started.elapsed();
+    let mut inputs = Inputs::for_home(home);
+    inputs.sessions = folders.clone();
+    let scan = discover(&inputs, std::time::Instant::now() + Duration::from_secs(4));
+    println!(
+        "{} session folders read in {read:?}; {} candidates in {:?}, truncated {}",
+        folders.len(),
+        scan.candidates.len(),
+        started.elapsed(),
+        scan.truncated
+    );
+    for candidate in &scan.candidates {
+        println!(
+            "{} sessions {} {:?} last commit {:?} recommended {}",
+            candidate.name,
+            candidate.sessions,
+            candidate.sources,
+            candidate.last_commit_at,
+            candidate.recommended
+        );
+    }
+}

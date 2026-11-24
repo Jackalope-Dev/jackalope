@@ -25,7 +25,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex,
+        Mutex, PoisonError,
     },
     time::{Duration, UNIX_EPOCH},
 };
@@ -143,7 +143,7 @@ impl Store {
     }
 
     fn with<T>(&self, read: impl FnOnce(&Ledger) -> T) -> Result<T, String> {
-        let mut slot = self.ledger.lock().map_err(|error| error.to_string())?;
+        let mut slot = self.ledger.lock().unwrap_or_else(PoisonError::into_inner);
         let ledger = slot.get_or_insert_with(|| self.load());
         ledger.as_ref().map(read).map_err(Clone::clone)
     }
@@ -161,7 +161,8 @@ impl Store {
         &self,
         change: impl FnOnce(&Path, &mut Ledger) -> Result<T, String>,
     ) -> Result<T, String> {
-        let mut slot = self.ledger.lock().map_err(|error| error.to_string())?;
+        // The ledger is replaced only after a save, so one left by a panic is still whole.
+        let mut slot = self.ledger.lock().unwrap_or_else(PoisonError::into_inner);
         let current = slot
             .get_or_insert_with(|| self.load())
             .as_ref()
@@ -397,8 +398,8 @@ impl Imports {
     pub fn progress(&self) -> ImportProgress {
         self.progress
             .lock()
-            .map(|progress| progress.clone())
-            .unwrap_or_default()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     /// Reads the stores and lists every session the person had, grouped by where it ran.
@@ -408,7 +409,7 @@ impl Imports {
         projects: &[ProjectFolder],
         scope: &Scope,
     ) -> Result<ImportScan, String> {
-        let mut state = self.scan.lock().map_err(|error| error.to_string())?;
+        let mut state = self.scan.lock().unwrap_or_else(PoisonError::into_inner);
         state.index.refresh(homes);
         let (records, error) = match self.store.records() {
             Ok(records) => (records, None),
@@ -492,6 +493,44 @@ impl Imports {
         })
     }
 
+    /// Where each of the person's sessions ran and when its file last changed, newest copy of
+    /// each. Reads only the stores: the folders themselves are not touched, so a caller can
+    /// decide which of them it may look at.
+    pub fn folders(
+        &self,
+        homes: &[(Source, PathBuf)],
+        recorded: &std::collections::HashSet<String>,
+        data_directory: &Path,
+    ) -> Vec<(String, u64)> {
+        let mut state = self.scan.lock().unwrap_or_else(PoisonError::into_inner);
+        state.index.refresh(homes);
+        let mut newest: HashMap<String, (String, u64)> = HashMap::new();
+        for entry in state.index.files.values() {
+            let Some(summary) = entry
+                .summary
+                .as_ref()
+                .filter(|summary| summary.title.is_some())
+            else {
+                continue;
+            };
+            let cwd = Path::new(&summary.cwd);
+            if recorded.contains(&summary.session_id)
+                || super::jackalope_worktree(cwd, summary.branch.as_deref())
+                || cwd.starts_with(data_directory)
+            {
+                continue;
+            }
+            let key = format!("{}:{}", entry.source.adapter(), summary.session_id);
+            if newest
+                .get(&key)
+                .is_none_or(|(_, modified)| *modified < entry.modified_ms)
+            {
+                newest.insert(key, (summary.cwd.clone(), entry.modified_ms));
+            }
+        }
+        newest.into_values().collect()
+    }
+
     /// Imports `keys` from the last scan, reporting progress through `changed`. Runs on the
     /// caller's thread until done or canceled.
     pub fn run(
@@ -506,9 +545,7 @@ impl Imports {
             .map(|state| state.found.clone())
             .unwrap_or_default();
         let update = |change: &dyn Fn(&mut ImportProgress)| {
-            if let Ok(mut progress) = self.progress.lock() {
-                change(&mut progress);
-            }
+            change(&mut self.progress.lock().unwrap_or_else(PoisonError::into_inner));
             changed();
         };
         let mut pending = Vec::new();
@@ -592,7 +629,7 @@ impl Imports {
 
     /// Marks an import as started, refusing a second one while it runs.
     pub fn begin(&self, total: usize) -> Result<(), String> {
-        let mut progress = self.progress.lock().map_err(|error| error.to_string())?;
+        let mut progress = self.progress.lock().unwrap_or_else(PoisonError::into_inner);
         if progress.running {
             return Err("An import is already running. Wait for it to finish or cancel it.".into());
         }
@@ -603,6 +640,31 @@ impl Imports {
             ..ImportProgress::default()
         };
         Ok(())
+    }
+
+    /// Runs an import begun with [`Imports::begin`], so that a panic while importing ends
+    /// it with the panic's message instead of leaving it running forever.
+    pub fn run_guarded(
+        &self,
+        keys: Vec<String>,
+        projects: &dyn Fn() -> Vec<ProjectFolder>,
+        changed: &dyn Fn(),
+    ) {
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.run(keys, &projects(), changed)
+        }));
+        if let Err(panic) = outcome {
+            let message = panic
+                .downcast_ref::<&str>()
+                .map(|text| text.to_string())
+                .or_else(|| panic.downcast_ref::<String>().cloned())
+                .unwrap_or_else(|| "no message".into());
+            self.cancel.store(false, Ordering::SeqCst);
+            let mut progress = self.progress.lock().unwrap_or_else(PoisonError::into_inner);
+            progress.running = false;
+            progress.current = None;
+            progress.error = Some(format!("The import stopped unexpectedly: {message}. Conversations saved before it stopped are kept."));
+        }
     }
 
     pub fn cancel(&self) {
@@ -742,7 +804,7 @@ fn timestamp(modified_ms: u64) -> String {
 
 /// The folder that names a repository: the main checkout of a worktree, or the top of
 /// the checkout. None outside a repository.
-fn repository_root(location: &Location) -> Option<PathBuf> {
+pub(super) fn repository_root(location: &Location) -> Option<PathBuf> {
     let common = location.common.as_deref();
     match common {
         Some(common) if common.file_name().is_some_and(|name| name == ".git") => {

@@ -100,6 +100,7 @@ macro_rules! with_commands {
             commands::project_favicon,
             commands::project_files,
             commands::project_git,
+            commands::project_discovery,
             commands::project_registry,
             commands::project_secrets,
             commands::readiness,

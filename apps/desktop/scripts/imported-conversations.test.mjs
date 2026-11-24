@@ -76,3 +76,11 @@ test('the offer appears only for a new conversation in a folder that exists', ()
     false,
   );
 });
+
+test('import progress is announced at quarters, not with every conversation', async () => {
+  const { importMilestone } = await import('../src/lib/imported-conversations.ts');
+  const milestones = Array.from({ length: 41 }, (_, done) => importMilestone({ done, total: 40 }));
+  assert.equal(new Set(milestones).size, 5);
+  assert.deepEqual([milestones[0], milestones[9], milestones[10], milestones[40]], [0, 0, 1, 4]);
+  assert.equal(importMilestone({ done: 0, total: 0 }), 0);
+});
