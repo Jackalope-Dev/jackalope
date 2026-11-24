@@ -235,6 +235,9 @@ fn key(text: &str, start: usize, header_end: usize) -> (usize, String) {
     if rest.starts_with("\\n") || rest.starts_with("\\r\\n") {
         return (escaped_key(text, header_end), KEY_MARK.into());
     }
+    if rest.starts_with([' ', '\t']) {
+        return (flattened_key(text, header_end), KEY_MARK.into());
+    }
     if !rest.starts_with('\n') && !rest.starts_with("\r\n") {
         return (header_end, KEY_MARK.into());
     }
@@ -286,6 +289,39 @@ fn key(text: &str, start: usize, header_end: usize) -> (usize, String) {
         }
     }
     (end, out)
+}
+
+/// The end of a key flattened onto one line, its lines separated by spaces or
+/// tabs as an unquoted `echo $KEY` prints it, whose header ends at
+/// `header_end`: through its END marker, or its last base64 run.
+fn flattened_key(text: &str, header_end: usize) -> usize {
+    let mut end = header_end;
+    loop {
+        let start = end + text[end..].len() - text[end..].trim_start_matches([' ', '\t']).len();
+        if start == end {
+            return end;
+        }
+        let rest = &text[start..];
+        if let Some(footer) = KEY_END.find(rest) {
+            return start + footer.end();
+        }
+        let length = rest
+            .find(|c: char| !(c.is_ascii_alphanumeric() || "+/=".contains(c)))
+            .unwrap_or(rest.len());
+        let (run, next) = (
+            &rest[..length],
+            rest[length..].trim_start_matches([' ', '\t']),
+        );
+        // A short last run, at the end of the line, is the key's last line.
+        let last_line = end > header_end
+            && !run.is_empty()
+            && run.bytes().any(|b| !b.is_ascii_alphabetic())
+            && (next.is_empty() || next.starts_with(['\n', '\r']));
+        if !last_line && !key_line(run, KEY_END.is_match(next), false) {
+            return end;
+        }
+        end = start + length;
+    }
 }
 
 /// The end of a key written with escaped line breaks (`\n` inside a JSON or
@@ -526,14 +562,25 @@ fn location(value: &str) -> bool {
             && matches!(bytes[2], b'\\' | b'/'))
 }
 
-/// An address with no credentials in it: no user, password, query or fragment.
+/// An address with no credentials in it: no user, password, query or
+/// fragment, and no path segment that looks like a secret, as a webhook's
+/// does.
 fn plain_url(value: &str) -> bool {
+    let secret_like = |segment: &str| {
+        segment.len() >= 16
+            || (segment.len() >= 8
+                && segment.bytes().any(|b| b.is_ascii_digit())
+                && segment.bytes().any(|b| b.is_ascii_alphabetic()))
+    };
     value.contains("://")
         && reqwest::Url::parse(value).is_ok_and(|url| {
             url.username().is_empty()
                 && url.password().is_none()
                 && url.query().is_none()
                 && url.fragment().is_none()
+                && !url
+                    .path_segments()
+                    .is_some_and(|mut segments| segments.any(secret_like))
         })
 }
 
@@ -757,6 +804,21 @@ mod tests {
             )),
             "[redacted private key] goes first.\nNotes\n[redacted private key]\nafter"
         );
+        assert_eq!(
+            masked(&format!("{begin} {one} {two} {end} after")),
+            "[redacted private key] after"
+        );
+        assert_eq!(
+            masked(&format!(
+                "$ echo $KEY\n{begin} {one}\t{two} {}\n$ next",
+                random(12)
+            )),
+            "$ echo $KEY\n[redacted private key]\n$ next"
+        );
+        assert_eq!(
+            masked(&format!("{begin} then the key, then {end} below.")),
+            format!("[redacted private key] then the key, then {end} below.")
+        );
         let encrypted = format!(
             "{begin}\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,{}\n\n{one}\n{end}\nafter",
             random(32)
@@ -966,6 +1028,7 @@ mod tests {
     fn environment_secrets_follow_names_and_connection_urls() {
         let password = format!("p@ss {}", random(10));
         let encoded = password.replace('@', "%40").replace(' ', "%20");
+        let webhook = format!("https://hooks.example.com/webhooks/123/{}", random(24));
         let values = environment(
             [
                 ("SERVICE_API_KEY", "service-key-value"),
@@ -978,6 +1041,7 @@ mod tests {
                 ("OAUTH_TOKEN_URL", "https://auth.example.com/token"),
                 ("AUTH0_AUTH_DOMAIN", "tenant.example.auth0.com"),
                 ("SERVICE_TOKEN", "https://api.example.com/v1"),
+                ("CHAT_WEBHOOK_TOKEN", &webhook),
                 ("WEBHOOK_SECRET", "https://hooks.example.com/in?sig=abc123"),
                 ("PGPASSWORD", "database-password"),
             ]
@@ -990,6 +1054,7 @@ mod tests {
                 "github-token-value".into(),
                 password,
                 encoded,
+                webhook.clone(),
                 "https://hooks.example.com/in?sig=abc123".into(),
                 "database-password".into(),
             ]
