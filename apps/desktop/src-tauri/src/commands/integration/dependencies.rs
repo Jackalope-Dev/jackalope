@@ -136,22 +136,13 @@ pub fn prepare_dependencies(
             &[&run.base_head],
             &format!("feat: integrate completed task {}", run.id),
         )?;
-        let output = repo::output(
-            &project,
-            &["merge-tree", "--write-tree", &combined, &commit],
-            Snapshot,
-        )?;
-        if !output.status.success() {
+        let merged = merge_tree::merge_tree(&project, &[], &combined, &commit, Snapshot)?;
+        if !merged.conflicts.is_empty() {
             return Err("Feature predecessor snapshots conflict. Review and correct the sources before retrying.".into());
         }
-        let tree = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .next()
-            .unwrap_or("")
-            .to_string();
         combined = commit_tree(
             &project,
-            &tree,
+            &merged.tree,
             &[&combined, &commit],
             "Jackalope feature dependency base",
         )?;
@@ -241,30 +232,17 @@ pub(in crate::commands) fn reconciliation_input(
             "Jackalope reconciliation input",
         )?;
         // diff3 markers give the resolving agent each block's common ancestor too.
-        let output = repo::output(
+        let merged = merge_tree::merge_tree(
             &project,
-            &[
-                "-c",
-                "merge.conflictStyle=diff3",
-                "merge-tree",
-                "--write-tree",
-                &combined,
-                &commit,
-            ],
+            &["-c", "merge.conflictStyle=diff3"],
+            &combined,
+            &commit,
             Snapshot,
-        )?;
-        if !output.status.success() && output.status.code() != Some(1) {
-            return Err("Git could not construct a reconciliation input.".into());
-        }
-        let text = String::from_utf8_lossy(&output.stdout);
-        let tree = text
-            .lines()
-            .next()
-            .filter(|s| !s.is_empty())
-            .ok_or("Missing reconciliation tree.")?;
+        )
+        .map_err(|_| "Git could not construct a reconciliation input.".to_string())?;
         combined = commit_tree(
             &project,
-            tree,
+            &merged.tree,
             &[&combined, &commit],
             "Jackalope reconciliation workspace",
         )?;

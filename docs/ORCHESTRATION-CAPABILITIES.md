@@ -287,6 +287,9 @@ base and theirs text) where Git reports them. Reconciliation attempts, and only 
 the `conflicts` and `resolve_conflicts` bridge tools: the first lists each conflicted file's
 blocks and content hash, and the second resolves every block of one file in a single call as
 ours, theirs, base, both or custom text. A lone `=======` line outside a block is ordinary text.
+Xcode project files reach the worktree with markers only when they conflict by structure too;
+their listing adds a note naming the objects to decide (see
+[Xcode project merges](IOS-DEVELOPMENT.md#xcode-project-merges)).
 A file that is not UTF-8 or is over 4 MB is listed with its own error for editing directly. A
 resolution is refused, and nothing is written, when the file changed since it was listed or the
 result would still contain a conflict block or stray marker.

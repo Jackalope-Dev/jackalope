@@ -2,7 +2,7 @@
 //!
 //! The change between the plan's starting point and its commit is cut into units:
 //! one per hunk of a modified text file, and one per file for new, deleted, binary
-//! or mode-changing files. A tool-free helper call groups the units, lock files left
+//! or mode-changing files and Xcode project files. A tool-free helper call groups the units, lock files left
 //! out, into commits with messages and dependencies. Jackalope checks the grouping
 //! (every unit exactly once, nothing unknown, an acyclic order), places each lock
 //! file with its manifest's commit, and builds the commits by applying each group to
@@ -247,7 +247,9 @@ fn units(project: &Path, base: &str, head: &str) -> Result<Vec<Unit>, String> {
         let chunk = chunks.next().ok_or("Git wrote an unexpected diff.")?;
         let (header, hunks) = split(&chunk);
         let text = String::from_utf8_lossy(&header);
+        // An Xcode project's hunks only make a valid project together.
         let whole = hunks.len() < 2
+            || crate::commands::pbxproj::is_project_file(&path)
             || [
                 "new file mode",
                 "deleted file mode",
@@ -1313,6 +1315,29 @@ mod tests {
             tree(&head)
         );
         assert_eq!(applied.commits.len(), 2);
+    }
+
+    #[test]
+    fn an_xcode_project_file_moves_as_one_whole_unit() {
+        let f = Fixture::new();
+        let git = |args: &[&str]| repo::git(&f.project, args, Snapshot).unwrap();
+        let project = f.project.join("App.xcodeproj/project.pbxproj");
+        fs::create_dir_all(project.parent().unwrap()).unwrap();
+        fs::write(&project, include_str!("../pbxproj/fixtures/base.pbxproj")).unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-m", "base"]);
+        let base = git(&["rev-parse", "HEAD"]);
+        fs::write(&project, include_str!("../pbxproj/fixtures/core.pbxproj")).unwrap();
+        git(&["commit", "-am", "core"]);
+        let units = units(&f.project, &base, &git(&["rev-parse", "HEAD"])).unwrap();
+        assert_eq!(units.len(), 1);
+        assert!(units[0].whole);
+        assert!(
+            String::from_utf8_lossy(&units[0].body)
+                .matches("\n@@ ")
+                .count()
+                > 1
+        );
     }
 
     #[test]
