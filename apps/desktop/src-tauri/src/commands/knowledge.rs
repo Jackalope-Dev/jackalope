@@ -11,7 +11,7 @@ use tauri::State;
 
 pub mod automatic;
 pub mod learning;
-pub mod rules;
+pub mod tool_rules;
 pub use automatic::LearningSource;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -41,7 +41,7 @@ pub struct KnowledgeEntry {
     pub enforced: Option<learning::Enforcement>,
     /// A check on agents' tool calls the person made from this lesson.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_rule: Option<rules::ToolRule>,
+    pub tool_rule: Option<tool_rules::ToolRule>,
     pub id: String,
     pub project_id: String,
     pub project_path: String,

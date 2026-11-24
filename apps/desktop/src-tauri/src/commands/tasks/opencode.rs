@@ -472,12 +472,12 @@ impl Api<'_> {
             let patterns: Vec<String> = scopes.iter().map(|(_, pattern)| pattern.clone()).collect();
             let label = format!("OpenCode {permission}: {}", patterns.join(", "));
             // OpenCode returns a rejection's message to the model as feedback.
-            if let Some(reason) = crate::commands::knowledge::rules::check_request(
+            if let Some(reason) = crate::commands::knowledge::tool_rules::check_request(
                 runtime,
                 run_id,
                 &label,
                 |workspace| {
-                    crate::commands::knowledge::rules::ToolCall::opencode(
+                    crate::commands::knowledge::tool_rules::ToolCall::opencode(
                         permission,
                         &patterns,
                         &request["metadata"],

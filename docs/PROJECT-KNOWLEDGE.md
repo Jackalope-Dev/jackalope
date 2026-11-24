@@ -458,9 +458,9 @@ and the sync data model. Learned lessons keep their status and use counts under 
 entry's `automatic.lifecycle`, including miss counts; the stale-lesson note is the
 entry's local `stale` field and the enforcing check is its local `enforced` field;
 a task's link to the lesson it enforces lives on its context receipt.
-`commands/knowledge/rules.rs` owns tool rules, kept in the entry's local `toolRule`
-field, and their matching. Entries and tasks
-saved before these existed load unchanged. Learned
+`commands/knowledge/tool_rules.rs` owns tool rules, kept in the entry's local `toolRule`
+field, and their matching; `automatic/rules.rs` reads other tools' rule files. Entries
+and tasks saved before these existed load unchanged. Learned
 ids derive from the project ID and the lesson, not the folder; project IDs belong to
 one installation, so sync matches projects by repository instead. History is
 append-only JSON Lines in `task-runs-v1/knowledge/ledger/`, one file per project; past

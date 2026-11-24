@@ -1209,7 +1209,7 @@ fn a_tool_rule_is_the_persons_and_recorded_in_history() {
         )],
     );
     let mut entry = learned(&store, &path).remove(0);
-    let rule = |pattern: &str| -> super::super::rules::ToolRule {
+    let rule = |pattern: &str| -> super::super::tool_rules::ToolRule {
         serde_json::from_value(serde_json::json!({
             "tools":["shell"],"pattern":pattern,"action":"deny","message":" Use pnpm. "
         }))

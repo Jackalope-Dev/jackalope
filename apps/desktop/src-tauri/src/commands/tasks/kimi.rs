@@ -519,11 +519,12 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
     );
     // ACP has no field for a reason, so the agent sees a rejection; the reason
     // rides along under `REASON` for the attempt's error and is removed before sending.
-    if let Some(reason) =
-        crate::commands::knowledge::rules::check_request(runtime, run_id, &label, |workspace| {
-            crate::commands::knowledge::rules::ToolCall::acp(tool_call, workspace)
-        })
-    {
+    if let Some(reason) = crate::commands::knowledge::tool_rules::check_request(
+        runtime,
+        run_id,
+        &label,
+        |workspace| crate::commands::knowledge::tool_rules::ToolCall::acp(tool_call, workspace),
+    ) {
         let mut outcome = params["options"]
             .as_array()
             .into_iter()

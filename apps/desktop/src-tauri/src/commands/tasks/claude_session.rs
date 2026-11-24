@@ -10,7 +10,7 @@
 
 use super::agent_process::{self, AgentProcess};
 use super::*;
-use crate::commands::knowledge::rules::{self, ToolCall, ToolRules};
+use crate::commands::knowledge::tool_rules::{self, ToolCall, ToolRules};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::process::ChildStdin;
@@ -637,9 +637,9 @@ impl Turn {
             .take(160)
             .collect();
         for found in &matches {
-            self.activity(&rules::activity_line(found, &label));
+            self.activity(&tool_rules::activity_line(found, &label));
         }
-        let (denied, warned) = rules::feedback(call.kind, &matches);
+        let (denied, warned) = tool_rules::feedback(call.kind, &matches);
         let mut output = json!({"hookEventName":"PreToolUse"});
         if let Some(reason) = denied {
             output["permissionDecision"] = json!("deny");
