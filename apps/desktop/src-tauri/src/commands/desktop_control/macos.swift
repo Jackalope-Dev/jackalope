@@ -58,6 +58,13 @@ func started(_ pid: pid_t) -> String? {
     return String(cString: buffer)
 }
 
+/// The executable a process runs, to recognize this helper's other processes.
+func executablePath(_ pid: pid_t) -> String? {
+    var buffer = [CChar](repeating: 0, count: 4096)
+    guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+    return String(cString: buffer)
+}
+
 func visibleWindows() -> [[String: Any]] {
     (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
         as? [[String: Any]]) ?? []
@@ -798,14 +805,18 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     // Anything above normal windows (menus, the Dock, panels) or a denied process is no target.
     if action == "at" {
         // Panels, menus and system layers (the Dock keeps a full-screen window above
-        // everything) are looked through; the first normal window under the pointer is the
-        // target, unless it is Jackalope's own. Untitled windows go by their app's name.
+        // everything) are looked through, as is the frame this helper draws just above a
+        // controlled window at the normal level; the first normal window under the pointer
+        // is the target, unless it is Jackalope's own. Untitled windows go by their app's name.
         let point = CGEvent(source: nil)?.location ?? .zero
+        let helper = executablePath(getpid())
         for value in visibleWindows() {
             guard let bounds = value[kCGWindowBounds as String] as? NSDictionary,
                   let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.contains(point),
                   (value[kCGWindowAlpha as String] as? Double ?? 1) > 0,
                   (value[kCGWindowLayer as String] as? Int) == 0 else { continue }
+            if let helper, let owner = value[kCGWindowOwnerPID as String] as? Int32,
+               executablePath(owner) == helper { continue }
             guard let id = value[kCGWindowNumber as String] as? UInt32,
                   let pid = value[kCGWindowOwnerPID as String] as? Int32, !deny.contains(pid),
                   let start = started(pid), let app = NSRunningApplication(processIdentifier: pid),

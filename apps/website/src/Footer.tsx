@@ -23,7 +23,8 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
     links: [
       ['Knowledgebase', '/knowledge/'],
       ['Run agents together', '/guides/run-codex-and-claude-code-in-parallel/'],
-      ['Review AI-generated code', '/guides/review-ai-generated-code/'],
+      ['Review AI-generated code', '/blog/review-ai-generated-code-checklist/'],
+      ['AGENTS.md vs CLAUDE.md', '/blog/agents-md-claude-md-project-instructions/'],
       ['Field notes', '/blog/'],
       ['Changelog', '/changelog/'],
       ['Roadmap', '/roadmap/'],
@@ -46,7 +47,6 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
     title: 'Connect',
     links: [
       ['Your account', '/access/'],
-      ['Your access & passes', '/access/'],
       ['Questions', '/#questions'],
       ['Join our Discord', DISCORD_URL, <DiscordIcon key="discord" />],
       ['GitHub', GITHUB_URL, <GitHubIcon key="github" />],

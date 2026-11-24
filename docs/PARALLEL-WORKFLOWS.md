@@ -217,7 +217,12 @@ and steps; their saved storage is left intact until the plan is saved.
 2. In Work's options menu, choose **Plan feature work**. Add focused tasks, or **Import a
    plan** from JSON, from that page's options menu. Review titles, instructions, assigned agents, owned paths and dependencies.
 3. Choose the concurrency limit and **Run ready tasks**. The limit counts currently
-   active application attempts across projects. Explicit single-task launches remain
+   active application attempts across projects. Automatic, the default, follows what this
+   computer can run: one agent per two CPUs and per 4 GiB of memory, whichever allows
+   fewer, from 1 to 16, the budget an added computer's runner uses. The menu marks that
+   number as recommended; a chosen number (1 to 16) is saved in `queue.json` and kept, and
+   one above the recommendation shows that it may slow the computer down. Provider
+   quota and account limits still apply separately. Explicit single-task launches remain
    available separately. Pausing dispatch leaves current attempts running; each has Stop.
 4. Follow work or read structured progress/blocker/handoff messages. Each task gets
    a separate worktree from the resolved target commit. Shared scopes wait for integration;

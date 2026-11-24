@@ -74,6 +74,15 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
       setActionError(describeError(cause));
     }
   };
+  const turnOnRule = async (entry: KnowledgeEntry) => {
+    setActionError('');
+    try {
+      await invokeNative('knowledge_save', { entry: { ...entry, enabled: true } });
+      await refresh();
+    } catch (cause) {
+      setActionError(describeError(cause));
+    }
+  };
   const retireEnforced = async (entry: KnowledgeEntry) => {
     setActionError('');
     try {
@@ -160,6 +169,8 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             const attention = lessonAttention(entry);
             const checkOffer = lessonCheckOffer(entry);
             const enforcedBy = entry.enforced && !entry.enforced.missing ? entry.enforced : null;
+            const suggested =
+              entry.automatic?.kind === 'rules' && entry.automatic.managed && !entry.enabled;
             return (
               <article key={entry.id} className="context-knowledge-card">
                 <div className="context-knowledge-type">
@@ -172,11 +183,13 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                   )}
                   {status
                     ? 'Learned'
-                    : entry.automatic
-                      ? 'Automatically learned'
-                      : entry.kind === 'memory'
-                        ? 'Lesson'
-                        : 'Workflow'}
+                    : entry.automatic?.kind === 'rules'
+                      ? 'Rule from another tool'
+                      : entry.automatic
+                        ? 'Automatically learned'
+                        : entry.kind === 'memory'
+                          ? 'Lesson'
+                          : 'Workflow'}
                   {status && (
                     <Badge
                       variant={
@@ -201,6 +214,19 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                     </Badge>
                   )}
                 </div>
+                {suggested && (
+                  <InlineNotice
+                    role="note"
+                    action={
+                      <Button variant="outline" onClick={() => void turnOnRule(entry)}>
+                        Use in tasks
+                      </Button>
+                    }
+                  >
+                    Found in this project and not used yet. Turn it on to give it to tasks whose
+                    request matches its words.
+                  </InlineNotice>
+                )}
                 {attention && (
                   <InlineNotice
                     tone="warning"

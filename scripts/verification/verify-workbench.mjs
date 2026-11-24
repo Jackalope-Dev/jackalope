@@ -142,7 +142,8 @@ try {
       /Feedback from attempt fixture-run/,
     );
     assert.equal(await page.getByText('Searchable older answer', { exact: false }).count(), 1);
-    await page.getByRole('button', { name: 'Format earlier response' }).click();
+    // Earlier replies format as they scroll into view.
+    await page.getByText('Searchable older answer', { exact: false }).scrollIntoViewIfNeeded();
     await page.getByRole('heading', { name: 'Earlier result' }).waitFor();
     await page.getByRole('button', { name: 'Ask agent to fix' }).click();
     await page.getByText('Error: Feedback storage full', { exact: true }).waitFor();

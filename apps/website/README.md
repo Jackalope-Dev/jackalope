@@ -130,6 +130,20 @@ Sequenzy, whose private API credential stays on the server. Legacy saved-form
 submissions use Sequenzy's confirmation settings and bypass that queue. The popup
 uses the site's shared dialog; it does not inject a hosted provider widget.
 
+Open signup or waitlist mode is the service's `OPEN_SIGNUP` setting, not a website
+build variable. Prerendered pages are the same in both modes; `/waitlist/`, `/access/`
+and the signup confirmation read `GET /v1/access/status` (`useSignupMode` in
+`src/access-api.ts`) and show waitlist or pass copy only in waitlist mode. Signed-in
+member pages use the `openSignup` field of their own responses.
+
+Production builds for the canonical origin (`https://jackalope.dev`) add LopeBase's
+cookieless page counter to every page's head (`vite.config.ts`); the dev server and
+builds with another `VITE_SITE_URL` do not. `reportConversion` in `src/analytics.ts`
+reports `signup`, `signup_confirmed` and `download` once per page load, without
+personal data. The site sends no Content-Security-Policy; if one is added, allow
+`https://app.lopebase.com` for scripts and connections and the inline queue stub.
+Keep the privacy page's description of the counter accurate when it changes.
+
 Before enabling signup, verify the sending domain, reply-to and mailing addresses,
 audience, consent settings and email sequences in the provider account. Keep account
 records and subscriber exports private. Live checks require an operator-controlled
@@ -185,7 +199,28 @@ Cloudflare configuration and replace its Worker name and domain for your deploym
 do not deploy a fork with the upstream identifiers.
 
 Serve each generated directory's `index.html`, normalize trailing slashes and return
-`404.html` with HTTP 404 for unknown routes. Avoid a catch-all 200 SPA rewrite.
+`404.html` with HTTP 404 for unknown routes. The build writes `dist/_redirects` (a 301
+from each page without its trailing slash, plus the retired URLs in `movedPages` in
+`src/seo.ts`) and appends rules to `dist/_headers` that serve every Markdown mirror and
+`llms*.txt` file with `X-Robots-Tag: noindex` and a canonical `Link` to its HTML page.
+Hosts that ignore those files need equivalent rules. Avoid a catch-all 200 SPA rewrite.
+
+On Cloudflare, `worker/index.ts` runs in front of the assets (`run_worker_first`,
+skipping `/assets/*` and `/media/*`). A page request whose `Accept` header prefers
+`text/markdown` gets the page as Markdown: the guide's `index.md` mirror when one
+exists, otherwise the prerendered `<main>` converted at request time. HTML pages gain
+`Vary: Accept` and discovery `Link` headers, and `/.well-known/api-catalog` is served
+as `application/linkset+json`. The Worker also serves a read-only website content
+MCP server at `/api/mcp` (stateless Streamable HTTP, `worker/mcp.ts`) and an A2A
+agent at `/api/a2a` (JSON-RPC 1.0 and 0.3, keyword routing, `worker/a2a.ts`). Both run
+the tools in `worker/tools.ts`, which read only `llms.txt`, `knowledge/llms.txt`,
+`changelog.json` and page assets, with bounded arguments, a 64 KiB body cap and the
+`API_LIMITER` per-IP rate limit. `src/agent-discovery.ts` generates the agent skills
+index and SKILL.md files, the MCP server card, the A2A agent card, the API catalog,
+`openapi.json`, the ARD `ai-catalog.json` and `poppy.json`; keep them limited to what
+the site really serves. `src/webmcp.ts`
+registers read-only WebMCP tools in browsers that support them. Static hosts without
+the Worker serve the discovery files but not Markdown negotiation.
 Subdirectory hosting is not configured. Serve MP4 as `video/mp4`, WebM as
 `video/webm` and VTT as `text/vtt`; preserve byte-range requests for video seeking.
 Use immutable caching for hashed assets and revalidate HTML and named public media.

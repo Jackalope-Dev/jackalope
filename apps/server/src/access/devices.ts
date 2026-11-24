@@ -10,6 +10,7 @@ import { memberFeedback } from './feedback';
 import { lessonsRoute } from './lessons';
 import { invitations, type Member, tokenSchema } from './service';
 import { settingsRoute } from './settings';
+import { skillsRoute } from './skills';
 import { openSignup, waitlistProgress } from './waitlist';
 
 const lifetime = 90 * 86400000;
@@ -211,6 +212,28 @@ export async function deviceRoutes(
           member.id,
           action,
           action === 'delete' ? undefined : await readJson(request),
+        ),
+      );
+    }
+    if (url.pathname === '/v1/desktop/skills' || url.pathname.startsWith('/v1/desktop/skills/')) {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new ServiceError(401, 'device_sign_in_required');
+      const step = url.pathname.slice('/v1/desktop/skills/'.length);
+      const action =
+        url.pathname === '/v1/desktop/skills' && request.method === 'DELETE'
+          ? 'delete'
+          : request.method === 'POST' && (step === 'pull' || step === 'push' || step === 'have')
+            ? step
+            : undefined;
+      if (!action) throw new ServiceError(404, 'not_found');
+      return json(
+        await skillsRoute(
+          env,
+          member.memberId,
+          member.id,
+          action,
+          action === 'delete' ? undefined : await readJson(request),
+          now,
         ),
       );
     }

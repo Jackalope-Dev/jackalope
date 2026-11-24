@@ -39,6 +39,14 @@ const privacy: Section[] = [
           Fonts are served with the site. Website appearance choices reset when you reload.
         </p>
         <p>
+          We count page views with LopeBase, a measurement service we operate at app.lopebase.com.
+          It receives the path of the page you viewed, the site or campaign label that brought you
+          here, and a count when a signup form is submitted, an email is confirmed, or a download
+          link is clicked. It sets no cookies, assigns no visitor identifier, and does not store
+          your IP address. Your browser’s session storage remembers the referring source until you
+          close the tab, so those counts can be credited to it.
+        </p>
+        <p>
           Our signup form uses Cloudflare Turnstile to check that a person, not an automated script,
           submitted it. Turnstile receives your IP address and browser and device signals for that
           check under Cloudflare’s privacy policy. We receive the check’s result, not those signals.

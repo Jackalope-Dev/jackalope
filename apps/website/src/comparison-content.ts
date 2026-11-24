@@ -3,6 +3,8 @@ import type { MarketingPage } from './marketing-content.ts';
 type Comparison = {
   slug: string;
   name: string;
+  /** Search title; defaults to "Jackalope vs <name>: Workflow comparison". */
+  seoTitle?: string;
   description: string;
   lede: string;
   signals: string[];
@@ -145,8 +147,9 @@ const comparisons: Comparison[] = [
     name: 'Cursor',
     published: '2026-09-17',
     reviewed: '2026-09-17',
+    seoTitle: 'Jackalope vs Cursor (2026): agent CLIs, worktrees, review',
     description:
-      'Jackalope vs Cursor: compare agent worktrees, local and cloud execution, code review, and workflows across your existing coding-agent CLIs.',
+      'Cursor runs its own agent. Jackalope runs Claude Code, Codex and Gemini CLI side by side in Git worktrees with one review queue. Compare the workflows.',
     lede: 'Cursor includes agent workflows with worktrees and cloud execution. Jackalope organizes supported local coding-agent CLIs around tasks, project accounts, and a combined review.',
     signals: ['Local agents', 'Git worktrees', 'Cloud execution', 'Review'],
     overview: {
@@ -231,8 +234,9 @@ const comparisons: Comparison[] = [
     name: 'Superset',
     published,
     reviewed: '2026-09-17',
+    seoTitle: 'Jackalope vs Superset (2026): parallel coding agents',
     description:
-      'Jackalope vs Superset: compare parallel coding agents, Git worktrees, recurring tasks, remote hosts, accounts, and how changes reach review.',
+      'Both run coding agents in parallel Git worktrees. Compare task dependencies, recurring work, remote hosts, accounts and how each change reaches review.',
     lede: 'Both bring multiple coding agents into one workspace. The useful comparison is how you organize the work between the first prompt and the final integration.',
     signals: ['Agent choice', 'Worktree isolation', 'Recurring work', 'Review workflow'],
     sources: [
@@ -1093,7 +1097,7 @@ export const comparisonLinks = comparisons.map(({ slug, name }) => ({
 export const comparisonPages: MarketingPage[] = comparisons.map((comparison) => ({
   path: `/compare/${comparison.slug}/`,
   kind: 'Workspace comparison',
-  title: `Jackalope vs ${comparison.name}: Workflow comparison`,
+  title: comparison.seoTitle ?? `Jackalope vs ${comparison.name}: Workflow comparison`,
   description: comparison.description,
   headline: `Jackalope vs ${comparison.name}`,
   lede: comparison.lede,

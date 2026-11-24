@@ -21,7 +21,7 @@ Use [Cloud configuration](CRABNEBULA-RELEASE.md) for active Mac/Linux release fe
 
 Both feeds use the same trusted updater key and app identity. Numeric versions must
 increase, so a user leaving beta waits until the stable feed offers a higher version.
-Settings → Help & community persists the selection in the native profile. A channel
+Settings → Updates persists the selection in the native profile. A channel
 change clears the offered update and is blocked during checking/installation; the
 native install command also rechecks the chosen channel and version. The telemetry
 channel comes from the installed binary, not the selected feed.
@@ -39,7 +39,8 @@ The hosted candidate workflow supplies both update URLs. Set its
 beta and stable clients at the same accepted service if you want one dashboard to
 compare them; release artifacts remain isolated in staging/production feeds. Forks
 can supply their own endpoints. Rehearsals strip community endpoints and channel
-switching, so they cannot accidentally send real usage data.
+switching, so they cannot accidentally send real usage data. Cloud builds and
+submitted Store packages ship the public service origin.
 
 Server deployment follows beta → staging and manual master → production. If using
 Cloudflare native Builds, change the staging build's watched production branch to

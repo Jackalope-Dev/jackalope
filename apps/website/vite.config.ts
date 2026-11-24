@@ -6,6 +6,7 @@ import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character
 import { Resvg } from '@resvg/resvg-js';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
+import { agentDiscoveryFiles } from './src/agent-discovery.ts';
 import type { ReleaseMap } from './src/changelog.ts';
 import { normalizePath, siteOrigin, updatesWith } from './src/content.ts';
 import { platformDownloads } from './src/platform-downloads.ts';
@@ -33,7 +34,13 @@ function changelogReleases(): ReleaseMap {
   }
 }
 
-export default defineConfig(({ mode }) => {
+/** LopeBase's page counter, after a stub that queues conversions reported before it loads. */
+const pageCounter = [
+  '<script>window.lopebase=window.lopebase||{q:[],conversion:function(){window.lopebase.q.push(arguments)}};</script>',
+  '<script defer src="https://app.lopebase.com/lb.js" data-site="jackalope.jackalope._l9ChvQTrEHDcH1B"></script>',
+].join('\n');
+
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   platformDownloads(env);
   const site = new URL(env.VITE_SITE_URL || siteOrigin);
@@ -61,6 +68,7 @@ export default defineConfig(({ mode }) => {
   // the site shows, with the same release state, instead of a copy that drifts.
   const files = {
     ...discoveryFiles(site.origin, env, releases),
+    ...agentDiscoveryFiles(site.origin),
     'changelog.json': JSON.stringify(updatesWith(releases)),
   };
   const icons = {
@@ -116,7 +124,18 @@ export default defineConfig(({ mode }) => {
           });
         },
         transformIndexHtml(html, context) {
-          return pageHtml(html, context.path === '/index.html' ? '/' : context.path, site.origin);
+          const page = pageHtml(
+            html,
+            context.path === '/index.html' ? '/' : context.path,
+            site.origin,
+            env,
+          );
+          // The cookieless page counter belongs to the canonical site: development
+          // servers and builds for another origin do not report to it. Prerendering
+          // reuses this built head, so every page carries the tag once.
+          return command === 'build' && site.origin === siteOrigin
+            ? page.replace('</head>', `${pageCounter}\n</head>`)
+            : page;
         },
         generateBundle() {
           this.emitFile({ type: 'asset', fileName: 'favicon.svg', source: favicon });

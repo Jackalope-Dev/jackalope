@@ -1,0 +1,27 @@
+PASS src/utils/format.test.js
+PASS src/api/client.test.js (5.123 s)
+  ● Console
+
+    console.warn
+      Deprecated option "timeoutMs" passed to createClient; use "timeout" instead.
+
+      at createClient (src/api/client.js:18:13)
+
+PASS src/components/Button.test.jsx
+  Button
+    ✓ renders its label (21 ms)
+    ✓ calls onClick when pressed (9 ms)
+    ✓ is disabled while loading (4 ms)
+    ○ skipped shows a tooltip on hover
+    ✎ todo announces state changes to screen readers
+PASS src/hooks/useDebounce.test.js
+  useDebounce
+    ✓ returns the initial value immediately (3 ms)
+    ✓ waits for the delay before updating (12 ms)
+    ✓ cancels pending updates on unmount (2 ms)
+
+Test Suites: 4 passed, 4 total
+Tests:       1 skipped, 1 todo, 48 passed, 50 total
+Snapshots:   3 passed, 3 total
+Time:        6.42 s
+Ran all test suites.
