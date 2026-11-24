@@ -764,6 +764,34 @@ fn the_windows_helper_compiles_and_lists_windows() {
     );
 }
 
+/// Compiles the Windows indicator the way a grant does, without showing it.
+#[cfg(windows)]
+#[test]
+fn the_windows_indicator_compiles() {
+    let directory =
+        std::env::temp_dir().join(format!("jackalope-indicator-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = directory.join("indicator.cs");
+    std::fs::write(&source, include_str!("indicator.cs")).unwrap();
+    let powershell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+        .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    let output = crate::commands::process_control::hidden(&mut std::process::Command::new(powershell))
+        .args(["-NoProfile", "-NonInteractive", "-Command"])
+        .arg(format!(
+            "$ErrorActionPreference='Stop'; Add-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition ([IO.File]::ReadAllText('{}'))",
+            source.display()
+        ))
+        .output()
+        .unwrap();
+    let _ = std::fs::remove_dir_all(&directory);
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 /// Opens a disposable form, starts a real indicator and drives the resident
 /// helper through every Windows action, printing per-action latency.
 #[cfg(windows)]
