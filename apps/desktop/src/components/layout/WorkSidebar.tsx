@@ -1,4 +1,4 @@
-import { ContextMenu, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
+import { ContextMenu, cn, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
 import {
   ChevronRight,
   Code2,
@@ -845,7 +845,13 @@ export function WorkSidebar({
       (projectView || (activeTab === 'kanban' && !somethingOpen && scope === 'project'));
     const listId = `project-tree-${project.id}`;
     return (
-      <section key={project.id} className="project-tree-group">
+      <section
+        key={project.id}
+        className={cn(
+          'project-tree-group',
+          project.id === GENERAL_PROJECT_ID && 'project-tree-general',
+        )}
+      >
         <ProjectContextMenu project={project} onSetIcon={setIconFor} {...actions}>
           <div
             className="project-tree-head"
@@ -1003,7 +1009,7 @@ export function WorkSidebar({
       {general ? (
         projectGroup(general)
       ) : (
-        <section className="project-tree-group">
+        <section className="project-tree-group project-tree-general">
           <div className="project-tree-head">
             <span className="project-tree-toggle" aria-hidden="true" />
             <button
