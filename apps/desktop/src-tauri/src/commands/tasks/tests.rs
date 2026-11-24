@@ -48,6 +48,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         host: None,
         verify_command: None,
         prepare_command: None,
+        time_limits: None,
         setup_files: Vec::new(),
         auto_verify: false,
         non_code: false,

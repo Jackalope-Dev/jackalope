@@ -184,7 +184,9 @@ fn run(directory: &Path, project: &Path, head: &str, deploy: &DeployPolicy) -> D
             }
         }
     };
-    let step = |command: &str| verification::run_disposable(command, &workspace, false);
+    let step = |command: &str| {
+        verification::run_disposable(command, &workspace, false, &Default::default())
+    };
     let deployed = match step(&deploy.command) {
         Ok(result) if result.success => output(&result),
         Ok(result) => return finish(Outcome::Failed, output(&result)),

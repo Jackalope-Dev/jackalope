@@ -39,6 +39,7 @@ import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { ProjectSecretsSettings } from './ProjectSecretsSettings';
 import { ProjectTerminalCommands } from './ProjectTerminalCommands';
+import { ProjectTimeLimitsSettings } from './ProjectTimeLimits';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 
@@ -257,7 +258,7 @@ export function ProjectPreferences({
             >
               <SettingRow
                 title="Workspace preparation"
-                description="Runs before new tasks, with your OS permissions. Five-minute limit; skipped for continuations."
+                description="Runs before new tasks, with your OS permissions. Skipped for continuations."
                 controlId="preparation-command"
                 descriptionId="preparation-command-description"
               >
@@ -291,7 +292,7 @@ export function ProjectPreferences({
               </SettingBody>
               <SettingRow
                 title="Verification command"
-                description="Runs with your OS permissions. Five-minute limit."
+                description="Runs with your OS permissions."
                 controlId="verification-command"
                 descriptionId="verification-command-description"
               >
@@ -328,6 +329,7 @@ export function ProjectPreferences({
                 />
               </SettingRow>
             </SettingGroup>
+            <ProjectTimeLimitsSettings projectId={project.id} />
             <SettingGroup title="Preview">
               <SettingRow
                 title="Preview command"

@@ -55,6 +55,9 @@ pub struct ProjectRecord {
     /// The command that prepares a fresh workspace before work starts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prepare_command: Option<String>,
+    /// Setup and check time limits from Project settings. Absent keeps the defaults.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limits: Option<super::verification::TimeLimits>,
     /// Untracked files copied into fresh workspaces.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setup_files: Vec<String>,

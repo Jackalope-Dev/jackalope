@@ -53,6 +53,7 @@ struct Check {
     run_ids: Vec<String>,
     prepare_command: Option<String>,
     setup_files: Vec<String>,
+    time_limits: verification::TimeLimits,
 }
 
 struct Claim(PathBuf);
@@ -154,6 +155,7 @@ pub(in crate::commands) fn gate(
         run_ids: plan.run_ids.clone(),
         prepare_command: setup.and_then(|run| run.prepare_command.clone()),
         setup_files: setup.map(|run| run.setup_files.clone()).unwrap_or_default(),
+        time_limits: setup.and_then(|run| run.time_limits).unwrap_or_default(),
     };
     let runtime = runtime.clone();
     std::thread::spawn(move || {
@@ -206,13 +208,14 @@ fn execute(directory: &Path, check: &Check) -> Result<Ran, String> {
             .prepare_command
             .as_deref()
             .filter(|setup| !setup.trim().is_empty())
-            .map(|setup| verification::run_disposable(setup, &workspace, true))
+            .map(|setup| verification::run_disposable(setup, &workspace, true, &check.time_limits))
             .transpose()?;
         let result = if preparation.as_ref().is_none_or(|setup| setup.success) {
             Some(verification::run_disposable(
                 &check.command,
                 &workspace,
                 false,
+                &check.time_limits,
             )?)
         } else {
             None

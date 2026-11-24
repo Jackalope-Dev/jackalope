@@ -221,7 +221,7 @@ fn regenerable_tree(name: &str) -> bool {
         | ".venv" | "venv" | "site-packages" | "__pycache__" | ".tox"
         | ".mypy_cache" | ".pytest_cache" | ".ruff_cache"
         // Elixir, Dart, Swift, Haskell
-        | "_build" | "deps" | ".dart_tool" | "Pods" | "DerivedData" | ".build"
+        | "_build" | "deps" | ".dart_tool" | "Pods" | "DerivedData" | ".build" | "SourcePackages"
         | ".stack-work" | "dist-newstyle"
     )
 }
@@ -1482,6 +1482,7 @@ mod tests {
             "node_modules/pkg",
             ".venv/lib/site-packages/pkg",
             "Pods/lib",
+            "SourcePackages/checkouts/pkg",
         ] {
             let dir = f.worktree.join("ignored").join(tree);
             fs::create_dir_all(&dir).unwrap();
@@ -1490,11 +1491,22 @@ mod tests {
         fs::create_dir(f.worktree.join("out")).unwrap();
         fs::write(f.worktree.join("out/bundle.js"), "generated").unwrap();
         fs::write(f.worktree.join("install.log"), "generated").unwrap();
+        // Xcode output under JACKALOPE_DERIVED_DATA, with package checkouts' Git folders and
+        // build databases inside, is excluded like the prepared marker and discarded.
+        crate::commands::tasks::preparation::exclude_marker(&f.worktree);
+        let derived = f.worktree.join(".jackalope/DerivedData");
+        fs::create_dir_all(derived.join("SourcePackages/checkouts/pkg/.git")).unwrap();
+        fs::create_dir_all(derived.join("Build/Intermediates.noindex/XCBuildData")).unwrap();
+        fs::write(
+            derived.join("Build/Intermediates.noindex/XCBuildData/build.db"),
+            "",
+        )
+        .unwrap();
         let entry = f.entry();
         let status = entry.cleanup.as_ref().unwrap();
         assert_eq!(status.blocked_reason, None);
         assert!(!status.recoverable);
-        assert_eq!(status.discarded_paths.len(), 3);
+        assert_eq!(status.discarded_paths.len(), 4);
         f.remove(&entry, &[]).unwrap();
         assert!(!f.worktree.exists());
     }

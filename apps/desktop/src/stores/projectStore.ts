@@ -11,6 +11,16 @@ import type { TerminalCommand } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
+/** Overrides for a project's setup and check time limits, in seconds. */
+export interface ProjectTimeLimits {
+  /** How long a setup command may print nothing. Default 300. */
+  prepareSilenceSecs?: number;
+  /** How long a check may print nothing. Default 600. */
+  checkSilenceSecs?: number;
+  /** The longest a setup command or check may run. Default 1800. */
+  checkCeilingSecs?: number;
+}
+
 export interface ProjectPreferences {
   preferredRunner?: string;
   theme?: ThemePalette;
@@ -38,6 +48,8 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  /** Setup and check time limits in seconds. Undefined fields keep the defaults. */
+  timeLimits?: ProjectTimeLimits;
   /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
   terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
@@ -367,6 +379,7 @@ interface ProjectRecord {
   /** Project instructions, given to every task agent at launch. */
   instructions?: string;
   prepareCommand?: string;
+  timeLimits?: ProjectTimeLimits;
   setupFiles?: string[];
   previewCommand?: string;
   reviewCaptures?: boolean;
@@ -414,6 +427,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     autoVerify: preferences?.autoVerify,
     instructions: preferences?.customInstructions?.trim() || undefined,
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
+    timeLimits: preferences?.timeLimits,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
     previewCommand: preferences?.previewCommand?.trim() || undefined,
     reviewCaptures: preferences?.reviewCaptures,

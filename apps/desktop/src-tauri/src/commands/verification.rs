@@ -15,10 +15,12 @@ use std::{
 };
 use tauri::State;
 mod leases;
+mod limits;
 pub(super) mod native_output;
 pub(super) mod output;
 mod test_report;
 pub use leases::{ensure_all_idle, ensure_idle};
+pub use limits::TimeLimits;
 
 /// Holds a workspace like a running check does, so checks, previews and
 /// integration wait while Jackalope runs its own process there.
@@ -76,9 +78,9 @@ impl Drop for DisposableWorktree {
     }
 }
 
-/// Ceiling on a single check or setup command. Commands are cut off for going quiet
-/// (see the stall budgets) long before this; it only bounds a command that keeps
-/// printing forever.
+/// Default ceiling on a single check or setup command. Commands are cut off for going
+/// quiet (see the stall budgets) long before this; it only bounds a command that keeps
+/// printing forever. Projects may set their own budgets ([`TimeLimits`]).
 pub(super) const CHECK_TIMEOUT_SECS: u64 = 1800;
 /// A verification command that has printed nothing for this long is treated as wedged.
 /// Generous, because a compile or test step can legitimately think in silence.
@@ -88,13 +90,16 @@ pub(super) const PREPARE_STALL_SECS: u64 = 300;
 /// How many times a setup command that was cut off mid-progress is retried in total.
 pub(super) const PREPARE_ATTEMPTS: u32 = 2;
 pub(super) const QUEUE_TIMEOUT_SECS: u64 = 300;
-pub(super) const BRIDGE_TIMEOUT_SECS: u64 = CHECK_TIMEOUT_SECS + QUEUE_TIMEOUT_SECS + 120;
+/// How long an agent waits on a bridge call; it covers the longest check a project may allow.
+pub(super) const BRIDGE_TIMEOUT_SECS: u64 =
+    limits::MAX_CHECK_TIMEOUT_SECS + QUEUE_TIMEOUT_SECS + 120;
 
-fn check_limits(stall: u64) -> process_control::Limits {
-    process_control::Limits::supervised(
-        Duration::from_secs(CHECK_TIMEOUT_SECS),
-        Duration::from_secs(stall),
-    )
+/// The limits saved on an attempt when it started, or the defaults.
+fn run_limits(runtime: &TaskRuntime, id: &str) -> TimeLimits {
+    runtime
+        .run_snapshot(id)
+        .and_then(|run| run.time_limits)
+        .unwrap_or_default()
 }
 
 /// Publish a long command's newest output line onto the run so the interface can show what
@@ -169,25 +174,23 @@ fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     cmd.current_dir(workspace);
     cmd.env_remove("JACKALOPE_BRIDGE_TOKEN")
         .env_remove("JACKALOPE_BRIDGE_URL");
+    cmd.envs(super::source_packages::environment(Path::new(workspace)));
     Ok(cmd)
 }
 
 /// Runs an explicitly requested command in a disposable workspace the caller has reserved,
 /// with a check slot, stall budget and ceiling like a project check. `setup` uses the setup
-/// command's shorter stall budget.
+/// command's stall budget.
 pub(in crate::commands) fn run_disposable(
     command: &str,
     workspace: &str,
     setup: bool,
+    limits: &TimeLimits,
 ) -> Result<process_control::CommandResult, String> {
     let _slot = leases::check_slot(|| false)?;
     process_control::run_supervised(
         shell(command, workspace)?,
-        check_limits(if setup {
-            PREPARE_STALL_SECS
-        } else {
-            CHECK_STALL_SECS
-        }),
+        limits.limits(setup),
         || false,
         |_, _| {},
     )
@@ -270,6 +273,7 @@ fn run_preparation(
     let _slot = runtime.timed(id, "preparationWait", || {
         leases::check_slot(|| !runtime.is_running(id))
     })?;
+    let limits = run_limits(runtime, id);
     let mut attempt = 1;
     let record = loop {
         runtime.update_checked(id, |run| {
@@ -290,7 +294,7 @@ fn run_preparation(
         let result = runtime.timed(id, "preparation", || {
             process_control::run_supervised(
                 shell(command, workspace)?,
-                check_limits(PREPARE_STALL_SECS),
+                limits.limits(true),
                 || !runtime.is_running(id),
                 observer(runtime, id),
             )
@@ -315,9 +319,30 @@ fn run_preparation(
     };
     if record.success {
         preparation::record_prepared(root, &fingerprint, command);
+        save_packages(runtime, id, root);
     }
     runtime.update(id, |run| run.progress = None);
     Ok(record)
+}
+
+/// Keeps the Swift package checkouts a successful command left in a task's workspace for
+/// the project's next worktrees.
+fn save_packages(runtime: &TaskRuntime, id: &str, workspace: &Path) {
+    let Some(run) = runtime.run_snapshot(id) else {
+        return;
+    };
+    if super::source_packages::capture(
+        runtime.data_directory(),
+        Path::new(&run.project_path),
+        workspace,
+    ) {
+        runtime.update(id, |run| {
+            activity(
+                run,
+                "Saved this workspace's Swift package checkouts for the project's next worktrees.",
+            )
+        });
+    }
 }
 
 fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
@@ -348,12 +373,15 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         let result = runtime.timed(&run.id, "verification", || {
             process_control::run_supervised(
                 shell(command, &run.workspace)?,
-                check_limits(CHECK_STALL_SECS),
+                run.time_limits.unwrap_or_default().limits(false),
                 || agent_active && !runtime.is_running(&run.id),
                 observer(runtime, &run.id),
             )
         })?;
         runtime.update(&run.id, |r| r.progress = None);
+        if result.success {
+            save_packages(runtime, &run.id, Path::new(&run.workspace));
+        }
         let after = super::integration::workspace_tree(run, &directory)?;
         let verification = Verification {
             command: command.to_string(),
@@ -600,6 +628,7 @@ macro_rules! tauri_commands {
     ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
         $next!($finish [$($done)*
             commands::verification::task_verify,
+            commands::verification::project_time_limit_suggestion,
         ] $($rest)*)
     };
 }
@@ -629,4 +658,15 @@ pub async fn task_verify(
             },
         )
     }).await.map_err(|e| e.to_string())?
+}
+
+/// Larger time limits suggested for a project at `path`, or `None` when the defaults suit it.
+/// Nothing is saved: Project settings offer the values and the person chooses.
+#[tauri::command]
+pub async fn project_time_limit_suggestion(path: String) -> Result<Option<TimeLimits>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        limits::xcode_project(Path::new(&path)).then_some(TimeLimits::XCODE)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
