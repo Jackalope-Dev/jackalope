@@ -291,6 +291,35 @@ points into the project checkout or resolves outside the worktree, or when it ho
 environments and Cargo `target/` are not cloned. The preparation command still runs, so
 it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
 
+A `.worktreeinclude` file at the project root, in `.gitignore` syntax, names Git-ignored
+files to copy from the project checkout into each new isolated worktree, such as `.env`
+files and local configuration. A file is copied only when Git ignores it in both the
+checkout and the task's branch and a pattern matches it, so tracked and untracked
+nonignored files never are. Negated patterns (`!.env.example`) exclude files. A pattern
+without a slash (`.env`) matches at any depth but does not reach into a folder Git ignores
+as a whole, such as `node_modules/`; name a path inside it (`config/local/app.json`) or
+the folder itself (`config/local/`) for that. The copy never replaces an existing file,
+recreates a link only when it is relative and stays inside the worktree, and skips links
+that leave it. Copies made file by file stop at 10,000 files and 256 MiB; everything
+skipped is listed with its reason in the task's activity, after the list of copied paths.
+Files are copy-on-write clones where the volume allows and ordinary copies elsewhere. A
+whole matched folder is cloned in one step on APFS (and per file on Btrfs or XFS), then
+checked like a dependency clone; it is copied file by file when the volume cannot clone or
+the pattern file has negations. The copies happen before the setup files, dependency
+clones and preparation command, so those can use them. Removing a worktree later treats an
+unchanged copy of a checkout file as disposable, while an edited one keeps the worktree.
+
+A saved terminal command (Project settings → Commands) can be marked **Run when a worktree
+is created**. Marked commands run in order in each new isolated worktree after the
+preparation command, with the same stall and time limits, the workspace reservation and a
+check slot; they always run, with no manifest reuse or automatic retry. When none is set,
+the first marked command decides whether dependency folders are cloned. A failure stops
+the task with the command's name, exit status and recorded output. **Stop when the task
+finishes** marks the task terminal that runs the command from its button: preparing the
+task's merge or archiving it stops that terminal's process tree, so a dev server does not
+block the merge. Commands typed into the terminal are not tracked, and both options are
+off for commands saved before they existed.
+
 Automatic verification is on for a project unless Check results automatically is turned
 off in Project settings, and does nothing until the project has a check command. Every
 launcher and the settings switch read it through `checksAutomatically`. Its saved command
