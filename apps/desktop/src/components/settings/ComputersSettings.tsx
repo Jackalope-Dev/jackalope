@@ -8,7 +8,7 @@ import {
   SettingRow,
   Switch,
 } from '@jackalope/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CloudMachine,
   type ComputerPreferences,
@@ -51,6 +51,10 @@ export function ComputersSettings() {
   const [hosted, setHosted] = useState(false);
   const [computers, setComputers] = useState<ComputerStatus[]>([]);
   const [preferences, setPreferences] = useState<ComputerPreferences | null>(null);
+  // The latest preferences, including changes still saving, and the save queue:
+  // each save sends every preference as last chosen, one after another.
+  const latestPreferences = useRef<ComputerPreferences | null>(null);
+  const savingPreferences = useRef<Promise<void>>(Promise.resolve());
   const [health, setHealth] = useState<Record<string, string>>({});
   const [pairing, setPairing] = useState(false);
   const [busy, setBusy] = useState('');
@@ -64,6 +68,7 @@ export function ComputersSettings() {
       listComputers(),
       computerPreferences(),
     ]);
+    latestPreferences.current = nextPreferences;
     setPreferences(nextPreferences);
     setDocker(nextDocker);
     setMachines(nextMachines.machines);
@@ -87,9 +92,21 @@ export function ComputersSettings() {
   }, [live]);
 
   const changePreferences = (change: Partial<ComputerPreferences>) => {
-    if (!preferences) return;
-    void setComputerPreferences({ ...preferences, ...change }).then(setPreferences, (cause) =>
-      setError(describeError(cause)),
+    const current = latestPreferences.current;
+    if (!current) return;
+    const next = { ...current, ...change };
+    latestPreferences.current = next;
+    setPreferences(next);
+    savingPreferences.current = savingPreferences.current.then(() =>
+      setComputerPreferences(next).then(
+        (saved) => {
+          if (latestPreferences.current === next) {
+            latestPreferences.current = saved;
+            setPreferences(saved);
+          }
+        },
+        (cause) => setError(describeError(cause)),
+      ),
     );
   };
 

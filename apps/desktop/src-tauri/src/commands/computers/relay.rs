@@ -24,7 +24,7 @@
 //! back in pieces. A run may have the relay for those alone, without a bridge.
 
 use super::protocol::protocol;
-use super::provider_proxy::{self, Grant};
+use super::provider_proxy::{self, Flow, Grant};
 pub(crate) use super::runner::Access;
 use super::runner::Where;
 use base64::Engine;
@@ -32,7 +32,6 @@ use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicBool, Ordering},
         mpsc::{channel, Receiver, Sender},
         Arc,
     },
@@ -110,10 +109,11 @@ pub(crate) struct Relay {
     receiver: Receiver<Answer>,
     /// The run's provider grant, when its API key stays on this device.
     proxy: Option<Arc<Grant>>,
-    /// Provider calls still streaming, each with the flag that stops it. An
+    /// Provider calls still streaming, each with its flow (stop flag and bytes
+    /// waiting for the runner). An
     /// entry leaves when its last piece is delivered or the call is abandoned,
     /// so there are never more than the calls in flight.
-    streams: HashMap<String, Arc<AtomicBool>>,
+    streams: HashMap<String, Flow>,
 }
 
 impl Relay {
@@ -225,11 +225,20 @@ impl Relay {
             ));
             return;
         }
-        let stop = Arc::new(AtomicBool::new(false));
-        self.streams.insert(id.clone(), stop.clone());
+        if self.streams.len() >= provider_proxy::STREAMS {
+            self.ready.push(Answer::refused(
+                &id,
+                None,
+                429,
+                "Too many requests to the provider are streaming for this run. Try again shortly.",
+            ));
+            return;
+        }
+        let flow = Flow::default();
+        self.streams.insert(id.clone(), flow.clone());
         let (sender, call) = (self.sender.clone(), call.clone());
         std::thread::spawn(move || {
-            super::remote::block(provider_proxy::forward(grant, id, call, sender, stop));
+            super::remote::block(provider_proxy::forward(grant, id, call, sender, flow));
         });
     }
 
@@ -254,7 +263,12 @@ impl Relay {
     pub fn delivered(&mut self, answer: Answer, sent: bool) {
         if !sent {
             self.ready.push(answer);
-        } else if answer.piece.as_ref().map_or(true, |piece| piece.last) {
+            return;
+        }
+        if let (Some(_), Some(flow)) = (&answer.piece, self.streams.get(&answer.call)) {
+            flow.delivered(answer.body.len());
+        }
+        if answer.piece.as_ref().map_or(true, |piece| piece.last) {
             self.in_flight.remove(&answer.call);
             self.streams.remove(&answer.call);
         }
@@ -262,8 +276,8 @@ impl Relay {
 
     /// Stops a stream whose agent is no longer waiting for it.
     pub fn abandon(&mut self, call: &str) {
-        if let Some(stop) = self.streams.remove(call) {
-            stop.store(true, Ordering::SeqCst);
+        if let Some(flow) = self.streams.remove(call) {
+            flow.stop();
         }
         self.ready.retain(|answer| answer.call != call);
         self.in_flight.remove(call);
@@ -273,8 +287,8 @@ impl Relay {
 impl Drop for Relay {
     /// A run that ended stops its provider streams.
     fn drop(&mut self) {
-        for stop in self.streams.values() {
-            stop.store(true, Ordering::SeqCst);
+        for flow in self.streams.values() {
+            flow.stop();
         }
     }
 }
@@ -862,7 +876,7 @@ connection: close
         let mut stops = Vec::new();
         for index in 0..500 {
             let call = format!("{index:020x}");
-            let stop = Arc::new(AtomicBool::new(false));
+            let stop = Flow::default();
             relay.in_flight.insert(call.clone());
             relay.streams.insert(call.clone(), stop.clone());
             relay.sender.send(piece(&call, 0, b"early", false)).unwrap();
@@ -871,13 +885,13 @@ connection: close
             relay.sender.send(piece(&call, 5, b"late", true)).unwrap();
             stops.push(stop);
         }
-        assert!(stops.iter().all(|stop| stop.load(Ordering::SeqCst)));
+        assert!(stops.iter().all(Flow::stopped));
         assert!(relay.answers().is_empty());
         assert!(relay.streams.is_empty() && relay.in_flight.is_empty() && relay.ready.is_empty());
         assert!(!relay.streaming());
 
         // Delivering the last piece ends a stream; dropping the relay stops the rest.
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = Flow::default();
         relay.in_flight.insert("live".into());
         relay.streams.insert("live".into(), stop.clone());
         relay.sender.send(piece("live", 0, b"a", false)).unwrap();
@@ -885,23 +899,21 @@ connection: close
         assert_eq!(answers.len(), 1);
         relay.delivered(answers[0].clone(), true);
         assert!(relay.streaming());
-        let other = Arc::new(AtomicBool::new(false));
+        let other = Flow::default();
         relay.in_flight.insert("other".into());
         relay.streams.insert("other".into(), other.clone());
         relay.delivered(piece("live", 1, b"", true), true);
         assert!(!relay.streams.contains_key("live") && !relay.in_flight.contains("live"));
-        assert!(!stop.load(Ordering::SeqCst));
+        assert!(!stop.stopped());
         drop(relay);
-        assert!(other.load(Ordering::SeqCst));
+        assert!(other.stopped());
     }
 
     #[test]
     fn unsent_pieces_are_sent_again_in_order() {
         let mut relay = Relay::provider_only(writer());
         relay.in_flight.insert("s".into());
-        relay
-            .streams
-            .insert("s".into(), Arc::new(AtomicBool::new(false)));
+        relay.streams.insert("s".into(), Flow::default());
         relay.sender.send(piece("s", 0, b"ab", false)).unwrap();
         let first = relay.answers();
         relay.delivered(first[0].clone(), false);
@@ -933,5 +945,46 @@ connection: close
         assert_eq!(answers.len(), 1);
         assert_eq!(answers[0].status, 404);
         assert!(!relay.streaming());
+    }
+
+    #[test]
+    fn an_attempt_streams_a_bounded_number_of_provider_requests() {
+        let grant = Arc::new(Grant::new(
+            provider_proxy::Provider::Anthropic,
+            "sk-ant-real-key-0123456789".into(),
+            "http://127.0.0.1:9",
+            Duration::from_secs(60),
+        ));
+        let mut relay = Relay::provider_only(writer()).with_provider_proxy(Some(grant));
+        let request = |index: usize| {
+            json!({
+                "id": format!("{index:020x}"),
+                "method": "POST",
+                "path": "/provider/anthropic/v1/messages",
+                "headers": {},
+                "body": "",
+            })
+        };
+        let calls: Vec<Value> = (0..provider_proxy::STREAMS + 1).map(request).collect();
+        relay.accept(&calls);
+        assert_eq!(relay.streams.len(), provider_proxy::STREAMS);
+        // The one past the limit is refused at once, whole, without reaching the provider.
+        let refused: Vec<&Answer> = relay.ready.iter().collect();
+        assert_eq!(refused.len(), 1);
+        assert_eq!(refused[0].status, 429);
+        assert!(refused[0].piece.is_none());
+
+        // Delivered pieces free their stream's buffer.
+        let (call, flow) = relay
+            .streams
+            .iter()
+            .next()
+            .map(|(call, flow)| (call.clone(), flow.clone()))
+            .unwrap();
+        flow.held(10);
+        relay.delivered(piece(&call, 0, b"0123", false), true);
+        assert_eq!(flow.buffered(), 6);
+        relay.delivered(piece(&call, 4, b"456789", false), true);
+        assert_eq!(flow.buffered(), 0);
     }
 }

@@ -74,6 +74,9 @@ pub(crate) struct ProviderProxy {
     pub headers: Vec<String>,
     /// Provider response headers passed back to the agent.
     pub response_headers: Vec<String>,
+    /// `anthropic-beta` families forwarded, each followed by its date
+    /// (`claude-code-` matches `claude-code-20250219`); others are dropped.
+    pub anthropic_betas: Vec<String>,
 }
 
 #[derive(Deserialize)]

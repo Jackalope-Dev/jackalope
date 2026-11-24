@@ -52,7 +52,6 @@
     "credentialHeaders": ["authorization", "x-api-key"],
     "headers": [
       "content-type",
-      "content-encoding",
       "accept",
       "user-agent",
       "anthropic-version",
@@ -80,6 +79,21 @@
       "x-ratelimit-limit-tokens",
       "x-ratelimit-remaining-tokens",
       "x-ratelimit-reset-tokens"
+    ],
+    "anthropicBetas": [
+      "claude-code-",
+      "interleaved-thinking-",
+      "fine-grained-tool-streaming-",
+      "context-1m-",
+      "context-management-",
+      "token-efficient-tools-",
+      "prompt-caching-",
+      "extended-cache-ttl-",
+      "output-128k-",
+      "effort-",
+      "structured-outputs-",
+      "tool-search-tool-",
+      "advanced-tool-use-"
     ]
   },
   "localTools": {

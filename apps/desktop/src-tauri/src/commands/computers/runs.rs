@@ -78,11 +78,13 @@ pub(crate) fn relay_token() -> &'static str {
 /// and the computer itself is the sandbox, so the agent runs without its own
 /// permission prompts or sandbox. With `bridge`, this device's bridge address
 /// becomes the computer's relay and its credential the relay's own secret;
-/// without it the Jackalope bridge is dropped.
+/// without it the Jackalope bridge is dropped. `sign_in` holds the agent's
+/// sign-in variables, from one read of its saved credential (see
+/// [`super::provider_proxy::sign_in`]); they are added last.
 pub(crate) fn translate(
     adapter: &str,
     command: &Command,
-    root: &Path,
+    sign_in: &[(String, String)],
     bridge: Option<&str>,
 ) -> Result<(Vec<String>, Environment), String> {
     if !crate::commands::agents::runs_on_computers(adapter) {
@@ -157,7 +159,7 @@ pub(crate) fn translate(
         env.push(("JACKALOPE_BRIDGE_URL".into(), relay_url().into()));
         env.push(("JACKALOPE_BRIDGE_TOKEN".into(), relay_token().into()));
     }
-    env.extend(credentials::environment(root, adapter)?);
+    env.extend(sign_in.iter().cloned());
     Ok((argv, env))
 }
 
@@ -275,6 +277,16 @@ pub(crate) struct Session {
 /// artifacts, so both are needed; anything else keeps the tar and patch.
 pub(crate) fn uses_git_sync(capabilities: &super::runner::RunnerCapabilities) -> bool {
     capabilities.has(super::runner::GIT_SYNC) && capabilities.has(super::runner::ARTIFACTS)
+}
+
+/// What became of an answer sent to the runner.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Delivery {
+    Delivered,
+    /// The agent no longer waits for it.
+    Gone,
+    /// The runner refused it, with why.
+    Refused(String),
 }
 
 /// Output since the previous read.
@@ -470,9 +482,10 @@ impl Session {
     /// Sends one bridge answer to the waiting agent. One above the relay's
     /// answer limit is uploaded as an artifact first, when the runner has them.
     /// A piece of a streamed provider answer carries its offset, whether it is
-    /// the last, and the provider's headers with the first. Returns whether
-    /// the agent was still waiting for it.
-    pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<bool, String> {
+    /// the last, and the provider's headers with the first. An error is a
+    /// failure to reach the runner, worth sending again; the runner's own
+    /// refusal is a [`Delivery::Refused`].
+    pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<Delivery, String> {
         let mut request = json!({
             "action": "run_answer",
             "call": answer.call,
@@ -494,8 +507,14 @@ impl Session {
         } else {
             request["body"] = json!(base64::engine::general_purpose::STANDARD.encode(&answer.body));
         }
-        let result = self.call(request, CALL_TIMEOUT)?;
-        Ok(result["delivered"] != false)
+        match self.call(request, CALL_TIMEOUT) {
+            Ok(result) if result["delivered"] == false => Ok(Delivery::Gone),
+            Ok(_) => Ok(Delivery::Delivered),
+            // The runner answered with an error code: sending the same answer
+            // again cannot succeed.
+            Err(error) if error.code.is_some() => Ok(Delivery::Refused(error.message)),
+            Err(error) => Err(error.message),
+        }
     }
 
     pub fn stop(&mut self) -> Result<(), String> {
@@ -952,7 +971,13 @@ mod tests {
             .env("JACKALOPE_BRIDGE_TOKEN", "secret")
             .env("GIT_AUTHOR_NAME", "Claude")
             .env("SOME_PATH", "D:\\cache");
-        let (argv, env) = translate("claude", &command, root.path(), None).unwrap();
+        let (argv, env) = translate(
+            "claude",
+            &command,
+            &credentials::environment(root.path(), "claude").unwrap(),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             argv,
             [
@@ -998,7 +1023,13 @@ mod tests {
             "--json",
             "-",
         ]);
-        let (argv, env) = translate("codex", &command, root.path(), None).unwrap();
+        let (argv, env) = translate(
+            "codex",
+            &command,
+            &credentials::environment(root.path(), "codex").unwrap(),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             argv,
             [
@@ -1050,7 +1081,13 @@ mod tests {
             .args(["--allowedTools", "mcp__jackalope__peers"])
             .env("JACKALOPE_BRIDGE_URL", endpoint)
             .env("JACKALOPE_BRIDGE_TOKEN", "real-secret");
-        let (argv, env) = translate("claude", &command, root.path(), Some(endpoint)).unwrap();
+        let (argv, env) = translate(
+            "claude",
+            &command,
+            &credentials::environment(root.path(), "claude").unwrap(),
+            Some(endpoint),
+        )
+        .unwrap();
         assert_eq!(argv[2], "--mcp-config");
         assert!(argv[3].contains(&format!("{}/mcp", relay_url())));
         assert!(!argv[3].contains(endpoint));
@@ -1079,7 +1116,13 @@ mod tests {
             "-c",
             "mcp_servers.docs.command=\"x\"",
         ]);
-        let (argv, _) = translate("codex", &command, root.path(), Some(endpoint)).unwrap();
+        let (argv, _) = translate(
+            "codex",
+            &command,
+            &credentials::environment(root.path(), "codex").unwrap(),
+            Some(endpoint),
+        )
+        .unwrap();
         assert_eq!(argv.len(), 4);
         assert!(argv[3].contains(&format!("{}/mcp", relay_url())));
         assert!(!argv[3].contains("DOCS_TOKEN") && !argv[3].contains("docs.server"));
@@ -1135,9 +1178,9 @@ mod tests {
     #[test]
     fn missing_credentials_and_adapters_are_reported() {
         let root = root();
-        let error = translate("claude", &Command::new("claude"), root.path(), None).unwrap_err();
+        let error = credentials::environment(root.path(), "claude").unwrap_err();
         assert!(error.contains("Settings → Computers"), "{error}");
-        let error = translate("gemini", &Command::new("gemini"), root.path(), None).unwrap_err();
+        let error = translate("gemini", &Command::new("gemini"), &[], None).unwrap_err();
         assert!(error.contains("cannot run on a computer"), "{error}");
     }
 

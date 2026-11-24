@@ -459,18 +459,35 @@ request under `/provider/<provider>/` like a bridge call, without the bridge sec
 This device (`computers/provider_proxy.rs`) checks the token in constant time and accepts
 only `GET /v1/models`, Anthropic's `POST /v1/messages` and `/v1/messages/count_tokens`,
 and OpenAI's `POST /v1/responses`, `/v1/responses/compact` and `/v1/chat/completions`,
-up to 16 MB. Routes must be plain: percent escapes, backslashes, dot or empty segments
-and fragments are refused, and the parsed URL must keep the provider's host and exactly
-the checked route and query. Only listed request headers are forwarded, the saved key is
-the only credential the provider receives, and the answer streams back in `run_answer`
-pieces of up to 256 KB at byte offsets, the first carrying the listed response headers;
-the runner writes each piece once, in order, and streams it to the agent as it arrives.
-An error answer is read whole and sent without the key or token. The token stops
-working when the attempt ends (at most seven hours), a stream stops when the agent hangs
-up or the run ends, the key and token are redacted from the attempt's record, and the
-attempt's activity counts the requests. A Claude Code sign-in token still goes to the
-computer, as the activity says, and a computer whose runner lacks `provider-proxy`
-fails the attempt instead of receiving the key.
+up to 16 MB and uncompressed. Routes must be plain: percent escapes, backslashes, dot or
+empty segments and fragments are refused, and the parsed URL must keep the provider's
+host and exactly the checked route and query. Only listed request headers are
+forwarded, and `anthropic-beta` keeps only the families Claude Code sends
+(`providerProxy.anthropicBetas`: `claude-code`, `interleaved-thinking`,
+`fine-grained-tool-streaming`, `context-1m`, `context-management`,
+`token-efficient-tools`, `prompt-caching`, `extended-cache-ttl`, `output-128k`,
+`effort`, `structured-outputs`, `tool-search-tool` and `advanced-tool-use`), so betas
+such as the MCP connector, code execution, the Files API, Skills and web fetch are
+dropped; a request that needs a dropped beta fails at the provider, and a family a new
+Claude Code version needs is added to that list. OpenAI Responses requests with
+`background: true` (which would keep running and billing after the token is revoked)
+or hosted `mcp` or `code_interpreter` tools are refused. The saved key is the only
+credential the provider receives, and the answer streams back in `run_answer` pieces of
+up to 256 KB at byte offsets, the first carrying the listed response headers; the runner
+writes each piece once, in order, and streams it to the agent as it arrives. At most
+1 MB of one stream waits for the runner: the provider's answer is read further only as
+the runner takes pieces, and an attempt streams at most eight requests at once (others
+get 429). A piece the runner refuses ends that stream only. An error answer is read
+whole and sent without the key or token. The token stops working when the attempt ends
+(at most seven hours), a stream stops when the agent hangs up or the run ends, the key
+and token are redacted from the attempt's record, and the attempt's activity counts the
+requests. Whoever holds the token during an attempt, the agent or anything else on the
+computer, can spend on the key through these routes without a cap until the attempt
+ends; the key itself cannot be read back. The run's variables and the grant come from
+one read of the saved credential, and with the setting on a failed read fails the
+attempt. A Claude Code sign-in token still goes to the computer, as the activity says,
+and a computer whose runner lacks `provider-proxy` fails the attempt instead of
+receiving the key.
 
 [Project secrets](AGENT-ACCOUNTS.md#project-secrets) whose **Available to** includes agents on computers
 are added to the run's environment as well. They replace a variable of the same name
@@ -890,10 +907,15 @@ syncs and brings back saved output, and older runners keeping the tar and patch;
 `computers::provider_proxy` covers the token replacing the key in the run, the saved key
 replacing every credential the computer sends, wrong, expired and revoked tokens, the
 route allowlist against encoded, double-encoded, backslash, dot-segment, query and
-fragment tricks, the size limit, error answers without the key, Claude Code sign-in
-tokens staying on the current path, and streaming from a stand-in provider in order as
-events arrive and stopping when told; `computers::relay` also covers joining stream
-pieces, abandoned streams leaving nothing behind and unsent pieces staying in order;
+fragment tricks, the size limit, error answers without the key and within the piece
+limit (including invalid UTF-8), the forwarded betas, refused OpenAI background
+responses and hosted tools, sign-ins from one credential read (a failed read and a
+credential changed in between), Claude Code sign-in tokens staying on the current path,
+streaming from a stand-in provider in order as events arrive, holding the provider back
+while the runner is slow, and stopping when told; `computers::relay` also covers joining
+stream pieces, abandoned streams leaving nothing behind, unsent pieces staying in order
+and the limit on concurrent streams; `tasks::runner::remote` covers a refused piece
+ending only its own stream;
 `computers::artifacts` covers chunked uploads, resuming, skipping stored artifacts,
 resumed downloads, hash mismatches and large bridge answers; `mcp_broker` covers
 lifting the result limit;

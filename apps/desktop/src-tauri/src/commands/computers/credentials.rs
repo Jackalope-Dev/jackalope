@@ -100,13 +100,20 @@ pub(crate) fn set(root: &Path, id: &str, value: Option<&str>) -> Result<(), Stri
 }
 
 /// The environment for `adapter` on a computer, from its first saved credential.
+#[cfg(test)]
 pub(crate) fn environment(root: &Path, adapter: &str) -> Result<Vec<(String, String)>, String> {
     let (kind, value) = chosen(root, adapter)?;
-    Ok(kind
-        .variables
-        .iter()
-        .map(|name| ((*name).to_string(), value.clone()))
-        .collect())
+    Ok(kind.environment(&value))
+}
+
+impl Kind {
+    /// The variables this credential is passed as, each holding `value`.
+    pub(crate) fn environment(&self, value: &str) -> Vec<(String, String)> {
+        self.variables
+            .iter()
+            .map(|name| ((*name).to_string(), value.to_string()))
+            .collect()
+    }
 }
 
 /// The credential `adapter` uses on a computer, its first saved one.

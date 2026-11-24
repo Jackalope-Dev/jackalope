@@ -125,11 +125,16 @@ impl AttemptRunner for RemoteRunner {
         let computer = self.computer.clone();
         let bridge = req.coordination.as_ref();
         let read_only = self.read_only;
-        // Checks the sign-in before waiting for the computer.
+        // The saved credential is read once, before waiting for the computer,
+        // and both the run's variables and any grant come from that read.
+        let sign_in = provider_proxy::sign_in(
+            computers::credentials::chosen(&root, adapter),
+            computers::usage::preferences(&root).keep_api_keys_on_device,
+        )?;
         runs::translate(
             adapter,
             &launch.cmd,
-            &root,
+            &sign_in.env,
             bridge.map(|b| b.endpoint.as_str()),
         )?;
         if !runtime.claim_workspace(id, workspace)? {
@@ -209,7 +214,7 @@ impl AttemptRunner for RemoteRunner {
         let (mut argv, mut env) = runs::translate(
             adapter,
             &launch.cmd,
-            &root,
+            &sign_in.env,
             relayed.map(|b| b.endpoint.as_str()),
         )?;
         let secrets = crate::commands::project_secrets::environment(
@@ -237,6 +242,7 @@ impl AttemptRunner for RemoteRunner {
             id,
             adapter,
             &computer,
+            sign_in,
             &session.capabilities,
             status.is_some(),
             &mut argv,
@@ -532,24 +538,18 @@ impl RemoteRunner {
             }
             let mut wait = runs::READ_WAIT_MS;
             if let Some(relay) = relay.as_mut() {
-                // After one answer fails, the rest wait for the next round, so
-                // a stream's pieces arrive in order.
-                let mut failed = lost_since.is_some();
-                for answer in relay.answers() {
-                    let delivered = if failed {
-                        None
-                    } else {
-                        session.answer(&answer).ok()
-                    };
-                    match delivered {
-                        // The agent stopped waiting for a streamed answer.
-                        Some(false) if answer.piece.is_some() => relay.abandon(&answer.call),
-                        Some(_) => relay.delivered(answer, true),
-                        None => {
-                            failed = true;
-                            relay.delivered(answer, false);
-                        }
-                    }
+                let refusals = send_answers(relay, lost_since.is_none(), |answer| {
+                    session.answer(answer).ok()
+                });
+                for reason in refusals {
+                    runtime.remote_diagnostic(
+                        id,
+                        format!(
+                            "{} refused an answer for the agent: {reason}",
+                            computer.name
+                        ),
+                        false,
+                    );
                 }
                 if relay.streaming() {
                     wait = STREAMING_READ_WAIT_MS;
@@ -1040,33 +1040,70 @@ fn placement_activity(
     text
 }
 
+/// Sends the relay's ready answers through `send`, which says what became of
+/// each, or `None` when the runner could not be reached; then the rest wait
+/// for the next round, so a stream's pieces stay in order. A stream the agent
+/// left, or one whose piece the runner refused, ends there without holding up
+/// other answers; a refused whole answer is dropped, since sending it again
+/// cannot succeed. Returns the runner's reasons for refusing.
+fn send_answers(
+    relay: &mut relay::Relay,
+    reachable: bool,
+    mut send: impl FnMut(&relay::Answer) -> Option<runs::Delivery>,
+) -> Vec<String> {
+    let mut reachable = reachable;
+    let mut ended: std::collections::HashSet<String> = Default::default();
+    let mut refusals = Vec::new();
+    for answer in relay.answers() {
+        if ended.contains(&answer.call) {
+            continue;
+        }
+        let delivery = if reachable { send(&answer) } else { None };
+        match delivery {
+            Some(runs::Delivery::Delivered) => relay.delivered(answer, true),
+            Some(outcome) => {
+                if let runs::Delivery::Refused(reason) = outcome {
+                    refusals.push(reason);
+                }
+                if answer.piece.is_some() {
+                    relay.abandon(&answer.call);
+                    ended.insert(answer.call);
+                } else {
+                    relay.delivered(answer, true);
+                }
+            }
+            None => {
+                reachable = false;
+                relay.delivered(answer, false);
+            }
+        }
+    }
+    refusals
+}
+
 /// With **Keep API keys on this device** on, gives the run a token and a base
-/// URL on its runner's relay in place of the saved API key. A Claude Code
-/// sign-in token still goes to the computer, as the activity says. A computer
-/// whose runner cannot carry provider requests fails the attempt rather than
-/// receive the key.
+/// URL on its runner's relay; the saved API key was never in its environment
+/// (see [`provider_proxy::sign_in`]). A computer whose runner cannot carry
+/// provider requests fails the attempt rather than receive the key.
 #[allow(clippy::too_many_arguments)]
 fn keep_key_here(
     runtime: &TaskRuntime,
     id: &str,
     adapter: &str,
     computer: &Computer,
+    sign_in: provider_proxy::SignIn,
     capabilities: &runner::RunnerCapabilities,
     answers_status: bool,
     argv: &mut Vec<String>,
     env: &mut runs::Environment,
 ) -> Result<Option<provider_proxy::Held>, String> {
-    let root = runtime.computers_root();
-    if !computers::usage::preferences(&root).keep_api_keys_on_device {
-        return Ok(None);
+    if let Some(note) = &sign_in.note {
+        runtime.update(id, |run| activity(run, note));
     }
-    let grant = match provider_proxy::grant(&root, adapter) {
-        Ok(grant) => grant,
-        Err(reason) => {
-            runtime.update(id, |run| activity(run, &reason));
-            return Ok(None);
-        }
+    let Some(grant) = sign_in.grant else {
+        return Ok(None);
     };
+    let grant = provider_proxy::Held::new(grant);
     if !answers_status || !capabilities.has(runner::PROVIDER_PROXY) {
         return Err(format!(
             "Keep API keys on this device is on, but {} cannot carry provider requests yet, so the agent did not start. Update its image, or turn the setting off in Settings → Computers.",
@@ -1080,7 +1117,7 @@ fn keep_key_here(
         grant.provider().label()
     );
     runtime.update(id, |run| activity(run, &line));
-    Ok(Some(provider_proxy::Held::new(grant)))
+    Ok(Some(grant))
 }
 
 fn megabytes(bytes: u64) -> String {
@@ -1210,5 +1247,67 @@ mod tests {
             super::patch_files(b"diff --git a/x b/x\n+1\ndiff --git a/y b/y\n"),
             2
         );
+    }
+
+    #[test]
+    fn a_refused_piece_ends_only_its_own_stream() {
+        use crate::commands::computers::{
+            provider_proxy::{Grant, Provider},
+            relay::{Access, Relay},
+            runs::Delivery,
+        };
+        use std::sync::Arc;
+        // A grant whose requests fail at once, so each stream is a single piece.
+        let grant = Arc::new(Grant::new(
+            Provider::Anthropic,
+            "sk-ant-real-key-0123456789".into(),
+            "http://127.0.0.1:9",
+            std::time::Duration::from_secs(60),
+        ));
+        let mut relay = Relay::provider_only(Access::default()).with_provider_proxy(Some(grant));
+        let call = |id: &str, path: &str| json!({"id": id, "method": "POST", "path": path, "headers": {}, "body": ""});
+        relay.accept(&[
+            call("00000000000000000001", "/provider/anthropic/v1/messages"),
+            // A bridge call this relay refuses, as a whole answer.
+            call("00000000000000000002", "/mcp"),
+        ]);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let mut seen = Vec::new();
+        let mut refusals = Vec::new();
+        while seen.len() < 2 && std::time::Instant::now() < deadline {
+            refusals.extend(super::send_answers(&mut relay, true, |answer| {
+                seen.push(answer.call.clone());
+                Some(if answer.piece.is_some() {
+                    Delivery::Refused("An earlier piece of this answer is missing.".into())
+                } else {
+                    Delivery::Delivered
+                })
+            }));
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        seen.sort();
+        assert_eq!(seen, ["00000000000000000001", "00000000000000000002"]);
+        assert_eq!(refusals.len(), 1);
+        // Nothing is left to send again, and the stream has ended.
+        assert!(super::send_answers(&mut relay, true, |_| panic!("sent again")).is_empty());
+        assert!(!relay.streaming());
+
+        // An unreachable runner keeps everything, in order, for the next round.
+        relay.accept(&[
+            call("00000000000000000003", "/mcp"),
+            call("00000000000000000004", "/mcp"),
+        ]);
+        let mut tried = 0;
+        super::send_answers(&mut relay, true, |_| {
+            tried += 1;
+            None
+        });
+        assert_eq!(tried, 1);
+        let mut order = Vec::new();
+        super::send_answers(&mut relay, true, |answer| {
+            order.push(answer.call.clone());
+            Some(Delivery::Delivered)
+        });
+        assert_eq!(order, ["00000000000000000003", "00000000000000000004"]);
     }
 }

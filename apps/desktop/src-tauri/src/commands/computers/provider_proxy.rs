@@ -13,15 +13,15 @@
 //! Claude Code sets the headers and endpoints a subscription sign-in needs
 //! itself, so they keep going to the computer as before.
 
+use super::credentials::Kind;
 use super::protocol::protocol;
 use super::relay::{Answer, Piece};
 use super::runs::{relay_url, Environment};
 use crate::commands::redaction::KnownSecrets;
 use serde_json::{json, Value};
 use std::{
-    path::Path,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
         mpsc::Sender,
         Arc,
     },
@@ -35,6 +35,19 @@ const LIFETIME: Duration = Duration::from_secs(7 * 3600);
 const ANSWER_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 /// The most response bytes one provider answer may carry.
 const ANSWER_LIMIT: u64 = 64 * 1024 * 1024;
+/// Bytes of one stream sent towards the runner and not yet delivered. The
+/// provider's answer is not read further until the runner takes some, so a
+/// runner that reads slowly holds back the provider instead of filling this
+/// device's memory.
+pub(crate) const STREAM_BUFFER: usize = 1024 * 1024;
+/// Provider requests one attempt may have streaming at once; more are refused
+/// with 429 until one ends. With [`STREAM_BUFFER`] this bounds what an attempt
+/// can hold here.
+pub(crate) const STREAMS: usize = 8;
+/// OpenAI request features refused for a token: background responses keep
+/// running, and billing, after the token is revoked, and hosted MCP and code
+/// interpreter tools reach other services from the provider.
+const OPENAI_REFUSED_TOOLS: &[&str] = &["mcp", "code_interpreter"];
 /// The most bytes of a provider error answer, which is read whole so the saved
 /// key can be removed from it before it leaves this device. It fits one piece
 /// (`providerProxy.pieceLimit`).
@@ -147,22 +160,53 @@ impl std::fmt::Debug for Grant {
     }
 }
 
-/// A grant for `adapter`'s saved credential on a computer, or why its
-/// credential goes to the computer as before.
-pub(crate) fn grant(root: &Path, adapter: &str) -> Result<Grant, String> {
-    let (kind, credential) = super::credentials::chosen(root, adapter)?;
-    let provider = Provider::for_credential(kind.id).ok_or_else(|| {
-        format!(
-            "Keep API keys on this device covers API keys only, so the {} goes to the computer as before.",
+/// What an agent on a computer signs in with, built from one read of its
+/// saved credential so the run's variables and the grant always agree.
+pub(crate) struct SignIn {
+    /// Variables the run gets. Empty when a grant stands in for an API key, so
+    /// the key is never in the run's environment.
+    pub env: Environment,
+    pub grant: Option<Grant>,
+    /// Why the credential goes to the computer although the setting is on.
+    pub note: Option<String>,
+}
+
+/// The sign-in for a run from `chosen`, the result of reading its saved
+/// credential ([`super::credentials::chosen`]). With `keep` (Keep API keys on
+/// this device) an API key becomes a grant and nothing else; a Claude Code
+/// sign-in token goes to the computer as before, with a note. A failed read
+/// fails the attempt either way, so nothing falls back to sending the key.
+pub(crate) fn sign_in(
+    chosen: Result<(&'static Kind, String), String>,
+    keep: bool,
+) -> Result<SignIn, String> {
+    let (kind, value) = chosen?;
+    if !keep {
+        return Ok(SignIn {
+            env: kind.environment(&value),
+            grant: None,
+            note: None,
+        });
+    }
+    match Provider::for_credential(kind.id) {
+        Some(provider) => Ok(SignIn {
+            env: Vec::new(),
+            grant: Some(Grant::new(provider, value, provider.upstream(), LIFETIME)),
+            note: None,
+        }),
+        None if kind.variables == ["CLAUDE_CODE_OAUTH_TOKEN"] => Ok(SignIn {
+            env: kind.environment(&value),
+            grant: None,
+            note: Some(format!(
+                "Keep API keys on this device covers API keys only, so the {} goes to the computer as before.",
+                kind.label
+            )),
+        }),
+        None => Err(format!(
+            "Keep API keys on this device is on, but the {} cannot stay on this device, so the agent did not start. Turn the setting off in Settings → Computers to send it to the computer.",
             kind.label
-        )
-    })?;
-    Ok(Grant::new(
-        provider,
-        credential,
-        provider.upstream(),
-        LIFETIME,
-    ))
+        )),
+    }
 }
 
 impl Grant {
@@ -514,13 +558,34 @@ fn screen(grant: &Grant, id: &str, call: &Value) -> Result<Upstream, Answer> {
             ),
         ));
     }
+    if headers.iter().any(|(name, value)| {
+        name.eq_ignore_ascii_case("content-encoding")
+            && !value
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("identity"))
+    }) {
+        return Err(refuse(
+            415,
+            "Jackalope forwards only uncompressed requests to the provider.",
+        ));
+    }
+    if provider == Provider::OpenAi {
+        if let Some(reason) = openai_refusal(route, &body) {
+            return Err(refuse(400, reason));
+        }
+    }
     let mut forwarded: Vec<(String, String)> = headers
         .iter()
         .filter_map(|(name, value)| {
             let name = name.to_ascii_lowercase();
-            (shape.headers.contains(&name) && !shape.credential_headers.contains(&name))
-                .then(|| Some((name, value.as_str()?.to_string())))
-                .flatten()
+            if !shape.headers.contains(&name) || shape.credential_headers.contains(&name) {
+                return None;
+            }
+            let value = value.as_str()?;
+            if name == "anthropic-beta" {
+                return allowed_betas(value).map(|kept| (name, kept));
+            }
+            Some((name, value.to_string()))
         })
         .collect();
     forwarded.push(match provider {
@@ -542,8 +607,108 @@ fn screen(grant: &Grant, id: &str, call: &Value) -> Result<Upstream, Answer> {
     })
 }
 
+/// One provider stream's controls, shared by [`forward`] and the relay.
+#[derive(Clone, Default)]
+pub(crate) struct Flow {
+    stop: Arc<AtomicBool>,
+    /// Bytes sent towards the runner and not yet delivered.
+    buffered: Arc<AtomicUsize>,
+}
+
+impl Flow {
+    /// Ends the stream: nothing more is read or sent.
+    pub fn stop(&self) {
+        self.stop.store(true, Ordering::SeqCst);
+    }
+
+    pub fn stopped(&self) -> bool {
+        self.stop.load(Ordering::SeqCst)
+    }
+
+    /// Records `bytes` of the stream delivered to the runner.
+    pub fn delivered(&self, bytes: usize) {
+        let _ = self
+            .buffered
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |held| {
+                Some(held.saturating_sub(bytes))
+            });
+    }
+
+    #[cfg(test)]
+    pub fn buffered(&self) -> usize {
+        self.buffered.load(Ordering::SeqCst)
+    }
+
+    /// Records `bytes` sent towards the runner, as [`forward`] does.
+    #[cfg(test)]
+    pub fn held(&self, bytes: usize) {
+        self.buffered.fetch_add(bytes, Ordering::SeqCst);
+    }
+
+    /// Waits until the stream may send more; false once it was stopped.
+    async fn room(&self) -> bool {
+        while self.buffered.load(Ordering::SeqCst) >= STREAM_BUFFER {
+            if self.stopped() {
+                return false;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        !self.stopped()
+    }
+}
+
+/// The `anthropic-beta` values forwarded: only those of families Claude Code
+/// sends (`providerProxy.anthropicBetas`). The rest, such as the MCP
+/// connector, code execution, the Files API, Skills and web fetch, are
+/// dropped, so a token cannot turn on features that reach other services or
+/// store data with the provider.
+fn allowed_betas(value: &str) -> Option<String> {
+    let families = &protocol().provider_proxy.anthropic_betas;
+    let kept: Vec<&str> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|beta| {
+            beta.bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+                && families.iter().any(|family| {
+                    beta.strip_prefix(family.as_str()).is_some_and(|date| {
+                        !date.is_empty() && date.bytes().all(|b| b.is_ascii_digit() || b == b'-')
+                    })
+                })
+        })
+        .collect();
+    (!kept.is_empty()).then(|| kept.join(","))
+}
+
+/// Why an OpenAI Responses request is refused: a background response, or a
+/// hosted tool in [`OPENAI_REFUSED_TOOLS`]. A body that is not JSON cannot be
+/// checked, so it is refused too.
+fn openai_refusal(route: &str, body: &[u8]) -> Option<&'static str> {
+    if !route.starts_with("/v1/responses") {
+        return None;
+    }
+    let Ok(request) = serde_json::from_slice::<Value>(body) else {
+        return Some("Jackalope can only forward a JSON Responses request.");
+    };
+    if request["background"] == true {
+        return Some("Background responses are not forwarded: they would keep running after this run's token stops working.");
+    }
+    let hosted = request["tools"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|tool| {
+            tool["type"]
+                .as_str()
+                .is_some_and(|kind| OPENAI_REFUSED_TOOLS.contains(&kind))
+        });
+    hosted
+        .then_some("Hosted MCP and code interpreter tools are not forwarded with this run's token.")
+}
+
 /// Forwards one provider call and streams its answer back as pieces, each
-/// sent as soon as it arrives. Stops early once `stop` is set, when the agent
+/// sent as soon as it arrives and while the stream's buffer has room
+/// ([`STREAM_BUFFER`]). Stops early once the flow is stopped, when the agent
 /// hung up or the run ended. An error answer is read whole, up to
 /// [`ERROR_LIMIT`], and sent with the key and token removed.
 pub(crate) async fn forward(
@@ -551,7 +716,7 @@ pub(crate) async fn forward(
     id: String,
     call: Value,
     sender: Sender<Answer>,
-    stop: Arc<AtomicBool>,
+    flow: Flow,
 ) {
     let usage = &grant.usage;
     usage.requests.fetch_add(1, Ordering::SeqCst);
@@ -611,9 +776,10 @@ pub(crate) async fn forward(
     let mut offset = 0u64;
     let mut first = Some(headers);
     let mut send = |body: &[u8], last: bool| {
-        if stop.load(Ordering::SeqCst) {
+        if flow.stopped() {
             return false;
         }
+        flow.buffered.fetch_add(body.len(), Ordering::SeqCst);
         let answer = Answer {
             call: id.clone(),
             status,
@@ -638,8 +804,18 @@ pub(crate) async fn forward(
                 break;
             }
         }
+        // Replacing invalid UTF-8 can make the text longer than the bytes
+        // read, so it is split into pieces again after scrubbing.
         let text = grant.scrub(&String::from_utf8_lossy(&body));
-        send(text.as_bytes(), true);
+        let parts: Vec<&[u8]> = text.as_bytes().chunks(piece_limit).collect();
+        if parts.is_empty() {
+            send(&[], true);
+        }
+        for (index, part) in parts.iter().enumerate() {
+            if !flow.room().await || !send(part, index + 1 == parts.len()) {
+                return;
+            }
+        }
         return;
     }
     // The status and headers go at once, before the first token.
@@ -652,7 +828,7 @@ pub(crate) async fn forward(
             Ok(Some(chunk)) if received + (chunk.len() as u64) <= ANSWER_LIMIT => {
                 received += chunk.len() as u64;
                 for part in chunk.chunks(piece_limit) {
-                    if !send(part, false) {
+                    if !flow.room().await || !send(part, false) {
                         return;
                     }
                 }
@@ -884,7 +1060,7 @@ mod tests {
     struct Scratch(std::path::PathBuf);
 
     impl Scratch {
-        fn path(&self) -> &Path {
+        fn path(&self) -> &std::path::Path {
             &self.0
         }
     }
@@ -902,14 +1078,17 @@ mod tests {
         let root =
             Scratch(std::env::temp_dir().join(format!("jackalope-proxy-{}", uuid::Uuid::new_v4())));
         std::fs::create_dir_all(root.path()).unwrap();
+        let read = || super::super::credentials::chosen(root.path(), "claude");
         super::super::credentials::set(
             root.path(),
             "claude-token",
             Some("sk-ant-oat01-0123456789abcdef"),
         )
         .unwrap();
-        let reason = grant(root.path(), "claude").unwrap_err();
-        assert!(reason.contains("API keys only"), "{reason}");
+        let token = sign_in(read(), true).unwrap();
+        assert!(token.grant.is_none());
+        assert!(token.note.unwrap().contains("API keys only"));
+        assert_eq!(token.env[0].0, "CLAUDE_CODE_OAUTH_TOKEN");
         super::super::credentials::set(root.path(), "claude-token", None).unwrap();
         super::super::credentials::set(
             root.path(),
@@ -917,9 +1096,73 @@ mod tests {
             Some("sk-ant-api03-0123456789abcdef"),
         )
         .unwrap();
-        let granted = grant(root.path(), "claude").unwrap();
-        assert_eq!(granted.provider(), Provider::Anthropic);
-        assert!(!format!("{granted:?}").contains("sk-ant-api03"));
+        let granted = sign_in(read(), true).unwrap();
+        assert!(granted.env.is_empty());
+        let grant = granted.grant.unwrap();
+        assert_eq!(grant.provider(), Provider::Anthropic);
+        assert!(!format!("{grant:?}").contains("sk-ant-api03"));
+    }
+
+    fn kind(id: &str) -> &'static Kind {
+        super::super::credentials::KINDS
+            .iter()
+            .find(|kind| kind.id == id)
+            .unwrap()
+    }
+
+    #[test]
+    fn a_failed_credential_read_never_falls_back_to_sending_the_key() {
+        // The keychain refused or failed: the attempt fails, setting on or off.
+        for keep in [true, false] {
+            let error = sign_in(Err("The keychain is locked.".into()), keep)
+                .err()
+                .unwrap();
+            assert!(error.contains("keychain is locked"), "{error}");
+        }
+        let key = "sk-ant-api03-from-the-one-read-0123";
+        let kept = sign_in(Ok((kind("anthropic-key"), key.into())), true).unwrap();
+        assert!(kept.env.is_empty() && kept.note.is_none());
+        assert_eq!(kept.grant.unwrap().protected()[0], key);
+        let sent = sign_in(Ok((kind("anthropic-key"), key.into())), false).unwrap();
+        assert!(sent.grant.is_none());
+        assert_eq!(
+            sent.env,
+            [("ANTHROPIC_API_KEY".to_string(), key.to_string())]
+        );
+        let openai = sign_in(
+            Ok((kind("openai-key"), "sk-proj-one-read-0123456789".into())),
+            true,
+        )
+        .unwrap();
+        assert!(openai.env.is_empty());
+        assert_eq!(openai.grant.unwrap().provider(), Provider::OpenAi);
+    }
+
+    #[test]
+    fn a_credential_changed_between_reads_cannot_reach_the_run() {
+        // The command is translated with the one read's variables; a key that
+        // differs from the granted one (saved again in between) is removed by
+        // value as well as by name.
+        let granted = sign_in(
+            Ok((kind("anthropic-key"), "sk-ant-api03-first-0123456".into())),
+            true,
+        )
+        .unwrap();
+        let grant = granted.grant.unwrap();
+        assert!(granted.env.is_empty());
+        let mut argv = vec!["claude".to_string()];
+        let mut env: Environment = vec![
+            (
+                "ANTHROPIC_API_KEY".into(),
+                "sk-ant-api03-second-0123456".into(),
+            ),
+            ("EXTRA".into(), "sk-ant-api03-first-0123456".into()),
+        ];
+        grant.apply("claude", &mut argv, &mut env);
+        assert!(
+            env.iter().all(|(_, value)| !value.contains("sk-ant-api03")),
+            "{env:?}"
+        );
     }
 
     /// A provider stand-in that records the request and answers with SSE
@@ -971,7 +1214,7 @@ mod tests {
         let (upstream, server) = mock_upstream();
         let grant = Arc::new(anthropic(&upstream));
         let (sender, receiver) = std::sync::mpsc::channel();
-        let stop = Arc::new(AtomicBool::new(false));
+        let flow = Flow::default();
         let request = call(
             "/provider/anthropic/v1/messages",
             json!({"x-api-key": grant.token.clone(), "content-type": "application/json"}),
@@ -985,7 +1228,7 @@ mod tests {
                     "00112233445566778899".into(),
                     request,
                     sender,
-                    stop,
+                    flow,
                 ))
             })
         };
@@ -1187,21 +1430,21 @@ mod tests {
         let (upstream, server) = mock_upstream();
         let grant = Arc::new(anthropic(&upstream));
         let (sender, receiver) = std::sync::mpsc::channel();
-        let stop = Arc::new(AtomicBool::new(false));
+        let flow = Flow::default();
         let request = call(
             "/provider/anthropic/v1/messages",
             json!({"x-api-key": grant.token.clone()}),
             b"{}",
         );
         let thread = {
-            let (grant, stop) = (grant.clone(), stop.clone());
+            let (grant, flow) = (grant.clone(), flow.clone());
             std::thread::spawn(move || {
-                super::super::remote::block(forward(grant, "c".into(), request, sender, stop))
+                super::super::remote::block(forward(grant, "c".into(), request, sender, flow))
             })
         };
         let first = receiver.recv_timeout(Duration::from_secs(20)).unwrap();
         assert_eq!(first.piece.unwrap().offset, 0);
-        stop.store(true, Ordering::SeqCst);
+        flow.stop();
         let _ = server.join();
         thread.join().unwrap();
         // At most the piece already on its way when the stream stopped.
@@ -1231,5 +1474,240 @@ mod tests {
         assert_eq!(answer.status, 401);
         assert!(answer.piece.unwrap().last);
         assert_eq!(grant.counts(), (1, 0, 1));
+    }
+
+    /// A provider stand-in that reads one request and writes `head` then
+    /// `body`, ignoring a client that hangs up.
+    fn answer_once(head: String, body: Vec<u8>) -> (String, std::thread::JoinHandle<()>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut length = 0;
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                if line.trim().is_empty() {
+                    break;
+                }
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = value.trim().parse().unwrap();
+                }
+            }
+            let mut request = vec![0; length];
+            reader.read_exact(&mut request).unwrap();
+            let mut stream = stream;
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(&body);
+        });
+        (address, server)
+    }
+
+    fn run_forward(
+        grant: &Arc<Grant>,
+        flow: &Flow,
+    ) -> (
+        std::sync::mpsc::Receiver<Answer>,
+        std::thread::JoinHandle<()>,
+    ) {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let request = call(
+            "/provider/anthropic/v1/messages",
+            json!({"x-api-key": grant.token.clone()}),
+            b"{}",
+        );
+        let (grant, flow) = (grant.clone(), flow.clone());
+        let thread = std::thread::spawn(move || {
+            super::super::remote::block(forward(grant, "c".into(), request, sender, flow))
+        });
+        (receiver, thread)
+    }
+
+    #[test]
+    fn a_slow_runner_holds_the_provider_back_instead_of_filling_memory() {
+        let size = 6 * STREAM_BUFFER;
+        let (upstream, server) = answer_once(
+            format!("HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {size}\r\nconnection: close\r\n\r\n"),
+            vec![b'x'; size],
+        );
+        let grant = Arc::new(anthropic(&upstream));
+        let flow = Flow::default();
+        let (receiver, thread) = run_forward(&grant, &flow);
+        let quiet = |receiver: &std::sync::mpsc::Receiver<Answer>| {
+            let mut bytes = 0;
+            while let Ok(answer) = receiver.recv_timeout(Duration::from_millis(500)) {
+                bytes += answer.body.len();
+            }
+            bytes
+        };
+        // Nothing is delivered, so reading stops once the buffer is full.
+        let held = quiet(&receiver);
+        let limit = STREAM_BUFFER + protocol().provider_proxy.piece_limit;
+        assert!(held >= STREAM_BUFFER && held <= limit, "{held}");
+        assert_eq!(flow.buffered(), held);
+        // As the runner takes pieces, more is read, never above the limit.
+        let mut total = held;
+        flow.delivered(held);
+        while total < size {
+            let more = quiet(&receiver);
+            assert!(more > 0 && more <= limit, "{more}");
+            total += more;
+            flow.delivered(more);
+        }
+        assert_eq!(total, size);
+        thread.join().unwrap();
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn large_non_utf8_error_answers_stay_within_the_piece_limit() {
+        let body = vec![0xffu8; ERROR_LIMIT];
+        let (upstream, server) = answer_once(
+            format!("HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n", body.len()),
+            body,
+        );
+        let grant = Arc::new(anthropic(&upstream));
+        let flow = Flow::default();
+        let (receiver, thread) = run_forward(&grant, &flow);
+        let mut pieces = Vec::new();
+        while let Ok(answer) = receiver.recv_timeout(Duration::from_secs(1)) {
+            flow.delivered(answer.body.len());
+            pieces.push(answer);
+        }
+        thread.join().unwrap();
+        server.join().unwrap();
+        let limit = protocol().provider_proxy.piece_limit;
+        assert!(pieces.len() > 1);
+        assert!(pieces
+            .iter()
+            .all(|answer| answer.status == 400 && answer.body.len() <= limit));
+        let joined: Vec<u8> = pieces
+            .iter()
+            .flat_map(|answer| answer.body.clone())
+            .collect();
+        // Each invalid byte became U+FFFD, three bytes long.
+        assert_eq!(joined.len(), ERROR_LIMIT * 3);
+        let mut offset = 0;
+        for (index, answer) in pieces.iter().enumerate() {
+            let piece = answer.piece.as_ref().unwrap();
+            assert_eq!(
+                (piece.offset, piece.last),
+                (offset, index + 1 == pieces.len())
+            );
+            offset += answer.body.len() as u64;
+        }
+    }
+
+    #[test]
+    fn only_the_betas_claude_code_uses_are_forwarded() {
+        assert_eq!(
+            allowed_betas(
+                "claude-code-20250219, interleaved-thinking-2025-05-14,mcp-client-2025-04-04"
+            ),
+            Some("claude-code-20250219,interleaved-thinking-2025-05-14".into())
+        );
+        for refused in [
+            "mcp-client-2025-04-04",
+            "code-execution-2025-08-25",
+            "files-api-2025-04-14",
+            "skills-2025-10-02",
+            "web-fetch-2025-09-10",
+            "computer-use-2025-01-24",
+            "message-batches-2024-09-24",
+            "claude-code-",
+            "claude-code-20250219x",
+            "claude-code-20250219;mcp-client-2025-04-04",
+            "CLAUDE-CODE-20250219",
+        ] {
+            assert_eq!(allowed_betas(refused), None, "{refused}");
+        }
+        let grant = anthropic("https://api.anthropic.com");
+        let upstream = screen(
+            &grant,
+            "c",
+            &call(
+                "/provider/anthropic/v1/messages",
+                json!({"x-api-key": grant.token.clone(), "anthropic-beta": "files-api-2025-04-14"}),
+                b"{}",
+            ),
+        )
+        .unwrap();
+        assert!(upstream
+            .headers
+            .iter()
+            .all(|(name, _)| name != "anthropic-beta"));
+    }
+
+    #[test]
+    fn openai_background_responses_and_hosted_tools_are_refused() {
+        let grant = Grant::new(
+            Provider::OpenAi,
+            "sk-openai-real-0123456789".into(),
+            "https://api.openai.com",
+            LIFETIME,
+        );
+        let headers = json!({"authorization": format!("Bearer {}", grant.token)});
+        let status = |path: &str, body: &Value| {
+            screen(
+                &grant,
+                "c",
+                &call(path, headers.clone(), body.to_string().as_bytes()),
+            )
+            .err()
+            .map(|answer| answer.status)
+        };
+        let responses = "/provider/openai/v1/responses";
+        assert_eq!(
+            status(
+                responses,
+                &json!({"model": "m", "tools": [{"type": "function"}, {"type": "web_search"}]})
+            ),
+            None
+        );
+        assert_eq!(
+            status(responses, &json!({"model": "m", "background": true})),
+            Some(400)
+        );
+        assert_eq!(
+            status(
+                "/provider/openai/v1/responses/compact",
+                &json!({"background": true})
+            ),
+            Some(400)
+        );
+        assert_eq!(
+            status(
+                responses,
+                &json!({"tools": [{"type": "mcp", "server_url": "https://x"}]})
+            ),
+            Some(400)
+        );
+        assert_eq!(
+            status(responses, &json!({"tools": [{"type": "code_interpreter"}]})),
+            Some(400)
+        );
+        let unreadable = screen(
+            &grant,
+            "c",
+            &call(responses, headers.clone(), b"\x28\xb5\x2f\xfd"),
+        )
+        .unwrap_err();
+        assert_eq!(unreadable.status, 400);
+        let mut compressed = headers.clone();
+        compressed["content-encoding"] = json!("zstd");
+        assert_eq!(
+            screen(&grant, "c", &call(responses, compressed, b"{}"))
+                .unwrap_err()
+                .status,
+            415
+        );
+        assert_eq!(
+            status(
+                "/provider/openai/v1/chat/completions",
+                &json!({"model": "m"})
+            ),
+            None
+        );
     }
 }
