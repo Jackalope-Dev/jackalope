@@ -44,6 +44,11 @@ test('a slash command is only recognised at the start of the draft, before any s
   assert.equal(slashQuery('/btw why', 8), null);
   assert.equal(slashQuery('hi /model', 9), null);
   assert.equal(slashQuery('/model', 0), null);
+  // Typing `/` before an existing draft offers nothing that could replace the draft.
+  assert.equal(slashQuery('/fix the login bug', 1), null);
+  assert.equal(slashQuery('/cfix the login bug', 2), null);
+  assert.equal(slashQuery('/mo\n', 3), 'mo');
+  assert.equal(slashQuery('/model  ', 6), 'model');
   assert.deepEqual(parseCommand('  /BTW  what changed?\nand why '), {
     name: 'btw',
     argument: 'what changed?\nand why',

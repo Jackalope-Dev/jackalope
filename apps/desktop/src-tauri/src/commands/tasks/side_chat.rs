@@ -90,6 +90,30 @@ fn in_flight() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
     CALLS.get_or_init(Default::default)
 }
 
+/// Most cancels that may wait for their question to arrive.
+const EARLY_CANCELS: usize = 64;
+
+/// The stop flag for question `id`. A cancel can reach the app before its question does,
+/// since the two commands run independently; it leaves a stopped flag that the question
+/// then takes, so its fork never starts.
+fn register(id: &str) -> Result<Arc<AtomicBool>, String> {
+    let mut calls = in_flight()
+        .lock()
+        .map_err(|_| "Side questions are unavailable.")?;
+    Ok(calls.entry(id.to_string()).or_default().clone())
+}
+
+fn cancel(id: &str) {
+    let Ok(mut calls) = in_flight().lock() else {
+        return;
+    };
+    if let Some(canceled) = calls.get(id) {
+        canceled.store(true, Ordering::SeqCst);
+    } else if uuid::Uuid::parse_str(id).is_ok() && calls.len() < EARLY_CANCELS {
+        calls.insert(id.to_string(), Arc::new(AtomicBool::new(true)));
+    }
+}
+
 /// Where a side question about `run` forks from: its agent, session, folder and account.
 fn source(run: &TaskRun) -> Result<(&str, &str, AccountBinding), String> {
     if run.remote.is_some() {
@@ -210,11 +234,7 @@ pub async fn task_side_question(
     }
     let runtime = runtime.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let canceled = Arc::new(AtomicBool::new(false));
-        in_flight()
-            .lock()
-            .map_err(|_| "Side questions are unavailable.")?
-            .insert(operation_id.clone(), canceled.clone());
+        let canceled = register(&operation_id)?;
         let result = ask(&runtime, &run_id, &question, &canceled);
         if let Ok(mut calls) = in_flight().lock() {
             calls.remove(&operation_id);
@@ -227,11 +247,7 @@ pub async fn task_side_question(
 
 #[tauri::command]
 pub fn task_side_question_cancel(operation_id: String) {
-    if let Ok(calls) = in_flight().lock() {
-        if let Some(canceled) = calls.get(&operation_id) {
-            canceled.store(true, Ordering::SeqCst);
-        }
-    }
+    cancel(&operation_id);
 }
 
 #[cfg(test)]
@@ -268,6 +284,24 @@ mod tests {
                 agent.id
             );
         }
+    }
+
+    #[test]
+    fn a_cancel_that_arrives_before_its_question_still_stops_it() {
+        let early = uuid::Uuid::new_v4().to_string();
+        cancel(&early);
+        assert!(register(&early).unwrap().load(Ordering::SeqCst));
+        in_flight().lock().unwrap().remove(&early);
+
+        let asked = uuid::Uuid::new_v4().to_string();
+        let flag = register(&asked).unwrap();
+        assert!(!flag.load(Ordering::SeqCst));
+        cancel(&asked);
+        assert!(flag.load(Ordering::SeqCst));
+        in_flight().lock().unwrap().remove(&asked);
+
+        cancel("not-an-operation");
+        assert!(!in_flight().lock().unwrap().contains_key("not-an-operation"));
     }
 
     #[test]

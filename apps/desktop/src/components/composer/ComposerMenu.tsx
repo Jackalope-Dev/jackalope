@@ -14,8 +14,9 @@ export interface ComposerMenuOption {
 
 /**
  * The suggestion list above a composer. Focus stays in the textarea, which points at
- * the highlighted option with `aria-activedescendant`; options choose on pointer down
- * so the field keeps its caret.
+ * the highlighted option with `aria-activedescendant` (`<id>-<index>`, since file paths
+ * can hold spaces an ID reference cannot); options choose on pointer down so the field
+ * keeps its caret.
  */
 export function ComposerMenu({
   id,
@@ -46,7 +47,7 @@ export function ComposerMenu({
         {options.map((option, index) => (
           <div
             key={option.id}
-            id={`${id}-${option.id}`}
+            id={`${id}-${index}`}
             role="option"
             tabIndex={-1}
             aria-selected={index === active}

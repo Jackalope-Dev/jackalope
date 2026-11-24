@@ -253,6 +253,8 @@ ${incoming}`
   const finishOrigin = (sent: string) => {
     rememberPrompt(historyScope, sent);
     setHistoryRevision((value) => value + 1);
+    // Resending the newest prompt leaves the history unchanged, so browsing restarts here.
+    assist.sent();
     if (origin.ideaId) useTaskStore.getState().deleteTask(origin.ideaId);
     if (mounted.current) setOrigin({});
   };

@@ -64,11 +64,15 @@ export function matchCommands(commands: ComposerCommand[], typed: string) {
   return commands.filter((command) => command.name.toLowerCase().startsWith(query));
 }
 
-/** The command being typed: `/` starts the draft and the caret is still in its name. */
+/**
+ * The command being typed: `/` starts the draft, the caret is still in its name and
+ * nothing follows it, so choosing a command never replaces text typed after it.
+ */
 export function slashQuery(text: string, caret: number): string | null {
   if (!text.startsWith('/')) return null;
   const name = text.slice(1, caret);
   if (caret < 1 || /\s/.test(name)) return null;
+  if (/\s/.test(text.slice(caret).trimEnd())) return null;
   return name;
 }
 

@@ -68,11 +68,14 @@ export function useComposerAssist({
   const pendingCaret = useRef<number | null>(null);
   const remoteHost = useHostContextStore((state) => state.host);
   const entries = useMemo(() => historyEntries(history), [history]);
-  // A sent prompt joins the history; browsing starts over from the new end.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resets only when the history changes
+  // A sent prompt joins the history; browsing starts over from the new end. Keyed on the
+  // prompts themselves: stores rebuild the list on every refresh, and resetting then would
+  // drop the draft that browsing keeps in its last slot.
+  const historyKey = entries.join('\u0000');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resets only when the prompts change
   useEffect(() => {
     browse.current = null;
-  }, [entries]);
+  }, [historyKey]);
   const list = useMemo(() => composerCommands(commands), [commands]);
   const slash = disabled ? null : slashQuery(text, caret);
   const mention =
@@ -148,7 +151,15 @@ export function useComposerAssist({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey)
+    // WebKit sends the Enter that commits an IME composition after `compositionend`, as
+    // key code 229 with `isComposing` already false.
+    if (
+      event.nativeEvent.isComposing ||
+      event.nativeEvent.keyCode === 229 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    )
       return false;
     if (open) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -194,6 +205,8 @@ export function useComposerAssist({
     if (!parsed) return false;
     const command = list.find((item) => item.name === parsed.name && item.id !== 'provider');
     if (!command) return false;
+    // Text after a command that takes none is a message, such as "/clear the cache".
+    if (parsed.argument && !command.argument && command.id !== 'plan') return false;
     if (command.argument && !parsed.argument) {
       replace(`/${command.name} `);
       return true;
@@ -217,7 +230,7 @@ export function useComposerAssist({
       'aria-expanded': open,
       'aria-controls': open ? listId : undefined,
       'aria-activedescendant':
-        open && options[highlighted] ? `${listId}-${options[highlighted].id}` : undefined,
+        open && options[highlighted] ? `${listId}-${highlighted}` : undefined,
     },
     menu: open ? (
       <ComposerMenu

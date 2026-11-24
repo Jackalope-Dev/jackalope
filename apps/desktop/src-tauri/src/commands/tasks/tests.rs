@@ -1002,6 +1002,27 @@ fn context_follows_the_latest_top_level_call_and_the_window_claude_reports() {
         .contains("\"context\""));
 }
 
+/// Claude Code 2.1.282's result names models by their dated IDs and, on a resumed
+/// session, also lists the models earlier turns used.
+#[test]
+fn the_context_window_comes_from_the_served_model_in_a_real_claude_result() {
+    let mut run = sample("claude");
+    for event in [
+        r#"{"type":"system","subtype":"init","session_id":"s-1","model":"claude-haiku-4-5-20251001","permissionMode":"default"}"#,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":8,"cache_read_input_tokens":26007,"cache_creation_input_tokens":4276,"output_tokens":37}}}"#,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"OK","session_id":"s-1","usage":{"input_tokens":18,"cache_creation_input_tokens":16223,"cache_read_input_tokens":40067,"output_tokens":295},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":18,"outputTokens":295,"cacheReadInputTokens":40067,"cacheCreationInputTokens":16223,"costUSD":0.0379457,"contextWindow":200000,"maxOutputTokens":32000},"claude-sonnet-5":{"inputTokens":8,"outputTokens":1119,"contextWindow":1000000,"maxOutputTokens":64000}}}"#,
+    ] {
+        consume_event(&mut run, event);
+    }
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 30_291,
+            window: Some(200_000)
+        })
+    );
+}
+
 #[test]
 fn an_unattributed_context_window_is_kept_only_when_every_model_agrees() {
     let mut run = sample("claude");

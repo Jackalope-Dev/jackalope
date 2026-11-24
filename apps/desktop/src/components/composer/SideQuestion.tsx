@@ -43,6 +43,7 @@ export function SideQuestion({
     if (!supported) return;
     const id = crypto.randomUUID();
     operation.current = id;
+    let settled = false;
     setAnswer(null);
     setError('');
     setBusy(true);
@@ -58,11 +59,14 @@ export function SideQuestion({
         if (operation.current === id) setError(describeError(cause));
       })
       .finally(() => {
+        settled = true;
         if (operation.current === id) setBusy(false);
       });
     return () => {
       operation.current = '';
-      void invokeNative('task_side_question_cancel', { operationId: id }).catch(() => undefined);
+      // Closing or re-asking stops a fork still running; an answered one has already ended.
+      if (!settled)
+        void invokeNative('task_side_question_cancel', { operationId: id }).catch(() => undefined);
     };
   }, [supported, run.id, question.id, question.text]);
   const agentName = catalogEntry(run.agent)?.name ?? run.agent;
