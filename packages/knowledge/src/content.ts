@@ -199,7 +199,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'updates',
         question: 'How do updates work?',
         paragraphs: [
-          'Jackalope checks for updates every hour and offers to install them. Turn on Download updates automatically in Settings → Help & community to have them ready in advance; Restart to update then appears in the title bar. Microsoft Store builds update through the Store.',
+          'Jackalope checks for updates every hour and offers to install them. Turn on Download updates automatically in Settings → Updates to have them ready in advance; Restart to update then appears in the title bar. Microsoft Store builds update through the Store.',
         ],
       },
     ],
@@ -1228,8 +1228,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'app-updates',
         question: 'How does Jackalope update itself?',
         paragraphs: [
-          'Installed Jackalope checks for updates shortly after it opens and every hour while its window is in use. When a newer version is ready, Jackalope tells you and offers Download and install. To get updates ready sooner, turn on Download updates automatically in Settings → Help & community; when a download finishes, Restart to update appears in the title bar. Nothing installs until you choose it, and installing waits until running tasks finish. Microsoft Store builds update through the Store.',
-          'In Settings → Help & community you can check now, turn automatic checks off and, when offered, choose the Stable or Beta update channel. If a check fails, the notice shows the reason.',
+          'Installed Jackalope checks for updates shortly after it opens and every hour while its window is in use. When a newer version is ready, Jackalope tells you and offers Download and install. To get updates ready sooner, turn on Download updates automatically in Settings → Updates; when a download finishes, Restart to update appears in the title bar. Nothing installs until you choose it, and installing waits until running tasks finish. Microsoft Store builds update through the Store.',
+          'In Settings → Updates you can check now, turn automatic checks off and, when offered, choose the Stable or Beta update channel. If a check fails, the notice shows the reason.',
         ],
       },
       {
@@ -1244,7 +1244,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'verification-checklist',
         question: 'What should I check before requesting support?',
         paragraphs: [
-          'Check that the CLI works in a terminal, inspect git status and git worktree list, and review the selected profile by opening Agents and choosing Configure beside the agent. Check Settings → Help & community for update information. Include the actual error and reproduction steps in your report.',
+          'Check that the CLI works in a terminal, inspect git status and git worktree list, and review the selected profile by opening Agents and choosing Configure beside the agent. Check Settings → Updates for update information. Include the actual error and reproduction steps in your report.',
         ],
       },
     ],
