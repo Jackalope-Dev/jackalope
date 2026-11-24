@@ -714,7 +714,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   output assigned to a variable are not parsed as commands. Agents are asked to edit
   files with their edit tools so each edit is checked, and `record_decision` replies
   flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the
-  task's activity. Saved always-allow rules still apply; a chained command (`&&`,
+  task's activity. ACP requests are read the way tool rules read them: Kimi's carry no kind or
+  input, so its earlier streamed arguments stand in, and a request that still cannot be
+  read asks. Saved always-allow rules still apply; a chained command (`&&`,
   `;`, `|`) is allowed when every command in it has a rule, and choosing always
   allow saves one for each, except chains through shells, interpreters or `sudo`. Codex keeps its workspace-write sandbox; Gemini
   CLI, Grok and Antigravity follow their own CLI approval policies.

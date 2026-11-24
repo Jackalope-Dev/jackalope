@@ -1,5 +1,14 @@
 [
   {
+    "id": "kimi-requests-get-the-full-risk-check",
+    "date": "2026-11-24",
+    "title": "Kimi requests get the full risk check.",
+    "description": "Automatic approval now reads what Kimi and other ACP agents are about to run or change, so risky requests ask you first.",
+    "items": [
+      "Destructive commands and writes outside the project ask instead of being approved; a request Jackalope cannot read also asks."
+    ]
+  },
+  {
     "id": "pick-up-where-a-usage-limit-stopped-you",
     "date": "2026-11-24",
     "title": "Pick up where a usage limit stopped you.",
