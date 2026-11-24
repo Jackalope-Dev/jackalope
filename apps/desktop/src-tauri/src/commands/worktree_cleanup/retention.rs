@@ -1,7 +1,9 @@
 //! Automatic cleanup: removes a project's task worktrees a chosen number of days after their
 //! task is merged, integrated or archived. Every removal goes through the same inspection and
 //! [`remove`] as the Clean up button, so uncommitted changes, unmerged commits, local data,
-//! locks, running work and reservations keep a worktree. Branches are never deleted.
+//! locks, running work and reservations keep a worktree. Because no one reviews what it deletes,
+//! it also keeps a worktree holding any ignored file a person may have made ([`local_files`]),
+//! which the Clean up button lists for confirmation instead. Branches are never deleted.
 //!
 //! The app calls this at a low cadence for projects that turned it on, passing the worktrees
 //! its own state retains (a combine follow-up's sources), which task history cannot see.
@@ -304,6 +306,17 @@ pub(super) fn run_pass(
                 .clone()
                 .ok_or("It could not be inspected.")?;
             let reason = decide(&settled, &current.head, &status)?;
+            let root = canonical(&current.path)?;
+            let mut scan = UNATTENDED_SCAN;
+            let found = local_files(
+                &root,
+                &status.discarded_paths,
+                checkout_of(project_path).as_deref(),
+                &mut scan,
+            )?;
+            if !found.is_empty() {
+                return Err(local_files_reason(&found));
+            }
             let days = match (now - settled.since).num_days() {
                 1 => "1 day".to_string(),
                 days => format!("{days} days"),
@@ -321,7 +334,7 @@ pub(super) fn run_pass(
                 continue;
             }
         };
-        match remove(
+        match remove_with(
             project_path,
             &current.path,
             status.target_branch.as_deref().unwrap_or_default(),
@@ -330,31 +343,57 @@ pub(super) fn run_pass(
             &runs,
             false,
             Some(&current.branch),
+            true,
         ) {
             Ok(()) => report.push(entry(&current, "removed", reason)),
+            Err(error) if is_local_files(&error) => report.push(entry(&current, "kept", error)),
             Err(error) => report.push(entry(&current, "failed", error)),
         }
     }
     Ok(report)
 }
 
+/// The project checkout whose files a worktree may hold unchanged copies of.
+fn checkout_of(project_path: &str) -> Option<PathBuf> {
+    checkout(&list_worktrees(project_path).ok()?)
+}
+
+/// Kept for local files: the one kind of kept worktree the log records, since the person has
+/// something to do about it.
+fn is_local_files(reason: &str) -> bool {
+    reason.starts_with("Kept: ")
+}
+
 fn log_path(runtime: &TaskRuntime) -> PathBuf {
     runtime.integration_directory().join(LOG)
 }
 
-/// Appends removals and failures to the cleanup log, keeping its newer half once it grows past
-/// its limit. Kept worktrees are only reported to the caller.
+/// Appends removals, failures and worktrees kept for local files to the cleanup log, keeping its
+/// newer half once it grows past its limit. Other kept worktrees are only reported to the caller.
 fn record(runtime: &TaskRuntime, entries: &[RetentionEntry]) -> Result<(), String> {
     use std::io::Write;
+    let path = log_path(runtime);
+    // The latest logged line per worktree, so an hourly pass does not repeat the same keep.
+    let mut last = std::collections::HashMap::new();
+    for logged in std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| serde_json::from_str::<RetentionEntry>(line).ok())
+    {
+        last.insert(logged.worktree.clone(), (logged.outcome, logged.reason));
+    }
     let lines: Vec<String> = entries
         .iter()
-        .filter(|entry| entry.outcome != "kept")
+        .filter(|entry| entry.outcome != "kept" || is_local_files(&entry.reason))
+        .filter(|entry| {
+            entry.outcome != "kept"
+                || last.get(&entry.worktree) != Some(&(entry.outcome.clone(), entry.reason.clone()))
+        })
         .filter_map(|entry| serde_json::to_string(entry).ok())
         .collect();
     if lines.is_empty() {
         return Ok(());
     }
-    let path = log_path(runtime);
     std::fs::create_dir_all(path.parent().ok_or("No log folder")?).map_err(|e| e.to_string())?;
     if std::fs::metadata(&path).is_ok_and(|metadata| metadata.len() > LOG_MAX_BYTES) {
         let text = std::fs::read_to_string(&path).unwrap_or_default();

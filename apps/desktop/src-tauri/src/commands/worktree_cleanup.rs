@@ -298,6 +298,145 @@ fn sensitive_name(filename: &str) -> bool {
         .any(|suffix| filename.ends_with(suffix))
 }
 
+/// Folders of dependencies and build output automatic cleanup may delete without anyone seeing
+/// them. Wider than [`regenerable_tree`], which also decides what the secret scan skips, so a
+/// `.env` inside `dist/` still keeps a worktree through that scan.
+fn unattended_output(name: &str) -> bool {
+    regenerable_tree(name)
+        || matches!(
+            name,
+            "dist"
+                | "build"
+                | ".next"
+                | ".nuxt"
+                | ".svelte-kit"
+                | ".output"
+                | ".angular"
+                | ".cache"
+                | ".parcel-cache"
+                | ".vite"
+                | "coverage"
+                | ".nyc_output"
+                | "storybook-static"
+        )
+}
+
+/// Files tools and the operating system recreate on their own.
+fn unattended_file(name: &str) -> bool {
+    matches!(name, ".DS_Store" | "Thumbs.db" | ".eslintcache")
+        || name.ends_with(".tsbuildinfo")
+        || name.ends_with(".pyc")
+}
+
+/// Jackalope's record of a completed setup command, rewritten on the next preparation. The rest
+/// of `.jackalope/` holds artifacts and attachments the Library lists, so it is kept.
+const PREPARATION_MARKER: &str = ".jackalope/prepared.json";
+
+/// Entries a [`local_files`] scan looks at before it keeps the worktree as too large to check.
+const UNATTENDED_SCAN: usize = 200_000;
+/// Paths named in the reason a worktree was kept.
+const LOCAL_FILES_SHOWN: usize = 3;
+
+/// Ignored paths in `discarded` (as Git listed them) that automatic cleanup must not delete,
+/// because a person may have made them: anything other than dependency or build output, files
+/// tools recreate, unchanged copies of checkout files, and Jackalope's preparation marker. A
+/// folder is named as `out/…`. Links are never followed and count as local files.
+pub(super) fn local_files(
+    root: &Path,
+    discarded: &[String],
+    original: Option<&Path>,
+    budget: &mut usize,
+) -> Result<Vec<String>, String> {
+    let mut found = Vec::new();
+    for name in discarded {
+        if found.len() > LOCAL_FILES_SHOWN {
+            break;
+        }
+        let Some(start) = ignored_location(root, name) else {
+            found.push(name.clone());
+            continue;
+        };
+        let relative = name.trim_end_matches('/');
+        if relative.split('/').any(unattended_output) {
+            continue;
+        }
+        let label = |is_dir: bool| {
+            if is_dir {
+                format!("{relative}/…")
+            } else {
+                relative.to_string()
+            }
+        };
+        let disposable = |path: &Path| {
+            let file = path
+                .file_name()
+                .map(|file| file.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            unattended_file(&file)
+                || path.strip_prefix(root).is_ok_and(|inside| {
+                    inside.to_string_lossy().replace('\\', "/") == PREPARATION_MARKER
+                })
+                || unchanged_copy(original, root, path)
+        };
+        let metadata = match std::fs::symlink_metadata(&start) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        if is_link(&metadata) {
+            found.push(label(false));
+            continue;
+        }
+        if !metadata.is_dir() {
+            if !disposable(&start) {
+                found.push(label(false));
+            }
+            continue;
+        }
+        let mut directories = vec![start.clone()];
+        'walk: while let Some(directory) = directories.pop() {
+            for entry in std::fs::read_dir(&directory).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                *budget = budget.saturating_sub(1);
+                if *budget == 0 {
+                    return Err(
+                        "Kept: its ignored files are too many to check without someone looking."
+                            .into(),
+                    );
+                }
+                let metadata =
+                    std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+                let file = entry.file_name().to_string_lossy().into_owned();
+                if metadata.is_dir() && !is_link(&metadata) {
+                    if !unattended_output(&file) {
+                        directories.push(entry.path());
+                    }
+                } else if is_link(&metadata) || !disposable(&entry.path()) {
+                    found.push(label(true));
+                    break 'walk;
+                }
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// Why automatic cleanup kept a worktree holding [`local_files`].
+pub(super) fn local_files_reason(found: &[String]) -> String {
+    let mut shown: Vec<&str> = found
+        .iter()
+        .take(LOCAL_FILES_SHOWN)
+        .map(String::as_str)
+        .collect();
+    if found.len() > LOCAL_FILES_SHOWN {
+        shown.push("…");
+    }
+    format!(
+        "Kept: has local files ({}). Move what you need, then remove it with Clean up in Project worktrees.",
+        shown.join(", ")
+    )
+}
+
 /// Whether `path`, a regular file inside the worktree `root`, is byte for byte the file at the
 /// same place in the project checkout `original`, as the copies `.worktreeinclude` and setup
 /// files make are until someone edits them. Removing such a copy loses nothing.
@@ -638,6 +777,7 @@ fn inspect_entries(
     Ok(entries)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn remove(
     repo_path: &str,
     worktree_path: &str,
@@ -647,6 +787,33 @@ pub(super) fn remove(
     runs: &[TaskRun],
     delete_branch: bool,
     expected_branch: Option<&str>,
+) -> Result<(), String> {
+    remove_with(
+        repo_path,
+        worktree_path,
+        target_branch,
+        expected_head,
+        expected_target_head,
+        runs,
+        delete_branch,
+        expected_branch,
+        false,
+    )
+}
+
+/// [`remove`], and with `unattended` also refusing a worktree that holds [`local_files`]: no one
+/// reviews the ignored paths an automatic removal deletes.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn remove_with(
+    repo_path: &str,
+    worktree_path: &str,
+    target_branch: &str,
+    expected_head: &str,
+    expected_target_head: &str,
+    runs: &[TaskRun],
+    delete_branch: bool,
+    expected_branch: Option<&str>,
+    unattended: bool,
 ) -> Result<(), String> {
     let entries = inspect_entries(repo_path, Some(target_branch), runs, Some(worktree_path))?;
     let wt = entries
@@ -679,10 +846,34 @@ pub(super) fn remove(
     let root = canonical(worktree_path)?;
     let original = checkout(&entries);
     let mut budget = 200_000usize;
+    if unattended {
+        let mut scan = UNATTENDED_SCAN;
+        let found = local_files(
+            &root,
+            &status.discarded_paths,
+            original.as_deref(),
+            &mut scan,
+        )?;
+        if !found.is_empty() {
+            return Err(local_files_reason(&found));
+        }
+    }
     for discarded in &status.discarded_paths {
         let path = ignored_location(&root, discarded)
             .filter(|path| path.starts_with(&root) && path != &root)
             .ok_or("Ignored path changed. Refresh before cleanup.")?;
+        if unattended {
+            let mut scan = UNATTENDED_SCAN;
+            let found = local_files(
+                &root,
+                std::slice::from_ref(discarded),
+                original.as_deref(),
+                &mut scan,
+            )?;
+            if !found.is_empty() {
+                return Err(local_files_reason(&found));
+            }
+        }
         // An unchanged copy of a checkout file may have been edited since the inspection, which
         // can take seconds, so the content is checked again right before it goes.
         if let Some(found) = preserved_content(&root, &path, &mut budget, original.as_deref())? {
@@ -1530,6 +1721,58 @@ mod tests {
             );
             assert_eq!(fs::read_to_string(file).unwrap(), "local data");
         }
+    }
+
+    #[test]
+    fn unattended_removal_keeps_local_files_the_clean_up_button_would_list() {
+        let f = Fixture::new("main");
+        f.commit(&f.worktree, "merged\n");
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
+        fs::create_dir_all(f.worktree.join("ignored/target/debug")).unwrap();
+        fs::write(f.worktree.join("ignored/target/debug/app"), "binary").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        let unattended = |entry: &WorktreeEntry| {
+            let status = entry.cleanup.as_ref().unwrap();
+            remove_with(
+                f.repo.to_str().unwrap(),
+                &entry.path,
+                "main",
+                &entry.head,
+                status.target_head.as_deref().unwrap(),
+                &[],
+                false,
+                Some(&entry.branch),
+                true,
+            )
+        };
+        let mut budget = UNATTENDED_SCAN;
+        let root = canonical(&entry.path).unwrap();
+        assert!(
+            local_files(&root, &status.discarded_paths, None, &mut budget)
+                .unwrap()
+                .is_empty()
+        );
+        fs::write(f.worktree.join("ignored/notes.txt"), "my notes").unwrap();
+        let entry = f.entry();
+        assert_eq!(
+            unattended(&entry).unwrap_err(),
+            local_files_reason(&["ignored/…".into()])
+        );
+        assert_eq!(
+            fs::read_to_string(f.worktree.join("ignored/notes.txt")).unwrap(),
+            "my notes"
+        );
+        assert!(f.worktree.join("ignored/target/debug/app").exists());
+        assert_eq!(
+            local_files_reason(&["a".into(), "b/…".into(), "c".into(), "d".into()]),
+            "Kept: has local files (a, b/…, c, …). Move what you need, then remove it with Clean up in Project worktrees."
+        );
+        f.remove(&entry, &[]).unwrap();
+        assert!(
+            !f.worktree.exists(),
+            "Clean up, which lists the files, still removes it"
+        );
     }
 
     #[test]

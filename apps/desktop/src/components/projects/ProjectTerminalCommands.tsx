@@ -6,7 +6,7 @@ type Lifecycle = 'runOnWorktreeCreate' | 'stopWhenFinished';
 
 const LIFECYCLE: { key: Lifecycle; title: string }[] = [
   { key: 'runOnWorktreeCreate', title: 'Run when a worktree is created' },
-  { key: 'stopWhenFinished', title: 'Stop when the task finishes' },
+  { key: 'stopWhenFinished', title: 'Stop its terminal when the task finishes' },
 ];
 
 /** Extra commands a task terminal offers as buttons, after preparation and verification. */
@@ -21,7 +21,7 @@ export function ProjectTerminalCommands({ project }: { project: Project }) {
   return (
     <SettingGroup
       title="Terminal commands"
-      description="Buttons in a task's terminal, beside the preparation and verification commands. Each runs in the task's workspace with your OS permissions. Keep credentials out of commands. A command set to run when a worktree is created runs in each new task worktree after preparation, and a failure stops the task with its output. One set to stop when the task finishes, such as a dev server, stops the terminal that ran it when the task is merged or archived."
+      description="Buttons in a task's terminal, beside the preparation and verification commands. Each runs in the task's workspace with your OS permissions. Keep credentials out of commands. A command set to run when a worktree is created runs in each new task worktree after preparation, and a failure stops the task with its output. One set to stop its terminal, such as a dev server, stops the whole terminal that ran it, with everything else running there, when the task is merged or archived."
     >
       <SettingBody>
         <KeyValueList

@@ -25,6 +25,8 @@ interface TerminalView {
   output: string;
   cursor: number;
   reset: boolean;
+  /** A command marked to stop with the task ran here, so the whole terminal stops then. */
+  stopsWhenFinished?: boolean;
 }
 export function TaskTerminal({ run }: { run: TaskRun }) {
   const splitKey = `terminal:${run.taskId}`;
@@ -59,6 +61,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
   const generationRef = useRef('');
   const [workspace, setWorkspace] = useState(run.workspace);
   const [running, setRunning] = useState(false);
+  const [stopsWhenFinished, setStopsWhenFinished] = useState(false);
   const [savedOutput, setSavedOutput] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -116,6 +119,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
     generationRef.current = '';
     setWorkspace(run.workspace);
     setRunning(false);
+    setStopsWhenFinished(false);
     setSavedOutput(false);
     setHasSelection(false);
     setFeedbackSaved(false);
@@ -231,6 +235,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
         if (disposed) return;
         writable = view?.running ?? false;
         setRunning(writable);
+        setStopsWhenFinished(writable && !!view?.stopsWhenFinished);
         if (view) {
           const changed = generation !== view.generation;
           generation = view.generation;
@@ -328,6 +333,12 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
         </Button>
       </div>
       <p className="work-context-path">{workspace}</p>
+      {stopsWhenFinished && (
+        <p className="task-muted text-sm">
+          This whole terminal stops when the task is merged or archived, including anything else
+          running in it.
+        </p>
+      )}
       {!!commands.length && (
         <fieldset className="flex flex-wrap items-center gap-2">
           <legend className="ui-sr-only">Project commands</legend>
@@ -336,8 +347,16 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
               key={item.id}
               variant="outline"
               size="sm"
-              title={item.command}
-              aria-label={`Run ${item.name}: ${item.command}`}
+              title={
+                item.stopWhenFinished
+                  ? `${item.command}\nStops this whole terminal when the task is merged or archived.`
+                  : item.command
+              }
+              aria-label={`Run ${item.name}: ${item.command}${
+                item.stopWhenFinished
+                  ? '. Stops this whole terminal when the task is merged or archived.'
+                  : ''
+              }`}
               disabled={!running || busy}
               onClick={() => {
                 setBusy(true);

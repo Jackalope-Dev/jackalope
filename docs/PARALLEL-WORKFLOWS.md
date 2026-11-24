@@ -433,9 +433,16 @@ applied, while a Keep and combine follow-up reads it, or while any process runs 
 (on macOS and Linux, also while the processes cannot be listed).
 It then goes through the same inspection and removal as Clean up, so uncommitted changes,
 unmerged commits, local data, locks, submodules, terminals, previews and checks keep it.
-Branches are never deleted. Removals and failures are logged in
-`integrations/worktree-cleanup.jsonl` in the native profile with the reason, and the
-newest show under the setting.
+Because no one sees what it deletes, it also keeps a worktree holding any ignored file that
+is not dependency or build output (`node_modules`, `target`, `dist`, `build`, `.next`,
+`.cache`, `__pycache__`, `.venv` and similar), a file tools recreate (`.DS_Store`,
+`*.tsbuildinfo`), a byte-identical copy of the checkout's file (as `.worktreeinclude` and
+setup files place them) or Jackalope's `.jackalope/prepared.json`. Notes, local output and
+`.jackalope/artifacts` therefore keep it, with the reason "Kept: has local files (notes.md,
+out/…)"; Clean up in Project worktrees lists those files and removes it on confirmation.
+Branches are never deleted. Removals, failures and worktrees kept for local files are logged
+in `integrations/worktree-cleanup.jsonl` in the native profile with the reason (a repeated
+keep only once), and the newest show under the setting.
 
 ## Usage and capacity
 

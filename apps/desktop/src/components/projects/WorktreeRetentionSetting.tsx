@@ -30,7 +30,7 @@ export function WorktreeRetentionSetting({ project }: { project: Project }) {
     <>
       <SettingRow
         title="Remove finished worktrees"
-        description="Removes a task's worktree once its task is merged or archived and this long has passed. Worktrees with uncommitted changes, unmerged commits, local data or running processes are kept. Branches stay."
+        description="Removes a task's worktree once its task is merged or archived and this long has passed. Worktrees with uncommitted changes, unmerged commits, running processes or ignored files other than dependencies and build output, such as notes, are kept. Branches stay."
         descriptionId="project-worktree-retention-description"
       >
         <Select

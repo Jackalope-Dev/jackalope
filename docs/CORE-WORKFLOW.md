@@ -314,11 +314,12 @@ is created**. Marked commands run in order in each new isolated worktree after t
 preparation command, with the same stall and time limits, the workspace reservation and a
 check slot; they always run, with no manifest reuse or automatic retry. When none is set,
 the first marked command decides whether dependency folders are cloned. A failure stops
-the task with the command's name, exit status and recorded output. **Stop when the task
-finishes** marks the task terminal that runs the command from its button: preparing the
-task's merge or archiving it stops that terminal's process tree, so a dev server does not
-block the merge. Commands typed into the terminal are not tracked, and both options are
-off for commands saved before they existed.
+the task with the command's name, exit status and recorded output. **Stop its terminal when
+the task finishes** marks the task terminal that runs the command from its button: preparing
+the task's merge or archiving it stops that whole terminal and everything running in it, not
+only the command, because a merge needs the workspace free of any running terminal. The
+terminal says so while it is marked. Commands typed into the terminal are not tracked, and
+both options are off for commands saved before they existed.
 
 Automatic verification is on for a project unless Check results automatically is turned
 off in Project settings, and does nothing until the project has a check command. Every

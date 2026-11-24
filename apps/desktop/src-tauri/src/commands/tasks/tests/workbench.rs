@@ -238,6 +238,7 @@ fn finishing_a_task_stops_only_a_terminal_that_ran_a_command_marked_for_it() {
         .unwrap();
     assert_eq!(work_terminal::stop_when_finished([run.task_id.as_str()]), 0);
     assert!(work_terminal::ensure_idle(&run.workspace).is_err());
+    assert_eq!(status()["stopsWhenFinished"], false);
     work_terminal::task_terminal_write(
         run.task_id.clone(),
         generation.clone(),
@@ -245,6 +246,11 @@ fn finishing_a_task_stops_only_a_terminal_that_ran_a_command_marked_for_it() {
         Some(true),
     )
     .unwrap();
+    assert_eq!(
+        status()["stopsWhenFinished"],
+        true,
+        "the terminal says the whole shell will stop"
+    );
     assert_eq!(work_terminal::stop_when_finished([other_task.as_str()]), 0);
     assert!(work_terminal::ensure_idle(&run.workspace).is_err());
     assert_eq!(work_terminal::stop_when_finished([run.task_id.as_str()]), 1);

@@ -233,7 +233,11 @@ impl Project {
         git(&repo, &["init", "--initial-branch", "main"]);
         git(&repo, &["config", "user.name", "Retention Test"]);
         git(&repo, &["config", "user.email", "retention@example.test"]);
-        fs::write(repo.join(".gitignore"), ".worktrees/\n.env\n").unwrap();
+        fs::write(
+            repo.join(".gitignore"),
+            ".worktrees/\n.env\ndist/\nnode_modules/\n.jackalope/\n.DS_Store\nnotes.md\nout/\n",
+        )
+        .unwrap();
         fs::write(repo.join("file.txt"), "initial\n").unwrap();
         git(&repo, &["add", "."]);
         git(&repo, &["commit", "-m", "fixture"]);
@@ -354,6 +358,37 @@ fn a_pass_removes_only_finished_clean_worktrees_past_retention_and_logs_why() {
     copied_run.archived_at = Some("2026-09-01T00:00:00Z".into());
     runs.push(copied_run);
 
+    let (output, output_base) = project.worktree("output");
+    for (file, text) in [
+        ("dist/bundle.js", "built"),
+        ("node_modules/pkg/index.js", "installed"),
+        (".jackalope/prepared.json", "{}"),
+        (".DS_Store", "finder"),
+    ] {
+        fs::create_dir_all(output.join(file).parent().unwrap()).unwrap();
+        fs::write(output.join(file), text).unwrap();
+    }
+    let mut output_run = run("run-output", "t-output", &output, &output_base);
+    output_run.archived_at = Some("2026-09-01T00:00:00Z".into());
+    runs.push(output_run);
+
+    let (notes, notes_base) = project.worktree("notes");
+    fs::write(notes.join("notes.md"), "my plan").unwrap();
+    fs::create_dir_all(notes.join("out/run")).unwrap();
+    fs::write(notes.join("out/run/report.txt"), "results").unwrap();
+    fs::create_dir_all(notes.join("dist")).unwrap();
+    fs::write(notes.join("dist/bundle.js"), "built").unwrap();
+    let mut notes_run = run("run-notes", "t-notes", &notes, &notes_base);
+    notes_run.archived_at = Some("2026-09-01T00:00:00Z".into());
+    runs.push(notes_run);
+
+    let (artifacts, artifacts_base) = project.worktree("artifacts");
+    fs::create_dir_all(artifacts.join(".jackalope/artifacts")).unwrap();
+    fs::write(artifacts.join(".jackalope/artifacts/shot.png"), "png").unwrap();
+    let mut artifacts_run = run("run-artifacts", "t-artifacts", &artifacts, &artifacts_base);
+    artifacts_run.archived_at = Some("2026-09-01T00:00:00Z".into());
+    runs.push(artifacts_run);
+
     let (combined, combined_base) = project.worktree("combined");
     let mut combined_run = run("run-combined", "t-combined", &combined, &combined_base);
     combined_run.archived_at = Some("2026-09-01T00:00:00Z".into());
@@ -395,6 +430,7 @@ fn a_pass_removes_only_finished_clean_worktrees_past_retention_and_logs_why() {
         (&merged, "its commits are merged into main 9 days ago"),
         (&archived, "its task was archived 8 days ago"),
         (&copied, "its task was archived"),
+        (&output, "its task was archived"),
     ] {
         let (result, why) = outcome(path);
         assert_eq!(result, "removed", "{why}");
@@ -409,6 +445,8 @@ fn a_pass_removes_only_finished_clean_worktrees_past_retention_and_logs_why() {
         (&edited, "secrets or local data"),
         (&combined, "combine"),
         (&foreign, "No task"),
+        (&notes, "Kept: has local files (notes.md, out/…)"),
+        (&artifacts, "Kept: has local files (.jackalope/…)"),
     ] {
         let (result, why) = outcome(path);
         assert_eq!(result, "kept", "{}: {why}", path.display());
@@ -432,10 +470,41 @@ fn a_pass_removes_only_finished_clean_worktrees_past_retention_and_logs_why() {
         "KEY=checkout"
     );
 
+    assert_eq!(
+        fs::read_to_string(notes.join("notes.md")).unwrap(),
+        "my plan",
+        "unattended cleanup never deletes a file a person may have made"
+    );
+    assert!(notes.join("dist/bundle.js").exists());
+
     record(&runtime, &report).unwrap();
     let logged = read_log(&runtime, project.repo.to_str().unwrap());
-    assert_eq!(logged.len(), 3, "only removals and failures are logged");
-    assert!(logged.iter().all(|entry| entry.outcome == "removed"));
+    assert_eq!(
+        logged.len(),
+        6,
+        "removals and worktrees kept for local files are logged: {logged:?}"
+    );
+    assert_eq!(
+        logged
+            .iter()
+            .filter(|entry| entry.outcome == "removed")
+            .count(),
+        4
+    );
+    assert!(logged
+        .iter()
+        .any(|entry| Path::new(&entry.worktree) == notes && entry.reason.starts_with("Kept: ")));
+    let again: Vec<RetentionEntry> = report
+        .iter()
+        .filter(|entry| entry.outcome == "kept")
+        .cloned()
+        .collect();
+    record(&runtime, &again).unwrap();
+    assert_eq!(
+        read_log(&runtime, project.repo.to_str().unwrap()).len(),
+        6,
+        "a later pass keeping the same worktree for the same files is not logged again"
+    );
     assert!(read_log(&runtime, "/another/project").is_empty());
 
     let mut unsaved = runs[2].clone();

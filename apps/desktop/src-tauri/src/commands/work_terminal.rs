@@ -36,7 +36,8 @@ struct Terminal {
     output: Arc<Mutex<Output>>,
     history: Option<std::path::PathBuf>,
     /// A saved command marked to stop when its task finishes ran here, so merging or archiving
-    /// the task stops this shell and everything it started.
+    /// the task stops this whole shell and everything it started. The mark covers the shell
+    /// rather than the command's job: merging needs the workspace free of any running terminal.
     stop_when_finished: bool,
 }
 impl Terminal {
@@ -100,6 +101,9 @@ pub struct TerminalView {
     output: String,
     cursor: usize,
     reset: bool,
+    /// The whole shell stops when its task is merged or archived, because a saved command
+    /// marked for that ran in it.
+    stops_when_finished: bool,
 }
 fn running(terminal: &mut Terminal) -> Result<bool, String> {
     if terminal
@@ -134,6 +138,7 @@ fn view(terminal: &mut Terminal, cursor: usize, generation: &str) -> Result<Term
         output: output.text[start..].into(),
         cursor: end,
         reset,
+        stops_when_finished: running && terminal.stop_when_finished,
     })
 }
 
@@ -585,6 +590,7 @@ pub async fn task_terminal_restore(
             cursor: saved.output.len(),
             output: saved.output,
             reset: true,
+            stops_when_finished: false,
         }))
     })
     .await
