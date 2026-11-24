@@ -78,5 +78,7 @@ export function TurnstileWidget({
       if (widget) window.turnstile?.remove(widget);
     };
   }, [action, handle]);
-  return turnstileSiteKey ? <div ref={container} className="signup-turnstile" /> : null;
+  // Always rendered: prerendering runs outside a production build, where the default key is
+  // off, and a container only one side renders fails hydration. It is hidden while empty.
+  return <div ref={container} className="signup-turnstile" />;
 }

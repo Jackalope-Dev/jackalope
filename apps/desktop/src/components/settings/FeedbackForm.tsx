@@ -84,8 +84,8 @@ export function FeedbackForm({
       </p>
       {!settings?.configured && (
         <p className="settings-disclosure-box">
-          Sending is unavailable in this build. You can copy a local support report from Settings →
-          Updates &amp; support.
+          This build can’t send feedback from the app. Use Prepare a local support report in
+          Settings → Help &amp; community to copy a report you can share instead.
         </p>
       )}
       {preview ? (

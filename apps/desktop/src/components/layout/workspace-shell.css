@@ -1129,6 +1129,10 @@ button.project-tree-toggle:hover {
   list-style: disc;
   color: var(--color-text-secondary);
 }
+.whats-new-body strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
 .whats-new-body li::marker {
   color: var(--color-accent-ink);
 }

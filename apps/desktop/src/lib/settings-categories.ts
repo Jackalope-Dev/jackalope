@@ -4,6 +4,7 @@ import {
   Cloud,
   Cpu,
   Database,
+  Download,
   FolderCog,
   GitFork,
   History,
@@ -201,11 +202,18 @@ export const SETTINGS_CATEGORIES = [
       'network telemetry crash reporting settings sync Claude Code Codex terminal conversations sessions outside',
   },
   {
+    id: 'Updates',
+    group: 'Help',
+    icon: Download,
+    keywords:
+      'app updates version check automatic install download release notes channel beta stable about upgrade',
+  },
+  {
     id: 'Help & community',
     group: 'Help',
     icon: LifeBuoy,
     keywords:
-      'updates support version automatic install release notes help feedback report community discord knowledgebase documentation',
+      'support help feedback bug report community discord knowledgebase documentation updates',
   },
   {
     id: 'Diagnostics',

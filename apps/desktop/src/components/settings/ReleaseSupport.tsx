@@ -16,7 +16,6 @@ import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { openHelp } from '../../lib/navigation';
 import { FeedbackForm } from './FeedbackForm';
-import { UpdateSettings } from './UpdateSettings';
 
 export function ReleaseSupport() {
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
@@ -53,7 +52,6 @@ export function ReleaseSupport() {
         </SettingRow>
       </SettingGroup>
       <FeedbackForm />
-      <UpdateSettings />
       <SettingGroup
         aria-label="Support report"
         title="Prepare a local support report"
