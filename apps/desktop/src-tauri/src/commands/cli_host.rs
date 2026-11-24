@@ -748,6 +748,30 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             .map_err(|e| e.to_string())??;
             Ok(Response::BrowserProfile { profile })
         }
+        Request::CodeHost { session_id } => {
+            use super::source_control::{self, Route};
+            let runtime = app.state::<TaskRuntime>().inner().clone();
+            let run = view::latest_run(&session_id, &runtime.integration_runs()?)
+                .cloned()
+                .ok_or("This conversation has no work to deliver yet.")?;
+            let integration = runtime.integration_directory();
+            let route = tauri::async_runtime::spawn_blocking(move || {
+                let checkout = if !run.workspace.is_empty() && Path::new(&run.workspace).is_dir() {
+                    &run.workspace
+                } else {
+                    &run.project_path
+                };
+                source_control::route(&integration, Path::new(checkout), &run.project_path)
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+            let kind = match route {
+                Route::GitHub => "github",
+                Route::GitLab(_) => "gitlab",
+                Route::Bitbucket(_) => "bitbucket",
+            };
+            Ok(Response::CodeHost { kind: kind.into() })
+        }
         Request::Computer { session_id, action } => {
             use super::computers;
             let runtime = app.state::<TaskRuntime>().inner().clone();

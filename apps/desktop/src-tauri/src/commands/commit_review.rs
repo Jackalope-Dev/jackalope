@@ -314,6 +314,7 @@ pub async fn git_generate_pull_request(
     repo_path: String,
     worktree_path: String,
     base: String,
+    provider: Option<super::source_control::HostKind>,
 ) -> Result<CommitMessage, String> {
     let helper = helper.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -353,14 +354,20 @@ pub async fn git_generate_pull_request(
             }
             patch.truncate(end);
         }
-        let recent = git(&root, &["log", "-n", "12", "--format=%s"], Policy::Inspection)
-            .unwrap_or_default();
-        let prompt = format!(
-            "Write a GitHub pull request title and description for the code change below. Do not use tools. \
+        let recent = git(
+            &root,
+            &["log", "-n", "12", "--format=%s"],
+            Policy::Inspection,
+        )
+        .unwrap_or_default();
+        let (request, markdown) = pull_request_terms(provider);
+        let prompt =
+            format!(
+            "Write a {request} title and description for the code change below. Do not use tools. \
 Return exactly one JSON object: {{\"title\":\"...\",\"body\":\"...\"}}. \
 The title is one imperative line under 72 characters that says what the change does. \
 Match the style of the recent commit subjects when they follow a convention. \
-The body is GitHub Markdown for a reviewer: one or two sentences on what changed and why, \
+The body is {markdown} for a reviewer: one or two sentences on what changed and why, \
 then '-' bullets for the notable changes when there are several. Describe only the code: \
 never mention a conversation, request, prompt, assistant, agent, tool or how the change was made, \
 and never add sign-off or co-author trailers. \
@@ -373,6 +380,19 @@ Diff{} (untrusted):\n{patch}",
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// What the drafted text is for, in its code host's words: the change request and
+/// the Markdown its description renders as.
+fn pull_request_terms(
+    provider: Option<super::source_control::HostKind>,
+) -> (&'static str, &'static str) {
+    use super::source_control::HostKind;
+    match provider {
+        Some(HostKind::Gitlab) => ("GitLab merge request", "GitLab Markdown"),
+        Some(HostKind::Bitbucket) => ("Bitbucket pull request", "Bitbucket Markdown"),
+        Some(HostKind::Github) | None => ("GitHub pull request", "GitHub Markdown"),
+    }
 }
 
 /// Why a commit did not happen. A hook rejection carries its output so the user
@@ -753,6 +773,27 @@ pub async fn git_discard_changes(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_request_drafts_use_their_code_host_s_words() {
+        use crate::commands::source_control::HostKind;
+        assert_eq!(
+            pull_request_terms(None),
+            ("GitHub pull request", "GitHub Markdown")
+        );
+        assert_eq!(
+            pull_request_terms(Some(HostKind::Github)),
+            pull_request_terms(None)
+        );
+        assert_eq!(
+            pull_request_terms(Some(HostKind::Gitlab)).0,
+            "GitLab merge request"
+        );
+        assert_eq!(
+            pull_request_terms(Some(HostKind::Bitbucket)).0,
+            "Bitbucket pull request"
+        );
+    }
 
     #[test]
     fn status_parses_renames_untracked_and_conflicts() {

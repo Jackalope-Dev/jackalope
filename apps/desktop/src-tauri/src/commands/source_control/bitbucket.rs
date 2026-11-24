@@ -358,12 +358,21 @@ pub(crate) async fn view(
         )
         .await?,
     );
-    // Conflicts are only reported per file; when they cannot be read, mergeability stays unknown.
+    // Conflicts are only reported per file; when they cannot all be read, mergeability
+    // stays unknown unless a conflict was already seen.
     let diffstat = get(credentials, &format!("{base}/diffstat?pagelen=100"))
         .await
         .ok()
-        .map(|value| values(&value));
+        .and_then(|value| diffstat_files(&value));
     normalize(&pr, &statuses, diffstat.as_deref())
+}
+
+/// The files of a diffstat page that can show whether a pull request conflicts: all of
+/// them, or a page that already shows a conflict. `None` when more pages could hide one.
+fn diffstat_files(page: &Value) -> Option<Vec<Value>> {
+    let files = values(page);
+    let conflict = files.iter().any(|file| file["status"] == "merge conflict");
+    (conflict || !page["next"].is_string()).then_some(files)
 }
 
 fn quoted(value: &str) -> String {
@@ -429,12 +438,16 @@ pub(crate) async fn create(
 }
 
 /// Merges a pull request with the chosen strategy. Bitbucket enforces the
-/// repository's merge checks; nothing here bypasses them.
+/// repository's merge checks; nothing here bypasses them. Bitbucket's merge request
+/// cannot name the commit to merge, so `head`, the commit the person saw, is compared
+/// with the pull request's source just before merging: a push between that read and
+/// the merge is not caught.
 pub(crate) async fn merge(
     credentials: &Credentials,
     repository: &Repository,
     number: u64,
     method: &str,
+    head: Option<&str>,
 ) -> Result<(), String> {
     let strategy = match method {
         "merge" => "merge_commit",
@@ -455,6 +468,15 @@ pub(crate) async fn merge(
             "This pull request is a draft. Mark it ready on Bitbucket before merging.".into(),
         );
     }
+    let source = text(&pr["source"]["commit"], "hash");
+    if let Some(head) = head {
+        if !same_commit(head, &source) {
+            return Err(
+                "This pull request has new commits since it was last checked. Check it again and review them before merging."
+                    .into(),
+            );
+        }
+    }
     request(
         credentials,
         reqwest::Method::POST,
@@ -464,6 +486,12 @@ pub(crate) async fn merge(
     .await
     .map(|_| ())
     .map_err(|error| format!("Bitbucket did not merge the pull request. {error}"))
+}
+
+/// Whether two hashes name the same commit; Bitbucket abbreviates its own.
+fn same_commit(a: &str, b: &str) -> bool {
+    let (a, b) = (a.to_ascii_lowercase(), b.to_ascii_lowercase());
+    a.len().min(b.len()) >= 7 && (a.starts_with(&b) || b.starts_with(&a))
 }
 
 /// Open comment threads: top-level comments that are neither deleted nor resolved,
@@ -861,6 +889,33 @@ mod tests {
             Some("7".into())
         );
         assert_eq!(pipeline_number("https://ci.example.com/build/9"), None);
+    }
+
+    #[test]
+    fn merges_compare_the_commit_that_was_seen() {
+        assert!(same_commit(
+            "113ce9372ea0",
+            "113CE9372EA0d1f2a3b4c5d6e7f8a9b0c1d2e3f4"
+        ));
+        assert!(same_commit("113ce9372ea0d1f2", "113ce9372ea0"));
+        assert!(!same_commit("113ce9372ea0", "9a8b7c6d5e4f"));
+        assert!(!same_commit("113ce9", "113ce9372ea0"));
+        assert!(!same_commit("", ""));
+    }
+
+    #[test]
+    fn a_partial_diffstat_cannot_say_there_is_no_conflict() {
+        let clean = json!({"values": [{"status": "modified"}]});
+        assert_eq!(diffstat_files(&clean).map(|files| files.len()), Some(1));
+        let more = json!({"values": [{"status": "modified"}], "next": "https://api.bitbucket.org/2.0/x?page=2"});
+        assert!(diffstat_files(&more).is_none());
+        let conflicted = json!({"values": [{"status": "merge conflict"}], "next": "https://api.bitbucket.org/2.0/x?page=2"});
+        let pr = fixture("pr-open");
+        let files = diffstat_files(&conflicted).unwrap();
+        assert_eq!(
+            normalize(&pr, &[], Some(&files)).unwrap().mergeable,
+            "CONFLICTING"
+        );
     }
 
     #[test]

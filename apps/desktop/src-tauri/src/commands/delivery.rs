@@ -417,6 +417,7 @@ pub async fn task_pull_request_status(
                     path,
                     &run.project_path,
                     &repository,
+                    false,
                 )?;
                 gitlab::view(path, &repository, number).map(|view| Ok(view.json()))
             }
@@ -439,15 +440,27 @@ pub async fn task_pull_request_status(
 /// Merges a task's pull request on GitHub through the person's GitHub CLI, with the
 /// method they chose. GitHub enforces the repository's own rules; nothing local changes.
 /// A GitLab merge request or Bitbucket pull request merges through its host the same
-/// way, under that host's own pipeline, approval and merge-check rules.
+/// way, under that host's own pipeline, approval and merge-check rules, and only at
+/// `head`, the commit the person saw when they confirmed. GitHub ignores `head`.
 #[tauri::command]
 pub async fn task_pull_request_merge(
     id: String,
     url: String,
     method: String,
+    head: Option<String>,
     state: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
     let (route, number) = source_control::route_url(&url);
+    let head = match head
+        .map(|head| head.trim().to_string())
+        .filter(|head| !head.is_empty() && route != Route::GitHub)
+    {
+        Some(head) if !commit_id(&head) => {
+            return Err("The commit to merge could not be read. Check again, then merge.".into())
+        }
+        head => head,
+    };
+    let pinned = head.clone();
     let runtime = state.inner().clone();
     let integration = runtime.integration_directory();
     let chosen = method.clone();
@@ -472,8 +485,15 @@ pub async fn task_pull_request_merge(
         match route {
             Route::GitHub => {}
             Route::GitLab(repository) => {
-                source_control::check_gitlab_host(&integration, path, &run.project_path, &repository)?;
-                return gitlab::merge(path, &repository, number, &chosen).map(|()| None);
+                source_control::check_gitlab_host(
+                    &integration,
+                    path,
+                    &run.project_path,
+                    &repository,
+                    true,
+                )?;
+                return gitlab::merge(path, &repository, number, &chosen, head.as_deref())
+                    .map(|()| None);
             }
             Route::Bitbucket(repository) => return Ok(Some(repository)),
         }
@@ -496,9 +516,21 @@ pub async fn task_pull_request_merge(
     .map_err(|error| error.to_string())??;
     if let Some(repository) = bitbucket_route {
         let credentials = bitbucket::require(&state.integration_directory())?;
-        bitbucket::merge(&credentials, &repository, number, &strategy).await?;
+        bitbucket::merge(
+            &credentials,
+            &repository,
+            number,
+            &strategy,
+            pinned.as_deref(),
+        )
+        .await?;
     }
     Ok(())
+}
+
+/// A full or abbreviated Git commit ID.
+fn commit_id(value: &str) -> bool {
+    (7..=64).contains(&value.len()) && value.bytes().all(|c| c.is_ascii_hexdigit())
 }
 
 /// Runs a Git command that changes the checkout, reporting Git's own message on failure.

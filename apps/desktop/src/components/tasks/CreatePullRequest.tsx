@@ -36,6 +36,7 @@ export function CreatePullRequest({
     invokeNative<{ title: string; body: string }>('git_generate_pull_request', {
       ...checkout,
       base: run.baseHead,
+      ...(provider && provider !== 'github' ? { provider } : {}),
     }),
   );
   const title = message.title;

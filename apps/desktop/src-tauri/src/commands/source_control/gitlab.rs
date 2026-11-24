@@ -20,6 +20,8 @@ const RESPONSE_LIMIT: usize = 4_000_000;
 /// Characters kept from the end of each failed job's log.
 const LOG_TAIL: usize = 2_500;
 const FAILED_LOGS: usize = 3;
+/// Pages of pipeline jobs read: five hundred jobs.
+const JOB_PAGES: usize = 5;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Failure {
@@ -400,6 +402,30 @@ pub(crate) fn normalize(
     })
 }
 
+/// A pipeline's jobs, a hundred per page (GitLab's most), up to [`JOB_PAGES`] pages.
+fn pipeline_jobs(
+    cwd: &Path,
+    repository: &Repository,
+    pipeline: &str,
+) -> Result<Vec<Value>, String> {
+    let base = project(repository);
+    let mut jobs = Vec::new();
+    for page in 1..=JOB_PAGES {
+        let rows = get(
+            cwd,
+            repository,
+            &format!("{base}/pipelines/{pipeline}/jobs?per_page=100&page={page}"),
+        )?;
+        let rows = rows.as_array().cloned().unwrap_or_default();
+        let full = rows.len() == 100;
+        jobs.extend(rows);
+        if !full {
+            break;
+        }
+    }
+    Ok(jobs)
+}
+
 /// Reads one merge request with its pipeline's jobs and the project's squash setting.
 pub(crate) fn view(
     cwd: &Path,
@@ -409,14 +435,7 @@ pub(crate) fn view(
     let base = project(repository);
     let mr = get(cwd, repository, &format!("{base}/merge_requests/{number}"))?;
     let jobs = match mr["head_pipeline"]["id"].as_u64() {
-        Some(id) => get(
-            cwd,
-            repository,
-            &format!("{base}/pipelines/{id}/jobs?per_page=100"),
-        )?
-        .as_array()
-        .cloned()
-        .unwrap_or_default(),
+        Some(id) => pipeline_jobs(cwd, repository, &id.to_string())?,
         None => Vec::new(),
     };
     // Only the squash setting comes from here; without it both methods are offered.
@@ -507,13 +526,16 @@ pub(crate) fn create(
         })
 }
 
-/// Merges a merge request now, at the commit last read. GitLab enforces the
+/// Merges a merge request now, pinned with GitLab's `sha` to `head`, the commit the
+/// person saw when they confirmed (without one, the commit read just before merging).
+/// GitLab refuses the merge when the branch has moved past it, and enforces the
 /// project's pipeline, approval and discussion rules; nothing here bypasses them.
 pub(crate) fn merge(
     cwd: &Path,
     repository: &Repository,
     number: u64,
     method: &str,
+    head: Option<&str>,
 ) -> Result<(), String> {
     let squash = match method {
         "merge" => false,
@@ -525,6 +547,17 @@ pub(crate) fn merge(
     if mr["state"] != "opened" {
         return Err(format!("This merge request is {}.", text(&mr, "state")));
     }
+    let current = text(&mr, "sha");
+    let sha = match head {
+        Some(head) if !head.eq_ignore_ascii_case(&current) => {
+            return Err(
+                "This merge request has new commits since it was last checked. Check it again and review them before merging."
+                    .into(),
+            )
+        }
+        Some(head) => head.to_string(),
+        None => current,
+    };
     let status = mr["detailed_merge_status"].as_str().unwrap_or("");
     if !status.is_empty() && status != "mergeable" {
         return Err(format!(
@@ -537,7 +570,7 @@ pub(crate) fn merge(
         repository,
         "PUT",
         &format!("{base}/merge_requests/{number}/merge"),
-        Some(json!({ "sha": text(&mr, "sha"), "squash": squash })),
+        Some(json!({ "sha": sha, "squash": squash })),
     )
     .map(|_| ())
     .map_err(|error| format!("GitLab did not merge the merge request. {error}"))
@@ -676,12 +709,7 @@ pub(crate) fn context(
         }
         "ci" => {
             let pipeline = get(cwd, repository, &format!("{base}/pipelines/{number}"))?;
-            let jobs = get(
-                cwd,
-                repository,
-                &format!("{base}/pipelines/{number}/jobs?per_page=100"),
-            )?;
-            let jobs = jobs.as_array().cloned().unwrap_or_default();
+            let jobs = pipeline_jobs(cwd, repository, number)?;
             let failed: Vec<&Value> = jobs
                 .iter()
                 .filter(|job| job["status"] == "failed" && job["allow_failure"] != true)

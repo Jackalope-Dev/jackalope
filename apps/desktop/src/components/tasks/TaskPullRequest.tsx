@@ -165,6 +165,7 @@ export function TaskPullRequest({
             run={run}
             url={pr.url}
             provider={pr.provider}
+            head={pr.headRefOid}
             methods={mergeMethods(pr.provider, pr.mergeMethods)}
             disabled={disabled || busy}
             onMerged={refresh}
@@ -224,6 +225,7 @@ function MergePullRequest({
   run,
   url,
   provider,
+  head,
   methods,
   disabled,
   onMerged,
@@ -231,6 +233,8 @@ function MergePullRequest({
   run: TaskRun;
   url: string;
   provider?: HostKind;
+  /** The head commit last read; GitLab and Bitbucket merge only at it. */
+  head?: string;
   methods: MergeMethod[];
   disabled?: boolean;
   onMerged: () => Promise<void>;
@@ -258,7 +262,12 @@ function MergePullRequest({
       }}
       onConfirm={async () => {
         try {
-          await invokeNative('task_pull_request_merge', { id: run.id, url, method });
+          await invokeNative(
+            'task_pull_request_merge',
+            provider && provider !== 'github' && head
+              ? { id: run.id, url, method, head }
+              : { id: run.id, url, method },
+          );
         } catch (cause) {
           throw new Error(describeError(cause));
         }

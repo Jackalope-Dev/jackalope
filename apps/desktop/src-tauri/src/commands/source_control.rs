@@ -211,17 +211,25 @@ pub(crate) fn route_url(url: &str) -> (Route, u64) {
 
 /// Reads a merge request address through glab only when it is on the task's own
 /// remote host or a GitLab host the person named, so a saved address cannot point
-/// their GitLab sign-in at another server.
+/// their GitLab sign-in at another server. A merge (`write`) is only made on the
+/// task's own remote host.
 pub(crate) fn check_gitlab_host(
     integration: &Path,
     checkout: &Path,
     project: &str,
     repository: &Repository,
+    write: bool,
 ) -> Result<(), String> {
     if let Some((_, own)) = locate(integration, checkout, project) {
         if own.host == repository.host {
             return Ok(());
         }
+    }
+    if write {
+        return Err(format!(
+            "This merge request is on {}, not this task's remote, so Jackalope will not merge it.",
+            repository.host
+        ));
     }
     let configured: Vec<_> = settings(integration)
         .unwrap_or_default()
@@ -697,6 +705,17 @@ mod tests {
             route(&integration, &checkout, &project),
             Route::GitLab(_)
         ));
+        let elsewhere = Repository {
+            host: "gitlab.com".into(),
+            path: "other/app".into(),
+        };
+        let own = Repository {
+            host: "git.corp.example".into(),
+            path: "team/app".into(),
+        };
+        assert!(check_gitlab_host(&integration, &checkout, &project, &elsewhere, false).is_ok());
+        assert!(check_gitlab_host(&integration, &checkout, &project, &elsewhere, true).is_err());
+        assert!(check_gitlab_host(&integration, &checkout, &project, &own, true).is_ok());
         let mut chosen = settings(&integration).unwrap();
         chosen
             .projects
