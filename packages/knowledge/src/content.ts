@@ -243,8 +243,17 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What is the Inbox?',
         paragraphs: [
           'Inbox, at the top of the sidebar, gathers what needs you across every project. Its count shows how many items are waiting on you.',
-          'Needs you lists questions, results ready to review, failed checks and work that needs recovery. Each card shows how risky the decision is and, when the evidence is clear, a suggested next step. New results shows what finished recently, with screenshots first. Alerts collects app notices, including an agent allowance that is running low or used up. Running now and Waiting on others show work in progress and pull requests waiting on someone else.',
+          'Needs you lists questions, results ready to review, failed checks and work that needs recovery. Each card shows how risky the decision is and, when the evidence is clear, a suggested next step. New results shows what finished recently, with screenshots first. Alerts collects app notices, including an agent allowance that is running low or used up. Running now and Waiting on others show work in progress and pull requests waiting on someone else; See overview opens the full list.',
           'Filter by Everything, Needs you, Alerts or Activity, or pick one project. Mark all read clears the new markers on results or alerts. Open any item to go straight to it.',
+        ],
+      },
+      {
+        id: 'overview',
+        question: 'Where can I see everything that is running?',
+        paragraphs: [
+          'Overview, below Inbox in the sidebar, shows every project at once. Open it with Command+Shift+O on a Mac or Ctrl+Shift+O on Windows and Linux, or from See overview under Running now in Inbox.',
+          'Running now lists every task, conversation, planned task, bot reply and agent review that is running, with its project, agent and model, the step it is on and how long it has run. Work waiting for your answer comes first. Projects gives each project a card with what needs you, what is ready to review, what is running and its drafts, plus its target branch, open pull requests and their checks, the last project check and any running preview. Projects that need you come first.',
+          'Usage at a glance lists accounts that are near or at their limit, and Recently finished shows the last few results and merges. Select anything to open it.',
         ],
       },
       {

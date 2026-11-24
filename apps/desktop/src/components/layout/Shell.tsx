@@ -1,6 +1,14 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { InlineNotice, LoadingState, SearchIcon, Tooltip } from '@jackalope/ui';
-import { Images, Inbox, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
+import {
+  Images,
+  Inbox,
+  LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import {
   type CSSProperties,
   lazy,
@@ -445,6 +453,7 @@ export function Shell({
     focusComposer,
     setSearchOpen: setCommandsOpen,
     openSettings: () => navigate('preferences'),
+    openOverview: () => navigate('overview'),
     toggleSettings,
     toggleSidebar: () => useWorkViewStore.getState().toggleNav(),
     terminalProject: remoteHost ? undefined : project,
@@ -640,6 +649,18 @@ export function Shell({
               <span>Inbox</span>
               <NeedsYouCount />
             </button>
+            <Tooltip side="right" content={`Overview (${displayShortcut(shortcuts.overview)})`}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('overview')}
+                aria-current={view.group === 'overview' ? 'page' : undefined}
+                aria-label="Overview"
+                className="workspace-nav-item"
+              >
+                <LayoutDashboard aria-hidden="true" />
+                <span>Overview</span>
+              </button>
+            </Tooltip>
             <button
               type="button"
               onClick={() => setActiveTab('library')}

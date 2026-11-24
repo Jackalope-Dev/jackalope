@@ -1,6 +1,7 @@
 import {
   History,
   Keyboard,
+  LayoutDashboard,
   LifeBuoy,
   type LucideIcon,
   Megaphone,
@@ -24,6 +25,7 @@ export interface CommandContext {
   focusComposer: () => void;
   setSearchOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   openSettings: () => void;
+  openOverview: () => void;
   /** Settings, or back to the previous view when Settings is already open. */
   toggleSettings: () => void;
   toggleSidebar: () => void;
@@ -68,6 +70,16 @@ export const COMMANDS: readonly Command[] = [
     keywords: 'work task conversation capture idea',
     shortcut: 'newWork',
     run: (ctx) => ctx.focusComposer(),
+  },
+  {
+    // Command search lists Overview as a page, so the command only carries the shortcut.
+    id: 'overview',
+    label: () => 'Open overview',
+    icon: LayoutDashboard,
+    keywords: '',
+    shortcut: 'overview',
+    hidden: true,
+    run: (ctx) => ctx.openOverview(),
   },
   {
     id: 'terminal',

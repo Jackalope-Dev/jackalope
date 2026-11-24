@@ -14,6 +14,7 @@ import {
   GitFork,
   History,
   Images,
+  LayoutDashboard,
   ListTodo,
   type LucideIcon,
   MonitorSmartphone,
@@ -26,7 +27,15 @@ import {
 } from 'lucide-react';
 import { openExternalUrl } from './native/env.ts';
 import type { SettingsCategory } from './settings-categories';
-export type ViewGroup = 'tasks' | 'library' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
+export type ViewGroup =
+  | 'tasks'
+  | 'overview'
+  | 'library'
+  | 'bots'
+  | 'hosts'
+  | 'project'
+  | 'agents'
+  | 'settings';
 
 /**
  * Every workspace view. Shell renders each page from workspace-views.tsx, records the
@@ -66,6 +75,15 @@ export const WORKSPACE_VIEWS = [
     group: 'tasks',
     primary: true,
     feature: 'tasks',
+  },
+  {
+    id: 'overview',
+    label: 'Overview',
+    description: 'What is running, how each project stands and account usage, at a glance.',
+    icon: LayoutDashboard,
+    group: 'overview',
+    feature: 'tasks',
+    keywords: 'dashboard running live status projects pull requests checks previews usage home',
   },
   {
     id: 'library',

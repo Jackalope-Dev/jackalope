@@ -3,6 +3,7 @@ import { primaryModifier } from './platform-shortcuts.ts';
 export const defaultShortcuts = {
   search: 'Mod+K',
   newWork: 'Mod+Shift+N',
+  overview: 'Mod+Shift+O',
   settings: 'Mod+,',
   terminal: 'Mod+J',
   sidebar: 'Mod+B',
@@ -11,6 +12,7 @@ export type ShortcutAction = keyof typeof defaultShortcuts;
 export const shortcutNames: Record<ShortcutAction, string> = {
   search: 'Search and commands',
   newWork: 'New work',
+  overview: 'Open overview',
   settings: 'Settings',
   terminal: 'Open terminal',
   sidebar: 'Collapse or expand sidebar',

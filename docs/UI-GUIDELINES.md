@@ -183,8 +183,8 @@ and size inputs to what they hold, such as a short code.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
 for menu rows, segments and dense navigation; coarse pointers raise both to 44px. The sidebar
-leads with Inbox (work across projects that needs the person) and Library (files work
-created), then favorite projects and work as tiles, then projects with their pinned work,
+leads with Inbox (work across projects that needs the person), Overview (what is running
+and how each project stands) and Library (files work created), then favorite projects and work as tiles, then projects with their pinned work,
 folders, live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
 compact layouts that keep this in view over extra padding. Native
 window chrome can follow platform sizing. Dialogs retain viewport space and scroll on

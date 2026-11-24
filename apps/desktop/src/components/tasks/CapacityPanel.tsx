@@ -3,8 +3,11 @@ import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { getAgentMetadata } from '../../lib/agent-catalog';
-import { capacityWindowName } from '../../lib/capacity-display';
+import {
+  capacityAgentName as agentName,
+  capacityWindowName,
+  shortAccount,
+} from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { countdown, limitName, observedLimits, resetTime } from '../../lib/usage-limit';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
@@ -14,8 +17,6 @@ import './capacity-panel.css';
 import { ProviderMark } from '../agents/ProviderMark';
 import { ActionError } from '../ui/ActionError';
 
-const agentName = (agent: string) =>
-  agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
 const windowExpired = (window: CapacityWindow, now: number) =>
   window.resetsAt != null && window.resetsAt * 1000 <= now;
 /** Single-line reset text; the tiles ellipsize, so the full wording lives in `resetDetail`. */
@@ -261,10 +262,4 @@ export function CapacityPanel() {
       )}
     </section>
   );
-}
-
-/** Shortens opaque account identifiers; the full value stays in the tooltip. */
-function shortAccount(account: string) {
-  const match = /^(.*?)\s*([0-9a-f]{8}-[0-9a-f-]{20,})$/i.exec(account);
-  return match ? `${match[1] || 'Account'} …${match[2].slice(-6)}` : account;
 }

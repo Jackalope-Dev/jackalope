@@ -31,6 +31,9 @@ export interface ViewContext {
 }
 
 // Pages load on demand so the first paint ships only the task workspace.
+const OverviewPage = lazy(() =>
+  import('../overview/OverviewPage').then((m) => ({ default: m.OverviewPage })),
+);
 const LibraryPage = lazy(() =>
   import('../library/LibraryPage').then((m) => ({ default: m.LibraryPage })),
 );
@@ -134,6 +137,9 @@ export const VIEW_PAGES: Record<PageTab, (ctx: ViewContext) => ReactNode> = {
         ctx.open('kanban');
       }}
     />
+  ),
+  overview: (ctx) => (
+    <OverviewPage onNewWork={ctx.focusComposer} onAddProject={ctx.openProjectSetup} />
   ),
   library: () => <LibraryPage />,
   'remote-hosts': () => <DevicesPage />,

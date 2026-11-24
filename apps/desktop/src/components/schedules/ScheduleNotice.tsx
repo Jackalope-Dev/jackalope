@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNativeResource } from '../../hooks/useNativeResource';
 import { navigateWorkspace } from '../../lib/app-events';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { listSchedules, needsAction } from '../../lib/schedules';
+import { useActivityStore } from '../../stores/activityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useCompanionNotices } from '../mascot/useCompanionNotices';
@@ -11,6 +12,18 @@ export function ScheduleNotice() {
   const desktop = isTauriEnvironment();
   const { data, error } = useNativeResource(listSchedules, [], { pollMs: 15000, enabled: desktop });
   const schedules = data?.schedules ?? [];
+  useEffect(() => {
+    if (!data) return;
+    useActivityStore.setState({
+      schedules: Object.fromEntries(
+        data.schedules.flatMap((schedule) =>
+          schedule.history.flatMap((event) =>
+            event.runId ? [[event.runId, schedule.definition.name] as const] : [],
+          ),
+        ),
+      ),
+    });
+  }, [data]);
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('jackalope-schedule-notices') ?? '[]');

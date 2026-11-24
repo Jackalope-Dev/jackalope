@@ -35,6 +35,7 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-task-detail.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Task states, live step progress, preparation failure detail and retry dispatch |
 | verify-pull-requests.mjs | Desktop 5192; JACKALOPE_PREVIEW_URL override | Followed pull request lanes, the Delivery card, fix drafts, merge confirmation and stop following |
 | capture-walkthrough.mjs [--theme dark] [--width 960] | Desktop 5192; JACKALOPE_PREVIEW_URL override | Asserts nothing: saves a screenshot of every workspace page, tab, settings section and main menu plus contact sheets under output/playwright/walkthrough, for reviewing spacing, copy and flow |
+| verify-overview.mjs | Desktop 5291; JACKALOPE_PREVIEW_URL override | Inbox Running now (finished work not listed as running, aligned rail, overflow), the Overview page's live work, project status, usage and recent results, its shortcut, keyboard and empty state |
 | verify-core-flows.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Project scope, unified work, keyboard search, preview readiness and delivery drafts |
 | verify-decisions.mjs | Desktop 5198; JACKALOPE_PREVIEW_URL override | Decision settings, project inheritance, key retry and removal |
 | verify-external-sessions.mjs | Desktop 5193; JACKALOPE_PREVIEW_URL override | Outside Jackalope sidebar group, transcript, continue and unavailable states, keyboard and appearance |
