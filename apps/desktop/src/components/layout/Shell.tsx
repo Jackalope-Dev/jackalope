@@ -63,6 +63,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
+import { ConnectAccountEntry } from '../account/AccountPrompts';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { ShortcutSheet } from './ShortcutSheet';
 import { WelcomeDialog, welcomePending } from './WelcomeDialog';
@@ -730,6 +731,7 @@ export function Shell({
               </button>
             ))}
           </nav>
+          <ConnectAccountEntry />
           <Tooltip side="right" content={`Settings (${displayShortcut(shortcuts.settings)})`}>
             <button
               type="button"

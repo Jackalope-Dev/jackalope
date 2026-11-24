@@ -211,6 +211,21 @@
   min-height: 48px;
   border-radius: var(--radius-lg);
 }
+.access-skip {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.access-skip > button {
+  min-height: 48px;
+  border-radius: var(--radius-lg);
+}
+.access-skip > p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
 .access-pairing {
   display: grid;
   gap: 10px;
@@ -319,20 +334,6 @@
 }
 .access-frame > .app-titlebar {
   margin: 0;
-}
-.access-notice {
-  display: flex;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 4px 0 8px;
-  padding: 8px 8px 8px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-elevated);
-  font-size: 14px;
 }
 
 .access-welcome:has(.desktop-waitlist) .access-connection {
