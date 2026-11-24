@@ -343,7 +343,7 @@ transcript with tool names; subagent work is not shown. Reading is local and not
 uploaded; Settings → Privacy turns it off and deletes the index.
 
 Continue in Jackalope starts a conversation whose first attempt resumes the CLI's own
-session (`codex exec resume`, `claude --resume`) under the account directory it was saved
+session (Codex's thread by ID, `claude --resume`) under the account directory it was saved
 in, directly in the checkout or worktree it ran in, reserving that folder like in-place
 work. It is unavailable, with the reason shown, when that directory is not one of
 Jackalope's accounts for the CLI, the account or agent is turned off for the project, the

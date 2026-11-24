@@ -137,7 +137,7 @@ fn drive(
 
 #[test]
 fn both_runners_place_tools_from_one_table() {
-    let local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
+    let local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None, None);
     let remote = Access {
         runner: computers::runner::RunnerCapabilities::from_status(Some(
             &json!({"runs": 4, "capabilities": CAPABILITIES}),
@@ -221,7 +221,7 @@ fn one_launch_records_the_same_result_through_both_runners() {
     .unwrap();
     let input = "Task:\nFixture only\n";
 
-    let mut local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
+    let mut local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None, None);
     // Like every agent launch, the fixture gets its own process group (unix) so its tree can be stopped.
     let mut agent = super::super::command("node");
     agent.arg(&script);

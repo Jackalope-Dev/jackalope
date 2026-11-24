@@ -653,6 +653,92 @@ impl LiveSessions {
         })
     }
 
+    /// Adds a message to the batch that is running, when its agent takes messages
+    /// mid-turn (a Codex turn), instead of queueing it for the next batch. `None` when
+    /// the running turn cannot take it, so the caller stops the turn and sends it next.
+    pub(super) fn steer(
+        &self,
+        id: &str,
+        message_id: String,
+        text: String,
+        draft_revision: Option<u64>,
+    ) -> Result<Option<SessionDraft>, String> {
+        Uuid::parse_str(&message_id).map_err(|_| "Invalid message identifier")?;
+        let text = text.trim().to_string();
+        if text.is_empty() || text.chars().count() > 12_000 {
+            return Err("Use a message between 1 and 12,000 characters.".into());
+        }
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let session = {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            inner
+                .ledger
+                .sessions
+                .iter()
+                .find(|session| session.id == id)
+                .cloned()
+                .ok_or("Conversation not found")?
+        };
+        if let Some(existing) = session.messages.iter().find(|m| m.id == message_id) {
+            return if existing.text == text {
+                Ok(Some(session.draft.clone()))
+            } else {
+                Err("This message was already saved with different text.".into())
+            };
+        }
+        if session.closed || session.messages.len() >= 1000 {
+            return Ok(None);
+        }
+        let Some(run_id) = session
+            .batches
+            .last()
+            .filter(|batch| !batch.settled)
+            .map(|batch| batch.run_id.clone())
+        else {
+            return Ok(None);
+        };
+        if !self
+            .runtime
+            .run_snapshot(&run_id)
+            .is_some_and(|run| run.steerable && run.status.is_running())
+        {
+            return Ok(None);
+        }
+        let prompt = format!("The person added this message while you were working. Fold it into the current batch; later messages override earlier ones.\n\nUser message {message_id}:\n{text}\n");
+        if let Err(reason) = self.runtime.steer(&run_id, &prompt) {
+            self.runtime.update(&run_id, |run| {
+                super::tasks::events::activity(
+                    run,
+                    &format!("The running turn did not take a new message: {reason}"),
+                )
+            });
+            return Ok(None);
+        }
+        self.update(|ledger| {
+            let session = Self::session(ledger, id)?;
+            let now = Utc::now().to_rfc3339();
+            session.messages.push(SessionMessage {
+                id: message_id.clone(),
+                text: text.clone(),
+                created_at: now.clone(),
+                run_id: Some(run_id.clone()),
+                canceled: false,
+                origin: None,
+            });
+            if let Some(batch) = session.batches.iter_mut().find(|b| b.run_id == run_id) {
+                batch.message_ids.push(message_id.clone());
+            }
+            session.updated_at = now;
+            if draft_revision == Some(session.draft.revision) {
+                session.draft = SessionDraft {
+                    text: String::new(),
+                    revision: session.draft.revision + 1,
+                };
+            }
+            Ok(Some(session.draft.clone()))
+        })
+    }
+
     /// Queues a message the person did not type, such as a bot reply, without touching the draft.
     pub(in crate::commands) fn post(
         &self,
@@ -1432,6 +1518,7 @@ macro_rules! tauri_commands {
             commands::live_sessions::live_session_snapshot,
             commands::live_sessions::live_session_create,
             commands::live_sessions::live_session_send,
+            commands::live_sessions::live_session_steer,
             commands::live_sessions::live_session_draft,
             commands::live_sessions::live_session_action,
             commands::live_sessions::live_session_window,
@@ -1529,6 +1616,27 @@ pub async fn live_session_send(
     .await
     .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
+    Ok(draft)
+}
+
+#[tauri::command]
+pub async fn live_session_steer(
+    service: State<'_, LiveSessions>,
+    app: AppHandle,
+    id: String,
+    message_id: String,
+    text: String,
+    draft_revision: Option<u64>,
+) -> Result<Option<SessionDraft>, String> {
+    let service = service.inner().clone();
+    let draft = tauri::async_runtime::spawn_blocking(move || {
+        service.steer(&id, message_id, text, draft_revision)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    if draft.is_some() {
+        let _ = app.emit("live-sessions-changed", ());
+    }
     Ok(draft)
 }
 

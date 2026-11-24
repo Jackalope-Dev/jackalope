@@ -70,6 +70,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         session_id: None,
         result: String::new(),
         streaming: String::new(),
+        steerable: false,
         pending_tools: Default::default(),
         details_omitted: false,
         activity: vec![],

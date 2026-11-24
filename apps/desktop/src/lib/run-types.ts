@@ -66,6 +66,8 @@ export interface TaskRun {
   liveSessionId?: string | null;
   effort?: TaskEffort | null;
   codexSpeed?: 'standard' | 'fast' | null;
+  /** The running turn takes new messages without stopping (a Codex app-server turn). */
+  steerable?: boolean;
   requestedServiceTier?: string | null;
   reasoningEffort?: string | null;
   efficiency?: {

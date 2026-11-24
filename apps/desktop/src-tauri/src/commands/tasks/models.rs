@@ -200,6 +200,14 @@ pub struct TaskRun {
     /// cleared when the message completes into activity or `result`.
     #[serde(skip)]
     pub streaming: String,
+    /// The agent's running turn takes new messages (Codex's turn/steer). Live state only:
+    /// never read back from a saved record.
+    #[serde(
+        default,
+        skip_deserializing,
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub steerable: bool,
     /// Labels of tool calls still waiting for their result, by call id, so a failed
     /// result can name the step. Kept in memory only.
     #[serde(skip)]
@@ -571,6 +579,7 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             streaming: String::new(),
+            steerable: self.steerable,
             pending_tools: Default::default(),
             details_omitted: true,
             activity: if self.status.is_active() {

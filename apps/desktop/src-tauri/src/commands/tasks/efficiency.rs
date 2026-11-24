@@ -175,6 +175,10 @@ pub struct Efficiency {
     pub first_token_ms: Option<u64>,
     /// How Claude Code ran this turn: `oneshot`, `started`, `resumed` or `reused`.
     pub claude_transport: Option<String>,
+    /// How Codex ran this turn: `started`, `resumed` or `reused` in an app-server session,
+    /// or `exec` when it ran as `codex exec` instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_transport: Option<String>,
     /// Saved checks the stop hook ran before letting the agent finish.
     pub stop_check_rounds: u64,
     pub edit_checks: u64,

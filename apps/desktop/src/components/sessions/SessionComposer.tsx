@@ -197,6 +197,19 @@ export function SessionComposer({
     !session.error &&
     !session.persona &&
     (session.batches.at(-1)?.settled ?? true);
+  const settle = (draft: SessionDraft, value: string) => {
+    pending.current = null;
+    assist.sent();
+    if (!draft.text || latest.current.trim() === value) {
+      revision.current = draft.revision;
+      saved.current = draft.text;
+    }
+    if (latest.current.trim() === value) {
+      setText(draft.text);
+      editing.current = false;
+      localStorage.removeItem(key);
+    }
+  };
   const send = async (mode: 'queue' | 'interrupt' | 'preview' = 'queue') => {
     const value = text.trim();
     if (!value || sending.current || session.closed) return;
@@ -209,6 +222,21 @@ export function SessionComposer({
     setError('');
     try {
       await draftSave.current;
+      // A turn that takes messages gets this one now; otherwise it is stopped and sent next.
+      if (mode === 'interrupt' && active?.steerable) {
+        const steered = await sessionCommand<SessionDraft | null>('steer', {
+          id: session.id,
+          messageId: message.id,
+          text: value,
+          draftRevision: revision.current,
+        });
+        if (steered) {
+          settle(steered, value);
+          await onSent();
+          input.current?.focus();
+          return;
+        }
+      }
       if (mode !== 'queue') {
         await sessionCommand('action', { id: session.id, action: 'pause' });
         if (mode === 'preview' && latestRun) await stopPreview(latestRun.id);
@@ -236,17 +264,7 @@ export function SessionComposer({
         draftRevision: revision.current,
         reasoningEffort: effort,
       });
-      pending.current = null;
-      assist.sent();
-      if (!draft.text || latest.current.trim() === value) {
-        revision.current = draft.revision;
-        saved.current = draft.text;
-      }
-      if (latest.current.trim() === value) {
-        setText(draft.text);
-        editing.current = false;
-        localStorage.removeItem(key);
-      }
+      settle(draft, value);
       await onSent();
       if (mode !== 'queue' || resumesOnSend) {
         await sessionCommand('action', { id: session.id, action: 'resume' });
@@ -374,7 +392,7 @@ export function SessionComposer({
             disabled={!text.trim() || saving || session.closed || active.status === 'stopping'}
             onClick={() => void send('interrupt')}
           >
-            Stop and send
+            {active.steerable ? 'Send now' : 'Stop and send'}
           </Button>
         )}
         {previewRunning && latestRun && (
