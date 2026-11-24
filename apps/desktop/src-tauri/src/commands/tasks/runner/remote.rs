@@ -16,7 +16,7 @@
 //! device's copy stays identical to what they read.
 
 use super::*;
-use crate::commands::computers::{pool, relay, runner};
+use crate::commands::computers::{pool, provider_proxy, relay, runner};
 
 /// How long a run waits for its computer to start; a first image build is slow.
 const START_WAIT: Duration = Duration::from_secs(20 * 60);
@@ -26,6 +26,8 @@ const START_WAIT: Duration = Duration::from_secs(20 * 60);
 const LOST_WINDOW: Duration = Duration::from_secs(30 * 60);
 /// Failed reads, about two seconds apart, between reconnection attempts.
 const RECONNECT_EVERY: u32 = 5;
+/// How long a read waits while a provider answer streams.
+const STREAMING_READ_WAIT_MS: u64 = 100;
 
 /// How a remote run's reading ended.
 struct Followed {
@@ -44,6 +46,9 @@ pub(in crate::commands::tasks) struct RemoteRunner {
     session: Option<runs::Session>,
     /// The agent reaches this device's bridge through the relay.
     relayed: bool,
+    /// The agent reaches its model provider through this device, which keeps
+    /// the API key; revoked when the runner is dropped.
+    proxy: Option<provider_proxy::Held>,
     /// The runner receives large bridge answers whole, as artifacts.
     large_answers: bool,
     argv: Vec<String>,
@@ -76,6 +81,7 @@ impl RemoteRunner {
             },
             session: None,
             relayed: false,
+            proxy: None,
             large_answers: false,
             argv: Vec::new(),
             env: Vec::new(),
@@ -119,11 +125,16 @@ impl AttemptRunner for RemoteRunner {
         let computer = self.computer.clone();
         let bridge = req.coordination.as_ref();
         let read_only = self.read_only;
-        // Checks the sign-in before waiting for the computer.
+        // The saved credential is read once, before waiting for the computer,
+        // and both the run's variables and any grant come from that read.
+        let sign_in = provider_proxy::sign_in(
+            computers::credentials::chosen(&root, adapter),
+            computers::usage::preferences(&root).keep_api_keys_on_device,
+        )?;
         runs::translate(
             adapter,
             &launch.cmd,
-            &root,
+            &sign_in.env,
             bridge.map(|b| b.endpoint.as_str()),
         )?;
         if !runtime.claim_workspace(id, workspace)? {
@@ -200,10 +211,10 @@ impl AttemptRunner for RemoteRunner {
                 format!("\nAn answer from on-demand tools can reach this computer only up to about {} KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024)
             });
         }
-        let (argv, mut env) = runs::translate(
+        let (mut argv, mut env) = runs::translate(
             adapter,
             &launch.cmd,
-            &root,
+            &sign_in.env,
             relayed.map(|b| b.endpoint.as_str()),
         )?;
         let secrets = crate::commands::project_secrets::environment(
@@ -226,10 +237,24 @@ impl AttemptRunner for RemoteRunner {
             });
         }
         runs::add_secrets(&mut env, secrets);
-        let protected = crate::commands::redaction::injected(
+        self.proxy = keep_key_here(
+            runtime,
+            id,
+            adapter,
+            &computer,
+            sign_in,
+            &session.capabilities,
+            status.is_some(),
+            &mut argv,
+            &mut env,
+        )?;
+        let mut protected = crate::commands::redaction::injected(
             env.iter().map(|(name, value)| (name, value)),
             &names,
         );
+        if let Some(grant) = &self.proxy {
+            protected.extend(grant.protected());
+        }
         if !protected.is_empty() {
             runtime.update_checked(id, |run| run.protect(protected))?;
         }
@@ -307,13 +332,15 @@ impl AttemptRunner for RemoteRunner {
             parts.insert("local".into(), local);
         }
         let relayed = self.relayed;
+        // The runner's relay also carries provider requests when the key stays here.
+        let relay = relayed || self.proxy.is_some();
         let (argv, env) = (
             std::mem::take(&mut self.argv),
             std::mem::take(&mut self.env),
         );
         let started = self
             .session()
-            .start(&argv, &env, &launch.input, relayed, &parts)?;
+            .start(&argv, &env, &launch.input, relay, &parts)?;
         self.immediate = started.exit;
         let computer = &self.computer;
         if relayed {
@@ -375,15 +402,22 @@ impl AttemptRunner for RemoteRunner {
     ) -> Result<Option<Outcome>, String> {
         let id = launch.id;
         let bridge = launch.req.coordination.as_ref().filter(|_| self.relayed);
-        let mut relay = bridge.map(|b| {
-            relay::Relay::new(&b.endpoint, &b.token, self.access.clone()).with_answer_limit(
-                if self.large_answers {
-                    relay::LARGE_ANSWER_LIMIT
-                } else {
-                    relay::ANSWER_LIMIT
-                },
-            )
-        });
+        let grant = self.proxy.as_ref().map(provider_proxy::Held::shared);
+        let mut relay = match bridge {
+            Some(b) => Some(
+                relay::Relay::new(&b.endpoint, &b.token, self.access.clone()).with_answer_limit(
+                    if self.large_answers {
+                        relay::LARGE_ANSWER_LIMIT
+                    } else {
+                        relay::ANSWER_LIMIT
+                    },
+                ),
+            ),
+            None => grant
+                .as_ref()
+                .map(|_| relay::Relay::provider_only(self.access.clone())),
+        }
+        .map(|relay| relay.with_provider_proxy(grant));
         let launched = self.launched.unwrap_or_else(std::time::Instant::now);
         let followed = match self.immediate.take() {
             Some(exit) => Followed {
@@ -393,8 +427,17 @@ impl AttemptRunner for RemoteRunner {
             },
             None => self.follow_run(runtime, id, launch.adapter, launched, &mut relay),
         };
-        self.lost = followed.lost;
+        // The run has ended or lost contact: its provider streams stop and its
+        // token is no longer honoured.
+        drop(relay);
         let computer = &self.computer;
+        if let Some(grant) = self.proxy.take() {
+            grant.revoke();
+            if let Some(line) = grant.summary(&computer.name) {
+                runtime.update(id, |run| activity(run, &line));
+            }
+        }
+        self.lost = followed.lost;
         let exit = followed.exit.as_ref();
         let code = exit
             .and_then(|exit| exit["code"].as_i64())
@@ -493,13 +536,26 @@ impl RemoteRunner {
                 computers::usage::note(&root, &computer.id);
                 last_note = std::time::Instant::now();
             }
+            let mut wait = runs::READ_WAIT_MS;
             if let Some(relay) = relay.as_mut() {
-                for answer in relay.answers() {
-                    let sent = lost_since.is_none() && session.answer(&answer).is_ok();
-                    relay.delivered(answer, sent);
+                let refusals = send_answers(relay, lost_since.is_none(), |answer| {
+                    session.answer(answer).ok()
+                });
+                for reason in refusals {
+                    runtime.remote_diagnostic(
+                        id,
+                        format!(
+                            "{} refused an answer for the agent: {reason}",
+                            computer.name
+                        ),
+                        false,
+                    );
+                }
+                if relay.streaming() {
+                    wait = STREAMING_READ_WAIT_MS;
                 }
             }
-            match session.read(&mut out, &mut err, reclaim) {
+            match session.read(&mut out, &mut err, reclaim, wait) {
                 Ok(page) => {
                     failures = 0;
                     reclaim = false;
@@ -984,6 +1040,86 @@ fn placement_activity(
     text
 }
 
+/// Sends the relay's ready answers through `send`, which says what became of
+/// each, or `None` when the runner could not be reached; then the rest wait
+/// for the next round, so a stream's pieces stay in order. A stream the agent
+/// left, or one whose piece the runner refused, ends there without holding up
+/// other answers; a refused whole answer is dropped, since sending it again
+/// cannot succeed. Returns the runner's reasons for refusing.
+fn send_answers(
+    relay: &mut relay::Relay,
+    reachable: bool,
+    mut send: impl FnMut(&relay::Answer) -> Option<runs::Delivery>,
+) -> Vec<String> {
+    let mut reachable = reachable;
+    let mut ended: std::collections::HashSet<String> = Default::default();
+    let mut refusals = Vec::new();
+    for answer in relay.answers() {
+        if ended.contains(&answer.call) {
+            continue;
+        }
+        let delivery = if reachable { send(&answer) } else { None };
+        match delivery {
+            Some(runs::Delivery::Delivered) => relay.delivered(answer, true),
+            Some(outcome) => {
+                if let runs::Delivery::Refused(reason) = outcome {
+                    refusals.push(reason);
+                }
+                if answer.piece.is_some() {
+                    relay.abandon(&answer.call);
+                    ended.insert(answer.call);
+                } else {
+                    relay.delivered(answer, true);
+                }
+            }
+            None => {
+                reachable = false;
+                relay.delivered(answer, false);
+            }
+        }
+    }
+    refusals
+}
+
+/// With **Keep API keys on this device** on, gives the run a token and a base
+/// URL on its runner's relay; the saved API key was never in its environment
+/// (see [`provider_proxy::sign_in`]). A computer whose runner cannot carry
+/// provider requests fails the attempt rather than receive the key.
+#[allow(clippy::too_many_arguments)]
+fn keep_key_here(
+    runtime: &TaskRuntime,
+    id: &str,
+    adapter: &str,
+    computer: &Computer,
+    sign_in: provider_proxy::SignIn,
+    capabilities: &runner::RunnerCapabilities,
+    answers_status: bool,
+    argv: &mut Vec<String>,
+    env: &mut runs::Environment,
+) -> Result<Option<provider_proxy::Held>, String> {
+    if let Some(note) = &sign_in.note {
+        runtime.update(id, |run| activity(run, note));
+    }
+    let Some(grant) = sign_in.grant else {
+        return Ok(None);
+    };
+    let grant = provider_proxy::Held::new(grant);
+    if !answers_status || !capabilities.has(runner::PROVIDER_PROXY) {
+        return Err(format!(
+            "Keep API keys on this device is on, but {} cannot carry provider requests yet, so the agent did not start. Update its image, or turn the setting off in Settings → Computers.",
+            computer.name
+        ));
+    }
+    grant.apply(adapter, argv, env);
+    let line = format!(
+        "The agent on {} reaches {} through this device, which keeps the API key.",
+        computer.name,
+        grant.provider().label()
+    );
+    runtime.update(id, |run| activity(run, &line));
+    Ok(Some(grant))
+}
+
 fn megabytes(bytes: u64) -> String {
     format!("{:.1} MB", bytes as f64 / 1_000_000.0)
 }
@@ -1111,5 +1247,67 @@ mod tests {
             super::patch_files(b"diff --git a/x b/x\n+1\ndiff --git a/y b/y\n"),
             2
         );
+    }
+
+    #[test]
+    fn a_refused_piece_ends_only_its_own_stream() {
+        use crate::commands::computers::{
+            provider_proxy::{Grant, Provider},
+            relay::{Access, Relay},
+            runs::Delivery,
+        };
+        use std::sync::Arc;
+        // A grant whose requests fail at once, so each stream is a single piece.
+        let grant = Arc::new(Grant::new(
+            Provider::Anthropic,
+            "sk-ant-real-key-0123456789".into(),
+            "http://127.0.0.1:9",
+            std::time::Duration::from_secs(60),
+        ));
+        let mut relay = Relay::provider_only(Access::default()).with_provider_proxy(Some(grant));
+        let call = |id: &str, path: &str| json!({"id": id, "method": "POST", "path": path, "headers": {}, "body": ""});
+        relay.accept(&[
+            call("00000000000000000001", "/provider/anthropic/v1/messages"),
+            // A bridge call this relay refuses, as a whole answer.
+            call("00000000000000000002", "/mcp"),
+        ]);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let mut seen = Vec::new();
+        let mut refusals = Vec::new();
+        while seen.len() < 2 && std::time::Instant::now() < deadline {
+            refusals.extend(super::send_answers(&mut relay, true, |answer| {
+                seen.push(answer.call.clone());
+                Some(if answer.piece.is_some() {
+                    Delivery::Refused("An earlier piece of this answer is missing.".into())
+                } else {
+                    Delivery::Delivered
+                })
+            }));
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        seen.sort();
+        assert_eq!(seen, ["00000000000000000001", "00000000000000000002"]);
+        assert_eq!(refusals.len(), 1);
+        // Nothing is left to send again, and the stream has ended.
+        assert!(super::send_answers(&mut relay, true, |_| panic!("sent again")).is_empty());
+        assert!(!relay.streaming());
+
+        // An unreachable runner keeps everything, in order, for the next round.
+        relay.accept(&[
+            call("00000000000000000003", "/mcp"),
+            call("00000000000000000004", "/mcp"),
+        ]);
+        let mut tried = 0;
+        super::send_answers(&mut relay, true, |_| {
+            tried += 1;
+            None
+        });
+        assert_eq!(tried, 1);
+        let mut order = Vec::new();
+        super::send_answers(&mut relay, true, |answer| {
+            order.push(answer.call.clone());
+            Some(Delivery::Delivered)
+        });
+        assert_eq!(order, ["00000000000000000003", "00000000000000000004"]);
     }
 }

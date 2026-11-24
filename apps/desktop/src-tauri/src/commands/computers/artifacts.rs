@@ -470,8 +470,12 @@ pub(crate) mod tests {
             status: 200,
             content_type: "application/json".into(),
             body: vec![b'x'; crate::commands::computers::relay::ANSWER_LIMIT + 1],
+            piece: None,
         };
-        session.answer(&large).unwrap();
+        assert_eq!(
+            session.answer(&large).unwrap(),
+            crate::commands::computers::runs::Delivery::Delivered
+        );
         let small = crate::commands::computers::relay::Answer {
             body: b"{}".to_vec(),
             ..large.clone()

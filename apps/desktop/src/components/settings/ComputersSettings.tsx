@@ -8,7 +8,7 @@ import {
   SettingRow,
   Switch,
 } from '@jackalope/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CloudMachine,
   type ComputerPreferences,
@@ -51,6 +51,11 @@ export function ComputersSettings() {
   const [hosted, setHosted] = useState(false);
   const [computers, setComputers] = useState<ComputerStatus[]>([]);
   const [preferences, setPreferences] = useState<ComputerPreferences | null>(null);
+  // The latest preferences, including changes still saving, and the save queue:
+  // each save sends every preference as last chosen, one after another.
+  const latestPreferences = useRef<ComputerPreferences | null>(null);
+  const savedPreferences = useRef<ComputerPreferences | null>(null);
+  const savingPreferences = useRef<Promise<void>>(Promise.resolve());
   const [health, setHealth] = useState<Record<string, string>>({});
   const [pairing, setPairing] = useState(false);
   const [busy, setBusy] = useState('');
@@ -64,6 +69,8 @@ export function ComputersSettings() {
       listComputers(),
       computerPreferences(),
     ]);
+    latestPreferences.current = nextPreferences;
+    savedPreferences.current = nextPreferences;
     setPreferences(nextPreferences);
     setDocker(nextDocker);
     setMachines(nextMachines.machines);
@@ -85,6 +92,33 @@ export function ComputersSettings() {
     );
     return () => window.clearInterval(timer);
   }, [live]);
+
+  const changePreferences = (change: Partial<ComputerPreferences>) => {
+    const current = latestPreferences.current;
+    if (!current) return;
+    const next = { ...current, ...change };
+    latestPreferences.current = next;
+    setPreferences(next);
+    savingPreferences.current = savingPreferences.current.then(() =>
+      setComputerPreferences(next).then(
+        (saved) => {
+          savedPreferences.current = saved;
+          if (latestPreferences.current === next) {
+            latestPreferences.current = saved;
+            setPreferences(saved);
+          }
+        },
+        (cause) => {
+          setError(describeError(cause));
+          // Show what is actually saved, unless a later change is on its way.
+          if (latestPreferences.current === next) {
+            latestPreferences.current = savedPreferences.current;
+            setPreferences(savedPreferences.current);
+          }
+        },
+      ),
+    );
+  };
 
   const replace = (next: ComputerStatus) =>
     setComputers((current) => current.map((item) => (item.id === next.id ? next : item)));
@@ -160,11 +194,7 @@ export function ComputersSettings() {
             label="Keep computers running when Jackalope quits"
             checked={preferences?.keepRunningOnQuit ?? false}
             disabled={!preferences}
-            onCheckedChange={(keepRunningOnQuit) =>
-              void setComputerPreferences({ keepRunningOnQuit }).then(setPreferences, (cause) =>
-                setError(describeError(cause)),
-              )
-            }
+            onCheckedChange={(keepRunningOnQuit) => changePreferences({ keepRunningOnQuit })}
           />
         </SettingRow>
       </SettingGroup>
@@ -234,7 +264,13 @@ export function ComputersSettings() {
 
       <Agent37Settings />
 
-      <AgentSignIns />
+      <AgentSignIns
+        keepApiKeysOnDevice={preferences?.keepApiKeysOnDevice ?? false}
+        disabled={!preferences}
+        onKeepApiKeysOnDeviceChange={(keepApiKeysOnDevice) =>
+          changePreferences({ keepApiKeysOnDevice })
+        }
+      />
 
       <SettingGroup
         title="Computers"
