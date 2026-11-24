@@ -136,7 +136,10 @@ try {
   // Keyboard: focus reveals it and Enter opens the confirmation with its preview.
   await page.mouse.move(0, 0);
   await action.focus();
-  assert.equal(await action.evaluate((node) => getComputedStyle(node).opacity), '1');
+  await page.waitForFunction(
+    (node) => getComputedStyle(node).opacity === '1',
+    await action.elementHandle(),
+  );
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog', { name: 'Edit from turn 2?' });
   await dialog.waitFor();
