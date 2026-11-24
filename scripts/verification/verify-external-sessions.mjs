@@ -33,7 +33,7 @@ window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
  if(command==='external_session_transcript')return {session:sessions.find(s=>s.key===args.key),earlier:0,subagentLines:3,entries:[
   {role:'user',text:'Make the command palette searchable with arrow keys'},
   {role:'assistant',text:'I will look at the palette component first.'},
-  {role:'tools',text:'',tools:['Read','Edit','Edit','Bash']},
+  {role:'tools',text:'',tools:[{name:'Read'},{name:'Edit'},{name:'Edit'},{name:'Bash'}]},
   {role:'assistant',text:'Arrow keys now move the selection, and **Enter** opens the item.'},
  ]};
  if(command==='external_session_continue')return 'continued-conversation';

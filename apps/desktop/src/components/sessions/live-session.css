@@ -855,3 +855,54 @@ html[data-window-glass] .external-continue {
     backdrop-filter: none;
   }
 }
+.external-tool-calls.ui-disclosure {
+  display: block;
+}
+.external-tool-calls > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.external-tool-calls ol {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.external-tool-calls li {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.external-tool-calls li code {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.external-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 10px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.external-attachments li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.external-session-notice {
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto 12px;
+}

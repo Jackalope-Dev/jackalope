@@ -37,6 +37,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { observeExternalSessions } from '../../stores/externalSessionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
+import { observeImportedConversations } from '../../stores/importedConversationStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -55,7 +56,7 @@ import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { ShortcutSheet } from './ShortcutSheet';
-import { WelcomeDialog } from './WelcomeDialog';
+import { WelcomeDialog, welcomePending } from './WelcomeDialog';
 import { WhatsNewDialog } from './WhatsNewDialog';
 import { CollapsedProjects, NeedsYouCount, WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
@@ -78,6 +79,7 @@ import {
 } from '../../lib/settings-categories';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
+import { HistoryImportHost } from '../sessions/ImportHistoryDialog';
 import type { ComposerSeed } from '../sessions/SessionStart';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
@@ -143,6 +145,8 @@ export function Shell({
 } = {}) {
   useEffect(observeLiveSessions, []);
   useEffect(observeExternalSessions, []);
+  useEffect(observeImportedConversations, []);
+  const [welcomed, setWelcomed] = useState(() => !welcomePending());
   useEffect(observeBots, []);
   const botsWaiting = useBotHubStore((state) => needsYou(state).count);
   const { botSessions, botRuns } = useLiveSessionStore(
@@ -811,7 +815,8 @@ export function Shell({
           />
         )}
       </Suspense>
-      <WelcomeDialog />
+      <WelcomeDialog onClose={() => setWelcomed(true)} />
+      <HistoryImportHost ready={welcomed} />
       <WhatsNewDialog />
       <ShortcutSheet />
     </div>

@@ -310,6 +310,32 @@ folder is gone, the conversation started in a subfolder, or the project runs age
 computer. Its changes stay in that folder: merge review and retry refuse it, and follow-ups
 continue in the conversation.
 
+### Importing Claude Code and Codex history
+
+**Import Claude and Codex history** (command search, Settings → Data & reset, and offered
+once after first setup when this computer has any) copies those conversations into
+Jackalope. The scan reads each CLI's default directory (`~/.claude`, `~/.codex`, or
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME` when set) and the stores of Jackalope's accounts for
+each CLI, and lists every conversation with its first prompt, last activity and message
+count, grouped by the project it ran in or, outside a project, by its repository or folder.
+Only conversations in a project can be imported; a repository that is not one offers **Add
+project**, and folders that no longer exist are left in their CLI. Jackalope's own
+attempts are left out as above. The dialog selects new and changed conversations, and
+filters by when they were last active.
+
+The import runs in the background with progress and can be canceled; conversations already
+saved stay. Each is saved under `imported-conversations/` in the profile: a transcript of
+the person's messages (with attachments named, not copied), the replies, and each tool call
+with its command, file or pattern in one line, plus an index of where it came from. Source
+files are read in bounded streams and never changed; unreadable lines are skipped and
+counted. Importing again is idempotent: unchanged conversations are skipped, and one the CLI
+wrote to since is replaced in place. A conversation continued in Jackalope is not imported
+again, because its CLI session now also holds Jackalope's turns. Imported conversations
+leave the Outside Jackalope group and appear in an Imported group under their project.
+Opening one shows the saved transcript; when its CLI wrote to it since, **Update** imports it
+again. Continue in Jackalope works as above, with the same reasons shown when it cannot,
+and the new conversation links back to the imported messages.
+
 ## Iteration and delivery
 
 Follow-ups use the same native session, workspace and saved account. During active

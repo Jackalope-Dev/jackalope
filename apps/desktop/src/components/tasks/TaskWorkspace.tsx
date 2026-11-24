@@ -20,6 +20,7 @@ import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
 import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useExternalSessionStore } from '../../stores/externalSessionStore';
+import { useImportedConversationStore } from '../../stores/importedConversationStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -42,6 +43,11 @@ const LiveSessionView = lazy(() =>
 );
 const ExternalSessionView = lazy(() =>
   import('../sessions/ExternalSessionView').then((m) => ({ default: m.ExternalSessionView })),
+);
+const ImportedConversationView = lazy(() =>
+  import('../sessions/ImportedConversationView').then((m) => ({
+    default: m.ImportedConversationView,
+  })),
 );
 const TaskDetail = lazy(() => import('./TaskDetail').then((m) => ({ default: m.TaskDetail })));
 const ProjectQueue = lazy(() =>
@@ -83,6 +89,9 @@ export function TaskWorkspace({
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const external = useExternalSessionStore((state) =>
     state.sessions.find((session) => session.key === state.selectedKey),
+  );
+  const imported = useImportedConversationStore((state) =>
+    state.conversations.find((conversation) => conversation.id === state.selectedId),
   );
   const sessionRuns = useLiveSessionStore((state) => state.runs);
   const allRuns = useAllRuns();
@@ -278,6 +287,12 @@ export function TaskWorkspace({
     return (
       <Suspense fallback={<LoadingState label="Loading conversation…" />}>
         <ExternalSessionView key={external.key} session={external} />
+      </Suspense>
+    );
+  if (imported && (projectFilter === 'all' || imported.projectId === projectFilter))
+    return (
+      <Suspense fallback={<LoadingState label="Loading conversation…" />}>
+        <ImportedConversationView key={imported.id} conversation={imported} />
       </Suspense>
     );
   if (parallel && project)
