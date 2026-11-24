@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadReplyPages, replyOmitted, withReplies } from '../src/lib/session-replies.ts';
+import {
+  keepLoadedReplies,
+  loadReplyPages,
+  replyOmitted,
+  withReplies,
+} from '../src/lib/session-replies.ts';
 import {
   findMatches,
   firstMatchFrom,
@@ -141,4 +146,22 @@ test('omitted replies load in pages and fill in without touching other runs', as
   );
   assert.equal(calls, 1);
   assert.equal(withReplies(runs, []), runs);
+});
+
+test('a reply resent without its text keeps the text already loaded while its length holds', () => {
+  const loaded = { id: 'a', result: 'héllo 👋', status: 'review' };
+  const other = { id: 'b', result: 'kept' };
+  const previous = [loaded, other];
+  // The window moved past `a`: the refresh resends it without its text.
+  const resent = { id: 'a', result: '', resultOmitted: true, resultChars: 7, status: 'review' };
+  const kept = keepLoadedReplies(previous, [resent, other], [resent]);
+  assert.equal(kept[0].result, loaded.result);
+  assert.equal(kept[0].resultOmitted, false);
+  assert.equal(kept[1], other);
+  // A different length means the reply changed: it loads again.
+  const changed = { ...resent, resultChars: 8 };
+  assert.equal(keepLoadedReplies(previous, [changed, other], [changed])[0], changed);
+  // Nothing resent without text leaves the runs as they are.
+  const next = [loaded, other];
+  assert.equal(keepLoadedReplies(previous, next, [other]), next);
 });

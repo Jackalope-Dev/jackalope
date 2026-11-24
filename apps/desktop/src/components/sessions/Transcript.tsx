@@ -161,6 +161,14 @@ export function Transcript({
     initialOffset: () => rows.reduce((total, row) => total + row.estimate, 0),
     rangeExtractor,
   });
+  // A row wholly above the view that changes size moves the offset with it in either
+  // direction; the library's default skips that while scrolling up, which is when older
+  // replies load and format above the text being read. A first measurement corrects any
+  // row starting above the view, as the default does.
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange ??= (item, _delta, instance) => {
+    const offset = instance.scrollOffset ?? 0;
+    return instance.itemSizeCache.has(item.key) ? item.end <= offset : item.start < offset;
+  };
   useLayoutEffect(() => {
     const top = list.current?.offsetTop ?? 0;
     if (top !== margin) setMargin(top);

@@ -1122,9 +1122,10 @@ function OmittedReply({ chars, onLoad }: { chars: number; onLoad: () => void }) 
   load.current = onLoad;
   useEffect(() => load.current(), []);
   return (
+    // Not a live region: every older reply scrolling past would be announced.
     <p
       className="live-muted"
-      role="status"
+      aria-busy="true"
       style={{ minHeight: Math.min(2000, Math.ceil(chars / 90) * 22) }}
     >
       Loading reply…

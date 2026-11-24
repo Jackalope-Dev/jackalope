@@ -6,6 +6,7 @@ import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { knownSessionRevisions, mergeSessionChanges } from '../lib/session-changes';
 import {
+  keepLoadedReplies,
   loadReplyPages,
   REPLY_WINDOW,
   replyOmitted,
@@ -53,7 +54,11 @@ export const useLiveSessionStore = create<SessionsState>((set, get) => ({
     })
       .then((snapshot) => {
         const current = get();
-        const next = mergeSessionChanges(current, snapshot);
+        const merged = mergeSessionChanges(current, snapshot);
+        const next = {
+          ...merged,
+          runs: keepLoadedReplies(current.runs, merged.runs, snapshot.runs),
+        };
         if (
           !current.loading &&
           next.sessions === current.sessions &&

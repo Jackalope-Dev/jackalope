@@ -45,3 +45,29 @@ export function withReplies(runs: TaskRun[], replies: readonly SessionReply[]) {
   });
   return changed ? next : runs;
 }
+
+/**
+ * Keeps text already loaded for replies that a refresh resent without it, such as one
+ * the reply window just moved past, while its length is unchanged; `changed` are the runs
+ * the refresh sent.
+ */
+export function keepLoadedReplies(
+  previous: TaskRun[],
+  next: TaskRun[],
+  changed: readonly TaskRun[],
+) {
+  const resent = new Set(changed.filter(replyOmitted).map((run) => run.id));
+  if (!resent.size) return next;
+  const loaded = new Map(
+    previous
+      .filter((run) => resent.has(run.id) && run.result && !run.resultOmitted)
+      .map((run) => [run.id, run.result]),
+  );
+  if (!loaded.size) return next;
+  return next.map((run) => {
+    const text = loaded.get(run.id);
+    return text !== undefined && replyOmitted(run) && [...text].length === run.resultChars
+      ? { ...run, result: text, resultOmitted: false }
+      : run;
+  });
+}
