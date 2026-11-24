@@ -335,5 +335,9 @@ mod tests {
                 "sk-managed-0123456789"
             ]
         );
+        assert_eq!(
+            outbound("uses project-secret-value and /profiles/codex"),
+            "uses [redacted] and /profiles/codex"
+        );
     }
 }

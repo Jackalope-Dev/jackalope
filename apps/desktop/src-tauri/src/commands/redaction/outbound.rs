@@ -12,12 +12,16 @@ use regex::{Regex, RegexSet};
 use serde_json::Value;
 use std::{
     borrow::Cow,
-    collections::BTreeSet,
-    sync::{Arc, LazyLock, RwLock},
+    collections::VecDeque,
+    sync::{Arc, LazyLock},
 };
 
-/// The most values remembered in one app session.
+/// The most values remembered at once; the least recently given are
+/// forgotten first. Secrets in the app's own environment are always kept.
 const MAX_KNOWN: usize = 1024;
+/// Fields of companion responses, besides [`STRUCTURAL`], that name a task,
+/// session or project the companion sends back in later requests.
+const IDENTIFIERS: &[&str] = &["taskId", "sessionId", "projectId"];
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -162,7 +166,10 @@ impl Shape {
             };
             if self.accepts(text, secret.start(), secret.end()) {
                 out.push_str(&text[last..secret.start()]);
-                out.push_str(&mark);
+                match self.kind {
+                    Kind::Block => out.push_str(&block(&mark, text, secret.start(), secret.end())),
+                    _ => out.push_str(&mark),
+                }
                 last = secret.end();
             }
         }
@@ -171,6 +178,30 @@ impl Shape {
             out
         })
     }
+}
+
+/// The replacement for the block at `start..end` of `text`. When each of its
+/// lines starts with the same prefix as its first, such as `+` in a diff, the
+/// replacement keeps that many prefixed lines so hunk lengths stay valid.
+fn block(mark: &str, text: &str, start: usize, end: usize) -> String {
+    let prefix = &text[text[..start].rfind('\n').map_or(0, |at| at + 1)..start];
+    let mut lines = text[start..end].split('\n').skip(1).peekable();
+    let mut out = mark.to_string();
+    if prefix.is_empty() || lines.peek().is_none() {
+        return out;
+    }
+    let mut count = 0;
+    for line in lines {
+        if !line.starts_with(prefix) {
+            return out;
+        }
+        count += 1;
+    }
+    for _ in 0..count {
+        out.push('\n');
+        out.push_str(prefix);
+    }
+    out
 }
 
 /// `text` with credential shapes masked.
@@ -189,42 +220,91 @@ fn shapes(text: &str) -> Cow<'_, str> {
     text
 }
 
+#[derive(Default)]
 struct Known {
-    values: BTreeSet<String>,
+    /// Secrets in this app's own environment.
+    environment: Vec<String>,
+    /// Values Jackalope handled since, least recently given first.
+    remembered: VecDeque<String>,
     secrets: Option<Arc<KnownSecrets>>,
 }
 
-static KNOWN: LazyLock<RwLock<Known>> = LazyLock::new(|| {
-    let values: BTreeSet<String> = environment(std::env::vars()).into_iter().collect();
-    RwLock::new(Known {
-        secrets: KnownSecrets::new(values.iter().cloned()).map(Arc::new),
-        values,
-    })
+impl Known {
+    #[cfg(not(test))]
+    fn new(environment: Vec<String>) -> Self {
+        let mut known = Self {
+            environment,
+            ..Self::default()
+        };
+        known.rebuild();
+        known
+    }
+
+    fn rebuild(&mut self) {
+        let values = self.environment.iter().chain(&self.remembered).cloned();
+        self.secrets = KnownSecrets::new(values).map(Arc::new);
+    }
+
+    fn remember(&mut self, values: &[String]) {
+        let mut added = false;
+        for value in values {
+            if value.chars().count() < super::MIN_CHARS {
+                continue;
+            }
+            if let Some(at) = self.remembered.iter().position(|known| known == value) {
+                self.remembered.remove(at);
+            } else {
+                added = true;
+            }
+            self.remembered.push_back(value.clone());
+        }
+        while self.remembered.len() > MAX_KNOWN {
+            self.remembered.pop_front();
+        }
+        if added {
+            self.rebuild();
+        }
+    }
+}
+
+#[cfg(not(test))]
+static KNOWN: LazyLock<std::sync::RwLock<Known>> = LazyLock::new(|| {
+    // `vars_os`: `vars` panics on a variable that is not Unicode.
+    let variables = std::env::vars_os()
+        .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)));
+    std::sync::RwLock::new(Known::new(environment(variables)))
 });
 
 /// Adds secret values Jackalope handled, such as those it gave an agent, to
 /// what outbound text never shows for the rest of this app session. Kept in
 /// memory only.
+#[cfg(not(test))]
 pub(crate) fn remember(values: &[String]) {
-    let Ok(mut known) = KNOWN.write() else {
-        return;
-    };
-    let before = known.values.len();
-    for value in values {
-        if known.values.len() >= MAX_KNOWN {
-            break;
-        }
-        if value.chars().count() >= super::MIN_CHARS {
-            known.values.insert(value.clone());
-        }
-    }
-    if known.values.len() != before {
-        known.secrets = KnownSecrets::new(known.values.iter().cloned()).map(Arc::new);
+    if let Ok(mut known) = KNOWN.write() {
+        known.remember(values);
     }
 }
 
+#[cfg(not(test))]
 fn known() -> Option<Arc<KnownSecrets>> {
     KNOWN.read().ok()?.secrets.clone()
+}
+
+// Tests run in parallel threads of one process, so each test thread keeps its
+// own values, starting without the test process's environment.
+#[cfg(test)]
+thread_local! {
+    static KNOWN: std::cell::RefCell<Known> = std::cell::RefCell::default();
+}
+
+#[cfg(test)]
+pub(crate) fn remember(values: &[String]) {
+    KNOWN.with(|known| known.borrow_mut().remember(values));
+}
+
+#[cfg(test)]
+fn known() -> Option<Arc<KnownSecrets>> {
+    KNOWN.with(|known| known.borrow().secrets.clone())
 }
 
 /// `text` as it may leave this device: known secret values and credential
@@ -241,7 +321,8 @@ pub(crate) fn outbound(text: &str) -> Cow<'_, str> {
 }
 
 /// [`outbound`] for every string in `value`, leaving object keys and the
-/// fields that identify, date or classify a record as they are.
+/// fields that identify, date or classify a record as they are. The result is
+/// the same JSON shape with only string contents changed.
 pub(crate) fn outbound_value(value: &mut Value) {
     match value {
         Value::String(text) => {
@@ -252,7 +333,9 @@ pub(crate) fn outbound_value(value: &mut Value) {
         Value::Array(items) => items.iter_mut().for_each(outbound_value),
         Value::Object(fields) => fields
             .iter_mut()
-            .filter(|(key, _)| !STRUCTURAL.contains(&key.as_str()))
+            .filter(|(key, _)| {
+                !STRUCTURAL.contains(&key.as_str()) && !IDENTIFIERS.contains(&key.as_str())
+            })
             .for_each(|(_, item)| outbound_value(item)),
         _ => {}
     }
@@ -476,6 +559,24 @@ mod tests {
     }
 
     #[test]
+    fn private_keys_in_a_diff_keep_its_line_count() {
+        let begin = format!("-----BEGIN {} KEY-----", "PRIVATE");
+        let end = format!("-----END {} KEY-----", "PRIVATE");
+        let (one, two) = (random(64), random(40));
+        let diff = format!("@@ -0,0 +1,5 @@\n+key:\n+{begin}\n+{one}\n+{two}\n+{end}\n");
+        let result = masked(&diff);
+        assert_eq!(
+            result,
+            "@@ -0,0 +1,5 @@\n+key:\n+[redacted private key]\n+\n+\n+\n"
+        );
+        assert_eq!(result.lines().count(), diff.lines().count());
+        assert_eq!(
+            masked(&format!("> {begin}\n{one}\n{end}\nafter")),
+            "> [redacted private key]\nafter"
+        );
+    }
+
+    #[test]
     fn connection_url_passwords() {
         let password = random(16);
         assert_eq!(
@@ -527,10 +628,56 @@ mod tests {
     }
 
     #[test]
+    fn the_least_recently_given_values_are_forgotten_first() {
+        let mut known = Known {
+            environment: vec![format!("environment-{}", random(12))],
+            ..Known::default()
+        };
+        let value = |n: usize| format!("value-{n:08}");
+        known.remember(&[value(0)]);
+        known.remember(&(1..MAX_KNOWN).map(value).collect::<Vec<_>>());
+        known.remember(&[value(0)]);
+        known.remember(&[value(MAX_KNOWN)]);
+        assert_eq!(known.remembered.len(), MAX_KNOWN);
+        assert_eq!(known.remembered.front(), Some(&value(2)));
+        let secrets = known.secrets.unwrap();
+        for kept in [value(0), value(MAX_KNOWN), known.environment[0].clone()] {
+            assert_eq!(secrets.redacted(&kept), super::super::MARK, "{kept}");
+        }
+        assert_eq!(secrets.redacted(&value(1)), value(1));
+    }
+
+    #[test]
+    fn masked_values_stay_valid_json() {
+        let quoted = format!("pa\"ss\\word-{}", random(8));
+        remember(std::slice::from_ref(&quoted));
+        let token = format!("ghp_{}", random(36));
+        let mut value = serde_json::json!({
+            "projectId": token,
+            "messages": [format!("{{\"env\":\"{quoted}\",\"t\":\"{token}\"}}")],
+            "nested": {"text": format!("{quoted}\n{token}")},
+        });
+        outbound_value(&mut value);
+        let text = serde_json::to_string(&value).unwrap();
+        let parsed: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(parsed["projectId"], token);
+        assert_eq!(
+            parsed["messages"][0],
+            "{\"env\":\"[redacted]\",\"t\":\"[redacted GitHub token]\"}"
+        );
+        assert_eq!(
+            parsed["nested"]["text"],
+            "[redacted]\n[redacted GitHub token]"
+        );
+        assert!(!text.contains("pa\\\"ss"));
+    }
+
+    #[test]
     fn values_keep_identifying_fields() {
         let token = format!("ghp_{}", random(36));
         let mut value = serde_json::json!({
             "id": token,
+            "taskId": token,
             "result": format!("pushed with {token}"),
             "activity": [format!("Bearer {}", random(32))],
             "count": 3,
@@ -540,6 +687,7 @@ mod tests {
             value,
             serde_json::json!({
                 "id": token,
+                "taskId": token,
                 "result": "pushed with [redacted GitHub token]",
                 "activity": ["Bearer [redacted bearer token]"],
                 "count": 3,
