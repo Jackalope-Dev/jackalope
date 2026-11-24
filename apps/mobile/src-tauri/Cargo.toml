@@ -22,6 +22,10 @@ url = "2"
 # Mozilla's roots instead of the platform verifier, which needs extra Java setup on Android.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots"] }
 
+# The desktop's reviewed GLib copy, which fixes the VariantStrIter unsoundness in 0.18.
+[patch.crates-io]
+glib = { path = "../../../patches/glib" }
+
 # Phone debug builds ship every native library inside the APK; full debug info makes it
 # hundreds of megabytes, too large for an emulator's default storage.
 [profile.dev]

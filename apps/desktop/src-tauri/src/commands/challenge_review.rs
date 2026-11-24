@@ -9,7 +9,6 @@ use super::{
     coordination::Coordinator,
     integration,
     process_control::CommandResult,
-    repo::{self, Policy},
     tasks::{RunRequest, TaskRun, TaskRuntime, WorkspaceMode},
     verification,
 };
@@ -257,25 +256,6 @@ pub(super) fn start(
     Ok(id)
 }
 
-/// Removes a disposable worktree however the rerun ends.
-struct Disposable {
-    project: PathBuf,
-    path: PathBuf,
-}
-
-impl Drop for Disposable {
-    fn drop(&mut self) {
-        let path = self.path.to_string_lossy().into_owned();
-        let _ = repo::git(
-            &self.project,
-            &["worktree", "remove", "--force", &path],
-            Policy::Isolated,
-        );
-        let _ = std::fs::remove_dir_all(&self.path);
-        let _ = repo::git(&self.project, &["worktree", "prune"], Policy::Isolated);
-    }
-}
-
 pub(super) fn rerun(
     runtime: &TaskRuntime,
     id: &str,
@@ -317,12 +297,7 @@ pub(super) fn rerun(
         .join("challenge")
         .join(uuid::Uuid::new_v4().simple().to_string());
     let workspace = path.to_string_lossy().into_owned();
-    repo::git(
-        &project,
-        &["worktree", "add", "--detach", &workspace, &commit],
-        Policy::Isolated,
-    )?;
-    let disposable = Disposable { project, path };
+    let disposable = verification::DisposableWorktree::add(&project, path, &commit)?;
     let lease = verification::reserve_workspace(&workspace)?;
     drop(guard);
     super::workspace_setup::copy_files(&run.project_path, &workspace, &run.setup_files)?;

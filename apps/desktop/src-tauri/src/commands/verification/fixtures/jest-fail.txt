@@ -1,0 +1,32 @@
+PASS src/utils/format.test.js
+FAIL src/components/Button.test.jsx
+  Button
+    ✓ renders its label (20 ms)
+    ✕ calls onClick when pressed (14 ms)
+    ✓ is disabled while loading (3 ms)
+
+  ● Button › calls onClick when pressed
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 0
+
+      24 |     render(<Button onClick={onClick}>Save</Button>);
+      25 |     await user.click(screen.getByRole('button'));
+    > 26 |     expect(onClick).toHaveBeenCalledTimes(1);
+         |                     ^
+      27 |   });
+      28 |
+
+      at Object.toHaveBeenCalledTimes (src/components/Button.test.jsx:26:21)
+
+PASS src/hooks/useDebounce.test.js
+  useDebounce
+    ✓ returns the initial value immediately (3 ms)
+
+Test Suites: 1 failed, 2 passed, 3 total
+Tests:       1 failed, 32 passed, 33 total
+Snapshots:   0 total
+Time:        4.87 s
+Ran all test suites.

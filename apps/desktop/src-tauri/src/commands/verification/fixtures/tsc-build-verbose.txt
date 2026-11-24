@@ -1,0 +1,12 @@
+[10:22:31 AM] Projects in this build:
+    * packages/brand/tsconfig.json
+    * packages/ui/tsconfig.json
+    * apps/web/tsconfig.json
+
+[10:22:31 AM] Project 'packages/brand/tsconfig.json' is up to date because newest input 'packages/brand/src/tokens.ts' is older than output 'packages/brand/dist/tokens.d.ts'
+
+[10:22:31 AM] Project 'packages/ui/tsconfig.json' is up to date because newest input 'packages/ui/src/button.tsx' is older than output 'packages/ui/dist/tsconfig.tsbuildinfo'
+
+[10:22:31 AM] Project 'apps/web/tsconfig.json' is out of date because output 'apps/web/dist/tsconfig.tsbuildinfo' is older than input 'apps/web/src/main.tsx'
+
+[10:22:31 AM] Building project '/home/dev/shop/apps/web/tsconfig.json'...

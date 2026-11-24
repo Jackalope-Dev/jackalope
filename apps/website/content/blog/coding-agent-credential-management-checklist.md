@@ -107,7 +107,7 @@ Put configuration names and setup steps in project instructions, with placeholde
 
 ## Separate Parallel Work Without Assuming Credential Isolation
 
-Git worktrees separate working directories, but repository configuration is shared by default. Creating another worktree doesn’t establish a separate authentication environment. Git explains the shared configuration in its [worktree documentation](https://git-scm.com/docs/git-worktree.html). Use the [worktree setup guide](https://jackalope.dev/blog/git-worktrees-for-ai-coding-agents/) for checkout management, then perform credential checks separately.
+Git worktrees separate working directories, but repository configuration is shared by default. Creating another worktree doesn’t establish a separate authentication environment. Git explains the shared configuration in its [worktree documentation](https://git-scm.com/docs/git-worktree.html). Use the [worktree setup guide](https://jackalope.dev/git-worktrees-for-ai-agents/) for checkout management, then perform credential checks separately.
 
 For higher-risk tasks, prefer a dedicated OS account or an isolated execution environment with explicit credential injection. Verify which files, network destinations, credential stores, and host integrations that environment exposes. Accept the extra setup when you need a meaningful boundary between company and personal access.
 

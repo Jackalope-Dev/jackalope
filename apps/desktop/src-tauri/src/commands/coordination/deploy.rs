@@ -142,22 +142,12 @@ fn output(result: &crate::commands::process_control::CommandResult) -> String {
 }
 
 /// A detached checkout of the deployed commit, removed however the deploy ends.
-struct Checkout {
-    project: PathBuf,
-    path: PathBuf,
-}
+struct Checkout(Option<verification::DisposableWorktree>);
 
 impl Drop for Checkout {
     fn drop(&mut self) {
         let _guard = integration::execution_guard();
-        let path = self.path.to_string_lossy().into_owned();
-        let _ = repo::git(
-            &self.project,
-            &["worktree", "remove", "--force", &path],
-            Policy::Isolated,
-        );
-        let _ = std::fs::remove_dir_all(&self.path);
-        let _ = repo::git(&self.project, &["worktree", "prune"], Policy::Isolated);
+        self.0.take();
     }
 }
 
@@ -181,24 +171,17 @@ fn run(directory: &Path, project: &Path, head: &str, deploy: &DeployPolicy) -> D
             Ok(guard) => guard,
             Err(error) => return finish(Outcome::Failed, error),
         };
-        if let Err(error) = std::fs::create_dir_all(path.parent().unwrap_or(directory))
+        match std::fs::create_dir_all(path.parent().unwrap_or(directory))
             .map_err(|e| e.to_string())
-            .and_then(|_| {
-                repo::git(
-                    project,
-                    &["worktree", "add", "--detach", &workspace, head],
-                    Policy::Isolated,
-                )
-            })
+            .and_then(|_| verification::DisposableWorktree::add(project, path, head))
         {
-            return finish(
-                Outcome::Failed,
-                format!("Could not check out {head}: {error}"),
-            );
-        }
-        Checkout {
-            project: project.to_path_buf(),
-            path,
+            Ok(worktree) => Checkout(Some(worktree)),
+            Err(error) => {
+                return finish(
+                    Outcome::Failed,
+                    format!("Could not check out {head}: {error}"),
+                )
+            }
         }
     };
     let step = |command: &str| verification::run_disposable(command, &workspace, false);

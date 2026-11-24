@@ -311,12 +311,12 @@ export function TaskDetail({
     await refresh();
     useExecutionStore.getState().select(id);
   };
-  const retry = async () => {
+  const retry = async (focus?: string) => {
     if (retrying || submitting) return;
     setRetrying(true);
     setError('');
     try {
-      const id = await retryTask(run.id);
+      const id = await retryTask(run.id, focus);
       await refresh();
       useExecutionStore.getState().select(id);
     } catch (cause) {
@@ -693,7 +693,12 @@ export function TaskDetail({
           kind={run.failureKind}
           preparation={run.preparation}
           retrying={retrying}
-          onRetry={isLatest && isRetryable(run) && !integrated ? () => void retry() : undefined}
+          onRetry={
+            isLatest && isRetryable(run) && !integrated ? (focus) => void retry(focus) : undefined
+          }
+          continuesProgress={
+            !!run.quotaFailure && !!run.workspace && run.workspace !== run.projectPath
+          }
           onInspect={() => setTab('activity')}
         />
       )}

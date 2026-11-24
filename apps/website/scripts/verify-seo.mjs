@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
 
 const decode = (value) =>
   value.replace(
@@ -19,6 +19,19 @@ export async function verifySeo(directory, pages, origin) {
     'Sitemap must contain every indexable canonical URL exactly once',
   );
   assert.ok((await read('robots.txt')).includes(`Sitemap: ${origin}/sitemap.xml`));
+  const headers = await read('_headers');
+  for (const name of await readdir(directory, { recursive: true })) {
+    const path = `/${name.split(sep).join('/')}`;
+    if (path.startsWith('/.well-known/')) continue;
+    if (!path.endsWith('.md') && !/\/llms(-full)?\.txt$/.test(path)) continue;
+    const page = path.replace(/[^/]*$/, '');
+    assert.ok(
+      headers.includes(
+        `${path}\n  X-Robots-Tag: noindex\n  Link: <${origin}${page}>; rel="canonical"\n`,
+      ),
+      `${path}: serve with noindex and a canonical link to ${page}`,
+    );
+  }
   assert.equal(new Set(pages.map((page) => page.path)).size, pages.length, 'Duplicate route');
   const titles = new Set();
   const descriptions = new Set();

@@ -235,4 +235,21 @@ mod tests {
         assert_eq!(reported_failure["stdout"], check.result.stdout);
         assert_eq!(reported_failure["success"], true);
     }
+
+    #[test]
+    fn recognized_failures_keep_stdout_verbatim_after_a_zero_exit() {
+        let padding = "setup: prepared fixture\n".repeat(100);
+        for (name, text) in super::super::test_report::tests::FAILING {
+            let mut check = check(true);
+            check.result.stdout = format!("{padding}{text}");
+            let response = response_with_reports(&check, true);
+            assert_eq!(response["stdout"], check.result.stdout, "{name}");
+            assert_eq!(response["omitted_passing_lines"], 0, "{name}");
+        }
+        let mut check = check(true);
+        check.result.stdout = format!("{padding}{}", include_str!("fixtures/vitest-pass.txt"));
+        let response = response_with_reports(&check, true);
+        assert_eq!(response["omitted_passing_lines"], 7);
+        assert_eq!(response["reported_test_summaries"][0]["runner"], "vitest");
+    }
 }

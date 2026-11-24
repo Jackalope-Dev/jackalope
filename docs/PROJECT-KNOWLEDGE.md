@@ -88,6 +88,39 @@ folders. It does not follow directory symlinks. Manifest reads are capped at
 records. Older observations remain historical; these bounds are not a complete
 semantic analysis of every repository or every user action.
 
+## Rules from other tools
+
+Project context also offers rule files written for other coding tools as automatic
+lessons of kind `rules`: Cursor `.cursor/rules/**/*.mdc` (and `.md`) and `.cursorrules`,
+Windsurf `.windsurf/rules/**/*.md` and `.windsurfrules`, Cline `.clinerules` (a file, or
+a folder of `.md` and `.txt` files) and GitHub Copilot `.github/copilot-instructions.md`
+and `.github/instructions/**/*.instructions.md`. `AGENTS.md` and `CLAUDE.md` are not
+offered; agents read them as their own CLI does.
+
+Each rule arrives paused, labelled **Rule from another tool**, and is supplied to tasks
+only after you choose **Use in tasks** or turn it on in its editor. It then matches like
+any lesson, by words in the request; there is no always-on lesson. Frontmatter sets its
+scope and matching words:
+
+- Always applies: Cursor `alwaysApply: true`, Windsurf `trigger: always_on` or no
+  frontmatter, Cline rules without `paths`, `.cursorrules`, `.windsurfrules`,
+  `copilot-instructions.md`, and globs of `*`, `**` or `**/*`. Matching words come from
+  the file name, `description` and text.
+- Path-scoped: Cursor `globs`, Windsurf `trigger: glob`, Cline `paths` and Copilot
+  `applyTo` (comma-separated). Folder and extension names in the globs lead the matching
+  words, so a request that names them selects the rule.
+- Applied when relevant: Cursor rules with only a `description`, other Windsurf triggers
+  and Copilot instructions without `applyTo`.
+
+`enabled: false` in frontmatter skips a file. A lesson names the file, its scope, the
+`description` and as much of the text as fits in 800 bytes, and tells the agent to read
+the full file. Jackalope never changes these files. Scans read the project folder only,
+without following directory links, up to four folder levels and 200 directory entries
+across the rule folders; they offer at most 20 files of up to 64 KB of UTF-8 text each and skip
+anything resolving outside the project. A rule whose file disappears is paused, a
+changed file refreshes its lesson unless you edited it, and removing one keeps it from
+being offered again.
+
 ## Learned lessons
 
 With **Learn automatically** on (the default, per project in Project settings or

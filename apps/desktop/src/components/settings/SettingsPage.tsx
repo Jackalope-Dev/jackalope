@@ -53,6 +53,7 @@ import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { SwarmSettings } from './SwarmConnection';
+import { UpdateSettings } from './UpdateSettings';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -300,6 +301,7 @@ export function SettingsPage({
                   {c === 'Privacy' && <PrivacySettings />}
                   {c === 'System' && <SystemInfoView />}
                   {c === 'Diagnostics' && <AuditLogWorkspace />}
+                  {c === 'Updates' && <UpdateSettings />}
                   {c === 'Help & community' && <ReleaseSupport />}
                   {c === 'Data & reset' && (
                     <>

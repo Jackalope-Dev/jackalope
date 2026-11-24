@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
+import { reportConversion } from './analytics';
 import { BrandMark } from './BrandMark';
 import { desktopDownloads } from './download-config';
 import {
@@ -57,6 +58,7 @@ function ReleaseDownloads({ builds }: { builds: ReleaseBuild[] }) {
             key={build.id}
             className={`button ${index === 0 ? 'button-primary' : 'button-quiet'}`}
             href={build.url}
+            onClick={() => reportConversion('download')}
           >
             Download for {build.label} <ArrowDownToLine size={17} />
           </a>
@@ -231,6 +233,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
                         ? `${accessOrigin}/v1/access/download`
                         : option.url
                     }
+                    onClick={() => reportConversion('download')}
                   >
                     {option.store ? 'Get it from Microsoft Store' : `Download for ${option.name}`}{' '}
                     <ArrowDownToLine size={17} />

@@ -30,6 +30,7 @@ import {
   sessionMember,
   tokenSchema,
 } from './service';
+import { blockedSignupEmail } from './signup-domains';
 import { SIGNUP_ACTION, verifyTurnstile } from './turnstile';
 import {
   acceptWaitlistToken,
@@ -132,7 +133,8 @@ export async function accessRoutes(
         })
         .parse(await readJson(request));
       let surveyToken = randomToken();
-      if (!body.website) {
+      // Honeypot fills and blocked domains get the same answer as a real signup.
+      if (!body.website && !blockedSignupEmail(body.email)) {
         await verifyTurnstile(
           env,
           body.turnstile,

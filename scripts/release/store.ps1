@@ -41,7 +41,10 @@ try {
         bundle = @{ createUpdaterArtifacts = $false; windows = @{ webviewInstallMode = @{ type = 'skip' } } }
         plugins = @{ updater = @{ pubkey = ''; endpoints = @() }; jackalope = @{ channel = $Channel } }
     }
+    # Submitted packages reach the public service for feedback and opted-in usage
+    # sharing, like the direct-download build; a rehearsal build has no such transport.
     if ($Mode -eq 'rehearsal') { $config.identifier = 'dev.jackalope.store.rehearsal' }
+    else { $config.plugins.jackalope.serviceUrl = 'https://api.jackalope.dev' }
     $configPath = Join-Path $output 'tauri.store.json'
     $config | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding utf8
     $buildOptions = @(if ($Mode -eq 'rehearsal') { '--debug' })

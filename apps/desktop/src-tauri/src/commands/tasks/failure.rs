@@ -1,6 +1,6 @@
 //! Why an attempt failed: a small typed kind kept beside the agent's own message.
 //! The kind only describes the failure. Quota handoff still follows
-//! `routing::quota_failure`, which this never changes.
+//! `routing::quota_failure`, which leaves out provider refusals ([`refusal`]).
 
 use super::routing::QuotaFailure;
 use super::TaskRun;
@@ -154,6 +154,12 @@ fn classify(message: &str, quota: Option<&QuotaFailure>) -> Option<FailureKind> 
     } else {
         None
     }
+}
+
+/// Whether a provider error reads as the model declining the content under its policy.
+/// A refusal is not lost capacity: another account would decline the same request.
+pub(super) fn refusal(lowercase: &str) -> bool {
+    contains_any(lowercase, REFUSED)
 }
 
 const REFUSED: &[&str] = &[
@@ -493,6 +499,19 @@ mod tests {
         reject_error_answer(&mut run);
         assert!(run.error.is_none());
         assert!(!run.result.is_empty());
+    }
+
+    #[test]
+    fn a_refusal_is_reported_as_one_and_never_as_lost_quota() {
+        let mut run = super::super::tests::sample("claude");
+        super::super::consume_event(
+            &mut run,
+            r#"{"type":"result","subtype":"success","is_error":true,"result":"API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy (https://www.anthropic.com/legal/aup). Retrying will hit the limit again."}"#,
+        );
+        assert!(run.quota_failure.is_none());
+        explain(&mut run, Some(1));
+        assert_eq!(run.failure_kind, Some(FailureKind::ProviderRefused));
+        assert!(run.error.unwrap().contains("Usage Policy"));
     }
 
     #[test]

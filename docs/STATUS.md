@@ -12,8 +12,9 @@ evidence; catalog facts do not prove quality, credit or upstream freshness.
 Experiment settings share a versioned registry. Optional DeepSeek request metering,
 quality-study feasibility planning and isolated warm API helpers support screening;
 representative benefit and installed-platform acceptance remain open.
-OpenCode tasks locally compact recognized passing-test output by default while
-retaining exact recovery files and diagnostics. Other adapters retain their native
+OpenCode tasks locally compact recognized passing test and build output (pytest,
+Node TAP, Jest, Vitest, Playwright, Cargo, Go, TypeScript) by default while
+retaining exact recovery files and diagnostics; failing or flaky runs stay whole. Other adapters retain their native
 shell output. Fresh-profile setup costs and representative task benefits need
 separate acceptance; smaller responses do not establish general cost or speed gains.
 
@@ -78,6 +79,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
+- A new task worktree with a preparation command first clones the checkout's installed
+  `node_modules` folders copy-on-write (APFS `clonefile`, Linux `FICLONE`) when both
+  checkouts' dependency manifests match; the command still runs. Other volumes and
+  Windows install in full, never by byte copy. Native acceptance remains open.
 - The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
@@ -302,14 +307,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
+  Provider refusals never trigger handoff. Retrying a quota-stopped attempt continues
+  its worktree changes with an optional focus line; the handoff context sent is kept
+  on the attempt.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.
   An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
   Add agent lists known ACP CLIs by name (Cursor, GitHub Copilot CLI, Goose, Qwen Code,
-  Auggie, Kiro, Hermes Agent and Command Code), marks the ones found on this computer and
-  fills in their path and arguments, which stay editable. None of these has been run
-  through Jackalope in an installed app.
+  Auggie, Kiro, Hermes Agent, Command Code and Oh My Pi), marks the ones found on this
+  computer and fills in their path and arguments, which stay editable. None of these has
+  been run through Jackalope in an installed app.
   First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
@@ -353,11 +361,20 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   them, and lets ready planned and swarm results merge too. Such projects push each
   merged branch head to their linked Artifacts repository and, when the policy has a
   `deploy` section, deploy it from a clean checkout with an optional check and rollback;
-  a failed deploy pauses automatic merging. Source worktrees remain
+  a failed deploy pauses automatic merging. Before an automatic merge is applied, the
+  saved check runs on the combined result in a temporary worktree unless a task's own
+  passing check already covers exactly that tree; a failing combination is not merged
+  and waits for the person with the output on each task. Merging from Review & merge by
+  hand does not run it, the running check is not shown, and installed-app acceptance
+  of the combined check remains open. Source worktrees remain
   available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
+- The queue's limit on agents at once on this device is Automatic by default: one per two
+  CPUs and per 4 GiB of memory, whichever allows fewer, from 1 to 16, marked as
+  recommended in the menu. A chosen number (1 to 16) is saved and kept, with a note
+  above the recommendation; swarm placement and plan size use the effective limit.
 - New tasks can assess focused work, investigation or a plan through the project's
   Decisions preference. Substantial requests are split into subtasks that start
   without a review click by default; a project setting or Review before starting
@@ -415,7 +432,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
-  Chat supports per-request lesson opt-outs. Automatic review lessons require a later
+  Chat supports per-request lesson opt-outs. Cursor, Windsurf, Cline and GitHub Copilot
+  rule files in the project are offered as paused lessons that tasks receive only after
+  being turned on. Automatic review lessons require a later
   accepted revision and a successful check of the accepted tree; unresolved notes
   remain visible without entering task context.
 - Per-project background learning, on by default: local reflection every 50 reported
@@ -676,6 +695,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Shared appearance, guided onboarding, task notifications, optional settings sync
   and opt-in learned-lesson sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
+- Skill Sync on the Skills page in Agents: it lists personal and project agent skills
+  (folders with a `SKILL.md` in the Claude Code, Codex and shared `.agents` skill
+  folders) and syncs the ones the person chooses through their account. It is off by
+  default, needs settings sync, matches project skills by repository root commits instead
+  of paths, never writes into tracked files and adds new project skills to the
+  repository's local exclude file. Committed, oversized, binary or credential-like
+  skills stay local. Edits on two computers become a conflict the person resolves. Synced
+  skill text is not end-to-end encrypted. Two-desktop acceptance in the installed app is
+  pending. There is no skills directory: **Export a copy** writes a folder to share, and
+  Browse is marked Coming later. See [settings sync](SETTINGS-SYNC.md#skills).
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
 

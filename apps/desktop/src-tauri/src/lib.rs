@@ -109,6 +109,7 @@ macro_rules! with_commands {
             commands::reset,
             commands::review_progress,
             commands::schedules,
+            commands::skills,
             commands::system,
             commands::task_strategy,
             commands::tasks,

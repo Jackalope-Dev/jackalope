@@ -1,13 +1,46 @@
 [
   {
     "id": "credentials-stay-out-of-what-leaves-the-app",
-    "date": "2026-11-20",
+    "date": "2026-11-24",
     "title": "Credentials stay out of what leaves the app.",
     "description": "Feedback reports, phone companion responses, Jev requests and exported plans now mask API keys, tokens and passwords before they are sent or written.",
     "items": [
       "Common token formats, private keys and connection-string passwords are replaced with a labeled placeholder.",
       "Secret values Jackalope gave an agent are masked too; local history and agent input are unchanged."
     ]
+  },
+  {
+    "id": "pick-up-quota-stopped-work-where-it-left-off",
+    "date": "2026-11-20",
+    "title": "Pick up quota-stopped work where it left off.",
+    "description": "Retrying a task the provider quota stopped now continues from its changes instead of starting over.",
+    "items": [
+      "Add an optional focus line for the next agent, and see the handoff context it received in Task details.",
+      "A provider refusing a request is reported as a refusal and no longer switches accounts."
+    ]
+  },
+  {
+    "id": "bring-rules-from-other-coding-tools",
+    "date": "2026-11-20",
+    "title": "Bring rules from other coding tools.",
+    "description": "Project context offers your Cursor, Windsurf, Cline and GitHub Copilot rule files as lessons you can turn on.",
+    "items": [
+      "Each rule arrives paused and keeps its file's scope, so path rules match requests that name those folders or file types.",
+      "Oh My Pi is listed among the known ACP agents in Add agent."
+    ]
+  },
+  {
+    "id": "your-skills-on-every-computer",
+    "date": "2026-11-20",
+    "title": "Your skills on every computer.",
+    "description": "Skills you keep outside the repo can now sync between your computers through your account, without ever being committed.",
+    "items": [
+      "The new Skills page in Agents shows your Claude Code, Codex and shared agent skills, personal and per project.",
+      "You choose which skills sync. Skill sync is off until you turn it on, and it needs settings sync.",
+      "If a skill changed on two computers, Jackalope shows both copies and waits for you to pick one. Nothing gets overwritten.",
+      "Synced project skills never go into a file the repo tracks, and new ones are kept out of your commits."
+    ],
+    "note": "Committed skills already travel with the repo, so they stay as they are. Skills that look like they hold a credential stay on the computer."
   },
   {
     "id": "keep-working-while-jackalope-uses-a-window",
