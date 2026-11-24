@@ -345,6 +345,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
                   id: terminalId,
                   generation: generationRef.current,
                   input: `${item.command}\r`,
+                  ...(item.stopWhenFinished ? { stopWhenFinished: true } : {}),
                 })
                   .catch((reason) => setError(describeError(reason)))
                   .finally(() => setBusy(false));

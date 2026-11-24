@@ -7,7 +7,7 @@ import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
-import type { TerminalCommand } from '../lib/terminal-commands.ts';
+import { type TerminalCommand, worktreeCommandsForRegistry } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
@@ -41,6 +41,11 @@ export interface ProjectPreferences {
   /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
   terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
+  /**
+   * Days after a task is merged or archived before its worktree is removed automatically.
+   * Undefined means off.
+   */
+  worktreeRetentionDays?: number;
   autoVerify?: boolean;
   /** Superseded by `workspaceMode`; `false` still means current-branch work. */
   isolatedByDefault?: boolean;
@@ -368,6 +373,8 @@ interface ProjectRecord {
   instructions?: string;
   prepareCommand?: string;
   setupFiles?: string[];
+  /** Saved commands marked to run in each new task worktree. */
+  worktreeCommands?: { name: string; command: string }[];
   previewCommand?: string;
   reviewCaptures?: boolean;
   reviewPages?: string[];
@@ -415,6 +422,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     instructions: preferences?.customInstructions?.trim() || undefined,
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
+    worktreeCommands: worktreeCommandsForRegistry(preferences?.terminalCommands),
     previewCommand: preferences?.previewCommand?.trim() || undefined,
     reviewCaptures: preferences?.reviewCaptures,
     reviewPages: reviewPagesForRegistry(preferences?.reviewPages),

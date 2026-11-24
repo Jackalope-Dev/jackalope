@@ -26,6 +26,7 @@ import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/sh
 import { swarmConnection } from '../../lib/swarm';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useSavedActionsMigration } from '../../lib/use-saved-actions-migration';
+import { useWorktreeRetention } from '../../lib/use-worktree-retention';
 import { ATTACH_OPEN_DRAFT_EVENT } from '../../lib/window-attach';
 import { WindowGlass } from '../../lib/window-glass';
 import { openConversation, openRun, selectWork } from '../../lib/work-selection';
@@ -349,6 +350,7 @@ export function Shell({
   };
   useTrackOpenWork();
   useSavedActionsMigration();
+  useWorktreeRetention();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const selectedManagedId = useManagedTaskStore((state) => state.selectedId);
