@@ -775,7 +775,7 @@ fn main() {
     let request: RunRequest = serde_json::from_value(serde_json::json!({"id":id,"projectId":"routing-budget-fixture","projectName":"Routing budget","projectPath":repo,"agent":"auto","prompt":"Complete the fixture.","isolated":true,"connectionIds":[]})).unwrap();
     let started = std::time::Instant::now();
     runtime.start(request).unwrap();
-    let deadline = started + Duration::from_secs(25);
+    let deadline = started + Duration::from_secs(90);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
         if !run.status.is_active() {

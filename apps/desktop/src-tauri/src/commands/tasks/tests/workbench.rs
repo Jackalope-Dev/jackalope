@@ -123,7 +123,9 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
             );
             exit_sent = std::time::Instant::now();
         }
-        if started.elapsed().as_secs() >= 30 {
+        // A login shell that loads version managers can take well over 30 s to read input
+        // while other builds share the machine.
+        if started.elapsed().as_secs() >= 120 {
             let output = split["output"].as_str().unwrap();
             let tail = output
                 .char_indices()
