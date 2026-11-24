@@ -811,9 +811,9 @@ public static class JackalopeDesktop {
 
     static void PostKey(Context context, ushort key, bool extended) {
         IntPtr focus = FocusWindow(context);
-        int flags = extended ? 1 << 24 : 0;
-        Post(focus, WM_KEYDOWN, new IntPtr(key), new IntPtr(1 | flags));
-        Post(focus, WM_KEYUP, new IntPtr(key), new IntPtr(unchecked((int)(1 | flags | 0xC0000000))));
+        uint flags = extended ? 1u << 24 : 0u;
+        Post(focus, WM_KEYDOWN, new IntPtr(key), new IntPtr(unchecked((int)(1u | flags))));
+        Post(focus, WM_KEYUP, new IntPtr(key), new IntPtr(unchecked((int)(1u | flags | 0xC0000000u))));
     }
 
     static readonly Dictionary<string, ushort> Named = new Dictionary<string, ushort> {
