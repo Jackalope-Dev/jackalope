@@ -203,6 +203,7 @@ fn the_gate_redacts_rejects_secrets_and_never_touches_hand_written_knowledge() {
             enabled: true,
             stale: None,
             enforced: None,
+            tool_rule: None,
             source_run_id: None,
             source_head: None,
             revision: 0,
@@ -1194,4 +1195,110 @@ fn saved_lifecycles_from_before_outcomes_load_with_empty_counts() {
     for field in ["misses", "corrections", "missedOften"] {
         assert!(lifecycle.get(field).is_none(), "{field}");
     }
+}
+
+#[test]
+fn a_tool_rule_is_the_persons_and_recorded_in_history() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[said(
+            "Always use pnpm for installs in this repository.",
+            "Task a",
+        )],
+    );
+    let mut entry = learned(&store, &path).remove(0);
+    let rule = |pattern: &str| -> super::super::tool_rules::ToolRule {
+        serde_json::from_value(serde_json::json!({
+            "tools":["shell"],"pattern":pattern,"action":"deny","message":" Use pnpm. "
+        }))
+        .unwrap()
+    };
+    entry.tool_rule = Some(rule("("));
+    assert!(store
+        .save(entry.clone())
+        .unwrap_err()
+        .contains("pattern is not valid"));
+    entry.tool_rule = Some(rule("\\bnpm install\\b"));
+    let ruled = store.save(entry).unwrap();
+    // The content is unchanged, yet Jackalope no longer manages the lesson.
+    assert!(!ruled.automatic.as_ref().unwrap().managed);
+    assert_eq!(ruled.tool_rule.as_ref().unwrap().message, "Use pnpm.");
+    let mut cleared = ruled.clone();
+    cleared.tool_rule = None;
+    let cleared = store.save(cleared).unwrap();
+    assert!(cleared.tool_rule.is_none());
+    let actions: Vec<_> = store
+        .history("p", &cleared.id, 10)
+        .into_iter()
+        .map(|r| r.action)
+        .collect();
+    assert_eq!(actions, ["born", "ruled", "unruled"]);
+
+    let mut ruled = cleared;
+    ruled.tool_rule = Some(rule("npm"));
+    let ruled = store.save(ruled).unwrap();
+    store.remove(&ruled.id, ruled.revision).unwrap();
+    let raw: Vec<KnowledgeEntry> =
+        serde_json::from_slice(&std::fs::read(&store.path).unwrap()).unwrap();
+    assert!(raw.iter().all(|entry| entry.tool_rule.is_none()));
+}
+
+#[test]
+fn a_lesson_with_a_tool_rule_is_never_archived_automatically() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[
+            said("Always use pnpm for installs in this repository.", "Task a"),
+            said("Prefer table-driven tests for parsers.", "Task a"),
+        ],
+    );
+    let entries = learned(&store, &path);
+    let mut ruled = entries
+        .iter()
+        .find(|e| e.content.contains("pnpm"))
+        .unwrap()
+        .clone();
+    let used = entries
+        .iter()
+        .find(|e| e.content.contains("parsers"))
+        .unwrap()
+        .id
+        .clone();
+    ruled.tool_rule = Some(
+        serde_json::from_value(serde_json::json!({
+            "tools":["shell"],"pattern":"npm install","action":"deny","message":"Use pnpm."
+        }))
+        .unwrap(),
+    );
+    let ruled = store.save(ruled).unwrap();
+    // A synced copy can bring `managed` back; the rule still keeps it the person's.
+    let mut raw: Vec<KnowledgeEntry> =
+        serde_json::from_slice(&std::fs::read(&store.path).unwrap()).unwrap();
+    for entry in &mut raw {
+        if let Some(source) = entry.automatic.as_mut() {
+            source.managed = true;
+        }
+    }
+    std::fs::write(&store.path, serde_json::to_vec(&raw).unwrap()).unwrap();
+    for run in 1..=PROBATION_OPPORTUNITIES + 1 {
+        store
+            .record_delivery(
+                "p",
+                &path,
+                &format!("run-{run}"),
+                std::slice::from_ref(&used),
+                true,
+            )
+            .unwrap();
+    }
+    let kept = learned(&store, &path)
+        .into_iter()
+        .find(|e| e.id == ruled.id)
+        .unwrap();
+    assert!(!lifecycle(&kept).unwrap().archived(), "{kept:?}");
+    assert!(kept.enabled);
 }

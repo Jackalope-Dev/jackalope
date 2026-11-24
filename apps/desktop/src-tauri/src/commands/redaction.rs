@@ -3,9 +3,13 @@
 //! text Jackalope keeps as evidence; this one replaces known values wherever
 //! they appear, in any shape, and leaves everything else as the agent wrote it.
 
+mod outbound;
+
 use base64::Engine as _;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
+
+pub(crate) use outbound::{outbound, outbound_clipped, outbound_value};
 
 /// What a value is replaced with.
 pub(crate) const MARK: &str = "[redacted]";
@@ -218,11 +222,12 @@ fn json_escaped(text: &str) -> String {
 /// The values of the variables Jackalope gave an agent that the attempt's
 /// record must not show: the project secrets in `secret_names`, and every
 /// credential, such as a managed account's key or the attempt's bridge token.
+/// Outbound text never shows them for the rest of the app session either.
 pub(crate) fn injected<N: AsRef<str>, V: AsRef<str>>(
     environment: impl IntoIterator<Item = (N, V)>,
     secret_names: &[String],
 ) -> Vec<String> {
-    environment
+    let values: Vec<String> = environment
         .into_iter()
         .filter(|(name, _)| {
             let name = name.as_ref();
@@ -230,7 +235,9 @@ pub(crate) fn injected<N: AsRef<str>, V: AsRef<str>>(
                 || secret_names.iter().any(|secret| secret == name)
         })
         .map(|(_, value)| value.as_ref().to_string())
-        .collect()
+        .collect();
+    outbound::remember(&values);
+    values
 }
 
 /// [`injected`] for the variables set on `command`.
@@ -327,6 +334,10 @@ mod tests {
                 "project-secret-value",
                 "sk-managed-0123456789"
             ]
+        );
+        assert_eq!(
+            outbound("uses project-secret-value and /profiles/codex"),
+            "uses [redacted] and /profiles/codex"
         );
     }
 }

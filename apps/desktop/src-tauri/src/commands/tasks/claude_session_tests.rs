@@ -40,6 +40,10 @@ async function turn(text) {
       timing: await hook('timing', { hook_event_name: 'PostToolUse', tool_name: 'Edit', duration_ms: 42 }),
       edit: await hook('edit_check', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: process.cwd() + '/notes.txt' } }),
       unknown: await hook('missing', {}),
+      ruleDeny: await hook('tool_rules', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'npm install left-pad' } }),
+      ruleWarn: await hook('tool_rules', { hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: process.cwd() + '/src/app.ts', content: 'console.log(1)' } }),
+      ruleNone: await hook('tool_rules', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'pnpm install' } }),
+      ruleDenyPermission: await hook('permission', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'npm install left-pad' } }),
     };
     fs.writeFileSync('hooks.json', JSON.stringify(replies));
   }
@@ -367,11 +371,35 @@ fn hook_callbacks_answer_through_the_control_protocol() {
             edit_check: true,
             permission: true,
             timing: true,
+            tool_rules: true,
             ..Hooks::default()
         },
         ..persistent()
     };
     let fixture = Fixture::new(project, settings);
+    for (title, rule) in [
+        (
+            "Use pnpm",
+            json!({"tools":["shell"],"pattern":"\\bnpm\\s+install\\b","action":"deny","message":"This repository uses pnpm."}),
+        ),
+        (
+            "No console logging",
+            json!({"tools":["write","edit"],"pattern":"console\\.log","path":"src/**/*.ts","message":"Use the logger."}),
+        ),
+    ] {
+        fixture
+            .runtime
+            .knowledge
+            .save(
+                serde_json::from_value(json!({
+                    "id":uuid::Uuid::new_v4().to_string(),"projectId":project,"projectPath":fixture.root,
+                    "kind":"memory","title":title,"content":title,"keywords":["rule"],"enabled":true,
+                    "sourceRunId":null,"revision":0,"updatedAt":"","toolRule":rule
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+    }
     std::fs::create_dir_all(fixture.runtime.preferences_directory()).unwrap();
     std::fs::write(
         fixture.folder.join("lint.cjs"),
@@ -396,6 +424,10 @@ fn hook_callbacks_answer_through_the_control_protocol() {
         registered["PreToolUse"][0]["hookCallbackIds"][0],
         "permission"
     );
+    assert_eq!(
+        registered["PreToolUse"][1]["hookCallbackIds"][0],
+        "tool_rules"
+    );
     assert_eq!(registered["PostToolUse"].as_array().unwrap().len(), 2);
     assert!(registered.get("Stop").is_none());
     let hooks = fixture.json("hooks.json");
@@ -419,8 +451,37 @@ fn hook_callbacks_answer_through_the_control_protocol() {
         .as_str()
         .unwrap();
     assert!(context.contains("lint failed for [notes.txt]"), "{context}");
+    // A denying rule blocks the call with its message as the reason.
+    let denied = &hooks["ruleDeny"]["hookSpecificOutput"];
+    assert_eq!(denied["hookEventName"], "PreToolUse");
+    assert_eq!(denied["permissionDecision"], "deny");
+    let reason = denied["permissionDecisionReason"].as_str().unwrap();
+    assert!(reason.contains("This repository uses pnpm."), "{reason}");
+    assert!(denied.get("additionalContext").is_none());
+    // A warning leaves the decision to the usual flow and shows the message as context.
+    let warned = &hooks["ruleWarn"]["hookSpecificOutput"];
+    assert!(warned.get("permissionDecision").is_none(), "{warned}");
+    assert!(warned["additionalContext"]
+        .as_str()
+        .unwrap()
+        .contains("Use the logger."));
+    assert_eq!(hooks["ruleNone"], json!({}));
+    // The permission callback leaves a call a rule denies to that rule.
+    assert_eq!(hooks["ruleDenyPermission"], json!({}));
+    assert!(!run
+        .activity
+        .iter()
+        .any(|line| line.starts_with("Auto-approved Bash: npm install")));
     assert!(context.contains("exit 3"), "{context}");
     assert_eq!(hooks["unknown"], json!({}));
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line == "Tool rule \"Use pnpm\" denied Bash: npm install left-pad"));
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line.starts_with("Tool rule \"No console logging\" warned on Write: ")));
     assert_eq!(run.efficiency.timings["tool:Edit"].total_ms, 42);
     assert_eq!(
         (
@@ -640,6 +701,7 @@ fn experiments_gate_sessions_hooks_and_isolation() {
         permission: true,
         timing: true,
         answers: true,
+        tool_rules: true,
     };
     // A project's explicit choice overrides the isolation default either way.
     assert!(Settings::from_experiments(Some(false)).isolated);
@@ -728,6 +790,7 @@ fn the_context_hook_delivers_selected_context_once() {
         context: Some(request),
         delivered: AtomicBool::new(false),
         rounds: AtomicU32::new(0),
+        rules: RuleCache::new(""),
     };
     let first = turn.answer("context", &json!({"hook_event_name":"UserPromptSubmit"}));
     let context = first["hookSpecificOutput"]["additionalContext"]
@@ -984,6 +1047,7 @@ fn the_answers_hook_delivers_a_late_answer_once() {
         context: None,
         delivered: AtomicBool::new(false),
         rounds: AtomicU32::new(0),
+        rules: RuleCache::new(""),
     };
     let input = json!({"hook_event_name":"PostToolUse","tool_name":"Bash"});
     assert_eq!(

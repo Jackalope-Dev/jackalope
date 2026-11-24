@@ -270,7 +270,9 @@ async fn evaluate_at(
     payload: &Value,
     canceled: impl Fn() -> bool,
 ) -> Result<Value, String> {
-    let body = serde_json::to_vec(payload).map_err(|_| "Could not prepare Jev routing.")?;
+    let mut payload = payload.clone();
+    super::redaction::outbound_value(&mut payload);
+    let body = serde_json::to_vec(&payload).map_err(|_| "Could not prepare Jev routing.")?;
     if body.len() > MAX_BYTES {
         return Err("This routing context is too large for Jev routing.".into());
     }
