@@ -680,6 +680,7 @@ pub fn export(record: &PlanRecord, template: &str) -> Result<PathBuf, String> {
     if target.is_symlink() {
         return Err("The export path is a symbolic link.".into());
     }
-    history::write_atomic(&target, revision.markdown.as_bytes())?;
+    let markdown = crate::commands::redaction::outbound(&revision.markdown);
+    history::write_atomic(&target, markdown.as_bytes())?;
     Ok(relative)
 }

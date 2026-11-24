@@ -314,10 +314,10 @@ pub fn review(
     if questions.is_empty() {
         return Ok(if shadow_mode() { None } else { local });
     }
-    let state = json!({"task":req.prompt,"requirements":run.contract.requirements,"result":run.result.chars().take(16000).collect::<String>(),
+    let state = json!({"task":req.prompt,"requirements":run.contract.requirements,"result":crate::commands::redaction::outbound_clipped(&run.result,16000),
         "resultTruncated":run.result.chars().count()>16000,"error":run.error,"verificationError":run.verification_error,
         "verification":run.verification,"processFailed":process_failed,"files":paths,
-        "patch":patch.as_ref().map(|s|s.chars().take(24000).collect::<String>()),"patchTruncated":patch.as_ref().is_none_or(|s|s.chars().count()>24000),
+        "patch":patch.as_ref().map(|s|crate::commands::redaction::outbound_clipped(s,24000)),"patchTruncated":patch.as_ref().is_none_or(|s|s.chars().count()>24000),
         "untrackedFiles":untracked,
         "assistance":{"mode":if shadow_mode() {"shadow"} else {"active"},"operation":"failure_and_review","localFailure":local},
         "coverageBoundary":"Tracked diff and bounded provider/check evidence; untracked file content is not included. All findings are advisory."});

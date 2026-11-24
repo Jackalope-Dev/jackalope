@@ -1,5 +1,15 @@
 [
   {
+    "id": "credentials-stay-out-of-what-leaves-the-app",
+    "date": "2026-11-24",
+    "title": "Credentials stay out of what leaves the app.",
+    "description": "Feedback reports, phone companion responses, Jev requests and exported plans now mask API keys, tokens and passwords before they are sent or written.",
+    "items": [
+      "Common token formats, private keys and connection-string passwords are replaced with a labeled placeholder.",
+      "Secret values Jackalope gave an agent are masked too; local history and agent input are unchanged."
+    ]
+  },
+  {
     "id": "lessons-that-steer-agents-as-they-work",
     "date": "2026-11-24",
     "title": "Lessons that steer agents as they work.",

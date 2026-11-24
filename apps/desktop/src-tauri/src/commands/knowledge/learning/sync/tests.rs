@@ -61,6 +61,14 @@ fn body(statement: &str) -> SyncedBody {
 }
 
 #[test]
+fn remembered_secret_values_are_not_shareable() {
+    let value = format!("orchid-{}", "q7".repeat(6));
+    assert!(shareable(&format!("Deploy with {value} first")));
+    crate::commands::redaction::injected([("JACKALOPE_FIXTURE_TOKEN", value.as_str())], &[]);
+    assert!(!shareable(&format!("Deploy with {value} first")));
+}
+
+#[test]
 fn uploads_carry_only_allowlisted_fields() {
     let (store, project) = fixture();
     let entry = learn(
