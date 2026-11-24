@@ -82,8 +82,8 @@ or chat. Preserve the existing updater key and keep a private recovery backup.
 | `CN_API_KEY` | Both Cloud environment secrets | Draft/upload/publication access |
 
 Linux AppImage needs the updater key but no additional publisher-signing subscription.
-Candidates include both trusted Cloud channel endpoints, retain approved native
-account access and use the existing task-aware update installation safeguards.
+Candidates include both trusted Cloud channel endpoints, keep the optional account
+connection and use the existing task-aware update installation safeguards.
 Signing credentials and live deployment state never belong in tracked configuration.
 
 Publication uses CN CLI 0.13.4; Windows signing uses
@@ -126,7 +126,8 @@ as described in [release automation](RELEASE-AUTOMATION.md#enablement-and-first-
    install it in a disposable OS user/profile, and verify its version, publisher,
    architecture and installation path.
 2. Connect an approved account, create saved work in a disposable repository, execute
-   a real task, quit and reopen, and confirm data persists.
+   a real task, quit and reopen, and confirm data persists. Also run a task in a
+   second profile that continued without an account.
 3. Prepare and build the newer version. Check the draft's notes, platform artifacts,
    signatures and receipts. Use **Publish Cloud candidate** to publish the exact
    tested run. Beta assets are accessible by public URLs even if not advertised.

@@ -223,9 +223,13 @@ that starts off, so a useful one starts on. What stays off until chosen: anythin
 writes into the person's repository, publishes, shares data beyond what sign-in
 disclosed, lets an agent decide in the person's place, or starts something at login.
 
-App appearance/privacy and account access precede the project setup steps.
-Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.
-Waitlist membership does not imply approved desktop access.
+App appearance/privacy and the optional account precede the project setup steps;
+continuing without an account is always available. Preserve settings-sync
+disclosure, pre-connection opt-out and deletion choices. Waitlist membership does
+not unlock account features. Gate an account feature with `RequiresAccount` (a card
+in place of the feature) or `AccountRequiredNotice` (inline beside local controls),
+never with a blocking dialog. Suggest connecting at most once, after a real
+milestone, through `AccountSuggestion`; remember snooze and dismissal.
 
 Provider-reported account identity is separate from custom labels. Keep account
 names and credentials local. A different default applies to future tasks;

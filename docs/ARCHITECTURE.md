@@ -1,8 +1,8 @@
 # Architecture
 
 Jackalope has three applications and shared UI, branding, knowledge and contract packages. Desktop execution
-is local; verified account access is required to start new work in every build.
-Saved history and running tasks remain accessible when access expires.
+is local and needs no Jackalope account. An optional account adds service-backed
+features such as settings sync and invitations.
 
 ## Repository ownership
 
@@ -274,7 +274,8 @@ access/feedback.ts owns authenticated campaign state, shared cooldowns, opt-in e
 eligibility and scoped website replies through the existing inbox/outbox. Anonymous
 telemetry remains separate. See [feedback invitations](FEEDBACK-INVITATIONS.md).
 Shared brand/tokens exports pure theme calculation for browser and Worker rendering.
-Native commands/account.rs owns the required account connection; its
+Native commands/account.rs owns the optional account connection and `AccountFeature`,
+the one gate every service-backed feature passes before a request; its
 credential is protected by account_storage.rs with Windows DPAPI or a macOS Keychain /
 Linux Secret Service reference. platform.rs initializes the Unix GUI login PATH before
 runtime threads start; children inherit the discovery environment. Worker access/devices.ts
@@ -322,4 +323,8 @@ and persistence. Rust tests use disposable repositories/profiles, with opt-in
 provider/browser trials separate. Worker tests use local workerd/D1/R2. Rendered
 checks and signed installed-upgrade trials supplement the suites; see [TODO.md](TODO.md).
 
-Store preview admission is owned by native `commands/execution_access.rs`. Account verification supplies a bounded lease, checked before native launch/coordination/scheduled dispatch and PTY creation. The renderer presents connection/recovery state but cannot grant access. Store builds use Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).
+Native launch, coordination, scheduled dispatch and PTY creation do not consult the
+account. Account verification supplies a bounded lease (`account/lease.rs`) that only
+account features check. The renderer mirrors the feature list in `lib/account.ts` and
+gates their views with `RequiresAccount`, but cannot grant access. Store builds use
+Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).

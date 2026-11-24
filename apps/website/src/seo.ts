@@ -442,7 +442,7 @@ export function discoveryFiles(
           ? `${platform.name} version ${env.VITE_RELEASE_VERSION?.trim()}`
           : platform.name,
     );
-  const availability = `Desktop downloads are available for ${new Intl.ListFormat('en', { type: 'conjunction' }).format(platforms)}. See ${origin}/download/ for current availability. Signup is open: using the app requires a free Jackalope account with a confirmed email. Model access is separate.`;
+  const availability = `Desktop downloads are available for ${new Intl.ListFormat('en', { type: 'conjunction' }).format(platforms)}. See ${origin}/download/ for current availability. The app runs without an account. Signup is open: a free Jackalope account with a confirmed email adds settings, lesson and skill sync across computers, invitations and beta access. Model access is separate.`;
   const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use Atlas sample project data.\n\n`;
   const publicPages = indexablePages;
   const links = publicPages

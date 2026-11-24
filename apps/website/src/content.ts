@@ -217,7 +217,7 @@ export const pages: SitePage[] = [
     path: '/download/',
     title: 'Jackalope download for Windows, macOS and Linux',
     description:
-      'Download Jackalope for Windows, macOS or Linux. Create a free account with your email, confirm it, and sign in to run coding agents side by side.',
+      'Download Jackalope for Windows, macOS or Linux and run coding agents side by side. No account needed; a free one adds sync across computers.',
   },
   {
     path: '/benchmarks/',

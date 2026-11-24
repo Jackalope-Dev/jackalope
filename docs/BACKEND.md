@@ -1,8 +1,8 @@
 # Native and hosted services
 
 Desktop tasks, history, coordination, schedules, browser sessions and repository
-inspection run in the Rust/Tauri host. New execution requires approved Jackalope account access in every build; saved
-work remains readable when access expires. CLIs contact their providers, configured MCP tools
+inspection run in the Rust/Tauri host without a Jackalope account; an optional account
+adds the account features in [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md). CLIs contact their providers, configured MCP tools
 may be remote, the optional marketplace uses AllMCPs, and configured releases
 check an HTTPS update feed. Local-first does not mean network-free.
 

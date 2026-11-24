@@ -156,7 +156,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Get started with Jackalope',
     shortTitle: 'Getting started',
     description:
-      'Install Jackalope, create a free account, find your way around and send feedback.',
+      'Install Jackalope, optionally connect a free account, find your way around and send feedback.',
     readingTime: '3 min read',
     sections: [
       {
@@ -170,10 +170,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
       {
         id: 'connect',
-        question: 'How do I connect my account?',
+        question: 'Do I need a Jackalope account?',
         paragraphs: [
-          'Running tasks needs a Jackalope account. Anyone can create one for free. Choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. The app then shows your email and Signed in.',
-          'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
+          'No. Tasks, conversations, terminals and the jackalope command run with your own agent CLIs without one. Choose Continue without an account on the welcome screen, and connect later from Settings → Jackalope account or the sidebar.',
+          'A free account syncs settings, lessons and skills across your computers and adds invitations and the beta program. To connect, choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. Account features keep working offline for up to 72 hours.',
         ],
       },
       {
@@ -457,7 +457,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'start-chat',
         question: 'How do I start a conversation in Jackalope?',
         paragraphs: [
-          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a Jackalope account, a supported installed agent, and a usable provider account to run work.',
+          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a supported installed agent and a usable provider account to run work; a Jackalope account is optional.',
           'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A conversation processes batches in order; it is not a parallel plan. Each row in the work list shows its shape: Conversation, Task, Planned task or Draft.',
         ],
         links: [

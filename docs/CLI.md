@@ -3,14 +3,14 @@
 The `jackalope` command opens a conversation with Jackalope from a terminal. You
 describe the work, Jackalope routes it to an agent, and the terminal shows the
 exchange, the assigned agent and the step the work is on. It uses the same live
-sessions, routing, account access and Git safeguards as the desktop app.
+sessions, routing and Git safeguards as the desktop app, and needs no Jackalope account.
 
 ## Host and clients
 
 A profile has one owner: `TaskRuntime` and `Coordinator` take exclusive locks on
 `task-runs-v1/runtime.lock` and `coordination/owner.lock`. The command therefore
 never opens a profile. It connects to the process that owns it, called the host,
-and inherits that host's approved-account lease.
+which runs work with or without a connected Jackalope account.
 
 - The desktop binary is the host. `jackalope-desktop --headless` runs the same
   services without a window; on macOS it has no Dock icon until a window opens.
@@ -354,7 +354,7 @@ Agent questions open a picker of their options once; choosing one, or typing a
 reply and pressing Enter, answers the oldest open question. The
 transcript shows the conversation's messages with each reply; when work was
 retried, every attempt's output appears in order under an attempt label. Errors
-raised before an agent starts, such as missing account access, update the view
+raised before an agent starts, such as a missing agent, update the view
 without further input.
 
 The terminal re-reads the conversation in the background when the host reports a

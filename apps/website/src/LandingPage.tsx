@@ -501,7 +501,8 @@ export function LandingPage({
             Start your first parallel task.
           </h2>
           <p className="lp-center lp-detail">
-            Free account, ready as soon as you confirm your email. Bring your own agents.
+            Bring your own agents. No account needed to start; a free one adds sync across
+            computers.
           </p>
           <div className="lp-final-form" id="newsletter">
             {signup}

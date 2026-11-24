@@ -19,8 +19,9 @@ Jackalope uses the agents you already have installed and their existing sign-ins
 [Contributing](CONTRIBUTING.md) · [Apache-2.0](LICENSE)
 
 **Available for macOS, Windows and Linux.** [Download Jackalope](https://jackalope.dev/download/)
-and sign up for a free account, or build from source. Running native tasks requires
-a Jackalope account, including in source builds. See [current status](docs/STATUS.md)
+or build from source. A free Jackalope account is optional: tasks, conversations and
+terminals run with your own agents without one, and connecting adds settings, lesson
+and skill sync across computers, invitations and beta access. See [current status](docs/STATUS.md)
 and [release requirements](docs/CROSS-PLATFORM-RELEASES.md) for what is still being
 validated on each platform.
 
@@ -67,8 +68,8 @@ For interface development, run `pnpm dev` for the desktop browser preview or
 and 5180. The desktop browser preview cannot execute native tasks.
 
 Building the source and running automated tests do not require a Jackalope cloud
-account, deployment secrets or a reporting endpoint. Running native tasks requires
-a Jackalope account in every build; signup is free. See [privacy and reporting](docs/BETA-MONITORING.md).
+account, deployment secrets or a reporting endpoint, and neither does running native
+tasks. See [privacy and reporting](docs/BETA-MONITORING.md).
 
 Run `pnpm verify` before submitting changes. [CONTRIBUTING.md](CONTRIBUTING.md)
 covers the toolchain, focused tests, secret checks and pull-request workflow.
@@ -79,7 +80,7 @@ covers the toolchain, focused tests, secret checks and pull-request workflow.
 | --- | --- |
 | [apps/desktop](apps/desktop) | React interface and Tauri/Rust task runtime |
 | [apps/website](apps/website) | Product website, guides and sample media |
-| [apps/server](apps/server) | Account access, optional feedback and update services |
+| [apps/server](apps/server) | Optional accounts, feedback and update services |
 | [packages](packages) | Shared branding, knowledge and packages |
 | [docs](docs/README.md) | User workflows, architecture and contributor reference |
 | [scripts](scripts) | Verification, dependency notices and release tooling |
