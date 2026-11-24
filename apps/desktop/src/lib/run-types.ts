@@ -33,11 +33,6 @@ export type FailureKind =
   | 'context_too_long'
   | 'agent_exited'
   | 'other';
-interface QuotaFailure {
-  modelOnly: boolean;
-  message: string;
-  resetsAt?: number | null;
-}
 export interface RunUsage {
   input: number;
   output: number;
@@ -116,7 +111,7 @@ export interface TaskRun {
   checkpoint?: { head: string; message: string } | null;
   checkpointError?: string | null;
   /** The provider limit that stopped the attempt; `resetsAt` is Unix seconds when reported. */
-  quotaFailure?: QuotaFailure | null;
+  quotaFailure?: { modelOnly: boolean; message: string; resetsAt?: number | null } | null;
   /** A retry the person scheduled for when that limit resets. */
   resumeAtReset?: { at: number; error?: string | null } | null;
   routing?: {
@@ -150,7 +145,7 @@ export interface TaskRun {
       sessionId: string | null;
       result: string;
       usage: RunUsage;
-      failure: QuotaFailure;
+      failure: { modelOnly: boolean; message: string; resetsAt?: number | null };
       recordedAt: string;
     }[];
   } | null;
