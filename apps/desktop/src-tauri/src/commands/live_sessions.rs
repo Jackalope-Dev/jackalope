@@ -735,6 +735,7 @@ impl LiveSessions {
                 run_id: Some(run_id.clone()),
                 canceled: false,
                 origin: None,
+                reasoning_effort: None,
             });
             if let Some(batch) = session.batches.iter_mut().find(|b| b.run_id == run_id) {
                 batch.message_ids.push(message_id.clone());

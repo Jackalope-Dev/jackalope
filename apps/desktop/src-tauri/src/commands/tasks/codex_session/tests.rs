@@ -392,6 +392,7 @@ fn request(
         continues: None,
         live_session_id: None,
         effort: None,
+        reasoning_effort: None,
         codex_speed: None,
         dependency_snapshot: Default::default(),
         monitor_change: None,
