@@ -1,5 +1,19 @@
 [
   {
+    "id": "build-ios-apps-with-your-agents",
+    "date": "2026-11-25",
+    "title": "Build iOS apps with your agents.",
+    "description": "iOS projects on a Mac get their own Simulator per task, agent tools that see and drive the app, a live Simulator preview and review screenshots.",
+    "items": [
+      "Jackalope finds Xcode even when xcode-select points at the Command Line Tools, and suggests setup and checks for Xcode, XcodeGen, Tuist, CocoaPods and Swift package projects.",
+      "Agents launch your app in the task's Simulator, read the screen, tap, type and take screenshots while you watch, and Preview shows a live screen you can tap, rotate and switch to dark mode or larger text.",
+      "Finished work that changes the app gets light, dark and large-text screenshots before and after.",
+      "New task workspaces reuse resolved Swift packages and Pods, and parallel tasks that add files no longer conflict in project.pbxproj.",
+      "Attach your own iPhone or iPad to run a task's build on it, upload a finished task to TestFlight after you confirm the build, or pair a Mac you own so iOS work runs there."
+    ],
+    "note": "Physical devices, TestFlight uploads and Mac computers are still being tested with real accounts."
+  },
+  {
     "id": "edit-from-an-earlier-turn",
     "date": "2026-11-25",
     "title": "Edit from an earlier turn.",
