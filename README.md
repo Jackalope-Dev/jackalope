@@ -35,6 +35,14 @@ Jackalope uses the agents you already have installed and their existing sign-ins
 | macOS | Download the DMG for [Apple silicon](https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/dmg-aarch64?channel=stable) or [Intel](https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/dmg-x86_64?channel=stable) |
 | Linux (x64) | Download the [AppImage](https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/appimage-x86_64?channel=stable) |
 
+On macOS you can also install with [Homebrew](https://github.com/Jackalope-Dev/homebrew-tap), which adds the `jackalope` command too:
+
+```sh
+brew tap jackalope-dev/tap
+brew trust jackalope-dev/tap
+brew install --cask jackalope
+```
+
 These are the same builds as the [download page](https://jackalope.dev/download/), or you
 can [build from source](#run-from-source). A free Jackalope account is optional: tasks,
 conversations and terminals run with your own agents without one, and connecting adds
