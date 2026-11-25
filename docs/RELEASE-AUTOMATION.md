@@ -129,7 +129,9 @@ run once per commit in **Verify platforms**, not again in each Cloud or Store bu
 publication and Store submission wait up to 45 minutes for those checks on the exact
 source commit and stop if any failed. Release builds start without a Rust cache.
 On master and ordinary pull requests, Verify skips trial packages and reports Intel
-macOS from a quick job, and a newer master push cancels the older run. Pushes to beta
+macOS from a quick job, and checks only what the change can affect (see
+[Contributing](../CONTRIBUTING.md)). A newer master push waits for the running one
+instead of cancelling it. Pushes to beta
 or stable, pull requests into them and manual runs build trial packages and run Intel
 macOS. Windows runs its native tests once, with the Store build's features when
 `RELEASE_DISTRIBUTION=store`.

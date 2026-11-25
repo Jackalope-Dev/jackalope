@@ -153,14 +153,20 @@ CI runs the full gate once on Windows. Linux and macOS use `pnpm verify --native
 for desktop JavaScript, Rust formatting and native unit tests, then run their
 browser, credential-storage, desktop-control and packaging checks. Shared server,
 website, UI gallery and repository checks are covered by the required Windows job.
-A pull request whose files nothing in the desktop app reads (documentation, root
-Markdown, the website, the swarm Worker, mobile, and the server outside `admin/`)
-skips the Rust, desktop and packaging steps: Windows runs `pnpm verify --shared-only`
-and the other platform checks report from a short Linux job without building. Any other file,
-including workflows, lockfiles and shared packages, runs everything, and pushes
-always run everything. The Rust cache is keyed by the base branch's lockfile, so
-pull requests restore master's dependency builds instead of uploading their own. A
-new push to a pull request cancels its older run; pushes to master never cancel.
+CI checks only what a change can affect. A pull request or merge queue entry is
+compared with its base; a push to master is compared with master's last commit whose
+Verify passed, so commits whose runs were replaced or failed are always covered. When
+nothing the native build or the Linux and macOS trials read changed (for example only
+the desktop frontend, shared packages, documentation, the website, the swarm Worker,
+mobile or the server), Windows runs `pnpm verify --shared-only` and the Linux and macOS
+checks report from a short Linux job without building. Native inputs are those listed
+above plus `verify.yml`, the Linux trial scripts and `.node-version`; any of them runs
+everything. Release branches, pull requests into them, manual runs and a master with no
+green run always run everything. The Rust cache is keyed by the base branch's
+lockfile, so pull requests restore master's dependency builds instead of uploading
+their own. A new push to a pull request cancels its older run. Master runs one push at
+a time without cancelling a run in progress; a newer push replaces only a run that has
+not started.
 The separate security workflow also runs weekly so new advisories are detected
 without rebuilding every platform. Required check names stay consistent with the
 release source checks and branch protection.

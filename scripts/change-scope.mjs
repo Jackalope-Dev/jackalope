@@ -24,6 +24,17 @@ const NATIVE_INPUTS = [
   /^scripts\/lib\//,
 ];
 
+/**
+ * Besides the native inputs, what CI's Linux and macOS jobs read: their workflow, the Linux
+ * platform trials and the Node version that runs them. A change to none of these and no
+ * native input cannot change those jobs' result.
+ */
+const PLATFORM_INPUTS = [
+  /^\.github\/workflows\/verify\.yml$/,
+  /^scripts\/verification\/linux-/,
+  /^\.node-version$/,
+];
+
 /** The repository files outside the crate that `sources` (path → Rust text) embed. */
 export function embeddedInputs(sources) {
   const inputs = new Set();
@@ -95,34 +106,41 @@ export function changedFiles(base) {
 /**
  * Which checks a set of changed files can affect. `shared` and `native` are the
  * halves of `pnpm verify` (Rust sources cannot change a JavaScript result);
- * `desktop` covers CI's native and desktop platform suites, and `dependencies` the
- * advisory audit. Unknown changes (null) affect everything.
+ * `desktop` covers CI's native and desktop platform suites, `platform` the Linux and macOS
+ * jobs, which build and test only native code, and `dependencies` the advisory audit.
+ * Unknown changes (null) affect everything.
  */
 export function affected(files) {
-  if (!files) return { shared: true, native: true, desktop: true, dependencies: true };
+  if (!files)
+    return { shared: true, native: true, desktop: true, platform: true, dependencies: true };
+  const native = files.some(
+    (file) => NATIVE_INPUTS.some((input) => input.test(file)) || nativeEmbeds().has(file),
+  );
   return {
     shared: files.some((file) => !file.startsWith(NATIVE)),
-    native: files.some(
-      (file) => NATIVE_INPUTS.some((input) => input.test(file)) || nativeEmbeds().has(file),
-    ),
+    native,
+    platform: native || files.some((file) => PLATFORM_INPUTS.some((input) => input.test(file))),
     desktop: files.some((file) => !DESKTOP_INDEPENDENT.some((path) => path.test(file))),
     dependencies: files.some((file) => DEPENDENCY_INPUTS.some((input) => input.test(file))),
   };
 }
 
-// CI: `node scripts/change-scope.mjs <base>` writes desktop=true|false and
-// dependencies=true|false to the step outputs. Without a base, or when the diff is
-// unavailable, both are true.
+// CI: `node scripts/change-scope.mjs <base>` writes desktop, platform and dependencies
+// (true|false) to the step outputs. Without a base, or when the diff is unavailable, all
+// are true.
 if (import.meta.main) {
   const base = process.argv[2];
   const files = base ? changedFiles(base) : null;
-  const { desktop, dependencies } = affected(files);
+  const { desktop, platform, dependencies } = affected(files);
   console.log(
     files
-      ? `${files.length} changed files since ${base}: desktop suites ${desktop ? 'run' : 'skipped'}, dependency audit ${dependencies ? 'runs' : 'skipped'}.`
-      : 'No comparable base: desktop suites and dependency audit run.',
+      ? `${files.length} changed files since ${base}: desktop suites ${desktop ? 'run' : 'skipped'}, Linux and macOS suites ${platform ? 'run' : 'skipped'}, dependency audit ${dependencies ? 'runs' : 'skipped'}.`
+      : 'No comparable base: every suite and the dependency audit run.',
   );
-  if (files && (!desktop || !dependencies)) console.log(files.join('\n'));
+  if (files && (!desktop || !platform || !dependencies)) console.log(files.join('\n'));
   if (process.env.GITHUB_OUTPUT)
-    appendFileSync(process.env.GITHUB_OUTPUT, `desktop=${desktop}\ndependencies=${dependencies}\n`);
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `desktop=${desktop}\nplatform=${platform}\ndependencies=${dependencies}\n`,
+    );
 }
