@@ -57,8 +57,22 @@ const CONTENT_CHECK_MAX_FILES: usize = 5_000;
 /// Largest ignored file compared with the project checkout's copy.
 const COPY_CHECK_MAX_BYTES: u64 = 16 * 1024 * 1024;
 
+/// The resolved path, without the `\\?\` verbatim prefix `std::fs::canonicalize` adds on
+/// Windows wherever the plain form means the same thing. Git cannot use a verbatim path as a
+/// working directory or argument (`//?/C:/…`), and every path compared here resolves through
+/// this one function, so comparisons stay like for like.
 fn canonical(path: &str) -> Result<PathBuf, String> {
-    std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
+    dunce::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
+}
+
+/// `relative` in Git's form, with `/` between components on every platform, as `git ls-files`
+/// reports the ignored paths it is compared with and shown beside.
+fn git_relative(relative: &Path) -> String {
+    relative
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// The project checkout, Git's first worktree, whose ignored files a worktree may hold unchanged
@@ -73,7 +87,7 @@ fn checkout(entries: &[WorktreeEntry]) -> Option<PathBuf> {
 // Resolve the existing ancestor so deleted task folders still protect related
 // worktrees without blocking every unrelated worktree in the repository.
 fn task_workspace(path: &Path) -> Result<PathBuf, String> {
-    match std::fs::canonicalize(path) {
+    match dunce::canonicalize(path) {
         Ok(path) => Ok(path),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let parent = path.parent().ok_or("Cannot resolve the task workspace.")?;
@@ -373,9 +387,9 @@ pub(super) fn local_files(
                 .map(|file| file.to_string_lossy().into_owned())
                 .unwrap_or_default();
             unattended_file(&file)
-                || path.strip_prefix(root).is_ok_and(|inside| {
-                    inside.to_string_lossy().replace('\\', "/") == PREPARATION_MARKER
-                })
+                || path
+                    .strip_prefix(root)
+                    .is_ok_and(|inside| git_relative(inside) == PREPARATION_MARKER)
                 || unchanged_copy(original, root, path)
         };
         let metadata = match std::fs::symlink_metadata(&start) {
@@ -483,11 +497,9 @@ fn preserved_content(
     original: Option<&Path>,
 ) -> Result<Option<String>, String> {
     let relative = |path: &Path| -> Result<String, String> {
-        Ok(path
-            .strip_prefix(root)
-            .map_err(|e| e.to_string())?
-            .to_string_lossy()
-            .into_owned())
+        Ok(git_relative(
+            path.strip_prefix(root).map_err(|e| e.to_string())?,
+        ))
     };
     let metadata = match std::fs::symlink_metadata(start) {
         Ok(metadata) => metadata,
@@ -1031,8 +1043,8 @@ fn archive(
         }));
     }
     // Confirm the raw paths still resolve to what Git registered, then keep using
-    // the raw forms: Git rejects the `\\?\` verbatim paths `canonicalize` yields
-    // on Windows for the bundle output.
+    // the raw forms for the bundle output: on Windows `canonical` still yields a `\\?\`
+    // verbatim path, which Git rejects, when the plain form would be too long.
     let repo = Path::new(repo_path);
     let path = Path::new(worktree_path);
     if canonical(worktree_path)?
@@ -1810,6 +1822,23 @@ mod tests {
         assert_eq!(
             fs::read_to_string(f.repo.join(".env")).unwrap(),
             "TOKEN=checkout"
+        );
+    }
+
+    #[test]
+    fn paths_reach_git_and_messages_in_git_form() {
+        // Built with the platform separator, which is `\` on Windows.
+        let nested = Path::new("ignored").join("deeper").join("local.env");
+        assert_eq!(git_relative(&nested), "ignored/deeper/local.env");
+        assert_eq!(
+            git_relative(&Path::new(".jackalope").join("prepared.json")),
+            PREPARATION_MARKER
+        );
+        let resolved = canonical(&std::env::temp_dir().to_string_lossy()).unwrap();
+        assert!(
+            !resolved.to_string_lossy().starts_with(r"\\?\"),
+            "Git rejects verbatim paths: {}",
+            resolved.display()
         );
     }
 

@@ -745,22 +745,32 @@ fn sessions_in_protected_locations_are_listed_without_looking_at_their_folder() 
 
 #[test]
 fn protected_locations_are_judged_from_the_path_text() {
-    use super::super::platform::protected_location_in;
-    let home = Path::new("/Users/someone");
+    use super::super::platform::{absolute_fixture, protected_location_in};
+    let home = absolute_fixture("/Users/someone");
     for path in [
         "/Users/someone/Desktop",
         "/Users/someone/Documents/repo",
         "/Users/someone/downloads/x",
+        "/users/SOMEONE/Documents/repo",
         "/Users/someone/Library/Mobile Documents/com~apple~CloudDocs/repo",
         "/Users/someone/Pictures/a",
         "/Users/someone/Movies",
         "/Users/someone/Music/b",
         "/Users/someone/Public/c",
-        "/Volumes/USB/repo",
         "/Users/other/Library/Mobile Documents/x",
+    ] {
+        let path = absolute_fixture(path);
+        assert!(protected_location_in(&path, &home), "{}", path.display());
+    }
+    // macOS volumes and system folders, a folder written without a drive, and a relative
+    // path. On Windows none of them has a drive, so all of them are relative there.
+    for path in [
+        "/Volumes/USB/repo",
+        "/System/Volumes/Data",
+        r"\Users\someone\Code\repo",
         "relative/path",
     ] {
-        assert!(protected_location_in(Path::new(path), home), "{path}");
+        assert!(protected_location_in(Path::new(path), &home), "{path}");
     }
     for path in [
         "/Users/someone/Code/repo",
@@ -769,6 +779,7 @@ fn protected_locations_are_judged_from_the_path_text() {
         "/opt/src/repo",
         "/private/tmp/repo",
     ] {
-        assert!(!protected_location_in(Path::new(path), home), "{path}");
+        let path = absolute_fixture(path);
+        assert!(!protected_location_in(&path, &home), "{}", path.display());
     }
 }

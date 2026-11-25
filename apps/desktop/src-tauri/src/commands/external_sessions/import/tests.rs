@@ -156,6 +156,15 @@ fn claude_fixture_reads_messages_tools_and_attachments_past_damaged_lines() {
         summary.title.as_deref(),
         Some("Fix the off-by-one in the parser")
     );
+    let relative = fixture.session(
+        &format!("claude/projects/-relative/{CLAUDE_SESSION}.jsonl"),
+        CLAUDE_FIXTURE,
+        Path::new("work/repo"),
+    );
+    assert!(
+        Source::Claude.summarize(&relative).is_none(),
+        "a relative folder cannot be placed in a project"
+    );
 }
 
 #[test]
@@ -218,9 +227,19 @@ fn codex_fixture_reads_messages_tools_and_attachments_past_damaged_lines() {
     assert!(transcript.partial_tail);
     let summary = Source::Codex.summarize(&file).unwrap();
     assert_eq!(summary.session_id, CODEX_THREAD);
+    assert_eq!(Path::new(&summary.cwd), fixture.path("repo"));
     assert_eq!(
         summary.title.as_deref(),
         Some("Add pagination defaults to the list endpoint")
+    );
+    let relative = fixture.session(
+        &format!("codex/relative/rollout-2026-11-10T15-57-20-{CODEX_THREAD}.jsonl"),
+        CODEX_FIXTURE,
+        Path::new("work/repo"),
+    );
+    assert!(
+        Source::Codex.summarize(&relative).is_none(),
+        "a relative folder cannot be placed in a project"
     );
 }
 
