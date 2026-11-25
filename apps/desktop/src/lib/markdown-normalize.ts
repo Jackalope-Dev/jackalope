@@ -38,9 +38,10 @@ function looksLikeProse(body: string) {
  * because agents sometimes drop it.
  */
 function readableFrontMatter(content: string): string {
-  const match = /^\s*(?:---[ \t]*\r?\n)?((?:[A-Za-z][\w-]*:[^\n]*\r?\n)+)---[ \t]*(?:\r?\n|$)/.exec(
-    content,
-  );
+  // `[^\r\n]` keeps a line's `\r` out of its value, so only `\r?` can match it; letting both
+  // try made a long block without a closing `---` backtrack exponentially.
+  const match =
+    /^\s*(?:---[ \t]*\r?\n)?((?:[A-Za-z][\w-]*:[^\r\n]*\r?\n)+)---[ \t]*(?:\r?\n|$)/.exec(content);
   if (!match) return content;
   const rows = match[1]
     .split(/\r?\n/)

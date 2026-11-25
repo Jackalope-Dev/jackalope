@@ -46,3 +46,10 @@ test('prose that merely contains a colon before a rule is left alone', () => {
   for (const content of ['Note: read this\n\n---\n\nMore', 'Summary\n---\nBody'])
     assert.equal(normalizeAgentMarkdown(content), content, content);
 });
+
+test('a long metadata-like block without a closing rule renders without stalling', () => {
+  const content = `${'Key: value\r\n'.repeat(2000)}No closing rule`;
+  const started = performance.now();
+  assert.equal(normalizeAgentMarkdown(content), content);
+  assert.ok(performance.now() - started < 500, 'front matter matching stays linear');
+});
