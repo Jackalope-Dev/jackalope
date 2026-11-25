@@ -7,6 +7,9 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Check virtualized transcripts in installed WKWebView, WebView2 and WebKitGTK: momentum
+  scrolling, the CSS Highlight API, Ctrl+F in WebView2, and Copy as Markdown's pending
+  clipboard write.
 - [ ] Check the new default shortcuts (Mod+Shift+M/E/P/G, Mod+I) in installed WebView2,
   WKWebView and WebKitGTK, including IBus on Linux.
 - [ ] Accept the optional account in installed builds: continue without an account on a clean
