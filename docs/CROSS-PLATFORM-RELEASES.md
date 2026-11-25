@@ -14,8 +14,8 @@ Native signed builds and installed upgrades still need platform acceptance.
 The [Store path](STORE-RELEASE.md) provides
 MSIX packaging, branch-based submission and Store-backed in-app update controls
 as the primary Windows channel. Cloud also publishes the
-[direct Windows installer](#direct-windows-installer), which requires separate
-publisher signing.
+[direct Windows installer](#direct-windows-installer), which is Azure-signed or,
+under an explicit opt-in, ships without Authenticode.
 
 Accept the exact candidate's clean installation, real execution, account lifecycle,
 saved-data recovery and older-to-newer update before distribution. An MSIX build
@@ -33,14 +33,17 @@ The release attaches every installer the Cloud publication contains (the macOS
 Apple silicon and Intel DMGs, the Linux x64 AppImage and, once enabled, the Windows
 x64 NSIS installer) plus a `SHA256SUMS` file. Its notes are the version's
 `releases/VERSION.md` notes, the same text Cloud and the in-app update notes show,
-followed by a download list that also links the Microsoft Store build.
+followed by a download list that also links the Microsoft Store build. An unsigned
+Windows installer is labeled "not code-signed", and the notes add that SmartScreen
+may warn ("More info", then "Run anyway") and point to `SHA256SUMS`.
 
 The job reuses the run's candidate artifacts and never builds or signs. It reads
 `cloud-release.json` from the publication job and requires the candidates' digest
 to match the confirmed Cloud publication, so the attached bytes are the bytes Cloud
 serves. A Windows installer is attached only with a valid, timestamped Jackalope
-Digital LLC Authenticode signature (`azure-sign.ps1 -VerifyOnly`); otherwise the
-job fails. The job has no environment secrets, and its token can only write
+Digital LLC Authenticode signature (`azure-sign.ps1 -VerifyOnly`), or as an unsigned
+installer while `WINDOWS_AUTHENTICODE=unsigned` is in effect; otherwise the job
+fails. The job has no environment secrets, and its token can only write
 repository contents (plus read Actions artifacts when promoting a candidate run).
 
 Retries are safe. A new release stays a draft until every file is uploaded and its
@@ -53,8 +56,8 @@ tags from being moved or deleted.
 
 ## Direct Windows installer
 
-Windows ships through Microsoft Store and, alongside it, as the Azure-signed NSIS
-installer published through Cloud like macOS and Linux. The Tauri updater in the
+Windows ships through Microsoft Store and, alongside it, as the NSIS installer
+published through Cloud like macOS and Linux. The Tauri updater in the
 EXE receives updates from the Cloud feed, and the GitHub Release mirror attaches
 the installer. The release configuration lists all four Cloud targets:
 
@@ -62,22 +65,33 @@ the installer. The release configuration lists all four Cloud targets:
 ["darwin-aarch64","darwin-x86_64","linux-x86_64","windows-x86_64"]
 ```
 
-Set that array in `CLOUD_RELEASE_TARGETS` and `CLOUD_ACCEPTED_TARGETS`, and set
-`CLOUD_SIGNING_READY=true` only after [Azure signing setup](CRABNEBULA-RELEASE.md#optional-direct-windows-signing).
-Planning fails before any build when Windows is selected without signing, and the
-build, Cloud publication and GitHub mirror each reject an installer without a valid
-Jackalope Digital LLC signature; an unsigned EXE is never published. The website
-download page stays Store-first.
+Set that array in `CLOUD_RELEASE_TARGETS` and `CLOUD_ACCEPTED_TARGETS` together:
+a normal publication needs the accepted set to match the release targets exactly,
+so changing only one blocks every platform. Then choose how the EXE is signed:
+
+| Variables | Windows installer |
+| --- | --- |
+| `CLOUD_SIGNING_READY=true` after [Azure signing setup](CRABNEBULA-RELEASE.md#optional-direct-windows-signing) | Azure Authenticode-signed; the build, Cloud publication and GitHub mirror each reject an installer without a valid Jackalope Digital LLC signature |
+| `WINDOWS_AUTHENTICODE=unsigned`, `CLOUD_SIGNING_READY` not `true` | [Published without Authenticode](CRABNEBULA-RELEASE.md#unsigned-direct-windows-installer); SmartScreen may warn on download and first launch |
+| Neither | Planning fails before any build when Windows is selected |
+
+`CLOUD_SIGNING_READY=true` wins when both are set. In both modes the installer
+carries the Tauri updater signature, and the installed app only accepts updates
+signed with the release updater key. Switching from unsigned to signed takes
+effect with the next candidate build; see
+[switching to signing](CRABNEBULA-RELEASE.md#unsigned-direct-windows-installer).
+The website download page stays Store-first.
 
 The EXE runs the same app code as the Store MSIX, so Store acceptance covers
 accounts, secure storage and agent behavior. After each stable release that
 changes Windows packaging, and after the first one with the installer, check
 only what differs:
 
-1. Clean install on a fresh Windows 11 VM. `Get-AuthenticodeSignature` reports
-   `Valid` with signer Jackalope Digital LLC and a timestamp for the installer and
-   the installed `jackalope-desktop.exe`. Record the SmartScreen result for the
-   download and first launch.
+1. Clean install on a fresh Windows 11 VM. For a signed installer,
+   `Get-AuthenticodeSignature` reports `Valid` with signer Jackalope Digital LLC
+   and a timestamp for the installer and the installed `jackalope-desktop.exe`;
+   for an unsigned one it reports `NotSigned` and the SHA-256 matches `SHA256SUMS`.
+   Record the SmartScreen result for the download and first launch.
 2. Run a real task with one installed agent.
 3. Update in place from the previous version: choose **Check for updates**, then
    **Restart to update**, and confirm the new version and saved work. The update

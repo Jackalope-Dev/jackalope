@@ -13,13 +13,15 @@ import {
   githubRelease,
   mirrorGithubRelease,
   publishedCloudRelease,
+  unsignedWindowsNotice,
 } from './github-release.mjs';
 
 const publicKey = Buffer.from('test public key').toString('base64');
 const source = 'b'.repeat(40);
 const unix = ['darwin-aarch64', 'darwin-x86_64', 'linux-x86_64'];
 
-async function candidates(t, selected = unix, channel = 'stable') {
+async function candidates(t, selected = unix, channel = 'stable', authenticode) {
+  const windows = (target) => target === 'windows-x86_64' && authenticode;
   const directory = await mkdtemp(resolve(tmpdir(), 'jackalope-github-release-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   for (const target of selected) {
@@ -41,6 +43,7 @@ async function candidates(t, selected = unix, channel = 'stable') {
           : 'appimage',
       approvalRequired: true,
       publicSigned: true,
+      ...(windows(target) ? { authenticode } : {}),
       files: {},
     };
     const config = cloudConfig({
@@ -49,6 +52,7 @@ async function candidates(t, selected = unix, channel = 'stable') {
       target,
       publicKey,
       signScript: 'C:/repo/sign.ps1',
+      ...(windows(target) ? { authenticode } : {}),
     });
     for (const name of cloudFiles(target, '0.3.0', 'candidate')) {
       const text =
@@ -64,7 +68,13 @@ async function candidates(t, selected = unix, channel = 'stable') {
     }
     await writeFile(resolve(path, 'receipt.json'), JSON.stringify(receipt));
   }
-  return collectCandidates(directory, { expectedTargets: selected, source, channel, publicKey });
+  return collectCandidates(directory, {
+    expectedTargets: selected,
+    source,
+    channel,
+    publicKey,
+    allowUnsignedWindows: authenticode === 'unsigned',
+  });
 }
 
 function fakeGithub() {
@@ -151,9 +161,38 @@ test('stable releases mirror the published installers with checksums and the rel
   const windows = await githubRelease(await candidates(t, targets));
   assert.ok(windows.assets.some((asset) => asset.name === 'Jackalope_0.3.0_x64-setup.exe'));
   assert.ok(windows.body.includes('Windows x64 installer: `Jackalope_0.3.0_x64-setup.exe`'));
+  assert.ok(windows.body.includes('These are the same signed files'));
+  assert.ok(!windows.body.includes(unsignedWindowsNotice));
+  assert.ok(!release.body.includes(unsignedWindowsNotice));
   await assert.rejects(
     githubRelease(await candidates(t, unix, 'beta')),
     /stable publications only/,
+  );
+});
+
+test('an opted-in unsigned Windows installer is marked in the release notes', async (t) => {
+  const release = await githubRelease(await candidates(t, targets, 'stable', 'unsigned'));
+  assert.ok(
+    release.body.includes(
+      'Windows x64 installer (not code-signed): `Jackalope_0.3.0_x64-setup.exe`',
+    ),
+  );
+  assert.ok(release.body.includes(unsignedWindowsNotice));
+  assert.match(unsignedWindowsNotice, /SmartScreen/);
+  assert.match(unsignedWindowsNotice, /More info\*\*, then \*\*Run anyway/);
+  assert.ok(!release.body.includes('same signed files'));
+  const sums = release.assets.find((asset) => asset.name === 'SHA256SUMS').content.toString();
+  const installer = release.assets.find((asset) => asset.name === 'Jackalope_0.3.0_x64-setup.exe');
+  assert.ok(sums.includes(`${installer.sha256}  ${installer.name}\n`));
+  // Without the opt-in the mirror refuses to collect the same candidates.
+  await assert.rejects(
+    collectCandidates(resolve(installer.path, '../..'), {
+      expectedTargets: targets,
+      source,
+      channel: 'stable',
+      publicKey,
+    }),
+    /WINDOWS_AUTHENTICODE=unsigned/,
   );
 });
 

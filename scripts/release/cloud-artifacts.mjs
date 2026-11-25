@@ -35,6 +35,19 @@ export function validateCloudReceipt(receipt, { requireCandidate = false } = {})
     throw new Error('Only clean publisher-signed candidates may be uploaded');
   if (receipt.publicSigned !== (receipt.mode === 'candidate'))
     throw new Error('Inconsistent signing receipt');
+  // Windows receipts record whether the installer carries an Azure Authenticode
+  // signature. Receipts without the field predate unsigned installers and claim
+  // one, so publication still verifies it. Rehearsals are never publisher-signed.
+  const windows = receipt.target === 'windows-x86_64';
+  const authenticode = windows
+    ? (receipt.authenticode ?? (receipt.mode === 'candidate' ? 'azure' : 'unsigned'))
+    : undefined;
+  if (
+    (!windows && receipt.authenticode !== undefined) ||
+    (windows && !['azure', 'unsigned'].includes(authenticode)) ||
+    (receipt.mode === 'rehearsal' && authenticode === 'azure')
+  )
+    throw new Error('Inconsistent Windows signing receipt');
   const assets = cloudAssets(receipt.target, receipt.version, receipt.mode);
   const installer = assets[0].name;
   const signature = `${assets.find((asset) => asset.updatePlatform).name}.sig`;
@@ -45,7 +58,7 @@ export function validateCloudReceipt(receipt, { requireCandidate = false } = {})
     expected.some((name) => !/^[a-f0-9]{64}$/.test(receipt.files[name]))
   )
     throw new Error('Invalid artifact names or checksums');
-  return { installer, signature, assets };
+  return { installer, signature, assets, authenticode };
 }
 
 export async function validateCloudFiles(directory, options) {
@@ -64,6 +77,7 @@ export async function validateCloudFiles(directory, options) {
     publicKey: config.plugins?.updater?.pubkey,
     signScript: config.bundle?.windows?.signCommand?.args?.[3],
     target: receipt.target,
+    ...(files.authenticode ? { authenticode: files.authenticode } : {}),
   });
   if (JSON.stringify(config) !== JSON.stringify(expected))
     throw new Error('Release configuration changed');
@@ -88,12 +102,17 @@ async function main() {
   ).version;
   await assertVersions(v);
   const notes = await readNotes(v, mode === 'candidate');
+  // cloud-build.ps1 sets the signing mode it prepared for; a candidate without
+  // one keeps the Azure-signed path.
+  const authenticode =
+    mode === 'candidate' ? process.env.CLOUD_WINDOWS_SIGNING || 'azure' : 'unsigned';
   if (command === 'config') {
     const config = cloudConfig({
       mode,
       channel: selectedChannel,
       publicKey: process.env.TAURI_UPDATER_PUBLIC_KEY,
       signScript: resolve(root, 'scripts/release/azure-sign.ps1'),
+      authenticode,
     });
     await writeFile(
       resolve(directory, 'tauri.cloud.json'),
@@ -127,6 +146,7 @@ async function main() {
     distribution: 'nsis',
     approvalRequired: true,
     publicSigned: mode === 'candidate',
+    authenticode,
     files,
     nativeBinary: {
       name: basename(process.env.CLOUD_NATIVE_BINARY),

@@ -113,7 +113,9 @@ if (!args.includes('--apply')) {
         })),
         rulesets: list(`${prefix}/rulesets`).map(({ id }) => api(`${prefix}/rulesets/${id}`)),
         releaseVariables: list(`${prefix}/actions/variables`, 'variables').filter(({ name }) =>
-          /^(CLOUD_|STORE_|APPLE_SIGNING_READY|RELEASE_DISTRIBUTION)/.test(name),
+          /^(CLOUD_|STORE_|APPLE_SIGNING_READY|RELEASE_DISTRIBUTION|WINDOWS_AUTHENTICODE)/.test(
+            name,
+          ),
         ),
         environments: environments.map(({ name }) => {
           const environment = api(`${prefix}/environments/${name}`);

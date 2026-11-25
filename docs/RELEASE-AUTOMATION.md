@@ -81,8 +81,8 @@ SHA to stable." It follows the same commands and leaves commits to the maintaine
 ## Windows Store releases
 
 Set `RELEASE_DISTRIBUTION=store`. Store distribution does not need Azure signing.
-With `windows-x86_64` in the Cloud targets, Cloud also publishes the Azure-signed
-NSIS installer alongside the Store build; see
+With `windows-x86_64` in the Cloud targets, Cloud also publishes the NSIS installer
+alongside the Store build, Azure-signed or under the unsigned opt-in; see
 [direct Windows installer](CROSS-PLATFORM-RELEASES.md#direct-windows-installer).
 Without it, Cloud builds only macOS and Linux.
 
@@ -169,7 +169,8 @@ Keep these repository variables disabled until their prerequisites pass:
 | --- | --- |
 | `RELEASE_DISTRIBUTION=store` | Windows uses Store; Cloud handles Mac/Linux and, when listed in the targets, the direct Windows installer. Legacy R2 publication has no Actions workflow |
 | `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the release configuration lists all four, including the direct Windows installer |
-| `CLOUD_SIGNING_READY` | Direct Windows Azure signing is configured; required when the targets include Windows, unnecessary for Store/Mac/Linux |
+| `CLOUD_SIGNING_READY` | Direct Windows Azure signing is configured; when the targets include Windows, this or `WINDOWS_AUTHENTICODE=unsigned` is required. Unnecessary for Store/Mac/Linux |
+| `WINDOWS_AUTHENTICODE` | `unsigned` publishes the direct Windows installer without Authenticode while `CLOUD_SIGNING_READY` is not `true`; leave unset for the signed path. See [unsigned installer](CRABNEBULA-RELEASE.md#unsigned-direct-windows-installer) |
 | `APPLE_SIGNING_READY` | Developer ID signing and notarization are configured |
 | `CLOUD_DRAFT_UPLOAD_ENABLED` | Permit validated candidates to be uploaded |
 | `CLOUD_PUBLISH_ENABLED` | Permit publication, including manually dispatched beta trials |
