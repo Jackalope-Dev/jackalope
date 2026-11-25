@@ -349,6 +349,28 @@ test('quality oracles reject initial defects, accept solutions, and detect unrel
         'export const solve=(items,page,size)=>{if(!Number.isSafeInteger(page)||!Number.isSafeInteger(size)||page<=0||size<=0)throw new RangeError();return items.slice((page-1)*size,page*size);};',
     };
     if (solutions[fixture.id]) writeFileSync(path.join(repo, 'index.mjs'), solutions[fixture.id]);
+    const fileSolutions = {
+      'invoice-rules': {
+        'invoice.mjs':
+          'export function invoiceTotal(lines, discountPercent = 0) {\n  if (!(discountPercent >= 0 && discountPercent <= 100)) throw new RangeError("discount");\n  let subtotal = 0;\n  for (const { price, qty = 1 } of lines) {\n    if (price < 0 || qty < 0 || !Number.isInteger(qty)) throw new RangeError("line");\n    subtotal += price * qty;\n  }\n  return subtotal - Math.floor((subtotal * discountPercent) / 100 + 0.5);\n}\n',
+      },
+      'rename-export': {
+        'api.mjs':
+          "const users = new Map([[1, { id: 1, name: 'Ada' }], [2, { id: 2, name: 'Lin' }]]);\n\nexport function loadUser(id) {\n  const user = users.get(id);\n  if (!user) throw new Error('No user ' + id);\n  return { ...user };\n}\n\n/** @deprecated Use loadUser. */\nexport const fetchUser = (id) => loadUser(id);\n",
+        'profile.mjs':
+          "import { loadUser } from './api.mjs';\n\nexport const profileName = (id) => loadUser(id).name;\n",
+        'admin.mjs':
+          "import * as api from './api.mjs';\n\nexport const adminLabel = (id) => 'admin:' + api.loadUser(id).name;\n",
+        'report.mjs':
+          "import { loadUser as getUser } from './api.mjs';\n\nexport const reportLine = (ids) => ids.map((id) => getUser(id).name).join(', ');\n",
+      },
+      'merge-events': {
+        'events.mjs':
+          'export function mergeEvents(a, b) {\n  const tagged = [...a.map((e, i) => ({ e, s: 0, i })), ...b.map((e, i) => ({ e, s: 1, i }))];\n  const best = new Map();\n  for (const t of tagged) {\n    const kept = best.get(t.e.id);\n    if (!kept || t.e.updatedAt > kept.e.updatedAt || (t.e.updatedAt === kept.e.updatedAt && t.s >= kept.s)) best.set(t.e.id, t);\n  }\n  return [...best.values()].sort((x, y) => x.e.at - y.e.at || x.s - y.s || x.i - y.i).map((t) => t.e);\n}\n',
+      },
+    };
+    for (const [name, contents] of Object.entries(fileSolutions[fixture.id] ?? {}))
+      writeFileSync(path.join(repo, name), contents);
     const good = run();
     assert.equal(good.status, 0, `${fixture.id}: ${good.stderr}`);
     // Jackalope's empty, Git-excluded workspace folder is not the agent's work; anything

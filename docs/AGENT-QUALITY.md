@@ -357,7 +357,9 @@ The quality runner accepts per-variant `--after-task-approach=scoped`,
 captured MCP responses; `--after-result-preview=on` also bounds large
 unselected responses while keeping the complete source recoverable. Preview
 requires result queries. `--after-initial-tools=small` measures eager delivery of
-a complete bounded catalog. Keep these controls explicit in saved comparisons.
+a complete bounded catalog. `--after-goal-restatement=batched` asks for the goal
+restatement in the same turn as the first file reads instead of a turn of its own.
+Keep these controls explicit in saved comparisons.
 Authored multi-source join cases can be generated with
 `node scripts/evaluation/pipeline-cases.mjs <suite.json>`. The name identifies the
 fixture family, not an available agent tool. Both sizes are screening fixtures.

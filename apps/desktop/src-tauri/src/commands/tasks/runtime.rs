@@ -1613,7 +1613,7 @@ impl TaskRuntime {
             cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
                 .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
             input.push_str(&context.instructions);
-            input.push_str(crate::commands::outcomes::RESTATEMENT_CONTRACT);
+            input.push_str(crate::commands::outcomes::restatement_contract());
             if crate::commands::decisions::agent_questions::available(self, &req.project_id) {
                 input.push_str(crate::commands::decisions::agent_questions::instructions());
             }

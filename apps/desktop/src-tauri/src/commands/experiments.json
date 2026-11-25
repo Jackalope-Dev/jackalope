@@ -41,6 +41,11 @@
       "default": "scoped",
       "environment": null
     },
+    "goal-restatement": {
+      "values": ["separate", "batched"],
+      "default": "separate",
+      "environment": "JACKALOPE_GOAL_RESTATEMENT"
+    },
     "tool-surface": {
       "values": ["full", "available", "deferred"],
       "default": "available",

@@ -36,6 +36,7 @@ experiments! {
     ProviderEffort = "provider-effort",
     Learning = "learning",
     TaskApproach = "task-approach",
+    GoalRestatement = "goal-restatement",
     ToolSurface = "tool-surface",
     ResultQueries = "result-queries",
     ResultPreview = "result-preview",

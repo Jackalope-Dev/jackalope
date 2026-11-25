@@ -1,3 +1,4 @@
+import { hardCases } from './quality-hard.mjs';
 import { heldoutCases } from './quality-heldout.mjs';
 
 // Workspace entries an oracle compares: everything but Git and the empty, Git-excluded
@@ -96,7 +97,7 @@ assert.deepEqual(readyTasks([{id:'x',dependsOn:['x']}],[]),[]);
   },
 ];
 
-qualityCases.push(...heldoutCases);
+qualityCases.push(...heldoutCases, ...hardCases);
 
 for (const fixture of qualityCases) {
   const protectedFiles = Object.fromEntries(

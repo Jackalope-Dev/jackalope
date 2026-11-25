@@ -130,6 +130,22 @@ pub fn validate_assessments(
 /// misread goal is visible before the work is done. Not a request to pause.
 pub const RESTATEMENT_CONTRACT: &str = "\nReporting contract: your first message restates, in your own words and a sentence each, the goal, the problem and the smallest change you expect to make. Record it once with restate_goal (HTTP: POST /v1/goal-restatement {goal,problem,smallestChange}), then continue without waiting for confirmation.\n";
 
+/// The same restatement made alongside the first reads instead of in a turn of its own,
+/// which costs a model round trip that rereads the whole context.
+const BATCHED_RESTATEMENT_CONTRACT: &str = "\nReporting contract: record a one-sentence restatement of the goal, the problem and the smallest change you expect to make with restate_goal (HTTP: POST /v1/goal-restatement {goal,problem,smallestChange}). Make that call in the same turn as your first reads of the task's files, not as a separate step, then continue without waiting for confirmation.\n";
+
+/// The restatement contract the `goal-restatement` experiment selects.
+pub fn restatement_contract() -> &'static str {
+    if crate::commands::experiments::is(
+        crate::commands::experiments::Experiment::GoalRestatement,
+        "batched",
+    ) {
+        BATCHED_RESTATEMENT_CONTRACT
+    } else {
+        RESTATEMENT_CONTRACT
+    }
+}
+
 /// The agent's own restatement of the task, shown as "Understood as".
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
