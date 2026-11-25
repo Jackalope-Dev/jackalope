@@ -142,12 +142,11 @@ export function App({ path = '/' }: { path?: string }) {
                 Sign in
               </a>
             )}
-            <a
-              className="icon-button github-link"
-              href={GITHUB_URL}
-              aria-label="Jackalope on GitHub"
-            >
-              <GitHubIcon size={18} />
+            <a className="github-star" href={GITHUB_URL} aria-label="Star on GitHub">
+              <GitHubIcon size={16} />
+              <span className="github-star-label">
+                Star<span className="github-star-suffix"> on GitHub</span>
+              </span>
             </a>
             <IconButton
               className="icon-button appearance-toggle"
@@ -203,6 +202,9 @@ export function App({ path = '/' }: { path?: string }) {
                       <a href={href}>{label}</a>
                     </Menu.Item>
                   ))}
+                  <Menu.Item asChild>
+                    <a href={GITHUB_URL}>Star on GitHub</a>
+                  </Menu.Item>
                 </Menu.Content>
               </Menu.Portal>
             </Menu.Root>
