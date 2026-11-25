@@ -113,7 +113,7 @@ function FeatureEditor({
           </FormField>
           <FormField
             label="Page"
-            description="Screenshots open this page only. Add a query such as ?tab=billing to reach a state."
+            description="Screenshots open this page only. Add a query such as ?tab=billing to reach a state. For an iOS app, use a deep link such as myapp://settings."
             error={pageError}
           >
             <Input

@@ -501,6 +501,8 @@ and page details** uses a fresh isolated browser and saves a screenshot with bou
 page elements and errors. It does not copy login or interactions from the embedded page.
 Users can attach that evidence to a follow-up, cancel a capture, and explicitly stop
 the preview before continuing. Preview ownership still blocks integration and cleanup.
+An iOS app runs in the task's Simulator instead, under the same ownership; see
+[iOS development](IOS-DEVELOPMENT.md#run-in-simulator).
 
 Delivery can inspect local Git state or read PR/CI through an installed, authenticated
 GitHub CLI. Ahead/behind counts use local upstream references, without fetching. PR

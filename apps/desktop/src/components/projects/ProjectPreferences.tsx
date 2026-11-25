@@ -22,6 +22,7 @@ import { type PlanSettings, planCommands } from '../../lib/plan-mode';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { checksAutomatically } from '../../lib/project-automation';
 import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
+import { simulatorTarget } from '../../lib/simulator-preview';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
@@ -99,6 +100,23 @@ function usePlanSettings(projectId: string | undefined) {
   return [plan, setPlan] as const;
 }
 
+/** Whether the project is an iOS app the Simulator can preview and capture. */
+function useIosApp(path: string | undefined) {
+  const [ios, setIos] = useState(false);
+  useEffect(() => {
+    setIos(false);
+    if (!path || !isTauriEnvironment()) return;
+    let current = true;
+    simulatorTarget(path)
+      .then((target) => current && setIos(!!target))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [path]);
+  return ios;
+}
+
 export function ProjectPreferences({
   embedded = false,
   projectId,
@@ -118,6 +136,7 @@ export function ProjectPreferences({
   const Container = embedded ? 'section' : WorkspacePage;
   const [tab, setTab] = useState<Tab>(rememberedTab);
   const [plan, setPlan] = usePlanSettings(project?.id);
+  const iosApp = useIosApp(project?.path);
   /** Remounts the planning controls after a preset rewrites their stored settings. */
   const [planVersion, setPlanVersion] = useState(0);
   return (
@@ -657,7 +676,7 @@ export function ProjectPreferences({
             <ProjectSwarmHosts key={`swarm-hosts-${project.id}`} projectId={project.id} />
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="feature-map" className="project-settings-panel">
-            {reviewCapturesOn(project.preferences) ? (
+            {reviewCapturesOn(project.preferences, iosApp) ? (
               <FeatureMapSettings project={project} />
             ) : (
               <SettingGroup

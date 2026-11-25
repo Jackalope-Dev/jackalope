@@ -64,6 +64,11 @@ pub struct ProjectRecord {
     /// The project's preview command, with `{port}` for the local port.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_command: Option<String>,
+    /// The command that builds an iOS app for its Simulator preview and review
+    /// captures, into `$JACKALOPE_DERIVED_DATA`. Absent uses the detected
+    /// `xcodebuild build`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator_preview: Option<String>,
     /// Preview paths always captured for review, such as `/`. Empty means `/`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_pages: Vec<String>,

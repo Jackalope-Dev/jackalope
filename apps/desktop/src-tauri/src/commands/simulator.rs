@@ -16,7 +16,16 @@ mod simctl;
 mod tests;
 mod tools;
 
+pub(crate) use driver::failure_tail;
 pub(crate) use tools::{app, configure, interact, logs, screenshot, snapshot};
+/// The `simctl` commands managed previews and review captures run on a device.
+pub(crate) mod device {
+    pub(crate) use super::simctl::{
+        capture, clean_status_bar, clear_status_bar, install, launch, open_url, plist_value, run,
+        terminate, ui, Simctl, TIMEOUT, VIEW_SIZE,
+    };
+}
+pub(crate) use tools::{bundle_id, url as valid_url};
 pub(crate) use tools::{
     AppRequest, ConfigureRequest, InteractRequest, LogsRequest, ScreenshotRequest, SnapshotRequest,
 };
@@ -161,7 +170,8 @@ fn apple_project(workspace: &Path) -> bool {
     })
 }
 
-/// Stops the attempt's driver unless another attempt still uses its device.
+/// Stops the attempt's driver unless another attempt or a managed preview
+/// still uses its device.
 pub fn attempt_ended(run_id: &str) {
     let Some(ended) = attempts().remove(run_id) else {
         return;
@@ -169,9 +179,80 @@ pub fn attempt_ended(run_id: &str) {
     let shared = attempts()
         .values()
         .any(|attempt| attempt.udid == ended.udid);
-    if !shared {
+    if !shared && !held(&ended.udid) {
         std::thread::spawn(move || driver::stop(&ended.udid));
     }
+}
+
+/// Devices a managed preview drives, with how many holds each has. Their
+/// driver outlives the attempts that used the device.
+fn holds() -> std::sync::MutexGuard<'static, HashMap<String, usize>> {
+    static HOLDS: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
+    HOLDS
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+}
+
+fn held(udid: &str) -> bool {
+    holds().contains_key(udid)
+}
+
+/// Keeps a device's driver for a managed preview. Dropping the last hold
+/// stops the driver unless an attempt's tools still use the device.
+pub(crate) struct DriverHold(String);
+
+impl DriverHold {
+    pub(crate) fn new(udid: &str) -> Self {
+        *holds().entry(udid.to_string()).or_default() += 1;
+        Self(udid.to_string())
+    }
+}
+
+impl Drop for DriverHold {
+    fn drop(&mut self) {
+        let last = {
+            let mut holds = holds();
+            match holds.get_mut(&self.0) {
+                Some(count) if *count > 1 => {
+                    *count -= 1;
+                    false
+                }
+                _ => {
+                    holds.remove(&self.0);
+                    true
+                }
+            }
+        };
+        let attempt = attempts().values().any(|attempt| attempt.udid == self.0);
+        if last && !attempt {
+            let udid = std::mem::take(&mut self.0);
+            std::thread::spawn(move || driver::stop(&udid));
+        }
+    }
+}
+
+/// Calls the device's driver for a managed preview, building and starting it
+/// on first use. `progress` receives the build and start lines.
+pub(crate) fn preview_call(
+    runtime: &TaskRuntime,
+    udid: &str,
+    path: &str,
+    body: &serde_json::Value,
+    progress: &(dyn Fn(&str) + Sync),
+    canceled: &(dyn Fn() -> bool + Sync),
+) -> Result<serde_json::Value, String> {
+    available()?;
+    let root = driver_root(runtime);
+    let driver = driver::for_device(
+        udid,
+        &driver::Context {
+            root: &root,
+            progress,
+            canceled,
+        },
+    )?;
+    driver.call(path, body, std::time::Duration::from_secs(60))
 }
 
 /// Stops every driver; called when the app quits.

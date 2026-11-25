@@ -6,6 +6,7 @@ import {
   FormField,
   InlineNotice,
   Input,
+  SegmentedControl,
   Select,
   SelectItem,
 } from '@jackalope/ui';
@@ -15,13 +16,16 @@ import { invokeNative } from '../../lib/native/transport';
 import { previewUrl } from '../../lib/preview-url';
 import { projectReadiness } from '../../lib/readiness';
 import type { ScreenshotArtifact, TaskRun } from '../../lib/run-types';
+import { type SimulatorTarget, simulatorTarget } from '../../lib/simulator-preview';
 import { stopPreview } from '../../lib/task-client';
 import { useProjectStore } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
 import { DesignPreview } from './DesignPreview';
 import { ScreenshotPreview } from './ScreenshotPreview';
+import { SimulatorPreview } from './SimulatorPreview';
 
 export interface Preview {
+  kind?: 'web' | 'simulator';
   port: number;
   command: string;
   running: boolean;
@@ -30,7 +34,77 @@ export interface Preview {
   exitCode: number | null;
 }
 
+type PreviewKind = 'web' | 'simulator';
+
+/**
+ * The task's Preview: the app in its own iOS Simulator for an iOS project, otherwise
+ * the project's web preview. A project with both offers a choice.
+ */
 export function TaskPreview({
+  run,
+  onFeedback,
+}: {
+  run: TaskRun;
+  onFeedback?: (text: string) => void | Promise<void>;
+}) {
+  const webCommand = useProjectStore(
+    (state) =>
+      !!state.projects
+        .find((project) => project.id === run.projectId)
+        ?.preferences?.previewCommand?.trim(),
+  );
+  const [target, setTarget] = useState<SimulatorTarget | null | undefined>(undefined);
+  const [kind, setKind] = useState<PreviewKind | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setTarget(undefined);
+    if (!run.workspace) {
+      setTarget(null);
+      return;
+    }
+    void simulatorTarget(run.workspace)
+      .then((value) => alive && setTarget(value))
+      .catch(() => alive && setTarget(null));
+    // A preview already running decides which kind opens.
+    void invokeNative<Preview | null>('task_preview_status', { id: run.id })
+      .then((value) => alive && value && setKind(value.kind ?? 'web'))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [run.id, run.workspace]);
+  if (target === undefined)
+    return (
+      <section className="task-preview" aria-label="Try result">
+        <p className="task-muted" role="status">
+          Checking how this project runs…
+        </p>
+      </section>
+    );
+  const chosen: PreviewKind = target ? (kind ?? 'simulator') : 'web';
+  return (
+    <>
+      {target && webCommand && (
+        <SegmentedControl<PreviewKind>
+          label="Preview kind"
+          items={[
+            { id: 'simulator', label: 'iOS Simulator' },
+            { id: 'web', label: 'Web' },
+          ]}
+          value={chosen}
+          onChange={setKind}
+        />
+      )}
+      {chosen === 'simulator' && target ? (
+        <SimulatorPreview key={run.id} run={run} target={target} onFeedback={onFeedback} />
+      ) : (
+        <WebPreview run={run} onFeedback={onFeedback} />
+      )}
+    </>
+  );
+}
+
+function WebPreview({
   run,
   onFeedback,
 }: {
@@ -102,7 +176,8 @@ export function TaskPreview({
       const revision = statusRevision.current;
       try {
         const value = await invokeNative<Preview | null>('task_preview_status', { id: run.id });
-        if (alive && revision === statusRevision.current) setPreview(value);
+        if (alive && revision === statusRevision.current)
+          setPreview(value?.kind === 'simulator' ? null : value);
       } catch (cause) {
         if (alive) setError(describeError(cause));
       } finally {

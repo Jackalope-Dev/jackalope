@@ -10,8 +10,12 @@ import {
 } from '../src/lib/feature-map.ts';
 import { capturePageName } from '../src/lib/review-captures.ts';
 
-test('feature pages must stay on the preview', () => {
+test('feature pages must stay on the preview or be an app deep link', () => {
   assert.equal(featurePageError('/settings?tab=billing'), '');
+  assert.equal(featurePageError(' myapp://settings?tab=1 '), '');
+  for (const page of ['javascript:alert(1)', 'myapp://a b', '1app://x', 'myapp:']) {
+    assert.match(featurePageError(page), /single \//, page);
+  }
   assert.match(featurePageError(''), /Enter the page/);
   for (const page of [
     'settings',

@@ -120,6 +120,9 @@ Make recurring share the task actions menu. Questions and save recovery remain
 visible above the task sections. Follow-up stays visible while the content scrolls.
 Preview and Delivery are separate task sections. Their setup, ownership, evidence and
 publication boundaries are described in [parallel workflows](PARALLEL-WORKFLOWS.md).
+For an iOS app, Preview builds and runs the app in the task's own Simulator with a live,
+tappable screen, and review screenshots come from the Simulator; see
+[iOS development](IOS-DEVELOPMENT.md#simulator-previews-and-review-captures).
 
 HTTP(S) result links open through the OS browser in desktop. Other schemes are
 not executed. Copy result reports clipboard failures. Screenshots still use the

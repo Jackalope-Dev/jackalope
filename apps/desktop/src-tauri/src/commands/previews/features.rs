@@ -1,6 +1,7 @@
 //! A project's feature map: the user-facing features worth a review screenshot.
 //!
-//! Each entry names a page, what "working" looks like there and the source
+//! Each entry names a page (a preview path, or for an iOS app a deep link such
+//! as `myapp://settings`), what "working" looks like there and the source
 //! paths (globs) it depends on. When finished work changes a matching file,
 //! review capture prefers that page and labels the screenshot with the entry.
 //! Suggestions come from route files and router definitions in the repository,
@@ -23,7 +24,8 @@ const ROUTER_FILE_BYTES: u64 = 256 * 1024;
 #[serde(rename_all = "camelCase", default)]
 pub struct Feature {
     pub name: String,
-    /// The preview path screenshots open, such as `/settings?tab=billing`.
+    /// The preview path screenshots open, such as `/settings?tab=billing`, or
+    /// for an iOS app the deep link the Simulator opens, such as `myapp://settings`.
     pub page: String,
     /// How a person reaches the state worth checking. Screenshots only open
     /// `page`; this is guidance for reviewers.
@@ -75,14 +77,37 @@ fn clean_glob(glob: &str) -> Option<String> {
         .then(|| glob.trim_end_matches('/').to_string())
 }
 
-/// Saved entries capture can use: named, with a page on the preview origin.
+/// An app deep link as captures open it: a custom scheme followed by `:`,
+/// without spaces or control characters. Web schemes are preview paths' job.
+pub fn deep_link(page: &str) -> Option<String> {
+    let page = page.trim();
+    let (scheme, rest) = page.split_once(':')?;
+    let valid = scheme
+        .chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic())
+        && scheme
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '-' | '.'))
+        && !matches!(
+            scheme.to_ascii_lowercase().as_str(),
+            "http" | "https" | "file" | "javascript" | "data" | "about" | "blob"
+        )
+        && !rest.is_empty()
+        && page.len() <= 300
+        && !page.chars().any(|ch| ch.is_whitespace() || ch.is_control());
+    valid.then(|| page.to_string())
+}
+
+/// Saved entries capture can use: named, with a page on the preview origin
+/// or an app deep link.
 pub fn usable(features: &[Feature]) -> Vec<Feature> {
     features
         .iter()
         .take(FEATURE_LIMIT)
         .filter_map(|feature| {
             let name = bounded(&feature.name);
-            let page = normalize(&feature.page)?;
+            let page = normalize(&feature.page).or_else(|| deep_link(&feature.page))?;
             (!name.is_empty()).then(|| Feature {
                 name,
                 page,

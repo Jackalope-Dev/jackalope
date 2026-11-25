@@ -1,14 +1,18 @@
 import { describeError } from '@jackalope/contracts/errors';
 import {
   InlineNotice,
+  Input,
   Select,
   SelectItem,
   SettingBody,
   SettingGroup,
   SettingRow,
+  Switch,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/native/env';
+import { reviewCapturesOn } from '../../lib/review-captures';
+import { type SimulatorTarget, simulatorTarget } from '../../lib/simulator-preview';
 import { type SimulatorBase, type SimulatorCatalog, simulatorCatalog } from '../../lib/simulators';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 
@@ -17,15 +21,20 @@ const AUTOMATIC = 'automatic';
 /** The device type and iOS version each task's own Simulator is created from. */
 export function ProjectSimulatorSettings({ project }: { project: Project }) {
   const [catalog, setCatalog] = useState<SimulatorCatalog | null>(null);
+  const [target, setTarget] = useState<SimulatorTarget | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let current = true;
     setCatalog(null);
+    setTarget(null);
     setError('');
     void simulatorCatalog(project.path)
       .then((value) => current && setCatalog(value))
       .catch((cause) => current && setError(describeError(cause)));
+    void simulatorTarget(project.path)
+      .then((value) => current && setTarget(value))
+      .catch(() => {});
     return () => {
       current = false;
     };
@@ -50,6 +59,8 @@ export function ProjectSimulatorSettings({ project }: { project: Project }) {
   );
   const save = (simulator: SimulatorBase | undefined) =>
     useProjectStore.getState().updateProjectPreferences(project.id, { simulator });
+  const update = useProjectStore.getState().updateProjectPreferences;
+  const webPreview = !!project.preferences?.previewCommand?.trim();
   return (
     <SettingGroup
       title="iOS Simulator"
@@ -123,6 +134,42 @@ export function ProjectSimulatorSettings({ project }: { project: Project }) {
                 </InlineNotice>
               </SettingBody>
             )}
+        </>
+      )}
+      {target && (
+        <>
+          <SettingRow
+            title="Simulator preview build"
+            description={`Preview's Run in Simulator and review screenshots build with this. Leave empty for ${target.buildCommand}. A saved command must build with -derivedDataPath "$JACKALOPE_DERIVED_DATA".`}
+            controlId="project-simulator-preview"
+            descriptionId="project-simulator-preview-description"
+          >
+            <Input
+              id="project-simulator-preview"
+              aria-describedby="project-simulator-preview-description"
+              className="project-setting-input"
+              value={project.preferences?.simulatorPreview ?? ''}
+              maxLength={4000}
+              spellCheck={false}
+              placeholder="Detected xcodebuild build"
+              onChange={(event) => update(project.id, { simulatorPreview: event.target.value })}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Capture Simulator review screenshots"
+            description={
+              webPreview
+                ? 'This project saves a web preview command, so review screenshots come from the web preview.'
+                : 'When work that changes the app finishes, build it, open it in the task’s Simulator and save its first screen in light, dark and large text, before and after. Adds a few minutes to finishing.'
+            }
+          >
+            <Switch
+              label="Capture Simulator review screenshots"
+              checked={!webPreview && reviewCapturesOn(project.preferences, true)}
+              disabled={webPreview}
+              onCheckedChange={(reviewCaptures) => update(project.id, { reviewCaptures })}
+            />
+          </SettingRow>
         </>
       )}
     </SettingGroup>
