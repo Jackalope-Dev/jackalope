@@ -206,8 +206,10 @@ export function TaskDetail({
     .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
   const latest = latestAttempt(runs, run.taskId);
   const isLatest = latest?.id === run.id;
+  // A retry of a turn a rewind undid would hand its work back to the agent.
+  const retryable = isLatest && isRetryable(run) && !integrated && !run.rewind?.rewound;
   /** Resuming and switching start a new attempt, so only the latest unmerged task attempt offers them. */
-  const limitActions = isLatest && isRetryable(run) && !integrated && !run.liveSessionId;
+  const limitActions = retryable && !run.liveSessionId;
   const sourceIdea = useTaskStore((state) =>
     state.tasks.find(
       (idea) =>
@@ -750,9 +752,7 @@ export function TaskDetail({
             kind={run.failureKind}
             preparation={run.preparation}
             retrying={retrying}
-            onRetry={
-              isLatest && isRetryable(run) && !integrated ? (focus) => void retry(focus) : undefined
-            }
+            onRetry={retryable ? (focus) => void retry(focus) : undefined}
             continuesProgress={
               !!run.quotaFailure && !!run.workspace && run.workspace !== run.projectPath
             }

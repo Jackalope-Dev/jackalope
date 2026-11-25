@@ -706,3 +706,99 @@ fn removed_workspaces_lose_their_rewind_refs_unless_still_needed() {
     assert!(notes.iter().any(|note| note.contains("cannot name a ref")));
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn restores_keep_ignored_files_and_submodules_and_undo_restages_a_staged_change() {
+    let root = std::env::temp_dir().join(format!("jackalope-rewind-git-{}", uuid::Uuid::new_v4()));
+    let repo = super::super::tests::trial_repository(&root);
+    let directory = root.join("scratch");
+    let mut run = turn("claude", "git-run", 1);
+    run.workspace = repo.to_string_lossy().into_owned();
+    let read = |name: &str| std::fs::read_to_string(repo.join(name)).unwrap();
+    let snapshot = |name: &str| {
+        safety_snapshot(
+            &run,
+            &directory,
+            &format!("refs/jackalope/rewinds/task/{name}"),
+        )
+        .unwrap()
+    };
+
+    // A turn starts with `.env` as an ordinary new file. Later it is ignored and changed,
+    // so no snapshot holds what it says now: restoring the old one would lose it.
+    std::fs::write(repo.join(".env"), "OLD\n").unwrap();
+    let start = snapshot("start");
+    std::fs::write(repo.join(".gitignore"), ".env\n").unwrap();
+    std::fs::write(repo.join(".env"), "NEW\n").unwrap();
+    let now = snapshot("now");
+    let error = restore(&repo, &directory, &now.tree, &start.tree, None).unwrap_err();
+    assert!(error.contains(".env"), "{error}");
+    assert_eq!(read(".env"), "NEW\n");
+    assert_eq!(read(".gitignore"), ".env\n");
+    // An ignored file already holding what would be written is not in the way.
+    std::fs::write(repo.join(".env"), "OLD\n").unwrap();
+    restore(&repo, &directory, &now.tree, &start.tree, None).unwrap();
+    assert!(!repo.join(".gitignore").exists());
+    assert_eq!(read(".env"), "OLD\n");
+
+    // A fully staged change is staged again by Undo.
+    std::fs::write(repo.join("staged.txt"), "staged\n").unwrap();
+    git(&repo, &["add", "--all"]);
+    let staged = snapshot("staged");
+    assert_eq!(staged.index.as_deref(), Some(staged.tree.as_str()));
+    restore(&repo, &directory, &staged.tree, &start.tree, None).unwrap();
+    assert!(!repo.join("staged.txt").exists());
+    assert!(git(&repo, &["diff", "--cached", "--name-only"]).is_empty());
+    let back = snapshot("back");
+    restore(
+        &repo,
+        &directory,
+        &back.tree,
+        &staged.tree,
+        staged.index.as_deref(),
+    )
+    .unwrap();
+    assert_eq!(
+        git(&repo, &["diff", "--cached", "--name-only"]),
+        ".env\nstaged.txt"
+    );
+
+    // A submodule added after the turn keeps its checkout even with `submodule.recurse`.
+    let library = root.join("library");
+    std::fs::create_dir_all(&library).unwrap();
+    git(&library, &["init", "-q", "-b", "main"]);
+    std::fs::write(library.join("lib.txt"), "lib\n").unwrap();
+    git(&library, &["add", "lib.txt"]);
+    git(
+        &library,
+        &[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "Library",
+        ],
+    );
+    git(&repo, &["reset", "-q"]);
+    git(
+        &repo,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "-q",
+            library.to_str().unwrap(),
+            "library",
+        ],
+    );
+    git(&repo, &["config", "submodule.recurse", "true"]);
+    let with_library = snapshot("library");
+    restore(&repo, &directory, &with_library.tree, &start.tree, None).unwrap();
+    assert_eq!(read("library/lib.txt"), "lib\n");
+    let _ = std::fs::remove_dir_all(&root);
+}

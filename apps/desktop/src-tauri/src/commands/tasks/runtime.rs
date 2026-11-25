@@ -2227,6 +2227,13 @@ impl TaskRuntime {
         if crate::commands::integration::applied_run_ids(self)?.contains(&run.id) {
             return Err("This attempt has already been integrated. Add a new task instead.".into());
         }
+        // A retry would carry the undone turn's work back to the agent and end the rewind.
+        if run.rewind.rewound.is_some() {
+            return Err(
+                "A rewind undid this turn. Send the edited message, or undo the rewind first."
+                    .into(),
+            );
+        }
         // Routing chose the concrete agent, so retry the same way the task was requested.
         let automatic = run.routing.is_some();
         Ok(RunRequest {

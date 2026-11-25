@@ -853,7 +853,7 @@ impl LiveSessions {
         if !session.batches.is_empty() {
             return memory;
         }
-        let recent: Vec<(String, String, Option<String>)> = {
+        let recent: Vec<(String, String, Vec<String>)> = {
             let Ok(inner) = self.inner.lock() else {
                 return memory;
             };
@@ -878,7 +878,11 @@ impl LiveSessions {
                     (
                         other.title.clone(),
                         other.updated_at.chars().take(10).collect(),
-                        other.batches.last().map(|batch| batch.run_id.clone()),
+                        other
+                            .batches
+                            .iter()
+                            .map(|batch| batch.run_id.clone())
+                            .collect(),
                     )
                 })
                 .collect()
@@ -887,9 +891,14 @@ impl LiveSessions {
             return memory;
         }
         memory.push_str("Your latest other conversations, newest first (the user can open them on the Bots page):\n");
-        for (title, date, run) in recent {
-            let result = run
-                .and_then(|id| runs.iter().find(|run| run.id == id))
+        for (title, date, batches) in recent {
+            // The latest turn no rewind undid.
+            let result = batches
+                .iter()
+                .rev()
+                .map(|id| runs.iter().find(|run| &run.id == id))
+                .find(|run| run.is_none_or(|run| run.rewind.rewound.is_none()))
+                .flatten()
                 .map(|run| super::bot_hub::clip(&run.result.replace('\n', " "), 400))
                 .filter(|result| !result.is_empty())
                 .unwrap_or_else(|| "(no reply yet)".into());

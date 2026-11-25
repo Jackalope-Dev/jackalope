@@ -77,7 +77,8 @@ pub struct SafetySnapshot {
     pub commit: String,
     pub head: String,
     pub tree: String,
-    /// The staged tree, when it differed from both `HEAD` and the files.
+    /// The staged tree, when it differed from `HEAD`, so Undo stages the same files again.
+    /// Snapshots saved before this was recorded for a fully staged change have none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index: Option<String>,
 }
@@ -418,9 +419,10 @@ fn safety_snapshot(
     let source = integration::snapshot(run, directory)?;
     let head_tree = repo::git(workspace, &["rev-parse", "HEAD^{tree}"], Policy::Snapshot)?;
     let staged = index_tree(workspace, directory)?;
-    let index = (staged != head_tree && staged != source.tree).then_some(staged);
+    let index = (staged != head_tree).then_some(staged);
     let mut parents = vec![source.head.clone()];
-    if let Some(index) = &index {
+    // A staged tree equal to the files is already the snapshot's own tree.
+    if let Some(index) = index.as_ref().filter(|index| **index != source.tree) {
         parents.push(repo::synthetic_commit(
             workspace,
             index,
@@ -453,6 +455,118 @@ fn safety_snapshot(
     })
 }
 
+/// Whether `relative` exists under `workspace` by exactly that name, not as another case of
+/// it on a case-insensitive disk.
+fn present(workspace: &Path, relative: &str) -> bool {
+    let path = workspace.join(relative);
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return false;
+    };
+    std::fs::read_dir(parent).is_ok_and(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .any(|entry| entry.file_name() == name)
+    })
+}
+
+/// Whether folder `relative` holds anything besides the tracked files in `removed`, which
+/// the restore deletes anyway.
+fn holds_untracked(
+    workspace: &Path,
+    relative: &str,
+    removed: &std::collections::HashSet<&str>,
+) -> bool {
+    let Ok(mut entries) = std::fs::read_dir(workspace.join(relative)) else {
+        return true;
+    };
+    entries.any(|entry| {
+        let Ok(entry) = entry else {
+            return true;
+        };
+        let Some(name) = entry
+            .file_name()
+            .to_str()
+            .map(|name| format!("{relative}/{name}"))
+        else {
+            return true;
+        };
+        match entry.file_type() {
+            Ok(kind) if kind.is_dir() => holds_untracked(workspace, &name, removed),
+            Ok(_) => !removed.contains(name.as_str()),
+            Err(_) => true,
+        }
+    })
+}
+
+/// The first path that restoring `target` over `current` would write over although Git does
+/// not track it in `current`: an ignored file or folder, or anything else Git cannot add.
+/// Git replaces ignored files in a checkout's way without asking, and the snapshots hold no
+/// ignored files, so such a path has to stop the restore. A file already holding exactly
+/// what would be written there is not in the way.
+fn in_the_way(workspace: &Path, current: &str, target: &str) -> Result<Option<String>, String> {
+    let raw = repo::git_exact(
+        workspace,
+        &["diff-tree", "-r", "-z", "--no-renames", current, target],
+        Policy::Snapshot,
+    )?;
+    let mut added = Vec::new();
+    let mut removed = std::collections::HashSet::new();
+    let mut fields = raw.split('\0');
+    // Each change is ":<old mode> <new mode> <old id> <new id> <status>", then its path.
+    while let (Some(change), Some(path)) = (fields.next(), fields.next()) {
+        match change.split(' ').collect::<Vec<_>>().as_slice() {
+            [_, mode, _, id, "A"] => added.push((path, *mode, *id)),
+            [.., "D"] => {
+                removed.insert(path);
+            }
+            _ => {}
+        }
+    }
+    let mut same = Vec::new();
+    for (path, mode, id) in added {
+        // A leading folder that is a file or link here, which Git would delete.
+        let parts: Vec<&str> = path.split('/').collect();
+        for end in 1..parts.len() {
+            let folder = parts[..end].join("/");
+            if removed.contains(folder.as_str()) {
+                break;
+            }
+            match std::fs::symlink_metadata(workspace.join(&folder)) {
+                Ok(metadata) if metadata.is_dir() => {}
+                Ok(_) if present(workspace, &folder) => return Ok(Some(folder)),
+                _ => break,
+            }
+        }
+        let Ok(metadata) = std::fs::symlink_metadata(workspace.join(path)) else {
+            continue;
+        };
+        if !present(workspace, path) {
+            continue;
+        }
+        if metadata.is_dir() {
+            if holds_untracked(workspace, path, &removed) {
+                return Ok(Some(path.into()));
+            }
+        } else if metadata.is_file() && matches!(mode, "100644" | "100755") {
+            same.push((path, id));
+        } else {
+            return Ok(Some(path.into()));
+        }
+    }
+    for chunk in same.chunks(200) {
+        let mut args = vec!["hash-object", "--"];
+        args.extend(chunk.iter().map(|(path, _)| *path));
+        let hashes = repo::git(workspace, &args, Policy::Snapshot)?;
+        let mut hashes = hashes.lines();
+        for (path, id) in chunk {
+            if hashes.next() != Some(*id) {
+                return Ok(Some((*path).into()));
+            }
+        }
+    }
+    Ok(None)
+}
+
 /// Makes the workspace's files `target`. `current` is the tree they must still be, as the
 /// safety snapshot saved them; anything else stops the restore before a file changes. The
 /// checkout's own index is set to `index`, or to `HEAD` when it is `None`; its branch
@@ -482,9 +596,23 @@ fn restore(
                     "Files changed while rewinding, so none were restored. Try again.".into(),
                 );
             }
+            if let Some(path) = in_the_way(workspace, current, target)? {
+                return Err(format!(
+                    "Restoring the files would replace {path}, which Git does not track here (it may be ignored), so none were restored. Move it out of the way and try again."
+                ));
+            }
             // A two-tree merge from the files as they are moves the working tree to the
-            // target: it removes what the target lacks and writes what it has.
-            scratch.git(&["read-tree", "-m", "-u", current, target])
+            // target: it removes what the target lacks and writes what it has. Submodules
+            // keep their checkouts whatever `submodule.recurse` says; their contents are not
+            // in the snapshots.
+            scratch.git(&[
+                "read-tree",
+                "--no-recurse-submodules",
+                "-m",
+                "-u",
+                current,
+                target,
+            ])
         },
     )?;
     let wanted = match index {
@@ -500,6 +628,12 @@ fn restore(
         );
     }
     Ok(())
+}
+
+/// A failed restore's reason, with where the files it started from are saved: Git can fail
+/// partway through writing them.
+fn saved_at(error: String, reference: &str) -> String {
+    format!("{error} The files from before are saved in Git at {reference}.")
 }
 
 /// Refuses while anything else may be using the workspace: an agent, a preview, a check or
@@ -725,7 +859,8 @@ impl TaskRuntime {
             &safety.tree,
             &prepared.checkpoint.tree,
             None,
-        )?;
+        )
+        .map_err(|error| saved_at(error, &safety.reference))?;
         let at = Utc::now().to_rfc3339();
         let rewind = Rewind {
             id: id.clone(),
@@ -826,7 +961,8 @@ impl TaskRuntime {
             &before.tree,
             &rewind.safety.tree,
             index,
-        )?;
+        )
+        .map_err(|error| saved_at(error, &before.reference))?;
         let at = Utc::now().to_rfc3339();
         for id in &rewind.rewound_run_ids {
             self.update_checked(id, |attempt| {

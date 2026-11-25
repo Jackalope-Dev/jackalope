@@ -117,7 +117,19 @@ pub fn learn_from_session(
             },
         });
     }
-    let run_ids: HashSet<&str> = pending.iter().filter_map(|m| m.run_id.as_deref()).collect();
+    // Turns a rewind undid were taken back, so nothing is learned from them.
+    let rewound: HashSet<&str> = snapshot
+        .runs
+        .iter()
+        .filter(|run| run.rewind.rewound.is_some())
+        .map(|run| run.id.as_str())
+        .collect();
+    let kept: Vec<&SessionMessage> = pending
+        .iter()
+        .copied()
+        .filter(|m| m.run_id.as_deref().is_none_or(|id| !rewound.contains(id)))
+        .collect();
+    let run_ids: HashSet<&str> = kept.iter().filter_map(|m| m.run_id.as_deref()).collect();
     let runs: Vec<&TaskRun> = snapshot
         .runs
         .iter()
@@ -125,7 +137,7 @@ pub fn learn_from_session(
         .collect();
     let project_id = &session.request.project_id;
     let project_path = &session.request.project_path;
-    let observations = observations(session_id, pending, &runs);
+    let observations = observations(session_id, &kept, &runs);
     let existing = runtime.knowledge.list(project_id, project_path)?;
     let proposals = learning::reflect(&observations, &existing);
     let report = runtime

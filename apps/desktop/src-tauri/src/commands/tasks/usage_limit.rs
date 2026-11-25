@@ -469,6 +469,9 @@ impl TaskRuntime {
             if replaced(inner.runs.values(), run) {
                 return Err("A newer attempt has replaced this one.".into());
             }
+            if run.rewind.rewound.is_some() {
+                return Err("A rewind undid this turn, so it cannot resume.".into());
+            }
             updated.resume_at_reset = Some(ResumeAtReset { at, error: None });
         } else {
             updated.resume_at_reset = None;
@@ -505,8 +508,10 @@ impl TaskRuntime {
             let Some(resume) = updated.resume_at_reset.take() else {
                 continue;
             };
-            let current =
-                updated.status == RunStatus::Failed && !replaced(inner.runs.values(), run);
+            // A rewind that undid the attempt replaced it too.
+            let current = updated.status == RunStatus::Failed
+                && updated.rewind.rewound.is_none()
+                && !replaced(inner.runs.values(), run);
             if self.save(&updated).is_ok() {
                 inner.runs.insert(id.clone(), updated);
                 if current {
