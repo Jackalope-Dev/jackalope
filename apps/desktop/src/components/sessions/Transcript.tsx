@@ -217,6 +217,54 @@ export function Transcript({
     }
     if (spanning) anchor.current = spanning.dataset.key ?? null;
   }, []);
+  // A disclosure opened or closed in a row, such as a group of rewound turns, holds that
+  // row in place: it grows or shrinks below its summary rather than past the top of the
+  // view, even at the end. Following pauses until the toggle lands and then holds only
+  // if the end is still in view.
+  useEffect(() => {
+    const container = list.current;
+    const node = scroller.current;
+    if (!container || !node) return;
+    let held: {
+      row: HTMLElement;
+      height: number;
+      distance: number;
+      following: boolean;
+      timer: number;
+    } | null = null;
+    const land = () => {
+      if (!held) return;
+      const { row, height, distance, timer } = held;
+      window.clearTimeout(timer);
+      following.current = held.following;
+      held = null;
+      // The rows' total size changes only once the row is measured, which may not have
+      // happened yet, so the end is judged from the row's own change in height.
+      follow(distance + row.getBoundingClientRect().height - height <= 1);
+    };
+    const start = (event: MouseEvent) => {
+      const summary = event.target instanceof Element ? event.target.closest('summary') : null;
+      const row = summary && container.contains(summary) ? rowOf(summary) : null;
+      if (!row || held) return;
+      anchor.current = row.dataset.key ?? null;
+      held = {
+        row,
+        height: row.getBoundingClientRect().height,
+        distance: distanceFromEnd(sampleScroll(node)),
+        following: following.current,
+        // A summary whose toggle was prevented sends no toggle event.
+        timer: window.setTimeout(land, 500),
+      };
+      following.current = false;
+    };
+    container.addEventListener('click', start, true);
+    container.addEventListener('toggle', land, true);
+    return () => {
+      container.removeEventListener('click', start, true);
+      container.removeEventListener('toggle', land, true);
+      if (held) window.clearTimeout(held.timer);
+    };
+  }, [follow]);
 
   // Follow a resized viewport and what follows the rows growing on its own, and come back
   // to the same place after being hidden. Rows are not observed here: their growth
@@ -536,19 +584,29 @@ export function Transcript({
             captureAnchor();
           }}
           onWheel={(event) => {
+            if (!event.currentTarget.contains(event.target as Node)) return;
             pending.current = null;
             if (event.deltaY < 0 && event.currentTarget.scrollTop > 0) follow(false);
           }}
           onKeyDown={(event) => {
+            if (!event.currentTarget.contains(event.target as Node)) return;
             if (['PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
               pending.current = null;
           }}
           onFocus={(event) => {
+            // Focus inside a dialog a row opened arrives here through its portal.
+            if (!event.currentTarget.contains(event.target)) return;
             const row = list.current?.contains(event.target) ? rowOf(event.target) : null;
             setFocused(row ? Number(row.dataset.index) : null);
           }}
           onBlur={(event) => {
-            if (!list.current?.contains(event.relatedTarget)) setFocused(null);
+            const next = event.relatedTarget;
+            if (!event.currentTarget.contains(event.target)) return;
+            // A row that opened a dialog stays rendered, so the dialog and the focus it
+            // returns to survive scrolling.
+            if (next instanceof Element && next.closest('[role="dialog"], [role="alertdialog"]'))
+              return;
+            if (!list.current?.contains(next)) setFocused(null);
           }}
         >
           {before}

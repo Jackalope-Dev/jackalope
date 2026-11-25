@@ -181,9 +181,24 @@ export function RewindUndoNotice({
 }
 
 /** Turns a rewind undid: collapsed and muted, still readable, never removed. */
-export function RewoundTurns({ count, children }: { count: number; children: ReactNode }) {
+export function RewoundTurns({
+  count,
+  open,
+  onOpenChange,
+  children,
+}: {
+  count: number;
+  /** Held by the caller where the group can unmount, as in a virtualized transcript. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: ReactNode;
+}) {
   return (
-    <Disclosure className="rewound-turns">
+    <Disclosure
+      className="rewound-turns"
+      open={open}
+      onToggle={onOpenChange && ((event) => onOpenChange(event.currentTarget.open))}
+    >
       <DisclosureSummary>
         {count} rewound {count === 1 ? 'turn' : 'turns'}
       </DisclosureSummary>

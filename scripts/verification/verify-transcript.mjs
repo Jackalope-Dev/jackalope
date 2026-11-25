@@ -59,6 +59,7 @@ if(command==='live_session_send'){const s=useLiveSessionStore.getState().session
 if(command==='live_session_results'){if(f.failResults)throw new Error('The saved reply could not be read.');f.pages=(f.pages??0)+1;return args.runIds.filter(id=>full.has(id)).slice(0,100).map(id=>({id,result:full.get(id)}));}
 if(command==='live_session_search'){const q=args.query.trim().toLowerCase();const counts={};for(const [id,text] of full){const n=text.toLowerCase().split(q).length-1;if(n)counts[id]=n;}return counts;}
 if(command==='live_session_draft'){const s=useLiveSessionStore.getState().sessions[0];return {text:args.text,revision:s.draft.revision+1};}
+if(command==='task_rewind_preview')return {runId:args.runId,latestRunId:'r1999',turn:1980,undone:20,conversation:'codex',prompt:'Fixture'};
 if(command==='desktop_attach_support')return {drag:false,pick:false,badge:false};
 if(command.startsWith('plugin:event|'))return 0;
 throw new Error('Not available in the transcript fixture: '+command);}};
@@ -308,6 +309,135 @@ async function checkBehavior(page) {
     ),
     0,
   );
+
+  // Rewound turns collapse into one row that find leaves out and that holds its place
+  // when it opens or closes, also at the end; it stays open while it scrolls away.
+  await page.evaluate(() =>
+    window.transcriptFixture.runs((runs) =>
+      runs.map((run) => {
+        const index = Number(run.id.slice(1));
+        if (run.status === 'running') run = { ...run, status: 'review', endedAt: run.startedAt };
+        if (index >= 1500 && index <= 1502)
+          return { ...run, rewind: { rewound: { rewindId: 'rewind', at: run.startedAt } } };
+        if (index === 1979)
+          return { ...run, rewind: { mark: { session: 'provider', entry: 'e' } } };
+        if (index === 1980)
+          return {
+            ...run,
+            rewind: { checkpoint: { reference: 'refs/x', commit: 'c', head: 'h', tree: 't' } },
+          };
+        return run;
+      }),
+    ),
+  );
+  await transcript.focus();
+  await page.keyboard.press(`${modifier}+F`);
+  const finder = page.getByRole('searchbox', { name: 'Find in conversation' });
+  await finder.fill('Message 1501:');
+  await page.waitForFunction(
+    () => document.querySelector('.transcript-find-count')?.textContent === 'No matches',
+  );
+  await finder.fill('Message 1499:');
+  await page.waitForFunction(
+    () => document.querySelector('.transcript-find-count')?.textContent === '1 of 1',
+  );
+  await finder.press('Escape');
+  const group = page.locator('.transcript-row[data-key="rewound:m1500"] .rewound-turns');
+  await group.waitFor();
+  assert.equal(await group.locator('[data-find-part]').count(), 0, 'find skips rewound turns');
+  const summary = group.locator('summary');
+  await summary.scrollIntoViewIfNeeded();
+  const summaryTop = () => summary.evaluate((node) => node.getBoundingClientRect().top);
+  const opened = await summaryTop();
+  await summary.click();
+  await group.getByText('Message 1502:').waitFor();
+  await page.waitForTimeout(300);
+  assert.ok(Math.abs((await summaryTop()) - opened) <= 1, 'opening holds the summary in place');
+  const groupHeight = await group.evaluate((node) => node.closest('.transcript-row').offsetHeight);
+  assert.ok(groupHeight > 400, `the opened group is measured (${groupHeight}px)`);
+  // The focused summary would keep its row rendered.
+  await transcript.focus();
+  await page.evaluate(() => {
+    document.querySelector('.live-transcript').scrollTop = 0;
+  });
+  await page.waitForTimeout(300);
+  assert.equal(await group.count(), 0, 'the group unmounts once far away');
+  await page.keyboard.press(`${modifier}+F`);
+  await finder.fill('Message 1503:');
+  await finder.press('Escape');
+  await group.waitFor();
+  assert.equal(await group.evaluate((node) => node.open), true, 'the group stays open');
+  await summary.scrollIntoViewIfNeeded();
+  const closing = await summaryTop();
+  await summary.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    () => !document.querySelector('[data-key="rewound:m1500"] .rewound-turns').open,
+  );
+  await page.waitForTimeout(300);
+  assert.ok(Math.abs((await summaryTop()) - closing) <= 1, 'closing holds the summary in place');
+
+  // At the end, a group that opens below the view stops following instead of scrolling it away.
+  await page.evaluate(() =>
+    window.transcriptFixture.runs((runs) =>
+      runs.map((run) =>
+        ['r1998', 'r1999'].includes(run.id)
+          ? { ...run, rewind: { rewound: { rewindId: 'rewind', at: run.startedAt } } }
+          : run,
+      ),
+    ),
+  );
+  await page.locator('.transcript-jump').click();
+  await page.waitForFunction(() => {
+    const node = document.querySelector('.live-transcript');
+    return node.scrollHeight - node.scrollTop - node.clientHeight < 2;
+  });
+  const last = page.locator('.transcript-row[data-key="rewound:m1998"] summary');
+  await last.waitFor();
+  const lastTop = await last.evaluate((node) => node.getBoundingClientRect().top);
+  await last.click();
+  await page.waitForTimeout(400);
+  assert.ok(
+    Math.abs((await last.evaluate((node) => node.getBoundingClientRect().top)) - lastTop) <= 1,
+    'the summary stays under the pointer at the end',
+  );
+  await page.locator('.transcript-jump').waitFor();
+  await last.click();
+  await page.waitForFunction(() => {
+    const node = document.querySelector('.live-transcript');
+    return node.scrollHeight - node.scrollTop - node.clientHeight < 2;
+  });
+
+  // Edit from here opens its dialog from a virtualized row; the row stays rendered while
+  // the dialog is open and focus returns to it.
+  const row = page.locator('.transcript-row[data-key="m1980"]');
+  await page.keyboard.press(`${modifier}+F`);
+  await finder.fill('Message 1980:');
+  await finder.press('Escape');
+  await row.waitFor();
+  const edit = row.getByRole('button', { name: 'Edit from here' });
+  assert.equal(await edit.evaluate((node) => getComputedStyle(node).opacity), '0');
+  await edit.focus();
+  await page.waitForFunction(
+    (node) => getComputedStyle(node).opacity === '1',
+    await edit.elementHandle(),
+  );
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Edit from turn 1980?' });
+  await dialog.waitFor();
+  await page.evaluate(() => {
+    document.querySelector('.live-transcript').scrollTop = 0;
+  });
+  await page.waitForTimeout(300);
+  assert.equal(await row.count(), 1, 'the row behind the dialog stays rendered');
+  await dialog.waitFor();
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  assert.equal(
+    await edit.evaluate((node) => node === document.activeElement),
+    true,
+    'focus returns to Edit from here',
+  );
 }
 
 async function checkLayout(page, name) {
@@ -555,7 +685,7 @@ try {
     }
     assert.deepEqual(errors, []);
     console.log(
-      'Transcript browser fixtures passed: bounded rendering, following, Jump to latest, send returns to the end, find across unrendered and unloaded replies, selection retention, copying with replies loaded on demand, retrying failed reply loads, reduced motion and light/dark at three widths. No native execution.',
+      'Transcript browser fixtures passed: bounded rendering, following, Jump to latest, send returns to the end, find across unrendered and unloaded replies, selection retention, rewound groups and Edit from here on virtualized rows, copying with replies loaded on demand, retrying failed reply loads, reduced motion and light/dark at three widths. No native execution.',
     );
   }
 } finally {

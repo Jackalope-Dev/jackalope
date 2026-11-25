@@ -39,7 +39,7 @@ Run `node scripts/verification/verify-transcript.mjs` for a 2,000-message conver
 fixture. It starts its own Vite server, reports DOM size, initial render time and frame
 timings while scrolling and streaming (`--measure-only` skips the behavior checks), and
 checks following, Jump to latest, sending, find across unrendered rows, selection
-retention, reduced motion and light/dark at three widths. Metrics go under
+retention, rewound-turn groups, Edit from here on virtualized rows, reduced motion and light/dark at three widths. Metrics go under
 `output/playwright/transcript/`; they are diagnostic, not installed-app acceptance.
 
 Run `node scripts/verification/verify-workbench.mjs` for isolated browser checks of
@@ -64,8 +64,10 @@ mock native commands; it does not prove installed shell or window behavior.
   (`components/sessions/Transcript.tsx`, TanStack Virtual). Rows measure as they render.
   While reading back, the first row starting inside the view is the anchor: rows before
   it that render, measure, format or load move the offset by their change in size, in
-  either scroll direction, so the text being read holds still. A selection or focused
-  control keeps its rows rendered. Replies in one transcript share one code-highlighting
+  either scroll direction, so the text being read holds still. A disclosure opened or
+  closed in a row, such as a group of rewound turns (one row, its open state kept while
+  it scrolls away), holds that row in place instead, also at the end. A selection, a
+  focused control or a dialog opened from a row keeps its rows rendered. Replies in one transcript share one code-highlighting
   worker, and each transcript registers its own find highlight names.
 - A transcript follows new content only while the person is at its end. Scrolling up
   stops following and shows Jump to latest with a count of new messages and replies;
@@ -73,7 +75,7 @@ mock native commands; it does not prove installed shell or window behavior.
 - Find in conversation (Mod+F, configurable) searches the message and reply data, so
   unrendered and unformatted rows match, then scrolls to the match and highlights
   rendered matches with the CSS highlight API. Matches stop counting at 5,000. It stays
-  out of hidden conversations, dialogs and the terminal. Replies that are not loaded
+  out of hidden conversations, dialogs and the terminal, and leaves out rewound turns. Replies that are not loaded
   are counted natively (`live_session_search`).
 - The renderer asks for the open conversation with `replies: 40`; older finished replies
   arrive with `resultOmitted` and `resultChars` instead of `result`, load in pages of at
