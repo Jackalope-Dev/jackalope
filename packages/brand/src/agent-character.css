@@ -84,10 +84,7 @@
   stroke: none;
   opacity: 0.55;
 }
-/* Plush: the fur edge and ground shadow only read on larger characters. */
-.brand-agent-character[data-material="plush"][data-large] .brand-agent-fill {
-  filter: var(--brand-agent-fur);
-}
+/* Plush: the ground shadow only reads on larger characters. */
 .brand-agent-character[data-material="plush"][data-large] .brand-agent-ground {
   display: inline;
 }
@@ -114,21 +111,21 @@
       var(--brand-agent-idle-delay, 0s) infinite;
   }
 
-  /* Working: three hops, a turn on the third, and a smile now and then. */
+  /* Working: a small hop every beat, a turn on every third and a smile now and then. */
   .brand-agent-character[data-state="working"] .brand-agent-body {
-    animation: brand-agent-hop 3.6s linear var(--brand-agent-work-delay, 0s) infinite;
+    animation: brand-agent-hop 4.4s linear var(--brand-agent-work-delay, 0s) infinite;
   }
   .brand-agent-character[data-state="working"] .brand-agent-turn {
-    animation: brand-agent-hop-turn 3.6s linear var(--brand-agent-work-delay, 0s) infinite;
+    animation: brand-agent-hop-turn 13.2s linear var(--brand-agent-work-delay, 0s) infinite;
   }
   .brand-agent-character[data-state="working"] .brand-agent-ground {
-    animation: brand-agent-hop-ground 3.6s linear var(--brand-agent-work-delay, 0s) infinite;
+    animation: brand-agent-hop-ground 4.4s linear var(--brand-agent-work-delay, 0s) infinite;
   }
   .brand-agent-character[data-state="working"] .brand-agent-face {
     animation: none;
   }
   .brand-agent-character[data-state="working"] .brand-agent-smile {
-    animation: brand-agent-smile 7.2s ease-in-out var(--brand-agent-work-delay, 0s) infinite;
+    animation: brand-agent-smile 13.2s ease-in-out var(--brand-agent-work-delay, 0s) infinite;
   }
 
   /* Waiting: a slow, attentive lean on top of the head tilt. */
@@ -250,69 +247,48 @@
     opacity: 0.08;
   }
 }
+/* One small hop per beat with long rests between, and a turn on every third hop. */
 @keyframes brand-agent-hop {
   0%,
-  18%,
-  33%,
-  51%,
-  66%,
-  88%,
+  22%,
   100% {
     transform: none;
     animation-timing-function: ease-out;
   }
-  4%,
-  37%,
-  70% {
-    transform: scale(1.07, 0.92);
+  4% {
+    transform: scale(1.03, 0.97);
     animation-timing-function: ease-out;
   }
-  9%,
-  42% {
-    transform: translateY(-7px) scale(0.95, 1.06);
+  10% {
+    transform: translateY(-4px) scale(0.98, 1.02);
     animation-timing-function: ease-in;
   }
-  77% {
-    transform: translateY(-10px) scale(0.95, 1.06);
-    animation-timing-function: ease-in;
-  }
-  14%,
-  47%,
-  84% {
-    transform: scale(1.07, 0.93);
+  16% {
+    transform: scale(1.03, 0.97);
     animation-timing-function: ease-out;
   }
 }
 @keyframes brand-agent-hop-turn {
   0%,
-  71%,
-  83%,
+  1.5%,
+  5.5%,
   100% {
     transform: none;
   }
-  77% {
+  3.5% {
     transform: scaleX(-1);
   }
 }
 @keyframes brand-agent-hop-ground {
   0%,
   4%,
-  14%,
-  37%,
-  47%,
-  70%,
-  84%,
+  16%,
   100% {
     transform: none;
   }
-  9%,
-  42% {
-    transform: scale(0.78);
-    opacity: 0.09;
-  }
-  77% {
-    transform: scale(0.7);
-    opacity: 0.07;
+  10% {
+    transform: scale(0.86);
+    opacity: 0.1;
   }
 }
 @keyframes brand-agent-smile {

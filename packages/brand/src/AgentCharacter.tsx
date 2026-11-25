@@ -41,7 +41,7 @@ const silhouettes: Record<string, string> = {
     'M40 22C55 22 66 33 66 47C66 61 55 70 40 70C25 70 14 61 14 47C14 33 25 22 40 22ZM40 22C38 14 42 8 50 8C50 15 46 20 40 22Z',
 };
 
-// Characters drawn at least this wide get the fur edge and a ground shadow; smaller ones stay crisp.
+// Characters drawn at least this wide get a ground shadow; smaller ones stay clean.
 const LARGE = 48;
 
 // One observer of each kind serves every character on the page.
@@ -108,7 +108,7 @@ export function AgentCharacter({
   provider: string;
   state?: AgentCharacterState;
   gaze?: AgentGaze;
-  /** Plush adds soft studio shading, bead eyes and, at larger sizes, a fur edge. */
+  /** Plush adds soft studio shading, bead eyes and, at larger sizes, a ground shadow. */
   material?: 'plush' | 'flat';
   /** A click makes the character hop and turn round. Leave off inside clickable rows. */
   interactive?: boolean;
@@ -201,7 +201,7 @@ export function AgentCharacter({
       viewBox="0 0 88 88"
       fill="none"
       aria-hidden="true"
-      style={{ ...timing.current, '--brand-agent-fur': `url(#${id}-fur)` } as CSSProperties}
+      style={timing.current as CSSProperties}
       onClick={
         interactive || onClick
           ? (event) => {
@@ -226,10 +226,6 @@ export function AgentCharacter({
             <stop offset="0" className="brand-agent-stop-rim" />
             <stop offset="0.55" className="brand-agent-stop-clear" />
           </linearGradient>
-          <filter id={`${id}-fur`} x="-10%" y="-10%" width="120%" height="120%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" />
-            <feDisplacementMap in="SourceGraphic" scale="2.4" yChannelSelector="G" />
-          </filter>
         </defs>
       )}
       {plush && <ellipse className="brand-agent-ground" cx="42" cy="80" rx="22" ry="3" />}

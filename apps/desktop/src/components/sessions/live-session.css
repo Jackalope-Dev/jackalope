@@ -301,7 +301,7 @@
   background: transparent;
   box-shadow: none;
 }
-.live-composer textarea:focus-visible {
+.live-composer textarea:focus {
   outline: none;
   box-shadow: none;
 }
@@ -406,7 +406,7 @@
   padding: 4px 6px;
   line-height: 1.5;
 }
-.live-start-composer textarea:focus-visible {
+.live-start-composer textarea:focus {
   outline: none;
   box-shadow: none;
 }
@@ -834,7 +834,7 @@
   box-shadow: none;
   line-height: 1.5;
 }
-.external-continue textarea:focus-visible {
+.external-continue textarea:focus {
   outline: none;
   box-shadow: none;
 }

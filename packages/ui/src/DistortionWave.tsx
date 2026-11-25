@@ -30,9 +30,9 @@ export interface DistortionWaveHandle {
 }
 
 const DURATION: Record<DistortionWaveType, number> = {
-  vertical: 1000,
-  horizontal: 1000,
-  center: 900,
+  vertical: 850,
+  horizontal: 850,
+  center: 780,
 };
 // How far the front reaches along each axis: a wide, shallow front rises from a button at the
 // bottom and spans the width quickly; a horizontal one sweeps across from a tall source.
@@ -151,28 +151,28 @@ void main() {
   // Distance from the source's box rather than its centre, so the front leaves its edge.
   vec2 q = max(abs(rel) - uSourceSize * 0.5, 0.0);
   float swell = sin(clamp(uProgress, 0.0, 1.0) * 3.14159);
-  float d = length(q * uMetric) + (fbm(p * 0.011 + vec2(uTime * 0.6, -uTime * 0.4)) - 0.5) * (20.0 + 44.0 * swell);
+  float d = length(q * uMetric) + (fbm(p * 0.011 + vec2(uTime * 0.6, -uTime * 0.4)) - 0.5) * (12.0 + 24.0 * swell);
   float x = uRadius - d;
 
-  float shift = 5.0 + 11.0 * swell;
+  float shift = 4.0 + 7.0 * swell;
   float r = swellBand(x + shift, uBand);
   float g = swellBand(x, uBand);
   float b = swellBand(x - shift, uBand);
   float weight = r + g + b;
   vec3 color = (uC1 * r + uC2 * g + uC3 * b) / max(weight, 1e-4);
-  float alpha = max(r, max(g, b)) * mix(0.34, 0.5, uDark);
+  float alpha = max(r, max(g, b)) * mix(0.2, 0.3, uDark);
 
   float passed = smoothstep(0.0, uBand * 0.6, x);
   float edgeDistance = min(min(p.x, p.y), min(uSize.x - p.x, uSize.y - p.y));
   float hue = fract(atan(rel.y, rel.x) / 6.28318 + uTime * 0.15) * 3.0;
   vec3 edgeColor = hue < 1.0 ? mix(uC1, uC2, hue) : hue < 2.0 ? mix(uC2, uC3, hue - 1.0) : mix(uC3, uC1, hue - 2.0);
-  over(color, alpha, edgeColor, (1.0 - smoothstep(0.0, 26.0, edgeDistance)) * passed * 0.45);
+  over(color, alpha, edgeColor, (1.0 - smoothstep(0.0, 26.0, edgeDistance)) * passed * 0.22);
 
   float pull = (1.0 - smoothstep(0.0, 0.22, uProgress)) * exp(-length(q) / 18.0);
-  over(color, alpha, uC1, pull * 0.5);
+  over(color, alpha, uC1, pull * 0.3);
 
   float line = exp(-abs(x) / 1.1) * smoothstep(0.18, 0.42, uProgress);
-  over(color, alpha, mix(uC2, vec3(1.0), mix(0.3, 0.7, uDark)), line * 0.8);
+  over(color, alpha, mix(uC2, vec3(1.0), mix(0.3, 0.7, uDark)), line * 0.5);
 
   alpha *= 1.0 - smoothstep(0.8, 1.0, uProgress);
   outColor = vec4(color * alpha, alpha);
@@ -348,7 +348,7 @@ export function playDistortionWave({
     height: box.height,
     source: sourceBox,
     metric,
-    band: Math.min(180, Math.max(70, Math.min(box.width, box.height) * 0.28)),
+    band: Math.min(120, Math.max(56, Math.min(box.width, box.height) * 0.2)),
     colors: [accent, secondary, tertiary],
     dark: (0.2126 * surface[0] + 0.7152 * surface[1] + 0.0722 * surface[2]) / 255 < 0.5,
   };
@@ -396,7 +396,7 @@ export function playDistortionWave({
     [
       { scale: '1', translate: '0 0', transformOrigin },
       {
-        scale: '0.992',
+        scale: '0.996',
         translate: `${toward(cx - box.width / 2)}px ${toward(cy - box.height / 2)}px`,
         transformOrigin,
         offset: 0.16,
@@ -433,7 +433,7 @@ export function playDistortionWave({
     const behind = Math.max(0, 100 - (scene.band / span) * 100);
     const near = Math.max(0, 100 - ((scene.band * 0.3) / span) * 100);
     const mask = `radial-gradient(ellipse ${rx}px ${ry}px at ${at}, transparent ${behind}%, rgb(0 0 0 / 0.55) ${(behind + near) / 2}%, #000 ${near}%, transparent 100%)`;
-    blur.style.setProperty('--wave-blur', `${(1 + 7 * swell).toFixed(2)}px`);
+    blur.style.setProperty('--wave-blur', `${(0.5 + 3.5 * swell).toFixed(2)}px`);
     blur.style.setProperty('mask-image', mask);
     blur.style.setProperty('-webkit-mask-image', mask);
     if (!midpoint && progress >= 0.45) {
