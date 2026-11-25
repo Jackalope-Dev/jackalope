@@ -253,11 +253,14 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 .work-group + .work-group {
-  margin-top: 12px;
+  margin-top: 8px;
 }
+/* The first row's hover pill sits as far below the divider as the last row ends above the
+   next group, so a group's spacing reads the same at the top and bottom. */
 .work-group h2,
 .work-finished > summary {
   min-height: 32px;
+  margin-bottom: 6px;
   padding: 6px 10px;
   font-size: var(--text-sm);
   font-weight: 500;

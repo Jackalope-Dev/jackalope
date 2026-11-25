@@ -35,6 +35,13 @@ switches. Production checks require a successful worker highlight, bounded rende
 line counts and keyboard access to the final line; a main-thread fallback cannot
 silently satisfy worker acceptance. The isolated preview selects an available port.
 
+Run `node scripts/verification/verify-transcript.mjs` for a 2,000-message conversation
+fixture. It starts its own Vite server, reports DOM size, initial render time and frame
+timings while scrolling and streaming (`--measure-only` skips the behavior checks), and
+checks following, Jump to latest, sending, find across unrendered rows, selection
+retention, rewound-turn groups, Edit from here on virtualized rows, reduced motion and light/dark at three widths. Metrics go under
+`output/playwright/transcript/`; they are diagnostic, not installed-app acceptance.
+
 Run `node scripts/verification/verify-workbench.mjs` for isolated browser checks of
 the workspace sidebar, terminal focus and reconnect, topic selection in large conversations,
 detached-window drafts and feedback recovery. It starts its own Vite server and uses
@@ -51,7 +58,39 @@ mock native commands; it does not prove installed shell or window behavior.
   records omitted from the request are transferred again rather than dropped.
 - Hidden windows coalesce native notifications until visible, retaining their periodic
   fallback. Session lookups use indexes, and only the latest 20 replies format richly
-  by default. Earlier text remains searchable and can be formatted explicitly.
+  by default; earlier replies format as they near the viewport.
+- Conversation transcripts, including Jackalope conversations, the tasks they own and
+  read-only conversations from other CLIs, render only rows near the viewport
+  (`components/sessions/Transcript.tsx`, TanStack Virtual). Rows measure as they render.
+  While reading back, the first row starting inside the view is the anchor: rows before
+  it that render, measure, format or load move the offset by their change in size, in
+  either scroll direction, so the text being read holds still. A disclosure opened or
+  closed in a row, such as a group of rewound turns (one row, its open state kept while
+  it scrolls away), holds that row in place instead, also at the end. A selection, a
+  focused control or a dialog opened from a row keeps its rows rendered. Replies in one transcript share one code-highlighting
+  worker, and each transcript registers its own find highlight names.
+- A transcript follows new content only while the person is at its end. Scrolling up
+  stops following and shows Jump to latest with a count of new messages and replies;
+  reaching the end, jumping or sending follows again.
+- Find in conversation (Mod+F, configurable) searches the message and reply data, so
+  unrendered and unformatted rows match, then scrolls to the match and highlights
+  rendered matches with the CSS highlight API. Matches stop counting at 5,000. It stays
+  out of hidden conversations, dialogs and the terminal, and leaves out rewound turns. Replies that are not loaded
+  are counted natively (`live_session_search`).
+- The renderer asks for the open conversation with `replies: 40`; older finished replies
+  arrive with `resultOmitted` and `resultChars` instead of `result`, load in pages of at
+  most 500 replies and about 512K characters (`live_session_results`) as their rows
+  render, and Copy as Markdown loads every reply first. A failed load offers Retry on
+  the row and in the conversation's notice, and tries again when the row next renders.
+  Runs outside the window (older runs of the open conversation and all but the newest
+  run of every other one) arrive in `compactRuns`, trimmed to the fields transcript
+  rows, status, cost and attention read; the store fills them out with empty lists and
+  marks them `summaryOmitted`, and merged run lists use the task list's full summary for
+  them. Callers that omit `replies`, such as the terminal-command host, still receive
+  every run and reply in full. Active runs always stay whole, and the omission never
+  reaches saved history. Revision fingerprints are 64 bits, so an idle refresh costs
+  about 48 bytes per record. The budget test in `live_sessions/changes.rs` holds the
+  first open of a 2,000-message conversation under 1.6 MB, most of it the messages.
 - Usage & quota offers opt-in timing capture for the current window. At most 2,000
   samples stay in memory; exports contain metric names and aggregate timings, never
   command arguments or content. Event Timing covers events at least 16 ms, and long-task

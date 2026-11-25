@@ -1,5 +1,16 @@
 [
   {
+    "id": "long-conversations-stay-fast",
+    "date": "2026-11-25",
+    "title": "Long conversations stay fast.",
+    "description": "Conversations with thousands of messages now open and stream instantly.",
+    "items": [
+      "Jackalope keeps your place while you read and shows Jump to latest when new replies arrive.",
+      "Press Cmd/Ctrl+F to find text anywhere in a conversation, including older replies.",
+      "Imported Claude Code and Codex conversations get the same fast view."
+    ]
+  },
+  {
     "id": "build-ios-apps-with-your-agents",
     "date": "2026-11-25",
     "title": "Build iOS apps with your agents.",

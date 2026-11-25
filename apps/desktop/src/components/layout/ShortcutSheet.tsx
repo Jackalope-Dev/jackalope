@@ -15,6 +15,10 @@ const TABS = Array.from({ length: 9 }, (_, index) => `tab${index + 1}` as Keybin
 
 /** Keys that are not rebindable, listed after the groups they belong with. */
 const FIXED: Record<string, [string, string][]> = {
+  Conversation: [
+    ['Next or previous match', 'Enter · Shift+Enter'],
+    ['Close find', 'Esc'],
+  ],
   Composer: [
     ['Send a message', 'Enter'],
     ['New line', 'Shift+Enter'],

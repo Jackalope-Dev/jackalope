@@ -1,5 +1,5 @@
 import { FileText, SquareSlash } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ComposerCommand } from '../../lib/composer-commands';
 import './composer.css';
 
@@ -36,13 +36,19 @@ export function ComposerMenu({
   onChoose: (option: ComposerMenuOption) => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
+  const placement = useMenuPlacement(list, options.length);
   useEffect(() => {
     list.current
       ?.querySelector<HTMLElement>(`[data-index="${active}"]`)
       ?.scrollIntoView({ block: 'nearest' });
   }, [active]);
   return (
-    <div className="composer-menu" ref={list}>
+    <div
+      className="composer-menu"
+      data-placement={placement.side}
+      style={placement.maxHeight ? { maxHeight: placement.maxHeight } : undefined}
+      ref={list}
+    >
       <div id={id} role="listbox" aria-label={label}>
         {options.map((option, index) => (
           <div
@@ -81,4 +87,55 @@ export function ComposerMenu({
       )}
     </div>
   );
+}
+
+const GAP = 6;
+const MARGIN = 8;
+/** Enough room above for a few rows before the menu opens below the composer instead. */
+const MIN_ABOVE = 160;
+
+function clippingBounds(node: HTMLElement) {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent);
+    if (style.overflowY !== 'visible' || style.overflowX !== 'visible') {
+      const rect = parent.getBoundingClientRect();
+      top = Math.max(top, rect.top);
+      bottom = Math.min(bottom, rect.bottom);
+    }
+  }
+  return { top, bottom };
+}
+
+/**
+ * Opens the menu on whichever side of its composer has room inside the panels that clip
+ * it, and caps its height to that room so every option stays reachable by scrolling.
+ */
+function useMenuPlacement(menu: RefObject<HTMLDivElement | null>, count: number) {
+  const [placement, setPlacement] = useState<{ side: 'above' | 'below'; maxHeight?: number }>({
+    side: 'above',
+  });
+  useLayoutEffect(() => {
+    const node = menu.current;
+    const anchor = node?.offsetParent;
+    // The option count changes the height wanted, so it re-measures as the list filters.
+    if (!count || !node || !(anchor instanceof HTMLElement)) return;
+    const measure = () => {
+      const bounds = clippingBounds(anchor);
+      const rect = anchor.getBoundingClientRect();
+      const above = rect.top - bounds.top - GAP - MARGIN;
+      const below = bounds.bottom - rect.bottom - GAP - MARGIN;
+      const wanted = node.scrollHeight;
+      const side = above >= Math.min(wanted, MIN_ABOVE) || above >= below ? 'above' : 'below';
+      const room = Math.floor(side === 'above' ? above : below);
+      setPlacement((current) =>
+        current.side === side && current.maxHeight === room ? current : { side, maxHeight: room },
+      );
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [menu, count]);
+  return placement;
 }

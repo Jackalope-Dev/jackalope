@@ -72,6 +72,8 @@ export interface SessionSnapshot {
   revisions?: Record<string, string>;
   sessions: LiveSession[];
   runs: TaskRun[];
+  /** Runs outside a windowed snapshot's window, trimmed; see `expandCompactRuns`. */
+  compactRuns?: (Partial<TaskRun> & { id: string })[];
   error: string | null;
 }
 export interface SessionReview {

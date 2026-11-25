@@ -237,6 +237,17 @@ export interface TaskRun {
   sessionId: string | null;
   result: string;
   detailsOmitted?: boolean;
+  /**
+   * A conversation snapshot left this reply out to stay small; `result` is empty and
+   * `resultChars` is the reply's length. Load it with `loadReplies`.
+   */
+  resultOmitted?: boolean;
+  resultChars?: number;
+  /**
+   * A conversation snapshot trimmed this run to the fields its transcript row and status
+   * read; the task list's own snapshot holds the full summary.
+   */
+  summaryOmitted?: boolean;
   activity: string[];
   diagnostics: string[];
   error: string | null;

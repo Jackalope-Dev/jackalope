@@ -1,7 +1,8 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useContext, useEffect, useMemo, useRef } from 'react';
 import { Streamdown } from 'streamdown';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { createMarkdownHighlighter } from '../../lib/markdown-highlighter';
+import { MarkdownHighlighterContext } from '../../lib/markdown-highlighter-context';
 import { normalizeAgentMarkdown } from '../../lib/markdown-normalize';
 import { ResultImage } from '../../lib/result-images';
 import { safeResultLink } from '../../lib/task-workflow';
@@ -36,8 +37,14 @@ export default memo(function TaskMarkdown({
     observer.observe(element, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
-  const highlighter = useMemo(createMarkdownHighlighter, []);
-  useEffect(() => highlighter.dispose, [highlighter]);
+  const shared = useContext(MarkdownHighlighterContext);
+  const highlighter = useMemo(() => {
+    if (!shared) return createMarkdownHighlighter();
+    shared.current ??= createMarkdownHighlighter();
+    return shared.current;
+  }, [shared]);
+  // A shared highlighter belongs to the transcript that provides it.
+  useEffect(() => (shared ? undefined : highlighter.dispose), [highlighter, shared]);
   const plugins = useMemo(() => ({ code: highlighter.plugin }), [highlighter]);
   return (
     <div ref={root} className={`task-markdown ${scheme}`}>

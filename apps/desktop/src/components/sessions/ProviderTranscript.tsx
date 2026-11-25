@@ -1,11 +1,12 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Button, Disclosure, DisclosureSummary, InlineNotice, Textarea } from '@jackalope/ui';
 import { Paperclip, Wrench } from 'lucide-react';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useMemo, useRef, useState } from 'react';
 import { useAction } from '../../hooks/useAction';
 import type { TranscriptEntry } from '../../lib/external-sessions';
 import { openExternalUrl } from '../../lib/native/env';
 import { ActionError } from '../ui/ActionError';
+import { Transcript, type TranscriptRow } from './Transcript';
 import { TranscriptResult } from './TranscriptResult';
 import './live-session.css';
 
@@ -22,14 +23,14 @@ function ToolCalls({ tools }: { tools: NonNullable<TranscriptEntry['tools']> }) 
     return (
       <p className="external-tools">
         <Wrench size={12} aria-hidden="true" />
-        <span>Used {names}</span>
+        <span data-find-part="0">Used {names}</span>
       </p>
     );
   return (
     <Disclosure className="external-tools external-tool-calls">
       <DisclosureSummary>
         <Wrench size={12} aria-hidden="true" />
-        <span>Used {names}</span>
+        <span data-find-part="0">Used {names}</span>
       </DisclosureSummary>
       <ol>
         {tools.map((tool, index) => (
@@ -45,39 +46,63 @@ function ToolCalls({ tools }: { tools: NonNullable<TranscriptEntry['tools']> }) 
 }
 
 /**
- * A Claude Code or Codex transcript, read-only: the person's messages on the right and the
- * agent's replies beside its character, with tool calls summarized between them.
+ * A page holding a read-only Claude Code or Codex transcript: the person's messages on the
+ * right and the agent's replies beside its character, with tool calls summarized between
+ * them. The page scrolls as one virtualized transcript, so `before` (the heading) scrolls
+ * away and `footer` (the continue card) floats over the replies at the bottom.
  */
 export function ProviderTranscript({
   agent,
   agentName,
   entries,
+  loaded,
   earlier,
   notes,
+  before,
+  footer,
+  title,
 }: {
+  /** The page's accessible name. */
+  title: string;
   agent: string;
   agentName: string;
   entries: TranscriptEntry[];
+  /** False while the transcript is still being read. */
+  loaded: boolean;
   /** Entries before the first one shown, left out because the transcript is long. */
   earlier: number;
   /** Quiet lines after the transcript, such as what was not shown. */
   notes?: string[];
+  before: ReactNode;
+  footer: ReactNode;
 }) {
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (entries.length) end.current?.scrollIntoView({ block: 'end' });
-  }, [entries]);
-  return (
-    <section className="external-transcript" aria-label="Conversation">
-      {earlier > 0 && (
-        <p className="live-muted">{earlier.toLocaleString()} earlier messages are not shown.</p>
-      )}
-      {entries.map((entry, index) =>
-        entry.role === 'user' ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: entries are a fixed, ordered read
-          <article key={index} className="live-message live-sent">
+  // Replies already formatted render formatted again when they scroll back into view.
+  const formatted = useRef(new Set<number>());
+  // Keys count from the conversation's start, so they stay put when older entries drop off.
+  const rows = useMemo<TranscriptRow[]>(
+    () =>
+      entries.map((entry, index) => {
+        const text =
+          entry.role === 'tools'
+            ? `Used ${[...new Set((entry.tools ?? []).map((tool) => tool.name))].join(', ')}`
+            : entry.text;
+        return {
+          key: String(earlier + index),
+          text: [text],
+          estimate: entry.role === 'assistant' ? 90 + Math.ceil(text.length / 90) * 22 : 70,
+        };
+      }),
+    [entries, earlier],
+  );
+  const renderRow = (index: number) => {
+    const entry = entries[index];
+    const at = earlier + index;
+    return (
+      <div className="external-transcript">
+        {entry.role === 'user' ? (
+          <article className="live-message live-sent">
             <span className="live-author sr-only">You</span>
-            {entry.text && <p>{entry.text}</p>}
+            {entry.text && <p data-find-part="0">{entry.text}</p>}
             {!!entry.attachments?.length && (
               <ul className="external-attachments" aria-label="Attachments">
                 {entry.attachments.map((attachment) => (
@@ -90,36 +115,64 @@ export function ProviderTranscript({
             )}
           </article>
         ) : entry.role === 'assistant' ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: entries are a fixed, ordered read
-          <article key={index} className="live-message live-reply">
+          <article className="live-message live-reply">
             <span className="live-mascot">
               <AgentCharacter provider={agent} />
             </span>
             <div>
               <span className="live-author">{agentName}</span>
-              <TranscriptResult
-                content={entry.text}
-                active={false}
-                recent={index >= entries.length - 6}
-                onOpenLink={(url) => void openExternalUrl(url)}
-              />
+              <div data-find-part="0">
+                <TranscriptResult
+                  content={entry.text}
+                  active={false}
+                  recent={index >= entries.length - 6 || formatted.current.has(at)}
+                  onFormatted={() => formatted.current.add(at)}
+                  onOpenLink={(url) => void openExternalUrl(url)}
+                />
+              </div>
             </div>
           </article>
         ) : (
-          // biome-ignore lint/suspicious/noArrayIndexKey: entries are a fixed, ordered read
-          <ToolCalls key={index} tools={entry.tools ?? []} />
-        ),
-      )}
-      {!entries.length && (
-        <p className="live-muted">This conversation has no messages to show yet.</p>
-      )}
-      {notes?.map((note) => (
-        <p key={note} className="live-muted">
-          {note}
-        </p>
-      ))}
-      <div ref={end} />
-    </section>
+          <ToolCalls tools={entry.tools ?? []} />
+        )}
+      </div>
+    );
+  };
+  return (
+    <Transcript
+      className="workspace-page-layout external-session"
+      label="conversation"
+      title={title}
+      rows={rows}
+      items={entries.length}
+      renderRow={renderRow}
+      jumpToLatest={false}
+      before={
+        <>
+          {before}
+          {loaded && earlier > 0 && (
+            <p className="external-transcript live-muted">
+              {earlier.toLocaleString()} earlier messages are not shown.
+            </p>
+          )}
+        </>
+      }
+      after={
+        loaded && (
+          <div className="external-transcript">
+            {!entries.length && (
+              <p className="live-muted">This conversation has no messages to show yet.</p>
+            )}
+            {notes?.map((note) => (
+              <p key={note} className="live-muted">
+                {note}
+              </p>
+            ))}
+          </div>
+        )
+      }
+      footer={footer}
+    />
   );
 }
 

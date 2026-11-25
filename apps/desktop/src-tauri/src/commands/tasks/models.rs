@@ -221,6 +221,12 @@ pub struct TaskRun {
     pub pending_tools: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub details_omitted: bool,
+    /// A conversation snapshot left `result` out to bound its size; the full reply has
+    /// `result_chars` characters and is read with `live_session_results`. Never saved.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub result_omitted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_chars: Option<usize>,
     pub activity: Vec<String>,
     #[serde(default)]
     pub diagnostics: Vec<String>,
@@ -591,6 +597,8 @@ impl TaskRun {
             steerable: self.steerable,
             pending_tools: Default::default(),
             details_omitted: true,
+            result_omitted: false,
+            result_chars: None,
             activity: if self.status.is_active() {
                 self.activity
                     .iter()

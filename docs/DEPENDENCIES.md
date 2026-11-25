@@ -111,6 +111,8 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | @tailwindcss/oxide-darwin-arm64 | 4.3.4 | MIT |
 | @tailwindcss/oxide-wasm32-wasi | 4.3.4 | MIT |
 | @tailwindcss/vite | 4.3.4 | MIT |
+| @tanstack/react-virtual | 3.14.28 | MIT |
+| @tanstack/virtual-core | 3.19.13 | MIT |
 | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT |
 | @tauri-apps/cli | 2.12.4 | Apache-2.0 OR MIT |
 | @tauri-apps/cli-darwin-arm64 | 2.12.4 | Apache-2.0 OR MIT |

@@ -1,0 +1,97 @@
+/* A virtualized transcript: the scroller, its find bar and Jump to latest float over it. */
+.transcript {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.transcript-scroll {
+  position: relative;
+  /* Rows above the reading position correct the scroll offset themselves when they
+     measure; the browser's own anchoring would correct it twice. */
+  overflow-anchor: none;
+}
+.transcript-scroll:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.transcript-rows {
+  position: relative;
+  width: 100%;
+}
+/* flow-root keeps each row's margins inside the height it is measured at. */
+.transcript-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flow-root;
+}
+.transcript-row [data-find-current] {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+/* Find highlights are styled per transcript in Transcript.tsx, under names of its own. */
+
+.transcript-find {
+  position: absolute;
+  top: 8px;
+  right: max(16px, (100% - 56rem) / 2);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(26rem, calc(100% - 32px));
+  padding: 4px 4px 4px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-surface);
+  animation: ui-drop-in var(--motion-base) var(--ease-out);
+}
+.transcript-find-field {
+  flex: 1;
+  min-width: 0;
+}
+.transcript-find-field::-webkit-search-cancel-button {
+  appearance: none;
+}
+.transcript-find-count {
+  min-width: 4.5rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.transcript-jump {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 1;
+  gap: 6px;
+  box-shadow: var(--shadow-surface);
+  animation: ui-rise-in var(--motion-base) var(--ease-out);
+}
+.transcript-jump-count {
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .transcript-find,
+  .transcript-jump {
+    animation: none;
+  }
+}
+@media (max-width: 480px) {
+  .transcript-find-count {
+    min-width: 0;
+  }
+}

@@ -157,7 +157,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   suggestions use headings and opening lines; a saved topic can prepare a separate task
   draft without launching it. Original conversations remain intact.
 - Live-session snapshots transfer changed records and preserve unchanged renderer
-  objects. Older replies retain searchable text with formatting on demand. Usage & quota
+  objects. Long conversations render only nearby rows, follow new replies only at the end with Jump to latest, and Mod+F finds text across the whole conversation; the open conversation loads its newest 40 replies over IPC and fetches older ones as they scroll into view, with older runs sent as compact summaries. Usage & quota
   can record and export bounded local UI/native timings without uploading content.
   Installed multi-window acceptance and comparative workflow measurements remain open.
 

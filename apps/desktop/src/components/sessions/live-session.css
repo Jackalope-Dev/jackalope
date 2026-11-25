@@ -907,3 +907,11 @@ html[data-window-glass] .external-continue {
   max-width: 56rem;
   margin: 0 auto 12px;
 }
+
+/* An older reply that failed to load keeps its height and offers Retry. */
+.live-reply-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+}

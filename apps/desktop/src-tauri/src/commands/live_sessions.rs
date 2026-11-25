@@ -237,6 +237,9 @@ pub struct SessionSnapshot {
     pub revisions: Option<std::collections::BTreeMap<String, String>>,
     pub sessions: Vec<LiveSession>,
     pub runs: Vec<TaskRun>,
+    /// Runs outside a windowed snapshot's window, trimmed; see `changes::window_runs`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub compact_runs: Vec<serde_json::Value>,
     pub error: Option<String>,
 }
 
@@ -386,6 +389,7 @@ impl LiveSessions {
             revisions: None,
             sessions,
             runs,
+            compact_runs: Vec::new(),
             error,
         })
     }
@@ -1544,6 +1548,8 @@ macro_rules! tauri_commands {
     ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
         $next!($finish [$($done)*
             commands::live_sessions::live_session_snapshot,
+            commands::live_sessions::live_session_results,
+            commands::live_sessions::live_session_search,
             commands::live_sessions::live_session_create,
             commands::live_sessions::live_session_send,
             commands::live_sessions::live_session_steer,
@@ -1560,19 +1566,70 @@ macro_rules! tauri_commands {
 }
 pub(crate) use tauri_commands;
 
+/// `replies` bounds the snapshot: the focused conversation keeps its newest replies whole,
+/// older ones arrive with `resultOmitted` (read them with `live_session_results`), and
+/// runs outside the window arrive trimmed in `compactRuns`. Callers that leave it out
+/// receive every run and reply in full, as before.
 #[tauri::command]
 pub async fn live_session_snapshot(
     service: State<'_, LiveSessions>,
     id: Option<String>,
     known: Option<std::collections::BTreeMap<String, String>>,
+    replies: Option<usize>,
 ) -> Result<SessionSnapshot, String> {
     let service = service.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let snapshot = service.snapshot(id.as_deref())?;
+        let mut snapshot = service.snapshot(id.as_deref())?;
+        if let Some(replies) = replies {
+            snapshot = changes::window_runs(
+                snapshot,
+                id.as_deref(),
+                replies.min(changes::MAX_WINDOW_REPLIES),
+            )?;
+        }
         match known {
             Some(known) => changes::changed_snapshot(snapshot, &known),
             None => Ok(snapshot),
         }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Reply text left out of a windowed snapshot, in the order asked, up to a page.
+#[tauri::command]
+pub async fn live_session_results(
+    service: State<'_, LiveSessions>,
+    id: String,
+    run_ids: Vec<String>,
+) -> Result<Vec<changes::SessionReply>, String> {
+    if run_ids.len() > changes::REPLY_PAGE_RUNS {
+        return Err("Too many replies requested at once.".into());
+    }
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let runs = service.runtime.live_session_runs(Some(&id))?;
+        Ok(changes::reply_page(&runs, &id, &run_ids))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Occurrences of `query` in each reply of a conversation, for find across replies the
+/// renderer has not loaded.
+#[tauri::command]
+pub async fn live_session_search(
+    service: State<'_, LiveSessions>,
+    id: String,
+    query: String,
+) -> Result<std::collections::BTreeMap<String, usize>, String> {
+    if query.chars().count() > 500 {
+        return Err("Search for at most 500 characters.".into());
+    }
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let runs = service.runtime.live_session_runs(Some(&id))?;
+        Ok(changes::search_replies(&runs, &id, &query))
     })
     .await
     .map_err(|e| e.to_string())?
