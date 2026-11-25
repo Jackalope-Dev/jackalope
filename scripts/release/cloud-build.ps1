@@ -15,11 +15,22 @@ try {
     $env:RELEASE_CHANNEL = $Channel
     $env:CLOUD_PACKAGE_DIRECTORY = Join-Path $root ('output/cloud/' + [guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Force $env:CLOUD_PACKAGE_DIRECTORY | Out-Null
+    # Candidates are Azure-signed unless the release plan chose an installer
+    # without Authenticode, which also needs the explicit repository opt-in.
+    $signing = if ($env:CLOUD_WINDOWS_SIGNING) { $env:CLOUD_WINDOWS_SIGNING } else { 'azure' }
+    if ($signing -cnotin @('azure','unsigned')) { throw 'Unknown Windows signing mode.' }
     if ($Mode -eq 'candidate') {
         $pending = git status --porcelain --untracked-files=normal
         if ($LASTEXITCODE -ne 0 -or $pending) { throw 'A signed candidate requires a clean, committed checkout.' }
-        if ($env:CLOUD_SIGNING_READY -ne 'true') { throw 'Configure Azure signing before building a candidate.' }
-        foreach ($name in @('TAURI_SIGNING_PRIVATE_KEY','TAURI_UPDATER_PUBLIC_KEY','AZURE_SIGNING_DLIB','AZURE_SIGNING_ENDPOINT','AZURE_SIGNING_ACCOUNT','AZURE_SIGNING_PROFILE')) {
+        $required = @('TAURI_SIGNING_PRIVATE_KEY','TAURI_UPDATER_PUBLIC_KEY')
+        if ($signing -eq 'azure') {
+            if ($env:CLOUD_SIGNING_READY -ne 'true') { throw 'Configure Azure signing before building a candidate.' }
+            $required += @('AZURE_SIGNING_DLIB','AZURE_SIGNING_ENDPOINT','AZURE_SIGNING_ACCOUNT','AZURE_SIGNING_PROFILE')
+        } else {
+            if ($env:CLOUD_SIGNING_READY -eq 'true') { throw 'Azure signing is configured; build a signed candidate.' }
+            if ($env:WINDOWS_AUTHENTICODE -cne 'unsigned') { throw 'Set WINDOWS_AUTHENTICODE=unsigned to build an installer without Authenticode.' }
+        }
+        foreach ($name in $required) {
             if (![Environment]::GetEnvironmentVariable($name)) { throw "Missing candidate input: $name" }
         }
     } else {
@@ -30,6 +41,7 @@ try {
         $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
         $env:TAURI_UPDATER_PUBLIC_KEY = (Get-Content -LiteralPath ($temporaryKey + '.pub') -Raw).Trim()
     }
+    $env:CLOUD_WINDOWS_SIGNING = $signing
     Invoke-Checked { node scripts/release/cloud-artifacts.mjs config }
     $configPath = Join-Path $env:CLOUD_PACKAGE_DIRECTORY 'tauri.cloud.json'
     $buildArgs = @('--features','beta-access','--config',$configPath,'--bundles','nsis')
@@ -42,9 +54,14 @@ try {
     $installer = Join-Path $target "$profile/bundle/nsis/${name}_${version}_x64-setup.exe"
     $binaryName = if ($Mode -eq 'rehearsal') { 'jackalope-rehearsal.exe' } else { 'jackalope-desktop.exe' }
     $binary = Join-Path $target "$profile/$binaryName"
-    if ($Mode -eq 'candidate') {
+    if ($Mode -eq 'candidate' -and $signing -eq 'azure') {
         & "$PSScriptRoot/azure-sign.ps1" -File $binary -VerifyOnly
         & "$PSScriptRoot/azure-sign.ps1" -File $installer -VerifyOnly
+    } elseif ($Mode -eq 'candidate') {
+        # The receipt records this installer as unsigned; keep that claim true.
+        foreach ($file in @($binary, $installer)) {
+            if ((Get-AuthenticodeSignature -LiteralPath $file).Status -ne 'NotSigned') { throw "Expected no Authenticode signature: $file" }
+        }
     }
     Copy-Item -LiteralPath $installer, ($installer + '.sig') -Destination $env:CLOUD_PACKAGE_DIRECTORY
     $env:CLOUD_NATIVE_BINARY = $binary

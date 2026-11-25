@@ -3,7 +3,8 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { CLOUD_TARGETS, MICROSOFT_STORE_URL } from '../../packages/contracts/src/release.ts';
 import { compare, root, sha256 } from './catalog.mjs';
-import { collectCandidates, releaseTargets } from './cloud-publish.mjs';
+import { authenticodeInstallers, collectCandidates, releaseTargets } from './cloud-publish.mjs';
+import { windowsSigning } from './crabnebula-config.mjs';
 
 /**
  * Mirrors a published stable Cloud release to a public GitHub Release. It
@@ -19,12 +20,15 @@ const labels = {
   [CLOUD_TARGETS['windows-x86_64'].cdnPlatform]: 'Windows x64 installer',
 };
 const marker = (digest) => `<!-- jackalope-github-release:${digest} -->`;
+export const unsignedWindowsNotice =
+  'The Windows installer is not code-signed yet, so Windows SmartScreen may warn when you open it. Choose **More info**, then **Run anyway**. You can check the download against `SHA256SUMS` first. Updates installed from inside the app are still verified with the Jackalope update signature.';
 
 /** The GitHub Release for a verified Cloud plan: its tag, notes and attached files. */
 export async function githubRelease(plan) {
   if (plan.channel !== 'stable') throw new Error('GitHub Releases mirror stable publications only');
   const installers = plan.assets.filter((asset) => labels[asset.publicPlatform]);
   if (!installers.length) throw new Error('The publication has no installers to mirror');
+  const unsigned = installers.some((asset) => asset.authenticode === 'unsigned');
   const files = [];
   for (const asset of installers.sort((a, b) => a.name.localeCompare(b.name)))
     files.push({
@@ -32,7 +36,10 @@ export async function githubRelease(plan) {
       path: asset.path,
       sha256: asset.sha256,
       size: (await stat(asset.path)).size,
-      label: labels[asset.publicPlatform],
+      label:
+        asset.authenticode === 'unsigned'
+          ? `${labels[asset.publicPlatform]} (not code-signed)`
+          : labels[asset.publicPlatform],
     });
   const sums = Buffer.from(files.map((file) => `${file.sha256}  ${file.name}\n`).join(''));
   files.push({ name: 'SHA256SUMS', content: sums, sha256: sha256(sums), size: sums.length });
@@ -44,7 +51,8 @@ export async function githubRelease(plan) {
     plan.notes.trim(),
     '## Downloads',
     downloads.join('\n'),
-    'These are the same signed files published to the Jackalope download service. `SHA256SUMS` lists their SHA-256 checksums.',
+    ...(unsigned ? [unsignedWindowsNotice] : []),
+    `These are the same ${unsigned ? '' : 'signed '}files published to the Jackalope download service. \`SHA256SUMS\` lists their SHA-256 checksums.`,
     marker(plan.digest),
   ].join('\n\n');
   return {
@@ -238,13 +246,15 @@ if (import.meta.main) {
     source: published.source,
     channel: process.env.RELEASE_CHANNEL,
     publicKey: process.env.TAURI_UPDATER_PUBLIC_KEY,
+    allowUnsignedWindows: windowsSigning(process.env) === 'unsigned',
   });
   if (plan.digest !== published.digest)
     throw new Error('Candidates differ from the confirmed Cloud publication');
   const release = await githubRelease(plan);
-  // Fail closed: only an installer carrying a valid, timestamped Jackalope
-  // Digital LLC Authenticode signature from the Azure signing path is attached.
-  for (const asset of release.assets.filter((item) => item.name.endsWith('.exe')))
+  // Fail closed: a Windows installer is attached only with a valid, timestamped
+  // Jackalope Digital LLC Authenticode signature, unless the publication was
+  // collected under the explicit WINDOWS_AUTHENTICODE=unsigned opt-in.
+  for (const asset of authenticodeInstallers(plan.assets))
     execFileSync(
       'pwsh',
       [

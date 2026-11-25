@@ -52,6 +52,8 @@ jobs:
           CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
           CLOUD_ACCEPTED_TARGETS: ${{ vars.CLOUD_ACCEPTED_TARGETS }}
           CLOUD_BETA_TEST_TARGETS: ${{ vars.CLOUD_BETA_TEST_TARGETS }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
         run: node scripts/release/cloud-publish.mjs output/cloud-candidates publish
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -95,5 +97,7 @@ jobs:
       - name: Mirror the stable release to GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
         run: node scripts/release/github-release.mjs output/cloud-candidates output/cloud-publication

@@ -25,14 +25,35 @@ export function clearAppleSigning(environment) {
     delete environment[name];
 }
 
+/**
+ * How a candidate's Windows installer is Authenticode-signed. Azure Artifact
+ * Signing wins whenever CLOUD_SIGNING_READY is set; otherwise the installer
+ * ships without Authenticode only with the explicit WINDOWS_AUTHENTICODE=unsigned
+ * opt-in. Null means Windows candidates cannot be built. Either way the Tauri
+ * updater signature is still required.
+ */
+export function windowsSigning({ CLOUD_SIGNING_READY, WINDOWS_AUTHENTICODE } = {}) {
+  if (CLOUD_SIGNING_READY === 'true') return 'azure';
+  return WINDOWS_AUTHENTICODE === 'unsigned' ? 'unsigned' : null;
+}
+
 export function cloudEndpoint(channel) {
   if (!isReleaseChannel(channel)) throw new Error('Unknown release channel');
   return cloudUpdateEndpoint(channel);
 }
 
-export function cloudConfig({ mode, channel, publicKey, signScript, target = 'windows-x86_64' }) {
+export function cloudConfig({
+  mode,
+  channel,
+  publicKey,
+  signScript,
+  target = 'windows-x86_64',
+  authenticode = 'azure',
+}) {
   if (!isCloudTarget(target)) throw new Error('Unsupported Cloud target');
   if (!['rehearsal', 'candidate'].includes(mode)) throw new Error('Unknown build mode');
+  if (!['azure', 'unsigned'].includes(authenticode))
+    throw new Error('Unknown Windows signing mode');
   if (!publicKey || !/^[A-Za-z0-9+/]+={0,2}$/.test(publicKey))
     throw new Error('A valid updater public key is required');
   const preview = mode === 'rehearsal';
@@ -61,7 +82,7 @@ export function cloudConfig({ mode, channel, publicKey, signScript, target = 'wi
       }),
     },
   };
-  if (!preview && target === 'windows-x86_64') {
+  if (!preview && target === 'windows-x86_64' && authenticode === 'azure') {
     if (!signScript || /["\r\n]/.test(signScript)) throw new Error('Invalid signing script path');
     config.bundle.windows = {
       signCommand: {
