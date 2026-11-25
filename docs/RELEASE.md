@@ -21,7 +21,7 @@ This guide covers Windows x64 NSIS and MSI distribution. Use
 Prepare reviewable artifacts before publication. Protect signing and publication
 credentials separately from pull-request verification.
 
-Keep published `beta-v*` and `stable-v*` tags fixed to their reviewed source.
+Keep published `beta-v*`, `stable-v*` and GitHub Release `v*` tags fixed to their reviewed source.
 Source corrections require a new version and tag; do not move or delete release tags.
 
 | Area | Current implementation | Still required |

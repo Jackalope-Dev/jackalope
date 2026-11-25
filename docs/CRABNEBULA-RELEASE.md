@@ -1,7 +1,8 @@
 # Cloud signing and release setup
 
-Windows releases use [Microsoft Store](STORE-RELEASE.md); Azure signing is needed
-only when separately enabling direct EXE distribution. Cloud handles macOS/Linux.
+Windows releases use [Microsoft Store](STORE-RELEASE.md). Cloud handles macOS/Linux,
+and the direct Windows EXE when `windows-x86_64` is added to the Cloud targets.
+Azure signing is needed only for that EXE.
 
 Use [release automation](RELEASE-AUTOMATION.md) for branches, versions, workflow
 selection, publication and recovery. This guide covers the external signing inputs

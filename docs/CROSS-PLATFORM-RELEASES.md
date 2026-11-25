@@ -13,12 +13,78 @@ publishing a channel, with signing, source-check and installed-acceptance gates.
 Native signed builds and installed upgrades still need platform acceptance.
 The [Store path](STORE-RELEASE.md) provides
 MSIX packaging, branch-based submission and Store-backed in-app update controls
-as the primary Windows channel. Cloud targets are macOS and Linux; direct EXE
-distribution is optional and requires separate publisher signing.
+as the primary Windows channel. Cloud also publishes the
+[direct Windows installer](#direct-windows-installer), which requires separate
+publisher signing.
 
 Accept the exact candidate's clean installation, real execution, account lifecycle,
 saved-data recovery and older-to-newer update before distribution. An MSIX build
 does not prove certification; an ephemeral updater signature does not prove publisher trust.
+
+## GitHub Releases mirror
+
+Each stable Cloud publication is mirrored to a public GitHub Release tagged
+`vVERSION` at the published source commit. The `github-release` job runs after
+the publication job succeeds in **Cloud release** (stable, `publish` mode,
+including automatic runs) and in **Publish Cloud candidate** (from stable). Beta,
+rehearsal, candidate and draft runs never create a GitHub Release.
+
+The release attaches every installer the Cloud publication contains (the macOS
+Apple silicon and Intel DMGs, the Linux x64 AppImage and, once enabled, the Windows
+x64 NSIS installer) plus a `SHA256SUMS` file. Its notes are the version's
+`releases/VERSION.md` notes, the same text Cloud and the in-app update notes show,
+followed by a download list that also links the Microsoft Store build.
+
+The job reuses the run's candidate artifacts and never builds or signs. It reads
+`cloud-release.json` from the publication job and requires the candidates' digest
+to match the confirmed Cloud publication, so the attached bytes are the bytes Cloud
+serves. A Windows installer is attached only with a valid, timestamped Jackalope
+Digital LLC Authenticode signature (`azure-sign.ps1 -VerifyOnly`); otherwise the
+job fails. The job has no environment secrets, and its token can only write
+repository contents (plus read Actions artifacts when promoting a candidate run).
+
+Retries are safe. A new release stays a draft until every file is uploaded and its
+size and SHA-256 digest match, and a retry resumes that draft. A published release
+that already matches is left unchanged. A `vVERSION` tag at another commit, a
+release without this publication's marker, or changed, missing or extra files stop
+the job for an operator; it never overwrites or deletes a published release. Rerun
+only the failed `github-release` job. `pnpm release:setup --apply` protects `v*`
+tags from being moved or deleted.
+
+## Direct Windows installer
+
+Windows ships through Microsoft Store and, alongside it, as the Azure-signed NSIS
+installer published through Cloud like macOS and Linux. The Tauri updater in the
+EXE receives updates from the Cloud feed, and the GitHub Release mirror attaches
+the installer. The release configuration lists all four Cloud targets:
+
+```json
+["darwin-aarch64","darwin-x86_64","linux-x86_64","windows-x86_64"]
+```
+
+Set that array in `CLOUD_RELEASE_TARGETS` and `CLOUD_ACCEPTED_TARGETS`, and set
+`CLOUD_SIGNING_READY=true` only after [Azure signing setup](CRABNEBULA-RELEASE.md#optional-direct-windows-signing).
+Planning fails before any build when Windows is selected without signing, and the
+build, Cloud publication and GitHub mirror each reject an installer without a valid
+Jackalope Digital LLC signature; an unsigned EXE is never published. The website
+download page stays Store-first.
+
+The EXE runs the same app code as the Store MSIX, so Store acceptance covers
+accounts, secure storage and agent behavior. After each stable release that
+changes Windows packaging, and after the first one with the installer, check
+only what differs:
+
+1. Clean install on a fresh Windows 11 VM. `Get-AuthenticodeSignature` reports
+   `Valid` with signer Jackalope Digital LLC and a timestamp for the installer and
+   the installed `jackalope-desktop.exe`. Record the SmartScreen result for the
+   download and first launch.
+2. Run a real task with one installed agent.
+3. Update in place from the previous version: choose **Check for updates**, then
+   **Restart to update**, and confirm the new version and saved work. The update
+   must come from the Cloud stable feed through the Tauri updater.
+4. Uninstall, and confirm the app, shortcuts and processes are gone.
+5. Install alongside the Store build. Confirm both launch, each updates only
+   through its own channel, and neither removes or overwrites the other.
 
 ## Platform acceptance
 
