@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::{path::Path, process::Command, time::Duration};
 
 pub(super) const TIMEOUT: Duration = Duration::from_secs(60);
+#[cfg(test)]
 pub(super) const BOOT_TIMEOUT: Duration = Duration::from_secs(300);
 /// The longest side of a Screen view frame, in pixels.
 pub(super) const VIEW_SIZE: u32 = 1000;
@@ -27,6 +28,7 @@ fn simctl(args: &[&str]) -> Simctl {
     }
 }
 
+#[cfg(test)]
 pub(super) fn bootstatus(udid: &str) -> Simctl {
     simctl(&["bootstatus", udid, "-b"])
 }
@@ -203,6 +205,7 @@ pub(super) fn run(command: &Simctl, timeout: Duration) -> Result<String, String>
 }
 
 /// A simulator as `simctl list devices` reports it.
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Device {
     pub udid: String,
@@ -210,13 +213,10 @@ pub(super) struct Device {
     pub booted: bool,
 }
 
+#[cfg(test)]
 pub(super) fn devices() -> Result<Vec<Device>, String> {
     let output = run(&simctl(&["list", "devices", "--json"]), TIMEOUT)?;
-    parse_devices(&output)
-}
-
-pub(super) fn parse_devices(json: &str) -> Result<Vec<Device>, String> {
-    let value: Value = serde_json::from_str(json).map_err(|error| error.to_string())?;
+    let value: Value = serde_json::from_str(&output).map_err(|error| error.to_string())?;
     Ok(value["devices"]
         .as_object()
         .into_iter()

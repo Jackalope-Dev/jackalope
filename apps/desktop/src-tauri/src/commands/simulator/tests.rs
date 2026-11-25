@@ -478,9 +478,6 @@ fn the_driver_source_ships_a_generated_project() {
 
 #[test]
 fn simctl_output_parses() {
-    let devices = simctl::parse_devices(r#"{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-27-2":[{"udid":"A","name":"iPhone 17","state":"Booted"},{"udid":"B","name":"iPad","state":"Shutdown"}]}}"#).unwrap();
-    assert_eq!(devices.len(), 2);
-    assert!(devices[0].booted && !devices[1].booted);
     let apps = parse_apps(&json!({
         "com.apple.Preferences": {"ApplicationType": "System", "CFBundleDisplayName": "Settings"},
         "com.example.App": {"ApplicationType": "User", "CFBundleName": "Demo"},

@@ -689,7 +689,7 @@ fn listed(service: &Coordinator, run: &TaskRun) -> Vec<&'static Tool> {
         .iter()
         .filter(|tool| tool.supported() && !access.tool_unavailable(tool.name))
         .filter(|tool| match tool.offer {
-            Offer::Always | Offer::Platform | Offer::Xcode => true,
+            Offer::Always | Offer::Platform => true,
             Offer::Bots => is_bot(run),
             Offer::AgentQuestions => {
                 super::decisions::agent_questions::available(&service.runtime, &run.project_id)

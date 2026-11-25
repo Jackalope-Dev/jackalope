@@ -186,6 +186,12 @@ comparisons with Keep and combine, plan questions limited to preferences, per-at
 catch-up, Sharpen, lesson-to-check enforcement and a feature map for review captures are
 implemented. Real-agent behavior and installed-app acceptance remain open.
 
+iOS projects on a Mac get the resolved Xcode toolchain, detected setup and checks, a
+Simulator per task with agent tools that read and drive the app, reused Swift packages and
+Pods, structured `project.pbxproj` merges, attached physical devices, TestFlight uploads the
+person confirms and Mac computers. Installed-app, physical-device and TestFlight acceptance
+remain open. See [iOS development](IOS-DEVELOPMENT.md).
+
 Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
 existing projects, with pushes and expiring review snapshots. Live account and installed
 acceptance remain open.

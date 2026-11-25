@@ -7,6 +7,20 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept iOS development end to end in the installed app: an agent task on an iOS project
+  with its own Simulator (guidance, background boot, idle shutdown), the simulator tools and
+  Screen view, the Simulator preview and review captures, the base-device and time-limit
+  settings, a physical iPhone with a signed team build (`device_app`, `device_logs`, Run on
+  device), a real TestFlight upload through processing, and a Mac computer installed as a
+  LaunchAgent behind Tailscale HTTPS running real Claude Code and Codex tasks.
+- [ ] Decide how command-line builds pass Xcode's Swift macro trust check (a documented setup
+  step or an opt-in `-skipMacroValidation`), and snapshot Swift packages that use local
+  package references.
+- [ ] Give agents on a computer a Simulator and the simulator tools on a Mac computer, and send
+  file secrets to computers.
+- [ ] Merge `.xcscheme` and `Package.resolved` structurally, and use one Xcode project detector
+  for simulator tools, devices, TestFlight and host placement.
+
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
   credentials, generic notification text), signed device builds and CI builds for both

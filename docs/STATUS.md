@@ -730,6 +730,22 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Browse is marked Coming later. See [settings sync](SETTINGS-SYNC.md#skills).
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
+- iOS projects on a Mac ([iOS development](IOS-DEVELOPMENT.md)): Jackalope resolves an
+  installed Xcode when `xcode-select` names the Command Line Tools and gives it to agents,
+  setup, checks, previews and terminals. Project setup recognises Xcode workspaces and
+  projects, XcodeGen, Tuist, CocoaPods and Swift packages and suggests setup and
+  `xcodebuild test` on the task's Simulator. Each iOS task workspace gets its own headless
+  Simulator (reused by follow-ups, a bounded pool, shut down when idle and deleted with the
+  workspace; only devices Jackalope created are touched). Agents read and drive apps there
+  with `simulator_*` tools through a bundled XCUITest driver, and the Screen view shows the
+  device. New worktrees reuse CocoaPods, Carthage and resolved Swift packages as
+  copy-on-write clones, and projects can lengthen setup and check time limits.
+  `project.pbxproj` files merge object by object, so concurrent file, target and package
+  additions do not conflict. A person can attach a paired iPhone or iPad to a conversation
+  for `device_app` and `device_logs` and Run on device, upload a task's app to TestFlight
+  with a project App Store Connect key after confirming the build, and pair a Mac they own
+  as a computer that iOS work is placed on. Project secrets can be files given to local
+  agents as private per-attempt paths.
 
 ## Services and distribution
 
@@ -882,6 +898,14 @@ key chords. The cross-app drag, badge and background control have unit and
 browser-fixture coverage, plus an opt-in macOS native trial of background input; the
 Windows background path has no native run yet. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
+
+iOS support has unit coverage and opt-in native tests that create, boot, drive and delete
+real Simulators, archive a generic iOS build and merge real XcodeGen projects; no agent task
+has run it end to end in the installed app. Install, launch and console capture on a
+physical device, signed device builds, a TestFlight upload and App Store Connect
+processing, a LaunchAgent-installed Mac computer behind HTTPS, simulators for agents on a
+computer and command-line builds of packages with Swift macros (Xcode's macro trust check)
+are unverified or unsupported. Mac computers have no desktop control or browser tools.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
 viewer or cloud machine has been accepted in an installed app on any platform. A bot's
