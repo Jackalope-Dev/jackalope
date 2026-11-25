@@ -458,7 +458,7 @@ pub(super) fn parse_response(response: &[u8]) -> Result<(u16, Value), String> {
 
 /// The lines of `xcodebuild` output worth showing: its error lines, or else
 /// the last lines.
-pub(super) fn failure_tail(output: &str) -> String {
+pub(crate) fn failure_tail(output: &str) -> String {
     let errors: Vec<&str> = output
         .lines()
         .map(str::trim)

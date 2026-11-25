@@ -209,7 +209,7 @@ pub struct LogsRequest {
 
 // MARK: Validation
 
-pub(super) fn bundle_id(value: Option<&str>) -> Result<&str, String> {
+pub(crate) fn bundle_id(value: Option<&str>) -> Result<&str, String> {
     let value = value
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -248,7 +248,7 @@ fn environment(env: &BTreeMap<String, String>) -> Result<Vec<(String, String)>, 
         .collect()
 }
 
-fn url(value: Option<&str>) -> Result<&str, String> {
+pub(crate) fn url(value: Option<&str>) -> Result<&str, String> {
     let value = value
         .map(str::trim)
         .filter(|value| !value.is_empty())

@@ -48,6 +48,11 @@ export interface ProjectPreferences {
   worktreeDir?: string;
   verifyCommand?: string;
   previewCommand?: string;
+  /**
+   * Builds an iOS app for its Simulator preview and review screenshots, into
+   * `$JACKALOPE_DERIVED_DATA`. Undefined uses the detected `xcodebuild build`.
+   */
+  simulatorPreview?: string;
   prepareCommand?: string;
   /** Apple team ID that device builds sign with (`DEVELOPMENT_TEAM`). */
   developmentTeam?: string;
@@ -83,7 +88,10 @@ export interface ProjectPreferences {
   personalClaudeSetup?: boolean;
   /** Fast command Claude Code runs after each file edit; `{file}` is the edited path. */
   editCheck?: string;
-  /** Before/after screenshots of finished work from the preview command. Undefined means on. */
+  /**
+   * Before/after screenshots of finished work, from the preview command or, for an iOS
+   * app, the Simulator. Undefined means on.
+   */
   reviewCaptures?: boolean;
   /** Preview paths always captured for review, one per entry. Empty means `/`. */
   reviewPages?: string[];
@@ -387,6 +395,7 @@ interface ProjectRecord {
   timeLimits?: ProjectTimeLimits;
   setupFiles?: string[];
   previewCommand?: string;
+  simulatorPreview?: string;
   developmentTeam?: string;
   reviewCaptures?: boolean;
   reviewPages?: string[];
@@ -437,6 +446,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     timeLimits: preferences?.timeLimits,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
     previewCommand: preferences?.previewCommand?.trim() || undefined,
+    simulatorPreview: preferences?.simulatorPreview?.trim() || undefined,
     developmentTeam: preferences?.developmentTeam?.trim() || undefined,
     reviewCaptures: preferences?.reviewCaptures,
     reviewPages: reviewPagesForRegistry(preferences?.reviewPages),

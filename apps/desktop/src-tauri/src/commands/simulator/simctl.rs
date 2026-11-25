@@ -5,14 +5,14 @@ use super::super::{process_control, xcode};
 use serde_json::Value;
 use std::{path::Path, process::Command, time::Duration};
 
-pub(super) const TIMEOUT: Duration = Duration::from_secs(60);
+pub(crate) const TIMEOUT: Duration = Duration::from_secs(60);
 pub(super) const BOOT_TIMEOUT: Duration = Duration::from_secs(300);
 /// The longest side of a Screen view frame, in pixels.
-pub(super) const VIEW_SIZE: u32 = 1000;
+pub(crate) const VIEW_SIZE: u32 = 1000;
 
 /// One `xcrun simctl` invocation.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(super) struct Simctl {
+pub(crate) struct Simctl {
     pub args: Vec<String>,
     /// Extra environment, such as `SIMCTL_CHILD_` variables for a launch.
     pub env: Vec<(String, String)>,
@@ -31,7 +31,7 @@ pub(super) fn bootstatus(udid: &str) -> Simctl {
     simctl(&["bootstatus", udid, "-b"])
 }
 
-pub(super) fn install(udid: &str, app: &Path) -> Simctl {
+pub(crate) fn install(udid: &str, app: &Path) -> Simctl {
     simctl(&["install", udid, &app.to_string_lossy()])
 }
 
@@ -39,7 +39,7 @@ pub(super) fn uninstall(udid: &str, bundle: &str) -> Simctl {
     simctl(&["uninstall", udid, bundle])
 }
 
-pub(super) fn launch(
+pub(crate) fn launch(
     udid: &str,
     bundle: &str,
     args: &[String],
@@ -54,11 +54,11 @@ pub(super) fn launch(
     command
 }
 
-pub(super) fn terminate(udid: &str, bundle: &str) -> Simctl {
+pub(crate) fn terminate(udid: &str, bundle: &str) -> Simctl {
     simctl(&["terminate", udid, bundle])
 }
 
-pub(super) fn open_url(udid: &str, url: &str) -> Simctl {
+pub(crate) fn open_url(udid: &str, url: &str) -> Simctl {
     simctl(&["openurl", udid, url])
 }
 
@@ -70,7 +70,7 @@ pub(super) fn app_container(udid: &str, bundle: &str) -> Simctl {
     simctl(&["get_app_container", udid, bundle, "app"])
 }
 
-pub(super) fn ui(udid: &str, option: &str, value: &str) -> Simctl {
+pub(crate) fn ui(udid: &str, option: &str, value: &str) -> Simctl {
     simctl(&["ui", udid, option, value])
 }
 
@@ -91,7 +91,7 @@ pub(super) fn privacy(udid: &str, action: &str, service: &str, bundle: Option<&s
 
 /// A status bar with a fixed time, full signal and a charged battery, for
 /// screenshots that do not change from run to run.
-pub(super) fn clean_status_bar(udid: &str) -> Simctl {
+pub(crate) fn clean_status_bar(udid: &str) -> Simctl {
     simctl(&[
         "status_bar",
         udid,
@@ -115,7 +115,7 @@ pub(super) fn clean_status_bar(udid: &str) -> Simctl {
     ])
 }
 
-pub(super) fn clear_status_bar(udid: &str) -> Simctl {
+pub(crate) fn clear_status_bar(udid: &str) -> Simctl {
     simctl(&["status_bar", udid, "clear"])
 }
 
@@ -172,7 +172,7 @@ pub(super) fn log_show(udid: &str, process: &str, seconds: u32, level: &str) -> 
 
 /// Runs `command` against the resolved Xcode and returns its output, or the
 /// tool's own error text.
-pub(super) fn run(command: &Simctl, timeout: Duration) -> Result<String, String> {
+pub(crate) fn run(command: &Simctl, timeout: Duration) -> Result<String, String> {
     let mut process = xcode::xcrun("simctl");
     process.args(&command.args);
     for (name, value) in &command.env {
@@ -234,7 +234,7 @@ pub(super) fn parse_devices(json: &str) -> Result<Vec<Device>, String> {
 }
 
 /// A PNG of the screen, scaled so its longest side is at most `longest`.
-pub(super) fn capture(udid: &str, longest: Option<u32>) -> Result<Vec<u8>, String> {
+pub(crate) fn capture(udid: &str, longest: Option<u32>) -> Result<Vec<u8>, String> {
     let file =
         std::env::temp_dir().join(format!("jackalope-simulator-{}.png", uuid::Uuid::new_v4()));
     let taken = run(&screenshot(udid, &file), TIMEOUT).and_then(|_| match longest {
@@ -247,7 +247,7 @@ pub(super) fn capture(udid: &str, longest: Option<u32>) -> Result<Vec<u8>, Strin
 }
 
 /// Scales a PNG in place with `sips`, which ships with macOS.
-pub(super) fn scale(file: &Path, longest: u32) -> Result<(), String> {
+pub(crate) fn scale(file: &Path, longest: u32) -> Result<(), String> {
     let mut command = Command::new("/usr/bin/sips");
     command
         .arg("-Z")
@@ -267,7 +267,7 @@ pub(super) fn scale(file: &Path, longest: u32) -> Result<(), String> {
 }
 
 /// Reads one string key from a property list file with `plutil`.
-pub(super) fn plist_value(file: &Path, key: &str) -> Result<String, String> {
+pub(crate) fn plist_value(file: &Path, key: &str) -> Result<String, String> {
     let mut command = Command::new("/usr/bin/plutil");
     command.args(["-extract", key, "raw", "-o", "-"]).arg(file);
     let result = process_control::run(command, Duration::from_secs(10))?;

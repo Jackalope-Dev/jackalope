@@ -1,0 +1,85 @@
+.simulator-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.simulator-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.simulator-preview-toolbar .themed-select {
+  min-width: 10rem;
+}
+
+.simulator-preview-stage {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+}
+
+.simulator-preview-screen {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.simulator-preview-screen[data-selecting] {
+  cursor: crosshair;
+}
+
+.simulator-preview-screen[data-busy] {
+  cursor: progress;
+}
+
+.simulator-preview-screen img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: min(70vh, 760px);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.simulator-preview-highlight {
+  position: absolute;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-subtle);
+  pointer-events: none;
+}
+
+.simulator-preview-empty {
+  margin: 0;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.simulator-preview-forms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.simulator-preview-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .simulator-preview-forms {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

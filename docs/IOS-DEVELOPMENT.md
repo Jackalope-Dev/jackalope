@@ -74,7 +74,8 @@ When a device is assigned:
   in an iOS project. A JavaScript check in a React Native app gets none.
 - A check in a disposable worktree (combined checks before merging, challenge reruns)
   gets a temporary device that is deleted with it.
-- Previews and task terminals receive an already assigned device; they never create one.
+- Web previews and task terminals receive an already assigned device; they never create
+  one. **Run in Simulator** and Simulator review captures create and boot it.
 
 Processes receive `JACKALOPE_SIMULATOR_UDID` and `JACKALOPE_SIMULATOR_NAME`. When a
 device cannot be had, the reason is recorded in the task's activity (or prefixed to a
@@ -212,7 +213,170 @@ Xcode and an iOS runtime.
 
 ## Simulator previews and review captures
 
-<!-- section: simulator-preview -->
+A task's Preview tab runs an iOS app in the task's own Simulator, and finished work gets
+review screenshots from the Simulator, the way web projects use a preview command and
+the [browser](BROWSER-AUTOMATION.md#review-screenshots). Native code lives in
+`commands/previews/simulator.rs` (the preview kind) and `commands/previews/review/ios.rs`
+(captures); the renderer in `SimulatorPreview.tsx`.
+
+### Run in Simulator
+
+`simulator_preview_target(path)` reports whether a folder is an iOS app: an Xcode
+workspace or project that [targets iOS](#xcode-toolchain-and-project-detection) in the
+folder or its `ios` folder. Swift packages have no app and keep the web preview. For an
+iOS app the Preview tab offers **Run in Simulator** instead of the command and port form;
+a project that also saves a web preview command chooses between **iOS Simulator** and
+**Web** above the panel, and a preview already running opens its own kind.
+
+`task_preview_simulator_start` then, in the background:
+
+1. Takes the task's Simulator with `simulators::ensure`, creating and booting it within
+   the pool like an agent would (web previews and terminals only receive an assigned one).
+2. Builds with the resolved Xcode:
+   `xcodebuild build -workspace|-project <path> -scheme <scheme> -destination id=<udid> -derivedDataPath <workspace>/.jackalope/DerivedData`,
+   with the scheme from project detection. An owned process tree, stopped after 30
+   minutes or 10 silent minutes, or by Stop or Rebuild. The newest 64,000 characters of
+   output are the **Build log**, and a failure shows `xcodebuild`'s error lines.
+3. Finds the app in `-showBuildSettings -json` (the application target's
+   `TARGET_BUILD_DIR/WRAPPER_NAME` for `iphonesimulator`), else the newest `.app` in
+   `Build/Products/*-iphonesimulator` (test runners skipped).
+4. Installs it with `simctl install`, reads `CFBundleIdentifier` and launches it with
+   `simctl launch --terminate-running-process`.
+5. Starts the [driver](#driver) for taps and typing (under a minute the first time,
+   about 40 seconds on a fresh device) and brings the app back in front of the driver's
+   runner. The status line says when input is ready; a driver that fails leaves the
+   screen and device settings working and says why.
+
+Project settings → Commands → iOS Simulator → **Simulator preview build**
+(`simulatorPreview`, mirrored to the native project ledger) replaces step 2 with a
+command run through `/bin/sh` in the workspace, with `JACKALOPE_SIMULATOR_UDID`,
+`JACKALOPE_SIMULATOR_NAME`, `JACKALOPE_DERIVED_DATA`, `JACKALOPE_SPM_CACHE` and the
+resolved `DEVELOPER_DIR`. It must build into `$JACKALOPE_DERIVED_DATA`, where step 3
+looks for the newest app. The Preview tab's **Build setup** edits the same value and saves
+it when the preview starts. A saved command also lets a project whose scheme Jackalope
+cannot find run.
+
+### Ownership
+
+A Simulator preview lives in the same map as web previews (`PREVIEWS` in
+`commands/previews.rs`), so `task_preview_status`, `task_preview_stop`, `ensure_idle`,
+`close_all` and the integration, continuation and cleanup checks treat both alike: a
+preview that is building or running holds its workspace until it is stopped. The view
+has `kind: "simulator"`, `port: 0` and a `simulator` object (`udid`, `device`,
+`bundleId`, `phase` booting, building, installing, launching, running, failed or
+stopped, `input` off, starting, ready or failed, `appearance`, `contentSize`,
+`landscape`); views without `kind` read as web.
+
+While it runs, the preview holds the device (`simulators::InUse`) and its driver
+(`simulator::DriverHold`), so neither idle shutdown nor the end of an attempt stops them.
+**Stop preview** cancels a build, terminates the app and releases both; the driver stops
+unless an attempt's tools still use the device. A failed build releases them at once and
+keeps the log until **Save log and reset**. **Rebuild** (`task_preview_simulator_reload`)
+cancels a build under way, then builds, installs and launches the workspace's current
+files again. Quitting Jackalope ends every preview.
+
+### Live screen
+
+While the app runs, `task_preview_simulator_frame` returns a `simctl io screenshot`
+scaled to at most 1000 pixels on its longest side, polled about one and a half times a
+second while the panel is shown and the window is not hidden. Frames are never saved.
+
+- **Tap**: a click is sent as a position from 0 to 1 on each axis of the frame
+  (`task_preview_simulator_act` with `{action: "tap", x, y}`), turned into points with
+  the screen size from the driver's latest snapshot, and tapped through the driver at
+  those coordinates in the app (the home screen when the app is not in front).
+- **Toolbar**: Home (`press_button`), Rotate between portrait and landscape left
+  (`rotate`), Light and Dark (`simctl ui appearance`), Text size (`simctl ui
+  content_size`, the twelve Dynamic Type sizes) and Select.
+- **Type into the focused field** sends at most 5,000 characters with the driver's
+  `type`; tap a field first. **Open link** opens any URL with a scheme (`simctl openurl`),
+  such as a deep link. iOS asks "Open in “App”?" before a custom scheme opens an app;
+  Jackalope taps **Open** through the driver when that prompt appears within four
+  seconds (matched by its English text).
+
+The live view taps only; swipes, long presses and hardware keyboard input go through
+the agent tools or Xcode.
+
+### Select
+
+**Select** reads the screen's elements and frames (`task_preview_simulator_elements`,
+the driver snapshot flattened) and highlights the element under the pointer: the
+smallest one containing it, passing over unlabeled containers when anything else
+matches. A click calls `task_preview_simulator_select`, which takes a fresh snapshot, hit
+tests the same way, crops a full-resolution screenshot to the element's frame with six
+points of padding (`sips`) and saves `<id>.png` and `<id>.selection.json` (type, label,
+identifier, value, frame and screen in points, bundle ID) in the workspace's
+`.jackalope/artifacts/screenshots`, recorded among the attempt's screenshots with
+`simulator://<udid>` as its address. Selections join the same notes as web preview
+selections (`jackalope-preview-selections:<run>` in the desktop profile, at most ten):
+each gets a "What should change?" note, and **Add selections to follow-up** sends them
+with the screenshot and context paths. Escape or **Done selecting** leaves Select.
+
+### Review captures
+
+When an attempt that changed files finishes successfully and its project saves no web
+preview command, Jackalope captures the app in the background if **Capture Simulator
+review screenshots** is on (the shared `reviewCaptures` setting, on by default), this
+Mac has Xcode, the workspace is an iOS app and the attempt changed a file that can alter
+what it shows: Swift, Objective-C, `.xib`, `.storyboard`, asset catalog contents,
+`.strings`, `.stringsdict`, `.xcstrings`, `.plist`, `.xcconfig`, `project.pbxproj`, XcodeGen
+`project.yml` or Tuist `Project.swift`. JavaScript changes in a React Native app are not
+captured.
+
+It builds and installs the app as Run in Simulator does (with the saved build command
+when there is one) while holding the workspace like a running check, sets a clean status
+bar (9:41, full signal, charged), then for each screen sets the appearance and Dynamic
+Type size, relaunches the app, opens the screen's deep link when it has one (accepting
+the "Open in" prompt through the driver, started on the first deep link and stopped
+afterwards) and saves a
+PNG once two consecutive screenshots match (at most eight seconds), scaled to at most
+1600 pixels:
+
+| Screen | Viewports |
+| --- | --- |
+| `First screen` (reason `launch`) | `iphone-light`, `iphone-dark`, `iphone-large-text` (`accessibility-large`) |
+| Deep links in review pages (`configured`), then feature-map deep links whose sources changed (`feature`) | `iphone-light`, `iphone-dark` |
+
+At most four screens are captured; an iPad device names them `ipad-…`. Review shows them
+like web captures, labelled iPhone · Light, iPhone · Dark and iPhone · Large text. The
+"before" side follows the [web rules](BROWSER-AUTOMATION.md#review-screenshots): it
+builds the project checkout into its own `.jackalope/DerivedData` only when the task
+used a separate worktree and the checkout is clean at the starting commit, installs that
+app over the result's, captures the same screens, then reinstalls and launches the
+result's app so follow-ups and previews find it. Afterwards the status bar override is
+cleared and the device's appearance and text size are restored. Everything stops after
+five minutes, since building takes most of the time, or when the result leaves review;
+recovery after a quit and failure notes match web captures.
+
+The [feature map](BROWSER-AUTOMATION.md#feature-map) accepts a deep link such as
+`myapp://settings` as an entry's page (any scheme except `http`, `https`, `file`,
+`javascript`, `data`, `about` and `blob`), with source globs over the app's files. Web
+captures skip deep-link entries and Simulator captures skip path entries. **Suggest
+from code** reads web routers only.
+
+### Testing previews
+
+`cargo test previews::` covers saved views without a kind, build and settings commands,
+reading the built app from build settings and products, coordinate mapping, hit testing,
+crops, action commands, finding the Open prompt among system alerts, the files that
+trigger captures, screens and variants, and deep-link feature pages. `node --test scripts/simulator-preview.test.mjs
+scripts/feature-map.test.mjs scripts/review-captures.test.mjs` from `apps/desktop`
+covers the renderer's mapping, highlight, status and labels. The opt-in native test
+generates a SwiftUI app with XcodeGen in a Git checkout and a task worktree that changes
+its title, runs it as a Simulator preview on a `Jackalope test…` device, checks the
+frame, taps a button by coordinates and sees its label change, types into a field,
+selects it, changes appearance and text size, rotates and types into the field by
+coordinates in landscape, opens a deep link past its prompt, stops the
+preview, captures light, dark and large-text review screenshots before and after with a
+deep-link feature screen, and deletes the device:
+
+~~~sh
+cd apps/desktop/src-tauri
+cargo test --lib previews::simulator::tests::real_simulator_preview_and_review_captures -- --ignored --nocapture
+~~~
+
+It needs a Mac with Xcode, an iOS runtime and XcodeGen, and takes about three minutes
+including the driver build.
 
 ## Workspaces and build caches
 
