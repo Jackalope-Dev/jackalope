@@ -7,6 +7,18 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept iOS development end to end in the installed app: an agent task on an iOS project
+  with its own Simulator (guidance, background boot, idle shutdown), the simulator tools and
+  Screen view, the Simulator preview and review captures, the base-device and time-limit
+  settings, a physical iPhone with a signed team build (`device_app`, `device_logs`, Run on
+  device), a real TestFlight upload through processing, and a Mac computer installed as a
+  LaunchAgent behind Tailscale HTTPS running real Claude Code and Codex tasks.
+- [ ] Snapshot Swift packages that use local package references.
+- [ ] Give agents on a computer a Simulator and the simulator tools on a Mac computer, and send
+  file secrets to computers.
+- [ ] Merge `.xcscheme` and `Package.resolved` structurally, and use one Xcode project detector
+  for simulator tools, devices, TestFlight and host placement.
+
 - [ ] Check virtualized transcripts in installed WKWebView, WebView2 and WebKitGTK: momentum
   scrolling, the CSS Highlight API, Ctrl+F in WebView2, and Copy as Markdown's pending
   clipboard write.

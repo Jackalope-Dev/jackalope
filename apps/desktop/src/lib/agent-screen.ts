@@ -9,6 +9,18 @@ interface AgentBrowserView {
   error: string | null;
 }
 
+/** The iOS Simulator the attempt's simulator tools use. */
+interface AgentSimulatorView {
+  status: 'live' | 'unavailable';
+  udid: string;
+  device: string | null;
+  /** Bundle ID of the app the agent last used. */
+  app: string | null;
+  /** Base64 PNG of the screen, scaled down. */
+  frame: string | null;
+  error: string | null;
+}
+
 export type DesktopScope = 'window' | 'app' | 'desktop';
 
 export interface AgentDesktopView {
@@ -47,10 +59,12 @@ export interface AgentScreen {
   desktop: AgentDesktopView | null;
   /** The run's bot or task computer. Absent from older builds. */
   computer?: ComputerStatus | null;
+  /** Present once the attempt's simulator tools used a simulator. Absent from older builds. */
+  simulator?: AgentSimulatorView | null;
   capturedAt: string;
 }
 
-/** Reads the attempt's browser and desktop access without starting or changing either. */
+/** Reads the attempt's browser, simulator and desktop access without starting or changing any. */
 export const readAgentScreen = (runId: string, capture: boolean) =>
   invokeNative<AgentScreen>('task_agent_screen', { runId, capture });
 

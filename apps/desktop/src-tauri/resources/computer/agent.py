@@ -83,6 +83,7 @@ import json
 import math
 import os
 import platform
+import plistlib
 import re
 import secrets
 import select
@@ -153,9 +154,10 @@ RELAY_TOKEN = SHARED["relay"]["token"]
 RELAY_BODY_LIMIT = SHARED["relay"]["requestLimit"]
 RELAY_ANSWER_LIMIT = SHARED["relay"]["answerLimit"]
 RELAY_TOO_LARGE = SHARED["relay"]["tooLarge"]
-# Agent CLIs whose licenses do not allow shipping them in a published image are
-# installed into the bot's home on first use, from the package registry.
-ON_DEMAND = {"claude": "@anthropic-ai/claude-code"}
+# Agent CLIs the computer lacks are installed into the bot's home on first use,
+# from the package registry: Claude Code, whose license does not allow shipping
+# it in a published image, and Codex on a Mac, which runs without the image.
+ON_DEMAND = {"claude": "@anthropic-ai/claude-code", "codex": "@openai/codex"}
 LOCAL_PREFIX = os.path.join(HOME, ".local")
 INSTALL_SECONDS = 100
 # Bridge calls handed over per read, and their total size.
@@ -186,10 +188,12 @@ PROGRAM = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
 # dist-manifest.json); a download that differs is refused.
 UV_VERSION = "0.13.5"
 UV_RELEASE = ("https://github.com/astral-sh/uv/releases/download/{version}/"
-              "uv-{arch}-unknown-linux-gnu.tar.gz")
+              "uv-{target}.tar.gz")
 UV_SHA256 = {
-    "x86_64": "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f",
-    "aarch64": "4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403",
+    "x86_64-unknown-linux-gnu": "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f",
+    "aarch64-unknown-linux-gnu": "4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403",
+    "x86_64-apple-darwin": "b0f52b0e3945b4107d89024ea38e625683011fbfc05a0d98f9fa2d6dcee28c66",
+    "aarch64-apple-darwin": "743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73",
 }
 UV_LIMIT = 128 * 1024 * 1024
 # Longer than Jackalope waits for the person to answer an approval.
@@ -248,6 +252,15 @@ SYMBOL_LANGUAGES = {
 }
 
 
+# A Mac the person owns runs this agent natively (see mac_setup in the desktop's
+# computers module): no display, desktop control or managed Chromium, and runs
+# reach the Xcode toolchain through DEVELOPER_DIR (see xcode()).
+MACOS = sys.platform == "darwin"
+XCODE_CACHE_SECONDS = 60
+XCODE_ROOTS = ["/Applications", os.path.join(HOME, "Applications")]
+SIMULATOR_RUNTIMES = 32
+
+
 # Why a request failed, sent as `code` beside `error` (SHARED["errorCodes"]).
 FAILED = "failed"
 UNSUPPORTED = "unsupported"
@@ -303,7 +316,10 @@ def browser_running():
 
 
 def agent_browser():
-    """The agent-browser program for this processor, or None when it is missing."""
+    """The agent-browser program for this processor, or None when it is missing.
+    A Mac has no Chromium this agent manages, so it has no browser tools."""
+    if MACOS:
+        return None
     arch = {"x86_64": "x64", "amd64": "x64", "aarch64": "arm64", "arm64": "arm64"}.get(
         platform.machine().lower())
     path = os.path.join(AGENT_BROWSER_HOME, "bin", f"agent-browser-linux-{arch}")
@@ -312,6 +328,111 @@ def agent_browser():
 
 def capabilities():
     return [name for name in CAPABILITIES if name != "browser" or agent_browser()]
+
+
+def architecture():
+    """The processor as `hello` reports it: x86_64, arm64 or the raw name."""
+    machine = platform.machine().lower()
+    return {"amd64": "x86_64", "aarch64": "arm64"}.get(machine, machine)
+
+
+def system():
+    """`os` and `arch` for hello, plus `xcode` on a Mac."""
+    if not MACOS:
+        return {"os": "linux", "arch": architecture()}
+    return {"os": "macos", "arch": architecture(), "xcode": xcode()}
+
+
+def xcode_describe(directory, source):
+    """A full Xcode's developer directory with its version, or None (the
+    Command Line Tools have no xcodebuild)."""
+    if not directory or not os.path.isfile(os.path.join(directory, "usr", "bin", "xcodebuild")):
+        return None
+    info = {}
+    with contextlib.suppress(OSError, ValueError, plistlib.InvalidFileException):
+        with open(os.path.join(os.path.dirname(directory), "version.plist"), "rb") as handle:
+            info = plistlib.load(handle)
+    return {"developerDir": directory, "version": info.get("CFBundleShortVersionString"),
+            "build": info.get("ProductBuildVersion"), "source": source}
+
+
+def xcode_selected():
+    try:
+        done = subprocess.run(["/usr/bin/xcode-select", "-p"], capture_output=True, text=True,
+                              timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def xcode_installed(roots):
+    """Xcode.app first, then the newest other Xcode*.app (such as Xcode-beta)."""
+    found = []
+    for root in roots:
+        with contextlib.suppress(OSError):
+            for name in sorted(os.listdir(root)):
+                if not (name.startswith("Xcode") and name.endswith(".app")):
+                    continue
+                described = xcode_describe(os.path.join(root, name, "Contents", "Developer"),
+                                           "installed")
+                if described:
+                    version = [int(part) for part in re.findall(r"\d+", described["version"] or "")]
+                    found.append((name == "Xcode.app", version, described))
+    found.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return found[0][2] if found else None
+
+
+def xcode_toolchain():
+    """The Xcode runs use, resolved like Jackalope's desktop (commands/xcode.rs):
+    DEVELOPER_DIR, then a full Xcode selection, then an installed Xcode when
+    xcode-select names the Command Line Tools."""
+    if not MACOS:
+        return None
+    return (xcode_describe(os.environ.get("DEVELOPER_DIR"), "environment")
+            or xcode_describe(xcode_selected(), "selected")
+            or xcode_installed(XCODE_ROOTS))
+
+
+def simulator_runtimes(developer_dir):
+    """Available simulator runtimes, newest first, or None when simctl fails."""
+    try:
+        done = subprocess.run(["/usr/bin/xcrun", "simctl", "list", "runtimes", "-j"],
+                              capture_output=True, timeout=30,
+                              env=dict(os.environ, DEVELOPER_DIR=developer_dir))
+        listed = json.loads(done.stdout or b"{}").get("runtimes") if done.returncode == 0 else None
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    if not isinstance(listed, list):
+        return None
+    runtimes = [{"name": item.get("name"), "version": item.get("version"),
+                 "identifier": item.get("identifier"), "platform": item.get("platform")}
+                for item in listed if isinstance(item, dict) and item.get("isAvailable")]
+    return runtimes[::-1][:SIMULATOR_RUNTIMES]
+
+
+_XCODE = {"at": 0.0, "value": None}
+
+
+def xcode():
+    """The resolved Xcode with its simulator runtimes, cached for
+    XCODE_CACHE_SECONDS so a newly installed one is noticed without a restart."""
+    if time.time() - _XCODE["at"] < XCODE_CACHE_SECONDS:
+        return _XCODE["value"]
+    found = xcode_toolchain()
+    if found:
+        found["runtimes"] = simulator_runtimes(found["developerDir"])
+    _XCODE.update(at=time.time(), value=found)
+    return found
+
+
+def xcode_environment():
+    """Points DEVELOPER_DIR at the resolved Xcode for everything this agent
+    starts (runs, checks, commands) when xcode-select names the Command Line
+    Tools, without changing the system selection. An explicit DEVELOPER_DIR
+    or a full Xcode selection is left alone."""
+    found = xcode_toolchain()
+    if found and found["source"] == "installed":
+        os.environ["DEVELOPER_DIR"] = found["developerDir"]
 
 
 def slots_for(cpus, memory):
@@ -823,14 +944,15 @@ def install_uv():
             "arm64": "aarch64"}.get(machine)
     if not arch:
         raise Failure(f"uv has no build for this computer's {machine} processor.")
-    url = UV_RELEASE.format(version=UV_VERSION, arch=arch)
+    target = f"{arch}-apple-darwin" if MACOS else f"{arch}-unknown-linux-gnu"
+    url = UV_RELEASE.format(version=UV_VERSION, target=target)
     try:
         with urllib.request.urlopen(url, timeout=INSTALL_SECONDS) as response:
             data = response.read(UV_LIMIT + 1)
     except OSError as error:
         raise Failure(f"uv could not be downloaded to this computer: {error}"[:300])
     if len(data) > UV_LIMIT or not hmac.compare_digest(hashlib.sha256(data).hexdigest(),
-                                                       UV_SHA256[arch]):
+                                                       UV_SHA256[target]):
         raise Failure(f"The uv {UV_VERSION} download did not match its recorded SHA-256, "
                       "so it was not installed.")
     directory = os.path.join(LOCAL_PREFIX, "bin")
@@ -3135,10 +3257,18 @@ def handle(request):
     if action in RUN_ACTIONS:
         return handle_run(request)
     if action == "hello":
+        report = {"protocol": PROTOCOL, "runs": RUNS_PROTOCOL, "capabilities": capabilities(),
+                  "slots": slots(), **system()}
+        if MACOS:
+            return {**report, "browser": False}
         wait_for_display()
         width, height = screen_size()
-        return {"protocol": PROTOCOL, "runs": RUNS_PROTOCOL, "capabilities": capabilities(),
-                "slots": slots(), "screen": [width, height], "browser": browser_running()}
+        return {**report, "screen": [width, height], "browser": browser_running()}
+    if MACOS:
+        if action == "exec":
+            return execute(request)
+        raise Failure("A Mac computer has no desktop control. Use computer_exec, or simctl for "
+                      "a simulator's screen.", UNSUPPORTED)
     wait_for_display()
     if action in ("snapshot", "screenshot"):
         return observe(request, action)
@@ -3294,6 +3424,8 @@ def http(address):
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "serve"
+    if MACOS and mode in ("serve", "http"):
+        xcode_environment()
     if mode == "serve":
         serve()
     elif mode == "http":
@@ -3304,7 +3436,7 @@ if __name__ == "__main__":
         launch_connection(sys.argv[2])
     elif mode == "mcp-approve":
         approve_tool()
-    elif mode == "browser":
+    elif mode == "browser" and not MACOS:
         wait_for_display()
         start_browser()
     else:

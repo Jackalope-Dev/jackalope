@@ -1,5 +1,5 @@
 use super::{
-    integration, process_control,
+    integration, merge_tree, process_control,
     repo::{self, Policy},
     source_control::{self, bitbucket, gitlab, Route},
     tasks::TaskRuntime,
@@ -649,7 +649,13 @@ fn merge_into(path: &Path, branch: &str, target: &str) -> Result<String, String>
         return Err(format!("There is no local {target} branch to merge into."));
     }
     change(path, &["switch", target])?;
-    if let Err(error) = change(path, &["merge", "--no-ff", "--no-edit", branch]) {
+    if let Err(error) = change(path, &["merge", "--no-ff", "--no-edit", branch]).or_else(|error| {
+        // Xcode project files that conflict only as text are merged by structure.
+        match merge_tree::resolve_project_files(path) {
+            Ok(true) => change(path, &["commit", "--no-edit"]),
+            _ => Err(error),
+        }
+    }) {
         let _ = change(path, &["merge", "--abort"]);
         let _ = change(path, &["switch", branch]);
         return Err(format!(
@@ -806,6 +812,42 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(path.join("a.txt")).unwrap(),
             "task\n"
+        );
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn local_merge_merges_concurrent_xcode_project_additions() {
+        let temp =
+            std::env::temp_dir().join(format!("jackalope-local-pbxproj-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&temp).unwrap();
+        let path = temp.as_path();
+        let project = path.join("project.pbxproj");
+        let write = |text: &str, message: &str| {
+            std::fs::write(&project, text).unwrap();
+            change(path, &["add", "project.pbxproj"]).unwrap();
+            change(path, &["commit", "-qm", message]).unwrap();
+        };
+        change(path, &["init", "-q", "-b", "main"]).unwrap();
+        change(path, &["config", "user.name", "Test"]).unwrap();
+        change(path, &["config", "user.email", "test@example.invalid"]).unwrap();
+        change(path, &["config", "core.autocrlf", "false"]).unwrap();
+        write(include_str!("pbxproj/fixtures/base.pbxproj"), "Base");
+        change(path, &["switch", "-q", "-c", "task"]).unwrap();
+        write(include_str!("pbxproj/fixtures/network.pbxproj"), "Task");
+        change(path, &["switch", "-q", "main"]).unwrap();
+        write(include_str!("pbxproj/fixtures/core.pbxproj"), "Main");
+        change(path, &["switch", "-q", "task"]).unwrap();
+        let head = merge_into(path, "task", "main").unwrap();
+        assert_eq!(read(path, &["rev-parse", "main"]).unwrap(), head);
+        assert_eq!(
+            read(path, &["rev-list", "--count", "--merges", "main"]).unwrap(),
+            "1"
+        );
+        assert!(read(path, &["status", "--porcelain"]).unwrap().is_empty());
+        assert_eq!(
+            std::fs::read_to_string(&project).unwrap(),
+            include_str!("pbxproj/fixtures/core_and_network.pbxproj")
         );
         let _ = std::fs::remove_dir_all(temp);
     }

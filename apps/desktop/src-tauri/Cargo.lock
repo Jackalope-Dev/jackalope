@@ -3333,6 +3333,7 @@ dependencies = [
  "ratatui",
  "regex",
  "reqwest",
+ "ring",
  "rmcp",
  "ruzstd",
  "serde",

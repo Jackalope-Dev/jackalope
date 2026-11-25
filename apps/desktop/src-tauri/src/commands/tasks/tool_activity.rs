@@ -424,6 +424,18 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
         "mcp__jackalope__computer_verify" | "computer_verify" => {
             return "Running project checks".into()
         }
+        "mcp__jackalope__device_app" | "device_app" => {
+            return match input["action"].as_str() {
+                Some("install") => "Installing the app on your device",
+                Some("launch") => "Launching the app on your device",
+                Some("terminate") => "Stopping the app on your device",
+                _ => "Checking your device",
+            }
+            .into()
+        }
+        "mcp__jackalope__device_logs" | "device_logs" => {
+            return "Reading the device console".into()
+        }
         _ => None,
     };
     if let Some(verb) = verb {
@@ -461,7 +473,7 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
 
 /// What a tool call spends the agent's time on, for the task report: `ask` (waiting on
 /// the person), `check` (tests, builds, linters, saved checks), `app` (browser and
-/// desktop use), `command`, `helper` (subagents), `web`, `edit`, `read`, `search`,
+/// desktop and simulator use), `command`, `helper` (subagents), `web`, `edit`, `read`, `search`,
 /// `plan` (plans, notes, tool discovery) or `tool` (anything else).
 pub(super) fn activity_kind(name: &str, input: &Value) -> &'static str {
     let name = name.to_ascii_lowercase();
@@ -477,7 +489,7 @@ pub(super) fn activity_kind(name: &str, input: &Value) -> &'static str {
         | "ask_permission"
         | "ask_custom_permission" => "ask",
         "computer_verify" | "verification_output" => "check",
-        "desktop_control" => "app",
+        "desktop_control" | "device_app" | "device_logs" => "app",
         "read" | "read_file" | "readfile" | "read_many_files" | "view" | "notebookread"
         | "read_context" => "read",
         "grep" | "glob" | "search" | "search_files" | "grep_search" | "list_directory" | "ls"
@@ -500,6 +512,7 @@ pub(super) fn activity_kind(name: &str, input: &Value) -> &'static str {
         | "tools_search"
         | "tools_read" => "plan",
         _ if base.starts_with("browser_")
+            || base.starts_with("simulator_")
             || ["playwright", "puppeteer", "chrome", "browser"]
                 .iter()
                 .any(|word| base.contains(word)) =>
@@ -557,7 +570,11 @@ fn command_kind(command: &Value) -> &'static str {
     if script.contains("/v1/computer/verify") || script.contains("/v1/computer/output") {
         return "check";
     }
-    if script.contains("/v1/browser/") || script.contains("/v1/desktop/") {
+    if script.contains("/v1/browser/")
+        || script.contains("/v1/desktop/")
+        || script.contains("/v1/device/")
+        || script.contains("/v1/simulator/")
+    {
         return "app";
     }
     let words = script
@@ -805,6 +822,10 @@ mod tests {
             "app"
         );
         assert_eq!(activity_kind("jackalope:ask_user", &json!({})), "ask");
+        assert_eq!(
+            activity_kind("mcp__jackalope__simulator_interact", &json!({})),
+            "app"
+        );
         assert_eq!(
             activity_kind("mcp__playwright__browser_click", &json!({})),
             "app"

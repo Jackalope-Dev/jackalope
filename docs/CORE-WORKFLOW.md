@@ -161,6 +161,9 @@ Make recurring share the task actions menu. Questions and save recovery remain
 visible above the task sections. Follow-up stays visible while the content scrolls.
 Preview and Delivery are separate task sections. Their setup, ownership, evidence and
 publication boundaries are described in [parallel workflows](PARALLEL-WORKFLOWS.md).
+For an iOS app, Preview builds and runs the app in the task's own Simulator with a live,
+tappable screen, and review screenshots come from the Simulator; see
+[iOS development](IOS-DEVELOPMENT.md#simulator-previews-and-review-captures).
 
 HTTP(S) result links open through the OS browser in desktop. Other schemes are
 not executed. Copy result reports clipboard failures. Screenshots still use the
@@ -272,7 +275,15 @@ runtime: a command is stopped when it produces no output for its stall budget, s
 slow command that keeps reporting progress is allowed to finish. Both are still
 capped by an overall ceiling. The recorded outcome distinguishes a command that was
 stopped for going quiet, one stopped at the ceiling, and one that exited with a
-failing status, and the task's error repeats that distinction.
+failing status, and the task's error repeats that distinction. The defaults are five
+quiet minutes for preparation, ten for checks and 30 minutes in total. Time limits in
+Project settings override each one (quiet limits 1–60 minutes, total 5–120 minutes);
+they are mirrored to the native project registry, an attempt keeps the values it
+started with (`TaskRun.timeLimits`), and combined checks and challenge reruns use the
+attempt's values. For a project with an `.xcodeproj` or `.xcworkspace` at its top level
+or one folder down, Project settings suggest 15 and 20 quiet minutes and 60 in total
+until the person saves their own values; nothing changes until they accept. Bridge
+calls wait long enough for the longest allowed check.
 
 A workspace records the dependency manifests its preparation command completed
 against. When a later attempt finds those manifests unchanged, preparation is
@@ -280,16 +291,41 @@ skipped and reported as skipped rather than run again. A preparation command tha
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
 
-Before preparing a new isolated worktree, Jackalope clones each `node_modules` folder the
-project checkout has beside a `package.json` into the same place, but only when both
-checkouts' dependency manifests fingerprint the same for the preparation command. Clones
-are copy-on-write (`clonefile` on APFS, `FICLONE` on Btrfs or XFS); a volume or platform
-that cannot clone, including Windows, gets no copy and the command installs in full.
-Existing folders and linked paths are never used. A clone is removed when a link inside it
-points into the project checkout or resolves outside the worktree, or when it holds a
-`pyvenv.cfg` or `CMakeCache.txt`; tool caches (`.cache`, `.vite`) are dropped. Python
-environments and Cargo `target/` are not cloned. The preparation command still runs, so
-it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
+Before preparing a new isolated worktree, Jackalope clones the installed folders the
+project checkout has beside their manifests into the same place, but only when both
+checkouts' dependency manifests fingerprint the same for the preparation command:
+
+| Manifest | Folder | Kept only when |
+| --- | --- | --- |
+| `package.json` | `node_modules` | Tool caches (`.cache`, `.vite`) are dropped |
+| `Podfile.lock` | `Pods` | `Pods/Manifest.lock` matches the checkout's `Podfile.lock`, and no generated project, configuration or script file names the checkout's path |
+| `Cartfile.resolved` | `Carthage/Build` | The general rules below hold |
+| `Package.resolved` beside `Package.swift` | `.build` (resolution only) | Every dependency is remote and each absolute path in SwiftPM's state lies inside the folder |
+
+Clones are copy-on-write (`clonefile` on APFS, `FICLONE` on Btrfs or XFS); a volume or
+platform that cannot clone, including Windows, gets no copy and the command installs in
+full. Existing folders and linked paths are never used. A clone is removed when a link
+inside it points into the project checkout or resolves outside the worktree, or when it
+holds a `pyvenv.cfg` or `CMakeCache.txt`. For a Swift package only `checkouts`,
+`repositories`, `artifacts`, `prebuilts` and `workspace-state.json` are cloned, never
+build products, and the absolute repository paths SwiftPM records (each checkout's Git
+alternates and `origin`, prebuilt and artifact paths) are rewritten for the new place.
+Python environments and Cargo `target/` are not cloned. The preparation command still
+runs, so it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
+
+The fingerprint also covers `Podfile`, `Package.swift`, `Package.resolved` (including the
+ones inside `.xcodeproj` and `.xcworkspace` bundles), `project.yml`, `.xcode-version` and
+`DEVELOPER_DIR`, and the walk skips `Pods`, `DerivedData`, `.build`, `SourcePackages` and
+`Carthage`. A marker stays valid only while every installed folder it recorded
+(`node_modules`, `.venv`, `venv`, `Pods`, `Carthage/Build`, `.build`,
+`.jackalope/DerivedData/SourcePackages`) still exists.
+
+Preparation, checks, disposable check worktrees and agents on this device get
+`JACKALOPE_DERIVED_DATA` (`<workspace>/.jackalope/DerivedData`) and `JACKALOPE_SPM_CACHE`
+(its `SourcePackages` folder); `.jackalope/` is excluded from Git in every task workspace.
+Swift package checkouts for Xcode projects are seeded into new worktrees from snapshots
+whether or not a preparation command is set; see
+[iOS development](IOS-DEVELOPMENT.md#workspaces-and-build-caches).
 
 A `.worktreeinclude` file at the project root, in `.gitignore` syntax, names Git-ignored
 files to copy from the project checkout into each new isolated worktree, such as `.env`

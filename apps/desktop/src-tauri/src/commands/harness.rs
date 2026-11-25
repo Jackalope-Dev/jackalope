@@ -99,6 +99,8 @@ pub enum HumanActionKind {
     SignIn,
     Payment,
     Account,
+    /// Code signing, provisioning or App Store Connect setup.
+    Signing,
     Other,
 }
 
@@ -118,7 +120,9 @@ pub struct HumanAction {
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HumanActionInput {
-    #[schemars(description = "secret, sign_in, payment, account or other")]
+    #[schemars(
+        description = "secret, sign_in, payment, account, signing (code signing, provisioning or App Store Connect setup) or other"
+    )]
     pub kind: HumanActionKind,
     #[schemars(description = "Short title of what the person must do, up to 120 characters")]
     pub title: String,

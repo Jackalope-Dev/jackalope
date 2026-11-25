@@ -10,6 +10,7 @@ use crate::commands::{
     },
     integration,
     mcp_broker::{self, ExecuteInput, SearchInput},
+    simulator,
     tasks::{
         runner::record::{record, ToolEvent},
         TaskRun,
@@ -128,7 +129,7 @@ pub(super) async fn resolve_conflicts(
 #[serde(deny_unknown_fields)]
 pub(super) struct DiscoveryInput {
     #[schemars(
-        description = "Tool names or groups: browser, desktop, coordination. Empty loads all optional tools."
+        description = "Tool names or groups: browser, desktop, simulator, coordination. Empty loads all optional tools."
     )]
     #[serde(default)]
     names: Vec<String>,
@@ -175,6 +176,20 @@ pub(super) async fn desktop_control(
     crate::commands::desktop_control::execute(call.runtime().clone(), call.caller.run, input, wait)
         .await
         .map_err(ToolError::refused)
+}
+
+pub(super) async fn device_app(
+    call: Call,
+    input: crate::commands::devices::AppInput,
+) -> Result<Value, ToolError> {
+    crate::commands::devices::app_tool(call.runtime().clone(), call.caller.run, input).await
+}
+
+pub(super) async fn device_logs(
+    call: Call,
+    input: crate::commands::devices::LogsInput,
+) -> Result<Value, ToolError> {
+    crate::commands::devices::logs_tool(call.runtime().clone(), call.caller.run, input).await
 }
 
 pub(super) async fn computer_request(
@@ -527,5 +542,118 @@ pub(super) async fn verification_output(
     input: crate::commands::verification::output::OutputRequest,
 ) -> Result<Value, ToolError> {
     crate::commands::verification::output::read(call.run().verification.as_ref(), input)
+        .map_err(ToolError::refused)
+}
+
+pub(super) async fn simulator_app(
+    call: Call,
+    input: simulator::AppRequest,
+) -> Result<Value, ToolError> {
+    let summary = match (&input.bundle_id, &input.url, &input.path) {
+        (_, Some(url), _) if input.action == "open_url" => format!("open_url {url}"),
+        (_, _, Some(path)) if input.action == "install" => format!("install {path}"),
+        (Some(bundle), _, _) => format!("{} {bundle}", input.action),
+        _ => input.action.clone(),
+    };
+    let value = simulator::app(call.runtime(), call.run(), input)
+        .await
+        .map_err(ToolError::refused)?;
+    record(
+        call.runtime(),
+        &call.run().id,
+        None,
+        ToolEvent::Interaction {
+            label: "Simulator app",
+            summary,
+        },
+    );
+    Ok(value)
+}
+
+pub(super) async fn simulator_snapshot(
+    call: Call,
+    input: simulator::SnapshotRequest,
+) -> Result<Value, ToolError> {
+    simulator::snapshot(call.runtime(), call.run(), input)
+        .await
+        .map_err(ToolError::refused)
+}
+
+pub(super) async fn simulator_interact(
+    call: Call,
+    input: simulator::InteractRequest,
+) -> Result<Value, ToolError> {
+    let target = input
+        .reference
+        .clone()
+        .or_else(|| input.text.clone().filter(|_| input.action == "wait"))
+        .or_else(|| input.direction.clone())
+        .or_else(|| input.x.zip(input.y).map(|(x, y)| format!("{x:.0},{y:.0}")))
+        .unwrap_or_default();
+    let summary = format!("{} {target}", input.action).trim().to_string();
+    let value = simulator::interact(call.runtime(), call.run(), input)
+        .await
+        .map_err(ToolError::refused)?;
+    record(
+        call.runtime(),
+        &call.run().id,
+        None,
+        ToolEvent::Interaction {
+            label: "Simulator interaction",
+            summary,
+        },
+    );
+    Ok(value)
+}
+
+pub(super) async fn simulator_screenshot(
+    call: Call,
+    input: simulator::ScreenshotRequest,
+) -> Result<Value, ToolError> {
+    let (artifact, value) = simulator::screenshot(call.runtime(), call.run(), input)
+        .await
+        .map_err(ToolError::refused)?;
+    record(
+        call.runtime(),
+        &call.run().id,
+        None,
+        ToolEvent::Screenshot(artifact),
+    );
+    Ok(value)
+}
+
+pub(super) async fn simulator_configure(
+    call: Call,
+    input: simulator::ConfigureRequest,
+) -> Result<Value, ToolError> {
+    let value = simulator::configure(call.runtime(), call.run(), input)
+        .await
+        .map_err(ToolError::refused)?;
+    let applied: Vec<&str> = value["applied"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    if !applied.is_empty() {
+        record(
+            call.runtime(),
+            &call.run().id,
+            None,
+            ToolEvent::Interaction {
+                label: "Simulator settings",
+                summary: applied.join(", "),
+            },
+        );
+    }
+    Ok(value)
+}
+
+pub(super) async fn simulator_logs(
+    call: Call,
+    input: simulator::LogsRequest,
+) -> Result<Value, ToolError> {
+    simulator::logs(call.runtime(), call.run(), input)
+        .await
         .map_err(ToolError::refused)
 }

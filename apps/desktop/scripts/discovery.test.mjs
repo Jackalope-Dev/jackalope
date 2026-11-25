@@ -147,3 +147,20 @@ test('repository discovery preserves tasks, conventions, stack and assembled con
   assert.ok(assembled.assembledPrompt.includes('React'));
   assert.ok(assembled.assembledPrompt.includes('Tauri v2'));
 });
+
+test('discovery tags Swift packages and iOS apps from their project files', async () => {
+  const files = {
+    'Package.swift': 'let package = Package(name: "Core", platforms: [.iOS(.v17)])',
+    'project.yml': 'name: Notes\ntargets:\n  Notes:\n    platform: iOS\n',
+    Podfile: "platform :ios, '17.0'",
+  };
+  const result = await discoverCodebaseContext(
+    { projectId: 'ios-project', projectName: 'Notes', projectPath: '/fixture' },
+    async (path) => files[path] ?? null,
+  );
+  for (const tag of ['Swift', 'iOS', 'XcodeGen', 'CocoaPods']) {
+    assert.ok(result.techStack.includes(tag), tag);
+  }
+  assert.ok(result.testCommands.includes('swift test'));
+  assert.ok(result.sourceFilesDetected.includes('Podfile'));
+});

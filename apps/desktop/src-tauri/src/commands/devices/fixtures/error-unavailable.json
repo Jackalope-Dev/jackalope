@@ -1,0 +1,47 @@
+{
+  "error": {
+    "code": 4016,
+    "domain": "com.apple.dt.CoreDeviceError",
+    "userInfo": {
+      "CurrentlyAssertableStates": {
+        "array": []
+      },
+      "NSLocalizedDescription": {
+        "string": "The device is not able to fulfill the requested usage assertion requirements."
+      },
+      "RequestedDeviceStates": {
+        "array": [
+          {
+            "string": "com.apple.coredevice.powerAssertionTaken"
+          },
+          {
+            "string": "com.apple.coredevice.remoteServiceDiscoveryTrustedConnectivityAvailable"
+          },
+          {
+            "string": "com.apple.coredevice.coreDeviceServicesLoaded"
+          }
+        ]
+      }
+    }
+  },
+  "errorSignature": "(com.apple.dt.CoreDeviceError 4016)",
+  "info": {
+    "arguments": [
+      "devicectl",
+      "device",
+      "info",
+      "apps",
+      "--device",
+      "11111111-2222-3333-4444-555555555555",
+      "--json-output",
+      "/tmp/out.json"
+    ],
+    "commandType": "devicectl.device.info.apps",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 5,
+    "outcome": "failed",
+    "version": "651.32"
+  }
+}

@@ -35,6 +35,11 @@ fn discovery_loads_groups_or_named_optional_tools() {
         group(Group::Desktop)
     );
     assert_eq!(
+        requested(&["simulator".into()]).unwrap(),
+        group(Group::Simulator)
+    );
+    assert_eq!(group(Group::Simulator).len(), 6);
+    assert_eq!(
         requested(&["message".into()]).unwrap(),
         BTreeSet::from(["message".to_owned()])
     );
@@ -54,6 +59,7 @@ fn codex_approves_each_browser_and_desktop_call() {
     let policy = codex_tool_policy();
     assert_eq!(policy["browser_interact"]["approval_mode"], "approve");
     assert_eq!(policy["computer_exec"]["approval_mode"], "approve");
+    assert_eq!(policy["simulator_interact"]["approval_mode"], "approve");
     assert!(policy.get("execute_tool").is_none());
     assert!(policy.get("computer_verify").is_none());
     assert!(policy.get("message").is_none());

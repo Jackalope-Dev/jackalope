@@ -162,6 +162,7 @@ impl TaskRuntime {
         self.mcp_broker.close(id);
         crate::commands::browser::close(id);
         crate::commands::desktop_control::close(id);
+        crate::commands::simulator::attempt_ended(id);
         crate::commands::computers::release_run(id);
         if let Some(process) = process {
             if graceful && self.codex_sessions.interrupt(id) {
@@ -170,6 +171,7 @@ impl TaskRuntime {
                 process.terminate();
             }
         }
+        crate::commands::project_secrets::release(&self.secret_files_root(), id);
         Ok(())
     }
 
@@ -664,12 +666,15 @@ impl TaskRuntime {
                 .as_deref()
                 .filter(|command| !command.trim().is_empty());
             if fresh_worktree {
-                if let Some(command) =
-                    prepare.or(worktree_commands.first().map(|item| item.command.as_str()))
-                {
-                    self.clone_dependencies(id, &root, &workspace, command)?;
-                }
+                self.clone_dependencies(
+                    id,
+                    &root,
+                    &workspace,
+                    prepare.or(worktree_commands.first().map(|item| item.command.as_str())),
+                )?;
             }
+            // Xcode builds write `.jackalope/DerivedData` through `JACKALOPE_DERIVED_DATA`.
+            crate::commands::tasks::preparation::exclude_marker(Path::new(&workspace));
             if let Some(command) = prepare {
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
@@ -733,12 +738,14 @@ impl TaskRuntime {
 
     /// Seeds a new worktree with the checkout's installed dependency folders before the setup
     /// command, which still runs so anything that drifted since the checkout installed is fixed.
+    /// Swift package checkouts for Xcode projects are seeded with or without a setup command:
+    /// they are matched to the worktree's own `Package.resolved` pins.
     fn clone_dependencies(
         &self,
         id: &str,
         root: &str,
         workspace: &str,
-        command: &str,
+        command: Option<&str>,
     ) -> Result<(), String> {
         self.update(id, |run| {
             run.progress = Some(StepProgress::new(
@@ -747,12 +754,31 @@ impl TaskRuntime {
                 1,
             ))
         });
-        let outcome = self.timed(id, "dependencyClone", || {
-            Ok(crate::commands::dependency_clone::clone_dependencies(
-                root, workspace, command,
-            ))
+        let (outcome, packages) = self.timed(id, "dependencyClone", || {
+            let packages = crate::commands::source_packages::restore(
+                self.data_directory(),
+                Path::new(root),
+                Path::new(workspace),
+            );
+            let outcome = command
+                .map(|command| {
+                    crate::commands::dependency_clone::clone_dependencies(root, workspace, command)
+                })
+                .unwrap_or_default();
+            Ok((outcome, packages))
         })?;
         self.update(id, |run| {
+            match &packages {
+                crate::commands::source_packages::Restore::Restored => activity(
+                    run,
+                    "Reused Swift package checkouts resolved for the same Package.resolved (copy-on-write).",
+                ),
+                crate::commands::source_packages::Restore::Failed(reason) => activity(
+                    run,
+                    &format!("Did not reuse saved Swift package checkouts: {reason}."),
+                ),
+                _ => {}
+            }
             if !outcome.cloned.is_empty() {
                 activity(
                     run,
@@ -768,10 +794,12 @@ impl TaskRuntime {
                     &format!("Did not reuse the project checkout's {folder}: {reason}."),
                 );
             }
-            if outcome.unsupported {
+            if outcome.unsupported
+                || packages == crate::commands::source_packages::Restore::Unsupported
+            {
                 activity(
                     run,
-                    "This volume cannot make copy-on-write copies, so the setup command installs dependencies in full.",
+                    "This volume cannot make copy-on-write copies, so dependencies install in full.",
                 );
             }
         });
@@ -1048,6 +1076,11 @@ impl TaskRuntime {
             (adapter == "claude").then(|| super::claude_session::settings(self, &req.project_id));
         let persistent = claude.is_some_and(|settings| settings.persistent) && remote.is_none();
         let mut cmd = command(executable);
+        if remote.is_none() && !workspace.is_empty() {
+            cmd.envs(crate::commands::source_packages::environment(Path::new(
+                &workspace,
+            )));
+        }
         let mut opencode_connection = None;
         let mut opencode_config = None;
         if let Some(binding) = &req.account_binding {
@@ -1443,18 +1476,72 @@ impl TaskRuntime {
             )
             .map_err(|error| format!("Project secrets could not be read: {error}"))?;
             secret_names = secrets.iter().map(|(name, _)| name.clone()).collect();
-            if !secrets.is_empty() {
+            cmd.envs(secrets);
+            // File secrets become private files for this attempt only; the
+            // variable names a path, and the contents join the redacted values.
+            let files = crate::commands::project_secrets::files(
+                &self.project_secrets_root(),
+                &req.project_id,
+            )
+            .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+            let written = crate::commands::project_secrets::materialize(
+                &self.secret_files_root(),
+                id,
+                &files,
+            )?;
+            let contents: Vec<String> = files
+                .iter()
+                .flat_map(|file| crate::commands::redaction::file_contents(&file.contents))
+                .collect();
+            if !contents.is_empty() {
+                self.update_checked(id, |run| run.protect(contents))?;
+            }
+            // A file's path is not secret, so it is not redacted from the record.
+            let mut given = secret_names.clone();
+            for (name, path) in written {
+                cmd.env(&name, path);
+                given.push(name);
+            }
+            if !given.is_empty() {
                 self.update_checked(id, |run| {
                     activity(
                         run,
-                        &format!(
-                            "Project secrets for the agent: {}.",
-                            secret_names.join(", ")
-                        ),
+                        &format!("Project secrets for the agent: {}.", given.join(", ")),
                     )
                 })?;
             }
-            cmd.envs(secrets);
+        }
+        // An iOS project's agent gets the resolved Xcode and its workspace's
+        // own Simulator, which boots while the agent starts.
+        let mut simulator = None;
+        if remote.is_none() {
+            crate::commands::xcode::apply_for(&mut cmd, Path::new(&workspace));
+            if crate::commands::simulators::needed_by_agent(&workspace) {
+                match crate::commands::simulators::assign(self, id) {
+                    Ok(device) => {
+                        cmd.envs(device.environment());
+                        self.update_checked(id, |run| {
+                            activity(
+                                run,
+                                &format!(
+                                    "Simulator for this task: {} ({}).",
+                                    device.name, device.udid
+                                ),
+                            )
+                        })?;
+                        let runtime = self.clone();
+                        let owner = id.to_string();
+                        crate::commands::simulators::boot_in_background(
+                            device.clone(),
+                            move || !runtime.is_running(&owner),
+                        );
+                        simulator = Some(device);
+                    }
+                    Err(error) => self.update_checked(id, |run| {
+                        activity(run, &format!("No Simulator for this task: {error}"))
+                    })?,
+                }
+            }
         }
         // A resumed session already has its context.
         if req.previous_run_id.is_none() && req.continues.is_none() {
@@ -1510,6 +1597,9 @@ impl TaskRuntime {
             .map(|run| super::efficiency::launch_context(run, host_parallelism))
             .unwrap_or_default();
         input.push_str(&launch_context);
+        if let Some(device) = &simulator {
+            input.push_str(&device.guidance());
+        }
         let native_mcp = req.coordination.is_some() && spec.bridge() == Bridge::Mcp;
         if native_mcp
             && crate::commands::experiments::is(
@@ -1571,7 +1661,7 @@ impl TaskRuntime {
                     "--permission-prompt-tool",
                     "mcp__jackalope__permission_prompt",
                     "--allowedTools",
-                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__conflicts,mcp__jackalope__resolve_conflicts,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__record_decision,mcp__jackalope__restate_goal,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
+                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__conflicts,mcp__jackalope__resolve_conflicts,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__desktop_control,mcp__jackalope__device_app,mcp__jackalope__device_logs,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__record_decision,mcp__jackalope__restate_goal,mcp__jackalope__computer_verify,mcp__jackalope__verification_output,mcp__jackalope__simulator_app,mcp__jackalope__simulator_snapshot,mcp__jackalope__simulator_interact,mcp__jackalope__simulator_screenshot,mcp__jackalope__simulator_configure,mcp__jackalope__simulator_logs",
                 ]);
             }
         }
@@ -2160,6 +2250,10 @@ impl TaskRuntime {
     pub fn project_secrets_root(&self) -> PathBuf {
         self.directory.join("project-secrets")
     }
+    /// Each running attempt's file secrets; emptied when the attempt ends and at startup.
+    pub fn secret_files_root(&self) -> PathBuf {
+        self.directory.join("secret-files")
+    }
     pub fn preferences_directory(&self) -> PathBuf {
         self.directory.join("preferences")
     }
@@ -2672,6 +2766,8 @@ impl TaskRuntime {
                 host,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
+                time_limits: crate::commands::project_registry::record(self, &request.project_id)
+                    .and_then(|project| project.time_limits),
                 setup_files: request.setup_files.clone(),
                 auto_verify: request.auto_verify,
                 non_code: request.non_code,
@@ -2747,7 +2843,9 @@ impl TaskRuntime {
             runtime.stage(&request.id, None);
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
+            crate::commands::project_secrets::release(&runtime.secret_files_root(), &request.id);
             crate::commands::desktop_control::attempt_ended(&request.id);
+            crate::commands::simulator::attempt_ended(&request.id);
             crate::commands::computers::release_run(&request.id);
         });
         Ok(id)

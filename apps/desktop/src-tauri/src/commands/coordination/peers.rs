@@ -4,7 +4,8 @@
 //! (the tree the scope check records about every ten seconds) instead of
 //! waiting for integration, and pairwise `merge-tree` reports content conflicts
 //! while they are still small. Reads never write to a worktree, index or ref;
-//! the only objects created are unreferenced synthetic commits for merge-tree.
+//! the only objects created are unreferenced synthetic commits for merge-tree and
+//! the trees and blobs of Xcode project files it merges by structure.
 //!
 //! `adopt` is the one writer: at the caller's request it copies named files
 //! from a peer's snapshot into the caller's own worktree and records an
@@ -264,31 +265,9 @@ fn conflicts(left: (&TaskRun, &str), right: (&TaskRun, &str)) -> Result<Vec<Stri
     {
         return Ok(found);
     }
-    let output = repo::command(
-        workspace,
-        &["merge-tree", "--write-tree", "--name-only", &a, &b],
-        Policy::Inspection,
-    )
-    .output()
-    .map_err(|e| e.to_string())?;
-    let paths = match output.status.code() {
-        Some(0) => Vec::new(),
-        Some(1) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let mut lines = stdout.lines().skip(1);
-            let mut paths = lines
-                .by_ref()
-                .take_while(|line| !line.is_empty())
-                .map(str::to_string)
-                .collect::<Vec<_>>();
-            paths.dedup();
-            if paths.is_empty() {
-                paths.push("Git reported a conflict without file names.".into());
-            }
-            paths
-        }
-        _ => return Err(String::from_utf8_lossy(&output.stderr).trim().into()),
-    };
+    let paths =
+        crate::commands::merge_tree::merge_tree(workspace, &[], &a, &b, Policy::Inspection)?
+            .conflicts;
     let mut cache = CONFLICTS.lock().unwrap();
     let cache = cache.get_or_insert_with(HashMap::new);
     if cache.len() > 512 {

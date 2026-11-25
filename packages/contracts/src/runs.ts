@@ -23,7 +23,7 @@ export interface AgentAnswer {
 
 /** Something only the person can do; never routed to an agent. */
 export interface HumanAction {
-  kind: 'secret' | 'sign_in' | 'payment' | 'account' | 'other';
+  kind: 'secret' | 'sign_in' | 'payment' | 'account' | 'signing' | 'other';
   instructions: string;
   url?: string;
   secretName?: string;

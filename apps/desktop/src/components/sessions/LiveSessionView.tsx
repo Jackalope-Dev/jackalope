@@ -20,6 +20,7 @@ import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import { copyText } from '../../lib/clipboard';
+import { deviceSupport } from '../../lib/devices';
 import {
   type LiveSession,
   type MessageOrigin,
@@ -63,6 +64,7 @@ import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
 import { isPopOutPane, PopOutButton, useWorkspaceActions } from '../tasks/WorkTools';
 import { ChatOptions } from './ChatOptions';
+import { DevicePanel } from './DevicePanel';
 import { ReadAloudButton } from './ReadAloudButton';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
@@ -288,6 +290,19 @@ export function LiveSessionView({
   const tooled = !detached && !simple;
   useWorkSeen(tooled ? latest : undefined);
   const workspace = useWorkspaceActions(tooled ? latest : undefined);
+  // Offered on a Mac with Xcode when the conversation's workspace has an Xcode project.
+  const [devices, setDevices] = useState(false);
+  const deviceWorkspace = latest?.workspace ?? session.request.projectPath;
+  useEffect(() => {
+    if (!isTauriEnvironment() || !/Mac/.test(navigator.platform)) return;
+    let current = true;
+    void deviceSupport(deviceWorkspace)
+      .then((support) => current && setDevices(support.supported && support.xcodeProject))
+      .catch(() => current && setDevices(false));
+    return () => {
+      current = false;
+    };
+  }, [deviceWorkspace]);
   useEffect(() => {
     const attempt = `${latest?.id}:${latest?.status}:${session.paused}`;
     if (reviewAttempt.current !== attempt) {
@@ -455,7 +470,25 @@ export function LiveSessionView({
                 />
               ),
             },
-          ].filter((item) => item.id === 'context' || (!integrated && !simple))}
+            ...(devices
+              ? [
+                  {
+                    id: 'device',
+                    label: 'iPhone or iPad',
+                    content: () => (
+                      <DevicePanel
+                        conversation={session.id}
+                        projectId={session.request.projectId}
+                        projectName={session.request.projectName}
+                        runId={latest?.id}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ].filter(
+            (item) => item.id === 'context' || item.id === 'device' || (!integrated && !simple),
+          )}
         />
       )}
       {detached && (

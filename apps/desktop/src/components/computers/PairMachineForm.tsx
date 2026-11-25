@@ -7,11 +7,18 @@ import {
   FlowDiagram,
   FormField,
   Input,
+  SegmentedControl,
   SetupSteps,
 } from '@jackalope/ui';
 import { Laptop, Server } from 'lucide-react';
 import { useState } from 'react';
-import { addCloudMachine, type CloudMachine, cloudMachines } from '../../lib/computers';
+import {
+  addCloudMachine,
+  type CloudMachine,
+  cloudMachines,
+  macSetupScript,
+} from '../../lib/computers';
+import { revealInFileManager } from '../../lib/native/env';
 import './computers.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { useNativeResource } from '../../hooks/useNativeResource';
@@ -32,6 +39,17 @@ function newSecret() {
  */
 const runCommand = (secret: string, image: string) =>
   `docker run -d --name jackalope-computer --init --restart unless-stopped --cap-drop ALL --security-opt no-new-privileges --shm-size 1g -e JACKALOPE_COMPUTER_TOKEN=${secret} -v jackalope-home:/home/bot -p 127.0.0.1:8765:8765 -p 127.0.0.1:6080:6080 ${image}`;
+
+/** Mirrors the Mac setup in docs/BOT-COMPUTERS.md (script from `computers/mac.rs`). */
+const macCommand = (secret: string) =>
+  `JACKALOPE_COMPUTER_TOKEN=${secret} sh jackalope-mac-computer.sh`;
+const MAC_HTTPS = 'tailscale serve --bg 8765';
+
+type MachineKind = 'linux' | 'mac';
+const KINDS = [
+  { id: 'linux', label: 'Linux with Docker' },
+  { id: 'mac', label: 'Mac' },
+] as const;
 
 /**
  * Pairs a cloud machine the person runs. The secret is generated here so the start
@@ -54,7 +72,10 @@ export function PairMachineForm({
   const [error, setError] = useState('');
   // This version's published image; a locally built one when it is unknown.
   const image = useNativeResource(cloudMachines, []).data?.image || LOCAL_IMAGE;
-  const command = runCommand(secret.trim(), image);
+  const [kind, setKind] = useState<MachineKind>('linux');
+  const [script, setScript] = useState('');
+  const [saving, setSaving] = useState(false);
+  const command = kind === 'mac' ? macCommand(secret.trim()) : runCommand(secret.trim(), image);
   const [started, setStarted] = useState(false);
   const [paired, setPaired] = useState(false);
   const address = url.trim();
@@ -75,7 +96,7 @@ export function PairMachineForm({
             shown,
             url,
             secret.trim(),
-            viewerUrl.trim() || null,
+            kind === 'linux' ? viewerUrl.trim() || null : null,
           );
           setPaired(true);
           onPaired(machine);
@@ -93,24 +114,76 @@ export function PairMachineForm({
         state={flow}
         error={flow === 'failed' ? error : undefined}
       />
+      <SegmentedControl
+        label="Machine type"
+        items={KINDS}
+        value={kind}
+        onChange={(next) => {
+          setKind(next);
+          setStarted(false);
+          setError('');
+        }}
+      />
       <SetupSteps
         label="Pair a cloud machine"
         steps={[
           {
             id: 'start',
-            title: 'Start the computer on your machine',
+            title:
+              kind === 'mac'
+                ? 'Set up the computer on your Mac'
+                : 'Start the computer on your machine',
             hint:
-              image === LOCAL_IMAGE
-                ? 'Build the jackalope-computer image first, then run this and put HTTPS in front of port 8765.'
-                : 'Run this on the machine; Docker downloads the computer image. Then put HTTPS in front of port 8765.',
+              kind === 'mac'
+                ? 'Save the setup script, copy it to the Mac and run this there. It installs this version’s computer agent and starts it at login. The Mac needs Xcode for iOS work and Node for agent CLIs.'
+                : image === LOCAL_IMAGE
+                  ? 'Build the jackalope-computer image first, then run this and put HTTPS in front of port 8765.'
+                  : 'Run this on the machine; Docker downloads the computer image. Then put HTTPS in front of port 8765.',
             state: started ? 'done' : 'current',
             summary: 'Started with the copied command',
             content: (
               <div className="settings-setup-fields">
+                {kind === 'mac' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      loading={saving}
+                      loadingLabel="Saving…"
+                      onClick={async () => {
+                        setSaving(true);
+                        setError('');
+                        try {
+                          const path = await macSetupScript();
+                          setScript(path);
+                          await revealInFileManager(path).catch(() => undefined);
+                        } catch (cause) {
+                          setError(describeError(cause));
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                    >
+                      Save setup script
+                    </Button>
+                    {script && <code className="text-xs break-all">{script}</code>}
+                  </div>
+                )}
                 <div className="pair-machine-command">
                   <code>{command}</code>
                   <CopyButton text={command} label="Copy command" variant="outline" size="sm" />
                 </div>
+                {kind === 'mac' && (
+                  <div className="pair-machine-command">
+                    <code>{MAC_HTTPS}</code>
+                    <CopyButton
+                      text={MAC_HTTPS}
+                      label="Copy HTTPS command"
+                      variant="outline"
+                      size="sm"
+                    />
+                  </div>
+                )}
                 <div>
                   <Button type="button" variant="secondary" onClick={() => setStarted(true)}>
                     It's running
@@ -154,7 +227,11 @@ export function PairMachineForm({
                   />
                 </FormField>
                 <Disclosure>
-                  <DisclosureSummary>Advanced: pairing secret and viewer</DisclosureSummary>
+                  <DisclosureSummary>
+                    {kind === 'mac'
+                      ? 'Advanced: pairing secret'
+                      : 'Advanced: pairing secret and viewer'}
+                  </DisclosureSummary>
                   <div className="settings-setup-fields">
                     <FormField
                       label="Pairing secret"
@@ -172,18 +249,20 @@ export function PairMachineForm({
                         onChange={(event) => setSecret(event.target.value)}
                       />
                     </FormField>
-                    <FormField
-                      label="Viewer address"
-                      description="Optional. Its noVNC page for Watch / take over."
-                    >
-                      <Input
-                        type="url"
-                        spellCheck={false}
-                        value={viewerUrl}
-                        disabled={busy}
-                        onChange={(event) => setViewerUrl(event.target.value)}
-                      />
-                    </FormField>
+                    {kind === 'linux' && (
+                      <FormField
+                        label="Viewer address"
+                        description="Optional. Its noVNC page for Watch / take over."
+                      >
+                        <Input
+                          type="url"
+                          spellCheck={false}
+                          value={viewerUrl}
+                          disabled={busy}
+                          onChange={(event) => setViewerUrl(event.target.value)}
+                        />
+                      </FormField>
+                    )}
                   </div>
                 </Disclosure>
                 <div className="flex flex-wrap gap-2">

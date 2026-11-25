@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::previews::features;
 use crate::commands::project_registry::ProjectRecord;
 use std::path::Path;
 
@@ -384,4 +385,104 @@ fn real_review_capture_saves_result_screenshots_and_cleans_up() {
     let _lease = crate::commands::verification::reserve_workspace(root.to_str().unwrap()).unwrap();
     drop(runtime);
     let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn ios_captures_follow_native_changes_and_feature_deep_links() {
+    for path in [
+        "Demo/ContentView.swift",
+        "Demo/Legacy/View.m",
+        "Demo/Base.lproj/Main.storyboard",
+        "Demo/Cell.xib",
+        "Demo/Assets.xcassets/AccentColor.colorset/Contents.json",
+        "Demo/Localizable.xcstrings",
+        "Demo/Info.plist",
+        "Demo.xcodeproj/project.pbxproj",
+        "project.yml",
+    ] {
+        assert!(ios::relevant(path), "{path}");
+    }
+    for path in [
+        "README.md",
+        "web/src/app.ts",
+        "Demo/Tests.txt",
+        "package.json",
+    ] {
+        assert!(!ios::relevant(path), "{path}");
+    }
+    let settings = ios::Settings {
+        custom: None,
+        pages: vec!["demo://pinned".into()],
+        features: vec![
+            features::Feature {
+                name: "Settings".into(),
+                page: "demo://settings".into(),
+                sources: vec!["Demo/Settings/**".into()],
+                ..Default::default()
+            },
+            features::Feature {
+                name: "Profile".into(),
+                page: "demo://profile".into(),
+                sources: vec!["Demo/Profile/**".into()],
+                ..Default::default()
+            },
+        ],
+    };
+    let screens = ios::screens(&settings, &["Demo/Settings/SettingsView.swift".into()]);
+    assert_eq!(
+        screens,
+        [
+            (ios::FIRST_SCREEN.to_string(), "launch"),
+            ("demo://pinned".to_string(), "configured"),
+            ("demo://settings".to_string(), "feature"),
+        ]
+    );
+    assert_eq!(
+        ios::variants("iphone", true),
+        ["iphone-light", "iphone-dark", "iphone-large-text"]
+    );
+    assert_eq!(ios::variants("ipad", false), ["ipad-light", "ipad-dark"]);
+    assert_eq!(ios::variant_settings("iphone-dark"), ("dark", "large"));
+    assert_eq!(
+        ios::variant_settings("iphone-large-text"),
+        ("light", "accessibility-large")
+    );
+    assert_eq!(ios::variant_settings("ipad-light"), ("light", "large"));
+}
+
+#[test]
+fn feature_deep_links_are_kept_for_ios_and_left_out_of_web_captures() {
+    assert_eq!(
+        features::deep_link(" demo://settings?tab=1 ").as_deref(),
+        Some("demo://settings?tab=1")
+    );
+    for page in [
+        "https://example.com",
+        "http://x",
+        "javascript:alert(1)",
+        "demo://a b",
+        "1demo://x",
+        "demo:",
+        "/settings",
+    ] {
+        assert_eq!(features::deep_link(page), None, "{page}");
+    }
+    let mut project = record(Some("pnpm dev --port {port}"));
+    project.feature_map = vec![
+        features::Feature {
+            name: "Billing".into(),
+            page: "/billing".into(),
+            ..Default::default()
+        },
+        features::Feature {
+            name: "App settings".into(),
+            page: "demo://settings".into(),
+            ..Default::default()
+        },
+    ];
+    let usable = features::usable(&project.feature_map);
+    assert_eq!(usable.len(), 2);
+    let web = settings(&project).unwrap();
+    assert_eq!(web.features.len(), 1);
+    assert_eq!(web.features[0].page, "/billing");
 }

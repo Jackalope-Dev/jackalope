@@ -154,6 +154,7 @@ fn hard_block(
     let path = canonical(&wt.path)?;
     super::previews::ensure_idle(&wt.path)?;
     super::verification::ensure_idle(&wt.path)?;
+    super::simulators::ensure_idle(&wt.path)?;
     if repo.starts_with(&path) {
         return Err("Current project folder — kept.".into());
     }
@@ -248,7 +249,7 @@ fn regenerable_tree(name: &str) -> bool {
         | ".venv" | "venv" | "site-packages" | "__pycache__" | ".tox"
         | ".mypy_cache" | ".pytest_cache" | ".ruff_cache"
         // Elixir, Dart, Swift, Haskell
-        | "_build" | "deps" | ".dart_tool" | "Pods" | "DerivedData" | ".build"
+        | "_build" | "deps" | ".dart_tool" | "Pods" | "DerivedData" | ".build" | "SourcePackages"
         | ".stack-work" | "dist-newstyle"
     )
 }
@@ -663,15 +664,8 @@ fn content_in_target(path: &Path, head: &str, target: &str) -> Result<bool, Stri
                     Inspection,
                 )
                 .map_err(|_| "Cannot inspect local content safely.".to_string())?;
-                let result = repo::output(
-                    path,
-                    &["merge-tree", "--write-tree", target, &commit],
-                    Inspection,
-                )?;
-                if !result.status.success()
-                    || String::from_utf8_lossy(&result.stdout).lines().next()
-                        != Some(target_tree.trim())
-                {
+                let merged = super::merge_tree::merge_tree(path, &[], target, &commit, Inspection)?;
+                if !merged.conflicts.is_empty() || merged.tree != target_tree.trim() {
                     return Ok(false);
                 }
             }
@@ -928,8 +922,10 @@ pub(super) fn remove_with(
         vec!["worktree", "remove", "--", worktree_path]
     };
     let tasks = super::tasks::rewind::tasks_using(&root, runs);
+    let simulator = super::simulators::workspace_identity(worktree_path);
     repo::git_exact(Path::new(repo_path), &args, Inspection).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
     super::tasks::rewind::forget_refs(Path::new(repo_path), &tasks, runs, None);
+    super::simulators::release(simulator);
     if delete_branch && !wt.branch.is_empty() {
         delete_merged_branch(
             repo_path,
@@ -1217,12 +1213,14 @@ fn archive(
     }
     // Nothing else can be recovered from disk now — take the worktree down.
     let tasks = super::tasks::rewind::tasks_using(path, runs);
+    let simulator = super::simulators::workspace_identity(worktree_path);
     repo::git_exact(
         repo,
         &["worktree", "remove", "--force", "--", worktree_path],
         Inspection,
     )?;
     super::tasks::rewind::forget_refs(repo, &tasks, runs, Some(&archive_root));
+    super::simulators::release(simulator);
     if branch.starts_with("jackalope/") {
         let _ = repo::git_exact(repo, &["branch", "-D", &branch], Inspection);
     }
@@ -1308,7 +1306,11 @@ fn remove_orphan(repo_path: &str, folder_path: &str, runs: &[TaskRun]) -> Result
     if let Some(reason) = folder.blocked_reason {
         return Err(reason);
     }
-    std::fs::remove_dir_all(&target).map_err(|e| format!("Cannot remove {}: {e}. Close terminals, development servers or file viewers using this folder, then retry.", target.display()))
+    super::simulators::ensure_idle(folder_path)?;
+    let simulator = super::simulators::workspace_identity(folder_path);
+    std::fs::remove_dir_all(&target).map_err(|e| format!("Cannot remove {}: {e}. Close terminals, development servers or file viewers using this folder, then retry.", target.display()))?;
+    super::simulators::release(simulator);
+    Ok(())
 }
 
 /// Drop Git's registration for worktrees whose folder is already gone.
@@ -1859,6 +1861,7 @@ mod tests {
             "node_modules/pkg",
             ".venv/lib/site-packages/pkg",
             "Pods/lib",
+            "SourcePackages/checkouts/pkg",
         ] {
             let dir = f.worktree.join("ignored").join(tree);
             fs::create_dir_all(&dir).unwrap();
@@ -1867,11 +1870,22 @@ mod tests {
         fs::create_dir(f.worktree.join("out")).unwrap();
         fs::write(f.worktree.join("out/bundle.js"), "generated").unwrap();
         fs::write(f.worktree.join("install.log"), "generated").unwrap();
+        // Xcode output under JACKALOPE_DERIVED_DATA, with package checkouts' Git folders and
+        // build databases inside, is excluded like the prepared marker and discarded.
+        crate::commands::tasks::preparation::exclude_marker(&f.worktree);
+        let derived = f.worktree.join(".jackalope/DerivedData");
+        fs::create_dir_all(derived.join("SourcePackages/checkouts/pkg/.git")).unwrap();
+        fs::create_dir_all(derived.join("Build/Intermediates.noindex/XCBuildData")).unwrap();
+        fs::write(
+            derived.join("Build/Intermediates.noindex/XCBuildData/build.db"),
+            "",
+        )
+        .unwrap();
         let entry = f.entry();
         let status = entry.cleanup.as_ref().unwrap();
         assert_eq!(status.blocked_reason, None);
         assert!(!status.recoverable);
-        assert_eq!(status.discarded_paths.len(), 3);
+        assert_eq!(status.discarded_paths.len(), 4);
         f.remove(&entry, &[]).unwrap();
         assert!(!f.worktree.exists());
     }

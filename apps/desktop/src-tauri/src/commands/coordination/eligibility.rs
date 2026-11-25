@@ -515,6 +515,7 @@ mod scheduling_tests {
                     ),
                 ]
                 .into(),
+                device_xcode: false,
             },
             grants: HashMap::new(),
             url: None,

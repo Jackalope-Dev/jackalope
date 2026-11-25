@@ -2,7 +2,12 @@ import { Button, InlineNotice, SegmentedControl, Select, SelectItem } from '@jac
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
-import { capturedPages, capturePageName, type ReviewCaptures } from '../../lib/review-captures';
+import {
+  capturedPages,
+  capturePageName,
+  type ReviewCaptures,
+  viewportLabel,
+} from '../../lib/review-captures';
 import type { ScreenshotArtifact } from '../../lib/run-types';
 import './review-screenshots.css';
 import { describeError } from '@jackalope/contracts/errors';
@@ -81,7 +86,8 @@ export function ReviewScreenshots({
   const effectiveMode: Mode = comparable ? mode : 'side';
   const showBefore = !!page?.before || captures.beforeAvailable;
   const viewport =
-    page && `${page.viewport === 'narrow' ? 'Narrow' : 'Desktop'} · ${page.width}×${page.height}`;
+    page &&
+    `${viewportLabel(page.viewport)}${page.width && page.height ? ` · ${page.width}×${page.height}` : ''}`;
 
   return (
     <section className="review-screenshots" aria-label="Review screenshots">
@@ -94,7 +100,7 @@ export function ReviewScreenshots({
           >
             {pages.map((item, index) => (
               <SelectItem key={`${item.path}:${item.viewport}`} value={String(index)}>
-                {capturePageName(item)} · {item.viewport === 'narrow' ? 'Narrow' : 'Desktop'}
+                {capturePageName(item)} · {viewportLabel(item.viewport)}
               </SelectItem>
             ))}
           </Select>

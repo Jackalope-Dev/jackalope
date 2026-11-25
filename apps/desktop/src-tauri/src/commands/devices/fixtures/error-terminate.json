@@ -1,0 +1,49 @@
+{
+  "error": {
+    "code": 10014,
+    "domain": "com.apple.dt.CoreDeviceError",
+    "userInfo": {
+      "NSLocalizedDescription": {
+        "string": "Failed to send signal 15 to process 21,642."
+      },
+      "NSLocalizedFailureReason": {
+        "string": "No such process; the process may have already terminated."
+      },
+      "NSUnderlyingError": {
+        "error": {
+          "code": 3,
+          "domain": "NSPOSIXErrorDomain",
+          "userInfo": {}
+        }
+      },
+      "ProcessIdentifier": {
+        "int": 21642
+      },
+      "Signal": {
+        "int": 15
+      }
+    }
+  },
+  "errorSignature": "(com.apple.dt.CoreDeviceError 10014 (NSPOSIXErrorDomain 3))",
+  "info": {
+    "arguments": [
+      "devicectl",
+      "device",
+      "process",
+      "terminate",
+      "--device",
+      "5B88C7AF-57B1-46E2-9424-3B98AE662BE4",
+      "--pid",
+      "21642",
+      "--json-output",
+      "/tmp/out.json"
+    ],
+    "commandType": "devicectl.device.process.terminate",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 5,
+    "outcome": "failed",
+    "version": "651.32"
+  }
+}

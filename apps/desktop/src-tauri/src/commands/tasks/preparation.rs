@@ -4,7 +4,7 @@ use crate::commands::process_control::CommandResult;
 /// Dependency manifests worth fingerprinting. A workspace whose manifests are byte-identical
 /// to the ones a successful setup command already saw does not need that command run again,
 /// which is what makes a retry (or a resumed worktree) start in seconds instead of minutes.
-const MANIFESTS: [&str; 10] = [
+const MANIFESTS: [&str; 13] = [
     "pnpm-lock.yaml",
     "package-lock.json",
     "yarn.lock",
@@ -15,6 +15,40 @@ const MANIFESTS: [&str; 10] = [
     "uv.lock",
     "requirements.txt",
     "go.sum",
+    "Podfile.lock",
+    "Package.resolved",
+    "Cartfile.resolved",
+];
+
+/// Installed or resolved folders a completed setup leaves behind, relative to the workspace.
+/// A marker stays valid only while every one it recorded still exists.
+const ARTIFACTS: [&str; 7] = [
+    "node_modules",
+    ".venv",
+    "venv",
+    "Pods",
+    "Carthage/Build",
+    ".build",
+    ".jackalope/DerivedData/SourcePackages",
+];
+
+/// Folders the manifest walk never enters: version control, Jackalope's own state, and
+/// installed or built trees whose nested manifests belong to dependencies.
+const SKIPPED: [&str; 14] = [
+    ".git",
+    ".worktrees",
+    ".jackalope",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    "Pods",
+    "DerivedData",
+    ".build",
+    "SourcePackages",
+    "Carthage",
 ];
 
 const MARKER: &str = ".jackalope/prepared.json";
@@ -141,7 +175,7 @@ pub fn tail(text: &str, limit: usize) -> String {
 pub fn fingerprint(workspace: &Path, command: &str) -> String {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    "preparation-v2".hash(&mut hasher);
+    "preparation-v3".hash(&mut hasher);
     std::env::consts::OS.hash(&mut hasher);
     std::env::consts::ARCH.hash(&mut hasher);
     command.hash(&mut hasher);
@@ -170,6 +204,7 @@ pub fn fingerprint(workspace: &Path, command: &str) -> String {
         "RUSTUP_TOOLCHAIN",
         "VIRTUAL_ENV",
         "UV_PROJECT_ENVIRONMENT",
+        "DEVELOPER_DIR",
     ] {
         name.hash(&mut hasher);
         std::env::var_os(name).hash(&mut hasher);
@@ -184,18 +219,7 @@ pub(in crate::commands) fn dependency_inputs(workspace: &Path) -> Option<Vec<Str
         .follow_links(false)
         .filter_entry(|entry| {
             !entry.file_type().is_some_and(|kind| kind.is_dir())
-                || ![
-                    ".git",
-                    ".worktrees",
-                    ".jackalope",
-                    "node_modules",
-                    "target",
-                    ".venv",
-                    "venv",
-                    "dist",
-                    "build",
-                ]
-                .contains(&entry.file_name().to_str().unwrap_or_default())
+                || !SKIPPED.contains(&entry.file_name().to_str().unwrap_or_default())
         })
         .build();
     for (count, entry) in walk.enumerate() {
@@ -227,6 +251,10 @@ pub(in crate::commands) fn dependency_inputs(workspace: &Path) -> Option<Vec<Str
                 ".python-version",
                 "rust-toolchain.toml",
                 "rust-toolchain",
+                "Podfile",
+                "Package.swift",
+                "project.yml",
+                ".xcode-version",
             ]
             .contains(&name)
             || relative.starts_with("scripts/")
@@ -245,9 +273,9 @@ pub fn already_prepared(workspace: &Path, fingerprint: &str) -> Option<String> {
     let saved: Value = serde_json::from_str(&text).ok()?;
     let artifacts = saved["artifacts"].as_array()?;
     if artifacts.iter().any(|artifact| {
-        artifact.as_str().is_none_or(|name| {
-            !["node_modules", ".venv", "venv"].contains(&name) || !workspace.join(name).is_dir()
-        })
+        artifact
+            .as_str()
+            .is_none_or(|name| !ARTIFACTS.contains(&name) || !workspace.join(name).is_dir())
     }) {
         return None;
     }
@@ -274,7 +302,7 @@ pub fn record_prepared(workspace: &Path, fingerprint: &str, command: &str) {
             "fingerprint": fingerprint,
             "command": command,
             "completedAt": Utc::now().to_rfc3339(),
-            "artifacts": (["node_modules", ".venv", "venv"].into_iter().filter(|name| workspace.join(name).is_dir()).collect::<Vec<_>>()),
+            "artifacts": (ARTIFACTS.into_iter().filter(|name| workspace.join(name).is_dir()).collect::<Vec<_>>()),
         })
         .to_string(),
     );
@@ -340,6 +368,68 @@ mod tests {
         assert!(already_prepared(&workspace, &third).is_some());
         std::fs::remove_dir(workspace.join("node_modules")).unwrap();
         assert!(already_prepared(&workspace, &third).is_none());
+        std::fs::remove_dir_all(workspace).unwrap();
+    }
+
+    #[test]
+    fn apple_manifests_count_and_their_installed_trees_are_not_walked() {
+        let workspace = scratch();
+        let swiftpm = "App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm";
+        for folder in [
+            swiftpm,
+            "Pods/Local Podspecs",
+            "Kit/.build/checkouts/dep",
+            "DerivedData/x",
+            "Carthage/Checkouts/b",
+        ] {
+            std::fs::create_dir_all(workspace.join(folder)).unwrap();
+        }
+        for file in [
+            "Podfile",
+            "Podfile.lock",
+            "project.yml",
+            "Cartfile.resolved",
+            ".xcode-version",
+            "Kit/Package.swift",
+            "Kit/Package.resolved",
+            "App.xcodeproj/project.pbxproj",
+            "Pods/Manifest.lock",
+            "Kit/.build/checkouts/dep/Package.swift",
+            "DerivedData/x/Package.resolved",
+            "Carthage/Checkouts/b/Cartfile.resolved",
+        ] {
+            std::fs::write(workspace.join(file), "1").unwrap();
+        }
+        std::fs::write(workspace.join(swiftpm).join("Package.resolved"), "{}").unwrap();
+        assert_eq!(
+            dependency_inputs(&workspace).unwrap(),
+            [
+                ".xcode-version",
+                "App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+                "Cartfile.resolved",
+                "Kit/Package.resolved",
+                "Kit/Package.swift",
+                "Podfile",
+                "Podfile.lock",
+                "project.yml",
+            ]
+        );
+        let before = fingerprint(&workspace, "pod install");
+        std::fs::write(
+            workspace.join(swiftpm).join("Package.resolved"),
+            "{\"pins\":[]}",
+        )
+        .unwrap();
+        assert_ne!(before, fingerprint(&workspace, "pod install"));
+        std::fs::create_dir(workspace.join("Pods/SwiftyJSON")).unwrap();
+        let digest = fingerprint(&workspace, "pod install");
+        record_prepared(&workspace, &digest, "pod install");
+        assert!(already_prepared(&workspace, &digest).is_some());
+        std::fs::remove_dir_all(workspace.join("Pods")).unwrap();
+        assert!(
+            already_prepared(&workspace, &digest).is_none(),
+            "removed Pods must run the setup command again"
+        );
         std::fs::remove_dir_all(workspace).unwrap();
     }
 

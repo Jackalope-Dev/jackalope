@@ -1,0 +1,35 @@
+{
+  "info": {
+    "arguments": [
+      "devicectl",
+      "device",
+      "install",
+      "app",
+      "--device",
+      "5B88C7AF-57B1-46E2-9424-3B98AE662BE4",
+      "/tmp/Host.app",
+      "--json-output",
+      "/tmp/out.json"
+    ],
+    "commandType": "devicectl.device.install.app",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 5,
+    "outcome": "success",
+    "version": "651.32"
+  },
+  "result": {
+    "deviceIdentifier": "5B88C7AF-57B1-46E2-9424-3B98AE662BE4",
+    "installedApplications": [
+      {
+        "bundleID": "digital.jackalope.Host",
+        "databaseSequenceNumber": 732,
+        "databaseUUID": "E2793A45-3218-41D4-9EAA-A084BD5B25F9",
+        "installationURL": "file:///Users/me/Library/Developer/CoreSimulator/Devices/5B88C7AF-57B1-46E2-9424-3B98AE662BE4/data/Containers/Bundle/Application/1FC1A18C-1441-4619-A39E-9249DCD0439A/Host.app/",
+        "launchServicesIdentifier": "unknown",
+        "options": {}
+      }
+    ]
+  }
+}

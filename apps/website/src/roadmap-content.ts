@@ -100,6 +100,12 @@ export const roadmapStages = [
           'Pair a device, choose shared projects, and check tasks, answer questions, send follow-ups or review changes. Desktop hosts connect over SSH or HTTPS; phones use HTTPS with optional private Tailscale setup. Work stays on its host when a client disconnects. Android and iOS companion apps that show work from all your paired computers in one list, with notifications when work needs you, are in development. Native multi-device and platform acceptance remain in progress; this is not a released hosting service.',
       },
       {
+        title: 'Build iOS apps, not just websites.',
+        summary: 'Simulators, devices and TestFlight for iOS projects, in validation.',
+        detail:
+          "On a Mac, Jackalope finds Xcode even when xcode-select points at the Command Line Tools and suggests setup and checks for Xcode, XcodeGen, Tuist, CocoaPods and Swift package projects. Each iOS task gets its own Simulator, and agents can launch your app there, read the screen, tap, type and take screenshots for review while you watch. New task workspaces reuse resolved Swift packages and Pods, and parallel tasks that add files no longer conflict in the Xcode project file. Attach your own iPhone or iPad to a conversation to run a task's build on it, upload a finished task to TestFlight after you confirm the build, or pair a Mac you own so iOS work runs there. Installed-app, physical-device and TestFlight testing are in progress.",
+      },
+      {
         title: 'Your agents, from the terminal.',
         summary: 'A jackalope command that picks up where the app leaves off.',
         detail:

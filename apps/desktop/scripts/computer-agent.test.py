@@ -580,7 +580,9 @@ class RunProtocol(Harness):
     def test_uv_is_pinned_and_a_mismatched_download_is_refused(self):
         agent = self.agent
         self.assertRegex(agent.UV_VERSION, r"^\d+\.\d+\.\d+$")
-        self.assertEqual(sorted(agent.UV_SHA256), ["aarch64", "x86_64"])
+        self.assertEqual(sorted(agent.UV_SHA256), [
+            "aarch64-apple-darwin", "aarch64-unknown-linux-gnu",
+            "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"])
         for digest in agent.UV_SHA256.values():
             self.assertRegex(digest, r"^[0-9a-f]{64}$")
         good = archive({"uv-x86_64-unknown-linux-gnu/uv": b"#!/bin/sh\n",
@@ -609,6 +611,7 @@ class RunProtocol(Harness):
         urlopen = agent.urllib.request.urlopen
         try:
             agent.LOCAL_PREFIX = local
+            agent.MACOS = False
             agent.platform.machine = lambda: "x86_64"
             agent.urllib.request.urlopen = fake_open
             # The real recorded hash does not match this stand-in archive.
@@ -620,9 +623,16 @@ class RunProtocol(Harness):
                 f"https://github.com/astral-sh/uv/releases/download/{agent.UV_VERSION}/"
                 "uv-x86_64-unknown-linux-gnu.tar.gz"])
             # Only the archive is fetched: no published checksum is trusted.
-            agent.UV_SHA256 = dict(agent.UV_SHA256, x86_64=hashlib.sha256(good).hexdigest())
+            agent.UV_SHA256 = dict(agent.UV_SHA256, **{
+                "x86_64-unknown-linux-gnu": hashlib.sha256(good).hexdigest()})
             agent.install_uv()
             self.assertEqual(len(fetched), 2)
+            # A Mac downloads the macOS build, checked against its own hash.
+            agent.MACOS = True
+            with self.assertRaises(agent.Failure):
+                agent.install_uv()
+            self.assertTrue(fetched[-1].endswith("/uv-x86_64-apple-darwin.tar.gz"), fetched[-1])
+            agent.MACOS = False
             for name in ("uv", "uvx"):
                 self.assertTrue(os.access(os.path.join(local, "bin", name), os.X_OK))
             agent.UV_LIMIT = len(good) - 1
@@ -764,6 +774,88 @@ class Runner(unittest.TestCase):
         status = self.call(action="run_status", run="c1")
         self.assertEqual((status["runs"], status["capabilities"]),
                          (self.agent.RUNS_PROTOCOL, self.agent.capabilities()))
+
+    def fake_xcode(self, root, name, version, build):
+        developer = os.path.join(root, name, "Contents", "Developer")
+        os.makedirs(os.path.join(developer, "usr", "bin"))
+        open(os.path.join(developer, "usr", "bin", "xcodebuild"), "w").close()
+        with open(os.path.join(root, name, "Contents", "version.plist"), "wb") as handle:
+            self.agent.plistlib.dump({"CFBundleShortVersionString": version,
+                                      "ProductBuildVersion": build}, handle)
+        return developer
+
+    def test_a_mac_reports_its_xcode_and_no_desktop(self):
+        agent = self.agent
+        apps = os.path.join(self.temp.name, "Applications")
+        beta = self.fake_xcode(apps, "Xcode-beta.app", "28.0", "28A1")
+        main = self.fake_xcode(apps, "Xcode.app", "27.2", "27B52")
+        tools = os.path.join(self.temp.name, "CommandLineTools")
+        os.makedirs(tools)
+        environment = dict(os.environ)
+        os.environ.pop("DEVELOPER_DIR", None)
+        try:
+            agent.MACOS = True
+            agent.XCODE_ROOTS = [apps]
+            agent.xcode_selected = lambda: tools
+            agent.simulator_runtimes = lambda developer: [{"name": "iOS 27.0", "version": "27.0",
+                                                          "identifier": "ios-27", "platform": "iOS"}]
+            # Xcode.app wins over a newer beta when xcode-select names the
+            # Command Line Tools.
+            found = agent.xcode_toolchain()
+            self.assertEqual((found["developerDir"], found["version"], found["build"], found["source"]),
+                             (main, "27.2", "27B52", "installed"))
+            agent.xcode_environment()
+            self.assertEqual(os.environ["DEVELOPER_DIR"], main)
+            # An explicit DEVELOPER_DIR wins and is left alone.
+            os.environ["DEVELOPER_DIR"] = beta
+            self.assertEqual(agent.xcode_toolchain()["source"], "environment")
+            agent.xcode_environment()
+            self.assertEqual(os.environ["DEVELOPER_DIR"], beta)
+            os.environ.pop("DEVELOPER_DIR")
+            # A full Xcode selection needs no DEVELOPER_DIR.
+            agent.xcode_selected = lambda: beta
+            self.assertEqual(agent.xcode_toolchain()["source"], "selected")
+            agent.xcode_environment()
+            self.assertNotIn("DEVELOPER_DIR", os.environ)
+
+            agent.xcode_selected = lambda: tools
+            hello = self.call(action="hello")
+            self.assertEqual(hello["os"], "macos")
+            self.assertIn(hello["arch"], ("arm64", "x86_64"))
+            self.assertEqual(hello["xcode"]["developerDir"], main)
+            self.assertEqual(hello["xcode"]["runtimes"][0]["name"], "iOS 27.0")
+            self.assertNotIn("screen", hello)
+            self.assertFalse(hello["browser"])
+            self.assertNotIn("browser", hello["capabilities"])
+            self.assertIn("git-sync", hello["capabilities"])
+            # Desktop actions are unsupported; exec still runs a command.
+            refused = self.agent.respond({"id": 1, "action": "screenshot"})
+            self.assertEqual((refused["ok"], refused["code"]), (False, "unsupported"))
+            ran = self.call(action="exec", command="echo mac", cwd=self.temp.name)
+            self.assertEqual(ran["stdout"], "mac\n")
+        finally:
+            os.environ.clear()
+            os.environ.update(environment)
+
+    def test_a_mac_without_xcode_reports_none(self):
+        agent = self.agent
+        agent.MACOS = True
+        agent.XCODE_ROOTS = [os.path.join(self.temp.name, "none")]
+        agent.xcode_selected = lambda: None
+        environment = dict(os.environ)
+        os.environ.pop("DEVELOPER_DIR", None)
+        try:
+            hello = self.call(action="hello")
+            self.assertEqual(hello["os"], "macos")
+            self.assertIsNone(hello["xcode"])
+        finally:
+            os.environ.clear()
+            os.environ.update(environment)
+
+    def test_linux_reports_its_system_without_xcode(self):
+        self.agent.MACOS = False
+        self.assertEqual(self.agent.system()["os"], "linux")
+        self.assertNotIn("xcode", self.agent.system())
 
     def test_slots_follow_the_machine_size_unless_overridden(self):
         agent = self.agent

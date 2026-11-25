@@ -791,6 +791,26 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Browse is marked Coming later. See [settings sync](SETTINGS-SYNC.md#skills).
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
+- iOS projects on a Mac ([iOS development](IOS-DEVELOPMENT.md)): Jackalope resolves an
+  installed Xcode when `xcode-select` names the Command Line Tools and gives it to agents,
+  setup, checks, previews and terminals. Project setup recognises Xcode workspaces and
+  projects, XcodeGen, Tuist, CocoaPods and Swift packages and suggests setup and
+  `xcodebuild test` on the task's Simulator. Each iOS task workspace gets its own headless
+  Simulator (reused by follow-ups, a bounded pool, shut down when idle and deleted with the
+  workspace; only devices Jackalope created are touched). Agents read and drive apps there
+  with `simulator_*` tools through a bundled XCUITest driver, and the Screen view shows the
+  device. Preview builds, installs and launches the app on that Simulator with a live screen
+  the person can tap, type into, rotate, switch to dark mode or larger text, open links in
+  and select elements from for follow-up notes. Finished work that changes the app gets
+  light, dark and large-text review screenshots before and after, and feature-map entries
+  can name deep links. New worktrees reuse CocoaPods, Carthage and resolved Swift packages as
+  copy-on-write clones, and projects can lengthen setup and check time limits.
+  `project.pbxproj` files merge object by object, so concurrent file, target and package
+  additions do not conflict. A person can attach a paired iPhone or iPad to a conversation
+  for `device_app` and `device_logs` and Run on device, upload a task's app to TestFlight
+  with a project App Store Connect key after confirming the build, and pair a Mac they own
+  as a computer that iOS work is placed on. Project secrets can be files given to local
+  agents as private per-attempt paths.
 
 ## Services and distribution
 
@@ -944,6 +964,14 @@ key chords. The cross-app drag, badge and background control have unit and
 browser-fixture coverage, plus an opt-in macOS native trial of background input; the
 Windows background path has no native run yet. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
+
+iOS support has unit coverage and opt-in native tests that create, boot, drive and delete
+real Simulators, archive a generic iOS build and merge real XcodeGen projects; no agent task
+has run it end to end in the installed app. Install, launch and console capture on a
+physical device, signed device builds, a TestFlight upload and App Store Connect
+processing, a LaunchAgent-installed Mac computer behind HTTPS, simulators for agents on a
+computer are unverified or unsupported. Builds of packages with Swift macros or plugins
+need them trusted once in Xcode; Jackalope explains how and never skips the check. Mac computers have no desktop control or browser tools.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
 viewer or cloud machine has been accepted in an installed app on any platform. A bot's

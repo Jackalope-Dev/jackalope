@@ -144,12 +144,17 @@ save a cropped screenshot and bounded HTML/computed-style context in the task wo
 page-reported source attributes remain untrusted hints. Selection notes persist in the
 desktop profile. Stopping the preview closes its selection browser and temporary profile.
 The embedded iframe and fresh-page capture do not share that window's state.
+An iOS app's Simulator preview selects on its live screen instead and adds to the same
+selection notes; see [iOS development](IOS-DEVELOPMENT.md#select).
 
 ## Review screenshots
 
 When an attempt that changed files finishes successfully, its result is recorded first
 and Jackalope then captures review screenshots in the background if the project saves a preview command containing
 `{port}` and **Capture review screenshots** is on (the default once a command exists).
+An iOS app without a preview command is captured in its Simulator instead, with
+light, dark and large-text variants; see
+[iOS development](IOS-DEVELOPMENT.md#review-captures).
 It runs the command on a free loopback port in the task workspace, waits up to 60
 seconds for an HTTP answer and opens each page in a headless disposable browser with a
 temporary profile, a fixed viewport (desktop 1280×800, optional narrow 390×844), a
@@ -170,6 +175,8 @@ entry has a name, a page, what working looks like, optional steps to reach it an
 project-relative source globs (`*`, `**`, `?`, `{a,b}`; a plain path also covers the
 folder beneath it). Screenshots only open the page, so a state worth checking has to
 be reachable by URL, such as `/settings?tab=billing`; the steps are reviewer guidance.
+For an iOS app the page can be a deep link such as `myapp://settings`, which Simulator
+captures open; web captures skip those entries and Simulator captures skip paths.
 Changed files are the attempt's diff from its starting commit plus untracked,
 non-ignored files. Every capture of a page carries the entries for that page
 (`features` on the capture), and Review shows their name, working line and steps.

@@ -2,7 +2,7 @@
 
 A bot computer is a persistent machine an agent controls instead of the person's own
 desktop: a Linux desktop with a window manager, Chromium and the usual command-line
-tools. Use this guide to set one up, to run a cloud machine, to run a project's task
+tools, or a Mac the person pairs for iOS work (see [a Mac](#a-mac)). Use this guide to set one up, to run a cloud machine, to run a project's task
 agents on a computer, or to change the providers, the image or the in-sandbox agent. [Desktop control](DESKTOP-CONTROL.md) covers the
 person's own desktop and [browser automation](BROWSER-AUTOMATION.md) the task browser.
 
@@ -177,6 +177,62 @@ bot's or task's browser tools stay on the task's local browser for cloud machine
 agent running on the machine uses its runner's); `desktop_control` and
 `computer_exec` reach the machine. Anyone holding the secret can run commands there.
 
+The machine record (`machines.json`) keeps the system its agent last reported in
+`hello`: `os` (`linux` or `macos`), `arch` and, on a Mac, `xcode` (version, build and
+available simulator runtimes). It is saved when the machine is paired and updated when
+**Test connection**, a start or a state check gets a different answer; a record from
+before agents reported it reads as Linux. Settings → Computers shows it beside the
+address (`macOS · arm64 · Xcode 27.2 · iOS 27.2, iOS 27.0`, `macOS · no Xcode` or
+`Linux`), and **Test connection** says it after `Connected`. Local sandboxes and Agent37
+computers run the Linux image.
+
+### A Mac
+
+A Mac the person owns (a Mac mini, or a cloud Mac such as MacStadium, AWS EC2 Mac or
+Scaleway) pairs as a cloud machine without Docker, so iOS builds, tests, simulators and
+agents can run there. **Pair machine** → **Mac** offers **Save setup script**, which
+writes `jackalope-mac-computer.sh` to `computers/mac-setup/` in Jackalope's data and
+shows it in Finder, and the command to run it on the Mac with the generated secret:
+
+~~~sh
+JACKALOPE_COMPUTER_TOKEN=<secret> sh jackalope-mac-computer.sh [port]
+tailscale serve --bg 8765
+~~~
+
+The script (`computers/mac.rs`) carries this app version's own `agent.py` and
+`protocol.json`, so the Mac runs the agent and protocol this desktop speaks whether or
+not an image was published. It holds no secret. It needs `/usr/bin/python3` 3.9 or
+later (Xcode or the Command Line Tools provide it), installs both files in
+`~/.jackalope-computer` (mode 700), writes the secret to `~/.jackalope-computer/token`
+(mode 600), and starts `run.sh` under the LaunchAgent `dev.jackalope.computer`
+(`~/Library/LaunchAgents/dev.jackalope.computer.plist`, `RunAtLoad` and `KeepAlive`,
+logging to `~/.jackalope-computer/agent.log`). `run.sh` reads the secret into
+`JACKALOPE_COMPUTER_TOKEN`, puts `~/.local/bin`, `/opt/homebrew/bin` and
+`/usr/local/bin` ahead of the system `PATH` and runs `python3 agent.py http
+127.0.0.1:<port>` (8765 by default). The script waits up to 20 seconds for
+`/v1/health` and says where the log is if the agent does not answer. Running it again
+updates the agent or the secret. HTTPS in front of the port is the person's, as for
+any cloud machine: `tailscale serve --bg 8765` gives the Mac an `https://<mac>.<tailnet>.ts.net`
+address inside the tailnet, or Caddy can proxy it. To remove it, run `launchctl bootout
+gui/$(id -u)/dev.jackalope.computer` and delete `~/.jackalope-computer` and the plist.
+From a checkout, `JACKALOPE_COMPUTER_TOKEN=<secret> python3
+apps/desktop/src-tauri/resources/computer/agent.py http 127.0.0.1:8765` runs the same
+agent in the foreground.
+
+A LaunchAgent runs in the person's login session, so a headless Mac needs automatic
+login to start the agent after a restart; simulators need that session too. Agent CLIs
+come from npm (`claude` and `codex` are installed into `~/.local` on first use), so the
+Mac needs Node. On a Mac the agent has no display, desktop control, viewer or managed
+Chromium: `hello` reports no `screen`, `browser` is never among its capabilities (the
+browser tools stay on the task's local browser), desktop actions answer `unsupported`,
+and `exec` (`computer_exec`) and every run action work as on Linux. When `xcode-select`
+names the Command Line Tools and no `DEVELOPER_DIR` is set, the agent resolves an
+installed Xcode as this device does (`Xcode.app`, then the newest other `Xcode*.app` in
+`/Applications` or `~/Applications`) and sets `DEVELOPER_DIR` for everything it starts,
+so `xcodebuild` and `xcrun simctl` work in runs, checks and commands without changing
+the system selection. See [iOS development](IOS-DEVELOPMENT.md#remote-macs) for how iOS
+work is placed.
+
 ## Agents on a computer
 
 Running a project's agents on a computer, Agent37 computers and agent sign-ins for
@@ -184,7 +240,10 @@ computers are beta and marked **Beta** wherever the app shows them. A project wh
 **Agents run on** names a computer runs its Claude Code and Codex task agents there,
 including read-only planning attempts (plan mode's planner and a swarm round's
 orchestrator). Other agents run on this device and say so in the attempt's activity,
-except for swarm forks of a project whose swarms run only on computers.
+except for swarm forks of a project whose swarms run only on computers. An attempt of a
+project that builds with Xcode fails with the reason, in its error and its `Placement:`
+activity, when its computer is not a Mac with Xcode, rather than running where nothing
+builds.
 Planned and swarm work can also spread to other computers and this device (see
 [swarms across hosts](#swarms-across-hosts)). Workspace preparation, checks, the checkpoint, review and integration stay on
 this device and are unchanged, so the coordinator, execution guard and runtime lock
@@ -318,7 +377,12 @@ way every time for the same hosts, loads and needs:
    connection rules above). A fork that names a secret available only to computers never
    runs here. A fork with a browser-checked criterion needs the browser tools: this device,
    a computer whose runner reported `browser`, or the project's computer until a run shows
-   it lacks them. A fork no host can take stops with the reason, like any dispatch error,
+   it lacks them. A fork of a project that builds with Xcode (see
+   [iOS development](IOS-DEVELOPMENT.md#remote-macs)) needs a host with Xcode: this
+   device when it resolves one, or a paired Mac whose agent reported Xcode; it never goes
+   to a computer without Xcode, and when no host it may use has Xcode it runs on this
+   device as before, saying it cannot build there (under **Computers only** it is refused
+   instead). A fork no host can take stops with the reason, like any dispatch error,
    and pauses the project's queue.
 2. Computers out of contact are skipped; if that leaves none, the fork waits.
 3. The fork's home host takes it while it has a free slot: the project's computer when it
@@ -775,7 +839,9 @@ capacity pool, host health and the placer (with `coordination/hosts.rs` refreshi
 working out each fork's needs and retrying lost hosts), `computers/policy.rs` the
 answers to the runner's policy callbacks and events, `computers/sync.rs` the Git bundles
 of `git-sync`, `computers/artifacts.rs` the artifact transfers,
-`computers/credentials.rs` the agent sign-ins for computers,
+`computers/credentials.rs` the agent sign-ins for computers, `computers/platform.rs`
+what each computer runs (`os`, `arch`, Xcode) and which projects need Xcode,
+`computers/mac.rs` the Mac setup script,
 `computers/provider_proxy.rs` the provider requests of runs that keep their API key here, and
 `tasks/runner/remote.rs` the attempt side of an agent on a computer, one of the two
 runners behind `tasks/runner.rs` (see [the runner](#the-runner)).
@@ -792,7 +858,11 @@ carries beside its message (`failed`, `unsupported`, `permanent`). The desktop r
 from the bundled resources and `agent.py` from beside itself in the image.
 
 `agent.py` uses only Debian's Python with Pillow, pyatspi, `xdotool`, `wmctrl`, `xclip`,
-`scrot`, and agent-browser for the runner's browser tools. It answers the helper protocol's `hello` (`protocol: 1`) and `list`,
+`scrot`, and agent-browser for the runner's browser tools; on a Mac it needs only the
+system Python (3.9 or later) and Git (see [a Mac](#a-mac)). `hello` also reports `os`
+and `arch`, and on a Mac `xcode` (`developerDir`, `version`, `build`, `source` and up to
+32 available simulator `runtimes`, newest first, or `null`), resolved again at most
+once a minute. It answers the helper protocol's `hello` (`protocol: 1`) and `list`,
 `snapshot` (AT-SPI elements with screen bounds, at most 300, password text protected),
 `screenshot` (base64 PNG, optional `thumb` width), `click`, `double_click`, `right_click`,
 `drag`, `scroll`, `type`, `set_value`, `press` (`chord` with modifiers and key), `focus`,
@@ -844,11 +914,11 @@ Claude Code's license does not allow redistributing it, so it is not in the imag
 first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
 volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking. The
 first run with a connection that needs `uvx` or `uv` installs uv the same way, from the
-uv release pinned in `agent.py` (`UV_VERSION`) for the computer's processor (x86_64 or
-aarch64 Linux, at most 128 MB). The archive must match the SHA-256 recorded beside the
+uv release pinned in `agent.py` (`UV_VERSION`) for the computer's processor and system
+(x86_64 or aarch64 Linux or macOS, at most 128 MB). The archive must match the SHA-256 recorded beside the
 version (`UV_SHA256`, copied from that release's published `.sha256` assets and
 `dist-manifest.json`); any other download is refused and nothing is installed. Moving to
-a new uv release means updating the version and both hashes together. The image has no
+a new uv release means updating the version and all four hashes together. The image has no
 Docker.
 
 The image's definition hash covers `Dockerfile`, `start.sh`, `agent.py` and
@@ -856,7 +926,8 @@ The image's definition hash covers `Dockerfile`, `start.sh`, `agent.py` and
 pin, gives a new
 `<version>-<hash>` tag. A local sandbox pulls or builds the new image and is recreated
 from it at its next start, Agent37 gets a new template (see each provider above), and a
-cloud machine keeps its old image until its owner runs the new tag.
+cloud machine keeps its old image until its owner runs the new tag. A Mac keeps the
+agent its setup script installed until the new version's script runs there.
 
 `.github/workflows/computer-image.yml` publishes the image for linux/amd64 to
 `ghcr.io/jackalope-dev/jackalope-computer` on every push to `beta` or `stable` and on
@@ -936,6 +1007,14 @@ forks off this device (at launch and in routing), and changes left on a lost com
 being saved, never applied, by the sweep or by a later attempt of the workspace, while a
 continuation still brings them back; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
+`computers::platform` covers reading `os`, `arch` and Xcode from `hello`, records
+without them reading as Linux, and which projects need Xcode; `computers::tests` covers
+a paired machine keeping what its agent reported; `computers::pool` also covers Xcode
+work staying off computers without Xcode, its fallback to this device and its refusal
+under **Computers only**; `tasks::runner` covers a project computer without Xcode
+refusing an attempt of an Xcode project; `computers::mac` covers the setup script
+carrying this version's agent and protocol without a secret and, on macOS, running its
+installer against a scratch home with `launchctl` and `curl` stubbed.
 `computers::image` covers the published reference and the definition hash shared with
 `node --test scripts/release/computer-image.test.mjs`; `computers::agent37` also covers
 the template import body and its fallback.
@@ -952,7 +1031,10 @@ and its reuse, stall and stored output, source reads, declarations in each langu
 repository search ranked like this device's with plain text matches after them, policy
 callbacks that allow only an
 explicit allow (including no answer), site questions skipped for the computer's own pages,
-and screenshots saved in the workspace and returned even when ignored; provider requests
+and screenshots saved in the workspace and returned even when ignored; the Mac mode
+(`hello` with `os`, `arch` and Xcode, Xcode resolved past the Command Line Tools and
+`DEVELOPER_DIR` set only then, desktop actions unsupported while `exec` runs, a Mac
+without Xcode, the macOS uv download); provider requests
 streamed through the relay (chunked request bodies, headers kept or dropped, pieces sent
 again or out of order, a stream the agent left being forgotten, size and browser
 refusals); artifact resume,

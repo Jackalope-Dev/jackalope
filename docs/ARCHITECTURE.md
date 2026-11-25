@@ -100,6 +100,7 @@ changes must preserve both sides and old saved records.
 | cli_host.rs, cli_host/, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint and its mapping of conversations, plans and projects onto the terminal protocol, PATH links, opening the command in the system terminal and the shared project mirror (settings and their defaults live in cli/project_settings.rs, shared with the CLI) |
 | scope_path.rs | Repository-relative paths tasks own or name, with one case-folding rule for containment and overlap |
 | git.rs, git_command.rs, repo.rs, worktree_cleanup.rs | Worktree operations, explicit Git environment policies and Git plumbing shared with the CLI (private indexes, synthetic commits, `-z` parsers) |
+| merge_tree.rs, pbxproj.rs | `merge-tree` and stopped `git merge` results with Xcode project files merged object by object |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
 | process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
 | notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
@@ -112,6 +113,8 @@ changes must preserve both sides and old saved records.
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
+| devices.rs, devices/ | The person's iPhones and iPads through `devicectl` JSON: listing, conversation and project grants, the `device_app` and `device_logs` tools, owned console capture and Run on device builds |
+| simulator.rs, simulator/, resources/simulator-driver/ | Agent tools for iOS apps in the Simulator: `simctl` app, settings, screenshot and log commands, and the bundled XCUITest driver, built once per Xcode and run per device as an owned process, that reads accessibility trees and acts by ref |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
 | computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
 | computers/pool.rs, coordination/hosts.rs | The capacity pool of execution hosts (this device and the person's computers): per-project host choices, limits, health, the deterministic placer for planned and swarm forks, and the one retry of a fork whose host was lost |
@@ -122,6 +125,7 @@ changes must preserve both sides and old saved records.
 | account/skill_sync.rs | Opt-in account sync of chosen skills behind settings sync consent: account binding, the per-account choice, pull, revision-checked push, device holdings and deletion |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
+| xcode.rs, xcode/, simulators.rs, simulators/ | The resolved Xcode toolchain, Xcode project detection, and each iOS workspace's own Simulator with its ledger, boot pool and cleanup; see [iOS development](IOS-DEVELOPMENT.md) |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
 | cloudflare.rs, cloudflare/ | The protected Cloudflare connection and Connect Cloudflare sign-in, the product scopes it may request, and the v4 account API client shared by Artifacts, cloud resources and Swarm setup |
 | cloudflare_artifacts.rs, cloudflare_resources.rs | Artifacts repository creation, host-scoped token pushes and review snapshots; per-project cloud resources and their manifest |

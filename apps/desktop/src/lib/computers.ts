@@ -69,7 +69,14 @@ export interface DockerStatus {
   installUrl: string | null;
 }
 
-export interface CloudMachine {
+/** What a computer's agent reports about its system; records from before it did read as Linux. */
+export interface HostPlatform {
+  os?: 'linux' | 'macos';
+  arch?: string | null;
+  xcode?: { version?: string | null; build?: string | null; runtimes?: string[] } | null;
+}
+
+export interface CloudMachine extends HostPlatform {
   id: string;
   name: string;
   url: string;
@@ -81,6 +88,19 @@ export interface MachineHealth {
   reachable: boolean;
   screen: [number, number] | null;
   message: string | null;
+  platform: HostPlatform | null;
+}
+
+/** "macOS · arm64 · Xcode 27.2 · iOS 27.0", "macOS · no Xcode" or "Linux". */
+export function describePlatform(platform: HostPlatform): string {
+  if (platform.os !== 'macos') return platform.arch ? `Linux · ${platform.arch}` : 'Linux';
+  const parts = ['macOS'];
+  if (platform.arch) parts.push(platform.arch);
+  if (!platform.xcode) return [...parts, 'no Xcode'].join(' · ');
+  parts.push(platform.xcode.version ? `Xcode ${platform.xcode.version}` : 'Xcode');
+  const runtimes = platform.xcode.runtimes ?? [];
+  if (runtimes.length) parts.push(runtimes.slice(0, 2).join(', '));
+  return parts.join(' · ');
 }
 
 export const DEFAULT_COMPUTER_SETTINGS: ComputerSettings = {
@@ -190,6 +210,9 @@ export const addCloudMachine = (
 
 export const testCloudMachine = (id: string) =>
   invokeNative<MachineHealth>('computer_machine_test', { id });
+
+/** Writes this version's Mac setup script and returns its path. */
+export const macSetupScript = () => invokeNative<string>('computer_mac_setup');
 
 export const removeCloudMachine = (id: string) =>
   invokeNative<void>('computer_machine_remove', { id });

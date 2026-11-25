@@ -43,14 +43,17 @@ impl Coordinator {
     /// What a planned fork needs from its host, from what it declares: an
     /// agent that cannot run on a computer, project secrets its instructions
     /// name that only this device or only computers hold, connections
-    /// selected for its plan that cannot reach a computer, and criteria
-    /// checked in a browser.
+    /// selected for its plan that cannot reach a computer, criteria checked
+    /// in a browser, and a project that builds with Xcode.
     pub(super) fn needs(&self, ledger: &Ledger, item: &QueueItem) -> Needs {
         let mut needs =
             Needs {
                 browser: item.context_selection.outcomes.iter().any(|outcome| {
                     outcome.contains(crate::commands::planning::handoff::BROWSER_TAG)
                 }),
+                xcode: crate::commands::computers::platform::xcode_need(std::path::Path::new(
+                    &item.project_path,
+                )),
                 ..Default::default()
             };
         let adapter = self

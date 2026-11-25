@@ -347,14 +347,18 @@ through a separate temporary Git index. Forced additions already in the source i
 preserved. The source index and files are not staged, reset or committed in place.
 
 Git `commit-tree` and `merge-tree` prepare the combined result against the captured target branch.
+Xcode project files (`.pbxproj`) that conflict only as text are merged object by object
+first; see [Xcode project merges](IOS-DEVELOPMENT.md#xcode-project-merges). The same
+applies to feature-dependency bases, reconciliation input, peer conflict prediction, the
+cleanup content check and **Merge locally**.
 The app retains a reference and durable review receipt. A conflict produces a blocked
 review with the conflicting paths; it does not touch the target branch. Reiterate an affected task,
 or resolve with ordinary Git tools and prepare a new review. There is no conflict editor yet.
 
 A ready review can be split into ordered commits before it is applied. **Split into commits**
 asks the default agent, without tools, to group the change: each hunk of a modified text file is
-one unit, while new, deleted, binary, mode-changing, single-hunk files and a file replaced by a
-link (or the reverse) move whole. The diff format is fixed regardless of the person's Git diff
+one unit, while new, deleted, binary, mode-changing, single-hunk and Xcode project files and a
+file replaced by a link (or the reverse) move whole. The diff format is fixed regardless of the person's Git diff
 settings. The agent returns at most 12 commits with messages and the earlier commits each one
 needs; any `Signed-off-by:` line it writes is dropped, since only the person can sign off. Jackalope
 rejects a grouping that omits, repeats or invents a hunk, or whose dependencies form a cycle;
@@ -521,6 +525,8 @@ and page details** uses a fresh isolated browser and saves a screenshot with bou
 page elements and errors. It does not copy login or interactions from the embedded page.
 Users can attach that evidence to a follow-up, cancel a capture, and explicitly stop
 the preview before continuing. Preview ownership still blocks integration and cleanup.
+An iOS app runs in the task's Simulator instead, under the same ownership; see
+[iOS development](IOS-DEVELOPMENT.md#run-in-simulator).
 
 Delivery can inspect local Git state or read PR/CI through an installed, authenticated
 GitHub CLI. Ahead/behind counts use local upstream references, without fetching. PR

@@ -165,7 +165,34 @@ export async function discoverCodebaseContext(
     if (cargoContent.includes('tokio')) techStack.add('Tokio Async');
   }
 
-  // 3. Inspect AGENTS.md
+  // 3. Inspect Swift and Xcode project files
+  const packageSwift = await read('Package.swift');
+  const xcodeGen = await read('project.yml');
+  const tuist = await read('Project.swift');
+  const podfile = await read('Podfile');
+  for (const [file, content] of [
+    ['Package.swift', packageSwift],
+    ['project.yml', xcodeGen],
+    ['Project.swift', tuist],
+    ['Podfile', podfile],
+  ] as const) {
+    if (content !== null) sourceFilesDetected.push(file);
+  }
+  if (packageSwift !== null) {
+    techStack.add('Swift');
+    buildCommands.add('swift build');
+    testCommands.add('swift test');
+    if (packageSwift.includes('.iOS(')) techStack.add('iOS');
+  }
+  if (xcodeGen !== null && /\biOS\b/.test(xcodeGen)) techStack.add('iOS');
+  if (tuist?.includes('.iOS')) techStack.add('iOS');
+  if (podfile?.includes(':ios')) techStack.add('iOS');
+  if (xcodeGen !== null) techStack.add('XcodeGen');
+  if (tuist !== null) techStack.add('Tuist');
+  if (podfile !== null) techStack.add('CocoaPods');
+  if (xcodeGen !== null || tuist !== null || podfile !== null) techStack.add('Swift');
+
+  // 4. Inspect AGENTS.md
   const agentsContent = await read('AGENTS.md');
   if (agentsContent) {
     sourceFilesDetected.push('AGENTS.md');
@@ -197,6 +224,12 @@ export async function discoverCodebaseContext(
     : await invokeNative<ProjectDefaults>('project_defaults', { path: projectPath }).catch(
         () => undefined,
       );
+  const xcode = projectDefaults?.xcode;
+  if (xcode) {
+    techStack.add('Swift');
+    if (xcode.ios) techStack.add('iOS');
+    if (xcode.container !== 'package') techStack.add('Xcode');
+  }
   const duration = Date.now() - startTime;
 
   return {

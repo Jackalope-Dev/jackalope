@@ -51,6 +51,7 @@ macro_rules! with_commands {
             commands::agent_profiles,
             commands::agent_screen,
             commands::agent_sign_in,
+            commands::app_store_connect,
             commands::attachments,
             commands::bot_hub,
             commands::browser_profiles,
@@ -75,6 +76,7 @@ macro_rules! with_commands {
             commands::desktop_control,
             commands::desktop_control::attach,
             commands::desktop_integration,
+            commands::devices,
             commands::dictation,
             commands::external_sessions,
             commands::first_commit,
@@ -89,6 +91,7 @@ macro_rules! with_commands {
             commands::live_sessions,
             commands::local_ai,
             commands::local_detection,
+            commands::xcode,
             commands::managed_runtime,
             commands::mcp,
             commands::notifications,
@@ -109,11 +112,13 @@ macro_rules! with_commands {
             commands::reset,
             commands::review_progress,
             commands::schedules,
+            commands::simulators,
             commands::skills,
             commands::source_control,
             commands::system,
             commands::task_strategy,
             commands::tasks,
+            commands::testflight,
             commands::verification,
             commands::voice,
             commands::work_terminal,
@@ -303,6 +308,7 @@ pub fn run(launch: Launch) {
             let resetting = reset_on_startup(&directory)?;
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
+            commands::simulators::initialize(directory.join("simulators"), runtime.clone());
             runtime.observe_changes(app.handle().clone());
             commands::computers::pool::restore_health(&runtime.computers_root());
             runtime.launch_lost_host_recovery();

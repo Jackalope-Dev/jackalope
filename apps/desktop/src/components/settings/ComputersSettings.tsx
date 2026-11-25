@@ -19,6 +19,7 @@ import {
   computerUsage,
   type DockerStatus,
   deleteComputer,
+  describePlatform,
   dockerStatus,
   listComputers,
   providerLabel,
@@ -142,9 +143,22 @@ export function ComputersSettings() {
       setHealth((current) => ({
         ...current,
         [machine.id]: result.reachable
-          ? `Connected${result.screen ? ` · ${result.screen[0]}×${result.screen[1]} screen` : ''}`
+          ? [
+              'Connected',
+              result.platform && describePlatform(result.platform),
+              result.screen && `${result.screen[0]}×${result.screen[1]} screen`,
+            ]
+              .filter(Boolean)
+              .join(' · ')
           : (result.message ?? 'Not reachable'),
       }));
+      if (result.platform) {
+        setMachines((current) =>
+          current.map((saved) =>
+            saved.id === machine.id ? { ...saved, ...result.platform } : saved,
+          ),
+        );
+      }
     });
 
   return (
@@ -207,7 +221,7 @@ export function ComputersSettings() {
           <SettingRow
             key={machine.id}
             title={machine.name}
-            description={health[machine.id] ?? machine.url}
+            description={health[machine.id] ?? `${describePlatform(machine)} · ${machine.url}`}
           >
             <div className="flex gap-2">
               <Button

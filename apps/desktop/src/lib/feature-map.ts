@@ -1,7 +1,10 @@
 /** One user-facing feature in a project's feature map; mirrors the native `Feature`. */
 export interface FeatureMapEntry {
   name: string;
-  /** Preview path review screenshots open, such as `/settings?tab=billing`. */
+  /**
+   * Preview path review screenshots open, such as `/settings?tab=billing`, or for an iOS
+   * app the deep link the Simulator opens, such as `myapp://settings`.
+   */
   page: string;
   /** How a person reaches the state worth checking. Guidance only; screenshots open `page`. */
   steps?: string;
@@ -28,12 +31,27 @@ function pageKey(page: string): string {
   return path.replace(/\/+$/, '') || '/';
 }
 
+const WEB_SCHEMES = new Set(['http', 'https', 'file', 'javascript', 'data', 'about', 'blob']);
+
+/** Whether a page is an app deep link such as `myapp://settings`; mirrors the native check. */
+function isDeepLink(page: string): boolean {
+  const value = page.trim();
+  const match = /^([a-z][a-z0-9+.-]*):(.+)$/i.exec(value);
+  return (
+    !!match &&
+    !WEB_SCHEMES.has((match[1] ?? '').toLowerCase()) &&
+    value.length <= 300 &&
+    !/[\s\p{Cc}]/u.test(value)
+  );
+}
+
 /** Why a page cannot be captured, or an empty string when it can. */
 export function featurePageError(page: string): string {
   const path = page.trim();
   if (!path) return 'Enter the page to open, such as /settings.';
+  if (isDeepLink(path)) return '';
   if (!path.startsWith('/') || path.startsWith('//') || /[\s\\]/.test(path))
-    return 'Use a path on the preview, starting with a single /.';
+    return 'Use a path on the preview, starting with a single /, or an iOS app link such as myapp://settings.';
   return '';
 }
 

@@ -7,9 +7,20 @@ import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
 import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
+import type { SimulatorBase } from '../lib/simulators.ts';
 import { type TerminalCommand, worktreeCommandsForRegistry } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
+
+/** Overrides for a project's setup and check time limits, in seconds. */
+export interface ProjectTimeLimits {
+  /** How long a setup command may print nothing. Default 300. */
+  prepareSilenceSecs?: number;
+  /** How long a check may print nothing. Default 600. */
+  checkSilenceSecs?: number;
+  /** The longest a setup command or check may run. Default 1800. */
+  checkCeilingSecs?: number;
+}
 
 export interface ProjectPreferences {
   preferredRunner?: string;
@@ -37,7 +48,16 @@ export interface ProjectPreferences {
   worktreeDir?: string;
   verifyCommand?: string;
   previewCommand?: string;
+  /**
+   * Builds an iOS app for its Simulator preview and review screenshots, into
+   * `$JACKALOPE_DERIVED_DATA`. Undefined uses the detected `xcodebuild build`.
+   */
+  simulatorPreview?: string;
   prepareCommand?: string;
+  /** Apple team ID that device builds sign with (`DEVELOPMENT_TEAM`). */
+  developmentTeam?: string;
+  /** Setup and check time limits in seconds. Undefined fields keep the defaults. */
+  timeLimits?: ProjectTimeLimits;
   /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
   terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
@@ -73,7 +93,10 @@ export interface ProjectPreferences {
   personalClaudeSetup?: boolean;
   /** Fast command Claude Code runs after each file edit; `{file}` is the edited path. */
   editCheck?: string;
-  /** Before/after screenshots of finished work from the preview command. Undefined means on. */
+  /**
+   * Before/after screenshots of finished work, from the preview command or, for an iOS
+   * app, the Simulator. Undefined means on.
+   */
   reviewCaptures?: boolean;
   /** Preview paths always captured for review, one per entry. Empty means `/`. */
   reviewPages?: string[];
@@ -81,6 +104,8 @@ export interface ProjectPreferences {
   reviewViewports?: ('desktop' | 'narrow')[];
   /** User-facing features whose pages review screenshots prefer when their sources change. */
   featureMap?: FeatureMapEntry[];
+  /** The device type and runtime of task Simulators. Undefined uses the newest standard iPhone. */
+  simulator?: SimulatorBase;
 }
 
 /**
@@ -372,14 +397,18 @@ interface ProjectRecord {
   /** Project instructions, given to every task agent at launch. */
   instructions?: string;
   prepareCommand?: string;
+  timeLimits?: ProjectTimeLimits;
   setupFiles?: string[];
   /** Saved commands marked to run in each new task worktree. */
   worktreeCommands?: { name: string; command: string }[];
   previewCommand?: string;
+  simulatorPreview?: string;
+  developmentTeam?: string;
   reviewCaptures?: boolean;
   reviewPages?: string[];
   reviewViewports?: string[];
   featureMap?: FeatureMapEntry[];
+  simulator?: SimulatorBase;
 }
 
 /**
@@ -421,13 +450,17 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     autoVerify: preferences?.autoVerify,
     instructions: preferences?.customInstructions?.trim() || undefined,
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
+    timeLimits: preferences?.timeLimits,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
     worktreeCommands: worktreeCommandsForRegistry(preferences?.terminalCommands),
     previewCommand: preferences?.previewCommand?.trim() || undefined,
+    simulatorPreview: preferences?.simulatorPreview?.trim() || undefined,
+    developmentTeam: preferences?.developmentTeam?.trim() || undefined,
     reviewCaptures: preferences?.reviewCaptures,
     reviewPages: reviewPagesForRegistry(preferences?.reviewPages),
     reviewViewports: preferences?.reviewViewports?.length ? preferences.reviewViewports : undefined,
     featureMap: featureMapForRegistry(preferences?.featureMap),
+    simulator: preferences?.simulator,
   }));
 }
 

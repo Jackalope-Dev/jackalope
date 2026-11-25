@@ -192,6 +192,42 @@ fn a_paired_machine_belongs_to_one_bot() {
 }
 
 #[test]
+fn paired_machines_keep_the_system_their_agent_reports() {
+    let root = root();
+    std::fs::write(
+        root.join("machines.json"),
+        r#"{"machines":[{"id":"m1","name":"Mini","url":"https://mini.example.com","createdAt":"2026-01-01T00:00:00Z"}]}"#,
+    )
+    .unwrap();
+    let computer = Computer {
+        provider: REMOTE_MACHINE.into(),
+        machine_id: Some("m1".into()),
+        ..bot(&root, "b1")
+    };
+    // A record from before agents reported their system is Linux.
+    assert_eq!(
+        platform::of(&root, &computer),
+        platform::HostPlatform::default()
+    );
+    let mac = platform::HostPlatform::from_hello(&json!({
+        "os": "macos", "arch": "arm64", "xcode": {"version": "27.2", "runtimes": [{"name": "iOS 27.0"}]}
+    }));
+    remote::learn(&root, "m1", &mac).unwrap();
+    assert!(platform::of(&root, &computer).builds_xcode());
+    let saved: Value =
+        serde_json::from_slice(&std::fs::read(root.join("machines.json")).unwrap()).unwrap();
+    assert_eq!(saved["machines"][0]["os"], "macos");
+    assert_eq!(saved["machines"][0]["xcode"]["version"], "27.2");
+    assert_eq!(
+        remote::machine(&root, "m1").unwrap().url,
+        "https://mini.example.com"
+    );
+    // Local sandboxes run the Linux image; an unknown machine changes nothing.
+    assert!(!platform::of(&root, &bot(&root, "b2")).builds_xcode());
+    remote::learn(&root, "gone", &mac).unwrap();
+}
+
+#[test]
 fn docker_detection_explains_each_unavailable_state() {
     let running = r#"{"Client":{"Version":"27.1.1"},"Server":{"Version":"27.1.1","Os":"linux","Arch":"arm64"}}"#;
     let status = docker::interpret(Ok(running), "desktop-linux");
