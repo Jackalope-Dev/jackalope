@@ -32,6 +32,9 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept Edit from here in an installed app on macOS, Windows and Linux for Claude Code and
+  Codex conversations and tasks, including Undo and the turn after a rewind; watch for changes
+  to Claude Code's hidden `--resume-session-at` flag.
 - [ ] Accept repository discovery on a fresh macOS install with sessions under protected
   folders (no permission prompts), and on Windows and Linux.
 - [ ] Accept worktree lifecycle in an installed app on macOS, Windows and Linux:

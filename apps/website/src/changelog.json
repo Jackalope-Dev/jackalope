@@ -1,5 +1,16 @@
 [
   {
+    "id": "edit-from-an-earlier-turn",
+    "date": "2026-11-25",
+    "title": "Edit from an earlier turn.",
+    "description": "Rewind a Claude Code or Codex conversation to any earlier turn and send it differently.",
+    "items": [
+      "Files and the agent's own conversation both go back, and your later changes are saved first.",
+      "Undo the rewind until you send the next message.",
+      "Undone turns stay in the history, collapsed, so nothing disappears."
+    ]
+  },
+  {
     "id": "every-shortcut-is-yours-to-change",
     "date": "2026-11-24",
     "title": "Every shortcut is yours to change.",

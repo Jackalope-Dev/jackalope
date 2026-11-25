@@ -442,6 +442,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
   review before explicit application. Focused review and elapsed integration time remain
   distinct local measurements. Installed-provider and cost/quality acceptance remain open.
+- Edit from here rewinds a Claude Code or Codex conversation or task in a Jackalope worktree
+  to an earlier turn: files return from a hidden per-turn checkpoint, the agent's own
+  conversation resumes from the turn before (Claude `--resume-session-at --fork-session`,
+  Codex app-server thread fork), current files are kept in a safety snapshot, undone turns
+  stay in history collapsed, and Undo works until the next turn. Real Claude and Codex trial
+  runs passed; installed acceptance remains open.
 - Plan mode is explicit: **Plan with me** in the composer or beside a plan or
   investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
   planning attempt explores, asks at most the project's question cap (default 5) and
