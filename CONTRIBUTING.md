@@ -149,17 +149,18 @@ Keep the CI checks required for integration. Local verification does not
 include CI's Linux/macOS desktop, browser, keyring and packaging checks, and a
 Windows pass cannot establish that those platform-specific checks pass.
 
-CI runs the full gate once on Windows. Linux and macOS use `pnpm verify --native-only`
-for desktop JavaScript, Rust formatting and native unit tests, then run their
-browser, credential-storage, desktop-control and packaging checks. Shared server,
-website, UI gallery and repository checks are covered by the required Windows job.
+CI splits the gate. The `shared` job runs `pnpm verify --shared-only` once on Linux:
+repository, server, website, UI gallery, mobile and desktop JavaScript checks and the
+builds. In parallel, Windows (`verify`), Linux and macOS run `pnpm verify --native-only`
+for desktop JavaScript, Rust formatting and native unit tests, and Linux and macOS then
+run their browser, credential-storage, desktop-control and packaging checks.
 CI checks only what a change can affect. A pull request or merge queue entry is
 compared with its base; a push to master is compared with master's last commit whose
 Verify passed, so commits whose runs were replaced or failed are always covered. When
 nothing the native build or the Linux and macOS trials read changed (for example only
 the desktop frontend, shared packages, documentation, the website, the swarm Worker,
-mobile or the server), Windows runs `pnpm verify --shared-only` and the Linux and macOS
-checks report from a short Linux job without building. Native inputs are those listed
+mobile or the server), only the `shared` job does real work: the Windows, Linux and
+macOS checks report from a short Linux job without building. Native inputs are those listed
 above plus `verify.yml`, the Linux trial scripts and `.node-version`; any of them runs
 everything. Release branches, pull requests into them, manual runs and a master with no
 green run always run everything. The Rust cache is keyed by the base branch's
