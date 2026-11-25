@@ -970,8 +970,8 @@ real Simulators, archive a generic iOS build and merge real XcodeGen projects; n
 has run it end to end in the installed app. Install, launch and console capture on a
 physical device, signed device builds, a TestFlight upload and App Store Connect
 processing, a LaunchAgent-installed Mac computer behind HTTPS, simulators for agents on a
-computer and command-line builds of packages with Swift macros (Xcode's macro trust check)
-are unverified or unsupported. Mac computers have no desktop control or browser tools.
+computer are unverified or unsupported. Builds of packages with Swift macros or plugins
+need them trusted once in Xcode; Jackalope explains how and never skips the check. Mac computers have no desktop control or browser tools.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
 viewer or cloud machine has been accepted in an installed app on any platform. A bot's

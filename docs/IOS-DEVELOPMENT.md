@@ -429,9 +429,20 @@ setup quiet limit, check quiet limit and total limit per project; for a project 
 `.xcodeproj` or `.xcworkspace` it suggests 15 and 20 quiet minutes and 60 in total. Existing
 projects keep the defaults (5, 10 and 30 minutes) until someone saves values.
 
-Command-line builds of packages that declare Swift macros stop at Xcode's macro trust
-check ("must be enabled before it can be used") until the macros are trusted for that
-Xcode, as with any `xcodebuild` run.
+### Swift macros and package plugins
+
+Xcode runs a package's Swift macros and build plugins only after someone trusts them once
+in the Xcode app; `xcodebuild` has no prompt and stops with "must be enabled before it can
+be used". Jackalope keeps that check. When a check, setup command, Simulator preview,
+review capture, device run or TestFlight step fails this way, `xcode/macros.rs` names each
+package and target and adds what to do: open the project in Xcode once, build it, and
+choose Trust & Enable for each package. Xcode remembers the trust on that Mac, so later
+command-line builds pass, and asks again when a package's macros change. Check and setup
+output carries the same text, so agents read it too; their Simulator guidance tells them to
+ask the person with `request_human_action` instead of bypassing it. Jackalope never passes
+`-skipMacroValidation` or `-skipPackagePluginValidation`, and an agent command that does,
+or that writes Xcode's skip defaults, asks the person in projects that auto-approve
+routine commands.
 
 ## Xcode project merges
 

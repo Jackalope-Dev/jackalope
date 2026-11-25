@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 
 use super::process_control;
 
+pub mod macros;
 pub mod project;
 
 /// How long a resolution is reused before the disk is checked again, so a

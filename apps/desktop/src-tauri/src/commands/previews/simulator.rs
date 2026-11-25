@@ -341,7 +341,13 @@ pub(super) fn build(
                 result
                     .exit_code
                     .map_or("unknown".to_string(), |code| code.to_string()),
-                simulator::failure_tail(&output)
+                xcode::macros::explain(
+                    &simulator::failure_tail(&output),
+                    detected
+                        .as_ref()
+                        .and_then(|(project, _)| project.path.as_deref())
+                        .map(Path::new)
+                )
             ),
         });
     }

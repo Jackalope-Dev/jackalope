@@ -1114,7 +1114,7 @@ fn failure(step: &str, result: &CommandResult, job: &Job) -> String {
     } else {
         errors.join("\n")
     };
-    format!("{step} failed{exit}:\n{detail}")
+    crate::commands::xcode::macros::explain(&format!("{step} failed{exit}:\n{detail}"), None)
 }
 
 static JOBS: LazyLock<Mutex<HashMap<String, Arc<Job>>>> = LazyLock::new(Default::default);

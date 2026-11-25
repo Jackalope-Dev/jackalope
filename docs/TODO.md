@@ -13,9 +13,7 @@ release dates.
   settings, a physical iPhone with a signed team build (`device_app`, `device_logs`, Run on
   device), a real TestFlight upload through processing, and a Mac computer installed as a
   LaunchAgent behind Tailscale HTTPS running real Claude Code and Codex tasks.
-- [ ] Decide how command-line builds pass Xcode's Swift macro trust check (a documented setup
-  step or an opt-in `-skipMacroValidation`), and snapshot Swift packages that use local
-  package references.
+- [ ] Snapshot Swift packages that use local package references.
 - [ ] Give agents on a computer a Simulator and the simulator tools on a Mac computer, and send
   file secrets to computers.
 - [ ] Merge `.xcscheme` and `Package.resolved` structurally, and use one Xcode project detector

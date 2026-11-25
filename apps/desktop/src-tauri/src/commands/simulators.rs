@@ -62,7 +62,7 @@ impl Device {
     /// What an agent is told about its device.
     pub fn guidance(&self) -> String {
         format!(
-            "\nThis task has its own iOS Simulator, {} ({}), UDID in $JACKALOPE_SIMULATOR_UDID. Build, install and test on it with xcodebuild -destination \"id=$JACKALOPE_SIMULATOR_UDID\" or xcrun simctl <command> \"$JACKALOPE_SIMULATOR_UDID\". It runs without a window; do not open Simulator or DeviceHub, boot or erase other devices, or create new ones. App data on it persists across follow-ups to this task.\n",
+            "\nThis task has its own iOS Simulator, {} ({}), UDID in $JACKALOPE_SIMULATOR_UDID. Build, install and test on it with xcodebuild -destination \"id=$JACKALOPE_SIMULATOR_UDID\" or xcrun simctl <command> \"$JACKALOPE_SIMULATOR_UDID\". It runs without a window; do not open Simulator or DeviceHub, boot or erase other devices, or create new ones. App data on it persists across follow-ups to this task. If a build stops because a Swift macro or package plugin \"must be enabled before it can be used\", do not pass -skipMacroValidation or -skipPackagePluginValidation or change Xcode's trust settings; ask the person with request_human_action to open the project in Xcode once and choose Trust & Enable.\n",
             self.name,
             short_runtime(&self.runtime)
         )

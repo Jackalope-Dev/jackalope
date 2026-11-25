@@ -196,7 +196,11 @@ pub fn build_failure(output: &str, team: Option<&str>) -> String {
     } else {
         ""
     };
-    format!("The device build failed.{hint}\n{said}")
+    let message = format!("The device build failed.{hint}\n{said}");
+    match crate::commands::xcode::macros::hint(output, None) {
+        Some(trust) => format!("{message}\n\n{trust}"),
+        None => message,
+    }
 }
 
 /// One value from a property list, binary or XML.

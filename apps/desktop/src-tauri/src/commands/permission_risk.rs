@@ -663,6 +663,11 @@ impl Context {
         if installs_software(&program, &lower) {
             return risky("it installs or removes software on this computer");
         }
+        if program == "xcodebuild"
+            && (has("-skipmacrovalidation") || has("-skippackagepluginvalidation"))
+        {
+            return risky("it runs Swift macros or package plugins you have not trusted in Xcode");
+        }
         match program.as_str() {
             "su" | "runas" => risky("it runs with elevated privileges"),
             "start-process" | "saps" | "start"
@@ -2779,6 +2784,18 @@ mod tests {
         ] {
             asks(bash(command), command);
         }
+    }
+
+    #[test]
+    fn skipping_xcode_macro_trust_escalates() {
+        for command in [
+            "xcodebuild build -scheme App -skipMacroValidation",
+            "xcodebuild test -scheme App -skipPackagePluginValidation",
+            "defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES",
+        ] {
+            asks(bash(command), command);
+        }
+        routine(bash("xcodebuild build -scheme App"), "a plain build");
     }
 
     #[test]

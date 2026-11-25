@@ -151,6 +151,19 @@ pub struct Verification {
     pub result: process_control::CommandResult,
 }
 
+/// Adds what to do when Xcode refused to run a package's macros or plugins, so
+/// the person and the agent see how to trust them rather than a bare build error.
+fn explain_macros(mut result: process_control::CommandResult) -> process_control::CommandResult {
+    if result.success {
+        return result;
+    }
+    let output = format!("{}\n{}", result.stdout, result.stderr);
+    if let Some(hint) = super::xcode::macros::hint(&output, None) {
+        result.stderr = format!("{}\n\n{hint}", result.stderr.trim_end());
+    }
+    result
+}
+
 fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     if command.trim().is_empty() || command.len() > 4000 || command.contains('\0') {
         return Err("Set a verification command of 1–4,000 characters in Project Settings.".into());
@@ -247,8 +260,12 @@ pub(in crate::commands) fn run_disposable(
         process.envs(disposable.device.environment());
         super::xcode::apply(&mut process);
     }
-    let mut result =
-        process_control::run_supervised(process, limits.limits(setup), || false, |_, _| {})?;
+    let mut result = explain_macros(process_control::run_supervised(
+        process,
+        limits.limits(setup),
+        || false,
+        |_, _| {},
+    )?);
     if let Some(Err(error)) = simulator {
         result.stderr = format!(
             "Jackalope could not provide a Simulator: {error}\n{}",
@@ -350,14 +367,16 @@ pub(in crate::commands) fn run_worktree_command(
                     &format!("Running {name}, which runs when a worktree is created: {command}"),
                 );
             })?;
-            let result = runtime.timed(id, "worktreeCommand", || {
-                process_control::run_supervised(
-                    shell(command, workspace)?,
-                    run_limits(runtime, id).limits(true),
-                    || !runtime.is_running(id),
-                    observer(runtime, id),
-                )
-            })?;
+            let result = runtime
+                .timed(id, "worktreeCommand", || {
+                    process_control::run_supervised(
+                        shell(command, workspace)?,
+                        run_limits(runtime, id).limits(true),
+                        || !runtime.is_running(id),
+                        observer(runtime, id),
+                    )
+                })
+                .map(explain_macros)?;
             let record = PreparationRecord::from_result(command, 1, &result);
             runtime.update_checked(id, |run| {
                 run.diagnostics.push(format!(
@@ -406,15 +425,18 @@ fn run_preparation(
                 },
             );
         })?;
-        let result = runtime.timed(id, "preparation", || {
-            let (process, _in_use) = with_simulator(shell(command, workspace)?, simulator.as_ref());
-            process_control::run_supervised(
-                process,
-                limits.limits(true),
-                || !runtime.is_running(id),
-                observer(runtime, id),
-            )
-        })?;
+        let result = runtime
+            .timed(id, "preparation", || {
+                let (process, _in_use) =
+                    with_simulator(shell(command, workspace)?, simulator.as_ref());
+                process_control::run_supervised(
+                    process,
+                    limits.limits(true),
+                    || !runtime.is_running(id),
+                    observer(runtime, id),
+                )
+            })
+            .map(explain_macros)?;
         let record = PreparationRecord::from_result(command, attempt, &result);
         let saved = record.clone();
         runtime.update_checked(id, |run| {
@@ -489,16 +511,18 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
                 1,
             ))
         });
-        let result = runtime.timed(&run.id, "verification", || {
-            let (process, _in_use) =
-                with_simulator(shell(command, &run.workspace)?, simulator.as_ref());
-            process_control::run_supervised(
-                process,
-                run.time_limits.unwrap_or_default().limits(false),
-                || agent_active && !runtime.is_running(&run.id),
-                observer(runtime, &run.id),
-            )
-        })?;
+        let result = runtime
+            .timed(&run.id, "verification", || {
+                let (process, _in_use) =
+                    with_simulator(shell(command, &run.workspace)?, simulator.as_ref());
+                process_control::run_supervised(
+                    process,
+                    run.time_limits.unwrap_or_default().limits(false),
+                    || agent_active && !runtime.is_running(&run.id),
+                    observer(runtime, &run.id),
+                )
+            })
+            .map(explain_macros)?;
         runtime.update(&run.id, |r| r.progress = None);
         if result.success {
             save_packages(runtime, &run.id, Path::new(&run.workspace));
