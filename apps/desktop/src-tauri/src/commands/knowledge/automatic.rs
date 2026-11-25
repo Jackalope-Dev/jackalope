@@ -142,7 +142,7 @@ fn reusable(text: &str) -> bool {
         .any(|s| lower.contains(s))
 }
 
-pub(super) fn objective(prompt: &str) -> &str {
+pub(crate) fn objective(prompt: &str) -> &str {
     prompt
         .strip_prefix("### 🎯 Objective\n")
         .map(|text| text.split("\n\n### ").next().unwrap_or(text))

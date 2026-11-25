@@ -358,7 +358,9 @@ captured MCP responses; `--after-result-preview=on` also bounds large
 unselected responses while keeping the complete source recoverable. Preview
 requires result queries. `--after-initial-tools=small` measures eager delivery of
 a complete bounded catalog. `--after-goal-restatement=batched` asks for the goal
-restatement in the same turn as the first file reads instead of a turn of its own.
+restatement in the same turn as the first file reads instead of a turn of its own;
+`scoped` skips it for small, fully specified tasks (a request of up to 800 characters
+with no requirements, workflow inputs or thorough approach).
 Keep these controls explicit in saved comparisons.
 Authored multi-source join cases can be generated with
 `node scripts/evaluation/pipeline-cases.mjs <suite.json>`. The name identifies the

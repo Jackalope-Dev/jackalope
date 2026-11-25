@@ -42,7 +42,7 @@
       "environment": null
     },
     "goal-restatement": {
-      "values": ["separate", "batched"],
+      "values": ["separate", "batched", "scoped"],
       "default": "separate",
       "environment": "JACKALOPE_GOAL_RESTATEMENT"
     },
