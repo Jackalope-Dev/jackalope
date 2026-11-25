@@ -18,7 +18,9 @@ const PROTECTED_FOLDERS: [&str; 8] = [
 /// Whether looking inside `path` could make macOS ask the person for permission: a guarded
 /// home folder, iCloud Drive or a mounted volume. Decided from the path text alone, so a
 /// caller can skip the folder without touching it. Relative paths count as protected,
-/// since where they point is unknown.
+/// since where they point is unknown; on Windows that includes `\Users\x`, which has no drive.
+/// The home folder matches whatever its case, as macOS and Windows disks ignore case and an
+/// agent records the folder as the person typed it.
 pub(crate) fn protected_location_in(path: &Path, home: &Path) -> bool {
     if !path.is_absolute()
         || path.starts_with("/Volumes")
@@ -29,11 +31,19 @@ pub(crate) fn protected_location_in(path: &Path, home: &Path) -> bool {
     {
         return true;
     }
-    let Some(first) = path
-        .strip_prefix(home)
-        .ok()
-        .and_then(|inside| inside.components().next())
-    else {
+    let mut inside = path.components();
+    for part in home.components() {
+        let same = inside.next().is_some_and(|other| {
+            other
+                .as_os_str()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&part.as_os_str().to_string_lossy())
+        });
+        if !same {
+            return false;
+        }
+    }
+    let Some(first) = inside.next() else {
         return false;
     };
     let first = first.as_os_str().to_string_lossy();
@@ -242,6 +252,17 @@ pub fn poll_until<T, E>(
             return Ok(None);
         }
         std::thread::sleep(interval.min(deadline - now));
+    }
+}
+
+/// `path`, written from the root with `/`, as an absolute path on this platform: on the `C:`
+/// drive on Windows, where a path without a drive is relative to the current one.
+#[cfg(test)]
+pub(crate) fn absolute_fixture(path: &str) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(format!("C:{path}"))
+    } else {
+        PathBuf::from(path)
     }
 }
 

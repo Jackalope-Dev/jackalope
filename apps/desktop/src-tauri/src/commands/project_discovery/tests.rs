@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::platform::absolute_fixture;
 use std::process::Command;
 
 struct Home {
@@ -15,8 +16,11 @@ impl Home {
         }
     }
 
+    /// `relative`, written with `/`, inside the home folder with the platform's separators.
     fn path(&self, relative: &str) -> PathBuf {
-        self.root.join(relative)
+        relative
+            .split('/')
+            .fold(self.root.clone(), |path, part| path.join(part))
     }
 
     fn git(&self, folder: &Path, args: &[&str]) {
@@ -64,6 +68,18 @@ impl Drop for Home {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.root);
     }
+}
+
+/// `folder` as VS Code writes it in `storage.json`: `file:///c%3A/Users/...` on Windows.
+fn file_uri(folder: &Path) -> String {
+    let mut text = folder
+        .to_string_lossy()
+        .replace('\\', "/")
+        .replace(' ', "%20");
+    if text.as_bytes().get(1) == Some(&b':') {
+        text = format!("/{}%3A{}", text[..1].to_ascii_lowercase(), &text[2..]);
+    }
+    format!("file://{text}")
 }
 
 fn now_ms() -> u64 {
@@ -120,7 +136,7 @@ fn finds_repositories_from_sessions_code_folders_and_editors() {
     std::fs::write(
         &editor_file,
         serde_json::json!({
-            "windowsState": {"lastActiveWindow": {"folder": format!("file://{}", editor.to_string_lossy().replace(' ', "%20"))}},
+            "windowsState": {"lastActiveWindow": {"folder": file_uri(&editor)}},
             "backupWorkspaces": {"folders": [{"folderUri": "vscode-remote://ssh-remote+box/home/x"}]},
         })
         .to_string(),
@@ -202,24 +218,28 @@ fn guarded_folders_are_never_opened() {
     for path in ["Code/x", "Developer", "DocumentsArchive/x"] {
         assert!(!protected(&home.path(path), &home.root), "{path}");
     }
-    assert!(!protected(Path::new("/opt/src/repo"), &home.root));
+    assert!(!protected(&absolute_fixture("/opt/src/repo"), &home.root));
 }
 
 #[test]
 fn editor_uris_decode_to_local_folders() {
-    assert_eq!(
-        file_path("file:///Users/me/Code/my%20app"),
-        Some(PathBuf::from("/Users/me/Code/my app"))
-    );
+    let folder = absolute_fixture("/Users/me/Code/my app");
+    assert_eq!(file_path(&file_uri(&folder)), Some(folder));
     assert_eq!(file_path("vscode-remote://ssh-remote+box/x"), None);
     assert_eq!(file_path("file:///bad%zz"), None);
     assert_eq!(file_path("file://relative"), None);
-    if cfg!(windows) {
-        assert_eq!(
-            file_path("file:///c%3A/Users/me/repo"),
-            Some(PathBuf::from("c:/Users/me/repo"))
-        );
-    }
+    // Each platform reads only its own absolute form.
+    let (local, foreign) = if cfg!(windows) {
+        ("file:///c%3A/Users/me/repo", "file:///Users/me/repo")
+    } else {
+        ("file:///Users/me/repo", "file:///c%3A/Users/me/repo")
+    };
+    assert_eq!(
+        file_path(local),
+        Some(absolute_fixture("/Users/me/repo")),
+        "{local}"
+    );
+    assert_eq!(file_path(foreign), None, "{foreign}");
     let home = Home::new();
     let file = home.path("storage.json");
     std::fs::write(&file, b"{not json").unwrap();
