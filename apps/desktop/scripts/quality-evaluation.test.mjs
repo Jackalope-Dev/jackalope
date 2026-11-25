@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -351,6 +351,13 @@ test('quality oracles reject initial defects, accept solutions, and detect unrel
     if (solutions[fixture.id]) writeFileSync(path.join(repo, 'index.mjs'), solutions[fixture.id]);
     const good = run();
     assert.equal(good.status, 0, `${fixture.id}: ${good.stderr}`);
+    // Jackalope's empty, Git-excluded workspace folder is not the agent's work; anything
+    // written inside it is.
+    mkdirSync(path.join(repo, '.jackalope'));
+    assert.equal(run().status, 0, `${fixture.id} should accept an empty .jackalope`);
+    writeFileSync(path.join(repo, '.jackalope', 'notes.md'), 'Extra work');
+    assert.notEqual(run().status, 0, `${fixture.id} should reject files in .jackalope`);
+    rmSync(path.join(repo, '.jackalope'), { recursive: true });
     writeFileSync(path.join(repo, 'unrequested.txt'), 'Extra work');
     assert.notEqual(run().status, 0, `${fixture.id} should reject scope expansion`);
   }
