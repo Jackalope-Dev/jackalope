@@ -165,11 +165,12 @@ fn finds_repositories_from_sessions_code_folders_and_editors() {
     let scan = discover(&inputs, Instant::now() + Duration::from_secs(30));
     assert!(!scan.truncated);
     let names: BTreeSet<_> = found(&scan).iter().map(|(name, _, _)| *name).collect();
-    assert_eq!(
-        names,
-        BTreeSet::from(["atlas", "beacon", "comet", "empty"]),
-        "{scan:?}"
-    );
+    // Only macOS guards Documents; elsewhere the repository there is found like any other.
+    let mut expected = BTreeSet::from(["atlas", "beacon", "comet", "empty"]);
+    if !cfg!(target_os = "macos") {
+        expected.insert("private");
+    }
+    assert_eq!(names, expected, "{scan:?}");
     let first = &scan.candidates[0];
     assert_eq!(first.name, "atlas");
     assert_eq!(first.path, atlas.to_string_lossy());

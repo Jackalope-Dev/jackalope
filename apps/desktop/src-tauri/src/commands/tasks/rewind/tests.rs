@@ -801,6 +801,8 @@ fn restores_keep_ignored_files_and_submodules_and_undo_restages_a_staged_change(
     git(&repo, &["config", "submodule.recurse", "true"]);
     let with_library = snapshot("library");
     restore(&repo, &directory, &with_library.tree, &start.tree, None).unwrap();
-    assert_eq!(read("library/lib.txt"), "lib\n");
+    // The submodule is a fresh clone, so Windows runners with core.autocrlf check it out
+    // with CRLF; only its presence and content matter here.
+    assert_eq!(read("library/lib.txt").replace("\r\n", "\n"), "lib\n");
     let _ = std::fs::remove_dir_all(&root);
 }

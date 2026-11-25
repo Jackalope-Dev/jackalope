@@ -698,6 +698,8 @@ fn titles_are_one_trimmed_line() {
     assert!(!read::generated("<div> is misaligned, fix it"));
 }
 
+/// Only macOS guards these folders; elsewhere a session there is checked like any other.
+#[cfg(target_os = "macos")]
 #[test]
 fn sessions_in_protected_locations_are_listed_without_looking_at_their_folder() {
     let fixture = Fixture::new();

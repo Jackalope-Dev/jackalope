@@ -943,6 +943,8 @@ fn trial_project_discovery_with_local_sessions() {
     }
 }
 
+/// Only macOS guards these folders; elsewhere a session there is checked like any other.
+#[cfg(target_os = "macos")]
 #[test]
 fn protected_session_folders_are_grouped_and_described_without_being_opened() {
     let fixture = Fixture::new();
