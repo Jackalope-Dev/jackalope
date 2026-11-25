@@ -75,8 +75,8 @@ One-time setup:
    `STORE_PUBLISHER_DISPLAY_NAME`.
 4. Run `pnpm release:setup --apply` to configure protected branches, branch-scoped
    Store/Cloud environments and immutable release tags. It selects
-   `RELEASE_DISTRIBUTION=store` and removes Windows from Cloud targets. Existing
-   enablement flags are preserved. Keep them off until their prerequisites pass.
+   `RELEASE_DISTRIBUTION=store` and leaves Windows out of new Cloud target lists.
+   Existing enablement flags and target choices are preserved. Keep them off until their prerequisites pass.
 5. Prepare two increasing beta versions with `pnpm release:prepare patch`, review
    notes, set `Status: ready`, verify, commit and push each. Run **Store release**
    in candidate mode to inspect the package. After the first manual Partner Center

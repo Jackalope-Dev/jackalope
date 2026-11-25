@@ -183,3 +183,35 @@ jobs:
             output/cloud-candidates/cloud-release.json
             output/cloud-candidates/cloud-notes.md
           if-no-files-found: ignore
+  # Mirrors a confirmed stable Cloud publication to a public GitHub Release with
+  # the same bytes. It has no environment secrets and only writes the release.
+  github-release:
+    needs: [plan, release]
+    if: needs.plan.outputs.channel == 'stable' && needs.plan.outputs.mode == 'publish'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+      CLOUD_RELEASE_TARGETS: ${{ needs.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: cloud-candidate-*
+          path: output/cloud-candidates
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: cloud-publication-*
+          path: output/cloud-publication
+      - name: Mirror the stable release to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/release/github-release.mjs output/cloud-candidates output/cloud-publication

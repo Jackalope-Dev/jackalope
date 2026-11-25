@@ -30,16 +30,19 @@ if (automatic && enabled) {
   if (refs.some((ref) => ref.ref === `refs/tags/${tag}`)) enabled = false;
 }
 if (enabled) await readNotes(v, mode !== 'rehearsal');
-let selected =
-  !automatic && event.inputs?.targets === 'windows'
-    ? ['windows-x86_64']
-    : releaseTargets(process.env.CLOUD_RELEASE_TARGETS);
-if (process.env.RELEASE_DISTRIBUTION === 'store') {
-  if (event.inputs?.targets === 'windows')
-    throw new Error('Windows releases use Microsoft Store; run Store release');
-  selected = selected.filter((target) => target !== 'windows-x86_64');
-  if (!selected.length) throw new Error('Configure Mac/Linux Cloud targets for Store distribution');
-}
+const configured = () => releaseTargets(process.env.CLOUD_RELEASE_TARGETS);
+const windowsOnly = !automatic && event.inputs?.targets === 'windows';
+const selected = windowsOnly ? ['windows-x86_64'] : configured();
+// With Store distribution the direct Windows installer ships through Cloud only
+// when CLOUD_RELEASE_TARGETS lists it; the default targets leave it out.
+if (
+  process.env.RELEASE_DISTRIBUTION === 'store' &&
+  windowsOnly &&
+  !configured().includes('windows-x86_64')
+)
+  throw new Error(
+    'Windows releases use Microsoft Store; add windows-x86_64 to CLOUD_RELEASE_TARGETS for the direct installer',
+  );
 const runners = {
   'windows-x86_64': 'windows-2022',
   'darwin-aarch64': 'macos-15',

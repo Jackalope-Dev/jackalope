@@ -68,6 +68,7 @@ export function managedRulesets(defaultBranch) {
             'refs/tags/stable-v*',
             'refs/tags/store-beta/v*',
             'refs/tags/store-stable/v*',
+            'refs/tags/v*',
           ],
           exclude: [],
         },

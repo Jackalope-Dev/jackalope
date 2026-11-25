@@ -160,24 +160,6 @@ for (const [name, value] of Object.entries({
   if (!variables.some((variable) => variable.name === name))
     api(`${prefix}/actions/variables`, 'POST', { name, value });
 }
-const configuredTargets = variables.find(({ name }) => name === 'CLOUD_RELEASE_TARGETS');
-if (configuredTargets) {
-  const unix = JSON.parse(configuredTargets.value).filter((target) => target !== 'windows-x86_64');
-  api(`${prefix}/actions/variables/CLOUD_RELEASE_TARGETS`, 'PATCH', {
-    name: 'CLOUD_RELEASE_TARGETS',
-    value: JSON.stringify(unix.length ? unix : unixTargets),
-  });
-}
-for (const name of ['CLOUD_ACCEPTED_TARGETS', 'CLOUD_BETA_TEST_TARGETS']) {
-  const previous = variables.find((variable) => variable.name === name);
-  if (previous)
-    api(`${prefix}/actions/variables/${name}`, 'PATCH', {
-      name,
-      value: JSON.stringify(
-        JSON.parse(previous.value).filter((target) => target !== 'windows-x86_64'),
-      ),
-    });
-}
 const distribution = variables.find(({ name }) => name === 'RELEASE_DISTRIBUTION');
 api(
   `${prefix}/actions/variables${distribution ? '/RELEASE_DISTRIBUTION' : ''}`,
