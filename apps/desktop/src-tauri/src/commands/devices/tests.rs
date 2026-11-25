@@ -513,6 +513,8 @@ fn named_builds_must_belong_to_the_workspace() {
 }
 
 #[test]
+// Reads plists with macOS tools and expects macOS paths, as the feature runs only there.
+#[cfg(target_os = "macos")]
 fn xcode_derived_data_counts_when_its_workspace_is_inside() {
     let workspace = scratch();
     let root = scratch();

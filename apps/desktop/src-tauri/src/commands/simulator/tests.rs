@@ -424,6 +424,8 @@ fn driver_answers_and_failures_parse() {
 }
 
 #[test]
+// Expects `/` separators in the joined paths.
+#[cfg(unix)]
 fn driver_runs_are_built_and_started_with_xcodebuild_arguments() {
     let build = driver::build_args(Path::new("/data/source"), Path::new("/data/derived"));
     assert_eq!(build[0], "build-for-testing");
@@ -574,6 +576,8 @@ fn running_attempt(
 }
 
 #[tokio::test]
+// Elsewhere every simulator call is refused for needing macOS before input is checked.
+#[cfg(target_os = "macos")]
 async fn the_bridge_refuses_invalid_requests_before_touching_a_device() {
     let (directory, runtime, service, run, headers) = running_attempt("invalid");
     assign(&run.id, "not-a-device");

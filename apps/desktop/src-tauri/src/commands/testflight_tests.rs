@@ -92,6 +92,8 @@ fn settings_json(root: &Path, extra: &str) -> String {
 }
 
 #[test]
+// The build-settings fixture holds macOS paths, as `xcodebuild` runs only there.
+#[cfg(unix)]
 fn the_app_targets_version_and_build_are_read() {
     let root = scratch();
     let root = root.0.as_path();
@@ -324,6 +326,8 @@ fn strings(args: Vec<OsString>) -> Vec<String> {
 }
 
 #[test]
+// Expects `/` separators in the joined paths.
+#[cfg(unix)]
 fn archive_and_export_commands_sign_with_the_key_and_keep_output_in_app_data() {
     let plan = plan(
         Path::new("/data/testflight/run/current"),
@@ -523,10 +527,12 @@ esac
         });
         let state = job.snapshot();
         assert_eq!(state.phase, Phase::Failed);
-        assert_eq!(
-            state.error.as_deref(),
-            Some("The upload failed (exit 70):\nerror: exportArchive: No signing certificate \"iOS Distribution\" found\n** EXPORT FAILED **")
-        );
+        // xcodebuild writes these to stdout and stderr, which may arrive in either order.
+        let error = state.error.as_deref().unwrap();
+        assert!(error.starts_with("The upload failed (exit 70):\n"));
+        assert!(error
+            .contains("\nerror: exportArchive: No signing certificate \"iOS Distribution\" found"));
+        assert!(error.contains("\n** EXPORT FAILED **"));
         assert!(!folder.join("key").exists());
 
         std::fs::remove_file(tools.join("fail-export")).unwrap();
